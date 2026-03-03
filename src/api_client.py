@@ -9,7 +9,6 @@ import urllib.error
 import urllib.parse
 from io import BytesIO
 from src.utils import Colors
-from src.utils import Colors
 
 logger = logging.getLogger(__name__)
 

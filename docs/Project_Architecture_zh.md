@@ -1,70 +1,244 @@
-# Illumio PCE Monitor - 專案架構
+# Illumio PCE Monitor — 專案架構與程式碼指南
 
 > **[English](Project_Architecture.md)** | **[繁體中文](Project_Architecture_zh.md)**
 
-## 概覽
-**Illumio PCE Monitor** 是一個基於 Python 的應用程式，專為與 Illumio Core REST API (V2, 支援 Illumio 25.2) 互動而設計。它提供無人值守背景監控、互動式 CLI 設定，以及輕量級的 Flask Web GUI。
-其核心目標是從 Illumio 串流獲取流量與事件日誌，利用使用者定義的門檻（連線數、頻寬、總傳輸量）進行評估，並產生告警（Webhook, Email, LINE）。
+---
+
+## 1. 系統架構概覽
+
+```mermaid
+graph TB
+    subgraph Entry["進入點"]
+        CLI["CLI 選單<br/>(main.py)"]
+        DAEMON["Daemon 迴圈<br/>(main.py)"]
+        GUI["Web GUI<br/>(gui.py)"]
+    end
+
+    subgraph Core["核心引擎"]
+        CFG["ConfigManager<br/>(config.py)"]
+        API["ApiClient<br/>(api_client.py)"]
+        ANA["Analyzer<br/>(analyzer.py)"]
+        REP["Reporter<br/>(reporter.py)"]
+    end
+
+    subgraph External["外部服務"]
+        PCE["Illumio PCE<br/>REST API v2"]
+        SMTP_SVC["SMTP 伺服器"]
+        LINE_SVC["LINE API"]
+        HOOK_SVC["Webhook 端點"]
+    end
+
+    CLI --> CFG
+    DAEMON --> CFG
+    GUI --> CFG
+    CFG --> API
+    API --> PCE
+    CFG --> ANA
+    ANA --> API
+    ANA --> REP
+    REP --> SMTP_SVC
+    REP --> LINE_SVC
+    REP --> HOOK_SVC
+```
+
+**資料流向**：進入點 → `ConfigManager`（載入規則/憑證）→ `ApiClient`（查詢 PCE）→ `Analyzer`（比對規則與回傳資料）→ `Reporter`（發送告警）。
 
 ---
 
-## 目錄與檔案結構
+## 2. 目錄結構
 
 ```text
 illumio_monitor/
+├── illumio_monitor.py     # 進入點 — 匯入並呼叫 src.main.main()
+├── config.json            # 執行時設定（憑證、規則、告警、偏好設定）
+├── state.json             # 持久化狀態（last_check 時間戳、告警歷史、已處理 ID）
+├── requirements.txt       # Python 相依套件
+│
 ├── src/
-│   ├── main.py        # 進入點。CLI 參數解析與 Daemon 迴圈管理。
-│   ├── config.py      # 管理 settings.json（憑證、載入的規則、Email 設定）。
-│   ├── api_client.py  # Illumio REST API 封裝，具備自動重試與串流特性。
-│   ├── analyzer.py    # 核心邏輯引擎，對比 API 返回資料與設定規則。
-│   ├── reporter.py    # 負責輸出和告警彙整（SMTP, Webhook, LINE APIs）。
-│   ├── gui.py         # Flask Web 應用程式路由與供前端使用的 API 後端。
-│   ├── settings.py    # CLI 互動選單，負責規則的 CRUD 操作。
-│   ├── utils.py       # 輔助函式（色彩常數、位元組字串處理）。
-│   ├── i18n.py        # 多國語言 (I18N) 翻譯字典與當前語言邏輯。
-│   ├── templates/     # 包含 HTML 前端樣板檔案（例如 index.html）。
-│   └── static/        # 包含 CSS/JS 前端檔案（預留區）。
-├── docs/              # 擷取的 API 文件與架構文件。
-├── logs/              # 應用程式執行日誌。
-└── tests/             # Pytest 框架及測試邏輯驗證。
+│   ├── __init__.py        # 套件初始化，匯出 __version__
+│   ├── main.py            # CLI 參數解析 (argparse)、Daemon 迴圈、互動選單
+│   ├── api_client.py      # Illumio REST API 客戶端（含重試與串流）
+│   ├── analyzer.py        # 規則引擎：流量比對、指標計算、狀態管理
+│   ├── reporter.py        # 告警聚合與多通道發送
+│   ├── config.py          # 設定載入/儲存、規則 CRUD、原子寫入
+│   ├── gui.py             # Flask Web 應用程式（路由、JSON API 端點）
+│   ├── settings.py        # CLI 互動選單（規則/告警設定）
+│   ├── i18n.py            # 國際化字典（EN/ZH）與語言切換
+│   ├── utils.py           # 工具函式：日誌設定、ANSI 色碼、單位格式化、CJK 寬度
+│   ├── templates/         # Jinja2 HTML 模板（Web GUI）
+│   └── static/            # CSS/JS 前端資源
+│
+├── docs/                  # 文件（本文件、使用手冊、API Cookbook）
+├── tests/                 # 單元測試 (pytest)
+├── logs/                  # 執行時日誌（輪替，10MB × 5 備份）
+└── deploy/                # 部署輔助腳本（NSSM、systemd 設定）
 ```
 
 ---
 
-## 核心元件分析
+## 3. 各模組深度分析
 
-### 1. `api_client.py` - 資料擷取
-- 完全依賴 Python 內建的 `urllib.request`（無外部 `requests` 套件相依性）。
-- 處理 Illumio 的**非同步流量查詢** (`/api/v2/orgs/{org_id}/traffic_flows/async_queries`)。
-- **記憶體最佳化：** 由於流量查詢可能返回數 GB 的資料，此元件採用 Python 產生器 (`yield`) 搭配 gzip 解壓縮逐塊傳遞資料，確保在大流量匯入時維持 O(1) 的記憶體消耗。
-- 內建指數退避 (Exponential Backoff) 重試機制，應對 API 的 429 (Rate Limits) 與 500 錯誤。
+### 3.1 `api_client.py` — REST API 客戶端
 
-### 2. `analyzer.py` - 引擎
-- 將 `api_client` 擷取的資料包與 `config.py` 中定義的規則進行驗證比對。
-- 計算即時頻寬與累計總傳輸量。
-- 透過儲存於本地的 `state.json` 評估**門檻值**與**冷卻時間**。
-- **高效能本地端過濾**：一次性向 PCE 查詢所有規則中所需的最長監控視窗，後續全部在記憶體內執行子過濾器邏輯。
-- 應用 `tempfile.mkstemp` 及 `os.replace`，確保儲存 `state.json` 時採**原子性寫入 (Atomic Writes)**，防止 Daemon 中斷造成的資料損毀。
+**職責**：與 Illumio PCE 的所有 HTTP 通訊。
 
-### 3. `reporter.py` - 告警發送子系統
-- 將監測指標分為：健康度檢查、安全事件、流量數，及傳輸量告警。
-- 針對不同輸出通道格式化內容：CLI/Log (純文字)、Webhooks (JSON 結構)、Email (HTML 表格)。
-- 具備 Webhook 保護機制，使用設定的超時限制與異常捕捉來防範外部服務斷線。
+| 方法 | API 端點 | HTTP | 用途 |
+|:---|:---|:---|:---|
+| `check_health()` | `/api/v2/health` | GET | PCE 健康狀態 |
+| `fetch_events()` | `/orgs/{id}/events` | GET | 安全稽核事件 |
+| `execute_traffic_query_stream()` | `/orgs/{id}/traffic_flows/async_queries` | POST→GET→GET | 非同步流量查詢含輪詢 |
+| `get_labels()` | `/orgs/{id}/labels` | GET | 依 key 列出標籤 |
+| `create_label()` | `/orgs/{id}/labels` | POST | 建立新標籤 |
+| `get_workload()` | `/api/v2{href}` | GET | 取得單一工作負載 |
+| `update_workload_labels()` | `/api/v2{href}` | PUT | 更新工作負載標籤集 |
+| `search_workloads()` | `/orgs/{id}/workloads` | GET | 依參數搜尋工作負載 |
 
-### 4. `gui.py` - 使用者介面
-- **後端：** 透過 Flask 提供供 AJAX 呼叫的 JSON API 端點（例如 `/api/rules`, `/api/dashboard/top10`），並整合了子程序捕捉技術，讓 Web UI 也能執行 CLI 上的「Debug 模式」。
-- **前端：** 以純淨的方式抽出為 `templates/index.html`。利用原生 JavaScript 的 `fetch()` 函式直接與 Flask 的 JSON 後端溝通。具備免重整即可切換的多國語言動態翻譯功能。
+**關鍵設計模式**：
+- **指數退避重試**：遇到 `429`（速率限制）、`502/503/504`（伺服器錯誤）自動重試，最多 3 次
+- **串流下載**：流量查詢結果（可能數 GB）以 gzip 下載，在記憶體中解壓縮，透過 Python 生成器逐行 yield — O(1) 記憶體消耗
+- **無外部相依**：僅使用 `urllib.request`（不需要 `requests` 函式庫）
 
-### 5. `tests/` - 單元驗證
-- 包含 `test_analyzer.py`，利用 `pytest` 執行全面性的測試。
-- 用以模擬 Illumio API 回傳的大量 Json 結果，藉以強制驗證邊界邏輯（例如滑動時間視窗、冷卻時間重置與進階過濾器匹配度）。
+### 3.2 `analyzer.py` — 規則引擎
+
+**職責**：根據使用者定義的規則評估 API 資料。
+
+**核心函式**：
+
+| 函式 | 用途 |
+|:---|:---|
+| `run_analysis()` | 主流程編排：健康檢查 → 事件 → 流量 → 儲存狀態 |
+| `check_flow_match()` | 評估單一流量記錄是否符合規則的篩選條件 |
+| `calculate_mbps()` | 混合頻寬計算（區間 Delta → 生命週期退回） |
+| `calculate_volume_mb()` | 資料量計算（同樣的混合方式） |
+| `query_flows()` | Web GUI 流量分析器使用的通用查詢端點 |
+| `run_debug_mode()` | 互動式診斷，顯示原始規則評估結果 |
+| `_check_cooldown()` | 透過每規則最小重新告警間隔防止告警洪水 |
+
+**狀態管理** (`state.json`)：
+- `last_check`：上次成功檢查的 ISO 時間戳 — 用作事件查詢的錨點
+- `history`：每條規則的匹配計數滾動視窗（修剪至 2 小時）
+- `alert_history`：每條規則的上次告警時間戳（冷卻機制）
+- `processed_ids`：去重緩衝區（上限 2000 筆）
+- **原子寫入**：使用 `tempfile.mkstemp()` + `os.replace()` 防止當機時損壞
+
+### 3.3 `reporter.py` — 告警發送器
+
+**職責**：格式化並透過設定的通道發送告警。
+
+**告警分類**：`health_alerts`、`event_alerts`、`traffic_alerts`、`metric_alerts`
+
+**輸出格式**：
+- **Email**：豐富的 HTML 表格，含色彩編碼的嚴重等級標章和嵌入式流量快照
+- **LINE**：純文字摘要（LINE API 字元限制）
+- **Webhook**：原始 JSON 酬載（完整結構化資料供 SOAR 擷取）
+
+### 3.4 `config.py` — 設定管理器
+
+**職責**：載入、儲存和驗證 `config.json`。
+
+- **深度合併**：使用者設定覆蓋預設值 — 缺失欄位自動補齊
+- **原子儲存**：先寫至 `.tmp` 檔案，再透過 `os.replace()` 確保當機安全
+- **規則 CRUD**：`add_or_update_rule()`、`remove_rules_by_index()`、`load_best_practices()`
+
+### 3.5 `gui.py` — Flask Web GUI
+
+**職責**：瀏覽器介面管理介面。
+
+**架構**：Flask 後端提供約 25 個 JSON API 端點，由 Vanilla JS 前端（`templates/index.html`）消費。
+
+**關鍵路由**：
+
+| 路由 | 方法 | 用途 |
+|:---|:---|:---|
+| `/api/status` | GET | Dashboard 資料（健康狀態、統計、規則） |
+| `/api/rules` | GET/POST/DELETE | 規則 CRUD |
+| `/api/dashboard/top10` | POST | 流量分析器（依頻寬/流量/連線數 Top-10） |
+| `/api/quarantine/search` | POST | 隔離用工作負載搜尋 |
+| `/api/quarantine/apply` | POST | 對工作負載套用隔離標籤 |
+| `/api/settings` | GET/PUT | 讀取/寫入應用程式設定 |
+
+### 3.6 `i18n.py` — 國際化
+
+**職責**：為所有 UI 文字提供翻譯字串。
+
+- 包含約 800 筆字典，將 key 對應至 `{"en": "...", "zh": "..."}` 鍵值對
+- `t(key, **kwargs)` 函式回傳目前語言的字串，支援變數替換
+- 語言透過 `set_language("en"|"zh")` 全域設定
 
 ---
 
-## 近期重構與 Code Review 成果
+## 4. 資料流程圖
 
-本專案架構近期經過了嚴格的 Peer Review，成果已經整合如下：
-1. **前端重構：** 已將 `gui.py` 內龐大的單體 HTML 區塊成功抽離至標準的 Jinja 架構 (`templates/index.html`)。
-2. **原子化寫入：** 在 `analyzer.py` 中引入了原子性檔案置換策略，徹底修復 `state.json` 寫入途中被強制中斷導致的毀損漏洞。
-3. **優化輪詢等待：** 移除 `main.py` Daemon 當中封閉式的 `time.sleep()` 延遲迴圈，並替換為 `threading.Event().wait()`，這使得使用者發出 SIGINT (Ctrl+C) 時，程式能立刻做出關閉反應而不是等待。
-4. **測試驅動的驗證 (Test Driven Verification)：** 成功配置了 `pytest` 測試框架，確保核心分析引擎對流量 JSON 的解析及門檻評估在日後更新時不被破壞。
+```mermaid
+sequenceDiagram
+    participant D as Daemon/CLI
+    participant C as ConfigManager
+    participant A as ApiClient
+    participant P as PCE
+    participant E as Analyzer
+    participant R as Reporter
+
+    D->>C: 載入設定與規則
+    D->>A: 初始化（憑證）
+    D->>E: run_analysis()
+
+    E->>A: check_health()
+    A->>P: GET /api/v2/health
+    P-->>A: 200 OK
+    A-->>E: 狀態
+
+    E->>A: fetch_events(last_check)
+    A->>P: GET /orgs/{id}/events?timestamp[gte]=...
+    P-->>A: 事件清單
+    A-->>E: 事件
+    E->>E: 比對事件與事件規則
+
+    E->>A: execute_traffic_query_stream(start, end, pds)
+    A->>P: POST /orgs/{id}/traffic_flows/async_queries
+    P-->>A: 202 {href, status: "queued"}
+    loop 輪詢直到完成
+        A->>P: GET /orgs/{id}/traffic_flows/async_queries/{uuid}
+        P-->>A: {status: "completed"}
+    end
+    A->>P: GET .../download
+    P-->>A: gzip 串流
+    A-->>E: yield 流量記錄
+
+    E->>E: 比對流量與 traffic/bandwidth/volume 規則
+    E->>R: 新增觸發的告警
+    E->>E: save_state()
+
+    R->>R: 格式化告警（HTML/文字/JSON）
+    R-->>D: 透過 Email/LINE/Webhook 發送
+```
+
+---
+
+## 5. 如何修改此專案
+
+### 5.1 新增規則類型
+
+1. 在 `settings.py` 中 **定義規則結構** — 建立新的 `add_xxx_menu()` 函式
+2. 在 `analyzer.py` → `run_analysis()` 中 **新增比對邏輯** — 在流量迴圈中處理新類型
+3. 在 `gui.py` 中 **新增 GUI 支援** — 為新規則類型建立 API 端點
+4. 在 `i18n.py` 中 **新增 i18n 鍵值** — 為任何新的 UI 字串新增翻譯
+
+### 5.2 新增告警通道
+
+1. 在 `config.py` → `_DEFAULT_CONFIG["alerts"]` 中 **新增設定欄位**
+2. 在 `reporter.py` 中 **實作發送器** — 建立 `_send_xxx()` 方法
+3. 在 `reporter.py` → `send_alerts()` 中 **註冊到分派器** — 加入新通道檢查
+4. 在 `gui.py` 的 **GUI 設定** 中 → `api_save_settings()` 和前端新增對應欄位
+
+### 5.3 新增 API 端點
+
+1. 在 `api_client.py` 中 **新增方法** — 遵循現有方法的模式
+2. **URL 格式**：org-scoped 端點使用 `self.base_url`，全域端點使用 `self.api_cfg['url']/api/v2`
+3. **錯誤處理**：回傳 `(status, body)` 元組，讓呼叫端處理特定狀態碼
+4. **參考** `docs/REST_APIs_25_2.txt` 取得端點 Schema
+
+### 5.4 新增 i18n 語言
+
+1. 在 `i18n.py` 的字典中，為每筆項目新增語言代碼（與 `"en"` 和 `"zh"` 並列）
+2. 在 `gui.py` → settings 端點中新增語言選項
+3. 更新 `config.py` 預設值以包含新語言代碼

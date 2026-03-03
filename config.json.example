@@ -1,0 +1,87 @@
+{
+    "api": {
+        "url": "https://pce.example.com:8443",
+        "org_id": "1",
+        "key": "api_xxxxxxxxxxxxxx",
+        "secret": "your-api-secret-here",
+        "verify_ssl": true
+    },
+    "alerts": {
+        "active": ["mail"],
+        "line_channel_access_token": "",
+        "line_target_id": "",
+        "webhook_url": "",
+        "line_token": ""
+    },
+    "email": {
+        "sender": "pce-monitor@example.com",
+        "recipients": [
+            "soc-team@example.com"
+        ]
+    },
+    "smtp": {
+        "host": "smtp.example.com",
+        "port": 587,
+        "user": "",
+        "password": "",
+        "enable_auth": true,
+        "enable_tls": true
+    },
+    "settings": {
+        "enable_health_check": true,
+        "language": "en",
+        "theme": "light",
+        "dashboard_queries": [
+            {
+                "name": "Total Volume",
+                "rank_by": "volume",
+                "pd": 3,
+                "port": null,
+                "proto": null,
+                "src_label": null,
+                "dst_label": null,
+                "src_ip_in": null,
+                "dst_ip_in": null,
+                "ex_port": null,
+                "ex_src_label": null,
+                "ex_dst_label": null,
+                "ex_src_ip": null,
+                "ex_dst_ip": null
+            },
+            {
+                "name": "Top Bandwidth",
+                "rank_by": "bandwidth",
+                "pd": 3,
+                "port": null,
+                "proto": null,
+                "src_label": null,
+                "dst_label": null,
+                "src_ip_in": null,
+                "dst_ip_in": null,
+                "ex_port": null,
+                "ex_src_label": null,
+                "ex_dst_label": null,
+                "ex_src_ip": null,
+                "ex_dst_ip": null
+            },
+            {
+                "name": "Blocked Traffic",
+                "rank_by": "count",
+                "pd": 2,
+                "port": null,
+                "proto": null,
+                "src_label": null,
+                "dst_label": null,
+                "src_ip_in": null,
+                "dst_ip_in": null,
+                "ex_port": null,
+                "ex_src_label": null,
+                "ex_dst_label": null,
+                "ex_src_ip": null,
+                "ex_dst_ip": null
+            }
+        ],
+        "timezone": "local"
+    },
+    "rules": []
+}
