@@ -1,0 +1,6679 @@
+[
+  {
+    "href": "/orgs/1/events/41b892f8-87f6-4be7-bf08-5dff9c795955",
+    "timestamp": "2026-03-08T16:33:34.457Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "agent": {
+        "href": "/orgs/1/agents/1038",
+        "hostname": "pce.lab.local"
+      },
+      "ven": {
+        "href": "/orgs/1/vens/43aa3c2b-acb5-491a-acfa-52fc67755f86",
+        "hostname": "pce.lab.local"
+      }
+    },
+    "event_type": "agent.tampering",
+    "status": "success",
+    "severity": "err",
+    "action": {
+      "uuid": "63e742b6-ff0e-4a4f-87b1-33b61384ccda",
+      "api_endpoint": "FILTERED",
+      "api_method": "PUT",
+      "http_status_code": 204,
+      "src_ip": "172.16.15.130"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "5dab0cd9-8c23-4251-ad16-79a3b99231c1",
+        "notification_type": "workload.oob_policy_changes",
+        "info": {
+          "tampering_revert_succeeded": true,
+          "beginning_timestamp": "2026-03-08T16:33:34Z",
+          "ending_timestamp": "2026-03-08T16:33:34Z",
+          "num_events": 1
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/2bd818a6-5f2c-4a92-9ecb-36441eef4fd6",
+    "timestamp": "2026-03-08T16:31:23.669Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "0f599596-5a89-4dbe-aca9-fe2bf03c7c23",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "a8efd0bc-7c4f-45b7-bdfa-f003f93621b5",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/33c9dbbd-1813-4736-860d-3d51b26f7e80",
+    "timestamp": "2026-03-08T16:30:58.164Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "a364391e-c26a-4bea-a533-5d1790e4d0ca",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "de2fc65c-7956-47e2-b8f7-24e8e308c4e5",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/15384feb-430b-4092-94a7-bf51d037ddad",
+    "timestamp": "2026-03-08T16:30:56.513Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "63e60450-6ec8-4961-accf-a7173e085be7",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/586307b9-f794-4cc3-bc02-d8e409d98154",
+    "timestamp": "2026-03-08T16:30:56.501Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "1514ff72-5cd3-4c82-9200-559579bccb89",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/27003ba8-4242-4964-86fc-a296a58e2621",
+    "timestamp": "2026-03-08T16:30:56.492Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "8f78205b-d0d0-4633-be26-318ca2d14037",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/09bc88e4-1343-4fce-9b46-b6513e6edc28",
+    "timestamp": "2026-03-08T16:30:56.480Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "291155de-3b8d-42d0-8b27-9abc0e8b96f1",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/038a162e-25f2-4978-bb49-46130e183ec7",
+    "timestamp": "2026-03-08T16:30:10.086Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "e253cf68-b8f3-4835-b385-bb90d3685245",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "cfe77bd4-ca5f-431a-a2d9-206cf4ed1372",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/0565f67e-a647-4bf8-8d06-eff927649012",
+    "timestamp": "2026-03-08T16:29:37.525Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "49cf8355-8d23-47df-ab20-1e071e3ec7cb",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "c2cb9ef6-a735-43da-acaa-2ea7a29301da",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/51c5601e-cec4-45a3-93bf-cd88f91af6f9",
+    "timestamp": "2026-03-08T16:29:28.599Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.sign_in",
+    "status": "failure",
+    "severity": "info",
+    "action": {
+      "uuid": "bb375e6b-ee1a-47f4-977c-d0c98fa85233",
+      "api_endpoint": "/login/users/sign_in",
+      "api_method": "POST",
+      "http_status_code": 200,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [
+      {
+        "uuid": "479168d6-8e66-4a66-9dda-86c319742f07",
+        "resource": {
+          "user": {
+            "href": "/users/11",
+            "type": "local",
+            "username": "admin@lab.local"
+          }
+        },
+        "changes": {
+          "last_failed_at": {
+            "before": "2026-03-08T16:14:04.316Z",
+            "after": "2026-03-08T16:29:28.590Z"
+          }
+        },
+        "change_type": "update"
+      }
+    ],
+    "notifications": [
+      {
+        "uuid": "5f13b4c6-78ca-4fd6-9fb1-85afa4002f05",
+        "notification_type": "user.login_failed",
+        "info": {
+          "associated_user": {
+            "supplied_username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/6d384f0d-1ded-40a9-be0c-02f604691883",
+    "timestamp": "2026-03-08T16:29:13.530Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "67f557ac-84f1-4dda-bd15-0e052d7221b7",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "1bdc4695-3cc3-4b7a-a64f-bc109ebbdd36",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/ded08821-d8f3-4e86-8d3a-df3951cd71e8",
+    "timestamp": "2026-03-08T16:25:59.493Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.sign_in",
+    "status": "failure",
+    "severity": "info",
+    "action": {
+      "uuid": "901a2162-9072-4201-a8ba-4854f5cb7c1f",
+      "api_endpoint": "/login/users/sign_in",
+      "api_method": "POST",
+      "http_status_code": 200,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "5f48a75c-c7a4-48b4-8bba-af29a9cc1236",
+        "notification_type": "user.login_failed",
+        "info": {
+          "associated_user": {
+            "supplied_username": "dsfsdf"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/c4e941e7-205a-4e67-bf75-54147a4aa36e",
+    "timestamp": "2026-03-08T16:25:07.202Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "14f6d0eb-956d-4f33-855f-b40daeabc143",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "1c3586bd-2546-4661-9313-60020c966b3e",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/ef027c4c-acdb-4c78-89b1-e05a6785329b",
+    "timestamp": "2026-03-08T16:24:56.319Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "5b3c4538-11d8-4484-9567-ee619c47c642",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/309c3166-0f92-460f-9867-f1c7181c4286",
+    "timestamp": "2026-03-08T16:21:56.261Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "b94178b4-5133-4e24-bfbe-331fb7506abf",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/062b794f-00ed-4273-8b57-bac182197904",
+    "timestamp": "2026-03-08T16:20:04.105Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "a58b1fe0-9029-474b-9e4a-aca094e54cf3",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "88be8495-dfb0-40f1-8428-2b99cd5bcb87",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/0e3f6040-d92f-4cb4-9389-6172f1f058ad",
+    "timestamp": "2026-03-08T16:15:56.173Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "09570def-5caa-47a6-86f2-170235885a72",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/5437cb9f-3da4-458f-a154-4effeda60b8f",
+    "timestamp": "2026-03-08T16:15:00.926Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "6a28d6db-a5ca-49ea-93fc-8d4a3b8a4e91",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "f6b648bd-45ab-42d4-8c26-cbf7eb798661",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/4d519cab-16b8-46e0-a135-1ea7b550d345",
+    "timestamp": "2026-03-08T16:14:21.106Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "5705f4dc-352f-4f00-880d-a9a27803ee48",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "0ffd47c6-9ee3-49b2-8f11-43c89dc547dc",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/687c3df4-e7fe-48d9-a039-af3f99bd9bb9",
+    "timestamp": "2026-03-08T16:14:13.001Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "0e8a8ce9-4b0c-491b-b685-cb8d6b07ba7f",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "f628cf38-7c8b-40be-983c-6286f9313e0b",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/d81b201a-8a2d-45af-ab0d-d9d2b5b83606",
+    "timestamp": "2026-03-08T16:14:04.325Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.sign_in",
+    "status": "failure",
+    "severity": "info",
+    "action": {
+      "uuid": "90848c58-ac2a-4f1b-9164-8256adf0185d",
+      "api_endpoint": "/login/users/sign_in",
+      "api_method": "POST",
+      "http_status_code": 200,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [
+      {
+        "uuid": "558b10fd-b46b-4856-ba1d-ab3980e86deb",
+        "resource": {
+          "user": {
+            "href": "/users/11",
+            "type": "local",
+            "username": "admin@lab.local"
+          }
+        },
+        "changes": {
+          "last_failed_at": {
+            "before": "2026-03-08T15:21:08.002Z",
+            "after": "2026-03-08T16:14:04.316Z"
+          }
+        },
+        "change_type": "update"
+      }
+    ],
+    "notifications": [
+      {
+        "uuid": "58830e5a-96eb-480c-8e75-01580ae47592",
+        "notification_type": "user.login_failed",
+        "info": {
+          "associated_user": {
+            "supplied_username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/489dbe8f-1be3-42df-b740-1114bf620bc1",
+    "timestamp": "2026-03-08T16:13:42.948Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "97c34f82-693a-4018-ae3a-62b2a110a637",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "ccddb424-f253-4b29-9a39-0e9ef467a1b1",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/400670da-4f7b-4853-9a8a-b2eff95f916c",
+    "timestamp": "2026-03-08T16:13:35.928Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.sign_in",
+    "status": "failure",
+    "severity": "info",
+    "action": {
+      "uuid": "d105a566-b885-451d-91e2-53698365bf4e",
+      "api_endpoint": "/login/users/sign_in",
+      "api_method": "POST",
+      "http_status_code": 200,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "b2826c59-093c-4ad4-ad45-802ed69477c7",
+        "notification_type": "user.login_failed",
+        "info": {
+          "associated_user": {
+            "supplied_username": "eeeeeeeeeeeeeeee"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/da2923f8-1110-4305-84dc-e37fc409d8a1",
+    "timestamp": "2026-03-08T16:12:31.958Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "c15ebf87-4e6c-490b-82aa-16e6ef491d67",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "35c300b8-35e4-420e-895f-ce5c782baad1",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/c2ed9a4d-17bf-4939-a7e8-b0b7f94b2782",
+    "timestamp": "2026-03-08T16:09:58.617Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "fa6912a1-f051-41a8-a65e-384d49273ba4",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "c2443f22-5705-4609-aa02-06d22e6f8dd4",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/69cc4e80-7af3-4579-9308-1d586f4d143a",
+    "timestamp": "2026-03-08T16:09:56.018Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "7b1a4d32-22b4-4952-aa11-a84c9e9a0f71",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/05303862-8886-4087-a4f6-d56a52bbed08",
+    "timestamp": "2026-03-08T16:06:55.954Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "bdb6c600-593d-4342-88ec-506fd7692213",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/12cc4cfe-b707-4cbd-b5ac-f3cb04de93e3",
+    "timestamp": "2026-03-08T16:04:55.306Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "26476d50-77e9-4b51-87f1-de0ad7fff299",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "70c31acc-5d87-4a27-a2bb-984fa34b4a0d",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/6a6c8244-e965-48f8-b2fa-72453af26f01",
+    "timestamp": "2026-03-08T16:00:55.849Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "0c3ba170-964e-469a-8f23-23fbb9c8a9f8",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/9400ab58-9759-4c0f-aa45-0d753b588abc",
+    "timestamp": "2026-03-08T16:00:42.707Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "1fcb2dbd-7200-4738-a6a1-a1a74c2fd7e1",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "d7ca7d93-7fcc-4c6b-8720-4da51dccee5e",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/6b5620d3-f200-4a38-a580-1c6f0b187cc8",
+    "timestamp": "2026-03-08T16:00:34.023Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "9f724744-e11f-4399-9d5d-d4b926afe3f2",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "fd9950b8-6ef0-4341-b7fb-29c880cf34c4",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/89c65e08-a181-442b-a0b7-677dd9ba7971",
+    "timestamp": "2026-03-08T16:00:27.842Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.sign_in",
+    "status": "failure",
+    "severity": "info",
+    "action": {
+      "uuid": "f3f4e0b2-01b5-4b7f-97ac-00a49e742238",
+      "api_endpoint": "/login/users/sign_in",
+      "api_method": "POST",
+      "http_status_code": 200,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "2aae8e67-ff2f-4187-9112-ce84856b0828",
+        "notification_type": "user.login_failed",
+        "info": {
+          "associated_user": {
+            "supplied_username": "dsfsd@sdfsdf"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/b4cac695-180d-4db6-ac45-6f81bf258ab4",
+    "timestamp": "2026-03-08T15:59:53.803Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "cf01fc61-483c-401a-a83b-6660c083e295",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "71ad76a8-b906-4f69-8416-662722ecf1e8",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/aa6dc31d-3a4a-456e-babc-4a6496c35ee6",
+    "timestamp": "2026-03-08T15:59:26.020Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "d5a509b4-5a66-4227-925f-b322382d59f7",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "fab76d6c-bfd1-44aa-b5a8-13ce12038aeb",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/dc886a57-884c-4f17-be5f-2bdd7ba1f5f0",
+    "timestamp": "2026-03-08T15:54:55.688Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "071d42cc-80c1-484f-8c0a-1313c071acad",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/95722e89-eea2-4cd9-b3e4-1ba59822b77b",
+    "timestamp": "2026-03-08T15:54:51.694Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "635ed8d4-fe04-4fd3-b076-eac0a6517894",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "9b8e9ef0-3dde-4880-89b8-72253a1fa705",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/7e884f94-c3e4-475f-a784-3080a9eee5d4",
+    "timestamp": "2026-03-08T15:49:48.762Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "eed93f9a-d2e2-4792-a10e-4292995dc888",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "ff097b00-04c1-4e7f-9bd0-965507ab9bd8",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/b5587916-cb1c-4069-aed6-f8516d26eaa2",
+    "timestamp": "2026-03-08T15:44:46.420Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "822a2884-47b3-446b-aa99-1cd5b0a77742",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "bbfbfec9-bdd7-43b8-8506-636cc73b9fa0",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/105c1453-d2a8-4d48-afd4-cd25d0791c18",
+    "timestamp": "2026-03-08T15:39:43.666Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "a242c6a1-12c5-4c71-9f23-adc22da8ed6a",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "9888fe3c-b2f2-4571-86d5-9979ac7b2b45",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/476281df-7507-4830-9a6c-4de68944eb21",
+    "timestamp": "2026-03-08T15:34:40.907Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "69f381ae-9b44-4542-826b-9cd312a3d31d",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "06eab83e-e72d-4a32-bdc7-f1dfbdbacde7",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8e06af63-76a6-4bf2-b3c2-eb747d7647c9",
+    "timestamp": "2026-03-08T15:29:39.100Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "61853d69-1513-4160-88f2-62e711ab7d60",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "069bb00c-3b19-4c45-8c5f-7687cade8de7",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8ca22986-1339-4f69-a588-403ae593d28f",
+    "timestamp": "2026-03-08T15:24:35.748Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "85e67064-744e-4f4b-b0bb-2482149fc638",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "2c41651b-4269-46a3-992a-fd332c3b6887",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/76a3dd6a-9415-4f4a-9ea7-085ba07ef51c",
+    "timestamp": "2026-03-08T15:21:08.013Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.sign_in",
+    "status": "failure",
+    "severity": "info",
+    "action": {
+      "uuid": "c0167934-db13-42c4-9446-12e16f23a3cb",
+      "api_endpoint": "/login/users/sign_in",
+      "api_method": "POST",
+      "http_status_code": 200,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [
+      {
+        "uuid": "48068076-2b6b-4d69-9118-4828db6da8a9",
+        "resource": {
+          "user": {
+            "href": "/users/11",
+            "type": "local",
+            "username": "admin@lab.local"
+          }
+        },
+        "changes": {
+          "last_failed_at": {
+            "before": null,
+            "after": "2026-03-08T15:21:08.002Z"
+          }
+        },
+        "change_type": "update"
+      }
+    ],
+    "notifications": [
+      {
+        "uuid": "2758762d-9aa9-4386-9a0c-c0f385c772a3",
+        "notification_type": "user.login_failed",
+        "info": {
+          "associated_user": {
+            "supplied_username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/system_events/e9a9f67a-e5bf-4a2c-b0e2-3fca7ad2f3ce",
+    "timestamp": "2026-03-08T15:20:59.894Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.logout",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "1cdfcb46-0e13-4b6b-94b8-5ad79114999b",
+      "api_endpoint": "/api/v2/users/logout_from_jwt",
+      "api_method": "POST",
+      "http_status_code": 204,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "44d9fa55-fb22-49fd-9503-d8704ce0e238",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/83490f0a-e518-49ef-9451-12ce93138984",
+    "timestamp": "2026-03-08T15:20:59.813Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.sign_out",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "c9ace6ca-5018-4f6e-b15f-aaed8ac67819",
+      "api_endpoint": "/login/logout",
+      "api_method": "GET",
+      "http_status_code": 302,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "e5d643a4-10bb-445a-bd4b-72933a25aa20",
+        "notification_type": "user.login_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8cb3d9b3-4e81-46bb-a9be-6eda10988acf",
+    "timestamp": "2026-03-08T15:20:59.656Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.logout",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "252b4d2f-7cd3-4e63-ad91-18255ce4f4d2",
+      "api_endpoint": "/api/v2/users/11/logout",
+      "api_method": "PUT",
+      "http_status_code": 204,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "24fc373e-3d65-47e1-919a-b6fd034dbeaf",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/05a3ffc3-eba9-4211-bf9d-ba1089269c79",
+    "timestamp": "2026-03-08T15:20:56.872Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.login",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "efe504ec-9910-45cc-90ec-d43119e9778e",
+      "api_endpoint": "/api/v2/users/login",
+      "api_method": "GET",
+      "http_status_code": 200,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "a151f4fa-c7ce-406b-ad83-a6ff550ddcbe",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8f479d1c-9925-4b9f-83d9-1b5f2060f31e",
+    "timestamp": "2026-03-08T15:20:56.434Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.sign_in",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "b1703027-255b-4997-bb48-8027620aba59",
+      "api_endpoint": "/login/users/sign_in",
+      "api_method": "POST",
+      "http_status_code": 302,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [
+      {
+        "uuid": "cedc1650-b403-4c7c-8c8b-4d4f1a99aed9",
+        "resource": {
+          "user": {
+            "href": "/users/11",
+            "type": "local",
+            "username": "admin@lab.local"
+          }
+        },
+        "changes": {
+          "sign_in_attempts_count": {
+            "before": 100,
+            "after": 101
+          }
+        },
+        "change_type": "update"
+      }
+    ],
+    "notifications": [
+      {
+        "uuid": "da678056-c445-44fe-b5ca-2a41704ddddd",
+        "notification_type": "user.login_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "type": "local",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/bdd9dddf-3cd1-412c-8499-a81eb7fd1882",
+    "timestamp": "2026-03-08T15:20:51.427Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.sign_in",
+    "status": "failure",
+    "severity": "info",
+    "action": {
+      "uuid": "cb9af6ef-73e1-4c80-a9f0-50fec59969c9",
+      "api_endpoint": "/login/users/sign_in",
+      "api_method": "POST",
+      "http_status_code": 200,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "d1c4029c-90fc-4042-98c2-4c5029fab8e4",
+        "notification_type": "user.login_failed",
+        "info": {
+          "associated_user": {
+            "supplied_username": "qweqwe"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/system_events/ca84117f-6130-4f1a-ae1f-3cc4db24cc96",
+    "timestamp": "2026-03-08T15:20:47.807Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.login",
+    "status": "failure",
+    "severity": "err",
+    "action": {
+      "uuid": "91e7b1a6-c076-462f-8e7c-dd25e5b54ea6",
+      "api_endpoint": "/api/v2/users/login",
+      "api_method": "GET",
+      "http_status_code": 401,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "da743cee-2315-4afe-9cf2-10f8ab5ebef7",
+        "notification_type": "request.authentication_failed",
+        "info": {
+          "api_endpoint": "/api/v2/users/login",
+          "api_method": "GET",
+          "src_ip": "192.168.20.30"
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/1f2da135-a111-4d98-b7d7-684451f400ad",
+    "timestamp": "2026-03-08T15:19:33.428Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "50923805-e7f6-450c-a7ac-f784b9d484b4",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "7c701678-2bf7-4ee2-bb0f-d0f5b22919c6",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/4d4801ee-7581-418d-a8fe-a936b9dc1803",
+    "timestamp": "2026-03-08T15:15:54.803Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "a6b66e0d-d0f3-40f6-8aef-994053b0ebf8",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/9139b786-bba0-451c-a1da-bb3226043ebd",
+    "timestamp": "2026-03-08T15:09:54.700Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "8018f6af-3f70-4533-acab-2befe4e763dd",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/af2f486e-1f75-4328-91bd-88cec4cfec95",
+    "timestamp": "2026-03-08T15:09:54.690Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "f3658261-b51a-42cd-bb9d-92e9c47cb6de",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/30836bf5-5daf-4eed-afeb-6e07a35d3a46",
+    "timestamp": "2026-03-08T15:06:54.642Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "485fc243-e07a-4ca5-a384-cf2d980814bd",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/aa59e9ce-147b-4a2f-8086-e725c7e34e34",
+    "timestamp": "2026-03-08T15:06:54.630Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "f97936ef-e81b-4d15-8627-48a201b5b4a9",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/f96b77a4-593e-4554-8a85-ba3860c23f95",
+    "timestamp": "2026-03-08T15:03:54.550Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "b68b9f25-25ed-4579-bdd8-74b599102852",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/6a49f19c-69ca-4536-8067-f40038ec95e7",
+    "timestamp": "2026-03-08T15:00:54.505Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "8cb8aac8-f69f-4477-bec4-915fec1831df",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/d43739ca-08f5-4ab3-a930-f8cbdd34f12d",
+    "timestamp": "2026-03-08T15:00:54.495Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "ddb994d4-479c-4db1-a8ea-7de30f3a77dd",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/420fbdbb-1d77-429e-86e1-239b3610a465",
+    "timestamp": "2026-03-08T14:57:54.416Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "dc871be9-0a0c-4a46-8786-d7a636570f0b",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/41aaeb7d-c664-4d8b-984c-5a30a6129886",
+    "timestamp": "2026-03-08T14:57:54.406Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "321bc381-60ae-4b6f-be6f-0235dffe1b7f",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/1ac132cd-b30d-463d-bb27-576f296810b9",
+    "timestamp": "2026-03-08T14:54:54.307Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "fb424c3a-c38d-4821-919d-4fafce5db96c",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/41a2e38c-57e5-47a7-929b-2f7e40adb6d3",
+    "timestamp": "2026-03-08T14:45:37.062Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "1845c010-49a0-4224-aa4c-d4167cf370c0",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "a67c3014-d325-4ff7-bd75-c78e5c092da5",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/1dcda87d-4d45-4f06-bcd6-5d40f721aa55",
+    "timestamp": "2026-03-08T14:42:53.958Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "c18d9e2c-214e-4b73-b2db-20919ce39771",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/03f2740b-4be2-482b-bdde-2647fc7a582a",
+    "timestamp": "2026-03-08T14:37:21.452Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "0f7ae267-ef48-4141-84c3-2670c4981263",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "35661c3f-81b6-475e-a463-38b21387aad7",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/e80db877-b7d0-4199-b678-1c167eb24d42",
+    "timestamp": "2026-03-08T14:37:05.420Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "ddb88026-840b-4e8c-9524-03cd3814ad9e",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "121ce1ef-02d2-4ab7-8ee8-ccfea9ed9549",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/0f35dcf9-f827-4490-954d-3edb5a3bbd1c",
+    "timestamp": "2026-03-08T14:35:14.669Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "e29b7305-f1a4-4be2-981a-bc998a6b9323",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "f4a00086-c640-4331-9a56-f39c44ebcd74",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/26e8e994-e585-4bfd-abb3-08a00ec9d5ad",
+    "timestamp": "2026-03-08T14:34:17.936Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "30e4f376-81de-43d4-a574-9166aadfe745",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "fdb0f4cd-63a2-45d4-97df-9f6089b843c2",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/system_events/b214bcda-22bd-4ea7-8a14-4d6fd9675a6e",
+    "timestamp": "2026-03-08T14:32:41.678Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "request.authentication_failed",
+    "status": "failure",
+    "severity": "err",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "cba61a36-bfcc-4f07-86cb-a4f652779758",
+        "notification_type": "request.authentication_failed",
+        "info": {
+          "api_endpoint": "/api/v2/health",
+          "api_method": "GET",
+          "src_ip": "192.168.20.30"
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/189277b6-583d-4c9a-bac0-faf76ffe722c",
+    "timestamp": "2026-03-08T14:31:24.118Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "a0aa40b1-e026-4a1e-a020-6b1ca824a4ea",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "63ce148f-1a0b-4a32-8168-ae569f2c670d",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/eafdded6-62eb-4f6a-9d31-93f13c877361",
+    "timestamp": "2026-03-08T14:28:21.686Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "7fd72dda-c6ff-47b8-93d3-92a8eff83808",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "acef72ca-77db-4faf-92be-8ad065d38732",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/bb8f8360-5de8-4706-a821-0e264789f4e3",
+    "timestamp": "2026-03-08T14:27:53.906Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "1a2d7b71-5c08-4672-a377-77dabcef0f2f",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "16bc4b54-ed57-46c8-ac18-172181e76295",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/c53efad1-759e-4293-857b-f6e08149d8cd",
+    "timestamp": "2026-03-08T14:27:41.486Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "08de9925-9626-4712-9fe0-f3408f3d2833",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "429d5d70-2437-4aa3-a3bf-cdb7ae27176a",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/b81550d4-262e-4a8f-b0ca-b28f8f0536c4",
+    "timestamp": "2026-03-08T14:24:53.726Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "109cecae-0564-421f-9c97-d5fa5bddfd31",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "f20f8f27-16b0-45ea-a54a-ebe1edef0f13",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/b2a6c2ac-4507-4199-83d3-040a5f6f10c7",
+    "timestamp": "2026-03-08T14:24:38.751Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "1db61262-198a-4679-bcf9-f6e921c280af",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "997ff59f-f18b-424a-891a-173fe5feb364",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/ada4f739-cdc8-4be3-8e90-8c3cdf2c2262",
+    "timestamp": "2026-03-08T14:12:19.584Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "3cd2a0f5-3cba-4bf5-87fd-55963220906c",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "12302fda-bfdb-4be7-88a2-930094a76dc0",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/ac5f0370-f83e-4a1b-b0de-ab6b9c603b16",
+    "timestamp": "2026-03-08T14:11:52.456Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.sign_out",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "1fa4932f-f84e-4dbc-a834-9aec859d1262",
+      "api_endpoint": "/login/logout",
+      "api_method": "GET",
+      "http_status_code": 302,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": []
+  },
+  {
+    "href": "/system_events/7a45cd42-d1b2-460c-93a6-1c29c3e453db",
+    "timestamp": "2026-03-08T14:11:52.331Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.logout",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "88334cab-21fd-431a-8a9d-c7e566546e58",
+      "api_endpoint": "/api/v2/users/logout_from_jwt",
+      "api_method": "POST",
+      "http_status_code": 204,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "d71e1e9e-d060-4340-bd65-6b671433afd5",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      },
+      {
+        "uuid": "b74057ed-9215-47ed-86ba-0901c955bfdf",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      },
+      {
+        "uuid": "b10ef061-3b55-46a0-b5fb-9ebd3c3d1e67",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      },
+      {
+        "uuid": "f96cf9af-a388-451e-9367-dbeb20d90a1e",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      },
+      {
+        "uuid": "1abb6f85-b9d0-43ea-ac4a-9d3c1de71c34",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      },
+      {
+        "uuid": "ffa7c939-601c-4a5f-8094-07f9fa3e3ecf",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      },
+      {
+        "uuid": "dbf36d40-27f0-4a9a-bcb6-7e39897b97d2",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/13dd4425-24ac-4568-9125-ad8d457499dc",
+    "timestamp": "2026-03-08T14:11:52.204Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.logout",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "dcb524a8-8a8d-458c-b0fd-607f27fbcbf5",
+      "api_endpoint": "/api/v2/users/11/logout",
+      "api_method": "PUT",
+      "http_status_code": 204,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "743b3814-c3bd-41ea-b1ad-2f23d22bd161",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/13de3b97-fe6d-409f-b1b4-0640f06d68b5",
+    "timestamp": "2026-03-08T14:10:02.046Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "6b16072e-a18a-441d-ad8e-99f869289253",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "19b1d8f2-356d-4a23-8194-94df5ec08575",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/9c544a4f-46b9-4750-bcbe-b538677ef37f",
+    "timestamp": "2026-03-08T14:09:53.223Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "8dbcecf3-3806-47c5-8a42-668fb87e0988",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/4ac5ad04-42ad-40cf-8803-dd10bd9cc5ce",
+    "timestamp": "2026-03-08T14:09:53.212Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "29f4f924-25a5-4f75-87b1-2a292268d7e4",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/3a9413b3-8d4b-49a2-bdba-8e3ded214479",
+    "timestamp": "2026-03-08T14:09:53.199Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "0e653505-b224-4429-bd7a-536603f325cf",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/0346e32e-bf57-4483-b3f4-f7dcac51a2c3",
+    "timestamp": "2026-03-08T14:09:38.957Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "f5ae2a45-a142-4978-8853-21c73f42d80e",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "db8c1c10-4f34-4ac8-a927-8662a41e0832",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/c36836ff-d861-4af5-9995-e10ce5cded45",
+    "timestamp": "2026-03-08T14:08:51.971Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "ad544ae1-2f17-4cbc-b7a8-78d7525c1b75",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "8730bbe6-6be9-42f2-9339-bb02dd87ff1f",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/4c8d6026-cefe-4647-bf61-9f48180df3e2",
+    "timestamp": "2026-03-08T14:07:47.076Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "342d135f-4eb6-44a9-b625-0783c1c50226",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "65e4fdfa-d3cc-4d22-bf41-dbeac79793a9",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/3275b080-3c1f-4744-bcf2-b7dd4d563a54",
+    "timestamp": "2026-03-08T14:06:53.156Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "f7f078a2-09d0-4291-ad69-2c086d93a37c",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/1165c3a6-e448-4823-8e98-7254009c78c3",
+    "timestamp": "2026-03-08T14:06:53.145Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "98823c3c-f584-4091-bfcc-5761a86deeed",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8dd6dc99-fb41-4fc3-b0db-e9ae470198d6",
+    "timestamp": "2026-03-08T14:06:53.135Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "eadfc3d7-8557-47c6-ac10-50c9e4f1688e",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/2afb072a-84ef-4c34-9ac3-7d96f7b45266",
+    "timestamp": "2026-03-08T14:06:53.124Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "03f6adeb-8ce6-460a-8bec-c612185c030d",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/dcd6dc3a-4e50-4389-a815-c34a8ad898e5",
+    "timestamp": "2026-03-08T14:06:52.861Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "54f69e1e-b720-424f-a868-a4bdd440a5cd",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "c97ea629-81dd-4072-abb6-2fb436516d12",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/ed9ba2df-c68e-432d-a211-bc6eba6f08da",
+    "timestamp": "2026-03-08T14:02:47.350Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "b8398f9a-cee3-4927-bbd4-12c8e3a09fec",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "2fcc9e5f-0fd2-4d2d-8cae-61007cef2a74",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/a2d4066d-7745-4200-be41-a1e808bfe86a",
+    "timestamp": "2026-03-08T13:56:38.949Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "d792d926-088e-4262-9e81-19b21e866556",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "716673a2-25ed-479d-ba87-4dfd2208f026",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/64dfadcc-910d-495e-a9e6-2a8a65355608",
+    "timestamp": "2026-03-08T13:54:52.842Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "a8545afc-ebe8-42c7-b9b9-3175297e8990",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/43a86a94-f8bf-49d7-a5c0-3d2d9408c71d",
+    "timestamp": "2026-03-08T13:48:52.739Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "77edba9e-9322-4252-9ec8-45847f0d6836",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/d2a76991-09dc-4b10-8926-7bbf796fef0f",
+    "timestamp": "2026-03-08T13:48:52.728Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "9728d9e4-9c51-4814-9ef0-257d9cd3af2f",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/857e6151-7340-450c-b3e4-d3d82ddd20ee",
+    "timestamp": "2026-03-08T13:45:52.708Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "afcae9a1-f9a6-4c69-9445-9774002ceabd",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/41bdbe35-fa11-43e5-9b4c-19c638a66731",
+    "timestamp": "2026-03-08T13:45:52.699Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "112d01e4-a108-4175-98c2-810b9aae7c32",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/d34d8954-4240-48fe-b21f-16cf7ae7e988",
+    "timestamp": "2026-03-08T13:45:52.691Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "8fb86386-4dc5-428a-b530-914f19ce2851",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/0d1aebad-ca5f-4a01-a5db-56668a3ef966",
+    "timestamp": "2026-03-08T13:45:52.681Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "cfd409f9-8dd5-453a-abbb-66904e586d44",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/3c090f43-bc92-495d-8e7f-575871aff798",
+    "timestamp": "2026-03-08T13:39:52.491Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "427c3882-f8a5-428d-b387-eede647e5138",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/803c3494-0b2c-4fa1-976b-150238616212",
+    "timestamp": "2026-03-08T13:38:14.165Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "5b967fa7-e912-4380-a793-589aef4c661b",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "ebe7b0ae-6657-4feb-9fcb-cbe0dfca9920",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8306a359-346c-4a92-bb93-b257e0f92367",
+    "timestamp": "2026-03-08T13:37:35.882Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "2a8f9fbd-5fd2-4b19-9508-11feb342a8d6",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "4572a629-351c-4604-bb41-acf0dbf8f067",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/b93a9928-ec7d-470d-9b5e-3f4db211b548",
+    "timestamp": "2026-03-08T13:37:16.229Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "fac11196-20eb-4ca3-99f2-cd961eade520",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "66e48e69-0db4-45fd-872f-356ea7d8f52c",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/f4d453c5-5f40-4be5-b8d7-513881c7c06a",
+    "timestamp": "2026-03-08T13:36:21.244Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.login",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "bacf01b5-910c-43be-ab83-797cd13e8f95",
+      "api_endpoint": "/api/v2/users/login",
+      "api_method": "GET",
+      "http_status_code": 200,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "dafb34d8-b035-4cfb-9567-115160f17ba8",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/ff185d99-ba12-4605-a53f-9f6f6c4ef8e4",
+    "timestamp": "2026-03-08T13:36:20.705Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.sign_in",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "4921a55b-cb51-41a5-ac8a-5da6e8deab46",
+      "api_endpoint": "/login/users/sign_in",
+      "api_method": "POST",
+      "http_status_code": 302,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [
+      {
+        "uuid": "74fa0d77-fdd6-4b35-a629-ae6524e13af2",
+        "resource": {
+          "user": {
+            "href": "/users/11",
+            "type": "local",
+            "username": "admin@lab.local"
+          }
+        },
+        "changes": {
+          "sign_in_attempts_count": {
+            "before": 99,
+            "after": 100
+          },
+          "last_sign_in_ip": {
+            "before": "192.168.20.99",
+            "after": "192.168.20.30"
+          }
+        },
+        "change_type": "update"
+      }
+    ],
+    "notifications": [
+      {
+        "uuid": "b170e68b-2c10-462b-9c9f-63982f7c6bef",
+        "notification_type": "user.login_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "type": "local",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/system_events/f94799fe-32a5-4b23-95d5-9c8ff517f5b4",
+    "timestamp": "2026-03-08T13:36:13.699Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.login",
+    "status": "failure",
+    "severity": "err",
+    "action": {
+      "uuid": "4efe59e9-3a6d-46f6-a886-f4b89427871a",
+      "api_endpoint": "/api/v2/users/login",
+      "api_method": "GET",
+      "http_status_code": 401,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "fee4f93e-ede8-4f36-9061-259e32f3680b",
+        "notification_type": "request.authentication_failed",
+        "info": {
+          "api_endpoint": "/api/v2/users/login",
+          "api_method": "GET",
+          "src_ip": "192.168.20.30"
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/7064f3d2-bd04-4978-846c-b0e8feaf4bab",
+    "timestamp": "2026-03-08T13:35:53.272Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "0d1fd1bf-fcbc-4750-80dd-8d8a8b79647a",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "97c76ffa-2f04-4a47-a83a-cb035d2c1328",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/3e1ed38f-1fbc-4a06-a8e8-0b0ef0c3b110",
+    "timestamp": "2026-03-08T13:35:29.618Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "7d91ad9d-d47a-4357-a016-4be3a0598e9c",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "ae9c69cc-3c96-4991-8ac9-16123e9f862c",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/3392afa1-3bb7-4e39-a026-88f234ad7d1f",
+    "timestamp": "2026-03-08T13:35:09.069Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "8552010f-7344-4e9f-9bc4-7ccd83ce1d4d",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "13765fee-60a4-4875-95a4-d2433a242824",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/78d61445-bf01-4f5e-943e-cf350d02feaf",
+    "timestamp": "2026-03-08T13:34:42.720Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "e5cb42fc-be18-428c-bd18-aa4243735442",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "55a7b9ef-b2e2-497e-8a55-31b994cb046e",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/10e26ea9-216e-42b1-a909-004746c23dda",
+    "timestamp": "2026-03-08T13:33:52.358Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "67600e12-7806-4926-8a04-63558cb563f0",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/0c53e2cb-e0ff-45e3-be12-278bb9511e02",
+    "timestamp": "2026-03-08T13:33:52.344Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "0b697d91-561e-430f-847a-7e4763ee4dea",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/6c2862e4-2475-4ba7-9850-e1451dc68ca8",
+    "timestamp": "2026-03-08T13:24:44.928Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "399e2199-214d-4f90-9b54-4bc2855e8261",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "5cfecff3-0e7a-4751-b96d-6564d4bff8e8",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/731f403c-22f4-4e53-a062-0a90851ca866",
+    "timestamp": "2026-03-08T13:17:37.994Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "b3d47730-009a-4226-a86a-7e07979d7ee5",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "988af474-92f9-4fb2-ae23-ebd7f6a97e6f",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/de9cd802-5564-4f4e-b853-2ff22ece38d6",
+    "timestamp": "2026-03-08T13:17:09.407Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "2e414162-3ae1-4aa1-9bca-815eb32b2b10",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "082f2231-86df-4856-a2b7-9117e58a7521",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/f3edcc31-11bc-4c8a-b032-96fb29ba391c",
+    "timestamp": "2026-03-08T13:15:51.991Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "1bb0203f-4ea1-4244-ae8c-093ccba9f947",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/1a6a57f3-4af8-4f82-aac1-4c8c15164049",
+    "timestamp": "2026-03-08T13:15:13.660Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "20b60456-7cf2-4633-acc8-27e88b419b0b",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "36faaecd-22ec-457c-ba58-c00f8a039c02",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/632a1a98-2df5-423c-bcdb-6903888800e9",
+    "timestamp": "2026-03-08T13:14:53.254Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "2f639826-554f-4720-a9d5-c86c40206a50",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "1b9c7414-e222-4d4c-af9d-c26a3b26ee7a",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/7f045b48-7b90-461b-b342-82f8d2f5ba3d",
+    "timestamp": "2026-03-08T13:14:25.583Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "43cd90ba-5ad8-4e9a-b11c-658713077c26",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "a9cbce83-2bd9-4730-850d-ca740aeb1ccb",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/5de70d77-1352-435c-9ee4-099327a1987f",
+    "timestamp": "2026-03-08T13:14:02.587Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "bbb516ed-fc1d-41d4-8f89-b2a175354143",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "b6040921-dcce-4880-a519-b6ac6e0ec699",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/9360fe0f-2cc6-47d6-bcae-bcc1889adac6",
+    "timestamp": "2026-03-08T13:09:51.796Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "021856c7-f772-4e22-89b7-3e12d3649e5f",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/bb8461b5-96ea-4293-95b3-7a4fa1b06e7f",
+    "timestamp": "2026-03-08T13:08:58.143Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "0ed05ea9-bd2e-484e-8db7-0b8f0b8476d6",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "5656d4fe-05c2-44c2-a5a8-dccb1de947b1",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/f87be888-e248-4881-976c-1739a3d66bcf",
+    "timestamp": "2026-03-08T13:06:51.738Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "4444c7de-8108-4d31-a1dc-40640b0286e9",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/573d55e1-f7df-4c29-a6a7-e875b35522fa",
+    "timestamp": "2026-03-08T13:03:51.670Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "020eaa70-e32a-4125-982a-3974a0a52c9a",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/fee3b8f9-81c4-4e1a-b865-69c8db9870d4",
+    "timestamp": "2026-03-08T13:02:20.112Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "eefdbebd-aa4c-43ff-bfee-80e99cb2e8cc",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "15deb179-2925-429f-864e-fadb7bb5448c",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/5b114237-88aa-4777-9ce0-c77d3a5bb490",
+    "timestamp": "2026-03-08T13:01:23.380Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "152f37de-e2ac-4064-8bdb-10922fe9376b",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "5980cbcb-e8e1-471d-b72d-578fb769f937",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/4fef95aa-5022-4638-a2ac-1895f54d184c",
+    "timestamp": "2026-03-08T12:54:51.464Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "5860f900-d4d7-48f0-8704-90c4860db6e0",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/86719799-5053-4454-b88f-c1cafce4f8eb",
+    "timestamp": "2026-03-08T12:48:51.357Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "35ca1e3f-2a8d-43b0-927e-67943d6c81be",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/4e125da8-0cc0-4099-841e-dd21385f1f81",
+    "timestamp": "2026-03-08T12:48:51.347Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "b64bc1df-a27c-4ebc-b26f-3f9f908e7131",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/9b33c02c-02f0-40b6-af0d-050989e026ab",
+    "timestamp": "2026-03-08T12:48:51.337Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "43007829-322e-4512-a44d-c8f4d2e6b0b4",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/fe478499-524e-47d5-9859-22558646665c",
+    "timestamp": "2026-03-08T12:45:51.333Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "d11bfa15-7b2b-4405-9f20-413ba6625b48",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/d0867dd5-ff5e-4f01-941b-290550c2cfb2",
+    "timestamp": "2026-03-08T12:45:51.325Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "7aa310c2-81b4-455d-b973-dd180efdd7fd",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/f5cfdfb3-d6fa-45f4-b20a-71aac9503d28",
+    "timestamp": "2026-03-08T12:45:51.317Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "c349adb1-15a7-4a84-8d86-adce9580b13a",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/824eb3a9-b10b-436b-b1c7-16e692e31678",
+    "timestamp": "2026-03-08T12:45:51.308Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "d84955b4-48b3-49d0-b895-006f72a1a0f2",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8b0407df-f7a1-4941-8910-d41c7a82d336",
+    "timestamp": "2026-03-08T12:45:05.880Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "05ba1a7a-f849-49e6-90cf-af6d667e3138",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "f8e8912a-ef50-4af3-b93a-70d3f17117f8",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8d29f178-174f-443e-bf8f-974f5fba8abd",
+    "timestamp": "2026-03-08T12:42:51.232Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "97e4bcb5-3dd4-42c7-b893-5d77c6d5c2df",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/2334974b-fd52-4440-9010-68b609b2dde2",
+    "timestamp": "2026-03-08T12:37:57.258Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "987eccf3-9a04-40eb-acd8-0349d9e18cef",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "a8648372-e6f5-4592-bfb1-c82fdb6f32bf",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/e8451daa-1fb1-4f0f-8a79-b7827d8f01a4",
+    "timestamp": "2026-03-08T12:35:58.073Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "ae59d9eb-6aed-4139-8dcd-ff0202eb3fdc",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "6477edef-a846-4caf-9a9c-7efededda804",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/5480256b-ba1d-435f-ba58-8024d51e5183",
+    "timestamp": "2026-03-08T12:32:50.490Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "146a7685-5efe-441e-a7c1-826f1fd5fedf",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "71915cdd-9659-4590-8e3b-70ff0632cc16",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/87b2d713-dd59-45fb-9d3c-53a8d86fadc6",
+    "timestamp": "2026-03-08T12:22:18.571Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "153a936d-6f47-4823-b122-23dd64debbea",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "48701d99-9306-4b43-887e-aa2127de6e19",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/ff904a76-1302-4222-a650-27cecbfc63cd",
+    "timestamp": "2026-03-08T12:17:22.440Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "0b06e114-46c9-457a-a750-cb69ed916b11",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "7f8d8b13-9f7c-4727-91c2-8e3daf762855",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/5887ceb0-928e-464e-b10f-82a16cdab144",
+    "timestamp": "2026-03-08T12:16:17.224Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "567db3c6-af85-4c30-b90c-ebbb7544879a",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "c40fce27-6f13-4216-97f6-c7107d3ce302",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/3c85d786-b1b0-40e5-b17b-b0645e847242",
+    "timestamp": "2026-03-08T12:15:53.227Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "e2981b4a-c862-48ca-a524-879a71cde898",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "4118fb31-f666-4a67-82c4-2b7ebdf02815",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/d747d459-7e24-452d-83a3-279d5c76f05a",
+    "timestamp": "2026-03-08T12:15:38.193Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "71328ea1-fc34-4014-94d8-913392142b21",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "b6fc870d-2c26-472a-8dc4-c6152d17f99a",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/3e669783-964f-4ada-a9db-8e8cd0be02ab",
+    "timestamp": "2026-03-08T12:15:19.152Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "35edf895-f2b2-41ec-8c89-a63d11494015",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "6dc15686-9a07-48db-b1a0-3f45b199f933",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8f0cca31-d735-42fa-943e-87284bf10a12",
+    "timestamp": "2026-03-08T12:14:07.354Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "e1b2762e-1e47-4d40-83cf-5a4b7fefea17",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "8587de68-d99f-485f-9d0c-a203517eef66",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/55bf961b-4a3c-4549-93ef-346dc7f7c1fc",
+    "timestamp": "2026-03-08T12:13:21.952Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "3d33b872-411a-40c8-aebf-8b81bd53d408",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "cfad9c6b-b03a-4e54-8291-1f6463b704e0",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/5157d292-e4bf-40e2-bcde-7b5e9cbeed36",
+    "timestamp": "2026-03-08T12:12:33.223Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "0d3a25d6-9676-41b7-935e-fb344f80d4e8",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "e5fa9ac4-3296-4e2a-922f-880ee78758c8",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/48f7811f-60aa-4267-97da-70b2deb69971",
+    "timestamp": "2026-03-08T11:17:49.271Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "7ae343ae-be43-4bfe-8815-ae366ebcade2",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/6741e4b1-6ac9-42f8-b894-52494d996d90",
+    "timestamp": "2026-03-08T11:17:49.263Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "84292f5e-a69a-4e2c-b40d-06a20630715f",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/f6f5e786-f3f3-433a-8090-c6e60bf9090d",
+    "timestamp": "2026-03-08T11:17:49.255Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "7eb90b3e-5422-4b85-b0db-857546c3ae31",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/a041d981-1e97-4289-8cc1-2b1b1534fcf7",
+    "timestamp": "2026-03-08T11:17:49.245Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "849041d6-17ee-478e-b098-acaafb57869c",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/253caf2c-d635-4e1e-9cb6-bb1ad332d44b",
+    "timestamp": "2026-03-08T11:14:49.168Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "ef917a3b-dd6d-4680-bf42-9a034fd3c325",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/586abf86-89bd-414a-a29c-2a17425b37aa",
+    "timestamp": "2026-03-08T11:14:49.159Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "85cb463c-9ae8-45e3-96f5-a07b51a3eba1",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8829bdcd-5e94-4314-a125-2edc28200280",
+    "timestamp": "2026-03-08T11:14:49.150Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "9bce5508-f7f6-411f-9abf-82e2074798e3",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/4bc612b9-e2c2-4301-ae04-1f10e94dfd6a",
+    "timestamp": "2026-03-08T11:11:49.091Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "131b7d28-f382-4ff4-a3ea-2940a0854d2d",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/701cb3d9-23f2-44b9-a131-76c19766e1ea",
+    "timestamp": "2026-03-08T11:08:49.006Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "1e7902aa-4e76-4870-b5b9-dccca0bcf641",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/f548501e-d71a-4bdb-8375-7f99be026924",
+    "timestamp": "2026-03-08T11:08:48.998Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "e4c46906-d9e7-4297-bfc2-0ac55ed93629",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/bb389a7b-9bc4-4300-9cc8-c84d63a12c12",
+    "timestamp": "2026-03-08T11:08:48.989Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "faf6bd97-cdb8-450f-91ac-3ad113a2a58f",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/ce715617-ff48-4f33-9da5-bd9f2202cfb2",
+    "timestamp": "2026-03-08T11:05:48.947Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "cde97495-e56e-4952-a7d5-0e9be51076f9",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/2998bd6b-5ff7-495d-8e6d-4c2cfec55da3",
+    "timestamp": "2026-03-08T11:05:48.937Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "b29e9b0d-e5cd-4e46-94ba-d60ec14c2858",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/401c80e2-c09f-438e-a1f4-547921a73049",
+    "timestamp": "2026-03-08T11:02:48.857Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "87c1af2e-9e84-41d0-ae1b-fc7ca1c4a627",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/766da619-fcc5-417b-bc44-d5c1f4dbdf2a",
+    "timestamp": "2026-03-08T10:59:48.848Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "c100a467-a529-4ad4-b53a-387b113d741f",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/c2b3e160-f374-434a-bd5c-ddb23ed0b976",
+    "timestamp": "2026-03-08T10:59:48.841Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "b6c9daeb-ddda-4f85-8551-c19400d88df6",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/af6e892e-736b-4aad-afe4-bd13ad0187f9",
+    "timestamp": "2026-03-08T10:59:48.833Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "9b0a57e6-bf7c-4a79-ba64-daec2dc2fd3d",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8dd4aac4-2864-418c-bc16-3cfe3a8964a6",
+    "timestamp": "2026-03-08T10:59:48.824Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "da0379f2-1a70-4597-b3a1-e9f503466418",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/a9493a95-af4f-4a2d-9b84-26167e4e4496",
+    "timestamp": "2026-03-08T10:50:48.701Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "6420dc65-01f2-42fe-a802-91fb0897e5ed",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/becaf941-ec80-4945-b08e-5836a7ce4621",
+    "timestamp": "2026-03-08T10:47:29.830Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "0057ad6d-b1be-4baf-9f33-5f6e2f841e14",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "4bdc456b-f25f-4457-93c2-f544c9be32e0",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/042cf072-c0e0-4aca-83e6-2bffbe0b111e",
+    "timestamp": "2026-03-08T10:46:32.840Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "571c23f9-e287-41c4-9a64-71b39423a9b4",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "7a1990fa-b25c-431e-ad31-6dc83ce608e7",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/f30856af-e7c1-4f34-8df8-0a2413e67562",
+    "timestamp": "2026-03-08T10:46:08.850Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "b37922b6-b8df-41db-b68e-bbfba93cb6e0",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "5c7980ec-0ddf-43a6-a336-19e735495366",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/79174dcd-3528-4bfc-9403-b314baafc82c",
+    "timestamp": "2026-03-08T10:45:25.838Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "1933ddc8-a85e-4060-ab3a-978f0a26536d",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "6f26e3b3-bf6a-41cb-a28b-765d45a646a4",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/48d124d5-c952-4a8f-ae67-56f623f57e02",
+    "timestamp": "2026-03-08T10:44:22.819Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "306a13ee-b221-4485-8401-3876ab8dd8c0",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "3528f36a-4fd9-4a60-b4f6-3869ab68bf86",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/9fcffb13-0e88-4742-bc09-e437c5c4ed61",
+    "timestamp": "2026-03-08T10:44:03.682Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "ba39e589-c18b-4c0b-bdcc-13b069026d51",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "73c6a4ee-cdaa-49ee-b0f7-ef430c06dbe0",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/a9ee1359-9b5b-4a0e-bd09-8b1808aba14e",
+    "timestamp": "2026-03-08T10:43:12.605Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "8401773e-1793-4ced-a0ee-c8a971a16817",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "223f2bf3-fcbf-4f11-a6f8-c0a820cf76c1",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/36eb3ae6-f4e4-4f20-b125-35bf8263bd87",
+    "timestamp": "2026-03-08T10:40:25.245Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "a61f2948-495f-4404-a8fc-9f279cb0d7ea",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "ade4c903-c372-4d17-be8a-6761e8d6213d",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/f146bcf2-6fca-4c02-8fb5-a96d9eef4afe",
+    "timestamp": "2026-03-08T10:37:31.734Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "740e6670-60c0-498e-ada8-028b8e7d133d",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "00da4eb9-1629-46b4-95a6-dfcb731c1980",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/85a362f5-5c3b-40b5-aae8-cd339397e9eb",
+    "timestamp": "2026-03-08T10:36:26.753Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "64888c7b-1ab6-4913-9378-524ed3598622",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "4df956e4-7d0d-40cd-b63f-b201c400fba5",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/3c20d0f6-ebdb-46c7-8baf-b50920941cd0",
+    "timestamp": "2026-03-08T10:36:06.263Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "32fc3660-bc91-4e9e-826f-4fe84117f418",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "ac23d6ee-3f81-4783-a165-60ec65219ace",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/25dec711-0710-428b-a23a-09fc90018ab6",
+    "timestamp": "2026-03-08T10:35:09.231Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "0dbbab8a-97a9-452a-987b-b895762a32b8",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "44436b17-3c9b-40be-a57d-1fe1dda338d9",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/67042557-4032-4ed0-8988-fd7eb71d445f",
+    "timestamp": "2026-03-08T10:33:58.717Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "5edc0e18-0695-4621-87d1-a3edefec5119",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "d9497079-df25-462a-840b-ea84fc90c6b0",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/9e7e0341-f5d4-44f5-9b4c-ce07262122a1",
+    "timestamp": "2026-03-08T10:31:47.319Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "7a9b69b8-b9fe-4386-9366-642b2158d1b9",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "2fa14e7c-23b8-4eef-a189-b377fc4a1cf0",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/17de7e58-1d91-4afc-9a0b-e9282e35a7e7",
+    "timestamp": "2026-03-08T10:29:45.405Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "2aaa9536-3198-402d-ad51-ce1372227754",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "7ab1ede2-91c9-4189-9713-712fa5f41a2e",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/35ae6b97-86c3-45a5-8334-4343d126a490",
+    "timestamp": "2026-03-08T10:29:06.338Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "3885c8a8-2182-41df-b9a9-4ae09ce47194",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "347a7abf-6b4d-410c-b145-dd7073439d66",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/f6d2fbcf-b873-4157-bd04-ddeeb411c17c",
+    "timestamp": "2026-03-08T10:27:37.722Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "348c3bdc-ded3-458e-a6a8-9a063df228c9",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "7bd5627d-2023-4653-b4cf-9da3b06bcfa7",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/db01a938-41e8-4299-864e-b581c2414b81",
+    "timestamp": "2026-03-08T10:27:12.195Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "cf3660d2-802f-4923-b533-1619d9532a49",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "b0980d32-7c02-4791-876e-e081e73fc5ab",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/047161d7-bf88-4f9a-b371-e7e7482b8925",
+    "timestamp": "2026-03-08T10:23:48.061Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "704defb7-d20b-4a36-ab08-15fdbbb874ee",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/739309c2-d795-475a-af47-51ec5c654417",
+    "timestamp": "2026-03-08T10:20:35.097Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "03481744-9094-430a-a3be-48f774091cb5",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "06be539b-efea-4f7b-85a6-83a440769690",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/59edbb78-08e0-4a5e-a333-ce671d9098b4",
+    "timestamp": "2026-03-08T10:14:47.876Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "6ee2ea2b-f619-40e1-86b4-bc0e0c28f869",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/3fbc2b5a-3b0e-42c5-8171-d6d4869d1d3a",
+    "timestamp": "2026-03-08T10:14:47.867Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "5323298a-38a1-46ca-95dd-484a8b4cccf1",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/527327b0-c155-448b-89a2-252219183977",
+    "timestamp": "2026-03-08T10:14:47.857Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "0b605753-8a51-4e40-9ea5-eb00c6f73656",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/0be93517-3f46-49a7-816a-606468d37e1a",
+    "timestamp": "2026-03-08T10:11:47.818Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "c4599bc6-2063-4140-8daa-d0f297f0ba00",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/26c73fe3-00f5-4022-8707-d629dc65e19e",
+    "timestamp": "2026-03-08T10:08:47.752Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "63a2d9d3-3c91-4f92-b780-cf9655551260",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/47b63f6a-4164-4f50-8c3f-f13a3de15cd8",
+    "timestamp": "2026-03-08T10:05:47.700Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "c2182147-ae21-4395-ad0f-d348487ecb56",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/07f3b618-ca93-4fb0-9929-786af90967e3",
+    "timestamp": "2026-03-08T10:05:47.691Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "6e1459ac-10f7-4b00-a8dd-93420e5a2b21",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/15534621-8169-412f-ab30-13b0e41f9da9",
+    "timestamp": "2026-03-08T09:52:12.792Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "57d84618-bfac-492c-8357-4c4ae38a1a27",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "7a3bfea5-cd5c-4eaa-a6a2-82e7296073b7",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/12899d84-69ae-4f6e-be8f-6b802fc115ef",
+    "timestamp": "2026-03-08T09:44:34.223Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "56af8cda-3428-4c3e-9e80-098095086706",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "9ea42c21-d582-4af4-869e-9b35d3069da1",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/942f1747-2d70-4db7-810e-7185722ee4fc",
+    "timestamp": "2026-03-08T09:43:11.665Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "7d15ee22-5c2f-45c9-ab97-36ce3c79fcef",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "b5243fd9-62fd-4682-bd1a-aa4bbd18f37b",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/82a491dd-f295-4008-8a70-72ebc9cd2d7c",
+    "timestamp": "2026-03-08T09:42:21.802Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "83ee3703-d2f3-4390-ad42-e897d8146917",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "3d7595de-8bf2-4ee2-b35d-e13885a04cd2",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/70aee0e9-d955-420b-8e0e-a0a7759d1011",
+    "timestamp": "2026-03-08T09:41:05.951Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "f859b81c-be37-499a-931d-084c0657a077",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "5f9d1b46-694a-43b8-b664-2311776af4f9",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/7fbe4fca-118f-4550-b62b-be5bff24d890",
+    "timestamp": "2026-03-08T09:37:32.675Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "1ab7362c-02fc-4d83-849d-4a0281c4bc1d",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "ac650ec8-cabb-42af-8cb1-366bb56668e5",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/97c39222-d265-48d8-9eaf-11d20630816e",
+    "timestamp": "2026-03-08T09:33:37.507Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "751fc2c1-3282-4ddd-a384-0757094dece0",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "a48755a8-74d0-46a6-9d9b-76e3d48b32c1",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/d76b1ddf-798e-4c3f-914a-2b4aa6dd3265",
+    "timestamp": "2026-03-08T09:32:50.148Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "7b1fe619-2bb7-4b7b-a5db-b45f4316af1f",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "cae5652d-eb1e-487a-9e04-c0aba85803e7",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/8ef5328f-5a2c-4b97-a3f1-84c2f706bac0",
+    "timestamp": "2026-03-08T08:25:27.642Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.sign_out",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "7788b68f-b807-4c1c-8d12-789231fb4cd2",
+      "api_endpoint": "/login/logout",
+      "api_method": "GET",
+      "http_status_code": 302,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": []
+  },
+  {
+    "href": "/system_events/48984c14-5932-47a7-8d5c-7e6847bdb78c",
+    "timestamp": "2026-03-08T08:25:27.592Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.logout",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "7981576e-99fd-4ed4-8c3e-19caaed7d214",
+      "api_endpoint": "/api/v2/users/logout_from_jwt",
+      "api_method": "POST",
+      "http_status_code": 204,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "0c054767-ff55-4dcb-b1ba-9c32bcfcc4a6",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/2d57c71d-d56a-4a79-9719-9b6c63bc396a",
+    "timestamp": "2026-03-08T08:25:27.389Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.logout",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "1148f8f7-cfe1-49b2-a12f-8721e5555c67",
+      "api_endpoint": "/api/v2/users/11/logout",
+      "api_method": "PUT",
+      "http_status_code": 204,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "513ad457-646f-4f11-8f6c-570140d0c265",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "user_logout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/9bfc6afc-693f-4f99-999d-147d64c43375",
+    "timestamp": "2026-03-08T08:02:44.777Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "2475812b-856d-4275-891f-4d90f3d965d9",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/e4c9a685-a003-45bf-9eae-0bce87efe11a",
+    "timestamp": "2026-03-08T07:59:44.696Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "fcc839c2-7dee-455d-9cd1-9f551e595e5d",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/0e13f310-ca10-4fcd-a9a0-25cf8bd6d716",
+    "timestamp": "2026-03-08T07:59:44.687Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "7eafa7ef-16ae-4b22-a898-2220e0952a1d",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/2bbfce7e-8425-45d4-8bb5-4f77099e23c6",
+    "timestamp": "2026-03-08T07:58:59.425Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "a5da8f97-52b9-4a0c-ad07-84c41d3b2f76",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "c4c54acc-2d84-4531-ace0-8aa4bddddecf",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/5e6d4847-b935-4ad9-9be0-1e3e8d56d09e",
+    "timestamp": "2026-03-08T07:53:44.516Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "3726a95f-7ba8-43c8-91f8-fa764b48fcff",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/13ce565b-f204-4ff5-b068-86768c49dc41",
+    "timestamp": "2026-03-08T07:41:44.223Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "870dcb9e-61d9-46d1-9107-99152eb4a2f7",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/21fb6416-de7a-4baa-871d-8d6a65043a04",
+    "timestamp": "2026-03-08T07:41:44.214Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "9abafaf7-f628-4894-b5bf-d1b44ff9b278",
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/66c72871-7b64-4f04-b713-026cecc766f3",
+    "timestamp": "2026-03-08T07:37:33.391Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.login",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "d3204344-cc51-462a-a7f9-0236f640185d",
+      "api_endpoint": "/api/v2/users/login",
+      "api_method": "GET",
+      "http_status_code": 200,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "056bd0ef-6cf0-42af-8dd2-841d8a6d7c75",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/825a451b-3a6a-4a8b-962b-c1903df95f67",
+    "timestamp": "2026-03-08T07:37:32.823Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "user.sign_in",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "31bf1a96-37c4-4c6e-b61d-0f59c1e61c8f",
+      "api_endpoint": "/login/users/sign_in",
+      "api_method": "POST",
+      "http_status_code": 302,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [
+      {
+        "uuid": "7c04e8df-b871-49a1-b5cd-5bce3ddf10bf",
+        "resource": {
+          "user": {
+            "href": "/users/11",
+            "type": "local",
+            "username": "admin@lab.local"
+          }
+        },
+        "changes": {
+          "sign_in_attempts_count": {
+            "before": 98,
+            "after": 99
+          }
+        },
+        "change_type": "update"
+      }
+    ],
+    "notifications": [
+      {
+        "uuid": "cb6b3d3f-6087-48dd-bed1-888a1aeae089",
+        "notification_type": "user.login_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "type": "local",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/system_events/61deebce-b3ba-4b6a-ae2b-05dc4bad590c",
+    "timestamp": "2026-03-08T07:37:27.575Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.login",
+    "status": "failure",
+    "severity": "err",
+    "action": {
+      "uuid": "17e09c1a-d4ae-45c2-bf12-1d255b4736ba",
+      "api_endpoint": "/api/v2/users/login",
+      "api_method": "GET",
+      "http_status_code": 401,
+      "src_ip": "192.168.20.30"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "33e21bd4-68d8-49c2-97f9-a6c0aa318068",
+        "notification_type": "request.authentication_failed",
+        "info": {
+          "api_endpoint": "/api/v2/users/login",
+          "api_method": "GET",
+          "src_ip": "192.168.20.30"
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/54eec522-328a-4f5e-8aaa-6082e25ae964",
+    "timestamp": "2026-03-08T07:30:34.795Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "37b6fe7d-bc8a-4a9f-a8a8-65e57678c2ad",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "90155d10-6200-431a-9f4f-a9df50d9a26a",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/f725a502-8e03-46d4-ad69-a6ab437f86c7",
+    "timestamp": "2026-03-08T07:28:22.727Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "1de935be-4d67-4814-8081-5a12c4798211",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "73b5d654-ac7e-4f0b-ad02-07e0c1694295",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/305f2486-d978-4cc1-8663-abc34c9e54f6",
+    "timestamp": "2026-03-08T07:27:31.975Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "8e48e71e-737b-4787-8107-256072fb9afe",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "016baee4-81fc-460f-9267-6e6f084796ed",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/7a4b8fdc-f3af-4322-869e-9a08a72aa731",
+    "timestamp": "2026-03-08T07:20:50.036Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "3fe3144e-1796-45b1-bff6-fc8d78d6b9cf",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "06be0feb-cb71-4574-aeae-73f156a19c8f",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/459df015-9721-42e5-b284-7efd17ab91ac",
+    "timestamp": "2026-03-08T07:11:33.892Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "709ac311-864f-4025-86b9-706cd24bea9d",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "e60eb9bc-5ae5-4af6-a53f-3ae2dbdb65b5",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/6129eb67-d277-493a-9b1c-7812a998d83a",
+    "timestamp": "2026-03-08T07:10:06.897Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "f93ccdce-ba2b-4231-853a-0ef858cc5b98",
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "4dc79413-b4f0-498a-bad2-8130264cd135",
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/system_events/8b79be24-6bca-46cd-9b0f-9301e1d89b95",
+    "timestamp": "2026-03-08T00:09:39.332Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "system": {}
+    },
+    "event_type": "system_task.prune_old_log_events",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "uuid": "24492861-3f13-46fe-a373-5e03fa828bf2",
+      "api_endpoint": null,
+      "api_method": null,
+      "http_status_code": null,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "uuid": "808e4173-69e2-4780-84c7-12175d9b49d3",
+        "notification_type": "system_task.event_pruning_completed",
+        "info": {
+          "num_events_pruned": 1,
+          "ageout_time": "2025-12-09T08:09:35.389+08:00",
+          "org_ids": [
+            0,
+            1
+          ]
+        }
+      }
+    ]
+  }
+]

@@ -9,6 +9,7 @@ import urllib.error
 import urllib.parse
 from io import BytesIO
 from src.utils import Colors
+from src.i18n import t
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +136,7 @@ class ApiClient:
             "services": {"include": [], "exclude": []}
         }
 
-        print(f"正在提交流量查詢 ({start_time_str} 至 {end_time_str})...")
+        print(t('submitting_query', start=start_time_str, end=end_time_str))
         logger.info(f"Submitting traffic query ({start_time_str} to {end_time_str})")
         try:
             url = f"{self.base_url}/traffic_flows/async_queries"
@@ -149,7 +150,7 @@ class ApiClient:
 
             result = json.loads(body)
             job_url = result.get("href")
-            print("等待流量計算中...", end="", flush=True)
+            print(t('waiting_traffic', default='Waiting for traffic calculation...'), end="", flush=True)
 
             # Polling
             poll_url = f"{self.api_cfg['url']}/api/v2{job_url}"
@@ -161,11 +162,11 @@ class ApiClient:
 
                 state = json.loads(poll_body).get("status")
                 if state == "completed":
-                    print(" 完成。")
+                    print(f" {t('done')}")
                     logger.info("Traffic query completed.")
                     break
                 if state == "failed":
-                    print(" 失敗。")
+                    print(f" {t('query_failed', default='Failed.')}")
                     logger.error("Traffic query failed.")
                     return
                 print(".", end="", flush=True)

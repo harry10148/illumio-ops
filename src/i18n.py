@@ -12,14 +12,25 @@ def get_language() -> str:
 MESSAGES = {
     "en": {
         # General & Errors
+        "nav_back": "0.Back",
+        "nav_help": "?:Help",
         "error_loading_config": "Error loading config: {error}",
-        "config_saved": "Configuration saved.",
+        "confirm_delete": "Delete {count} rules? (y/n)",
+        "config_saved": "Configuration Saved Successfully.",
+        
+        # functional definitions
+        "def_threshold_type": "Definition: 'Immediate' triggers alert on every event. 'Cumulative' triggers only when count exceeds threshold within window.",
+        "def_filters": "Definition: Filter by PCE reported 'status' (Success/Failure) or 'severity' (Info/Warning/Error).",
+        "def_cooldown": "Definition: Minimum minutes to wait before sending the same alert again (Prevents alert fatigue).",
+        "def_traffic_pd": "Definition: Policy Decision. 1=Blocked, 2=Potentially Blocked (Test Mode), 3=Allowed, 4=All.",
+        "def_traffic_vol": "Definition: Total data transferred (bytes) or connection frequency.",
         "error_saving_config": "Error saving config: {error}",
         "rule_overwritten": "Rule already exists, updated configuration.",
         "rule_deleted": "Deleted: {name}",
         "loading_best_practices": "Loading Best Practices (will clear existing rules)...",
         "press_enter_to_continue": "Press Enter to continue...",
         "operation_cancelled": "Operation cancelled.",
+        "nav_back": "0. Back",
         "done": "Done.",
         "bye": "Bye.",
         
@@ -33,9 +44,10 @@ MESSAGES = {
         "main_menu_5": "5. System Settings (API / Email / Alerts)",
         "main_menu_6": "6. Load Official Best Practices",
         "main_menu_7": "7. Send Test Alert",
-        "main_menu_8": "8. Run Monitor Once",
-        "main_menu_9": "9. Traffic Rule Debug Mode",
-        "main_menu_10": "10. Launch Web GUI",
+        "main_menu_8": "8. Run Analysis & Send Alerts",
+        "main_menu_9": "9. Rule Simulation & Debug Mode",
+        "main_menu_10": "{Colors.CYAN}10. Launch Web GUI{Colors.ENDC}",
+        "main_menu_11": "11. View Application Logs",
         "main_menu_0": "0. Exit",
         "please_select": "Please select",
         "starting_web_gui": "Starting Web GUI at",
@@ -44,6 +56,8 @@ MESSAGES = {
         "menu_add_event_title": "=== Add Event Monitor Rule ===",
         "menu_return": "0. Return",
         "menu_cancel": "0. Cancel",
+        "filter_status": "Status Filter (1.Success, 2.Failure, 0.All) [Default: 0]",
+        "filter_severity": "Severity Filter (1.Error, 2.Warning, 3.Info, 0.All) [Default: 0]",
         "set_health_check": "H. Toggle PCE Health Check (Current: {status})",
         "select_category": "Select category (Number, H for Health Check, 0 to return): ",
         "select_event": "Select Event",
@@ -87,8 +101,8 @@ MESSAGES = {
         "time_window_mins_default_5": "Time Window (mins) [Default: 5]",
         
         "menu_manage_rules_title": "=== Manage Monitor Rules ===",
-        "no_rules": "(No rules currently)",
-        "input_delete_indices": "Enter to delete (e.g. 0, 2), modify (e.g. m 1), or -1 to return: ",
+        "input_delete_indices": "Enter 'd <indices>' to delete (e.g. d 0, 2), 'm <idx>' to modify (e.g. m 1), or 0 back: ",
+        "menu_view_logs_title": "=== Application Logs (Last 20 lines) ===",
         
         "menu_settings_title": "=== System Settings v{version} ===",
         "not_set": "Not Set",
@@ -130,11 +144,11 @@ MESSAGES = {
         "trigger_alert": ">>> Trigger Alert: {name}",
         "rule_cooldown": "Rule {name} triggered but in cooldown.",
         
-        "debug_mode_title": "=== Traffic Rule Simulation & Debug Mode ===",
+        "debug_mode_title": "=== Rule Simulation & Debug Mode ===",
         "query_past_mins": "Query data from past how many minutes? [Default: Auto-detect based on max rule window]",
-        "submitting_query": "Submitting traffic query ({start} to {end})...",
+        "submitting_query": "Submitting query ({start} to {end})...",
         "simulation_report": "=== Simulation Report ===",
-        "fetched_records": "Fetched {count} traffic records (Window: {mins} mins).",
+        "fetched_records": "Fetched {count} records (Window: {mins} mins).",
         "rule_header": "Rule: {name} ({type})",
         "time_filter_results": "  -> [Time Filter] Original: {total} -> Rule Window({win}m): Remaining {rem} records",
         "calc_max_bw": "  -> Calculated Max Bandwidth: {val:.4} Mbps",
@@ -144,6 +158,11 @@ MESSAGES = {
         "samples_top10": "  -> Samples (Top 10):",
         "would_trigger": "🔴 WOULD TRIGGER",
         "pass": "🟢 PASS",
+        "event_rule": "Event Rule",
+        "traffic_rule": "Traffic Rule",
+        "debug_done": "Debug complete. Press Enter to return.",
+        "save_debug_query": "Save raw queried data (events/traffic) to JSON for debugging? (y/n)",
+        "file_saved": "Data saved to {path}.",
         
         # Event Descriptions
         "event_agent_missed_heartbeats": "Missed Heartbeat",
@@ -156,11 +175,22 @@ MESSAGES = {
         "event_agent_clone_detected": "Agent Clone Detected",
         "event_agent_activate": "Agent Paired",
         "event_agent_deactivate": "Agent Unpaired",
+        "event_user_login": "Login Attempt (user.login)",
         "event_user_login_failed": "Login Failed",
-        "event_user_sign_in": "User Sign In",
+        "event_user_sign_in": "User Sign-In (includes login failures when status=failure)",
+        "event_user_create_session": "User Session Created (successful login)",
         "event_csrf_failed": "CSRF Validation Failed",
         "event_api_auth_failed": "API Auth Failed",
         "event_api_authz_failed": "API Authz Failed",
+        "event_user_authenticate": "User Authenticated",
+        "event_user_sign_out": "User Session Terminated",
+        "event_user_login": "User Logged In",
+        "event_user_logout": "User Logged Out",
+        "event_user_login_session_terminated": "User login session terminated",
+        "event_user_pce_session_terminated": "User session terminated",
+        "event_workload_online": "Workload Online",
+        "event_workload_recalc_rules": "Workload policy recalculated",
+        "event_workload_redetect_network": "Workload network redetected",
         "event_api_key_create": "Create API Key",
         "event_api_key_delete": "Delete API Key",
         "event_ruleset_delete": "Delete Rule Set",
@@ -172,10 +202,35 @@ MESSAGES = {
         "event_workload_create": "Create Workload",
         "event_workload_delete": "Delete Workload",
         "event_pce_start": "PCE Started",
-        "event_cluster_update": "Cluster Update",
+        "event_cluster_update": "Cluster Updated",
+        "agent.fw_state_table_threshold_exceeded": "Firewall state table threshold exceeded",
+        "agent.refresh_policy": "Policy refresh requested",
+        "event_brute_force": "Brute Force Detected (Login failure count exceeded)",
+        "event_policy_fail": "Policy Deployment Failed",
+        "event_upgrade_health": "Upgrade Health Issue",
+        
+        # Best Practice Rule Names
+        "rule_agent_tampering": "Firewall Tampering Detected",
+        "rule_brute_force": "Brute Force Attack Detected",
+        "rule_login_failed": "Repeated Login Failures",
+        "rule_api_auth_failed": "Repeated API Auth Failures",
+        "rule_csrf_attack": "CSRF Attack Detected",
+        "rule_agent_offline": "Agent Marked Offline",
+        "rule_policy_fail": "Policy Enforcement Failed",
+        "rule_agent_heartbeat": "Agent Heartbeat Missed",
+        "rule_agent_goodbye": "Agent Unpaired (Goodbye)",
+        "rule_high_blocked": "High Blocked Traffic volume",
         
         "selected": "Selected",
         "setup_smtp": "=== SMTP Settings ===",
+        
+        # Debug Mode & Traffic Query
+        "waiting_traffic": "Waiting for traffic calculation...",
+        "query_failed": "Failed.",
+        "pd_1_blocked_only": "Blocked Only",
+        "pd_2_allowed_only": "Allowed Only",
+        "pd_3_all": "All (Blocked + Potential + Allowed)",
+        "nav_default": "Default",
         
         # Mail/Reporter HTML UI
         "no_recipients": "Recipients empty, skipping Mail alert.",
@@ -415,8 +470,18 @@ MESSAGES = {
     },
     "zh_TW": {
         # General & Errors
+        "nav_back": "0.返回",
+        "nav_help": "?:說明",
         "error_loading_config": "讀取設定失敗: {error}",
-        "config_saved": "設定已儲存。",
+        "confirm_delete": "確定要刪除 {count} 條規則嗎？ (y/n)",
+        "config_saved": "配置已成功儲存。",
+        
+        # 功能定義 (functional definitions)
+        "def_threshold_type": "定義：'立即 (Immediate)' 每次事件即觸發。'累計 (Cumulative)' 則在時間窗口內超過設定次數才觸發。",
+        "def_filters": "定義：根據 PCE 回傳的 '狀態' (成功/失敗) 或 '嚴重性' (資訊/警告/錯誤) 進行精確過濾。",
+        "def_cooldown": "定義：發送相同告警前的最小間隔分鐘數（避免告警疲勞）。",
+        "def_traffic_pd": "定義：策略判定。 1=阻斷, 2=潛在阻斷 (測試模式), 3=允許, 4=全部。",
+        "def_traffic_vol": "定義：傳輸的總數據量 (Bytes) 或連線建立的頻率。",
         "error_saving_config": "儲存設定失敗: {error}",
         "warning_best_practices": "警告: 此操作將清除所有現有的規則，並載入官方推薦的最佳實踐設定。",
         "confirm_continue": "您確定要繼續操作嗎？",
@@ -424,6 +489,7 @@ MESSAGES = {
         "loading_best_practices": "正在載入最佳實踐 (會清空現有規則)...",
         "press_enter_to_continue": "按 Enter 繼續...",
         "operation_cancelled": "\n操作已取消。按 Enter 繼續...",
+        "nav_back": "0. 返回",
         "done": "完成。",
         "bye": "再見。",
         
@@ -437,9 +503,10 @@ MESSAGES = {
         "main_menu_5": "5. 系統設定 (API / 告警通道 / Email)",
         "main_menu_6": "6. 載入官方最佳實踐 (Best Practices)",
         "main_menu_7": "7. 發送測試告警",
-        "main_menu_8": "8. 立即執行監控 (Run Once)",
-        "main_menu_9": "9. 流量規則模擬與除錯 (Debug Mode)",
-        "main_menu_10": "10. 啟動 Web GUI (網頁管理介面)",
+        "main_menu_8": "8. 執行分析並發送告警",
+        "main_menu_9": "9. 規則模擬與除錯模式",
+        "main_menu_10": "{Colors.CYAN}10. 啟動 Web 介面 (GUI){Colors.ENDC}",
+        "main_menu_11": "11. 查看系統日誌 (Logs)",
         "main_menu_0": "0. 離開",
         "please_select": "請選擇",
         "starting_web_gui": "正在啟動 Web GUI 於",
@@ -448,6 +515,8 @@ MESSAGES = {
         "menu_add_event_title": "=== 新增事件監控規則 ===",
         "menu_return": "0. 返回上層",
         "menu_cancel": "0. 取消",
+        "filter_status": "狀態過濾 (1.成功, 2.失敗, 0.全部) [預設: 0]",
+        "filter_severity": "嚴重性過濾 (1.錯誤, 2.警告, 3.資訊, 0.全部) [預設: 0]",
         "set_health_check": "H. 設定 PCE Health Check (目前: {status})",
         "select_category": "請選擇類別 (輸入數字，H 設定健檢，0 返回): ",
         "select_event": "選擇事件",
@@ -492,7 +561,8 @@ MESSAGES = {
         
         "menu_manage_rules_title": "=== 管理監控規則 ===",
         "no_rules": "(目前沒有規則)",
-        "input_delete_indices": "輸入編號刪除 (如 0, 2)、修改 (如 m 1) 或 -1 返回: ",
+        "input_delete_indices": "輸入 'd 編號' 刪除 (如 d 0, 2)、'm 編號' 修改 (如 m 1) 或 0 返回: ",
+        "menu_view_logs_title": "=== 系統日誌 (最後 20 行) ===",
         
         "menu_settings_title": "=== 系統設定 (System Settings) v{version} ===",
         "not_set": "未設定",
@@ -534,11 +604,11 @@ MESSAGES = {
         "trigger_alert": ">>> 觸發告警: {name}",
         "rule_cooldown": "規則 {name} 已觸發但處於冷卻時間中。",
         
-        "debug_mode_title": "=== 流量規則模擬與除錯 (Debug Mode) ===",
+        "debug_mode_title": "=== 規則模擬與除錯模式 ===",
         "query_past_mins": "查詢過去幾分鐘的資料? [預設: 自動偵測最大規則時間]",
-        "submitting_query": "正在提交流量查詢 ({start} 至 {end})...",
+        "submitting_query": "正在提交查詢 ({start} 至 {end})...",
         "simulation_report": "=== 模擬結果報告 ===",
-        "fetched_records": "共取得 {count} 筆流量資料 (Window: {mins} mins)。",
+        "fetched_records": "共取得 {count} 筆資料 (Window: {mins} mins)。",
         "rule_header": "規則: {name} ({type})",
         "time_filter_results": "  -> [時間過濾] 原始資料: {total} -> 規則視窗({win}m): 剩餘 {rem} 筆",
         "calc_max_bw": "  -> 計算最大頻寬 (Max): {val:.4} Mbps",
@@ -548,6 +618,11 @@ MESSAGES = {
         "samples_top10": "  -> 樣本 (Top 10):",
         "would_trigger": "🔴 會觸發 (WOULD TRIGGER)",
         "pass": "🟢 通過 (PASS)",
+        "event_rule": "事件規則",
+        "traffic_rule": "流量規則",
+        "debug_done": "除錯完成，按 Enter 返回。",
+        "save_debug_query": "是否將查詢到的原始資料 (Events/Traffic) 儲存為 JSON 以供除錯？ (y/n)",
+        "file_saved": "資料已儲存至 {path}。",
         
         # Mail/Reporter HTML UI
         "no_recipients": "未設定收件人，略過發信。",
@@ -791,32 +866,76 @@ MESSAGES = {
         "event_agent_clone_detected": "偵測到複製 Agent",
         "event_agent_activate": "Agent 已配對",
         "event_agent_deactivate": "Agent 取消配對",
-        "event_user_login_failed": "登入失敗",
-        "event_user_sign_in": "使用者登入",
+        "event_user_login": "登入嘗試 (user.login)",
+        "event_user_login_failed": "登錄失敗",
+        "event_user_sign_in": "使用者登入 (含登入失敗，status=failure 時觸發)",
+        "event_user_create_session": "建立使用者工作階段 (成功登入)",
         "event_csrf_failed": "CSRF 驗證失敗",
         "event_api_auth_failed": "API 認證失敗",
-        "event_api_authz_failed": "API 授權失敗",
+        "event_api_authz_failed": "API 授權失敗 (Authorization Failed)",
+        "event_user_authenticate": "使用者已認證",
+        "event_user_sign_out": "工作階段終止 (Session Terminated)",
+        "event_user_login": "使用者登入",
+        "event_user_logout": "使用者登出",
+        "event_user_login_session_terminated": "登入視窗工作階段終止",
+        "event_user_pce_session_terminated": "PCE 工作階段終止",
+        "event_workload_online": "受控工作負載上線 (Workload Online)",
+        "event_workload_recalc_rules": "重新計算受控規則 (Policy Recalc)",
+        "event_workload_redetect_network": "網路重新偵測",
+        "event_csrf_failed": "CSRF 驗證失敗",
+        "event_api_auth_failed": "API 認證失敗",
         "event_api_key_create": "建立 API Key",
         "event_api_key_delete": "刪除 API Key",
         "event_ruleset_delete": "刪除規則集",
         "event_ruleset_create": "建立規則集",
-        "event_ruleset_update": "更新規則集",
-        "event_rule_create": "建立規則",
-        "event_rule_delete": "刪除規則",
-        "event_policy_prov": "政策派送 (Provisioning)",
+        "event_ruleset_update": "更新受控規則集",
+        "event_rule_create": "建立受控規則",
+        "event_rule_delete": "刪除受控規則",
+        "event_policy_prov": "受控策略部署 (Provisioning)",
         "event_workload_create": "建立工作負載",
         "event_workload_delete": "刪除工作負載",
         "event_pce_start": "PCE 啟動",
-        "event_cluster_update": "叢集更新",
+        "event_cluster_update": "叢集已更新",
+        "agent.fw_state_table_threshold_exceeded": "防火牆狀態表閾值已超限",
+        "agent.refresh_policy": "要求刷新受控規則",
+        "event_brute_force": "偵測到暴力破解 (登入失敗次數超限)",
+        "event_policy_fail": "策略部署失敗",
+        "event_upgrade_health": "升級健康度異常",
+
+        # Best Practice Rule Names
+        "rule_agent_tampering": "偵測到防火牆篡改",
+        "rule_brute_force": "偵測到暴力破解攻擊",
+        "rule_login_failed": "重複登錄失敗告警",
+        "rule_api_auth_failed": "重複 API 認證失敗",
+        "rule_csrf_attack": "偵測到 CSRF 攻擊",
+        "rule_agent_offline": "主機被標記為離線",
+        "rule_policy_fail": "策略套用失敗告警",
+        "rule_agent_heartbeat": "VEN 心跳遺漏告警",
+        "rule_agent_goodbye": "VEN 已取消配對(Goodbye)",
+        "rule_high_blocked": "高額阻斷流量告警",
         
         "selected": "已選擇",
         "setup_smtp": "=== SMTP 設定 ===",
+        
+        # Debug Mode & Traffic Query
+        "waiting_traffic": "等待流量計算中...",
+        "query_failed": "查詢失敗。",
+        "pd_1_blocked_only": "僅阻掖 (Blocked Only)",
+        "pd_2_allowed_only": "僅允許 (Allowed Only)",
+        "pd_3_all": "全部 (阻掖 + 潛在 + 允許)",
+        "nav_default": "預設",
     }
 }
 
 def t(key: str, **kwargs) -> str:
     """Translates a key into the currently selected language."""
-    text = MESSAGES.get(_current_lang, MESSAGES["en"]).get(key, key)
+    # 支援 default 參數：如果 key 不存在，使用 default 值
+    default_val = kwargs.pop('default', None)
+    text = MESSAGES.get(_current_lang, MESSAGES["en"]).get(key)
+    if text is None:
+        text = MESSAGES["en"].get(key)
+    if text is None:
+        text = default_val if default_val else key
     
     if kwargs:
         try:

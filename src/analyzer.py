@@ -2,6 +2,7 @@ import datetime
 import json
 import gc
 import os
+import sys
 import logging
 import tempfile
 from collections import Counter
@@ -253,7 +254,23 @@ class Analyzer:
             logger.info(f"Found {len(events)} events.")
             now_utc = datetime.datetime.now(datetime.timezone.utc)
             for rule in [r for r in self.cm.config["rules"] if r["type"] == "event"]:
-                matches = [e for e in events if rule["filter_value"] == e.get("event_type")]
+                # Enhanced filtering with status and severity
+                matches = []
+                for e in events:
+                    if rule["filter_value"] != e.get("event_type"):
+                        continue
+                        
+                    # Status Filter
+                    r_status = rule.get("filter_status", "all")
+                    if r_status != "all" and e.get("status") != r_status:
+                        continue
+                        
+                    # Severity Filter
+                    r_sev = rule.get("filter_severity", "all")
+                    if r_sev != "all" and e.get("severity") != r_sev:
+                        continue
+                        
+                    matches.append(e)
 
                 # Event History Logic for 'count' threshold
                 if matches:
@@ -567,102 +584,172 @@ class Analyzer:
         return matches[:500]
 
     def run_debug_mode(self, mins=None, pd_sel=None):
-        print(f"\n{Colors.HEADER}{t('menu_debug_mode_title')}{Colors.ENDC}")
+        print(f"\n{Colors.HEADER}{t('debug_mode_title')}{Colors.ENDC}")
 
+        # Auto-detect minutes if not provided
         max_win = 10
         for r in self.cm.config['rules']:
-            if r['type'] in ['traffic', 'bandwidth', 'volume']:
-                w = r.get('threshold_window', 10)
-                if w > max_win:
-                    max_win = w
+            w = r.get('threshold_window', 10)
+            if w > max_win:
+                max_win = w
 
         if mins is None:
-            mins = safe_input(t('debug_query_mins'), int, allow_cancel=True)
-        if not mins:
-            mins = max_win + 2
-
-        print(f"\nPolicy Decision {t('step_2_filters')}:")
-        print("1. Blocked Only")
-        print("2. Allowed Only")
-        print("3. All (Blocked + Potential + Allowed) [預設]")
-
-        if pd_sel is None:
-            pd_sel = safe_input(t('please_select'), int, range(1, 4), allow_cancel=True) or 3
-
-        pds = ["blocked", "potentially_blocked", "allowed"]
-        if pd_sel == 1:
-            pds = ["blocked"]
-        elif pd_sel == 2:
-            pds = ["allowed"]
+            mins_input = safe_input(t('query_past_mins'), int, allow_cancel=True)
+            if mins_input is None:  # 使用者按 0 返回
+                return
+            if mins_input == '' or mins_input == 0:  # 使用者按 Enter 或輸入 0，使用預設
+                mins = max_win + 2
+            else:
+                mins = int(mins_input)
 
         now = datetime.datetime.now(datetime.timezone.utc)
         start_dt = now - datetime.timedelta(minutes=mins)
-        print(f"{t('debug_submit_query')} ({start_dt.strftime('%H:%M')} -> {now.strftime('%H:%M')})...")
-        traffic_gen = self.api.execute_traffic_query_stream(
-            start_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
-            now.strftime('%Y-%m-%dT%H:%M:%SZ'),
-            pds
-        )
+        start_str = start_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+        end_str = now.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+        # 1. Fetch Events
+        print(f"\n{Colors.CYAN}[1/2] {t('checking_events')}...{Colors.ENDC}")
+        events = self.api.fetch_events(start_str)
+        print(f"  -> {t('found_events', count=len(events))}")
+
+        # 2. Fetch Traffic
+        print(f"\n{Colors.CYAN}[2/2] {t('submitting_query', start=start_dt.strftime('%H:%M'), end=now.strftime('%H:%M'))}{Colors.ENDC}")
+        
+        # Determine PDs for traffic query
+        if pd_sel is None:
+            print(f"\n{t('policy_decision')}")
+            print(f"1. {t('pd_1_blocked_only', default='Blocked Only')}")
+            print(f"2. {t('pd_2_allowed_only', default='Allowed Only')}")
+            print(f"3. {t('pd_3_all', default='All (Blocked + Potential + Allowed)')} [{t('nav_default', default='Default')}]")
+            pd_input = safe_input(t('please_select'), int, range(0, 4), allow_cancel=True)
+            if pd_input is None: return  # 使用者按 0 返回
+            if pd_input == '' or pd_input == 0:
+                pd_sel = 3  # 預設: All
+            else:
+                pd_sel = int(pd_input)
+
+        pds = ["blocked", "potentially_blocked", "allowed"]
+        if pd_sel == 1: pds = ["blocked"]
+        elif pd_sel == 2: pds = ["allowed"]
+
+        traffic_gen = self.api.execute_traffic_query_stream(start_str, end_str, pds)
         traffic = list(traffic_gen) if traffic_gen else []
+        print(f"  -> {t('fetched_records', count=len(traffic), mins=mins)}")
 
-        print(f"\n{Colors.CYAN}{t('debug_report_title')}{Colors.ENDC}")
-        print(f"{t('debug_records_found')} {len(traffic)} (Window: {mins} mins)。")
+        print(f"\n{Colors.HEADER}{t('simulation_report')}{Colors.ENDC}")
 
-        for rule in [r for r in self.cm.config["rules"] if r["type"] in ["traffic", "bandwidth", "volume"]]:
-            print(f"\n{Colors.HEADER}{t('traffic_rule')}: {rule['name']} ({rule['type'].upper()}){Colors.ENDC}")
+        for rule in self.cm.config["rules"]:
+            rtype = rule.get("type", "event")
+            r_label = t('event_rule') if rtype == "event" else t('traffic_rule')
+            print(f"\n{Colors.CYAN}--- {r_label}: {rule['name']} ({rtype.upper()}) ---{Colors.ENDC}")
+            
             rule_win = rule.get("threshold_window", 10)
             rule_start = now - datetime.timedelta(minutes=rule_win)
-
             matches = []
-            for f in traffic:
-                if self.check_flow_match(rule, f, rule_start):
-                    f_copy = f.copy()
-                    if rule["type"] == "bandwidth":
-                        val, note, _, _ = self.calculate_mbps(f)
-                        f_copy['_metric_val'] = val
-                        f_copy['_metric_fmt'] = f"{format_unit(val, 'bandwidth')} {note}"
-                    elif rule["type"] == "volume":
-                        val_bytes, note = self.calculate_volume_mb(f)
-                        f_copy['_metric_val'] = val_bytes
-                        f_copy['_metric_fmt'] = f"{format_unit(val_bytes, 'volume')} {note}"
-                    else:
-                        c = int(f.get("num_connections") or f.get("count", 1))
-                        f_copy['_metric_val'] = c
-                        f_copy['_metric_fmt'] = str(c)
-                    matches.append(f_copy)
 
-            print(f"  -> [Filter] Raw: {len(traffic)} -> Window({rule_win}m): {len(matches)} left")
+            if rtype == "event":
+                # Event Logic
+                for e in events:
+                    # Time check for events
+                    pts = e.get('timestamp')
+                    e_time = None
+                    if pts:
+                        try: e_time = datetime.datetime.strptime(pts, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=datetime.timezone.utc)
+                        except ValueError:
+                            try: e_time = datetime.datetime.strptime(pts, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
+                            except ValueError: pass
 
-            val = 0.0
-            if rule["type"] == "bandwidth":
-                for m in matches:
-                    if m['_metric_val'] > val:
-                        val = m['_metric_val']
-                print(f"  -> Max Bandwidth (Max): {val:.4f} Mbps")
-            elif rule["type"] == "volume":
-                val = sum(m['_metric_val'] for m in matches)
-                print(f"  -> Total Volume (Sum): {val:.4f} MB")
+                    if e_time and e_time < rule_start: continue
+                    
+                    if rule["filter_value"] != e.get("event_type"): continue
+                    
+                    # Filters
+                    r_status = rule.get("filter_status", "all")
+                    if r_status != "all" and e.get("status") != r_status: continue
+                    r_sev = rule.get("filter_severity", "all")
+                    if r_sev != "all" and e.get("severity") != r_sev: continue
+                    
+                    matches.append(e)
+                
+                print(t('time_filter_results', total=len(events), win=rule_win, rem=len(matches)))
+                val = len(matches)
+                threshold = float(rule.get("threshold_count", 1))
+                is_trigger = val >= threshold
+
+                status = f"{Colors.FAIL}{t('would_trigger')}{Colors.ENDC}" if is_trigger else f"{Colors.GREEN}{t('pass')}{Colors.ENDC}"
+                print(t('eval_result', status=status, threshold=int(threshold)))
+
+                if matches:
+                    print(t('samples_top10'))
+                    for i, m in enumerate(matches[:10]):
+                        msg = m.get('message', 'No message')
+                        m_status = m.get('status', 'N/A')
+                        m_ts = m.get('timestamp', 'N/A')[-13:-1] # Show HH:MM:SS.ms
+                        print(f"     [{i+1}] {m_ts} | {m_status} | {msg[:80]}")
+
             else:
-                val = sum(m['_metric_val'] for m in matches)
-                print(f"  -> Total Count (Sum): {int(val)}")
+                # Traffic / BW / Vol Logic
+                for f in traffic:
+                    if self.check_flow_match(rule, f, rule_start):
+                        f_copy = f.copy()
+                        if rtype == "bandwidth":
+                            v, note, _, _ = self.calculate_mbps(f)
+                            f_copy['_metric_val'] = v
+                            f_copy['_metric_fmt'] = f"{format_unit(v, 'bandwidth')} {note}"
+                        elif rtype == "volume":
+                            v, note = self.calculate_volume_mb(f)
+                            f_copy['_metric_val'] = v
+                            f_copy['_metric_fmt'] = f"{format_unit(v, 'volume')} {note}"
+                        else:
+                            c = int(f.get("num_connections") or f.get("count", 1))
+                            f_copy['_metric_val'] = c
+                            f_copy['_metric_fmt'] = str(c)
+                        matches.append(f_copy)
 
-            is_trigger = False
-            threshold = float(rule.get("threshold_count", 0))
-            if rule["type"] == "bandwidth":
-                if matches and val > threshold:
-                    is_trigger = True
-            else:
-                if val >= threshold:
-                    is_trigger = True
+                print(t('time_filter_results', total=len(traffic), win=rule_win, rem=len(matches)))
+                val = 0.0
+                if rtype == "bandwidth":
+                    val = max([m['_metric_val'] for m in matches]) if matches else 0.0
+                    print(t('calc_max_bw', val=val))
+                elif rtype == "volume":
+                    val = sum([m['_metric_val'] for m in matches])
+                    print(t('calc_sum_vol', val=val))
+                else:
+                    val = sum([m['_metric_val'] for m in matches])
+                    print(t('calc_sum_count', val=int(val)))
 
-            status = f"{Colors.FAIL}🔴 {t('trigger')}{Colors.ENDC}" if is_trigger else f"{Colors.GREEN}🟢 {t('pass')}{Colors.ENDC}"
-            print(f"  -> Result: {status} (Threshold: {threshold})")
+                threshold = float(rule.get("threshold_count", 0))
+                is_trigger = val > threshold if rtype == "bandwidth" else val >= threshold
+                
+                status = f"{Colors.FAIL}{t('would_trigger')}{Colors.ENDC}" if is_trigger else f"{Colors.GREEN}{t('pass')}{Colors.ENDC}"
+                print(t('eval_result', status=status, threshold=threshold))
 
-            if matches:
-                print(f"  -> Sample (Top 10):")
-                if rule["type"] in ["bandwidth", "volume"]:
-                    matches.sort(key=lambda x: x.get('_metric_val', 0), reverse=True)
+                if matches:
+                    print(t('samples_top10'))
+                    if rtype in ["bandwidth", "volume"]:
+                        matches.sort(key=lambda x: x.get('_metric_val', 0), reverse=True)
+                    for i, m in enumerate(matches[:10]):
+                        key = self.get_traffic_details_key(m)
+                        print(f"     [{i+1}] {key} Value: {m.get('_metric_fmt')} (PD:{m.get('policy_decision')})")
 
-                for i, m in enumerate(matches[:10]):
-                    key = self.get_traffic_details_key(m)
-                    print(f"     [{i + 1}] {key} Value: {m.get('_metric_fmt')} (PD:{m.get('policy_decision')})")
+        # Handle GUI/Non-interactive mode (stdin/stdout capture)
+        is_gui = hasattr(sys.stdout, 'getvalue')
+        
+        if not is_gui:
+            save_sel = safe_input(f"\n{t('save_debug_query')}", str, allow_cancel=True)
+            if save_sel and save_sel.lower() == 'y':
+                dump = {
+                    "timestamp": now.strftime('%Y-%m-%dT%H:%M:%SZ'),
+                    "mins": mins,
+                    "events_count": len(events),
+                    "traffic_count": len(traffic),
+                    "events": events,
+                    "traffic": traffic
+                }
+                path = os.path.join(ROOT_DIR, "debug_dump.json")
+                with open(path, 'w', encoding='utf-8') as f:
+                    json.dump(dump, f, indent=2, ensure_ascii=False)
+                print(f"\n{Colors.GREEN}{t('file_saved', path=path)}{Colors.ENDC}")
+
+        if not is_gui:
+            print(f"\n{Colors.GREEN}{t('debug_done')}{Colors.ENDC}")

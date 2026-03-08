@@ -16,28 +16,41 @@ class Colors:
     GREEN = '\033[92m' if _enabled else ''
     WARNING = '\033[93m' if _enabled else ''
     FAIL = '\033[91m' if _enabled else ''
+    DARK_GRAY = '\033[90m' if _enabled else ''
     ENDC = '\033[0m' if _enabled else ''
 
 
-def safe_input(prompt: str, value_type=str, valid_range=None, allow_cancel=True, hint=None):
-    full_prompt = f"{prompt} {Colors.CYAN}{hint}{Colors.ENDC}: " if hint else f"{prompt}: "
+def safe_input(prompt: str, value_type=str, valid_range=None, allow_cancel=True, hint=None, help_text=None):
+    nav_hint = f" [{t('nav_back', default='0.Back')}]" if allow_cancel else ""
+    help_hint = f" [{t('nav_help', default='?:Help')}]" if help_text else ""
+    full_prompt = f"{prompt}{Colors.CYAN}{nav_hint}{help_hint}{Colors.ENDC}"
+    if hint:
+        full_prompt += f" {Colors.CYAN}({hint}){Colors.ENDC}"
+    full_prompt += ": "
+    
     while True:
         try:
-            raw = input(full_prompt)
-            if not raw.strip():
-                if allow_cancel:
-                    return None
-                else:
-                    continue
-            if raw.strip() == '-1' and allow_cancel:
+            raw = input(full_prompt).strip()
+            
+            if raw == '?' and help_text:
+                print(f"{Colors.DARK_GRAY}{help_text}{Colors.ENDC}")
+                continue
+                
+            if not raw:
+                # User hit Enter without typing anything
+                return ""
+            
+            # Standardize 0 and -1 for cancel/back ONLY if explicitly typed
+            if allow_cancel and raw in ['0', '-1']:
                 return None
+            
             val = value_type(raw)
             if valid_range and val not in valid_range:
-                print(f"{Colors.FAIL}{t('error_out_of_range', default='數值超出範圍。')}{Colors.ENDC}")
+                print(f"{Colors.FAIL}{t('error_out_of_range', default='Value out of range.')}{Colors.ENDC}")
                 continue
             return val
         except ValueError:
-            print(f"{Colors.FAIL}{t('error_format', default='格式錯誤。')}{Colors.ENDC}")
+            print(f"{Colors.FAIL}{t('error_format', default='Invalid format.')}{Colors.ENDC}")
 
 
 def setup_logger(name: str, log_file: str, level=logging.INFO,

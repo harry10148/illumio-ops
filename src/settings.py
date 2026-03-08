@@ -21,9 +21,21 @@ FULL_EVENT_CATALOG = {
         "agent.deactivate": "event_agent_deactivate"
     },
     "User Access": {
-        "user.login_failed": "event_user_login_failed",
+        "user.authenticate": "event_user_authenticate",
         "user.sign_in": "event_user_sign_in",
+        "user.sign_out": "event_user_sign_out",
+        "user.logout": "event_user_logout",
+        "user.login_session_terminated": "event_user_login_session_terminated",
+        "user.pce_session_terminated": "event_user_pce_session_terminated",
+        "user.create_session": "event_user_create_session",
+        "user.login_failure_count_exceeded": "event_brute_force",
         "user.csrf_validation_failed": "event_csrf_failed"
+    },
+    "Agent Health Detail": {
+        "agent.policy_deploy_failed": "event_policy_fail",
+        "agent.missing_heartbeats_after_upgrade": "event_upgrade_health",
+        "agent.refresh_policy": "agent.refresh_policy",
+        "agent.fw_state_table_threshold_exceeded": "agent.fw_state_table_threshold_exceeded"
     },
     "Auth & API": {
         "request.authentication_failed": "event_api_auth_failed",
@@ -41,7 +53,10 @@ FULL_EVENT_CATALOG = {
     },
     "Workloads": {
         "workload.create": "event_workload_create",
-        "workload.delete": "event_workload_delete"
+        "workload.delete": "event_workload_delete",
+        "workload.online": "event_workload_online",
+        "workload.recalc_rules": "event_workload_recalc_rules",
+        "workload.redetect_network": "event_workload_redetect_network"
     },
     "System": {
         "pce.application_started": "event_pce_start",
@@ -74,8 +89,14 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
         evts = FULL_EVENT_CATALOG[cat]
         evt_keys = list(evts.keys())
         print(f"\n--- {cat} ---")
-        for i, k in enumerate(evt_keys): print(f"{i+1}. {k} ({t(evts[k])})")
-        print(t('menu_cancel'))
+        # Header for the list
+        print(f"{'No.':<4} {'Event Type':<40} | {'Description'}")
+        print("-" * 80)
+        for i, k in enumerate(evt_keys): 
+            desc = t(evts[k])
+            print(f"{i+1:<4} {k:<40} | {desc}")
+        
+        print(f"\n{t('menu_cancel')}")
         if edit_rule and edit_rule.get('filter_value') in evt_keys:
             def_idx = evt_keys.index(edit_rule['filter_value']) + 1
             ei = safe_input(f"{t('select_event')} [{def_idx}]", int, range(0, len(evt_keys)+1), allow_cancel=True) or def_idx
@@ -85,28 +106,50 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
         if not ei or ei == 0: continue
         k = evt_keys[ei-1]
         print(f"\n{t('selected')}: {k}")
-        print(f"{t('rule_trigger_type_1')}  {t('rule_trigger_type_2')}  {t('menu_cancel')}")
-        
-        def_ti = 2 if edit_rule and edit_rule.get('threshold_type') == 'count' else 1
-        pmpt = f"{t('please_select')} [{def_ti}]" if edit_rule else t('please_select')
-        ti = safe_input(pmpt, int, range(0, 3), allow_cancel=True) or (def_ti if edit_rule else None)
-        
-        if not ti or ti == 0: continue
+        pmpt = f"{t('rule_trigger_type_1')}  {t('rule_trigger_type_2')}"
+        def_ti = 1 if not edit_rule or edit_rule.get('threshold_type') == 'immediate' else 2
+        ti = safe_input(pmpt, int, range(0, 3), allow_cancel=True, help_text=t('def_threshold_type'))
+        if ti is None: continue
+        if ti == '' or ti == 0: ti = def_ti
         ttype, cnt, win = "immediate", 1, 10
         if ti == 2:
             ttype = "count"
             def_cnt = edit_rule.get('threshold_count', 5) if edit_rule else 5
             def_win = edit_rule.get('threshold_window', 10) if edit_rule else 10
-            cnt = safe_input(f"{t('cumulative_count')} [{def_cnt}]", int, hint=t('hint_example_5'), allow_cancel=True) or def_cnt
-            win = safe_input(f"{t('time_window_mins')} [{def_win}]", int, hint=t('hint_example_10'), allow_cancel=True) or def_win
+            cnt_in = safe_input(t('cumulative_count'), int, hint=str(def_cnt), allow_cancel=True)
+            if cnt_in is None: continue
+            cnt = int(cnt_in) if cnt_in != '' else def_cnt
+            win_in = safe_input(t('time_window_mins'), int, hint=str(def_win), allow_cancel=True)
+            if win_in is None: continue
+            win = int(win_in) if win_in != '' else def_win
             
         def_cd = edit_rule.get('cooldown_minutes', win) if edit_rule else win
-        cd = safe_input(f"{t('cooldown_mins_default', win=def_cd)} [{def_cd}]", int, allow_cancel=True) or def_cd
+        cd_in = safe_input(t('cooldown_mins_default').replace('[{win}]', '').replace('[Default: {win}]', '').strip(), int, allow_cancel=True, hint=str(def_cd), help_text=t('def_cooldown'))
+        cd = int(cd_in) if cd_in and cd_in != '' else def_cd
         rid = edit_rule.get('id', int(datetime.datetime.now().timestamp())) if edit_rule else int(datetime.datetime.now().timestamp())
+
+        # New Status & Severity Filters
+        print(f"\n{Colors.CYAN}--- {t('advanced_filters')} ---{Colors.ENDC}")
+        def_status = edit_rule.get('filter_status', 'all') if edit_rule else 'all'
+        s_map = {1: 'success', 2: 'failure', 0: 'all'}
+        s_inv = {v: k for k, v in s_map.items()}
+        si = safe_input(t('filter_status').replace('[預設: 0]', '').replace('[Default: 0]', '').strip(), int, range(0, 3), allow_cancel=True, hint=str(s_inv.get(def_status, 0)), help_text=t('def_filters'))
+        if si is None: break
+        if si == '': si = s_inv.get(def_status, 0)
+        sel_status = s_map.get(si, def_status)
         
+        def_sev = edit_rule.get('filter_severity', 'all') if edit_rule else 'all'
+        v_map = {1: 'error', 2: 'warning', 3: 'info', 0: 'all'}
+        v_inv = {v: k for k, v in v_map.items()}
+        vi = safe_input(t('filter_severity').replace('[預設: 0]', '').replace('[Default: 0]', '').strip(), int, range(0, 4), allow_cancel=True, hint=str(v_inv.get(def_sev, 0)), help_text=t('def_filters'))
+        if vi is None: break
+        if vi == '': vi = v_inv.get(def_sev, 0)
+        sel_sev = v_map.get(vi, def_sev)
+
         cm.add_or_update_rule({
             "id": rid,
             "type": "event", "name": t(evts[k]), "filter_key": "event_type", "filter_value": k,
+            "filter_status": sel_status, "filter_severity": sel_sev,
             "desc": t(evts[k]), "rec": "Check Logs", "threshold_type": ttype, "threshold_count": cnt, 
             "threshold_window": win, "cooldown_minutes": cd
         })
@@ -121,74 +164,87 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None):
     print(t('menu_return'))
     
     def_name = edit_rule.get('name', '') if edit_rule else ''
-    name_pmpt = f"{t('rule_name')} [{def_name}]" if def_name else t('rule_name')
-    name = safe_input(name_pmpt, str, allow_cancel=True) or def_name
-    if not name or name == '0': return
-    
-    print(t('policy_decision'))
-    print(t('pd_1'))
-    print(t('pd_2'))
-    print(t('pd_3'))
-    print(t('pd_4'))
+    name = safe_input(t('rule_name'), str, allow_cancel=True, hint=def_name)
+    if name is None: return 
+    if name == '': name = def_name
+    if not name: return
     
     def_pd = 1
     if edit_rule:
-        rpd = edit_rule.get('pd', 2)
-        if rpd == 2: def_pd = 1
-        elif rpd == 1: def_pd = 2
-        elif rpd == 0: def_pd = 3
-        elif rpd == -1: def_pd = 4
-        
-    pd_sel = safe_input(f"{t('pd_select_default')} [{def_pd}]", int, range(0, 5), allow_cancel=True) or def_pd
-    if pd_sel == 0: return
+        tpd = edit_rule.get('pd', 2)
+        if tpd == 2: def_pd = 1    # Blocked
+        elif tpd == 0: def_pd = 2  # Potential
+        elif tpd == 1: def_pd = 3  # Allowed
+        elif tpd == -1: def_pd = 4 # All
+
+    pd_sel = safe_input(t('pd_select_default'), int, range(0, 5), allow_cancel=True, hint=str(def_pd), help_text=t('def_traffic_pd'))
+    if pd_sel is None: return
+    if pd_sel == '': pd_sel = def_pd
+    
+    # 選單對應: 1=Blocked(pd=2), 2=Potential(pd=0), 3=Allowed(pd=1), 4=All(pd=-1)
     if pd_sel == 1: target_pd = 2
-    elif pd_sel == 2: target_pd = 1
-    elif pd_sel == 3: target_pd = 0
+    elif pd_sel == 2: target_pd = 0
+    elif pd_sel == 3: target_pd = 1
     else: target_pd = -1
     
     print(f"\n{Colors.CYAN}{t('advanced_filters')}{Colors.ENDC}")
     
     def_port = edit_rule.get('port', '') if edit_rule else ''
-    port_pmpt = f"{t('port_input')} [{def_port}]" if def_port else t('port_input')
-    port_in = safe_input(port_pmpt, int, allow_cancel=True) or (def_port if def_port else None)
+    port_in = safe_input(t('port_input'), int, allow_cancel=True, hint=str(def_port) if def_port else '')
+    if port_in is None: return
+    if port_in == '': port_in = (int(def_port) if def_port else None)
     
     proto_in = None
     if port_in:
         def_proto = 0
         if edit_rule and edit_rule.get('proto') == 6: def_proto = 1
         elif edit_rule and edit_rule.get('proto') == 17: def_proto = 2
-        p_sel = safe_input(f"{t('proto_select')} [{def_proto}]" if def_proto else t('proto_select'), int, range(0, 3), allow_cancel=True) or def_proto
+        p_sel = safe_input(t('proto_select'), int, range(0, 3), allow_cancel=True, hint=str(def_proto))
+        if p_sel is None: return
+        if p_sel == '': p_sel = def_proto
+        
         if p_sel == 1: proto_in = 6
         elif p_sel == 2: proto_in = 17
         
     def_src = edit_rule.get('src_label', edit_rule.get('src_ip_in', '')) if edit_rule else ''
-    src_in = safe_input(f"{t('src_input')} [{def_src}]" if def_src else t('src_input'), str, allow_cancel=True) or def_src
+    src_in = safe_input(t('src_input'), str, allow_cancel=True, hint=def_src)
+    if src_in is None: return
     
     def_dst = edit_rule.get('dst_label', edit_rule.get('dst_ip_in', '')) if edit_rule else ''
-    dst_in = safe_input(f"{t('dst_input')} [{def_dst}]" if def_dst else t('dst_input'), str, allow_cancel=True) or def_dst
+    dst_in = safe_input(t('dst_input'), str, allow_cancel=True, hint=def_dst)
+    if dst_in is None: return
+    if dst_in == '': dst_in = def_dst
     
     def_win = edit_rule.get('threshold_window', 10) if edit_rule else 10
-    win_pmpt = t('time_window_mins_default_5').replace('5', str(def_win))
-    win = safe_input(f"{win_pmpt} [{def_win}]", int, allow_cancel=True) or def_win
+    win_in = safe_input(t('time_window_mins_default_5').replace('[{win}]', '').replace('[Default: 5]', '').strip(), int, allow_cancel=True, hint=str(def_win))
+    if win_in is None: return
+    win = int(win_in) if win_in != '' else def_win
     
     def_cnt = edit_rule.get('threshold_count', 10) if edit_rule else 10
-    cnt = safe_input(f"{t('trigger_threshold_count')} [{def_cnt}]", int, allow_cancel=True) or def_cnt
+    cnt_in = safe_input(t('trigger_threshold_count'), int, allow_cancel=True, hint=str(def_cnt))
+    if cnt_in is None: return
+    cnt = int(cnt_in) if cnt_in != '' else def_cnt
     
     def_cd = edit_rule.get('cooldown_minutes', win) if edit_rule else win
-    cd = safe_input(f"{t('cooldown_mins_default', win=def_cd)} [{def_cd}]", int, allow_cancel=True) or def_cd
+    cd_in = safe_input(t('cooldown_mins_default').replace('[{win}]', '').replace('[Default: {win}]', '').strip(), int, allow_cancel=True, hint=str(def_cd), help_text=t('def_cooldown'))
+    if cd_in is None: return
+    cd = int(cd_in) if cd_in != '' else def_cd
     
     src_label_val, src_ip_val = (src_in, None) if src_in and '=' in src_in else (None, src_in)
     dst_label_val, dst_ip_val = (dst_in, None) if dst_in and '=' in dst_in else (None, dst_in)
     
     print(f"\n{Colors.CYAN}{t('excludes_optional')}{Colors.ENDC}")
     def_ex_port = edit_rule.get('ex_port', '') if edit_rule else ''
-    ex_port_in = safe_input(f"{t('ex_port_input')} [{def_ex_port}]" if def_ex_port else t('ex_port_input'), int, allow_cancel=True) or (def_ex_port if def_ex_port else None)
+    ex_port_in = safe_input(t('ex_port_input'), int, allow_cancel=True, hint=str(def_ex_port))
+    if ex_port_in is None: return
     
     def_ex_src = edit_rule.get('ex_src_label', edit_rule.get('ex_src_ip', '')) if edit_rule else ''
-    ex_src_in = safe_input(f"{t('ex_src_input')} [{def_ex_src}]" if def_ex_src else t('ex_src_input'), str, allow_cancel=True) or def_ex_src
+    ex_src_in = safe_input(t('ex_src_input'), str, allow_cancel=True, hint=def_ex_src)
+    if ex_src_in is None: return
     
     def_ex_dst = edit_rule.get('ex_dst_label', edit_rule.get('ex_dst_ip', '')) if edit_rule else ''
-    ex_dst_in = safe_input(f"{t('ex_dst_input')} [{def_ex_dst}]" if def_ex_dst else t('ex_dst_input'), str, allow_cancel=True) or def_ex_dst
+    ex_dst_in = safe_input(t('ex_dst_input'), str, allow_cancel=True, hint=def_ex_dst)
+    if ex_dst_in is None: return
     
     ex_src_label_val, ex_src_ip_val = (ex_src_in, None) if ex_src_in and '=' in ex_src_in else (None, ex_src_in)
     ex_dst_label_val, ex_dst_ip_val = (ex_dst_in, None) if ex_dst_in and '=' in ex_dst_in else (None, ex_dst_in)
@@ -217,16 +273,20 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None):
     print(t('menu_return'))
     
     def_name = edit_rule.get('name', '') if edit_rule else ''
-    name = safe_input(f"{t('rule_name_bw')} [{def_name}]" if def_name else t('rule_name_bw'), str, allow_cancel=True) or def_name
-    if not name or name == '0': return
+    name = safe_input(t('rule_name_bw'), str, allow_cancel=True, hint=def_name)
+    if name is None: return
+    if name == '': name = def_name
+    if not name: return
     
     print(f"\n{Colors.CYAN}{t('step_1_metric')}{Colors.ENDC}")
     print(t('metric_1'))
     print(t('metric_2'))
     
     def_msel = 1 if edit_rule and edit_rule.get('type') == 'bandwidth' else (2 if edit_rule else None)
-    m_sel = safe_input(f"{t('please_select')} [{def_msel}]" if def_msel else t('please_select'), int, range(0, 3), allow_cancel=True) or def_msel
-    if not m_sel or m_sel == 0: return
+    m_sel = safe_input(t('please_select'), int, range(0, 3), allow_cancel=True, hint=str(def_msel))
+    if m_sel is None: return
+    if m_sel == '' and def_msel: m_sel = def_msel
+    if not m_sel or m_sel not in (1, 2): return
     
     rtype = "bandwidth" if m_sel == 1 else "volume"
     unit_prompt = "Mbps" if m_sel == 1 else "MB"
@@ -234,47 +294,61 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None):
     print(f"\n{Colors.CYAN}{t('step_2_filters')}{Colors.ENDC}")
     
     def_port = edit_rule.get('port', '') if edit_rule else ''
-    port_in = safe_input(f"{t('port_input')} [{def_port}]" if def_port else t('port_input'), int, allow_cancel=True) or (def_port if def_port else None)
+    port_in = safe_input(t('port_input'), int, allow_cancel=True, hint=str(def_port) if def_port else '')
+    if port_in is None: return
+    if port_in == '': port_in = (int(def_port) if def_port else None)
     
     proto_in = None
     if port_in:
         def_proto = 0
         if edit_rule and edit_rule.get('proto') == 6: def_proto = 1
         elif edit_rule and edit_rule.get('proto') == 17: def_proto = 2
-        p_sel = safe_input(f"{t('proto_select')} [{def_proto}]" if def_proto else t('proto_select'), int, range(0, 3), allow_cancel=True) or def_proto
+        p_sel = safe_input(t('proto_select'), int, range(0, 3), allow_cancel=True, hint=str(def_proto))
+        if p_sel is None: return
         if p_sel == 1: proto_in = 6
         elif p_sel == 2: proto_in = 17
+        elif p_sel == '': proto_in = (edit_rule.get('proto') if edit_rule else None)
         
     def_src = edit_rule.get('src_label', edit_rule.get('src_ip_in', '')) if edit_rule else ''
-    src_in = safe_input(f"{t('src_input')} [{def_src}]" if def_src else t('src_input'), str, allow_cancel=True) or def_src
+    src_in = safe_input(t('src_input'), str, allow_cancel=True, hint=def_src)
+    if src_in is None: return
     
     def_dst = edit_rule.get('dst_label', edit_rule.get('dst_ip_in', '')) if edit_rule else ''
-    dst_in = safe_input(f"{t('dst_input')} [{def_dst}]" if def_dst else t('dst_input'), str, allow_cancel=True) or def_dst
+    dst_in = safe_input(t('dst_input'), str, allow_cancel=True, hint=def_dst)
+    if dst_in is None: return
     
     src_label_val, src_ip_val = (src_in, None) if src_in and '=' in src_in else (None, src_in)
     dst_label_val, dst_ip_val = (dst_in, None) if dst_in and '=' in dst_in else (None, dst_in)
     
     print(f"\n{Colors.CYAN}{t('step_3_threshold')}{Colors.ENDC}")
     def_th = edit_rule.get('threshold_count', '') if edit_rule else ''
-    th = safe_input(f"{t('trigger_threshold_unit', unit=unit_prompt)} [{def_th}]" if def_th else t('trigger_threshold_unit', unit=unit_prompt), float, allow_cancel=True) or def_th
-    if not th: return
+    th_in = safe_input(t('trigger_threshold_unit', unit=unit_prompt), float, allow_cancel=True, hint=str(def_th) if def_th else '', help_text=t('def_traffic_vol'))
+    if th_in is None: return
+    th = float(th_in) if th_in != '' else (float(def_th) if def_th != '' else None)
+    if th is None: return
     
     def_win = edit_rule.get('threshold_window', 5) if edit_rule else 5
-    win_pmpt = t('time_window_mins_default_5').replace('5', str(def_win))
-    win = safe_input(f"{win_pmpt} [{def_win}]", int, allow_cancel=True) or def_win
+    win_in = safe_input(t('time_window_mins_default_5').replace('[{win}]', '').replace('[Default: 5]', '').strip(), int, allow_cancel=True, hint=str(def_win))
+    if win_in is None: return
+    win = int(win_in) if win_in != '' else def_win
     
     def_cd = edit_rule.get('cooldown_minutes', win) if edit_rule else win
-    cd = safe_input(f"{t('cooldown_mins_default', win=def_cd)} [{def_cd}]", int, allow_cancel=True) or def_cd
+    cd_in = safe_input(t('cooldown_mins_default').replace('[{win}]', '').replace('[Default: {win}]', '').strip(), int, allow_cancel=True, hint=str(def_cd), help_text=t('def_cooldown'))
+    if cd_in is None: return
+    cd = int(cd_in) if cd_in != '' else def_cd
     
     print(f"\n{Colors.CYAN}{t('excludes_optional')}{Colors.ENDC}")
     def_ex_port = edit_rule.get('ex_port', '') if edit_rule else ''
-    ex_port_in = safe_input(f"{t('ex_port_input')} [{def_ex_port}]" if def_ex_port else t('ex_port_input'), int, allow_cancel=True) or (def_ex_port if def_ex_port else None)
+    ex_port_in = safe_input(t('ex_port_input'), int, allow_cancel=True, hint=str(def_ex_port))
+    if ex_port_in is None: return
     
     def_ex_src = edit_rule.get('ex_src_label', edit_rule.get('ex_src_ip', '')) if edit_rule else ''
-    ex_src_in = safe_input(f"{t('ex_src_input')} [{def_ex_src}]" if def_ex_src else t('ex_src_input'), str, allow_cancel=True) or def_ex_src
+    ex_src_in = safe_input(t('ex_src_input'), str, allow_cancel=True, hint=def_ex_src)
+    if ex_src_in is None: return
     
     def_ex_dst = edit_rule.get('ex_dst_label', edit_rule.get('ex_dst_ip', '')) if edit_rule else ''
-    ex_dst_in = safe_input(f"{t('ex_dst_input')} [{def_ex_dst}]" if def_ex_dst else t('ex_dst_input'), str, allow_cancel=True) or def_ex_dst
+    ex_dst_in = safe_input(t('ex_dst_input'), str, allow_cancel=True, hint=def_ex_dst)
+    if ex_dst_in is None: return
     
     ex_src_label_val, ex_src_ip_val = (ex_src_in, None) if ex_src_in and '=' in ex_src_in else (None, ex_src_in)
     ex_dst_label_val, ex_dst_ip_val = (ex_dst_in, None) if ex_dst_in and '=' in ex_dst_in else (None, ex_dst_in)
@@ -283,7 +357,7 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None):
     
     cm.add_or_update_rule({
         "id": rid,
-        "type": rtype, "name": name, 
+        "type": rtype, "name": name, "pd": edit_rule.get('pd', -1) if edit_rule else -1,
         "port": port_in, "proto": proto_in, 
         "src_label": src_label_val, "dst_label": dst_label_val,
         "src_ip_in": src_ip_val, "dst_ip_in": dst_ip_val,
@@ -343,25 +417,27 @@ def manage_rules_menu(cm: ConfigManager):
             padded_type = pad_string(rtype, 10)
             print(f"{i:<4} {padded_name} {padded_type} {cond:<20} {filter_str}")
         val = input(f"\n{t('input_delete_indices')}").strip().lower()
-        if val == '-1': break
+        if val == '0' or not val: break
         
-        if val.startswith('d ') or val.startswith('d'):
-            val = val[1:].strip()
+        if val.startswith('d ') or (val.startswith('d') and len(val) > 1 and val[1].isdigit()):
+            # Handle both 'd 0, 1' and 'd0, 1'
+            target = val[1:].strip()
+            if target.startswith('d'): target = target[1:].strip()
             try:
-                indices = [int(x.strip()) for x in val.split(',')]
+                indices = [int(x.strip()) for x in target.split(',')]
                 cm.remove_rules_by_index(indices)
                 print(t('done'))
-            except: pass
-        elif val.startswith('m ') or val.startswith('m'):
-            val = val[1:].strip()
+            except Exception as e:
+                print(f"Error deleting: {e}")
+        elif val.startswith('m ') or (val.startswith('m') and len(val) > 1 and val[1].isdigit()):
+            target = val[1:].strip()
+            if target.startswith('m'): target = target[1:].strip()
             try:
-                idx = int(val)
+                idx = int(target)
                 if 0 <= idx < len(cm.config['rules']):
                     rule = cm.config['rules'][idx]
                     print(f"\n{Colors.CYAN}--- Modifying Rule: {rule['name']} ---{Colors.ENDC}")
                     rtype = rule['type']
-                    # Pass the edit_rule object. Do NOT remove from rules immediately here.
-                    # Wait for successful save in the add_*_methods.
                     cm.remove_rules_by_index([idx])
                     if rtype == 'event':
                         add_event_menu(cm, edit_rule=rule)
@@ -372,14 +448,10 @@ def manage_rules_menu(cm: ConfigManager):
             except Exception as e:
                 print(f"Error modifying: {e}")
         else:
-            try:
-                # Fallback to direct numeric deletion for backwards compatibility
-                if val.isdigit() or ',' in val:
-                    indices = [int(x.strip()) for x in val.split(',')]
-                    cm.remove_rules_by_index(indices)
-                    print(t('done'))
-            except: pass
+            print(f"{Colors.FAIL}{t('error_format', default='Invalid format.')}{Colors.ENDC}")
+            
         input(t('press_enter_to_continue'))
+
 
 def alert_settings_menu(cm: ConfigManager):
     while True:
@@ -403,7 +475,7 @@ def alert_settings_menu(cm: ConfigManager):
         print(t('menu_return'))
         
         sel = safe_input(f"\n{t('please_select')}", int, range(0, 8))
-        if sel == 0: break
+        if sel is None: break
         
         if sel == 1:
             lang_sel = safe_input(t('select_language'), int, range(1, 3))
@@ -425,7 +497,7 @@ def alert_settings_menu(cm: ConfigManager):
         elif sel == 5:
             current_token = cm.config.get("alerts", {}).get("line_channel_access_token", "")
             masked = current_token[:5] + "..." if current_token else t('not_set')
-            new_token = safe_input(f"{t('line_token_input')} [{masked}]", str, allow_cancel=True)
+            new_token = safe_input(t('line_token_input'), str, allow_cancel=True, hint=masked)
             if new_token:
                 cm.config.setdefault("alerts", {})["line_channel_access_token"] = new_token
                 cm.save()
@@ -433,7 +505,7 @@ def alert_settings_menu(cm: ConfigManager):
         elif sel == 6:
             current_id = cm.config.get("alerts", {}).get("line_target_id", "")
             masked_id = current_id[:5] + "..." if current_id else t('not_set')
-            new_id = safe_input(f"{t('line_target_id_input')} [{masked_id}]", str, allow_cancel=True)
+            new_id = safe_input(t('line_target_id_input'), str, allow_cancel=True, hint=masked_id)
             if new_id:
                 cm.config.setdefault("alerts", {})["line_target_id"] = new_id
                 cm.save()
@@ -441,7 +513,7 @@ def alert_settings_menu(cm: ConfigManager):
         elif sel == 7:
             current_url = cm.config.get("alerts", {}).get("webhook_url", "")
             masked = current_url[:15] + "..." if current_url else t('not_set')
-            new_url = safe_input(f"{t('webhook_url_input')} [{masked}]", str, allow_cancel=True)
+            new_url = safe_input(t('webhook_url_input'), str, allow_cancel=True, hint=masked)
             if new_url:
                 cm.config.setdefault("alerts", {})["webhook_url"] = new_url
                 cm.save()
@@ -472,14 +544,14 @@ def settings_menu(cm: ConfigManager):
         print(f"{t('settings_4')} ({smtp_conf.get('host')}:{smtp_conf.get('port')} | {auth_status})")
         print(t('menu_return'))
         sel = safe_input(f"\n{t('please_select')}", int, range(0, 5))
-        if sel == 0: break
+        if sel is None: break
         if sel == 1:
-            new_url = safe_input(f"API URL [{cm.config['api']['url']}]", str, allow_cancel=True)
+            new_url = safe_input("API URL", str, allow_cancel=True, hint=cm.config['api']['url'])
             if new_url: cm.config['api']['url'] = new_url.strip('"').strip("'")
             
-            cm.config['api']['org_id'] = safe_input(f"Org ID [{cm.config['api']['org_id']}]", str, allow_cancel=True) or cm.config['api']['org_id']
-            cm.config['api']['key'] = safe_input(f"API Key [{masked_key}]", str, allow_cancel=True) or cm.config['api']['key']
-            new_sec = safe_input("API Secret [******]", str, allow_cancel=True)
+            cm.config['api']['org_id'] = safe_input("Org ID", str, allow_cancel=True, hint=cm.config['api']['org_id']) or cm.config['api']['org_id']
+            cm.config['api']['key'] = safe_input("API Key", str, allow_cancel=True, hint=masked_key) or cm.config['api']['key']
+            new_sec = safe_input("API Secret", str, allow_cancel=True, hint="******")
             if new_sec: cm.config['api']['secret'] = new_sec
             cm.save()
         elif sel == 2:
@@ -494,8 +566,8 @@ def settings_menu(cm: ConfigManager):
         elif sel == 4:
             c = cm.config.get('smtp', {})
             print(f"\n{Colors.CYAN}{t('setup_smtp')}{Colors.ENDC}")
-            c['host'] = safe_input(f"SMTP Host [{c.get('host','localhost')}]", str, allow_cancel=True) or c.get('host','localhost')
-            c['port'] = safe_input(f"SMTP Port [{c.get('port', 25)}]", int, allow_cancel=True) or c.get('port', 25)
+            c['host'] = safe_input("SMTP Host", str, allow_cancel=True, hint=c.get('host','localhost')) or c.get('host','localhost')
+            c['port'] = safe_input("SMTP Port", int, allow_cancel=True, hint=str(c.get('port', 25))) or c.get('port', 25)
             
             enable_tls = safe_input(t('enable_starttls', status=c.get('enable_tls', False)), str, allow_cancel=True)
             if enable_tls and enable_tls.lower() == 'y': c['enable_tls'] = True
@@ -506,8 +578,8 @@ def settings_menu(cm: ConfigManager):
             elif enable_auth and enable_auth.lower() == 'n': c['enable_auth'] = False
             
             if c['enable_auth']:
-                c['user'] = safe_input(f"Username [{c.get('user','')}]", str, allow_cancel=True) or c.get('user','')
-                new_pass = safe_input("Password [******]", str, allow_cancel=True)
+                c['user'] = safe_input("Username", str, allow_cancel=True, hint=c.get('user','')) or c.get('user','')
+                new_pass = safe_input("Password", str, allow_cancel=True, hint="******")
                 if new_pass: c['password'] = new_pass
             
             cm.config['smtp'] = c

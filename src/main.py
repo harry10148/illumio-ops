@@ -20,6 +20,7 @@ from src.settings import (
 from src.i18n import t
 
 logger = logging.getLogger(__name__)
+LOG_FILE = "" # To be set in main() or main_menu()
 
 # ─── Daemon / Monitor Loop ───────────────────────────────────────────────────
 
@@ -63,16 +64,36 @@ def run_daemon_loop(interval_minutes: int):
     print("\nDaemon stopped.")
 
 
+def view_logs(log_file):
+    """Simple log viewer for the CLI."""
+    os.system('cls' if os.name == 'nt' else 'clear')
+    print(f"{Colors.HEADER}{t('menu_view_logs_title')}{Colors.ENDC}")
+    print("-" * 60)
+    try:
+        if not os.path.exists(log_file):
+            print(f"Log file not found: {log_file}")
+        else:
+            with open(log_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                # Print last 20 lines
+                for line in lines[-20:]:
+                    print(line.strip())
+    except Exception as e:
+        print(f"Error reading logs: {e}")
+    input(f"\n{t('press_enter_to_continue')}")
+
+
 # ─── Interactive CLI Menu ─────────────────────────────────────────────────────
 
 def main_menu():
     # Setup Logging
+    global LOG_FILE
     PKG_DIR = os.path.dirname(os.path.abspath(__file__))
     ROOT_DIR = os.path.dirname(PKG_DIR)
     LOG_DIR = os.path.join(ROOT_DIR, 'logs')
     LOG_FILE = os.path.join(LOG_DIR, 'illumio_monitor.log')
 
-    setup_logger('illumio_monitor', LOG_FILE)
+    setup_logger('src', LOG_FILE)
     logger.info("Starting Illumio PCE Monitor")
 
     cm = ConfigManager()
@@ -92,9 +113,10 @@ def main_menu():
         print(t('main_menu_8'))
         print(t('main_menu_9'))
         print(t('main_menu_10').replace('{Colors.CYAN}', Colors.CYAN).replace('{Colors.ENDC}', Colors.ENDC))
+        print(t('main_menu_11'))
         print(t('main_menu_0'))
 
-        sel = safe_input(f"\n{t('please_select')}", int, range(0, 11))
+        sel = safe_input(f"\n{t('please_select')}", int, range(0, 12))
 
         if sel == 0:
             break
@@ -125,13 +147,13 @@ def main_menu():
             ana = Analyzer(cm, api, rep)
             ana.run_analysis()
             rep.send_alerts()
-            print(t('done_msg'))
+            input(t('press_enter_to_continue'))
         elif sel == 9:
             api = ApiClient(cm)
             rep = Reporter(cm)
             ana = Analyzer(cm, api, rep)
             ana.run_debug_mode()
-            input(t('debug_done'))
+            input(t('press_enter_to_continue'))
         elif sel == 10:
             # Launch Web GUI from console menu
             from src.gui import launch_gui, HAS_FLASK
@@ -146,6 +168,8 @@ def main_menu():
                 except (ValueError, TypeError):
                     port = 5001
                 launch_gui(cm, port=port)
+        elif sel == 11:
+            view_logs(LOG_FILE)
 
 
 # ─── Entry Point ──────────────────────────────────────────────────────────────
@@ -179,7 +203,7 @@ def main():
     ROOT_DIR = os.path.dirname(PKG_DIR)
     LOG_DIR = os.path.join(ROOT_DIR, 'logs')
     LOG_FILE = os.path.join(LOG_DIR, 'illumio_monitor.log')
-    setup_logger('illumio_monitor', LOG_FILE)
+    setup_logger('src', LOG_FILE)
 
     if args.monitor:
         run_daemon_loop(args.interval)

@@ -107,25 +107,34 @@ class ConfigManager:
         print(f"{Colors.BLUE}{t('loading_best_practices')}{Colors.ENDC}")
         self.config["rules"] = []
         ts = int(time.time())
+        # (Name_Key, Event_Type, Threshold_Type, Count, Window, Cooldown, Status, Severity)
         bps = [
-            ("Agent Tampering Detected", "agent.tampering", "immediate", 1, 10, 30),
-            ("Agent Offline", "system_task.agent_offline_check", "immediate", 1, 10, 30),
-            ("API Authentication Failed", "request.authentication_failed", "count", 5, 10, 30),
-            ("Login Failed", "user.login_failed", "count", 5, 10, 30)
+            ("rule_agent_tampering", "agent.tampering", "immediate", 1, 10, 30, "all", "all"),
+            ("rule_brute_force", "user.login_failure_count_exceeded", "immediate", 1, 10, 30, "all", "all"),
+            ("rule_login_failed", "user.sign_in", "count", 5, 10, 30, "failure", "all"),
+            ("rule_api_auth_failed", "request.authentication_failed", "count", 5, 10, 30, "all", "all"),
+            ("rule_csrf_attack", "user.csrf_validation_failed", "immediate", 1, 10, 30, "all", "all"),
+            ("rule_agent_offline", "system_task.agent_offline_check", "immediate", 1, 10, 30, "all", "all"),
+            ("rule_policy_fail", "agent.refresh_policy", "immediate", 1, 10, 30, "failure", "all"),
+            ("rule_agent_heartbeat", "system_task.agent_missed_heartbeats_check", "immediate", 1, 10, 30, "all", "all"),
+            ("rule_agent_goodbye", "agent.goodbye", "immediate", 1, 10, 30, "all", "all")
         ]
-        for i, (name, etype, ttype, cnt, win, cd) in enumerate(bps):
+        
+        for i, (name_key, etype, ttype, cnt, win, cd, f_stat, f_sev) in enumerate(bps):
             self.config["rules"].append({
-                "id": ts + i, "type": "event", "name": name,
+                "id": ts + i, "type": "event", "name": t(name_key),
                 "filter_key": "event_type", "filter_value": etype,
-                "desc": "Best Practice", "rec": "Check Logs",
+                "filter_status": f_stat, "filter_severity": f_sev,
+                "desc": "Official Best Practice", "rec": "Check logs",
                 "threshold_type": ttype, "threshold_count": cnt,
                 "threshold_window": win, "cooldown_minutes": cd
             })
+            
         self.config["rules"].append({
-            "id": ts + 100, "type": "traffic", "name": "High Blocked Traffic", "pd": 2,
+            "id": ts + 100, "type": "traffic", "name": t("rule_high_blocked"), "pd": 2,
             "port": None, "proto": None, "src_label": None, "dst_label": None,
-            "desc": "Blocked traffic exceeds threshold",
-            "rec": "Check Policy", "threshold_type": "count", "threshold_count": 10,
+            "desc": "High volume of blocked traffic detected.",
+            "rec": "Review segmentation rules", "threshold_type": "count", "threshold_count": 25,
             "threshold_window": 10, "cooldown_minutes": 30
         })
         self.save()
