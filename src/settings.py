@@ -1,6 +1,6 @@
 import os
 import datetime
-from src.utils import Colors, safe_input
+from src.utils import Colors, safe_input, draw_panel, draw_table
 from src.config import ConfigManager
 from src.i18n import t, set_language
 from src import __version__
@@ -71,19 +71,21 @@ DISCOVERY_EVENTS = [
 ]
 
 def add_event_menu(cm: ConfigManager, edit_rule=None):
-    from src.utils import Colors, safe_input
+    from src.utils import Colors, safe_input, draw_panel, draw_table
     
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
         title = t('menu_add_event_title') if not edit_rule else f"=== Modify Event Rule: {edit_rule.get('name', '')} ==="
-        print(f"{Colors.HEADER}{title}{Colors.ENDC}")
-        print(f"{Colors.DARK_GRAY}{t('hint_return')}{Colors.ENDC}")
-        print(t('menu_return'))
+        draw_panel(title, [
+            f"{Colors.DARK_GRAY}{t('hint_return')}{Colors.ENDC}",
+            t('menu_return')
+        ], width=80)
+        
         if not edit_rule:
-            print("-" * 40)
+            print("")
             cats = list(FULL_EVENT_CATALOG.keys())
             for i, c in enumerate(cats): print(f"{i+1}. {c}")
-            sel = input(f"\n{t('select_category')}").strip().upper()
+            sel = input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('select_category')} {Colors.GREEN}❯{Colors.ENDC} ").strip().upper()
         if sel == '0': break
         if sel == 'H':
             cm.config["settings"]["enable_health_check"] = not cm.config["settings"].get("enable_health_check", True)
@@ -93,14 +95,14 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
         cat = cats[int(sel)-1]
         evts = FULL_EVENT_CATALOG[cat]
         evt_keys = list(evts.keys())
-        print(f"\n--- {cat} ---")
-        # Header for the list
-        print(f"{'No.':<4} {'Event Type':<40} | {'Description'}")
-        print("-" * 80)
+        print(f"\n{Colors.BOLD}{Colors.CYAN}--- {cat} ---{Colors.ENDC}")
+        headers = ["No.", "Event Type", "Description"]
+        rows = []
         for i, k in enumerate(evt_keys):
             desc = t(FULL_EVENT_CATALOG[cat][k])
             display_k = k if k != "*" else "* (All Events)"
-            print(f"{i+1:<4} {display_k:<40} | {desc}")
+            rows.append([str(i+1), display_k, desc])
+        draw_table(headers, rows)
         
         print(f"\n{t('menu_cancel')}")
         if edit_rule and edit_rule.get('filter_value') in evt_keys:
@@ -172,16 +174,18 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
             "desc": t(evts[k]), "rec": "Check Logs", "threshold_type": ttype, "threshold_count": cnt, 
             "threshold_window": win, "cooldown_minutes": cd
         })
-        input(t('rule_saved'))
+        input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('rule_saved')} {Colors.GREEN}❯{Colors.ENDC} ")
         break
 
 def add_traffic_menu(cm: ConfigManager, edit_rule=None):
-    from src.utils import Colors, safe_input
+    from src.utils import Colors, safe_input, draw_panel
     
     title = t('menu_add_traffic_title') if not edit_rule else f"=== Modify Traffic Rule: {edit_rule.get('name', '')} ==="
-    print(f"\n{Colors.HEADER}{title}{Colors.ENDC}")
-    print(f"{Colors.DARK_GRAY}{t('hint_return')}{Colors.ENDC}")
-    print(t('menu_return'))
+    draw_panel(title, [
+        f"{Colors.DARK_GRAY}{t('hint_return')}{Colors.ENDC}",
+        t('menu_return')
+    ], width=80)
+    print("")
     
     def_name = edit_rule.get('name', '') if edit_rule else ''
     name = safe_input(t('rule_name'), str, allow_cancel=True, hint=def_name)
@@ -290,15 +294,17 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None):
         "desc": name, "rec": "Check Policy", "threshold_type": "count", "threshold_count": cnt, 
         "threshold_window": win, "cooldown_minutes": cd
     })
-    input(t('traffic_rule_saved'))
+    input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('traffic_rule_saved')} {Colors.GREEN}❯{Colors.ENDC} ")
 
 def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None):
-    from src.utils import Colors, safe_input
+    from src.utils import Colors, safe_input, draw_panel
     
     title = t('menu_add_bw_vol_title') if not edit_rule else f"=== Modify Rule: {edit_rule.get('name', '')} ==="
-    print(f"\n{Colors.HEADER}{title}{Colors.ENDC}")
-    print(f"{Colors.DARK_GRAY}{t('hint_return')}{Colors.ENDC}")
-    print(t('menu_return'))
+    draw_panel(title, [
+        f"{Colors.DARK_GRAY}{t('hint_return')}{Colors.ENDC}",
+        t('menu_return')
+    ], width=80)
+    print("")
     
     def_name = edit_rule.get('name', '') if edit_rule else ''
     name = safe_input(t('rule_name_bw'), str, allow_cancel=True, hint=def_name)
@@ -398,15 +404,19 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None):
         "threshold_window": win, "cooldown_minutes": cd,
         "desc": f"Alert when {rtype} > {th} {unit_prompt}", "rec": "Check network activity"
     })
-    input(t('rule_saved'))
+    input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('rule_saved')} {Colors.GREEN}❯{Colors.ENDC} ")
 
 def manage_rules_menu(cm: ConfigManager):
+    from src.utils import draw_panel, draw_table, get_visible_width
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
-        print(f"{Colors.HEADER}{t('menu_manage_rules_title')}{Colors.ENDC}")
-        print(f"{'No.':<4} {'Name':<30} {'Type':<10} {'Condition':<20} {'Filters / Excludes'}")
-        print("-" * 100)
+        draw_panel(t('menu_manage_rules_title'), [], width=100)
+        print("")
+
         if not cm.config['rules']: print(t('no_rules'))
+        else:
+            headers = ["No.", "Name", "Type", "Condition", "Filters / Excludes"]
+            rows = []
         for i, r in enumerate(cm.config['rules']):
             rtype = r['type'].capitalize()
             val = r['threshold_count']
@@ -434,15 +444,15 @@ def manage_rules_menu(cm: ConfigManager):
             if r.get('ex_dst_ip'): filters.append(f"{Colors.WARNING}[Excl DstIP:{r['ex_dst_ip']}]{Colors.ENDC}")
             filter_str = " ".join(filters)
             
-            from src.utils import pad_string, get_display_width
+            import unicodedata
             display_name = r['name']
             
             # CJK-aware truncation to keep table aligned
-            if get_display_width(display_name) > 28:
+            if get_visible_width(display_name) > 28:
                 temp_name = ""
                 curr_w = 0
                 for char in display_name:
-                    char_w = get_display_width(char)
+                    char_w = 2 if unicodedata.east_asian_width(char) in ('W', 'F') else 1
                     if curr_w + char_w + 3 > 28:
                         temp_name += "..."
                         break
@@ -450,10 +460,12 @@ def manage_rules_menu(cm: ConfigManager):
                     curr_w += char_w
                 display_name = temp_name
                 
-            padded_name = pad_string(display_name, 30)
-            padded_type = pad_string(rtype, 10)
-            print(f"{i:<4} {padded_name} {padded_type} {cond:<20} {filter_str}")
-        val = input(f"\n{t('input_delete_indices')}").strip().lower()
+            rows.append([str(i), display_name, rtype, cond, filter_str])
+            
+        if cm.config['rules']:
+            draw_table(headers, rows)
+            
+        val = input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('input_delete_indices')} {Colors.GREEN}❯{Colors.ENDC} ").strip().lower()
         if val == '0' or not val: break
         
         if val.startswith('d ') or (val.startswith('d') and len(val) > 1 and val[1].isdigit()):
@@ -487,13 +499,15 @@ def manage_rules_menu(cm: ConfigManager):
         else:
             print(f"{Colors.FAIL}{t('error_format', default='Invalid format.')}{Colors.ENDC}")
             
-        input(t('press_enter_to_continue'))
+        input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} {Colors.GREEN}❯{Colors.ENDC} ")
 
 
 def alert_settings_menu(cm: ConfigManager):
+    from src.utils import draw_panel
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
-        print(f"{Colors.HEADER}{t('settings_alert_title')}{Colors.ENDC}")
+        draw_panel(t('settings_alert_title'), [], width=80)
+        print("")
         
         current_lang = cm.config.get("settings", {}).get("language", "en")
         active_alerts = cm.config.get("alerts", {}).get("active", ["mail"])
@@ -556,9 +570,11 @@ def alert_settings_menu(cm: ConfigManager):
                 cm.save()
 
 def settings_menu(cm: ConfigManager):
+    from src.utils import draw_panel
     while True:
         os.system('cls' if os.name == 'nt' else 'clear')
-        print(f"{Colors.HEADER}{t('menu_settings_title', version=__version__)}{Colors.ENDC}")
+        draw_panel(t('menu_settings_title', version=__version__), [], width=80)
+        print("")
         masked_key = cm.config['api']['key'][:5] + "..." if cm.config['api']['key'] else t('not_set')
         print(f"API URL : {cm.config['api']['url']}")
         print(f"API Key : {masked_key}")

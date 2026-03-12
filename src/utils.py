@@ -2,8 +2,11 @@ import os
 import sys
 import logging
 import unicodedata
+import re
 from logging.handlers import RotatingFileHandler
 from src.i18n import t
+
+ANSI_ESCAPE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
 
 class Colors:
@@ -18,17 +21,25 @@ class Colors:
     FAIL = '\033[91m' if _enabled else ''
     DARK_GRAY = '\033[90m' if _enabled else ''
     ENDC = '\033[0m' if _enabled else ''
+    BOLD = '\033[1m' if _enabled else ''
+    UNDERLINE = '\033[4m' if _enabled else ''
 
 
 def safe_input(prompt: str, value_type=str, valid_range=None, allow_cancel=True, hint=None, help_text=None):
     if help_text:
         print(f"{Colors.DARK_GRAY}{help_text}{Colors.ENDC}")
         
-    full_prompt = f"{prompt}"
+    if prompt.startswith("\n"):
+        prefix = "\n"
+        prompt = prompt[1:]
+    else:
+        prefix = ""
+        
+    full_prompt = f"{prefix}{Colors.CYAN}[?]{Colors.ENDC} {prompt}"
     if hint:
         def_text = t('def_val_prefix', default='Default')
-        full_prompt += f" {Colors.CYAN}({def_text}: {hint}){Colors.ENDC}"
-    full_prompt += ": "
+        full_prompt += f" {Colors.DARK_GRAY}({def_text}: {hint}){Colors.ENDC}"
+    full_prompt += f" {Colors.GREEN}❯{Colors.ENDC} "
     
     while True:
         try:
@@ -86,20 +97,105 @@ def format_unit(value, type='volume') -> str:
     return str(val)
 
 
-def get_display_width(s: str) -> int:
-    """Calculate the display width of a string (CJK characters count as 2)."""
+def get_visible_width(s: str) -> int:
+    """Calculate the exact visible width of a string on screen, ignoring ANSI codes."""
+    clean_s = ANSI_ESCAPE.sub('', str(s))
     width = 0
-    for char in s:
+    for char in clean_s:
         status = unicodedata.east_asian_width(char)
-        width += 2 if status in ('W', 'F') else 1
+        # In Traditional Chinese (cp950) Windows environments, Ambiguous (A) chars usually take 2 spaces.
+        width += 2 if status in ('W', 'F', 'A') else 1
     return width
 
 
 def pad_string(s: str, total_width: int, fillchar: str = ' ') -> str:
     """Pad string to a specific display width considering CJK characters."""
-    current_width = get_display_width(s)
+    current_width = get_visible_width(s)
     if current_width >= total_width:
-        # Note: Truncation is tricky with mixed widths, returning mostly as-is 
-        # but you should truncate before passing to this function if strictly needed.
         return s
     return s + fillchar * (total_width - current_width)
+
+
+def draw_panel(title: str, lines: list, width: int = 80):
+    """Draws a modern UI panel in the terminal using ASCII characters."""
+    b = Colors.DARK_GRAY
+    e = Colors.ENDC
+    content = []
+    
+    # Header
+    content.append(f"{b}+-{'-' * (width - 2)}+{e}")
+    
+    # Title row (centered)
+    t_width = get_visible_width(title)
+    if t_width <= width - 4:
+        pad = width - 4 - t_width
+        left_pad = pad // 2
+        right_pad = pad - left_pad
+        content.append(f"{b}|{e} {' ' * left_pad}{Colors.BOLD}{Colors.CYAN}{title}{e}{' ' * right_pad} {b}|{e}")
+    else:
+        content.append(f"{b}|{e} {Colors.BOLD}{Colors.CYAN}{title}{e} {b}|{e}")
+        
+    content.append(f"{b}+-{'-' * (width - 2)}+{e}")
+    
+    # Lines
+    for line in lines:
+        if line == "-":
+            content.append(f"{b}+-{'-' * (width - 2)}+{e}")
+            continue
+            
+        real_width = get_visible_width(line)
+        if real_width <= width - 4:
+            pad = width - 4 - real_width
+            content.append(f"{b}|{e} {line}{' ' * pad} {b}|{e}")
+        else:
+            content.append(f"{b}|{e} {line} {b}|{e}")
+            
+    # Footer
+    content.append(f"{b}+-{'-' * (width - 2)}+{e}")
+    
+    print("\n".join(content))
+
+
+def draw_table(headers: list, rows: list):
+    """Draws a modern UI table in the terminal using ASCII characters."""
+    if not headers and not rows:
+        return
+        
+    cols_width = [get_visible_width(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            if i < len(cols_width):
+                w = get_visible_width(cell)
+                if w > cols_width[i]:
+                    cols_width[i] = w
+                    
+    # Add padding
+    cols_width = [w + 2 for w in cols_width]
+    
+    b = Colors.DARK_GRAY
+    e = Colors.ENDC
+    
+    def draw_sep(left, mid, right):
+        seps = [f"{'-' * w}" for w in cols_width]
+        return f"{b}{left}{mid.join(seps)}{right}{e}"
+        
+    def draw_row(row_data, is_header=False):
+        cells = []
+        for i, cell in enumerate(row_data):
+            if i >= len(cols_width): continue
+            cell_str = str(cell)
+            w = get_visible_width(cell_str)
+            pad = cols_width[i] - w - 1
+            content = f"{Colors.CYAN}{cell_str}{e}" if is_header else f"{cell_str}"
+            cells.append(f" {content}{' ' * pad}")
+        line = f"{b}|{e}".join(cells)
+        return f"{b}|{e}{line}{b}|{e}"
+        
+    print(draw_sep('+-', '-+-', '-+'))
+    print(draw_row(headers, is_header=True))
+    print(draw_sep('+-', '-+-', '-+'))
+    
+    for row in rows:
+        print(draw_row(row))
+        
+    print(draw_sep('+-', '-+-', '-+'))

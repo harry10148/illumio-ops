@@ -4,6 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0F172A">
   <title>Illumio PCE Monitor</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@600;700&family=Lato:wght@400;600;700&display=swap');
@@ -56,6 +57,25 @@
       color: var(--fg);
       min-height: 100vh;
       font-size: 14px;
+      touch-action: manipulation;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: 12px;
+      top: -44px;
+      z-index: 999;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: top 0.2s ease;
+    }
+
+    .skip-link:focus-visible {
+      top: 12px;
     }
 
     a {
@@ -115,6 +135,7 @@
       padding: 12px 24px;
       cursor: pointer;
       border-radius: var(--radius) var(--radius) 0 0;
+      background: transparent;
       color: var(--dim);
       font-weight: 600;
       font-size: .95rem;
@@ -124,6 +145,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
+      font-family: var(--body-font);
     }
 
     .tab:hover {
@@ -391,6 +413,7 @@
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      font-variant-numeric: tabular-nums;
     }
 
     .rule-table th {
@@ -899,10 +922,31 @@
       color: var(--danger);
       font-weight: bold;
     }
+
+    .btn:focus-visible,
+    .tab:focus-visible,
+    .sub-nav-btn:focus-visible,
+    .radio-group input[type=radio]:focus-visible,
+    .chk input[type=checkbox]:focus-visible {
+      outline: 2px solid var(--accent2);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
   </style>
 </head>
 
 <body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
 
   <!-- SVG Icons definition for reuse -->
   <svg style="display:none">
@@ -949,6 +993,11 @@
     <symbol id="icon-stop" viewBox="0 0 24 24">
       <rect x="3" y="3" width="18" height="18" rx="2" ry="2" stroke="currentColor" stroke-width="2" fill="none" />
     </symbol>
+    <symbol id="icon-help-circle" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" />
+      <path d="M9.1 9a3 3 0 1 1 5.2 2c-.9.9-1.5 1.3-1.5 2.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+      <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </symbol>
   </svg>
 
   <div class="header">
@@ -968,28 +1017,30 @@
     </div>
   </div>
 
-  <div class="tabs">
-    <div class="tab active" onclick="switchTab('dashboard')" data-i18n="gui_tab_dashboard">
+  <div class="tabs" role="tablist" aria-label="Main sections">
+    <button class="tab active" type="button" role="tab" aria-selected="true" aria-controls="p-dashboard" data-tab="dashboard" onclick="switchTab('dashboard')" data-i18n="gui_tab_dashboard">
       <svg class="icon">
         <use href="#icon-activity"></use>
       </svg> Traffic & Quarantine
-    </div>
-    <div class="tab" onclick="switchTab('rules')" data-i18n="gui_tab_rules">
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-rules" data-tab="rules" onclick="switchTab('rules')" data-i18n="gui_tab_rules">
       <svg class="icon">
         <use href="#icon-shield"></use>
       </svg> Rules
-    </div>
-    <div class="tab" onclick="switchTab('settings')" data-i18n="gui_tab_settings">
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-settings" data-tab="settings" onclick="switchTab('settings')" data-i18n="gui_tab_settings">
       <svg class="icon">
         <use href="#icon-settings"></use>
       </svg> Settings
-    </div>
-    <div class="tab" onclick="switchTab('actions')" data-i18n="gui_tab_actions">
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-actions" data-tab="actions" onclick="switchTab('actions')" data-i18n="gui_tab_actions">
       <svg class="icon">
         <use href="#icon-play"></use>
       </svg> Actions
-    </div>
+    </button>
   </div>
+
+  <main id="main-content">
 
   <!-- ═══ Traffic & Quarantine (Dashboard Tab) ═══ -->
   <div class="panel active" id="p-dashboard">
@@ -1695,7 +1746,7 @@
     </div>
   </div>
 
-  <div class="toast" id="toast"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
     /* ─── Helpers ─────────────────────────────────────────────────────── */
@@ -1834,10 +1885,21 @@
             if (el.type === 'button') el.value = _translations[k];
             else if (el.placeholder !== undefined) el.placeholder = _translations[k];
           } else {
-            el.innerHTML = _translations[k];
+            const icon = el.querySelector('svg');
+            if (icon) {
+              const textNodes = Array.from(el.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
+              if (textNodes.length) {
+                textNodes[textNodes.length - 1].textContent = ' ' + _translations[k];
+              } else {
+                el.appendChild(document.createTextNode(' ' + _translations[k]));
+              }
+            } else {
+              el.textContent = _translations[k];
+            }
           }
         }
       });
+      initTableResizers();
     }
 
     function initTableResizers() {
@@ -1876,7 +1938,11 @@
 
     /* ─── Tabs ────────────────────────────────────────────────────────── */
     function switchTab(id) {
-      document.querySelectorAll('.tab').forEach((t, i) => { t.classList.toggle('active', t.textContent.trim().toLowerCase().startsWith(id.slice(0, 4))) });
+      document.querySelectorAll('.tab').forEach((tabBtn) => {
+        const active = tabBtn.dataset.tab === id;
+        tabBtn.classList.toggle('active', active);
+        tabBtn.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
       document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
       $('p-' + id).classList.add('active');
       if (id === 'rules') loadRules();
@@ -1955,7 +2021,7 @@
                 <span style="font-size:10px;background:var(--dim);color:#fff;padding:2px 6px;border-radius:4px;margin-right:8px;">${rankLabel}</span>
                 <span style="flex:1"></span>
                 <span id="d-qstate-${i}" style="color:var(--dim);font-size:0.8rem;margin-right:12px;"></span>
-                <button class="btn btn-sm" style="background:var(--bg);border:1px solid var(--border);margin-right:6px;" onclick="openQueryModal(${i})">✏️</button>
+                <button class="btn btn-sm" style="background:var(--bg);border:1px solid var(--border);margin-right:6px;" onclick="openQueryModal(${i})" aria-label="Edit Query Widget" title="Edit Query Widget">✏️</button>
                 <button class="btn btn-primary btn-sm" onclick="runTop10Query(${i})" data-i18n="gui_run_btn">Run</button>
              </div>
              
@@ -2180,7 +2246,7 @@
         if (r.port) f.push('Port:' + r.port);
         if (r.src_label) f.push('Src:' + r.src_label); if (r.dst_label) f.push('Dst:' + r.dst_label);
         if (r.src_ip_in) f.push('SrcIP:' + r.src_ip_in); if (r.dst_ip_in) f.push('DstIP:' + r.dst_ip_in);
-        html += `<tr><td><input type="checkbox" class="r-chk" data-idx="${r.index}"></td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}">${cond}</td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | ')) || '—'}</td><td><button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')">✏️</button></td></tr>`;
+        html += `<tr><td><input type="checkbox" class="r-chk" data-idx="${r.index}"></td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}">${cond}</td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | ')) || '—'}</td><td><button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="Edit Rule" title="Edit Rule">✏️</button></td></tr>`;
       });
       $('r-body').innerHTML = html || ('<tr><td colspan="7" style="color:var(--dim);text-align:center;padding:24px">' + (_translations['gui_no_rules_add_one'] || 'No rules. Add one above.') + '</td></tr>');
       initTableResizers();
@@ -2850,6 +2916,7 @@
     loadDashboard();
     testConn();
   </script>
+  </main>
 </body>
 
 </html>
