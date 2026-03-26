@@ -9,10 +9,9 @@ Type=simple
 User=illumio_monitor
 Group=illumio_monitor
 WorkingDirectory=/opt/illumio_monitor
-# Ubuntu/Debian: PEP 668 blocks system-wide pip; use a venv.
-#   python3 -m venv /opt/illumio_monitor/venv
-#   /opt/illumio_monitor/venv/bin/pip install flask pandas pyyaml
-ExecStart=/opt/illumio_monitor/venv/bin/python /opt/illumio_monitor/illumio_monitor.py --monitor --interval 10
+# RHEL/CentOS: packages installed via dnf, system Python is used directly.
+#   dnf install python3-flask python3-pandas python3-PyYAML
+ExecStart=/usr/bin/python3 /opt/illumio_monitor/illumio_monitor.py --monitor --interval 10
 Restart=always
 RestartSec=10
 StandardOutput=journal

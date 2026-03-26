@@ -42,10 +42,22 @@ param(
 $ServiceName = "IllumioMonitor"
 $DisplayName = "Illumio PCE Monitor"
 $Description = "Monitors Illumio PCE for events, traffic anomalies, and health."
-$ProjectRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$PythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
+$ProjectRoot = Split-Path -Parent $PSScriptRoot          # deploy/ -> project root
 $EntryScript = Join-Path $ProjectRoot "illumio_monitor.py"
-$LogDir = Join-Path $ProjectRoot "logs"
+$LogDir      = Join-Path $ProjectRoot "logs"
+
+# Prefer venv Python if it exists; fall back to system Python
+$VenvPython = Join-Path $ProjectRoot "venv\Scripts\python.exe"
+if (Test-Path $VenvPython) {
+    $PythonExe = $VenvPython
+    Write-Host "Using venv Python: $PythonExe" -ForegroundColor Gray
+} else {
+    $PythonExe = (Get-Command python -ErrorAction SilentlyContinue).Source
+    if (-not $PythonExe) {
+        Write-Host "ERROR: Python not found. Install Python or create a venv at '$VenvPython'." -ForegroundColor Red
+        exit 1
+    }
+}
 
 # ─── Resolve NSSM ─────────────────────────────────────────────────────────────
 if ($NssmPath -and (Test-Path $NssmPath)) {
@@ -65,14 +77,9 @@ else {
     }
 }
 
-# Validate Python
-if (-not $PythonExe) {
-    Write-Host "ERROR: Python not found in PATH." -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "Using NSSM: $NSSM" -ForegroundColor Gray
+Write-Host "Using NSSM:   $NSSM" -ForegroundColor Gray
 Write-Host "Using Python: $PythonExe" -ForegroundColor Gray
+Write-Host "Project root: $ProjectRoot" -ForegroundColor Gray
 
 # ─── Install ──────────────────────────────────────────────────────────────────
 function Install-Service {
