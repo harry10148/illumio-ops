@@ -6,7 +6,7 @@
 
 > **[English](README.md)** | **[繁體中文](README_zh.md)**
 
-An advanced **agentless** monitoring and automation tool for **Illumio Core (PCE)** via REST API. Features intelligent traffic analysis, security event detection, workload quarantine, and automated multi-channel alerting — with **zero external dependencies** (Python stdlib only for CLI/daemon modes).
+An advanced **agentless** monitoring and automation tool for **Illumio Core (PCE)** via REST API. Features real-time security event detection, intelligent traffic analysis, advanced report generation with automated security findings, scheduled report delivery, and multi-channel alerting — with **zero external dependencies** for CLI/daemon modes (Python stdlib only).
 
 ---
 
@@ -16,20 +16,24 @@ An advanced **agentless** monitoring and automation tool for **Illumio Core (PCE
 |:---|:---|
 | **Triple Execution Modes** | Background daemon (`--monitor`), interactive CLI wizard, or Flask-powered **Web GUI** (`--gui`) |
 | **Security Event Monitoring** | Tracks PCE audit events with anchor-based timestamps — guaranteed zero duplicate alerts |
-| **High-Performance Traffic Engine** | Aggregates rules into a single bulk API query; processes data via O(1) memory streaming |
+| **High-Performance Traffic Engine** | Aggregates rules into a single bulk API query; O(1) memory streaming for large datasets |
+| **Advanced Report Engine** | 15-module traffic reports, 4-module audit reports, and VEN Status inventory reports — HTML + Excel |
+| **19 Automated Security Findings** | B-series (ransomware, coverage, anomalies) + L-series (lateral movement, exfiltration, blast-radius) |
+| **Report Schedules** | Cron-style recurring reports (daily/weekly/monthly) with automatic email delivery |
 | **Workload Quarantine** | Isolate compromised workloads by applying Quarantine labels (Mild/Moderate/Severe) |
 | **Multi-Channel Alerts** | Email (SMTP), LINE Notifications, and Webhooks dispatched simultaneously |
-| **Multi-Language UI** | Instant English ↔ Traditional Chinese switching in the Web GUI without reload |
+| **Multi-Language UI** | Instant English ↔ Traditional Chinese switching in Web GUI and HTML reports without reload |
 
 ---
 
 ## 🚀 Quick Start
 
 ### 1. Requirements
+
 - **Python 3.8+**
-- **Core (no install needed):** Python stdlib only — CLI and daemon modes run with zero external dependencies
+- **Core (no install needed):** CLI and daemon modes run with zero external dependencies
 - **Optional — Web GUI:** `flask`
-- **Optional — Traffic Report:** `pandas`, `openpyxl`, `pyyaml`
+- **Optional — Reports:** `pandas`, `openpyxl`, `pyyaml`
 
 ### 2. Installation & Launch
 
@@ -66,52 +70,78 @@ python illumio_monitor.py --monitor --interval 5
 
 ---
 
-## 🏢 Enterprise / Offline Installation
+## 📊 Report Engine
 
-For air-gapped environments without internet access, use one of the methods below.
+Reports can be generated from the Web GUI, CLI menu, or run automatically on a schedule.
+
+### Traffic Report — 15 Analysis Modules
+
+| Module | Description |
+|:---|:---|
+| Executive Summary | KPI cards: total flows, coverage %, top security findings |
+| 1 · Traffic Overview | Total flows, policy decision breakdown, top ports |
+| 2 · Policy Decisions | Per-decision with inbound/outbound split and per-port coverage % |
+| 3 · Uncovered Flows | Flows without allow rules; port gap ranking; uncovered services |
+| 4 · Ransomware Exposure | **Investigation targets** (allowed traffic on critical/high-risk ports), per-port detail, host exposure ranking |
+| 5 · Remote Access | SSH/RDP/VNC/TeamViewer traffic analysis |
+| 6 · User & Process | User accounts and processes appearing in flow records |
+| 7 · Cross-Label Matrix | Traffic matrix between environment/app/role label combinations |
+| 8 · Unmanaged Hosts | Traffic from/to non-PCE-managed hosts; per-app and per-port detail |
+| 9 · Traffic Distribution | Port and protocol distribution charts |
+| 10 · Allowed Traffic | Top allowed flows; audit flags |
+| 11 · Bandwidth & Volume | Top flows by bytes + bandwidth (max/avg/P95); anomaly detection |
+| 13 · Enforcement Readiness | Score 0–100 with factor breakdown and remediation recommendations |
+| 14 · Infrastructure Scoring | Node centrality scoring to identify critical infrastructure |
+| 15 · Lateral Movement Risk | Lateral movement pattern analysis and risk paths |
+| **Security Findings** | 19 automated rules — CRITICAL/HIGH/MEDIUM/LOW/INFO severity |
+
+### Other Reports
+
+| Report | Description |
+|:---|:---|
+| **Audit Report** | System health events, user authentication activity, policy changes |
+| **VEN Status Inventory** | Online/offline VENs with last-heartbeat bucketing (24h / 24–48h / long-term) |
+
+---
+
+## 🔍 Security Findings (19 Rules)
+
+Automated detection runs against every traffic dataset and groups findings by severity.
+
+| Series | Focus | Rules |
+|:---|:---|:---|
+| **B-series** | Ransomware exposure, policy coverage gaps, behavioural anomalies | B001–B009 |
+| **L-series** | Lateral movement, credential theft, blast-radius paths, data exfiltration | L001–L010 |
+
+Key detections include: ransomware ports allowed across environments (CRITICAL), single-source fan-out on lateral movement ports, blast-radius path analysis via graph traversal, and data exfiltration patterns (managed → unmanaged with high byte volume). See [Security Rules Reference](docs/Security_Rules_Reference.md) for full documentation.
+
+---
+
+## 🏢 Enterprise / Offline Installation
 
 ### Method A — Red Hat / CentOS (dnf / yum)
 
-Core and Web GUI dependencies are available directly from **RHEL 8/9 AppStream**:
-
 ```bash
-# Web GUI
-sudo dnf install python3-flask
-
-# YAML config (for Traffic Report)
-sudo dnf install python3-pyyaml
-
-# pandas (RHEL 8+ AppStream — version may be older)
-sudo dnf install python3-pandas
+sudo dnf install python3-flask python3-pyyaml python3-pandas
+# openpyxl is not in the official RHEL repo — use Method B
 ```
-
-> `openpyxl` is **not** in the official RHEL repo. Use Method B or C for it.
 
 ### Method B — Pre-download Wheels (pip offline)
 
-On a machine with internet access (must match target OS/arch, e.g. `linux_x86_64`):
-
 ```bash
-# Download all optional dependencies as wheel files
+# On a machine with internet access:
 pip download flask pandas openpyxl pyyaml -d ./offline_packages/
-```
 
-Copy `offline_packages/` to the air-gapped host, then install:
-
-```bash
+# On the air-gapped host:
 pip install --no-index --find-links=./offline_packages/ flask pandas openpyxl pyyaml
 ```
 
 ### Method C — Internal PyPI Mirror (Nexus / Artifactory)
 
-If your organisation runs a Nexus Repository or JFrog Artifactory:
-
 ```bash
 pip install pandas openpyxl pyyaml flask \
     --index-url https://nexus.internal/repository/pypi-proxy/simple/
 ```
-
-### Dependency Summary
 
 | Package | RHEL AppStream | Ubuntu `apt` | Offline wheel |
 |---------|:--------------:|:------------:|:-------------:|
@@ -122,12 +152,13 @@ pip install pandas openpyxl pyyaml flask \
 
 ---
 
+## 📚 Documentation
 
 | Document | Description |
 |:---|:---|
-| **[User Manual](docs/User_Manual.md)** | Installation, execution modes, rule creation, alert channels, Web GUI guide |
-| **[Project Architecture](docs/Project_Architecture.md)** | Codebase design, module responsibilities, data flow, modification guide |
-| **[API Cookbook](docs/API_Cookbook.md)** | Scenario-based API tutorial for SIEM/SOAR integration (Quarantine, Traffic Query, etc.) |
+| **[User Manual](docs/User_Manual.md)** | Installation, execution modes, rule creation, alert channels, reports, schedules |
+| **[Security Rules Reference](docs/Security_Rules_Reference.md)** | Full documentation for all 19 security finding rules with trigger conditions and tuning guidance |
+| **[API Cookbook](docs/API_Cookbook.md)** | Scenario-based API tutorial for SIEM/SOAR integration |
 
 ---
 
@@ -135,24 +166,55 @@ pip install pandas openpyxl pyyaml flask \
 
 ```text
 illumio_monitor/
-├── illumio_monitor.py     # Entry point
-├── config.json            # Runtime configuration (credentials, rules, alerts)
-├── state.json             # Persistent state (last check timestamp, alert history)
-├── requirements.txt       # Python dependencies
+├── illumio_monitor.py          # Entry point
+├── config.json                 # Runtime configuration (gitignored)
+├── state.json                  # Persistent state (gitignored)
+├── requirements.txt
+│
 ├── src/
-│   ├── main.py            # CLI argument parser, daemon loop, interactive menu
-│   ├── api_client.py      # Illumio REST API client (retry, streaming, auth)
-│   ├── analyzer.py        # Rule engine: traffic/event matching, metrics calculation
-│   ├── reporter.py        # Alert dispatcher (Email, LINE, Webhook)
-│   ├── config.py          # Configuration manager with atomic writes
-│   ├── gui.py             # Flask Web GUI backend (routes + API endpoints)
-│   ├── settings.py        # CLI interactive menus for rule CRUD
-│   ├── i18n.py            # Internationalization (EN/ZH translation dictionary)
-│   ├── utils.py           # Helpers (logging, color codes, unit formatting)
-│   ├── templates/         # Jinja2 HTML templates
-│   └── static/            # CSS/JS frontend assets
-├── docs/                  # Documentation files
-├── tests/                 # Unit tests (pytest)
-├── logs/                  # Runtime log files
-└── deploy/                # Deployment scripts (NSSM, systemd)
+│   ├── main.py                 # CLI argparse, daemon loop, interactive menu
+│   ├── api_client.py           # Illumio REST API client (retry, streaming, auth)
+│   ├── analyzer.py             # Rule engine: event/traffic/bandwidth matching
+│   ├── reporter.py             # Alert dispatcher (Email, LINE, Webhook) + report email
+│   ├── config.py               # ConfigManager (atomic writes, rule CRUD)
+│   ├── gui.py                  # Flask Web GUI (~25 JSON API endpoints)
+│   ├── settings.py             # CLI interactive wizards (rules, schedules)
+│   ├── report_scheduler.py     # Cron-style daemon scheduler for recurring reports
+│   ├── i18n.py                 # EN / ZH_TW translation dictionary (200+ keys)
+│   ├── utils.py                # Logging, ANSI colour, unit formatting, CJK width
+│   ├── templates/index.html    # Web GUI SPA (vanilla JS, Illumio brand theme)
+│   │
+│   └── report/                 # Report engine
+│       ├── report_generator.py     # Unified entry: parse → analyse → export
+│       ├── audit_generator.py      # Audit report orchestrator
+│       ├── ven_status_generator.py # VEN status report orchestrator
+│       ├── rules_engine.py         # 19 security finding rules (B+L series)
+│       ├── parsers/                # API parser, CSV parser, validators
+│       ├── exporters/              # HTML + Excel exporters, report i18n
+│       └── analysis/               # 15 traffic modules + 4 audit modules
+│
+├── config/
+│   ├── report_config.yaml      # Ransomware ports, detection thresholds
+│   ├── semantic_config.yaml    # Custom semantic rules (optional)
+│   └── csv_column_mapping.yaml # CSV column name mapping
+│
+├── docs/                       # Documentation
+├── deploy/                     # systemd service + Windows installer
+├── tests/                      # Unit tests (pytest)
+└── logs/                       # Rotating application logs
+```
+
+---
+
+## 🧪 Testing
+
+```bash
+# Unit tests
+pytest tests/test_analyzer.py
+
+# Audit report integration test (uses DummyApiClient)
+python test_audit.py
+
+# Real API integration test (requires valid config.json credentials)
+python test_real_events.py
 ```

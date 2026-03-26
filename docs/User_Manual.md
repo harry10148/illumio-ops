@@ -79,8 +79,10 @@ Opens a browser-based dashboard at `http://127.0.0.1:5001` with tabs for:
 |:---|:---|
 | **Dashboard** | API connectivity, rule summary, PCE health check, Traffic Analyzer with Top-10 widgets |
 | **Rules** | Full CRUD for Event/Traffic/Bandwidth/Volume rules, bulk delete, inline edit |
+| **Reports** | Generate Traffic, Audit, and VEN Status reports on demand; download HTML or Excel |
+| **Report Schedules** | Create/edit/toggle recurring schedules (daily/weekly/monthly) with email delivery |
 | **Workload Search** | Search by hostname/IP/label, apply Quarantine labels |
-| **Settings** | API credentials, alert channels, language/theme switching |
+| **Settings** | API credentials, alert channels, timezone, language/theme switching |
 | **Actions** | Run Monitor Once, Debug Mode, Test Alert, Load Best Practices |
 
 ### 2.3 Background Daemon
@@ -260,7 +262,7 @@ pip install pandas openpyxl pyyaml
 
 ### 7.2 Report Sections (Traffic Report)
 
-A traffic report contains 12 analytical sections plus the Security Findings section:
+A traffic report contains **15 analytical modules** plus the Security Findings section:
 
 | Section | Description |
 |:---|:---|
@@ -268,14 +270,17 @@ A traffic report contains 12 analytical sections plus the Security Findings sect
 | 1 · Traffic Overview | Total flows, allowed/blocked/PB breakdown, top ports |
 | 2 · Policy Decisions | Per-decision breakdown with inbound/outbound split and per-port coverage % |
 | 3 · Uncovered Flows | Flows without an allow rule; port gap ranking; uncovered services (app+port) |
-| 4 · Ransomware Exposure | Flows on ransomware-associated ports by risk level |
+| 4 · Ransomware Exposure | **Investigation targets** (destination hosts with ALLOWED traffic on critical/high ports) prominently highlighted; per-port detail; host exposure ranking |
 | 5 · Remote Access | SSH/RDP/VNC/TeamViewer traffic analysis |
 | 6 · User & Process | User accounts and processes appearing in flow records |
 | 7 · Cross-Label Matrix | Traffic matrix between environment/app/role label combinations |
 | 8 · Unmanaged Hosts | Traffic from/to non-PCE-managed hosts; per-app and per-port detail |
 | 9 · Traffic Distribution | Port and protocol distribution |
 | 10 · Allowed Traffic | Top allowed flows; audit flags |
-| 11 · Bandwidth & Volume | Top flows by byte volume; bandwidth statistics |
+| 11 · Bandwidth & Volume | Top flows by bytes + Bandwidth (Mbps) column; Max/Avg/P95 stat cards; anomaly detection (P95 of multi-connection flows) |
+| 13 · Enforcement Readiness | Score 0–100 with factor breakdown and remediation recommendations |
+| 14 · Infrastructure Scoring | Node centrality scoring to identify critical services (in-degree, out-degree, betweenness) |
+| 15 · Lateral Movement Risk | Lateral movement pattern analysis and high-risk paths |
 | **Security Findings** | **Automated rule evaluation — see Section 7.3** |
 
 ### 7.3 Security Findings Rules
@@ -340,11 +345,13 @@ Configure automated recurring reports via CLI menu **[15]** or Web GUI **Report 
 |:---|:---|
 | Report Type | Traffic Flow / Audit / VEN Status |
 | Frequency | Daily / Weekly (day of week) / Monthly (day of month) |
-| Time | UTC hour and minute |
+| Time | Hour and minute — input in your **configured timezone** (automatically stored as UTC) |
 | Lookback Days | How many days of traffic data to include |
 | Output Format | Excel / HTML / Both |
 | Send by Email | Attach report to email using SMTP settings |
 | Custom Recipients | Override default recipients for this schedule |
+
+> **Timezone note**: The time fields in CLI and Web GUI always display in the timezone configured under Settings → Timezone. The underlying storage is UTC, so the schedule remains correct if you change the timezone setting.
 
 The daemon loop checks schedules every 60 seconds and runs any schedule whose configured time has been reached.
 
