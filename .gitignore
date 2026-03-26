@@ -1,10 +1,11 @@
 # Secrets and Personal Config
-config.json
+config/config.json
 config-old.json
 CLAUDE.md
 
 # Runtime state (stored in logs/)
 logs/state.json
+state.json
 
 # Logs
 logs/

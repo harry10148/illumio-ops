@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 # Determine Root Directory (parent of the package)
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
-CONFIG_FILE = os.path.join(ROOT_DIR, "config.json")
+CONFIG_FILE = os.path.join(ROOT_DIR, "config", "config.json")
 
 # Default configuration template
 _DEFAULT_CONFIG = {

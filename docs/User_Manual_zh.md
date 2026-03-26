@@ -24,7 +24,7 @@ pip install -r requirements.txt    # 安裝 Flask（選用相依套件）
 複製範例設定檔後填入 PCE API 憑證：
 
 ```bash
-cp config.json.example config.json
+cp config/config.json.example config/config.json
 ```
 
 | 欄位 | 說明 | 範例 |

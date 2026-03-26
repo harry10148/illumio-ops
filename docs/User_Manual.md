@@ -24,7 +24,7 @@ pip install -r requirements.txt    # Installs Flask (optional dependencies)
 Copy the example config and fill in your PCE API credentials:
 
 ```bash
-cp config.json.example config.json
+cp config/config.json.example config/config.json
 ```
 
 | Field | Description | Example |

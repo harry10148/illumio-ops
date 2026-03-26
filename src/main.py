@@ -348,7 +348,7 @@ def _run_report_menu(cm):
             print(f"\nCurrent report config:")
             for k, v in report_cfg.items():
                 print(f"  {k}: {v}")
-            print(f"\nEdit report settings in config.json under the 'report' key.")
+            print(f"\nEdit report settings in config/config.json under the 'report' key.")
             input(f"\n{Colors.CYAN}[?]{Colors.ENDC} Press Enter to continue ")
 
 

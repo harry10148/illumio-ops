@@ -40,7 +40,7 @@ An advanced **agentless** monitoring and automation tool for **Illumio Core (PCE
 ```bash
 git clone <repo-url>
 cd illumio_monitor
-cp config.json.example config.json    # Edit with your PCE credentials
+cp config/config.json.example config/config.json    # Edit with your PCE credentials
 
 # Interactive CLI:
 python illumio_monitor.py
@@ -167,7 +167,8 @@ pip install pandas openpyxl pyyaml flask \
 ```text
 illumio_monitor/
 ├── illumio_monitor.py          # Entry point
-├── config.json                 # Runtime configuration (gitignored)
+├── config/
+│   ├── config.json             # Runtime configuration (gitignored)
 ├── state.json                  # Persistent state (gitignored)
 ├── requirements.txt
 │

@@ -40,7 +40,7 @@
 ```bash
 git clone <repo-url>
 cd illumio_monitor
-cp config.json.example config.json    # 編輯並填入 PCE 憑證
+cp config/config.json.example config/config.json    # 編輯並填入 PCE 憑證
 
 # 互動式 CLI：
 python illumio_monitor.py
@@ -167,7 +167,8 @@ pip install pandas openpyxl pyyaml flask \
 ```text
 illumio_monitor/
 ├── illumio_monitor.py          # 程式進入點
-├── config.json                 # 執行時設定（已加入 gitignore）
+├── config/
+│   ├── config.json             # 執行時設定（已加入 gitignore）
 ├── state.json                  # 持久化狀態（已加入 gitignore）
 ├── requirements.txt
 │
