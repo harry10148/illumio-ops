@@ -208,7 +208,7 @@ class ReportGenerator:
         df = self._parse_csv(csv_path)
         return self._run_pipeline(df, source='csv')
 
-    def export(self, result: ReportResult, fmt: str = 'excel',
+    def export(self, result: ReportResult, fmt: str = 'html',
                output_dir: str = 'reports',
                send_email: bool = False,
                reporter=None) -> list[str]:
@@ -217,7 +217,7 @@ class ReportGenerator:
 
         Args:
             result:     output of generate_from_*()
-            fmt:        'excel' | 'html' | 'all'
+            fmt:        'html' | 'csv' | 'all'
             output_dir: directory to write files into
             send_email: if True, send via reporter.send_report_email()
             reporter:   Reporter instance (required if send_email=True)
@@ -225,22 +225,20 @@ class ReportGenerator:
         Returns:
             list of file paths written
         """
-        from src.report.exporters.excel_exporter import ExcelExporter
         from src.report.exporters.html_exporter import HtmlExporter
+        from src.report.exporters.csv_exporter import CsvExporter
 
         paths = []
-        include_raw = self._report_cfg.get('output', {}).get('include_raw_data', False)
-
-        if fmt in ('excel', 'all'):
-            path = ExcelExporter(result.module_results, df=result.dataframe,
-                                 include_raw=include_raw).export(output_dir)
-            paths.append(path)
-            print(f"[Report] ✅ Excel saved: {path}")
 
         if fmt in ('html', 'all'):
             path = HtmlExporter(result.module_results).export(output_dir)
             paths.append(path)
             print(f"[Report] ✅ HTML saved: {path}")
+
+        if fmt in ('csv', 'all'):
+            path = CsvExporter(result.module_results, report_label='Traffic').export(output_dir)
+            paths.append(path)
+            print(f"[Report] ✅ CSV (ZIP) saved: {path}")
 
         # Save snapshot for Web UI Dashboard directly
         try:
@@ -252,12 +250,12 @@ class ReportGenerator:
             logger.warning(f"[ReportGenerator] Failed to write KPI snapshot: {e}")
 
         if send_email and reporter is not None:
-            excel_path = next((p for p in paths if p.endswith('.xlsx')), None)
+            html_path = next((p for p in paths if p.endswith('.html')), None)
             mod12 = result.module_results.get('mod12', {})
             subject = f"Illumio Traffic Flow Report — {datetime.date.today()}"
             html_body = self._build_email_body(mod12)
             try:
-                reporter.send_report_email(subject, html_body, attachment_path=excel_path)
+                reporter.send_report_email(subject, html_body, attachment_path=html_path)
                 print("[Report] ✅ Email sent")
             except Exception as e:
                 logger.error(f"[ReportGenerator] Email send failed: {e}")
@@ -447,7 +445,7 @@ class ReportGenerator:
       </table>
     </div>
     <div style="background:#F7F4EE;padding:12px 20px;border-top:1px solid #E3D8C5;text-align:center;color:#989A9B;font-size:11px">
-      Full report attached as Excel file. &middot; Illumio PCE Monitor
+      Full report attached as HTML file. &middot; Illumio PCE Monitor
     </div>
   </div>
 </div>

@@ -1473,14 +1473,14 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None):
 
     # Step 6: Output format
     _wizard_step(6, 7, t("sched_format"))
-    fmt_map = {"1": ["excel"], "2": ["html"], "3": ["excel", "html"]}
-    current_fmt = edit_sched.get("format", ["excel"]) if is_edit else ["excel"]
-    default_fmt_k = "3" if len(current_fmt) > 1 else ("2" if "html" in current_fmt else "1")
-    print("  1. Excel\n  2. HTML\n  3. Excel + HTML")
+    fmt_map = {"1": ["html"], "2": ["csv"], "3": ["html", "csv"]}
+    current_fmt = edit_sched.get("format", ["html"]) if is_edit else ["html"]
+    default_fmt_k = "3" if len(current_fmt) > 1 else ("2" if current_fmt == ["csv"] else "1")
+    print("  1. HTML\n  2. CSV (Raw Data ZIP)\n  3. HTML + CSV")
     fmt_sel = _ask(t("sched_format"), default=default_fmt_k)
     if fmt_sel is None:
         return
-    fmt = fmt_map.get(str(fmt_sel), ["excel"])
+    fmt = fmt_map.get(str(fmt_sel), ["html"])
 
     # Step 7: Email
     _wizard_step(7, 7, "Email Options")

@@ -67,19 +67,19 @@ class VenStatusGenerator:
             dataframe=df,
         )
 
-    def export(self, result: VenStatusResult, fmt: str = 'all', output_dir: str = 'reports') -> list:
-        from src.report.exporters.ven_status_exporter import VenStatusExporter
+    def export(self, result: VenStatusResult, fmt: str = 'html', output_dir: str = 'reports') -> list:
         from src.report.exporters.ven_html_exporter import VenHtmlExporter
+        from src.report.exporters.csv_exporter import CsvExporter
         os.makedirs(output_dir, exist_ok=True)
         paths = []
-        if fmt in ('excel', 'all'):
-            path = VenStatusExporter(result.module_results, df=result.dataframe).export(output_dir)
-            paths.append(path)
-            print(f"[VEN Report] ✅ Excel saved: {path}")
         if fmt in ('html', 'all'):
             path = VenHtmlExporter(result.module_results, df=result.dataframe).export(output_dir)
             paths.append(path)
             print(f"[VEN Report] ✅ HTML  saved: {path}")
+        if fmt in ('csv', 'all'):
+            path = CsvExporter(result.module_results, report_label='VEN_Status').export(output_dir)
+            paths.append(path)
+            print(f"[VEN Report] ✅ CSV (ZIP) saved: {path}")
         return paths
 
     # ── private ──────────────────────────────────────────────────────────────

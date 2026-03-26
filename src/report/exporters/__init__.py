@@ -1,1 +1,1 @@
-"""Report exporters: Excel (openpyxl) and HTML (Jinja2)."""
+"""Report exporters: HTML (primary) and CSV raw data ZIP (stdlib)."""

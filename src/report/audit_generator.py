@@ -86,14 +86,10 @@ class AuditGenerator:
             dataframe=df
         )
 
-    def export(self, result: AuditReportResult, fmt: str = 'excel', output_dir: str = 'reports') -> list[str]:
-        from src.report.exporters.audit_excel_exporter import AuditExcelExporter
+    def export(self, result: AuditReportResult, fmt: str = 'html', output_dir: str = 'reports') -> list[str]:
         from src.report.exporters.audit_html_exporter import AuditHtmlExporter
+        from src.report.exporters.csv_exporter import CsvExporter
         paths = []
-        if fmt in ('excel', 'all'):
-            path = AuditExcelExporter(result.module_results, df=result.dataframe).export(output_dir)
-            paths.append(path)
-            print(f"[Audit Report] ✅ Excel saved: {path}")
         if fmt in ('html', 'all'):
             path = AuditHtmlExporter(
                 result.module_results, df=result.dataframe,
@@ -101,6 +97,10 @@ class AuditGenerator:
             ).export(output_dir)
             paths.append(path)
             print(f"[Audit Report] ✅ HTML  saved: {path}")
+        if fmt in ('csv', 'all'):
+            path = CsvExporter(result.module_results, report_label='Audit').export(output_dir)
+            paths.append(path)
+            print(f"[Audit Report] ✅ CSV (ZIP) saved: {path}")
         return paths
 
     def _load_report_config(self) -> dict:

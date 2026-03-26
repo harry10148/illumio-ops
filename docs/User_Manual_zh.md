@@ -79,7 +79,7 @@ python illumio_monitor.py --gui --port 8080    # 自訂連接埠
 |:---|:---|
 | **Dashboard** | API 連線狀態、規則摘要、PCE 健康檢查、流量分析器含 Top-10 小工具 |
 | **Rules** | 完整的事件/流量/頻寬/流量規則 CRUD，支援批次刪除與行內編輯 |
-| **Reports** | 手動產生流量、稽核、VEN 狀態報表；下載 HTML 或 Excel |
+| **Reports** | 手動產生流量、稽核、VEN 狀態報表；下載 HTML 報表或 CSV 原始資料 ZIP |
 | **Report Schedules** | 建立/編輯/啟停週期性排程（每日/每週/每月），可設定自動 Email 寄送 |
 | **Workload Search** | 依主機名/IP/標籤搜尋工作負載，套用隔離標籤 |
 | **Settings** | API 憑證設定、告警通道設定、時區、語言/主題切換 |
@@ -253,11 +253,11 @@ sudo systemctl enable --now illumio-monitor
 | CLI → 選單項目 **[13] 產生報表** | 選擇報表類型與日期範圍 |
 | Daemon 模式 | 透過 **[15] 報表排程** 設定排程，報表自動產生，可選擇以 Email 寄送 |
 
-報表依格式設定儲存為 `.html` 及/或 `.xlsx` 至 `reports/` 目錄。
+報表依格式設定儲存為 `.html`（格式化報表）及/或 `_raw.zip`（CSV 原始資料）至 `reports/` 目錄。
 
 **所需相依套件：**
 ```bash
-pip install pandas openpyxl pyyaml
+pip install pandas pyyaml
 ```
 
 ### 7.2 報表章節（流量報表）
@@ -347,7 +347,7 @@ thresholds:
 | 執行頻率 | 每日 / 每週（指定星期幾）/ 每月（指定日期） |
 | 執行時間 | 小時與分鐘 — 以**設定中的時區**輸入（自動換算儲存為 UTC） |
 | 回溯天數 | 報表包含的歷史資料天數 |
-| 輸出格式 | Excel / HTML / 兩者皆輸出 |
+| 輸出格式 | HTML / CSV 原始 ZIP / 兩者皆輸出 |
 | 以 Email 寄送 | 使用 SMTP 設定附件寄送報表 |
 | 自訂收件人 | 覆寫此排程的預設收件人清單 |
 

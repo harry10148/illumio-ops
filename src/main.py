@@ -257,7 +257,7 @@ def _run_report_menu(cm):
     try:
         import pandas  # noqa: F401
     except ImportError:
-        print(f"{Colors.FAIL}Report feature requires: pip install pandas openpyxl pyyaml{Colors.ENDC}")
+        print(f"{Colors.FAIL}Report feature requires: pip install pandas pyyaml{Colors.ENDC}")
         input(f"\n{Colors.CYAN}[?]{Colors.ENDC} Press Enter to continue ")
         return
 
@@ -391,7 +391,7 @@ def main():
     parser.add_argument(
         "--report",
         action="store_true",
-        help="Generate a Traffic Flow Report (requires: pip install pandas openpyxl pyyaml)",
+        help="Generate a Traffic Flow Report (requires: pip install pandas pyyaml)",
     )
     parser.add_argument(
         "--source",
@@ -438,7 +438,7 @@ def main():
             import pandas  # noqa: F401
         except ImportError:
             print("Report feature requires additional packages. Install with:")
-            print("  pip install pandas openpyxl pyyaml")
+            print("  pip install pandas pyyaml")
             sys.exit(1)
         from src.report.report_generator import ReportGenerator
         from src.api_client import ApiClient
@@ -491,7 +491,7 @@ def _run_audit_report_menu(cm):
     try:
         import pandas  # noqa: F401
     except ImportError:
-        print(f"{Colors.FAIL}Report feature requires: pip install pandas openpyxl pyyaml{Colors.ENDC}")
+        print(f"{Colors.FAIL}Report feature requires: pip install pandas pyyaml{Colors.ENDC}")
         input(f"\n{Colors.CYAN}[?]{Colors.ENDC} Press Enter to continue ")
         return
 
@@ -552,7 +552,7 @@ def _run_ven_status_menu(cm):
     try:
         import pandas  # noqa: F401
     except ImportError:
-        print(f"{Colors.FAIL}Report feature requires: pip install pandas openpyxl{Colors.ENDC}")
+        print(f"{Colors.FAIL}Report feature requires: pip install pandas{Colors.ENDC}")
         input(f"\n{Colors.CYAN}[?]{Colors.ENDC} Press Enter to continue ")
         return
 

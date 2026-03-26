@@ -17,7 +17,7 @@
 | **三種執行模式** | 背景守護程序 (`--monitor`)、互動式 CLI 精靈、或 Flask 驅動的 **Web GUI** (`--gui`) |
 | **安全事件監控** | 追蹤 PCE 稽核事件，採用時間戳記錨點，保證零重複告警 |
 | **高效能流量引擎** | 將所有規則整合為單次 API 查詢，O(1) 記憶體串流處理大型資料集 |
-| **進階報表引擎** | 15 模組流量報表、4 模組稽核報表、VEN 狀態盤點報表 — HTML + Excel 雙格式 |
+| **進階報表引擎** | 15 模組流量報表、4 模組稽核報表、VEN 狀態盤點報表 — HTML 主報表 + CSV 原始資料 ZIP |
 | **19 項自動化資安發現** | B 系列（勒索軟體、覆蓋率、異常行為）+ L 系列（橫向移動、資料外洩、爆炸半徑） |
 | **排程報表** | 類 Cron 週期性報表（每日/每週/每月），可自動 Email 附件寄送 |
 | **工作負載隔離** | 透過 Quarantine Label（Mild/Moderate/Severe）隔離遭入侵主機 |
@@ -33,7 +33,7 @@
 - **Python 3.8+**
 - **核心功能（免安裝）**：CLI 及 Daemon 模式僅使用 Python 標準函式庫，無需任何外部套件
 - **選用 — Web GUI**：`flask`
-- **選用 — 報表**：`pandas`、`openpyxl`、`pyyaml`
+- **選用 — 報表**：`pandas`、`pyyaml`（無需 openpyxl）
 
 ### 2. 安裝與啟動
 
@@ -123,23 +123,23 @@ python illumio_monitor.py --monitor --interval 5
 
 ```bash
 sudo dnf install python3-flask python3-pyyaml python3-pandas
-# openpyxl 不在官方 RHEL Repo，請使用方案 B
+# 所有依賴均在 RHEL AppStream — 無需 EPEL
 ```
 
 ### 方案 B — 預先下載 Wheel（pip 離線安裝）
 
 ```bash
 # 在有網路的機器上：
-pip download flask pandas openpyxl pyyaml -d ./offline_packages/
+pip download flask pandas pyyaml -d ./offline_packages/
 
 # 在離線主機上：
-pip install --no-index --find-links=./offline_packages/ flask pandas openpyxl pyyaml
+pip install --no-index --find-links=./offline_packages/ flask pandas pyyaml
 ```
 
 ### 方案 C — 內部 PyPI Mirror（Nexus / Artifactory）
 
 ```bash
-pip install pandas openpyxl pyyaml flask \
+pip install pandas pyyaml flask \
     --index-url https://nexus.internal/repository/pypi-proxy/simple/
 ```
 
@@ -148,7 +148,6 @@ pip install pandas openpyxl pyyaml flask \
 | `flask` | ✅ `python3-flask` | ✅ `python3-flask` | ✅ |
 | `pyyaml` | ✅ `python3-pyyaml` | ✅ `python3-yaml` | ✅ |
 | `pandas` | ✅ `python3-pandas`（RHEL 8+）| ✅ `python3-pandas` | ✅ |
-| `openpyxl` | ❌ 不在官方 Repo | ✅ `python3-openpyxl` | ✅ |
 
 ---
 
@@ -191,7 +190,7 @@ illumio_monitor/
 │       ├── ven_status_generator.py # VEN 狀態報表協調器
 │       ├── rules_engine.py         # 19 條資安發現規則（B+L 系列）
 │       ├── parsers/                # API 解析器、CSV 解析器、驗證器
-│       ├── exporters/              # HTML + Excel 匯出器、報表 i18n
+│       ├── exporters/              # HTML 匯出器、CSV ZIP 匯出器、報表 i18n
 │       └── analysis/               # 15 個流量模組 + 4 個稽核模組
 │
 ├── config/

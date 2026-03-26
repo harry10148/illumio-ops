@@ -17,7 +17,7 @@ An advanced **agentless** monitoring and automation tool for **Illumio Core (PCE
 | **Triple Execution Modes** | Background daemon (`--monitor`), interactive CLI wizard, or Flask-powered **Web GUI** (`--gui`) |
 | **Security Event Monitoring** | Tracks PCE audit events with anchor-based timestamps — guaranteed zero duplicate alerts |
 | **High-Performance Traffic Engine** | Aggregates rules into a single bulk API query; O(1) memory streaming for large datasets |
-| **Advanced Report Engine** | 15-module traffic reports, 4-module audit reports, and VEN Status inventory reports — HTML + Excel |
+| **Advanced Report Engine** | 15-module traffic reports, 4-module audit reports, and VEN Status inventory reports — HTML + CSV raw data |
 | **19 Automated Security Findings** | B-series (ransomware, coverage, anomalies) + L-series (lateral movement, exfiltration, blast-radius) |
 | **Report Schedules** | Cron-style recurring reports (daily/weekly/monthly) with automatic email delivery |
 | **Workload Quarantine** | Isolate compromised workloads by applying Quarantine labels (Mild/Moderate/Severe) |
@@ -33,7 +33,7 @@ An advanced **agentless** monitoring and automation tool for **Illumio Core (PCE
 - **Python 3.8+**
 - **Core (no install needed):** CLI and daemon modes run with zero external dependencies
 - **Optional — Web GUI:** `flask`
-- **Optional — Reports:** `pandas`, `openpyxl`, `pyyaml`
+- **Optional — Reports:** `pandas`, `pyyaml` (no openpyxl required)
 
 ### 2. Installation & Launch
 
@@ -123,23 +123,23 @@ Key detections include: ransomware ports allowed across environments (CRITICAL),
 
 ```bash
 sudo dnf install python3-flask python3-pyyaml python3-pandas
-# openpyxl is not in the official RHEL repo — use Method B
+# All dependencies are available in RHEL AppStream — no EPEL required
 ```
 
 ### Method B — Pre-download Wheels (pip offline)
 
 ```bash
 # On a machine with internet access:
-pip download flask pandas openpyxl pyyaml -d ./offline_packages/
+pip download flask pandas pyyaml -d ./offline_packages/
 
 # On the air-gapped host:
-pip install --no-index --find-links=./offline_packages/ flask pandas openpyxl pyyaml
+pip install --no-index --find-links=./offline_packages/ flask pandas pyyaml
 ```
 
 ### Method C — Internal PyPI Mirror (Nexus / Artifactory)
 
 ```bash
-pip install pandas openpyxl pyyaml flask \
+pip install pandas pyyaml flask \
     --index-url https://nexus.internal/repository/pypi-proxy/simple/
 ```
 
@@ -148,7 +148,6 @@ pip install pandas openpyxl pyyaml flask \
 | `flask` | ✅ `python3-flask` | ✅ `python3-flask` | ✅ |
 | `pyyaml` | ✅ `python3-pyyaml` | ✅ `python3-yaml` | ✅ |
 | `pandas` | ✅ `python3-pandas` (RHEL 8+) | ✅ `python3-pandas` | ✅ |
-| `openpyxl` | ❌ not in repo | ✅ `python3-openpyxl` | ✅ |
 
 ---
 
@@ -191,7 +190,7 @@ illumio_monitor/
 │       ├── ven_status_generator.py # VEN status report orchestrator
 │       ├── rules_engine.py         # 19 security finding rules (B+L series)
 │       ├── parsers/                # API parser, CSV parser, validators
-│       ├── exporters/              # HTML + Excel exporters, report i18n
+│       ├── exporters/              # HTML exporter, CSV ZIP exporter, report i18n
 │       └── analysis/               # 15 traffic modules + 4 audit modules
 │
 ├── config/

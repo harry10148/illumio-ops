@@ -483,7 +483,7 @@ def _create_app(cm: ConfigManager) -> 'Flask':
         
         reports = []
         for f in os.listdir(reports_dir):
-            if f.endswith('.html') or f.endswith('.xlsx'):
+            if f.endswith('.html') or f.endswith('.zip'):
                 stat = os.stat(os.path.join(reports_dir, f))
                 reports.append({
                     "filename": f,

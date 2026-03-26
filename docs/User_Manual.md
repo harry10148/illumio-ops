@@ -79,7 +79,7 @@ Opens a browser-based dashboard at `http://127.0.0.1:5001` with tabs for:
 |:---|:---|
 | **Dashboard** | API connectivity, rule summary, PCE health check, Traffic Analyzer with Top-10 widgets |
 | **Rules** | Full CRUD for Event/Traffic/Bandwidth/Volume rules, bulk delete, inline edit |
-| **Reports** | Generate Traffic, Audit, and VEN Status reports on demand; download HTML or Excel |
+| **Reports** | Generate Traffic, Audit, and VEN Status reports on demand; download HTML or CSV raw data ZIP |
 | **Report Schedules** | Create/edit/toggle recurring schedules (daily/weekly/monthly) with email delivery |
 | **Workload Search** | Search by hostname/IP/label, apply Quarantine labels |
 | **Settings** | API credentials, alert channels, timezone, language/theme switching |
@@ -253,11 +253,11 @@ Reports can be triggered from three places:
 | CLI → menu item **[13] Generate Report** | Select report type and date range |
 | Daemon mode | Configure a schedule via **[15] Report Schedules** — reports run automatically and can be emailed |
 
-Reports are saved to the `reports/` directory as `.html` and/or `.xlsx` files depending on your format setting.
+Reports are saved to the `reports/` directory as `.html` (formatted report) and/or `_raw.zip` (CSV raw data) depending on your format setting.
 
 **Dependencies required:**
 ```bash
-pip install pandas openpyxl pyyaml
+pip install pandas pyyaml
 ```
 
 ### 7.2 Report Sections (Traffic Report)
@@ -347,7 +347,7 @@ Configure automated recurring reports via CLI menu **[15]** or Web GUI **Report 
 | Frequency | Daily / Weekly (day of week) / Monthly (day of month) |
 | Time | Hour and minute — input in your **configured timezone** (automatically stored as UTC) |
 | Lookback Days | How many days of traffic data to include |
-| Output Format | Excel / HTML / Both |
+| Output Format | HTML / CSV Raw ZIP / Both |
 | Send by Email | Attach report to email using SMTP settings |
 | Custom Recipients | Override default recipients for this schedule |
 

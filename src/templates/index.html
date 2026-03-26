@@ -1649,9 +1649,9 @@
         <div class="form-group">
           <label data-i18n="gui_sched_format">Output Format</label>
           <select id="sched-format" style="width:100%;">
-            <option value="excel" data-i18n="gui_sched_fmt_excel">Excel</option>
             <option value="html" data-i18n="gui_sched_fmt_html">HTML</option>
-            <option value="all" data-i18n="gui_sched_fmt_all">Excel + HTML</option>
+            <option value="csv" data-i18n="gui_sched_fmt_csv">CSV (Raw Data ZIP)</option>
+            <option value="all" data-i18n="gui_sched_fmt_all">HTML + CSV</option>
           </select>
         </div>
       </div>
@@ -2609,8 +2609,8 @@
       $('sched-minute').value   = sched ? (sched.minute !== undefined ? sched.minute : 0) : 0;
       $('sched-lookback').value = sched ? (sched.lookback_days || 7) : 7;
 
-      const fmt = sched ? (sched.format || ['excel']) : ['excel'];
-      $('sched-format').value = fmt.length > 1 ? 'all' : (fmt[0] || 'excel');
+      const fmt = sched ? (sched.format || ['html']) : ['html'];
+      $('sched-format').value = fmt.length > 1 ? 'all' : (fmt[0] || 'html');
 
       const emailOn = sched ? !!sched.email_report : false;
       $('sched-email').checked = emailOn;
@@ -2631,7 +2631,7 @@
       if (!name) { toast(_translations['gui_msg_name_required'] || 'Name is required.', true); return; }
 
       const fmt_val = $('sched-format').value;
-      const fmt = fmt_val === 'all' ? ['excel', 'html'] : [fmt_val];
+      const fmt = fmt_val === 'all' ? ['html', 'csv'] : [fmt_val];
       const recipsRaw = $('sched-recipients').value.trim();
       const recipients = recipsRaw ? recipsRaw.split('\n').map(r => r.trim()).filter(Boolean) : [];
 

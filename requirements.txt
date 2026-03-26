@@ -3,3 +3,8 @@
 
 # Optional: Web GUI mode (--gui)
 flask
+
+# Optional: Report generation (--report, menu items 12-14)
+# pandas  — data analysis; available in RHEL AppStream / standard repos
+# pyyaml  — report_config.yaml; available in RHEL AppStream (python3-pyyaml)
+# (No openpyxl required — reports export to HTML and CSV ZIP, stdlib only)
