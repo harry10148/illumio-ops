@@ -441,12 +441,14 @@ The VEN Status Report inventories all PCE-managed workloads and classifies VEN c
 | Section | Description |
 |:---|:---|
 | KPI Summary | Total VENs, Online count, Offline count |
-| Online VENs | VENs with `active` agent status |
-| Offline VENs | All non-active VENs |
-| Lost (last 24 h) | VENs whose last heartbeat was within the past 24 hours |
-| Lost (24–48 h ago) | VENs whose last heartbeat was 24–48 hours ago |
+| Online VENs | VENs with active agent status **and** last heartbeat ≤ 1 hour ago |
+| Offline VENs | VENs that are suspended/stopped, or active but heartbeat > 1 hour ago |
+| Lost (last 24 h) | Offline VENs whose last heartbeat was within the past 24 hours |
+| Lost (24–48 h ago) | Offline VENs whose last heartbeat was 24–48 hours ago |
 
-Each row includes: hostname, IP, labels, VEN status, last heartbeat, policy received timestamp, VEN version.
+Each row includes: hostname, IP, labels, VEN status, hours since last heartbeat, last heartbeat timestamp, policy received timestamp, VEN version.
+
+> **Online detection**: The PCE's `agent.status.status = "active"` reflects **administrative** state only. A VEN can remain `"active"` while unreachable (no heartbeat). The report uses `hours_since_last_heartbeat` — a VEN is considered online only if its last heartbeat was ≤ 1 hour ago. This matches the PCE Web Console behaviour.
 
 ### 7.4 Tuning Security Rules
 
@@ -483,6 +485,8 @@ Configure automated recurring reports via CLI menu **[15]** or Web GUI **Report 
 
 The daemon loop checks schedules every 60 seconds and runs any schedule whose configured time has been reached.
 
+After each successful run, old report files (`.html` and `.zip`) are automatically cleaned up according to the **retention policy** — see Section 8.3.
+
 ---
 
 ## 8. Settings Reference
@@ -509,6 +513,27 @@ The Dashboard tab supports saving custom traffic queries for repeated use. Each 
 
 Queries are stored in `config.json` → `settings.dashboard_queries` and are managed entirely through the Web GUI.
 
+### 8.3 Report Output
+
+Controls where reports are saved and how long they are kept.
+
+| Setting | Default | Description |
+|:---|:---|:---|
+| `report.output_dir` | `reports/` | Directory for generated reports (relative to project root, or absolute path) |
+| `report.retention_days` | `30` | Auto-delete `.html`/`.zip` reports older than this many days after each scheduled run. Set to `0` to disable. |
+
+**Configure from Web GUI**: Settings → **Report Output** fieldset
+**Configure from CLI**: Settings menu → **[5] Report Output**
+**Configure from `config.json`**:
+```json
+{
+    "report": {
+        "output_dir": "reports/",
+        "retention_days": 30
+    }
+}
+```
+
 ---
 
 ## 9. Troubleshooting
@@ -519,5 +544,8 @@ Queries are stored in `config.json` → `settings.dashboard_queries` and are man
 | `401 Unauthorized` | Invalid API credentials | Regenerate API Key in PCE Console |
 | `410 Gone` | Async query expired | The traffic query result was cleaned up; re-run the query |
 | `429 Too Many Requests` | API rate limiting | The system auto-retries with backoff; reduce query frequency if persistent |
-| Web GUI won't start | Flask not installed | Run `pip install flask` |
+| Web GUI won't start | Flask not installed | **Ubuntu/Debian**: use venv — `venv/bin/pip install flask pandas pyyaml`. **RHEL**: `dnf install python3-flask` |
+| `externally-managed-environment` pip error | Ubuntu/Debian PEP 668 | Create a venv: `python3 -m venv venv && venv/bin/pip install flask pandas pyyaml` |
 | No alerts received | Channel not activated | Ensure `alerts.active` array includes your channel(s) |
+| Report shows all VENs as online | Old cached state | Ensure `hours_since_last_heartbeat` is returned by your PCE version; check PCE API response for `agent.status` fields |
+| Schedule email fails: `'Finding' object has no attribute 'get'` | Outdated code | Pull latest — this was fixed in commit `98c0b47` |
