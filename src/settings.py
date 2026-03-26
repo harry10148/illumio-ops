@@ -1283,7 +1283,7 @@ def manage_report_schedules_menu(cm: ConfigManager):
         import json as _json
         pkg_dir = os.path.dirname(os.path.abspath(__file__))
         root_dir = os.path.dirname(pkg_dir)
-        state_file = os.path.join(root_dir, "state.json")
+        state_file = os.path.join(root_dir, "logs", "state.json")
         states = {}
         if os.path.exists(state_file):
             try:

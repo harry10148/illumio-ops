@@ -83,7 +83,7 @@ def _create_app(cm: ConfigManager) -> 'Flask':
         try:
             PKG_DIR = os.path.dirname(os.path.abspath(__file__))
             ROOT_DIR = os.path.dirname(PKG_DIR)
-            STATE_FILE = os.path.join(ROOT_DIR, "state.json")
+            STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
             if os.path.exists(STATE_FILE):
                 with open(STATE_FILE, 'r', encoding='utf-8') as f:
                     state = json.load(f)
@@ -164,7 +164,7 @@ def _create_app(cm: ConfigManager) -> 'Flask':
         try:
             PKG_DIR = os.path.dirname(os.path.abspath(__file__))
             ROOT_DIR = os.path.dirname(PKG_DIR)
-            STATE_FILE = os.path.join(ROOT_DIR, "state.json")
+            STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
             if os.path.exists(STATE_FILE):
                 with open(STATE_FILE, 'r', encoding='utf-8') as f:
                     state = json.load(f)
@@ -641,7 +641,7 @@ def _create_app(cm: ConfigManager) -> 'Flask':
         # Enrich with last-run state from state.json
         PKG_DIR_L = os.path.dirname(os.path.abspath(__file__))
         ROOT_DIR_L = os.path.dirname(PKG_DIR_L)
-        state_file = os.path.join(ROOT_DIR_L, "state.json")
+        state_file = os.path.join(ROOT_DIR_L, "logs", "state.json")
         states = {}
         if os.path.exists(state_file):
             try:
@@ -741,7 +741,7 @@ def _create_app(cm: ConfigManager) -> 'Flask':
     def api_report_schedule_history(schedule_id):
         PKG_DIR_L = os.path.dirname(os.path.abspath(__file__))
         ROOT_DIR_L = os.path.dirname(PKG_DIR_L)
-        state_file = os.path.join(ROOT_DIR_L, "state.json")
+        state_file = os.path.join(ROOT_DIR_L, "logs", "state.json")
         try:
             if not os.path.exists(state_file):
                 return jsonify({"ok": True, "history": []})

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 # Refine Root Dir for State File
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
-STATE_FILE = os.path.join(ROOT_DIR, "state.json")
+STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
 
 
 # ─── Standalone Calculators (shared by Analyzer and Report modules) ──────────
@@ -120,6 +120,7 @@ class Analyzer:
         try:
             # Atomic write using a temporary file
             dir_name = os.path.dirname(STATE_FILE) or '.'
+            os.makedirs(dir_name, exist_ok=True)
             fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix='.tmp')
             try:
                 with os.fdopen(fd, 'w', encoding='utf-8') as f:

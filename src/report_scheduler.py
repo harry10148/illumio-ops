@@ -28,7 +28,7 @@ class ReportScheduler:
         # Determine paths
         pkg_dir = os.path.dirname(os.path.abspath(__file__))
         self._root_dir = os.path.dirname(pkg_dir)
-        self._state_file = os.path.join(self._root_dir, "state.json")
+        self._state_file = os.path.join(self._root_dir, "logs", "state.json")
         self._config_dir = os.path.join(self._root_dir, "config")
 
     # ─── State helpers ────────────────────────────────────────────────────────
@@ -47,6 +47,7 @@ class ReportScheduler:
     def _save_state(self, schedule_id: int, last_run: str, status: str, error: str = ""):
         """Persist schedule execution result into state.json."""
         try:
+            os.makedirs(os.path.dirname(self._state_file), exist_ok=True)
             data = {}
             if os.path.exists(self._state_file):
                 with open(self._state_file, "r", encoding="utf-8") as f:
