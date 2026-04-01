@@ -79,14 +79,9 @@ def _local_to_utc_hour(local_hour: int, offset_hours: float) -> int:
 
 
 def _menu_hints(path):
-    if get_language() == "zh_TW":
-        return [
-            f"{Colors.DARK_GRAY}路徑: {path}{Colors.ENDC}",
-            f"{Colors.DARK_GRAY}快捷: Enter預設 | 0返回 | -1取消 | h/?說明{Colors.ENDC}",
-        ]
     return [
-        f"{Colors.DARK_GRAY}{t('cli_path_label', default='Path: {path}', path=path)}{Colors.ENDC}",
-        f"{Colors.DARK_GRAY}{t('cli_shortcuts_compact', default='Shortcuts: Enter=default | 0=back | -1=cancel | h/?=help')}{Colors.ENDC}",
+        f"{Colors.DARK_GRAY}{t('cli_path_label', path=path)}{Colors.ENDC}",
+        f"{Colors.DARK_GRAY}{t('cli_shortcuts_compact')}{Colors.ENDC}",
     ]
 
 
@@ -1052,9 +1047,7 @@ def alert_settings_menu(cm: ConfigManager):
         _wizard_step(
             1,
             1,
-            "選擇要調整的告警通道"
-            if get_language() == "zh_TW"
-            else t("choose_alert_channel"),
+            t("choose_alert_channel"),
         )
         print("")
 
@@ -1248,8 +1241,8 @@ def settings_menu(cm: ConfigManager):
             if cm.config["api"]["key"]
             else t("not_set")
         )
-        print(f"API URL : {cm.config['api']['url']}")
-        print(f"API Key : {masked_key}")
+        print(f"{t('gui_api_url')} : {cm.config['api']['url']}")
+        print(f"{t('gui_api_key')} : {masked_key}")
 
         alerts_cfg = cm.config.get("alerts", {})
         active = alerts_cfg.get("active", ["mail"])
@@ -1261,7 +1254,7 @@ def settings_menu(cm: ConfigManager):
         if "webhook" in active:
             channels.append("Webhook")
 
-        print(f"Alerts  : {', '.join(channels) if channels else t('not_set')}")
+        print(f"{t('gui_alerts')}  : {', '.join(channels) if channels else t('not_set')}")
         print("-" * 40)
         print(t("settings_1"))
         print(t("settings_2"))
@@ -1283,7 +1276,7 @@ def settings_menu(cm: ConfigManager):
         rs_cfg = cm.config.get("rule_scheduler", {})
         rs_status = "ON" if rs_cfg.get("enabled", False) else "OFF"
         print(t("settings_6", status=rs_status))
-        print(t("settings_7_web_gui_sec", default="7. Web GUI Security"))
+        print(t("settings_7_web_gui_sec"))
         print(t("menu_return"))
         sel = safe_input(f"\n{t('please_select')}", int, range(0, 8))
         if sel is None:

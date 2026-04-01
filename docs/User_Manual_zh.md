@@ -1,6 +1,6 @@
 # Illumio PCE Ops — 完整使用手冊
 
-![Version](https://img.shields.io/badge/Version-v3.0.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v3.1.0-blue?style=flat-square)
 
 ---
 

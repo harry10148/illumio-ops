@@ -1,6 +1,6 @@
 # Illumio PCE Ops
 
-![Version](https://img.shields.io/badge/Version-v3.0.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v3.1.0-blue?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.8%2B-yellow?style=flat-square&logo=python&logoColor=white)
 ![API](https://img.shields.io/badge/Illumio_API-v25.2-green?style=flat-square)
 
@@ -18,10 +18,10 @@
 | **安全防護強化** | **所有 Web 模式強制登入驗證**；支援 **IP 白名單控制** (CIDR/子網段)，嚴格限制來源存取 |
 | **安全事件監控** | 追蹤 PCE 稽核事件，採用時間戳記錨點，保證零重複告警 |
 | **高效能流量引擎** | 將所有規則整合為單次 API 查詢，O(1) 記憶體串流處理大型資料集 |
-| **進階報表引擎** | 15 模組流量報表、4 模組稽核報表、VEN 狀態盤點報表 — HTML 主報表 + CSV 原始資料 |
-| **19 項自動化資安發現** | B 系列（勒索軟體、覆蓋率、異常行為）+ L 系列（橫向移動、資料外洩、爆炸半徑） |
+| **進階報表引擎** | 15 模組流量報表（支援**批次刪除**管理）、4 模組稽核報表、VEN 狀態盤點報表 — HTML + CSV |
+| **自動化資安發現** | 19 項預設規則：B 系列（勒索軟體、覆蓋率）+ L 系列（橫向移動、資料外洩）。 |
 | **排程報表** | 類 Cron 週期性報表（每日/每週/每月），可自動 Email 附件寄送 |
-| **規則排程器** | 依時間區間自動啟用/停用 PCE 規則；**三層 Draft 安全防護**防止未 Provision 規則被意外派送 |
+| **規則排程器** | 依時間區間自動啟用/停用 PCE 規則；**三層 Draft 安全防護**防止意外派送 |
 | **工作負載隔離** | 透過 Quarantine Label 隔離遭入侵主機；支援 IP/CIDR/子網段搜尋 |
 
 ---

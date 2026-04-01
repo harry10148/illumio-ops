@@ -257,14 +257,7 @@ def main_menu():
         health_status = "ON" if settings.get("enable_health_check", True) else "OFF"
         current_lang = (settings.get("language", "en") or "en").upper()
         current_theme = (settings.get("theme", "dark") or "dark").capitalize()
-        shortcuts_line = (
-            "快捷: Enter預設 | 0返回 | -1取消 | h/?說明"
-            if get_language() == "zh_TW"
-            else t(
-                "cli_shortcuts_compact",
-                default="Shortcuts: Enter=default | 0=back | -1=cancel | h/?=help",
-            )
-        )
+        shortcuts_line = t("cli_shortcuts_compact")
 
         lines = [
             f"API: {cm.config['api']['url']} | Rules: {len(cm.config['rules'])}",

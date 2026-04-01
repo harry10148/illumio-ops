@@ -162,8 +162,9 @@ illumio_ops/
 
 **Architecture**: Flask backend exposing ~30 JSON API endpoints, consumed by a Vanilla JS frontend (`templates/index.html`).
 
-- **Security Middleware**: Mandates login authentication for all routes and enforces IP Allowlisting (CIDR support) via `@app.before_request`.
-- **Session Security**: Uses SHA-256 password hashing with unique salts and cryptographically signed session cookies.
+- **Security Middleware**: Mandates login authentication for all routes and enforces IP Allowlisting (CIDR support) via `@app.before_request`. Unauthorized requests are blocked with 401/403 status.
+- **Session Security**: Uses SHA-256 password hashing with unique salts and cryptographically signed session cookies. The `session_secret` is automatically generated on first run.
+- **Threading Model (--monitor-gui)**: The daemon loop runs in a dedicated `threading.Thread` while the Flask app occupies the main thread to handle signals and web requests correctly.
 
 **Key Endpoints**:
 

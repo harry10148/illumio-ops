@@ -1,6 +1,6 @@
 # Illumio PCE Ops
 
-![Version](https://img.shields.io/badge/Version-v3.0.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v3.1.0-blue?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.8%2B-yellow?style=flat-square&logo=python&logoColor=white)
 ![API](https://img.shields.io/badge/Illumio_API-v25.2-green?style=flat-square)
 
@@ -18,11 +18,11 @@ An advanced **agentless** monitoring and automation tool for **Illumio Core (PCE
 | **Security Enforced** | **Mandatory login authentication** for all Web GUI modes; supports **IP Allowlisting** (CIDR/Subnet) for restricted access. |
 | **Security Event Monitoring** | Tracks PCE audit events with anchor-based timestamps — guaranteed zero duplicate alerts. |
 | **High-Performance Traffic Engine** | Aggregates rules into a single bulk API query; O(1) memory streaming for large datasets. |
-| **Advanced Report Engine** | 15-module traffic reports, 4-module audit reports, and VEN Status inventory reports — HTML + CSV raw data. |
-| **19 Automated Security Findings** | B-series (ransomware, coverage, anomalies) + L-series (lateral movement, exfiltration, blast-radius). |
+| **Advanced Report Engine** | 15-module traffic reports with **Bulk-Delete** management; 4-module audit reports, and VEN Status inventory reports — HTML + CSV. |
+| **Security Findings** | 19 Automated rules: B-series (Ransomware, Coverage) + L-series (Lateral Movement, Exfiltration). |
 | **Report Schedules** | Cron-style recurring reports (daily/weekly/monthly) with automatic email delivery. |
-| **Rule Scheduler** | Auto enable/disable PCE rules on time windows; **three-layer Draft protection** prevents accidental provisioning. |
-| **Workload Quarantine** | Isolate compromised workloads with Quarantine labels (Mild/Moderate/Severe); supports IP/CIDR/subnet search. |
+| **Rule Scheduler** | Auto enable/disable PCE rules; **three-layer Draft protection** prevents accidental provisioning. |
+| **Workload Quarantine** | Isolate compromised workloads with Quarantine labels; supports IP/CIDR/subnet search. |
 | **Multi-Channel Alerts** | Email (SMTP), LINE Notifications, and Webhooks dispatched simultaneously. |
 
 ---

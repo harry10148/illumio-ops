@@ -162,8 +162,9 @@ illumio_ops/
 
 **架構**：Flask 後端提供約 30 個 JSON API 端點，由 Vanilla JS 前端（`templates/index.html`）消費。
 
-- **安全邊界 (Security Middleware)**：所有路由強制要求登入驗證，並透過 `@app.before_request` 實作 IP 白名單過濾（支援 CIDR）。
-- **連線安全**：採用 SHA-256 密碼雜湊與唯一 Salt，Session Cookies 經過加密簽署。
+- **安全邊界 (Security Middleware)**：所有路由強制要求登入驗證，並透過 `@app.before_request` 實作 IP 白名單過濾（支援 CIDR）。未經授權或非允許 IP 的請求將被攔截並回傳 401/403 狀態。
+- **連線安全**：採用 SHA-256 密碼雜湊與唯一 Salt，Session Cookies 經過加密簽署。`session_secret` 在首次執行時自動產生。
+- **執行緒模型 (--monitor-gui)**：Daemon 迴圈運行於獨立的 `threading.Thread` 中，而 Flask 應用程式佔用主執行緒，以正確處理訊號 (Signals) 與網頁請求。
 
 **關鍵路由**：
 

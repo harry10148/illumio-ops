@@ -1,4 +1,6 @@
 # Illumio PCE Ops — API Cookbook & SIEM/SOAR Integration Guide
+![Version](https://img.shields.io/badge/Version-v3.1.0-blue?style=flat-square)
+
 
 > **[English](API_Cookbook.md)** | **[繁體中文](API_Cookbook_zh.md)**
 

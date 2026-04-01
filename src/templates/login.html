@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login – Illumio PCE Ops</title>
+  <title>{{ t('login_title') }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -175,8 +175,8 @@
           </svg>
         </div>
         <div class="brand-text">
-          <h1>PCE Ops</h1>
-          <p>Illumio Monitoring Console</p>
+          <h1>{{ t('login_header') }}</h1>
+          <p>{{ t('login_subheader') }}</p>
         </div>
       </div>
 
@@ -184,17 +184,17 @@
 
       <form id="login-form" autocomplete="on">
         <div class="form-group">
-          <label for="username">Username</label>
-          <input type="text" id="username" name="username" required autocomplete="username" placeholder="Enter username">
+          <label for="username">{{ t('login_username') }}</label>
+          <input type="text" id="username" name="username" required autocomplete="username" placeholder="{{ t('login_username_placeholder') }}">
         </div>
         <div class="form-group">
-          <label for="password">Password</label>
-          <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="Enter password">
+          <label for="password">{{ t('login_password') }}</label>
+          <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="{{ t('login_password_placeholder') }}">
         </div>
-        <button type="submit" class="btn" id="login-btn">Sign In →</button>
+        <button type="submit" class="btn" id="login-btn">{{ t('login_btn') }}</button>
       </form>
 
-      <div class="footer">Illumio PCE Ops · Secure Access</div>
+      <div class="footer">{{ t('login_footer') }}</div>
     </div>
   </div>
 
@@ -203,13 +203,21 @@
     const errBox = document.getElementById('error-msg');
     const btn = document.getElementById('login-btn');
 
+    const i18n = {
+      signing_in: "{{ t('login_btn_signing_in') }}",
+      success: "{{ t('login_btn_success') }}",
+      btn_default: "{{ t('login_btn') }}",
+      invalid_auth: "{{ t('gui_err_invalid_auth') }}",
+      network_error: "{{ t('gui_err_network') }}"
+    };
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value;
 
       errBox.style.display = 'none';
-      btn.textContent = 'Signing in…';
+      btn.textContent = i18n.signing_in;
       btn.disabled = true;
 
       try {
@@ -220,20 +228,20 @@
         });
         const data = await res.json();
         if (data.ok) {
-          btn.textContent = '✓ Success!';
+          btn.textContent = i18n.success;
           setTimeout(() => { window.location.href = '/'; }, 300);
         } else {
-          errBox.textContent = data.error || 'Invalid username or password.';
+          errBox.textContent = data.error || i18n.invalid_auth;
           errBox.style.display = 'block';
-          btn.textContent = 'Sign In →';
+          btn.textContent = i18n.btn_default;
           btn.disabled = false;
           document.getElementById('password').value = '';
           document.getElementById('password').focus();
         }
       } catch {
-        errBox.textContent = 'Network error — please try again.';
+        errBox.textContent = i18n.network_error;
         errBox.style.display = 'block';
-        btn.textContent = 'Sign In →';
+        btn.textContent = i18n.btn_default;
         btn.disabled = false;
       }
     });

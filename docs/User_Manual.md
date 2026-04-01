@@ -1,6 +1,6 @@
 # Illumio PCE Ops — Comprehensive User Manual
 
-![Version](https://img.shields.io/badge/Version-v3.0.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v3.1.0-blue?style=flat-square)
 
 ---
 
@@ -149,7 +149,7 @@ Opens a browser-based dashboard at `http://127.0.0.1:5001` with tabs for:
 |:---|:---|
 | **Dashboard** | API connectivity, rule summary, PCE health check; Traffic Analyzer with Top-10 widgets (by bandwidth / volume / flow count); saved dashboard queries |
 | **Rules** | Full CRUD for Event/Traffic/Bandwidth/Volume rules, bulk delete, inline edit |
-| **Reports** | Generate Traffic, Audit, and VEN Status reports on demand; download HTML or CSV raw data ZIP; delete old reports |
+| **Reports** | Generate Traffic, Audit, and VEN Status reports; **Bulk-Delete** with multi-select; download HTML/CSV raw data ZIP; retention management |
 | **Report Schedules** | Create/edit/toggle recurring schedules (daily/weekly/monthly) with email delivery; trigger on demand; view run history |
 | **Rule Scheduler** | Browse all PCE rulesets; enable/disable individual rules with optional TTL; provision changes |
 | **Workload Search** | Search by hostname/IP/label; apply Quarantine labels (single or bulk) |

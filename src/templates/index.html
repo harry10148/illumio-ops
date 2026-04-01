@@ -358,6 +358,8 @@
       cursor: pointer;
       transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .btn svg {
@@ -1331,18 +1333,6 @@
 
     <!-- Top level stats -->
     <div class="cards">
-      <div class="card">
-        <div class="label" data-i18n="gui_active_rules">Active Rules</div>
-        <div class="value" id="d-rules">—</div>
-      </div>
-      <div class="card">
-        <div class="label" data-i18n="gui_health_check">Health Check</div>
-        <div class="value" id="d-health">—</div>
-      </div>
-      <div class="card">
-        <div class="label" data-i18n="gui_language">Language</div>
-        <div class="value" id="d-lang">—</div>
-      </div>
       <div class="card" id="card-flows" style="display:none">
         <div class="label">Total Flows</div>
         <div class="value" id="d-flows" style="color:var(--accent2)">—</div>
@@ -1729,6 +1719,9 @@
     <!-- ── Reports list sub-view ── -->
     <div id="reports-sv-list" class="reports-subview">
       <div class="toolbar" style="gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-danger btn-sm" id="btn-bulk-del-reports" onclick="deleteSelectedReports()" style="display:none;">
+          <svg class="icon"><use href="#icon-cross"></use></svg> <span data-i18n="gui_delete_selected">Delete Selected</span>
+        </button>
         <div class="spacer"></div>
         <button class="btn btn-primary btn-sm" id="btn-gen-report" onclick="openReportGenModal('traffic')">
           <svg class="icon"><use href="#icon-play"></use></svg> <span data-i18n="gui_btn_traffic_report">Traffic Report</span>
@@ -1744,6 +1737,7 @@
         <table class="rule-table">
           <thead>
             <tr>
+              <th style="width:30px;"><input type="checkbox" id="rt-chkall" onchange="toggleReportChecks(this)"></th>
               <th data-i18n="gui_col_filename">Filename</th>
               <th data-i18n="gui_col_date_created">Date Created</th>
               <th data-i18n="gui_col_size">Size</th>
@@ -2914,12 +2908,59 @@
         }
         const delBtn = `<button class="btn btn-sm btn-danger" onclick="deleteReport('${escapeHtml(rp.filename)}')" title="Delete" style="padding:4px 8px;line-height:1;">✕</button>`;
         tbody.innerHTML += `<tr>
+          <td><input type="checkbox" class="rt-chk" value="${escapeHtml(rp.filename)}" onchange="onReportCheckChange()"></td>
           <td>${escapeHtml(rp.filename)}</td>
           <td>${d}</td>
           <td>${sz}</td>
           <td><div style="display:flex;gap:6px;align-items:center;">${actionBtn}${delBtn}</div></td>
         </tr>`;
       });
+      // Reset master check
+      const master = $('rt-chkall');
+      if (master) master.checked = false;
+      onReportCheckChange();
+    }
+
+    function toggleReportChecks(master) {
+      document.querySelectorAll('.rt-chk').forEach(cb => cb.checked = master.checked);
+      onReportCheckChange();
+    }
+
+    function onReportCheckChange() {
+      const checked = document.querySelectorAll('.rt-chk:checked');
+      const btn = $('btn-bulk-del-reports');
+      if (btn) {
+        btn.style.display = checked.length > 0 ? '' : 'none';
+        const span = btn.querySelector('span');
+        if (span) {
+          const t = _translations['gui_delete_selected'] || 'Delete Selected';
+          span.textContent = `${t} (${checked.length})`;
+        }
+      }
+    }
+
+    async function deleteSelectedReports() {
+      const checked = document.querySelectorAll('.rt-chk:checked');
+      const filenames = [...checked].map(cb => cb.value);
+      if (filenames.length === 0) return;
+
+      const confirmMsg = (_translations['gui_delete_selected_confirm'] || 'Delete {count} reports?').replace('{count}', filenames.length);
+      if (!confirm(confirmMsg)) return;
+
+      try {
+        const r = await post('/api/reports/bulk-delete', { filenames });
+        if (r.ok || r.success) {
+          toast((_translations['gui_deleted_count'] || 'Deleted {count} items').replace('{count}', (r.deleted || []).length));
+          if (r.errors && r.errors.length > 0) {
+            toast((_translations['gui_delete_partial'] || 'Some items failed to delete'), 'warn');
+          }
+          await loadReports();
+        } else {
+          toast(r.error || 'Bulk delete failed', 'err');
+        }
+      } catch (err) {
+        toast('Bulk delete error: ' + err.message, 'err');
+      }
     }
 
     async function deleteReport(filename) {

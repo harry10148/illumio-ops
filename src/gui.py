@@ -93,6 +93,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     # Initialize session secret
     cm.load()
     app.secret_key = cm.config.get("web_gui", {}).get("secret_key", secrets.token_hex(32))
+    app.jinja_env.globals.update(t=t)
 
     @app.before_request
     def security_check():
@@ -102,7 +103,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         # IP Allowlist check
         allowed_ips = cm.config.get("web_gui", {}).get("allowed_ips", [])
         if not _check_ip_allowed(allowed_ips, request.remote_addr):
-            return jsonify({"error": "Forbidden", "message": "Your IP is not allowed to access this resource."}), 403
+            return jsonify({"error": t("gui_err_forbidden"), "message": t("gui_err_ip_not_allowed")}), 403
 
         # Auth check (always enforced for all GUI modes)
         # Bypass login routes
@@ -110,7 +111,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             return
         if not session.get('logged_in'):
             if request.path.startswith('/api/'):
-                return jsonify({"error": "Unauthorized"}), 401
+                return jsonify({"error": t("gui_err_unauthorized")}), 401
             return redirect('/login')
 
     # ─── Frontend SPA ─────────────────────────────────────────────────────
@@ -141,7 +142,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             session['logged_in'] = True
             return jsonify({"ok": True})
             
-        return jsonify({"ok": False, "error": "Invalid username or password"}), 401
+        return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
 
     @app.route('/logout')
     def logout():
@@ -176,7 +177,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 old_pass = d.get("old_password", "")
                 salt = gui_cfg.get("password_salt", "")
                 if _hash_password(salt, old_pass) != gui_cfg.get("password_hash"):
-                    return jsonify({"ok": False, "error": "Invalid old password"}), 401
+                    return jsonify({"ok": False, "error": t("gui_err_invalid_old_pass")}), 401
                     
             salt = secrets.token_hex(8)
             gui_cfg["password_salt"] = salt
@@ -647,6 +648,41 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         os.remove(target)
         return jsonify({"ok": True})
 
+    @app.route('/api/reports/bulk-delete', methods=['POST'])
+    def api_bulk_delete_reports():
+        d = request.json or {}
+        filenames = d.get('filenames', [])
+        if not filenames:
+            return jsonify({"ok": False, "error": "No filenames provided"}), 400
+            
+        cm.load()
+        PKG_DIR = os.path.dirname(os.path.abspath(__file__))
+        ROOT_DIR = os.path.dirname(PKG_DIR)
+        reports_dir = cm.config.get('report', {}).get('output_dir', 'reports')
+        if not os.path.isabs(reports_dir):
+            reports_dir = os.path.join(ROOT_DIR, reports_dir)
+            
+        resolved_reports_dir = os.path.realpath(reports_dir)
+        
+        success_count = 0
+        errors = []
+        
+        for filename in filenames:
+            try:
+                target = os.path.realpath(os.path.join(reports_dir, filename))
+                if not target.startswith(resolved_reports_dir + os.sep):
+                    errors.append(f"{filename}: {t('gui_invalid_filename')}")
+                    continue
+                if not os.path.isfile(target):
+                    errors.append(f"{filename}: {t('gui_file_not_found')}")
+                    continue
+                os.remove(target)
+                success_count += 1
+            except Exception as e:
+                errors.append(f"{filename}: {str(e)}")
+        
+        return jsonify({"ok": True, "deleted": success_count, "errors": errors})
+
     @app.route('/reports/<path:filename>', methods=['GET'])
     def api_serve_report(filename):
         cm.load()
@@ -683,10 +719,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             source = d.get('source', 'api')
             if source == 'csv':
                 if 'file' not in request.files:
-                    return jsonify({"ok": False, "error": "No CSV file uploaded"})
+                    return jsonify({"ok": False, "error": t("gui_err_no_csv")})
                 csv_file = request.files['file']
                 if csv_file.filename == '':
-                    return jsonify({"ok": False, "error": "Empty CSV filename"})
+                    return jsonify({"ok": False, "error": t("gui_err_empty_csv")})
                     
                 temp_path = os.path.join(tempfile.gettempdir(), csv_file.filename)
                 csv_file.save(temp_path)
@@ -886,7 +922,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
             t_thread = threading.Thread(target=_run, daemon=True)
             t_thread.start()
-            return jsonify({"ok": True, "message": "Schedule started in background."})
+            return jsonify({"ok": True, "message": t("gui_msg_sched_started")})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 400
 

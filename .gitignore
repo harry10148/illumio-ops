@@ -38,8 +38,14 @@ tests/.pytest_cache/
 # Reports output
 reports/
 
-# Claude Code project memory
+# Agent-specific directories
 .claude/
+.gemini/
+.agent/
+.agents/
+.tooling/
+brain/
+artifacts/
 
 # Temporary / backup files
 tmp_*.py
