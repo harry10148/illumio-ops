@@ -24,31 +24,9 @@ import pandas as pd
 from dataclasses import dataclass, field
 
 from src.i18n import t
+from src.report.tz_utils import parse_tz, fmt_tz_str as _fmt_tz_str, fmt_ts_local as _fmt_ts_local
 
 logger = logging.getLogger(__name__)
-
-
-def _fmt_tz_str(dt: datetime.datetime) -> str:
-    """Format a timezone-aware datetime as '2026-03-26 16:30:00 (UTC+08)'."""
-    offset_s = dt.strftime('%z')
-    sign = offset_s[0]; hh = int(offset_s[1:3]); mm = int(offset_s[3:5])
-    tz_label = f"UTC{sign}{hh}" if mm == 0 else f"UTC{sign}{hh}:{mm:02d}"
-    return dt.strftime('%Y-%m-%d %H:%M:%S') + f' ({tz_label})'
-
-
-def _fmt_ts_local(ts_str, tz: datetime.timezone) -> str:
-    """Format an ISO timestamp string to 'YYYY-MM-DD HH:MM (UTC+N)' in local time."""
-    if not ts_str:
-        return ''
-    try:
-        dt = datetime.datetime.fromisoformat(str(ts_str).replace('Z', '+00:00'))
-        local_dt = dt.astimezone(tz)
-        offset_s = local_dt.strftime('%z')          # e.g. "+0800"
-        sign = offset_s[0]; hh = int(offset_s[1:3]); mm = int(offset_s[3:5])
-        tz_label = f"UTC{sign}{hh}" if mm == 0 else f"UTC{sign}{hh}:{mm:02d}"
-        return local_dt.strftime('%Y-%m-%d %H:%M') + f' ({tz_label})'
-    except Exception:
-        return str(ts_str)
 
 _ONLINE_STATUSES = {'active', 'online'}
 # VENs whose last heartbeat is older than this are considered offline,
@@ -151,19 +129,7 @@ class VenStatusGenerator:
 
     def _parse_tz(self) -> datetime.timezone:
         tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
-        try:
-            if not tz_str or tz_str == 'local':
-                offset = datetime.datetime.now(datetime.timezone.utc).astimezone().utcoffset()
-                return datetime.timezone(offset)
-            if tz_str == 'UTC':
-                return datetime.timezone.utc
-            if tz_str.startswith('UTC+') or tz_str.startswith('UTC-'):
-                sign = 1 if tz_str[3] == '+' else -1
-                total_minutes = int(sign * float(tz_str[4:]) * 60)
-                return datetime.timezone(datetime.timedelta(minutes=total_minutes))
-        except Exception:
-            pass
-        return datetime.timezone.utc
+        return parse_tz(tz_str)
 
     def _analyze(self, df: pd.DataFrame) -> dict:
         now = datetime.datetime.now(self._parse_tz())

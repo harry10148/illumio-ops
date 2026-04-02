@@ -136,44 +136,15 @@ class ReportScheduler:
             from src.api_client import ApiClient
             api = ApiClient(self.cm)
 
-            paths = []
+            result, paths = self._generate_report(
+                report_type, api, fmt, output_dir, start_date, end_date, name)
 
-            if report_type == "traffic":
-                from src.report.report_generator import ReportGenerator
-                gen = ReportGenerator(self.cm, api_client=api, config_dir=self._config_dir)
-                result = gen.generate_from_api(start_date=start_date, end_date=end_date)
-                if result.record_count == 0:
-                    logger.warning(f"[Scheduler] '{name}': no traffic data — skipping export")
-                    return False
-                paths = gen.export(result, fmt=fmt, output_dir=output_dir,
-                                   send_email=False, reporter=None)
-                if send_email and paths:
-                    self._send_report_email(schedule, result, paths, start_date, end_date,
-                                            custom_recipients, report_type="traffic")
+            if result is None:
+                return False
 
-            elif report_type == "audit":
-                from src.report.audit_generator import AuditGenerator
-                gen = AuditGenerator(self.cm, api_client=api, config_dir=self._config_dir)
-                result = gen.generate_from_api(start_date=start_date, end_date=end_date)
-                if result.record_count == 0:
-                    logger.warning(f"[Scheduler] '{name}': no audit data — skipping export")
-                    return False
-                paths = gen.export(result, fmt=fmt, output_dir=output_dir)
-                if send_email and paths:
-                    self._send_report_email(schedule, result, paths, start_date, end_date,
-                                            custom_recipients, report_type="audit")
-
-            elif report_type == "ven_status":
-                from src.report.ven_status_generator import VenStatusGenerator
-                gen = VenStatusGenerator(self.cm, api_client=api)
-                result = gen.generate()
-                if result.record_count == 0:
-                    logger.warning(f"[Scheduler] '{name}': no VEN data — skipping export")
-                    return False
-                paths = gen.export(result, output_dir=output_dir)
-                if send_email and paths:
-                    self._send_report_email(schedule, result, paths, start_date, end_date,
-                                            custom_recipients, report_type="ven_status")
+            if send_email and paths:
+                self._send_report_email(schedule, result, paths, start_date, end_date,
+                                        custom_recipients, report_type=report_type)
 
             logger.info(f"[Scheduler] '{name}': completed, files={[os.path.basename(p) for p in paths]}")
             self._prune_old_reports(output_dir)
@@ -182,6 +153,45 @@ class ReportScheduler:
         except Exception as e:
             logger.error(f"[Scheduler] '{name}': failed — {e}", exc_info=True)
             raise
+
+    # ── Report type dispatch ────────────────────────────────────────────────
+
+    def _generate_report(self, report_type, api, fmt, output_dir, start_date, end_date, name):
+        """Dispatch to the appropriate generator. Returns (result, paths) or (None, [])."""
+        if report_type == "traffic":
+            from src.report.report_generator import ReportGenerator
+            gen = ReportGenerator(self.cm, api_client=api, config_dir=self._config_dir)
+            result = gen.generate_from_api(start_date=start_date, end_date=end_date)
+            if result.record_count == 0:
+                logger.warning(f"[Scheduler] '{name}': no traffic data — skipping export")
+                return None, []
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir,
+                               send_email=False, reporter=None)
+            return result, paths
+
+        elif report_type == "audit":
+            from src.report.audit_generator import AuditGenerator
+            gen = AuditGenerator(self.cm, api_client=api, config_dir=self._config_dir)
+            result = gen.generate_from_api(start_date=start_date, end_date=end_date)
+            if result.record_count == 0:
+                logger.warning(f"[Scheduler] '{name}': no audit data — skipping export")
+                return None, []
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir)
+            return result, paths
+
+        elif report_type == "ven_status":
+            from src.report.ven_status_generator import VenStatusGenerator
+            gen = VenStatusGenerator(self.cm, api_client=api)
+            result = gen.generate()
+            if result.record_count == 0:
+                logger.warning(f"[Scheduler] '{name}': no VEN data — skipping export")
+                return None, []
+            paths = gen.export(result, output_dir=output_dir)
+            return result, paths
+
+        else:
+            logger.error(f"[Scheduler] Unknown report_type: {report_type}")
+            return None, []
 
     def _send_report_email(self, schedule: dict, result, paths: list,
                             start_date: str, end_date: str,

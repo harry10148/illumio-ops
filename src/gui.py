@@ -84,9 +84,40 @@ def _check_ip_allowed(allowed_ips: list, remote_addr: str) -> bool:
             continue
     return False
 
+_PKG_DIR = os.path.dirname(os.path.abspath(__file__))
+_ROOT_DIR = os.path.dirname(_PKG_DIR)
+
+
+def _resolve_reports_dir(cm_ref: ConfigManager) -> str:
+    """Return absolute path to the report output directory."""
+    d = cm_ref.config.get('report', {}).get('output_dir', 'reports')
+    return d if os.path.isabs(d) else os.path.join(_ROOT_DIR, d)
+
+
+def _resolve_config_dir() -> str:
+    return os.path.join(_ROOT_DIR, 'config')
+
+
+def _resolve_state_file() -> str:
+    return os.path.join(_ROOT_DIR, 'logs', 'state.json')
+
+
+def _ok(data=None, **kw):
+    """Standard success response: {"ok": true, ...}"""
+    body = {"ok": True}
+    if data is not None:
+        body["data"] = data
+    body.update(kw)
+    return jsonify(body)
+
+
+def _err(msg, status=400):
+    """Standard error response: {"ok": false, "error": "..."}"""
+    return jsonify({"ok": False, "error": msg}), status
+
+
 def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
-    PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-    app = Flask(__name__, template_folder=os.path.join(PKG_DIR, 'templates'), static_folder=os.path.join(PKG_DIR, 'static'))
+    app = Flask(__name__, template_folder=os.path.join(_PKG_DIR, 'templates'), static_folder=os.path.join(_PKG_DIR, 'static'))
     app.config['JSON_AS_ASCII'] = False
     app.config['TEMPLATES_AUTO_RELOAD'] = True
     
@@ -99,11 +130,11 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     def security_check():
         if request.endpoint == 'static' or request.path.startswith('/static/'):
             return
-            
+
         # IP Allowlist check
         allowed_ips = cm.config.get("web_gui", {}).get("allowed_ips", [])
         if not _check_ip_allowed(allowed_ips, request.remote_addr):
-            return jsonify({"error": t("gui_err_forbidden"), "message": t("gui_err_ip_not_allowed")}), 403
+            return _err(t("gui_err_forbidden"), 403)
 
         # Auth check (always enforced for all GUI modes)
         # Bypass login routes
@@ -111,8 +142,24 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             return
         if not session.get('logged_in'):
             if request.path.startswith('/api/'):
-                return jsonify({"error": t("gui_err_unauthorized")}), 401
+                return _err(t("gui_err_unauthorized"), 401)
             return redirect('/login')
+
+        # CSRF protection for state-changing requests
+        if request.method in ('POST', 'PUT', 'DELETE'):
+            # Exempt login (session not yet established)
+            if request.path == '/api/login':
+                return
+            token = request.headers.get('X-CSRF-Token', '')
+            if not token or token != session.get('csrf_token'):
+                return _err("CSRF token missing or invalid", 403)
+
+    @app.after_request
+    def inject_csrf_cookie(response):
+        if 'csrf_token' not in session:
+            session['csrf_token'] = secrets.token_hex(32)
+        response.set_cookie('csrf_token', session['csrf_token'], httponly=False, samesite='Strict')
+        return response
 
     # ─── Frontend SPA ─────────────────────────────────────────────────────
     @app.route('/')
@@ -200,13 +247,11 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         
         cooldowns = []
         try:
-            PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-            ROOT_DIR = os.path.dirname(PKG_DIR)
-            STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
+            STATE_FILE = _resolve_state_file()
             if os.path.exists(STATE_FILE):
                 with open(STATE_FILE, 'r', encoding='utf-8') as f:
                     state = json.load(f)
-                    
+
                 now = datetime.datetime.now(datetime.timezone.utc)
                 alert_history = state.get("alert_history", {})
                 
@@ -282,9 +327,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         # Load state to get cooldowns
         alert_history = {}
         try:
-            PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-            ROOT_DIR = os.path.dirname(PKG_DIR)
-            STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
+            STATE_FILE = _resolve_state_file()
             if os.path.exists(STATE_FILE):
                 with open(STATE_FILE, 'r', encoding='utf-8') as f:
                     state = json.load(f)
@@ -425,7 +468,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         cm.load()
         if 0 <= idx < len(cm.config['rules']):
             return jsonify({"index": idx, **cm.config['rules'][idx]})
-        return jsonify({"error": t("gui_not_found")}), 404
+        return _err(t("gui_not_found"), 404)
 
     @app.route('/api/rules/<int:idx>', methods=['PUT'])
     def api_update_rule(idx):
@@ -454,7 +497,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     except (ValueError, TypeError): pass
             cm.save()
             return jsonify({"ok": True})
-        return jsonify({"error": t("gui_not_found")}), 404
+        return _err(t("gui_not_found"), 404)
 
     @app.route('/api/rules/<int:idx>', methods=['DELETE'])
     def api_delete_rule(idx):
@@ -582,17 +625,13 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 cm.config['settings']['dashboard_queries'].pop(idx)
                 cm.save()
                 return jsonify({"ok": True})
-        return jsonify({"error": t("gui_not_found")}), 404
+        return _err(t("gui_not_found"), 404)
 
     @app.route('/api/dashboard/snapshot', methods=['GET'])
     def api_dashboard_snapshot():
         cm.load()
-        PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-        ROOT_DIR = os.path.dirname(PKG_DIR)
-        reports_dir = cm.config.get('report', {}).get('output_dir', 'reports')
-        if not os.path.isabs(reports_dir):
-            reports_dir = os.path.join(ROOT_DIR, reports_dir)
-        
+        reports_dir = _resolve_reports_dir(cm)
+
         snapshot_path = os.path.join(reports_dir, 'latest_snapshot.json')
         if not os.path.exists(snapshot_path):
             return jsonify({"ok": False, "error": t("gui_no_snapshot")})
@@ -609,12 +648,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     @app.route('/api/reports', methods=['GET'])
     def api_list_reports():
         cm.load()
-        PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-        ROOT_DIR = os.path.dirname(PKG_DIR)
-        reports_dir = cm.config.get('report', {}).get('output_dir', 'reports')
-        if not os.path.isabs(reports_dir):
-            reports_dir = os.path.join(ROOT_DIR, reports_dir)
-        
+        reports_dir = _resolve_reports_dir(cm)
+
         if not os.path.exists(reports_dir):
             return jsonify({"ok": True, "reports": []})
         
@@ -634,11 +669,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     @app.route('/api/reports/<path:filename>', methods=['DELETE'])
     def api_delete_report(filename):
         cm.load()
-        PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-        ROOT_DIR = os.path.dirname(PKG_DIR)
-        reports_dir = cm.config.get('report', {}).get('output_dir', 'reports')
-        if not os.path.isabs(reports_dir):
-            reports_dir = os.path.join(ROOT_DIR, reports_dir)
+        reports_dir = _resolve_reports_dir(cm)
         # Prevent path traversal
         target = os.path.realpath(os.path.join(reports_dir, filename))
         if not target.startswith(os.path.realpath(reports_dir) + os.sep):
@@ -656,12 +687,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             return jsonify({"ok": False, "error": "No filenames provided"}), 400
             
         cm.load()
-        PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-        ROOT_DIR = os.path.dirname(PKG_DIR)
-        reports_dir = cm.config.get('report', {}).get('output_dir', 'reports')
-        if not os.path.isabs(reports_dir):
-            reports_dir = os.path.join(ROOT_DIR, reports_dir)
-            
+        reports_dir = _resolve_reports_dir(cm)
+
         resolved_reports_dir = os.path.realpath(reports_dir)
         
         success_count = 0
@@ -686,11 +713,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     @app.route('/reports/<path:filename>', methods=['GET'])
     def api_serve_report(filename):
         cm.load()
-        PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-        ROOT_DIR = os.path.dirname(PKG_DIR)
-        reports_dir = cm.config.get('report', {}).get('output_dir', 'reports')
-        if not os.path.isabs(reports_dir):
-            reports_dir = os.path.join(ROOT_DIR, reports_dir)
+        reports_dir = _resolve_reports_dir(cm)
         return send_from_directory(reports_dir, filename)
 
     @app.route('/api/reports/generate', methods=['POST'])
@@ -706,16 +729,13 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             from src.reporter import Reporter
             import tempfile
             
-            PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-            ROOT_DIR = os.path.dirname(PKG_DIR)
-            config_dir = os.path.join(ROOT_DIR, 'config')
-            
             cm.load()
+            config_dir = _resolve_config_dir()
             api = ApiClient(cm)
             reporter = Reporter(cm)
-            
+
             gen = ReportGenerator(cm, api_client=api, config_dir=config_dir)
-            
+
             source = d.get('source', 'api')
             if source == 'csv':
                 if 'file' not in request.files:
@@ -723,8 +743,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 csv_file = request.files['file']
                 if csv_file.filename == '':
                     return jsonify({"ok": False, "error": t("gui_err_empty_csv")})
-                    
-                temp_path = os.path.join(tempfile.gettempdir(), csv_file.filename)
+
+                safe_filename = os.path.basename(csv_file.filename)
+                temp_path = os.path.join(tempfile.gettempdir(), safe_filename)
                 csv_file.save(temp_path)
                 try:
                     result = gen.generate_from_csv(temp_path)
@@ -737,14 +758,12 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 start_date = d.get('start_date')
                 end_date = d.get('end_date')
                 result = gen.generate_from_api(start_date, end_date)
-            
+
             if result.record_count == 0:
                 return jsonify({"ok": False, "error": t("gui_no_traffic_data")})
-            
+
             fmt = d.get('format', 'all')
-            output_dir = cm.config.get('report', {}).get('output_dir', 'reports')
-            if not os.path.isabs(output_dir):
-                output_dir = os.path.join(ROOT_DIR, output_dir)
+            output_dir = _resolve_reports_dir(cm)
                 
             paths = gen.export(result, fmt=fmt, output_dir=output_dir, send_email=str(d.get('send_email', '')).lower() == 'true', reporter=reporter)
             
@@ -761,25 +780,20 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             from src.report.audit_generator import AuditGenerator
             from src.api_client import ApiClient
             
-            PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-            ROOT_DIR = os.path.dirname(PKG_DIR)
-            config_dir = os.path.join(ROOT_DIR, 'config')
-            
             cm.load()
+            config_dir = _resolve_config_dir()
             api = ApiClient(cm)
             gen = AuditGenerator(cm, api_client=api, config_dir=config_dir)
-            
+
             start_date = d.get('start_date')
             end_date = d.get('end_date')
-            
+
             result = gen.generate_from_api(start_date, end_date)
-            
+
             if result.record_count == 0:
                 return jsonify({"ok": False, "error": t("gui_no_audit_data")})
-            
-            output_dir = cm.config.get('report', {}).get('output_dir', 'reports')
-            if not os.path.isabs(output_dir):
-                output_dir = os.path.join(ROOT_DIR, output_dir)
+
+            output_dir = _resolve_reports_dir(cm)
                 
             paths = gen.export(result, fmt='all', output_dir=output_dir)
             filenames = [os.path.basename(p) for p in paths]
@@ -796,9 +810,6 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             from src.report.ven_status_generator import VenStatusGenerator
             from src.api_client import ApiClient
 
-            PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-            ROOT_DIR = os.path.dirname(PKG_DIR)
-
             cm.load()
             api = ApiClient(cm)
             gen = VenStatusGenerator(cm, api_client=api)
@@ -808,9 +819,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             if result.record_count == 0:
                 return jsonify({"ok": False, "error": t("gui_no_ven_data")})
 
-            output_dir = cm.config.get('report', {}).get('output_dir', 'reports')
-            if not os.path.isabs(output_dir):
-                output_dir = os.path.join(ROOT_DIR, output_dir)
+            output_dir = _resolve_reports_dir(cm)
 
             paths = gen.export(result, fmt='all', output_dir=output_dir)
             filenames = [os.path.basename(p) for p in paths]
@@ -828,9 +837,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         cm.load()
         schedules = cm.get_report_schedules()
         # Enrich with last-run state from state.json
-        PKG_DIR_L = os.path.dirname(os.path.abspath(__file__))
-        ROOT_DIR_L = os.path.dirname(PKG_DIR_L)
-        state_file = os.path.join(ROOT_DIR_L, "logs", "state.json")
+        state_file = _resolve_state_file()
         states = {}
         if os.path.exists(state_file):
             try:
@@ -928,9 +935,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
     @app.route('/api/report-schedules/<int:schedule_id>/history', methods=['GET'])
     def api_report_schedule_history(schedule_id):
-        PKG_DIR_L = os.path.dirname(os.path.abspath(__file__))
-        ROOT_DIR_L = os.path.dirname(PKG_DIR_L)
-        state_file = os.path.join(ROOT_DIR_L, "logs", "state.json")
+        state_file = _resolve_state_file()
         try:
             if not os.path.exists(state_file):
                 return jsonify({"ok": True, "history": []})
@@ -1324,8 +1329,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         """Lazy-init Rule Scheduler components."""
         from src.rule_scheduler import ScheduleDB, ScheduleEngine
         from src.api_client import ApiClient
-        ROOT_DIR = os.path.dirname(PKG_DIR)
-        db_path = os.path.join(ROOT_DIR, "config", "rule_schedules.json")
+        db_path = os.path.join(_resolve_config_dir(), "rule_schedules.json")
         db = ScheduleDB(db_path)
         db.load()
         api = ApiClient(cm)
@@ -1336,8 +1340,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     def rs_status():
         rs_cfg = cm.config.get("rule_scheduler", {})
         from src.rule_scheduler import ScheduleDB
-        ROOT_DIR = os.path.dirname(PKG_DIR)
-        db = ScheduleDB(os.path.join(ROOT_DIR, "config", "rule_schedules.json"))
+        db = ScheduleDB(os.path.join(_resolve_config_dir(), "rule_schedules.json"))
         db.load()
         return jsonify({
             "enabled": rs_cfg.get("enabled", False),
@@ -1398,9 +1401,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         try:
             rs = api.get_ruleset_by_id(rs_id)
         except Exception as e:
-            return jsonify({"error": f"PCE API error: {e}"}), 502
+            return _err(f"PCE API error: {e}", 502)
         if not rs:
-            return jsonify({"error": "Not found"}), 404
+            return _err("Not found", 404)
 
         ut = rs.get('update_type')
         rs_row = {
@@ -1461,7 +1464,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         data = request.get_json()
         href = data.get('href', '')
         if not href:
-            return jsonify({"error": "href required"}), 400
+            return _err("href required", 400)
 
         # Block draft-only scheduling natively for GUI
         if api.has_draft_changes(href) or not api.is_provisioned(href):
@@ -1473,14 +1476,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 datetime.datetime.strptime(data['start'], "%H:%M")
                 datetime.datetime.strptime(data['end'], "%H:%M")
             except (ValueError, KeyError):
-                return jsonify({"error": "Invalid time format (use HH:MM)"}), 400
+                return _err("Invalid time format (use HH:MM)", 400)
         elif data.get('type') == 'one_time':
             try:
                 ex = data['expire_at'].replace(' ', 'T')
                 datetime.datetime.fromisoformat(ex)
                 data['expire_at'] = ex
             except (ValueError, KeyError):
-                return jsonify({"error": "Invalid expiration format"}), 400
+                return _err("Invalid expiration format", 400)
 
         db_entry = {
             "type": data.get('type', 'recurring'),
@@ -1515,7 +1518,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         href = '/' + href if not href.startswith('/') else href
         conf = db.get(href)
         if not conf:
-            return jsonify({"error": "Not found"}), 404
+            return _err("Not found", 404)
         entry = dict(conf)
         entry['href'] = href
         entry['id'] = extract_id(href)

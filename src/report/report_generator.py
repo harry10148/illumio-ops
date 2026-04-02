@@ -24,40 +24,9 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from src.i18n import t
+from src.report.tz_utils import parse_tz as _parse_tz, fmt_tz_now as _fmt_tz_now
 
 logger = logging.getLogger(__name__)
-
-
-# ─── Timezone helpers ────────────────────────────────────────────────────────
-
-def _parse_tz(tz_str: str) -> datetime.timezone:
-    """
-    Parse a config timezone string into a datetime.timezone object.
-    Supported formats: 'local', 'UTC', 'UTC+8', 'UTC-5', 'UTC+5.5', etc.
-    'local' returns the system's local timezone via UTC offset.
-    """
-    if not tz_str or tz_str == 'local':
-        local_offset = datetime.datetime.now(datetime.timezone.utc).astimezone().utcoffset()
-        return datetime.timezone(local_offset)
-    if tz_str == 'UTC':
-        return datetime.timezone.utc
-    if tz_str.startswith('UTC+') or tz_str.startswith('UTC-'):
-        sign = 1 if tz_str[3] == '+' else -1
-        hours_part = float(tz_str[4:])
-        total_minutes = int(sign * hours_part * 60)
-        return datetime.timezone(datetime.timedelta(minutes=total_minutes))
-    return datetime.timezone.utc
-
-
-def _fmt_tz_now(tz: datetime.timezone) -> str:
-    """Return current time formatted as '2026-03-26 16:30:00 (UTC+08:00)'."""
-    now = datetime.datetime.now(tz)
-    offset = now.strftime('%z')          # e.g. +0800
-    sign = offset[0]
-    hh = offset[1:3]
-    mm = offset[3:5]
-    tz_label = f"UTC{sign}{hh}:{mm}" if mm != '00' else f"UTC{sign}{hh}"
-    return now.strftime('%Y-%m-%d %H:%M:%S') + f' ({tz_label})'
 
 
 # ─── Snapshot helper (module-level) ──────────────────────────────────────────
@@ -317,53 +286,32 @@ class ReportGenerator:
         )
 
     def _run_modules(self, df, findings: list) -> dict:
-        """Execute all 15 analysis modules in sequence."""
-        from src.report.analysis.mod01_traffic_overview    import traffic_overview
-        from src.report.analysis.mod02_policy_decisions    import policy_decision_analysis
-        from src.report.analysis.mod03_uncovered_flows     import uncovered_flows
-        from src.report.analysis.mod04_ransomware_exposure import ransomware_exposure
-        from src.report.analysis.mod05_remote_access       import host_to_host_protocol_analysis
-        from src.report.analysis.mod06_user_process        import user_process_analysis
-        from src.report.analysis.mod07_cross_label_matrix  import cross_label_flow_matrix
-        from src.report.analysis.mod08_unmanaged_hosts     import unmanaged_traffic
-        from src.report.analysis.mod09_traffic_distribution import traffic_distribution
-        from src.report.analysis.mod10_allowed_traffic     import allowed_traffic
-        from src.report.analysis.mod11_bandwidth           import bandwidth_analysis
-        from src.report.analysis.mod12_executive_summary   import executive_summary
-        from src.report.analysis.mod13_readiness           import enforcement_readiness
-        from src.report.analysis.mod14_infrastructure      import infrastructure_scoring
-        from src.report.analysis.mod15_lateral_movement    import lateral_movement_risk
+        """Execute all registered analysis modules via the module registry."""
+        from src.report.analysis import get_traffic_modules, get_summary_module
 
         top_n = self._report_cfg.get('output', {}).get('top_n', 20)
         results: dict = {'findings': findings}
+        module_errors: list = []
 
-        _MODS = [
-            ('mod01', lambda: traffic_overview(df)),
-            ('mod02', lambda: policy_decision_analysis(df, top_n)),
-            ('mod03', lambda: uncovered_flows(df, top_n)),
-            ('mod04', lambda: ransomware_exposure(df, self._report_cfg, top_n)),
-            ('mod05', lambda: host_to_host_protocol_analysis(df, self._report_cfg, top_n)),
-            ('mod06', lambda: user_process_analysis(df, top_n)),
-            ('mod07', lambda: cross_label_flow_matrix(df, top_n)),
-            ('mod08', lambda: unmanaged_traffic(df, top_n)),
-            ('mod09', lambda: traffic_distribution(df, top_n)),
-            ('mod10', lambda: allowed_traffic(df, top_n)),
-            ('mod11', lambda: bandwidth_analysis(df, top_n)),
-            ('mod13', lambda: enforcement_readiness(df, workloads=None, top_n=top_n)),
-            ('mod14', lambda: infrastructure_scoring(df, top_n)),
-            ('mod15', lambda: lateral_movement_risk(df, top_n)),
-        ]
-
-        for mod_id, fn in _MODS:
+        for mod_id, fn, adapter in get_traffic_modules():
             try:
-                results[mod_id] = fn()
+                results[mod_id] = adapter(fn, df, self._report_cfg, top_n)
                 print(f"[Report]   {mod_id} ✓", end='  \r', flush=True)
             except Exception as e:
                 logger.warning(f"[ReportGenerator] {mod_id} failed: {e}")
                 results[mod_id] = {'error': str(e)}
+                module_errors.append({'module': mod_id, 'error': str(e)})
 
-        # Module 12 last (depends on all others)
-        results['mod12'] = executive_summary(results)
+        # Summary module runs last (depends on all other results)
+        try:
+            summary_id, summary_fn = get_summary_module()
+            results[summary_id] = summary_fn(results)
+        except Exception as e:
+            logger.error(f"[ReportGenerator] summary module failed: {e}")
+            results['mod12'] = {'error': str(e)}
+            module_errors.append({'module': 'mod12', 'error': str(e)})
+
+        results['_module_errors'] = module_errors
         print(t("rpt_modules_complete") + "             ")
         return results
 

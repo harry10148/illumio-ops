@@ -473,6 +473,16 @@ def make_i18n_js() -> str:
 </script>"""
 
 
+# ── Column name → i18n key mapping (shared by all HTML exporters) ────────────
+# Auto-built from STRINGS: any key starting with "rpt_col_" maps its English
+# value to the key.  E.g. "Port" → "rpt_col_port"
+COL_I18N: dict[str, str] = {
+    v.get("en", ""): k
+    for k, v in STRINGS.items()
+    if k.startswith("rpt_col_") and v.get("en")
+}
+
+
 def lang_btn_html() -> str:
     """Return the fixed-position language-toggle button HTML."""
     return (
