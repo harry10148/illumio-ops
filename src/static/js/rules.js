@@ -1,4 +1,9 @@
 /* ─── Rules ───────────────────────────────────────────────────────── */
+function onEvTtChange() {
+  const isCount = rv('ev-tt') === 'count';
+  $('ev-cnt-wrap').style.display = isCount ? '' : 'none';
+  $('ev-win-wrap').style.display = isCount ? '' : 'none';
+}
 let _catalog = {}, _actionEvents = [];
 async function loadRules() {
   showSkeleton('r-body', 7);
@@ -46,7 +51,8 @@ async function deleteSelected() {
 function openModal(id, isEdit) {
   _editIdx = isEdit ?? null; $(id).classList.add('show');
   if (id === 'm-event' && !Object.keys(_catalog).length) loadCatalog();
-  if (id === 'm-event' && _editIdx === null) updateEventFilters();
+  if (id === 'm-event' && _editIdx === null) { updateEventFilters(); onEvTtChange(); }
+  if (id === 'm-event' && _editIdx !== null) { onEvTtChange(); }
   // Update modal title
   let target;
   if (id === 'm-event') target = $('me-title');
@@ -170,6 +176,7 @@ async function editRule(idx, type) {
       $('ev-status').value = r.filter_status || 'all';
       $('ev-severity').value = r.filter_severity || 'all';
       setRv('ev-tt', r.threshold_type || 'immediate');
+      onEvTtChange();
       $('ev-cnt').value = r.threshold_count || 5;
       $('ev-win').value = r.threshold_window || 10;
       $('ev-cd').value = r.cooldown_minutes || 10;

@@ -1183,14 +1183,14 @@
       <fieldset>
         <legend data-i18n="gui_threshold">Threshold</legend>
         <div class="form-group"><label data-i18n="gui_type">Type</label>
-          <div class="radio-group"><label><input type="radio" name="ev-tt" value="immediate" checked> <span
+          <div class="radio-group"><label><input type="radio" name="ev-tt" value="immediate" checked onchange="onEvTtChange()"> <span
                 data-i18n="gui_tt_immediate">Immediate</span></label><label><input type="radio" name="ev-tt"
-                value="count"> <span data-i18n="gui_tt_count">Cumulative</span></label></div>
+                value="count" onchange="onEvTtChange()"> <span data-i18n="gui_tt_count">Cumulative</span></label></div>
         </div>
         <div class="form-row-3">
-          <div class="form-group"><label data-i18n="gui_count">Count</label><input id="ev-cnt" type="number" value="5">
+          <div class="form-group" id="ev-cnt-wrap" style="display:none"><label data-i18n="gui_count">Count</label><input id="ev-cnt" type="number" value="5">
           </div>
-          <div class="form-group"><label data-i18n="gui_window_min">Window (min)</label><input id="ev-win" type="number"
+          <div class="form-group" id="ev-win-wrap" style="display:none"><label data-i18n="gui_window_min">Window (min)</label><input id="ev-win" type="number"
               value="10"></div>
           <div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="ev-cd" type="number"
               value="10"></div>

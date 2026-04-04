@@ -44,6 +44,8 @@ _DEFAULT_CONFIG = {
         }
     },
     "report_schedules": [],
+    "pce_profiles": [],
+    "active_pce_id": None,
     "rule_scheduler": {
         "enabled": False,
         "check_interval_seconds": 300
@@ -157,6 +159,69 @@ class ConfigManager:
                 count = count + 1
         if count > 0:
             self.save()
+
+    # ─── PCE Profile CRUD ─────────────────────────────────────────────────────
+
+    def get_pce_profiles(self) -> list:
+        return self.config.get("pce_profiles", [])
+
+    def get_active_pce_id(self):
+        return self.config.get("active_pce_id")
+
+    def add_pce_profile(self, profile: dict) -> dict:
+        if not profile.get("id"):
+            profile["id"] = int(time.time() * 1000)
+        self.config.setdefault("pce_profiles", []).append(profile)
+        self.save()
+        return profile
+
+    def update_pce_profile(self, profile_id: int, updates: dict) -> bool:
+        for i, p in enumerate(self.config.get("pce_profiles", [])):
+            if p.get("id") == profile_id:
+                self.config["pce_profiles"][i].update(updates)
+                if self.config.get("active_pce_id") == profile_id:
+                    self.sync_api_to_active_profile()
+                self.save()
+                return True
+        return False
+
+    def remove_pce_profile(self, profile_id: int) -> bool:
+        before = len(self.config.get("pce_profiles", []))
+        self.config["pce_profiles"] = [
+            p for p in self.config.get("pce_profiles", [])
+            if p.get("id") != profile_id
+        ]
+        if len(self.config["pce_profiles"]) < before:
+            if self.config.get("active_pce_id") == profile_id:
+                self.config["active_pce_id"] = None
+            self.save()
+            return True
+        return False
+
+    def activate_pce_profile(self, profile_id: int) -> bool:
+        for p in self.config.get("pce_profiles", []):
+            if p.get("id") == profile_id:
+                self.config["active_pce_id"] = profile_id
+                api = self.config.setdefault("api", {})
+                for k in ("url", "org_id", "key", "secret", "verify_ssl"):
+                    if k in p:
+                        api[k] = p[k]
+                self.save()
+                return True
+        return False
+
+    def sync_api_to_active_profile(self):
+        """Copy current config.api values back into the active profile."""
+        active_id = self.config.get("active_pce_id")
+        if active_id is None:
+            return
+        api = self.config.get("api", {})
+        for i, p in enumerate(self.config.get("pce_profiles", [])):
+            if p.get("id") == active_id:
+                for k in ("url", "org_id", "key", "secret", "verify_ssl"):
+                    if k in api:
+                        self.config["pce_profiles"][i][k] = api[k]
+                return
 
     # ─── Report Schedule CRUD ─────────────────────────────────────────────────
 

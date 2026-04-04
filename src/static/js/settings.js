@@ -8,7 +8,48 @@ async function loadSettings() {
   const s = _settings, a = s.api || {}, e = s.email || {}, sm = s.smtp || {}, al = s.alerts || {}, st = s.settings || {}, rpt = s.report || {};
   const sec = _security || {};
   const active = al.active || [];
+  const profiles = s.pce_profiles || [];
+  const activePceId = s.active_pce_id || null;
+
+  const profileOptions = profiles.map(p =>
+    `<option value="${p.id}" ${p.id === activePceId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+  ).join('');
+  const profileRows = profiles.map(p => `
+    <tr>
+      <td>${escapeHtml(p.name)}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(p.url)}">${escapeHtml(p.url)}</td>
+      <td>${p.org_id || ''}</td>
+      <td>
+        ${p.id !== activePceId ? `<button class="btn btn-primary btn-sm" onclick="activatePceProfile(${p.id})" data-i18n="gui_pce_activate">Activate</button>` : `<span style="color:var(--success);font-weight:600">✓</span>`}
+        <button class="btn btn-sm" style="margin-left:4px" onclick="deletePceProfile(${p.id})" data-i18n="gui_pce_delete_profile">Delete</button>
+      </td>
+    </tr>`).join('');
+
   $('s-form').innerHTML = `
+<fieldset><legend data-i18n="gui_pce_profiles">PCE Profiles</legend>
+  ${profiles.length > 0 ? `
+  <div style="overflow-x:auto;margin-bottom:12px">
+    <table class="rule-table" style="width:100%">
+      <thead><tr><th data-i18n="gui_pce_name">Name</th><th data-i18n="gui_url">URL</th><th data-i18n="gui_org_id">Org ID</th><th style="width:160px"></th></tr></thead>
+      <tbody>${profileRows}</tbody>
+    </table>
+  </div>` : ''}
+  <details style="margin-top:4px"><summary style="cursor:pointer;color:var(--accent)" data-i18n="gui_pce_add">Add PCE Profile</summary>
+  <div style="padding:12px 0 0">
+    <div class="form-row">
+      <div class="form-group"><label data-i18n="gui_pce_name">Profile Name</label><input id="s-pce-name" placeholder="My PCE"></div>
+      <div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-pce-url" placeholder="https://pce.example.com:8443"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-pce-org" value="1"></div>
+      <div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-pce-key"></div>
+      <div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-pce-secret" type="password"></div>
+    </div>
+    <div class="chk" style="margin-bottom:8px"><label><input type="checkbox" id="s-pce-ssl" checked> <span data-i18n="gui_verify_ssl">Verify SSL</span></label></div>
+    <button class="btn btn-primary btn-sm" onclick="addPceProfile()" data-i18n="gui_pce_add">Add PCE Profile</button>
+  </div></details>
+  ${activePceId ? `<p style="margin-top:8px;color:var(--dim);font-size:0.85em">⚡ <span data-i18n="gui_pce_active">Active PCE</span>: <strong>${escapeHtml((profiles.find(p=>p.id===activePceId)||{}).name||'')}</strong> — <span data-i18n="gui_pce_save_profile" style="font-style:italic">Saving settings will update this profile.</span></p>` : ''}
+</fieldset>
 <fieldset><legend data-i18n="gui_api_conn">API Connection</legend>
   <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${a.url || ''}"></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${a.org_id || ''}"></div></div>
   <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${a.key || ''}"></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${a.secret || ''}"></div></div>
@@ -136,5 +177,36 @@ async function saveSettings() {
   if (typeof renderQtPage === 'function') renderQtPage();
   if (typeof renderQwPage === 'function') renderQwPage();
   if (typeof renderDashboardQueries === 'function') renderDashboardQueries();
-  toast('Settings saved');
+  toast(_translations['gui_msg_settings_saved'] || 'Settings saved');
+}
+
+/* ─── PCE Profile Management ──────────────────────────────────────── */
+async function addPceProfile() {
+  const name = ($('s-pce-name') || {}).value?.trim();
+  const url  = ($('s-pce-url')  || {}).value?.trim();
+  if (!name || !url) { toast(_translations['gui_msg_name_required'] || 'Name and URL required', 'err'); return; }
+  const data = {
+    action: 'add', name, url,
+    org_id:     ($('s-pce-org')    || {}).value?.trim() || '1',
+    key:        ($('s-pce-key')    || {}).value || '',
+    secret:     ($('s-pce-secret') || {}).value || '',
+    verify_ssl: ($('s-pce-ssl')    || {}).checked !== false,
+  };
+  const r = await post('/api/pce-profiles', data);
+  if (r && r.ok) { toast(_translations['gui_pce_add'] || 'PCE profile added'); await loadSettings(); }
+}
+
+async function activatePceProfile(id) {
+  const r = await post('/api/pce-profiles', { action: 'activate', id });
+  if (r && r.ok) {
+    const name = (_settings.pce_profiles || []).find(p => p.id === id)?.name || '';
+    toast((_translations['gui_pce_switched'] || 'Switched to {name}').replace('{name}', name));
+    await loadSettings();
+  }
+}
+
+async function deletePceProfile(id) {
+  if (!confirm(_translations['gui_msg_confirm_delete'] || 'Delete this profile?')) return;
+  const r = await post('/api/pce-profiles', { action: 'delete', id });
+  if (r && r.ok) { toast(_translations['gui_pce_delete_profile'] || 'Deleted'); await loadSettings(); }
 }

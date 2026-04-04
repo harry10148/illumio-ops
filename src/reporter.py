@@ -486,9 +486,16 @@ class Reporter:
             resource_label = _RESOURCE_LABELS.get(resource_prefix, resource_prefix.replace('_', ' ').title())
             verb_label, verb_color, verb_bg = _VERB_STYLE.get(verb_key, (verb_key.replace('_', ' ').title() or 'Event', '#325158', '#E0F2FE'))
 
-            rc = ev.get('resource_changes') or {}
-            before = rc.get('before') or {}
-            after  = rc.get('after') or {}
+            rc = ev.get('resource_changes')
+            if isinstance(rc, list):
+                # PCE format: list of {field, before, after}
+                before = {item['field']: item.get('before') for item in rc if isinstance(item, dict) and 'field' in item}
+                after  = {item['field']: item.get('after')  for item in rc if isinstance(item, dict) and 'field' in item}
+            elif isinstance(rc, dict):
+                before = rc.get('before') or {}
+                after  = rc.get('after')  or {}
+            else:
+                before, after = {}, {}
             workloads = ev.get('workloads_affected') or {}
 
             # Human-readable summary line

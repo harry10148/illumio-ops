@@ -569,6 +569,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 "output_dir":      rpt.get("output_dir", "reports/"),
                 "retention_days":  rpt.get("retention_days", 30),
             },
+            "pce_profiles":   cm.get_pce_profiles(),
+            "active_pce_id":  cm.get_active_pce_id(),
         })
 
     @app.route('/api/settings', methods=['POST'])
@@ -599,8 +601,59 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     rpt_cfg['retention_days'] = max(0, int(rpt_in['retention_days']))
                 except (TypeError, ValueError):
                     pass
+        cm.sync_api_to_active_profile()
         cm.save()
         return jsonify({"ok": True})
+
+    @app.route('/api/pce-profiles', methods=['GET'])
+    def api_list_pce_profiles():
+        cm.load()
+        return jsonify({
+            "profiles": cm.get_pce_profiles(),
+            "active_pce_id": cm.get_active_pce_id(),
+        })
+
+    @app.route('/api/pce-profiles', methods=['POST'])
+    def api_pce_profiles_action():
+        d = request.json or {}
+        action = d.get("action")
+        if action == "add":
+            profile = {
+                "name":       d.get("name", "").strip(),
+                "url":        d.get("url", "").strip(),
+                "org_id":     d.get("org_id", "1"),
+                "key":        d.get("key", ""),
+                "secret":     d.get("secret", ""),
+                "verify_ssl": bool(d.get("verify_ssl", True)),
+            }
+            if not profile["name"] or not profile["url"]:
+                return _err("name and url required")
+            p = cm.add_pce_profile(profile)
+            return jsonify({"ok": True, "profile": p})
+        elif action == "update":
+            pid = d.get("id")
+            if not pid:
+                return _err("id required")
+            updates = {k: d[k] for k in ("name", "url", "org_id", "key", "secret", "verify_ssl") if k in d}
+            if not cm.update_pce_profile(int(pid), updates):
+                return _err("profile not found")
+            return jsonify({"ok": True})
+        elif action == "activate":
+            pid = d.get("id")
+            if not pid:
+                return _err("id required")
+            if not cm.activate_pce_profile(int(pid)):
+                return _err("profile not found")
+            return jsonify({"ok": True})
+        elif action == "delete":
+            pid = d.get("id")
+            if not pid:
+                return _err("id required")
+            if not cm.remove_pce_profile(int(pid)):
+                return _err("profile not found")
+            return jsonify({"ok": True})
+        else:
+            return _err("unknown action")
 
     @app.route('/api/dashboard/queries', methods=['GET'])
     def api_get_dashboard_queries():
