@@ -179,6 +179,8 @@ class ReportScheduler:
                                         custom_recipients, report_type=report_type)
 
             logger.info(f"[Scheduler] '{name}': completed, files={[os.path.basename(p) for p in paths]}")
+            max_reports = int(schedule.get("max_reports", 30))
+            self._prune_by_count(output_dir, report_type, max_reports)
             self._prune_old_reports(output_dir)
             return True
 
@@ -342,6 +344,45 @@ class ReportScheduler:
         )
 
     # ─── Report retention ────────────────────────────────────────────────────
+
+    # File prefix patterns for each report type (matches both .html and .zip)
+    _REPORT_PREFIXES = {
+        "traffic":      "Illumio_Traffic_Report_",
+        "audit":        "illumio_audit_report_",
+        "ven_status":   "illumio_ven_status_",
+        "policy_usage": "illumio_policy_usage_report_",
+    }
+
+    def _prune_by_count(self, output_dir: str, report_type: str, max_reports: int):
+        """Keep only the newest max_reports files for the given report type.
+
+        Files are identified by their name prefix, sorted by mtime descending.
+        Set max_reports to 0 to disable.
+        """
+        if max_reports <= 0 or not os.path.isdir(output_dir):
+            return
+        prefix = self._REPORT_PREFIXES.get(report_type)
+        if not prefix:
+            return
+
+        candidates = []
+        for fname in os.listdir(output_dir):
+            if fname.startswith(prefix) and (fname.endswith(".html") or fname.endswith(".zip")):
+                fpath = os.path.join(output_dir, fname)
+                try:
+                    candidates.append((os.path.getmtime(fpath), fpath))
+                except OSError:
+                    pass
+
+        # Sort newest-first, delete everything beyond max_reports
+        candidates.sort(reverse=True)
+        to_delete = candidates[max_reports:]
+        for _, fpath in to_delete:
+            try:
+                os.remove(fpath)
+                logger.info(f"[Scheduler] Count-pruned: {os.path.basename(fpath)} (limit={max_reports})")
+            except Exception as e:
+                logger.warning(f"[Scheduler] Could not prune {fpath}: {e}")
 
     def _prune_old_reports(self, output_dir: str):
         """Delete report files older than retention_days (default 30).

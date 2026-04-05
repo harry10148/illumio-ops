@@ -192,6 +192,7 @@ function openSchedModal(sched) {
   $('sched-tz-label').textContent = _tzDisplayLabel();
   $('sched-minute').value   = sched ? (sched.minute !== undefined ? sched.minute : 0) : 0;
   $('sched-lookback').value = sched ? (sched.lookback_days || 7) : 7;
+  $('sched-max-reports').value = sched ? (sched.max_reports !== undefined ? sched.max_reports : 30) : 30;
 
   const fmt = sched ? (sched.format || ['html']) : ['html'];
   $('sched-format').value = fmt.length > 1 ? 'all' : (fmt[0] || 'html');
@@ -241,6 +242,7 @@ async function saveSchedule() {
     hour: _localToUtc(parseInt($('sched-hour').value) || 8),
     minute: parseInt($('sched-minute').value) || 0,
     lookback_days: parseInt($('sched-lookback').value) || 7,
+    max_reports: parseInt($('sched-max-reports').value) || 30,
     format: fmt,
     email_report: $('sched-email').checked,
     email_recipients: recipients,
