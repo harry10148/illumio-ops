@@ -123,9 +123,11 @@ else:
 **Use Case**: Query blocked or anomalous traffic in the last N minutes for investigation.
 **Required Role**: `read_only` or above
 
-> **Important — Illumio Core 25.2 Change**: Synchronous traffic queries are deprecated. This tool uses exclusively **async queries** (`async_queries`) with support for up to **200,000 results** per query. All traffic analysis — including streaming downloads — goes through the three-phase async workflow below.
+> **Important — Illumio Core 25.2 Change**: Synchronous traffic queries are deprecated. This tool uses exclusively **async queries** (`async_queries`) with support for up to **200,000 results** per query. All traffic analysis — including streaming downloads — goes through the async workflow below.
 
 ### Workflow
+
+**Standard (Reported view):** 3 steps
 
 ```mermaid
 graph LR
@@ -134,13 +136,27 @@ graph LR
     C --> D["4. Parse &<br/>Analyze Flows"]
 ```
 
+**With Draft Policy Analysis:** 4 steps — insert `update_rules` before download to unlock hidden fields (`draft_policy_decision`, `rules`, `enforcement_boundaries`, `override_deny_rules`).
+
+```mermaid
+graph LR
+    A["1. Submit Query"] --> B["2. Poll (completed)"]
+    B --> C["3. PUT update_rules"]
+    C --> D["4. Poll again (completed)"]
+    D --> E["5. Download"]
+```
+
 ### API Calls
 
 | Step | Method | Endpoint | Purpose |
 |:---|:---|:---|:---|
 | 1 | POST | `/orgs/{org_id}/traffic_flows/async_queries` | Submit query |
 | 2 | GET | `/orgs/{org_id}/traffic_flows/async_queries/{uuid}` | Poll status |
-| 3 | GET | `.../async_queries/{uuid}/download` | Download results (gzip) |
+| 3 *(optional)* | PUT | `.../async_queries/{uuid}/update_rules` | Trigger draft policy computation |
+| 4 *(optional)* | GET | `/orgs/{org_id}/traffic_flows/async_queries/{uuid}` | Re-poll after update_rules |
+| 5 | GET | `.../async_queries/{uuid}/download` | Download results (JSON array) |
+
+> **update_rules notes**: Request body is empty (`{}`). Returns `202 Accepted`. PCE status stays `"completed"` during computation — wait ~10 s before re-polling. This tool passes `compute_draft=True` to `execute_traffic_query_stream()` to trigger this automatically.
 
 ### Request Body (Step 1)
 
@@ -215,21 +231,88 @@ Traffic flows are downloaded in bulk from the PCE, then filtered client-side usi
 
 > **Filter Direction**: When using `filter_direction: "src_or_dst"`, label and IP filters use OR logic (match if either source or destination satisfies the condition). The default is `"src_and_dst"` (both sides must match their respective filters).
 
-### Key Response Fields
+### Flow Record — Complete Field Reference
 
-| Field | Type | Description |
+#### Policy & Decision Fields
+
+| Field | Required | Description |
 |:---|:---|:---|
-| `src.ip` | string | Source IP address |
-| `src.workload.name` | string | Source workload name (if managed) |
-| `src.workload.labels` | array | Source workload labels (`[{key, value, href}]`) |
-| `dst.ip` | string | Destination IP address |
-| `dst.workload.name` | string | Destination workload name |
-| `service.port` | int | Destination port |
-| `service.proto` | int | IP protocol (6=TCP, 17=UDP, 1=ICMP) |
-| `num_connections` | int | Connection count |
-| `policy_decision` | string | `"allowed"`, `"blocked"`, `"potentially_blocked"` |
-| `timestamp_range.first_detected` | string | First seen timestamp |
-| `timestamp_range.last_detected` | string | Last seen timestamp |
+| `policy_decision` | Yes | Reported policy result based on **active** rules. Values: `allowed` / `potentially_blocked` / `blocked` / `unknown` |
+| `boundary_decision` | No | Reported boundary result. Values: `blocked` / `blocked_by_override_deny` / `blocked_non_illumio_rule` |
+| `draft_policy_decision` | No ⚠️ | **Requires `update_rules`**. Draft policy diagnosis combining action + reason (see table below) |
+| `rules` | No ⚠️ | **Requires `update_rules`**. HREFs of draft allow rules matching this flow |
+| `enforcement_boundaries` | No ⚠️ | **Requires `update_rules`**. HREFs of draft enforcement boundaries blocking this flow |
+| `override_deny_rules` | No ⚠️ | **Requires `update_rules`**. HREFs of draft override deny rules blocking this flow |
+
+**`draft_policy_decision` value reference** (action + reason formula):
+
+| Value | Meaning |
+|:---|:---|
+| `allowed` | Draft rules allow the flow |
+| `allowed_across_boundary` | Flow hits a deny boundary but an explicit allow rule overrides it (exception) |
+| `blocked_by_boundary` | Draft enforcement boundary will block this flow |
+| `blocked_by_override_deny` | Highest-priority override deny rule will block — no allow rule can override |
+| `blocked_no_rule` | Blocked by default-deny because no matching allow rule exists |
+| `potentially_blocked` | Same as blocked reason but destination host is in Visibility Only mode |
+| `potentially_blocked_by_boundary` | Boundary block, but destination host is in Visibility Only mode |
+| `potentially_blocked_by_override_deny` | Override deny block, but destination host is in Visibility Only mode |
+| `potentially_blocked_no_rule` | No allow rule, but destination host is in Visibility Only mode |
+
+**`boundary_decision` value reference** (reported view only):
+
+| Value | Meaning |
+|:---|:---|
+| `blocked` | Blocked by an enforcement boundary or deny rule |
+| `blocked_by_override_deny` | Blocked by an override deny rule (highest priority) |
+| `blocked_non_illumio_rule` | Blocked by a native host firewall rule (e.g. iptables, GPO) — not an Illumio rule |
+
+#### Connection Fields
+
+| Field | Required | Description |
+|:---|:---|:---|
+| `num_connections` | Yes | Number of times this aggregated flow was seen |
+| `flow_direction` | Yes | VEN capture perspective: `inbound` (destination VEN) / `outbound` (source VEN) |
+| `timestamp_range.first_detected` | Yes | First seen (ISO 8601 UTC) |
+| `timestamp_range.last_detected` | Yes | Last seen (ISO 8601 UTC) |
+| `state` | No | Connection state: `A` (Active) / `C` (Closed) / `T` (Timed out) / `S` (Snapshot) / `N` (New/SYN) |
+| `transmission` | No | `broadcast` / `multicast` / `unicast` |
+
+#### Service Object (`service`)
+
+> Process and user belong to the VEN-side host: **destination** for `inbound`, **source** for `outbound`.
+
+| Field | Required | Description |
+|:---|:---|:---|
+| `service.port` | Yes | Destination port |
+| `service.proto` | Yes | IANA protocol number (6=TCP, 17=UDP, 1=ICMP) |
+| `service.process_name` | No | Application process name (e.g. `sshd`, `nginx`) |
+| `service.windows_service_name` | No | Windows service name |
+| `service.user_name` | No | OS account running the process |
+
+#### Source / Destination Objects (`src`, `dst`)
+
+| Field | Description |
+|:---|:---|
+| `src.ip` / `dst.ip` | IPv4 or IPv6 address |
+| `src.workload.href` | Workload unique URI |
+| `src.workload.hostname` / `name` | Hostname and friendly name |
+| `src.workload.enforcement_mode` | `idle` / `visibility_only` / `selective` / `full` |
+| `src.workload.managed` | `true` if VEN is installed |
+| `src.workload.labels` | Array of `{href, key, value}` label objects |
+| `src.ip_lists` | IP Lists this address falls into |
+| `src.fqdn_name` | Resolved FQDN (if DNS data available) |
+| `src.virtual_server` / `virtual_service` | Kubernetes / load balancer virtual service |
+| `src.cloud_resource` | Cloud-native resource (e.g. AWS RDS) |
+
+#### Bandwidth & Network Fields
+
+| Field | Description |
+|:---|:---|
+| `dst_bi` | Destination bytes in (= source bytes out) |
+| `dst_bo` | Destination bytes out (= source bytes in) |
+| `icmp_type` / `icmp_code` | ICMP type and code (proto=1 only) |
+| `network` | PCE network object (`name`, `href`) |
+| `client_type` | Agent type reporting this flow: `server` / `endpoint` / `flowlink` / `scanner` |
 
 ---
 

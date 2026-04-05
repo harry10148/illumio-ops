@@ -127,11 +127,23 @@ else:
 
 ### 操作流程
 
+**標準（Reported 檢視）：** 3 步驟
+
 ```mermaid
 graph LR
     A["1. 提交非同步<br/>流量查詢"] --> B["2. 輪詢等待<br/>完成"]
     B --> C["3. 下載<br/>結果"]
     C --> D["4. 解析與<br/>分析流量"]
+```
+
+**含草稿政策分析：** 4 步驟 — 在下載前呼叫 `update_rules`，解鎖隱藏欄位（`draft_policy_decision`、`rules`、`enforcement_boundaries`、`override_deny_rules`）。
+
+```mermaid
+graph LR
+    A["1. 提交查詢"] --> B["2. 輪詢 (completed)"]
+    B --> C["3. PUT update_rules"]
+    C --> D["4. 再次輪詢 (completed)"]
+    D --> E["5. 下載結果"]
 ```
 
 ### API 呼叫
@@ -140,7 +152,11 @@ graph LR
 |:---|:---|:---|:---|
 | 1 | POST | `/orgs/{org_id}/traffic_flows/async_queries` | 提交查詢 |
 | 2 | GET | `/orgs/{org_id}/traffic_flows/async_queries/{uuid}` | 輪詢狀態 |
-| 3 | GET | `.../async_queries/{uuid}/download` | 下載結果（gzip） |
+| 3 *(選用)* | PUT | `.../async_queries/{uuid}/update_rules` | 觸發草稿政策運算 |
+| 4 *(選用)* | GET | `/orgs/{org_id}/traffic_flows/async_queries/{uuid}` | update_rules 後再次輪詢 |
+| 5 | GET | `.../async_queries/{uuid}/download` | 下載結果（JSON 陣列） |
+
+> **update_rules 注意事項**：Request body 留空（`{}`），回傳 `202 Accepted`。PCE 狀態在運算期間維持 `"completed"` 不變，建議等待約 10 秒後再輪詢。本工具透過 `execute_traffic_query_stream(compute_draft=True)` 自動觸發此流程。
 
 ### 請求主體（步驟 1）
 
@@ -221,21 +237,88 @@ results = ana.query_flows({
 })
 ```
 
-### 關鍵回應欄位
+### 流量紀錄（Flow Record）完整欄位說明
 
-| 欄位 | 類型 | 說明 |
+#### 策略決策欄位
+
+| 欄位 | 必填 | 說明 |
 |:---|:---|:---|
-| `src.ip` | string | 來源 IP 位址 |
-| `src.workload.name` | string | 來源工作負載名稱（若為受管） |
-| `src.workload.labels` | array | 來源工作負載標籤 (`[{key, value, href}]`) |
-| `dst.ip` | string | 目的 IP 位址 |
-| `dst.workload.name` | string | 目的工作負載名稱 |
-| `service.port` | int | 目的端口 |
-| `service.proto` | int | IP 協定（6=TCP, 17=UDP, 1=ICMP） |
-| `num_connections` | int | 連線次數 |
-| `policy_decision` | string | `"allowed"`、`"blocked"`、`"potentially_blocked"` |
-| `timestamp_range.first_detected` | string | 首次偵測時間戳 |
-| `timestamp_range.last_detected` | string | 最後偵測時間戳 |
+| `policy_decision` | 是 | 基於**已生效**規則的 Reported 處置結果。值：`allowed` / `potentially_blocked` / `blocked` / `unknown` |
+| `boundary_decision` | 否 | Reported 邊界決策。值：`blocked` / `blocked_by_override_deny` / `blocked_non_illumio_rule` |
+| `draft_policy_decision` | 否 ⚠️ | **需呼叫 `update_rules`**。草稿政策診斷，結合動作與原因（見下表） |
+| `rules` | 否 ⚠️ | **需呼叫 `update_rules`**。草稿白名單規則 HREFs |
+| `enforcement_boundaries` | 否 ⚠️ | **需呼叫 `update_rules`**。草稿強制邊界 HREFs |
+| `override_deny_rules` | 否 ⚠️ | **需呼叫 `update_rules`**。草稿覆寫拒絕規則 HREFs |
+
+**`draft_policy_decision` 值對照表**（動作 + 原因公式）：
+
+| 值 | 含義 |
+|:---|:---|
+| `allowed` | 草稿白名單將允許此流量 |
+| `allowed_across_boundary` | 跨越邊界允許：流量命中黑名單，但白名單例外規則將其放行 |
+| `blocked_by_boundary` | 草稿強制邊界（Enforcement Boundary）將封鎖此流量 |
+| `blocked_by_override_deny` | 最高優先級覆寫拒絕規則將封鎖，無法被任何白名單覆蓋 |
+| `blocked_no_rule` | 無匹配白名單，觸發預設拒絕（Default Deny）封鎖 |
+| `potentially_blocked` | 同上述封鎖原因，但目的端主機處於 Visibility Only 模式 |
+| `potentially_blocked_by_boundary` | 強制邊界封鎖，但目的端主機處於 Visibility Only 模式 |
+| `potentially_blocked_by_override_deny` | 覆寫拒絕封鎖，但目的端主機處於 Visibility Only 模式 |
+| `potentially_blocked_no_rule` | 無白名單，但目的端主機處於 Visibility Only 模式 |
+
+**`boundary_decision` 值對照表**（Reported 視圖）：
+
+| 值 | 含義 |
+|:---|:---|
+| `blocked` | 被強制邊界或拒絕規則封鎖 |
+| `blocked_by_override_deny` | 被覆寫拒絕規則封鎖（最高優先級） |
+| `blocked_non_illumio_rule` | 被本機原生防火牆規則封鎖（如 iptables、GPO），非 Illumio 規則 |
+
+#### 連線基礎欄位
+
+| 欄位 | 必填 | 說明 |
+|:---|:---|:---|
+| `num_connections` | 是 | 此聚合流量的連線次數 |
+| `flow_direction` | 是 | VEN 擷取視角：`inbound`（目的端 VEN）/ `outbound`（來源端 VEN） |
+| `timestamp_range.first_detected` | 是 | 首次偵測時間（ISO 8601 UTC） |
+| `timestamp_range.last_detected` | 是 | 最後偵測時間（ISO 8601 UTC） |
+| `state` | 否 | 連線狀態：`A`（活躍）/ `C`（已關閉）/ `T`（逾時）/ `S`（快照）/ `N`（新建/SYN） |
+| `transmission` | 否 | `broadcast`（廣播）/ `multicast`（多播）/ `unicast`（單播） |
+
+#### 服務物件（`service`）
+
+> Process 與 User 屬於 VEN 所在端主機：`inbound` 時屬目的端；`outbound` 時屬來源端。
+
+| 欄位 | 必填 | 說明 |
+|:---|:---|:---|
+| `service.port` | 是 | 目的通訊埠 |
+| `service.proto` | 是 | IANA 協定代碼（6=TCP, 17=UDP, 1=ICMP） |
+| `service.process_name` | 否 | 應用程式程序名稱（如 `sshd`、`nginx`） |
+| `service.windows_service_name` | 否 | Windows 服務名稱 |
+| `service.user_name` | 否 | 執行程序的 OS 帳號 |
+
+#### 來源／目的端物件（`src`、`dst`）
+
+| 欄位 | 說明 |
+|:---|:---|
+| `src.ip` / `dst.ip` | IPv4 或 IPv6 位址 |
+| `src.workload.href` | Workload 唯一識別 URI |
+| `src.workload.hostname` / `name` | 主機名稱與友善名稱 |
+| `src.workload.enforcement_mode` | `idle` / `visibility_only` / `selective` / `full` |
+| `src.workload.managed` | 是否安裝 VEN（`true`/`false`） |
+| `src.workload.labels` | 標籤陣列 `[{href, key, value}]` |
+| `src.ip_lists` | 此 IP 命中的 IP List 清單 |
+| `src.fqdn_name` | DNS 解析的 FQDN（若有 DNS 資料） |
+| `src.virtual_server` / `virtual_service` | Kubernetes / 負載平衡虛擬服務物件 |
+| `src.cloud_resource` | 雲端原生資源（如 AWS RDS） |
+
+#### 頻寬與網路欄位
+
+| 欄位 | 說明 |
+|:---|:---|
+| `dst_bi` | 目的端接收位元組數（= 來源端送出量） |
+| `dst_bo` | 目的端送出位元組數（= 來源端接收量） |
+| `icmp_type` / `icmp_code` | ICMP 類型與代碼（proto=1 時才存在） |
+| `network` | 觀測此流量的 PCE 網路物件（`name`、`href`） |
+| `client_type` | 回報此流量的代理類型：`server` / `endpoint` / `flowlink` / `scanner` |
 
 ---
 
