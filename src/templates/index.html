@@ -1140,18 +1140,19 @@
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_policy_dec">Policy Decision</legend>
-        <div class="radio-group" style="margin-top:5px; margin-bottom:6px; gap:12px;">
-          <label style="font-weight:600;"><input type="radio" name="qt-pd-mode" value="reported" checked onchange="qtSyncPdMode()"> <span data-i18n="gui_pd_mode_reported">Reported</span></label>
-          <label style="font-weight:600;"><input type="radio" name="qt-pd-mode" value="draft" onchange="qtSyncPdMode()"> <span data-i18n="gui_pd_mode_draft">Draft</span></label>
-        </div>
-        <div class="radio-group" style="margin-top: 2px; margin-bottom: 5px;">
-          <label><input type="radio" name="qt-pd-radio" value="blocked"> <span
-              data-i18n="gui_pd_blocked">Blocked</span></label>
-          <label><input type="radio" name="qt-pd-radio" value="potentially_blocked"> <span
-              data-i18n="gui_pd_potential">Potentially Blocked</span></label>
-          <label><input type="radio" name="qt-pd-radio" value="allowed"> <span
-              data-i18n="gui_pd_allowed">Allowed</span></label>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:3px;" data-i18n="gui_pd_reported_label">Reported</div>
+        <div class="radio-group" style="margin-top: 2px; margin-bottom: 8px;">
+          <label><input type="radio" name="qt-pd-radio" value="blocked"> <span data-i18n="gui_pd_blocked">Blocked</span></label>
+          <label><input type="radio" name="qt-pd-radio" value="potentially_blocked"> <span data-i18n="gui_pd_potential">Potentially Blocked</span></label>
+          <label><input type="radio" name="qt-pd-radio" value="allowed"> <span data-i18n="gui_pd_allowed">Allowed</span></label>
           <label><input type="radio" name="qt-pd-radio" value="" checked> <span data-i18n="gui_pd_all">All</span></label>
+        </div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:3px;" data-i18n="gui_pd_draft_label">Draft</div>
+        <div class="radio-group" style="margin-top: 2px; margin-bottom: 5px;">
+          <label><input type="radio" name="qt-dpd-radio" value="blocked_by_boundary"> Blocked by Boundary</label>
+          <label><input type="radio" name="qt-dpd-radio" value="potentially_blocked"> <span data-i18n="gui_pd_potential">Potentially Blocked</span></label>
+          <label><input type="radio" name="qt-dpd-radio" value="allowed"> <span data-i18n="gui_pd_allowed">Allowed</span></label>
+          <label><input type="radio" name="qt-dpd-radio" value="" checked> <span data-i18n="gui_pd_all">All</span></label>
         </div>
       </fieldset>
       <fieldset>

@@ -135,7 +135,7 @@ class ApiClient:
             print(f"{Colors.FAIL}{t('api_fetch_events_error', error=str(e))}{Colors.ENDC}")
             return []
 
-    def execute_traffic_query_stream(self, start_time_str, end_time_str, policy_decisions, filters=None):
+    def execute_traffic_query_stream(self, start_time_str, end_time_str, policy_decisions, filters=None, compute_draft=False):
         """
         Executes an async traffic query and yields results row by row to save memory.
         filters: optional dict — used for Python-side post-filtering, NOT sent to PCE API.
@@ -201,6 +201,41 @@ class ApiClient:
                 print(f" {t('api_timeout')}")
                 logger.error("Traffic query timed out.")
                 return
+
+            # Step 3 (optional): update_rules — triggers PCE to compute draft_policy_decision.
+            # Only called when compute_draft=True to avoid unnecessary latency on normal queries.
+            if compute_draft:
+                update_rules_url = f"{self.api_cfg['url']}/api/v2{job_url}/update_rules"
+                logger.info(f"Calling update_rules: PUT {update_rules_url}")
+                ur_status, ur_body = self._request(update_rules_url, method="PUT", data={}, timeout=30)
+                logger.info(f"update_rules response: HTTP {ur_status}")
+                if ur_status in (202, 204):
+                    ur_text = ur_body.decode('utf-8', errors='replace') if isinstance(ur_body, bytes) else str(ur_body)
+                    logger.info(f"update_rules accepted (HTTP {ur_status}), body: {ur_text[:300]}")
+                    print(t('waiting_traffic', default='Waiting for traffic calculation...'), end="", flush=True)
+                    # Fixed wait: PCE status may stay "completed" during draft computation.
+                    # Give PCE time to process before polling to avoid premature exit.
+                    time.sleep(10)
+                    for attempt in range(30):  # Poll up to 30 more times
+                        poll_status, poll_body = self._request(poll_url, timeout=15)
+                        if poll_status != 200:
+                            time.sleep(2)
+                            continue
+                        poll_result = json.loads(poll_body)
+                        state = poll_result.get("status")
+                        logger.info(f"update_rules poll [{attempt}]: status={state}")
+                        if state == "completed":
+                            print(f" {t('done')}")
+                            logger.info("update_rules computation done.")
+                            break
+                        print(".", end="", flush=True)
+                        time.sleep(2)
+                    else:
+                        logger.warning("update_rules polling timed out, proceeding with available data")
+                        print(f" {t('done')}")
+                else:
+                    ur_text = ur_body.decode('utf-8', errors='replace') if isinstance(ur_body, bytes) else str(ur_body)
+                    logger.warning(f"update_rules returned {ur_status}: {ur_text[:200]}, proceeding without draft policy data")
 
             # Stream Download
             dl_url = f"{self.api_cfg['url']}/api/v2{job_url}/download"

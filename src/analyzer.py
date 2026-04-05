@@ -512,11 +512,18 @@ class Analyzer:
             elif p == "blocked": strict_pd.add("blocked")
             elif p == "allowed": strict_pd.add("allowed")
         
-        traffic_stream = self.api.execute_traffic_query_stream(start_time, end_time, pds)
+        draft_pd_filter = (params.get("draft_policy_decision") or "").strip().lower()
+
+        # When filtering by draft policy decision, always query all reported PDs
+        # because the draft EB may affect flows whose reported PD is "allowed".
+        query_pds = pds if not draft_pd_filter else ["blocked", "potentially_blocked", "allowed"]
+
+        traffic_stream = self.api.execute_traffic_query_stream(
+            start_time, end_time, query_pds, compute_draft=bool(draft_pd_filter)
+        )
         if not traffic_stream:
             return []
 
-        draft_pd_filter = (params.get("draft_policy_decision") or "").strip().lower()
         search_query = params.get("search", "").lower()
 
         rule = {
