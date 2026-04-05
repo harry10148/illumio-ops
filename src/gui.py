@@ -1281,16 +1281,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     "s_name": s_name,
                     "s_ip": s.get('ip', ''),
                     "s_href": s.get('href', ''),
-                    "s_process": s.get('process', ''),
-                    "s_user": s.get('user', ''),
                     "s_labels": s.get('labels', []),
                     "d_name": d_name,
                     "d_ip": dst.get('ip', ''),
                     "d_href": dst.get('href', ''),
-                    "d_process": dst.get('process', ''),
-                    "d_user": dst.get('user', ''),
                     "d_labels": dst.get('labels', []),
                     "svc": svc_str,
+                    "svc_process": sv.get('process', ''),
+                    "svc_user": sv.get('user', ''),
                     "pd": pd_int
                 })
                 

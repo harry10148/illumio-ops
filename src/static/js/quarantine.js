@@ -220,14 +220,7 @@ function renderQtPage() {
     let chkBox = targetHref ? `<input type="checkbox" class="qt-chk" value="${targetHref}">` : `<span style="color:var(--dim);font-size:10px;">${_translations['gui_management_unmanaged'] || 'Unmanaged'}</span>`;
 
     const formatActor = (actor) => {
-      let procStr = '';
-      if (actor.process || actor.user) {
-        let p = actor.process ? `<span style="color:var(--accent); font-weight:bold;"><i class="fas fa-microchip"></i> Proc: ${escapeHtml(actor.process)}</span>` : '';
-        let u = actor.user ? `<span style="color:var(--accent2);"><i class="fas fa-user"></i> User: ${escapeHtml(actor.user)}</span>` : '';
-        let sep = (p && u) ? '<br>' : '';
-        procStr = `<div style="font-size:10px; margin-top:4px;">${p}${sep}${u}</div>`;
-      }
-      return `<strong style="font-size:11px;">${escapeHtml(actor.name)}</strong><br><small style="color:var(--dim);">${escapeHtml(actor.ip)}</small>${procStr}<div style="margin-top:2px;">${renderLabelsHtml(actor.labels)}</div>`;
+      return `<strong style="font-size:11px;">${escapeHtml(actor.name)}</strong><br><small style="color:var(--dim);">${escapeHtml(actor.ip)}</small><div style="margin-top:2px;">${renderLabelsHtml(actor.labels)}</div>`;
     };
 
     const sort = document.getElementById('qt-sort').value;
@@ -247,6 +240,14 @@ function renderQtPage() {
       svc_str = `<span onclick="showCellPopover(event, 'SVC', JSON.parse(decodeURIComponent('${encJson}')))" style="cursor:pointer; border-bottom:1px dotted var(--dim); color:var(--accent);">${escapeHtml(svc_str.substring(0, 23))}...</span>`;
     } else {
       svc_str = escapeHtml(svc_str);
+    }
+    // process/user belong to service object (VEN telemetry), shown in service cell
+    const svc_proc = item.service.process || '';
+    const svc_user = item.service.user || '';
+    if (svc_proc || svc_user) {
+      let p = svc_proc ? `<span style="color:var(--accent); font-weight:bold;"><i class="fas fa-microchip"></i> ${escapeHtml(svc_proc)}</span>` : '';
+      let u = svc_user ? `<span style="color:var(--accent2);"><i class="fas fa-user"></i> ${escapeHtml(svc_user)}</span>` : '';
+      svc_str += `<div style="font-size:10px; margin-top:3px;">${p}${p && u ? '<br>' : ''}${u}</div>`;
     }
 
     const rawPd = item.policy_decision || '';

@@ -1092,16 +1092,9 @@ function _renderTop10Body(idx, data, total, ts) {
       isoBtn = `<button class="btn btn-secondary btn-sm" onclick="openQuarantineModal('${m.s_href || m.d_href}')"><span data-i18n="gui_btn_isolate">Isolate</span></button>`;
     }
 
-    const formatActor = (name, ip, href, labelsHtml, process, user) => {
-      let procStr = '';
-      if (process || user) {
-        let p = process ? `<span style="color:var(--accent); font-weight:bold;"><i class="fas fa-microchip"></i> Process: ${escapeHtml(process)}</span>` : '';
-        let u = user ? `<span style="color:var(--accent2);"><i class="fas fa-user"></i> User: ${escapeHtml(user)}</span>` : '';
-        let sep = (p && u) ? '<br>' : '';
-        procStr = `<div style="font-size:10px; margin-top:4px;">${p}${sep}${u}</div>`;
-      }
+    const formatActor = (name, ip, href, labelsHtml) => {
       let a = href ? `<a href="#" style="color:var(--text);font-weight:bold;font-size:11px;">${escapeHtml(name)}</a>` : `<strong style="font-size:11px;">${escapeHtml(name)}</strong>`;
-      return `${a}<br><small style="color:var(--dim);">${escapeHtml(ip)}</small>${procStr}<div style="margin-top:2px;">${labelsHtml}</div>`;
+      return `${a}<br><small style="color:var(--dim);">${escapeHtml(ip)}</small><div style="margin-top:2px;">${labelsHtml}</div>`;
     };
 
     let svc_str = escapeHtml(m.svc);
@@ -1110,14 +1103,19 @@ function _renderTop10Body(idx, data, total, ts) {
       let encJson = encodeURIComponent(JSON.stringify(arr));
       svc_str = `<span onclick="showCellPopover(event, 'SVC', JSON.parse(decodeURIComponent('${encJson}')))" style="cursor:pointer; border-bottom:1px dotted var(--dim); color:var(--accent);">${escapeHtml(m.svc.substring(0, 23))}...</span>`;
     }
+    if (m.svc_process || m.svc_user) {
+      let p = m.svc_process ? `<span style="color:var(--accent); font-weight:bold;"><i class="fas fa-microchip"></i> ${escapeHtml(m.svc_process)}</span>` : '';
+      let u = m.svc_user ? `<span style="color:var(--accent2);"><i class="fas fa-user"></i> ${escapeHtml(m.svc_user)}</span>` : '';
+      svc_str += `<div style="font-size:10px; margin-top:3px;">${p}${p && u ? '<br>' : ''}${u}</div>`;
+    }
 
     html += `
       <tr>
         <td>${i + 1}</td>
         <td style="font-weight:bold;color:#6f42c1;">${m.val_fmt}</td>
         <td style="font-size:10px;white-space:nowrap;">${formatDateZ(m.first_seen)}<br>${formatDateZ(m.last_seen)}</td>
-        <td>${formatActor(m.s_name, m.s_ip, m.s_href, sLabels, m.s_process, m.s_user)}</td>
-        <td>${formatActor(m.d_name, m.d_ip, m.d_href, dLabels, m.d_process, m.d_user)}</td>
+        <td>${formatActor(m.s_name, m.s_ip, m.s_href, sLabels)}</td>
+        <td>${formatActor(m.d_name, m.d_ip, m.d_href, dLabels)}</td>
         <td>${svc_str}</td>
         <td>${pBadge}</td>
         <td>${isoBtn}</td>

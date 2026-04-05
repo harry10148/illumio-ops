@@ -592,41 +592,27 @@ class Analyzer:
                 elif p_int == 1: proto = "ICMP"
             except (ValueError, TypeError): pass
 
-            # process_name/user_name belong to whichever side has the VEN.
-            # If source is managed → process is from source VEN (outbound connection).
-            # If only destination is managed → process is from destination VEN (listening service).
-            # If both managed → attribute to source (initiator).
-            svc_proc_val = svc.get('process_name') or ""
-            svc_user_val = svc.get('user_name') or ""
-            src_managed = bool(src.get('workload'))
-            dst_managed = bool(dst.get('workload'))
-            if dst_managed and not src_managed:
-                src_proc_out, src_user_out = "", ""
-                dst_proc_out, dst_user_out = svc_proc_val, svc_user_val
-            else:
-                src_proc_out, src_user_out = svc_proc_val, svc_user_val
-                dst_proc_out, dst_user_out = "", ""
-
             f_copy['source'] = {
                 "name": s_name,
                 "ip": src.get('ip'),
                 "href": src.get('workload', {}).get('href'),
                 "labels": src.get('workload', {}).get('labels', []),
-                "process": src_proc_out,
-                "user": src_user_out
             }
             f_copy['destination'] = {
                 "name": d_name,
                 "ip": dst.get('ip'),
                 "href": dst.get('workload', {}).get('href'),
                 "labels": dst.get('workload', {}).get('labels', []),
-                "process": dst_proc_out,
-                "user": dst_user_out
             }
+            # process_name/user_name are service-object attributes (VEN telemetry).
+            # They cannot be reliably attributed to src or dst without knowing
+            # which side has the active VEN; keep them in the service dict.
             f_copy['service'] = {
                 "port": port,
                 "proto": proto,
-                "name": svc.get("name") or getattr(svc, 'name', '') or f.get("sn") or ""
+                "name": svc.get("name") or getattr(svc, 'name', '') or f.get("sn") or "",
+                "process": svc.get('process_name') or "",
+                "user": svc.get('user_name') or "",
             }
 
             bw_val, bw_note, _, _ = self.calculate_mbps(f)
