@@ -1050,6 +1050,12 @@
           <div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="dq-dst"
               placeholder="e.g. app=DB, 10.1.1.5"></div>
         </div>
+        <div class="form-row">
+          <div class="form-group"><label data-i18n="gui_any_label">Either Side Label (src OR dst)</label><input id="dq-any-label"
+              placeholder="e.g. env=Production, role:Web"></div>
+          <div class="form-group"><label data-i18n="gui_any_ip">Either Side IP (src OR dst)</label><input id="dq-any-ip"
+              placeholder="e.g. 10.0.1.5, IPList name"></div>
+        </div>
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_excludes">Excludes (Optional)</legend>
@@ -1060,6 +1066,12 @@
               placeholder="e.g. env=Kube, 10.9.9.9"></div>
           <div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="dq-exdst"
               placeholder="e.g. 8.8.8.8"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label data-i18n="gui_ex_any_label">Exclude Either Side Label</label><input id="dq-ex-any-label"
+              placeholder="e.g. env=Dev"></div>
+          <div class="form-group"><label data-i18n="gui_ex_any_ip">Exclude Either Side IP</label><input id="dq-ex-any-ip"
+              placeholder="e.g. 192.168.0.0/16"></div>
         </div>
       </fieldset>
       <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-query')"
@@ -1091,6 +1103,12 @@
           <div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="qt-dst"
               placeholder="e.g. app=DB, 10.1.1.5"></div>
         </div>
+        <div class="form-row">
+          <div class="form-group"><label data-i18n="gui_any_label">Either Side Label (src OR dst)</label><input id="qt-any-label"
+              placeholder="e.g. env=Production, role:Web"></div>
+          <div class="form-group"><label data-i18n="gui_any_ip">Either Side IP (src OR dst)</label><input id="qt-any-ip"
+              placeholder="e.g. 10.0.1.5, IPList name"></div>
+        </div>
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_policy_dec">Policy Decision</legend>
@@ -1113,6 +1131,12 @@
               placeholder="e.g. env=Kube, 10.9.9.9"></div>
           <div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="qt-exdst"
               placeholder="e.g. 8.8.8.8"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label data-i18n="gui_ex_any_label">Exclude Either Side Label</label><input id="qt-ex-any-label"
+              placeholder="e.g. env=Dev"></div>
+          <div class="form-group"><label data-i18n="gui_ex_any_ip">Exclude Either Side IP</label><input id="qt-ex-any-ip"
+              placeholder="e.g. 192.168.0.0/16"></div>
         </div>
       </fieldset>
       <div class="modal-actions">

@@ -26,7 +26,7 @@ api = ApiClient(cm)          # 使用 PCE 憑證初始化
 
 ## 場景一：健康檢查 — 驗證 PCE 連線
 
-**使用場景**：監控 Playbook 中的心跳檢測。  
+**使用場景**：監控 Playbook 中的心跳檢測。
 **所需角色**：任意（`read_only` 以上）
 
 ### API 呼叫
@@ -49,7 +49,7 @@ else:
 
 ## 場景二：工作負載隔離（Quarantine）
 
-**使用場景**：事件回應 — 透過標記 Quarantine 標籤來隔離遭入侵的主機。  
+**使用場景**：事件回應 — 透過標記 Quarantine 標籤來隔離遭入侵的主機。
 **所需角色**：`owner` 或 `admin`
 
 ### 操作流程
@@ -120,8 +120,10 @@ else:
 
 ## 場景三：流量分析查詢
 
-**使用場景**：查詢過去 N 分鐘內被阻擋或異常的流量以進行調查。  
+**使用場景**：查詢過去 N 分鐘內被阻擋或異常的流量以進行調查。
 **所需角色**：`read_only` 以上
+
+> **重要變更（Illumio Core 25.2）**：同步流量查詢端點已棄用。本工具專用非同步查詢 (`async_queries`)，單次查詢最多支援 **200,000** 筆結果。所有範例均使用非同步 API。
 
 ### 操作流程
 
@@ -154,6 +156,22 @@ graph LR
     "services": {"include": [], "exclude": []}
 }
 ```
+
+### 進階篩選選項
+
+除了基本的 `sources`/`destinations` include/exclude 外，本工具的高階查詢支援以下額外篩選參數：
+
+| 篩選參數 | 類型 | 說明 |
+|:---|:---|:---|
+| `ex_src_labels` | array | 排除來源標籤（格式：`["env:Production"]`） |
+| `ex_dst_labels` | array | 排除目的標籤（格式：`["app:Database"]`） |
+| `ex_src_ip` | string | 排除來源 IP 位址（支援 CIDR，例如 `"10.0.0.0/8"`） |
+| `ex_dst_ip` | string | 排除目的 IP 位址 |
+| `ex_port` | int | 排除特定目的端口 |
+| `any_label` | string | 來源或目的任一方符合即可（OR 邏輯） |
+| `any_ip` | string | 來源或目的 IP 任一方符合即可（OR 邏輯） |
+
+> **OR 邏輯篩選**：使用 `any_label` 或 `any_ip` 時，只要來源或目的其中一方匹配即視為符合條件，適用於不確定流量方向的場景。
 
 ### Python 程式碼
 
@@ -192,6 +210,15 @@ results = ana.query_flows({
 for r in results[:10]:
     print(f"{r['source']['name']} -> {r['destination']['name']} "
           f"| {r['formatted_bandwidth']} | {r['policy_decision']}")
+
+# 方式 C：使用排除篩選（過濾掉不需要的流量）
+results = ana.query_flows({
+    "start_time": "2026-03-03T00:00:00Z",
+    "end_time": "2026-03-03T23:59:59Z",
+    "policy_decisions": ["allowed", "blocked", "potentially_blocked"],
+    "ex_src_labels": ["env:Development"],   # 排除開發環境來源
+    "ex_dst_ip": "10.255.0.0/16",           # 排除管理網段目的
+})
 ```
 
 ### 關鍵回應欄位
@@ -214,7 +241,7 @@ for r in results[:10]:
 
 ## 場景四：安全事件監控
 
-**使用場景**：為 SIEM 儀表板擷取近期安全事件。  
+**使用場景**：為 SIEM 儀表板擷取近期安全事件。
 **所需角色**：`read_only` 以上
 
 ### API 呼叫
@@ -261,7 +288,7 @@ for evt in events:
 
 ## 場景五：工作負載搜尋與盤點
 
-**使用場景**：依主機名稱、IP 或標籤搜尋工作負載。  
+**使用場景**：依主機名稱、IP 或標籤搜尋工作負載。
 **所需角色**：`read_only` 以上
 
 ### API 呼叫
@@ -295,7 +322,7 @@ for wl in results:
 
 ## 場景六：標籤管理
 
-**使用場景**：列出或建立標籤以進行政策自動化。  
+**使用場景**：列出或建立標籤以進行政策自動化。
 **所需角色**：`admin` 以上（建立操作）
 
 ### Python 程式碼
@@ -324,7 +351,7 @@ if new_label:
 
 ## 場景七：工具內部 API (認證與安全性)
 
-**使用場景**：對 Illumio PCE Ops 工具本身進行自動化操作（例如：透過腳本批次更新規則、觸發報表）。    
+**使用場景**：對 Illumio PCE Ops 工具本身進行自動化操作（例如：透過腳本批次更新規則、觸發報表）。
 **需求**：有效的工具登入憑證（預設：`illumio`/`illumio`）。
 
 ### 操作流程
@@ -346,7 +373,7 @@ res = session.post(f"{BASE_URL}/api/login", json=login_payload)
 
 if res.json().get("ok"):
     print("登入成功")
-    
+
     # 2. 範例：觸發產生流量報表
     report_res = session.post(f"{BASE_URL}/api/reports/generate", json={
         "type": "traffic",
@@ -359,7 +386,163 @@ else:
 
 ---
 
+## 場景八：政策使用率分析
+
+**使用場景**：分析每條安全規則的實際流量命中數，找出未使用或低使用率的規則以進行政策最佳化。
+**所需角色**：`read_only` 以上（PCE API）；工具內部 API 需登入認證。
+
+### 操作流程
+
+```mermaid
+graph LR
+    A["1. 取得所有已佈建<br/>的 Ruleset"] --> B["2. 擷取每條<br/>規則明細"]
+    B --> C["3. 批次提交非同步<br/>流量查詢"]
+    C --> D["4. 彙整命中次數<br/>並產生報表"]
+```
+
+### API 呼叫（PCE 直接呼叫）
+
+| 步驟 | 方法 | 端點 | 用途 |
+|:---|:---|:---|:---|
+| 1 | GET | `/orgs/{org_id}/sec_policy/active/rule_sets?max_results=10000` | 取得所有已佈建的 Ruleset |
+| 2 | — | （從步驟 1 回應中解析 `rules` 陣列） | 擷取每條規則的 scope、port、proto |
+| 3 | POST | `/orgs/{org_id}/traffic_flows/async_queries` | 為每條規則提交對應的流量查詢 |
+| 4 | GET | `.../async_queries/{uuid}/download` | 下載查詢結果並計算命中數 |
+
+### Python 程式碼（使用 ApiClient）
+
+```python
+from src.config import ConfigManager
+from src.api_client import ApiClient
+
+cm = ConfigManager()
+api = ApiClient(cm)
+
+# --- 步驟 1：取得所有已佈建的 Ruleset ---
+rulesets = api.get_active_rulesets()
+print(f"共有 {len(rulesets)} 個已佈建的 Ruleset")
+
+# --- 步驟 2：展開所有規則 ---
+all_rules = []
+for rs in rulesets:
+    for rule in rs.get("rules", []):
+        rule["_ruleset_name"] = rs.get("name", "Unknown")
+        all_rules.append(rule)
+print(f"共有 {len(all_rules)} 條規則")
+
+# --- 步驟 3-4：批次查詢流量命中數（三階段並行處理） ---
+hit_hrefs, hit_counts = api.batch_get_rule_traffic_counts(
+    rules=all_rules,
+    start_date="2026-03-01T00:00:00Z",
+    end_date="2026-04-01T00:00:00Z",
+    max_concurrent=10,
+    on_progress=lambda msg: print(f"  {msg}")
+)
+
+# --- 結果彙整 ---
+unused_rules = [r for r in all_rules if r.get("href") not in hit_hrefs]
+print(f"\n命中規則數: {len(hit_hrefs)} / {len(all_rules)}")
+print(f"未使用規則數: {len(unused_rules)}")
+
+for rule in unused_rules[:10]:
+    print(f"  - [{rule['_ruleset_name']}] {rule.get('href')}")
+```
+
+### 透過工具內部 API 觸發報表
+
+```python
+import requests
+
+BASE_URL = "http://127.0.0.1:5001"
+session = requests.Session()
+session.post(f"{BASE_URL}/api/login", json={"username": "illumio", "password": "illumio"})
+
+# 觸發政策使用率報表產生
+res = session.post(f"{BASE_URL}/api/policy_usage_report/generate", json={
+    "lookback_days": 30
+})
+print(res.json())
+# 回傳: {"ok": true, "message": "Report generation started", ...}
+```
+
+> **效能提示**：`batch_get_rule_traffic_counts()` 使用三階段並行處理（提交 → 輪詢 → 下載），預設 10 個並行執行緒，可透過 `max_concurrent` 參數調整。大型環境（>500 條規則）建議設為 5 以避免 PCE 過載。
+
+---
+
+## 場景九：多 PCE 設定檔管理
+
+**使用場景**：在多個 PCE 環境（如開發、測試、正式）之間切換，無需手動修改 `config.json`。
+**需求**：工具內部 API 需登入認證。
+
+### 操作流程
+
+```mermaid
+graph LR
+    A["1. 列出現有<br/>設定檔"] --> B["2. 新增/匯入<br/>設定檔"]
+    B --> C["3. 啟用目標<br/>設定檔"]
+    C --> D["4. 驗證切換<br/>結果"]
+```
+
+### API 端點
+
+| 操作 | 方法 | 端點 | 請求主體 |
+|:---|:---|:---|:---|
+| 列出所有設定檔 | GET | `/api/pce-profiles` | — |
+| 新增設定檔 | POST | `/api/pce-profiles` | `{"action": "add", "profile": {...}}` |
+| 啟用設定檔 | POST | `/api/pce-profiles` | `{"action": "activate", "name": "<名稱>"}` |
+| 刪除設定檔 | POST | `/api/pce-profiles` | `{"action": "delete", "name": "<名稱>"}` |
+
+### Python 程式碼
+
+```python
+import requests
+
+BASE_URL = "http://127.0.0.1:5001"
+session = requests.Session()
+session.post(f"{BASE_URL}/api/login", json={"username": "illumio", "password": "illumio"})
+
+# --- 列出所有設定檔 ---
+res = session.get(f"{BASE_URL}/api/pce-profiles")
+profiles = res.json()
+print(f"設定檔數量: {len(profiles.get('profiles', []))}")
+print(f"目前啟用: {profiles.get('active')}")
+
+# --- 新增設定檔 ---
+res = session.post(f"{BASE_URL}/api/pce-profiles", json={
+    "action": "add",
+    "profile": {
+        "name": "Production-PCE",
+        "url": "https://pce-prod.example.com:8443",
+        "org_id": "1",
+        "key": "api_key_here",
+        "secret": "api_secret_here",
+        "verify_ssl": True
+    }
+})
+print(f"新增結果: {res.json()}")
+
+# --- 啟用設定檔 ---
+res = session.post(f"{BASE_URL}/api/pce-profiles", json={
+    "action": "activate",
+    "name": "Production-PCE"
+})
+print(f"啟用結果: {res.json()}")
+
+# --- 刪除設定檔 ---
+res = session.post(f"{BASE_URL}/api/pce-profiles", json={
+    "action": "delete",
+    "name": "Old-Dev-PCE"
+})
+print(f"刪除結果: {res.json()}")
+```
+
+> **SOAR 整合提示**：可將 PCE 設定檔切換包裝為 Playbook 的前置步驟，根據事件來源自動選擇對應的 PCE 環境進行回應操作。
+
+---
+
 ## SIEM/SOAR 快速查閱表
+
+### PCE 直接 API（需 HTTP Basic 認證）
 
 | 操作 | API 端點 | HTTP | 請求主體 | 預期回應 |
 |:---|:---|:---|:---|:---|
@@ -373,6 +556,22 @@ else:
 | 搜尋工作負載 | `/orgs/{id}/workloads?hostname=...` | GET | — | `200` + JSON 陣列 |
 | 取得工作負載 | `/api/v2{workload_href}` | GET | — | `200` + workload JSON |
 | 更新工作負載標籤 | `/api/v2{workload_href}` | PUT | `{labels: [{href}]}` | `204` |
+| 取得已佈建 Ruleset | `/orgs/{id}/sec_policy/active/rule_sets` | GET | — | `200` + JSON 陣列 |
 
-> **Base URL 格式**：`https://<pce_host>:<port>/api/v2/orgs/<org_id>/...`  
+> **Base URL 格式**：`https://<pce_host>:<port>/api/v2/orgs/<org_id>/...`
 > **認證**：HTTP Basic，API Key 作為使用者名稱，Secret 作為密碼。
+
+### 工具內部 API（需 Session 認證，見場景七）
+
+| 操作 | API 端點 | HTTP | 請求主體 | 預期回應 |
+|:---|:---|:---|:---|:---|
+| 登入 | `/api/login` | POST | `{username, password}` | `200` + `{ok}` |
+| 列出 PCE 設定檔 | `/api/pce-profiles` | GET | — | `200` + `{profiles, active}` |
+| 管理 PCE 設定檔 | `/api/pce-profiles` | POST | `{action, ...}` | `200` + `{ok}` |
+| 產生政策使用率報表 | `/api/policy_usage_report/generate` | POST | `{lookback_days}` | `200` + `{ok}` |
+| 批次套用隔離 | `/api/quarantine/bulk_apply` | POST | `{workloads, level}` | `200` + `{ok, results}` |
+| 手動觸發排程報表 | `/api/report-schedules/<id>/run` | POST | — | `200` + `{ok}` |
+| 查詢排程執行歷史 | `/api/report-schedules/<id>/history` | GET | — | `200` + `{history}` |
+| 列出 Ruleset（排程器） | `/api/rule_scheduler/rulesets` | GET | — | `200` + `{items}` |
+| 列出排程規則 | `/api/rule_scheduler/schedules` | GET | — | `200` + `{items}` |
+| 新增排程規則 | `/api/rule_scheduler/schedules` | POST | `{ruleset_href, ...}` | `200` + `{ok, id}` |

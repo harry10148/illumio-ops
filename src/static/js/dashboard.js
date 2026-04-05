@@ -935,6 +935,8 @@ function openQueryModal(idx = -1) {
     $('dq-port').value = ''; $('dq-proto').value = '';
     $('dq-src').value = ''; $('dq-dst').value = '';
     $('dq-expt').value = ''; $('dq-exsrc').value = ''; $('dq-exdst').value = '';
+    $('dq-any-label').value = ''; $('dq-any-ip').value = '';
+    $('dq-ex-any-label').value = ''; $('dq-ex-any-ip').value = '';
   } else {
     $('mq-title').textContent = 'Edit Query Widget';
     const q = _dashboardQueries[idx];
@@ -949,6 +951,10 @@ function openQueryModal(idx = -1) {
     $('dq-expt').value = q.ex_port || '';
     $('dq-exsrc').value = (q.ex_src_label || '') + (q.ex_src_ip ? (q.ex_src_label ? ', ' : '') + q.ex_src_ip : '');
     $('dq-exdst').value = (q.ex_dst_label || '') + (q.ex_dst_ip ? (q.ex_dst_label ? ', ' : '') + q.ex_dst_ip : '');
+    $('dq-any-label').value = q.any_label || '';
+    $('dq-any-ip').value = q.any_ip || '';
+    $('dq-ex-any-label').value = q.ex_any_label || '';
+    $('dq-ex-any-ip').value = q.ex_any_ip || '';
   }
   let btn = document.querySelector('#m-query .modal-actions');
   let isEdit = idx >= 0;
@@ -980,7 +986,11 @@ async function saveDashboardQuery() {
     proto: parseInt($('dq-proto').value) || null,
     src: $('dq-src').value, dst: $('dq-dst').value,
     ex_port: parseInt($('dq-expt').value) || null,
-    ex_src: $('dq-exsrc').value, ex_dst: $('dq-exdst').value
+    ex_src: $('dq-exsrc').value, ex_dst: $('dq-exdst').value,
+    any_label: $('dq-any-label').value.trim() || null,
+    any_ip: $('dq-any-ip').value.trim() || null,
+    ex_any_label: $('dq-ex-any-label').value.trim() || null,
+    ex_any_ip: $('dq-ex-any-ip').value.trim() || null,
   };
 
   const r = await post('/api/dashboard/queries', d);

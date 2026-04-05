@@ -203,6 +203,18 @@ class Analyzer:
         if rule.get("dst_ip_in") and not self._check_ip_filter(f.get('dst', {}), rule["dst_ip_in"]):
             return False
 
+        # Any-side include filters (src OR dst must match)
+        if rule.get("any_label"):
+            src_match = self._check_flow_labels(f.get('src', {}), rule["any_label"])
+            dst_match = self._check_flow_labels(f.get('dst', {}), rule["any_label"])
+            if not (src_match or dst_match):
+                return False
+        if rule.get("any_ip"):
+            src_match = self._check_ip_filter(f.get('src', {}), rule["any_ip"])
+            dst_match = self._check_ip_filter(f.get('dst', {}), rule["any_ip"])
+            if not (src_match or dst_match):
+                return False
+
         # Excludes
         if rule.get("ex_port"):
             f_port = f.get("dst_port") or f.get("service", {}).get("port")
@@ -220,19 +232,31 @@ class Analyzer:
         if rule.get("ex_dst_ip") and self._check_ip_filter(f.get('dst', {}), rule["ex_dst_ip"]):
             return False
 
+        # Any-side exclude filters (exclude if src OR dst matches)
+        if rule.get("ex_any_label"):
+            if (self._check_flow_labels(f.get('src', {}), rule["ex_any_label"]) or
+                    self._check_flow_labels(f.get('dst', {}), rule["ex_any_label"])):
+                return False
+        if rule.get("ex_any_ip"):
+            if (self._check_ip_filter(f.get('src', {}), rule["ex_any_ip"]) or
+                    self._check_ip_filter(f.get('dst', {}), rule["ex_any_ip"])):
+                return False
+
         return True
 
     def _check_flow_labels(self, flow_side, filter_str):
         if not filter_str:
             return True
-        try:
-            fk, fv = filter_str.split('=')
-            for l in flow_side.get('workload', {}).get('labels', []):
-                if l.get('key') == fk.strip() and l.get('value') == fv.strip():
-                    return True
-            return False
-        except ValueError:
-            return False
+        # Support both "key=value" and "key:value" separators
+        for sep in ('=', ':'):
+            if sep in filter_str:
+                fk, fv = filter_str.split(sep, 1)
+                fk, fv = fk.strip(), fv.strip()
+                for lbl in flow_side.get('workload', {}).get('labels', []):
+                    if lbl.get('key') == fk and lbl.get('value') == fv:
+                        return True
+                return False
+        return False
 
     def _check_ip_filter(self, flow_side, filter_val):
         if not filter_val:
@@ -502,7 +526,9 @@ class Analyzer:
             "src_ip_in": params.get("src_ip_in"), "dst_ip_in": params.get("dst_ip_in"),
             "ex_port": params.get("ex_port"),
             "ex_src_label": params.get("ex_src_label"), "ex_dst_label": params.get("ex_dst_label"),
-            "ex_src_ip": params.get("ex_src_ip"), "ex_dst_ip": params.get("ex_dst_ip")
+            "ex_src_ip": params.get("ex_src_ip"), "ex_dst_ip": params.get("ex_dst_ip"),
+            "any_label": params.get("any_label"), "any_ip": params.get("any_ip"),
+            "ex_any_label": params.get("ex_any_label"), "ex_any_ip": params.get("ex_any_ip"),
         }
 
         now_dt = datetime.datetime.now(datetime.timezone.utc)

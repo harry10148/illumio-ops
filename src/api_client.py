@@ -259,8 +259,10 @@ class ApiClient:
         Python-side filter applied after PCE download.
         Mirrors the label/IP logic from Analyzer.check_flow_match().
         filters keys: src_labels, dst_labels, src_ip, dst_ip, port, proto,
-                      ex_src_labels, ex_dst_labels, ex_src_ip, ex_dst_ip, ex_port.
+                      ex_src_labels, ex_dst_labels, ex_src_ip, ex_dst_ip, ex_port,
+                      any_label, any_ip, ex_any_label, ex_any_ip.
         Label format: "key:value" or "key=value".
+        any_label/any_ip: OR logic — matches if EITHER src or dst satisfies the condition.
         """
         src = flow.get('src', {})
         dst = flow.get('dst', {})
@@ -316,6 +318,16 @@ class ApiClient:
             except (ValueError, TypeError):
                 pass
 
+        # ── Any-side include filters (src OR dst must match) ─────────────────
+        any_label = filters.get('any_label')
+        if any_label:
+            if not (_label_match(src, any_label) or _label_match(dst, any_label)):
+                return False
+        any_ip = filters.get('any_ip')
+        if any_ip:
+            if not (_ip_match(src, any_ip) or _ip_match(dst, any_ip)):
+                return False
+
         # ── Exclude filters (must NOT match) ──────────────────────────────────
         for lbl in (filters.get('ex_src_labels') or []):
             if lbl and _label_match(src, lbl):
@@ -336,6 +348,16 @@ class ApiClient:
                     return False
             except (ValueError, TypeError):
                 pass
+
+        # ── Any-side exclude filters (exclude if src OR dst matches) ─────────
+        ex_any_label = filters.get('ex_any_label')
+        if ex_any_label:
+            if _label_match(src, ex_any_label) or _label_match(dst, ex_any_label):
+                return False
+        ex_any_ip = filters.get('ex_any_ip')
+        if ex_any_ip:
+            if _ip_match(src, ex_any_ip) or _ip_match(dst, ex_any_ip):
+                return False
 
         return True
 

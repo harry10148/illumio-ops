@@ -287,10 +287,11 @@ class Reporter:
                 source = clean(a.get('source', ''))
                 if source and source != 'System':
                     lines.append(f"  來源: {source}")
-                # Show first event details (username / IP)
+                # Show first event details (username / IP / workload)
                 raw = a.get('raw_data') or []
                 if raw:
                     ev0 = raw[0]
+                    event_type_0 = ev0.get('event_type', '')
                     resource = ev0.get('resource') or {}
                     res_user = (resource.get('user') or {}).get('username') or ''
                     cb_user = ((ev0.get('created_by') or {}).get('user') or {}).get('username') or ''
@@ -300,6 +301,24 @@ class Reporter:
                         lines.append(f"  帳號: {clean(username)}")
                     if src_ip:
                         lines.append(f"  IP: {clean(src_ip)}")
+                    if event_type_0 in ('agents.unpair', 'workloads.unpair'):
+                        wa = ev0.get('workloads_affected') or {}
+                        count = wa.get('total_affected', 0)
+                        if count:
+                            lines.append(f"  影響工作負載: {count} 台")
+                    elif event_type_0.startswith('agent.'):
+                        rc = ev0.get('resource_changes') or {}
+                        if isinstance(rc, list):
+                            after_rc = {i['field']: i.get('after') for i in rc if isinstance(i, dict) and 'field' in i}
+                        else:
+                            after_rc = rc.get('after') or {} if isinstance(rc, dict) else {}
+                        hostname = (
+                            after_rc.get('hostname') or after_rc.get('name')
+                            or (resource.get('agent') or {}).get('hostname')
+                            or ''
+                        )
+                        if hostname:
+                            lines.append(f"  主機: {clean(hostname)}")
 
         if self.traffic_alerts:
             lines.append(f"\n🛡 {t('traffic_alerts_header')}")
@@ -420,20 +439,30 @@ class Reporter:
             'sec_rule': 'Security Rule', 'rule_set': 'Ruleset',
             'sec_policy': 'Policy Provision', 'user': 'User Auth',
             'request': 'API Auth', 'authz_csrf': 'CSRF Check',
-            'agent': 'VEN Agent', 'workload': 'Workload',
+            'agent': 'VEN Agent', 'agents': 'VEN Agents',
+            'workload': 'Workload', 'workloads': 'Workloads',
             'label': 'Label', 'ip_list': 'IP List',
             'service': 'Service', 'ven': 'VEN',
+            'pairing_profile': 'Pairing Profile',
+            'authentication_settings': 'Auth Settings',
+            'firewall_settings': 'Firewall Settings',
         }
         _VERB_STYLE = {
             'create': ('Created', '#166644', '#D1FAE5'),
             'update': ('Updated', '#F97607', '#FFF3CD'),
             'delete': ('Deleted', '#BE122F', '#FEE2E2'),
             'sign_in': ('Sign-In', '#325158', '#E0F2FE'),
+            'sign_out': ('Sign-Out', '#325158', '#E0F2FE'),
             'authentication_failed': ('Auth Fail', '#BE122F', '#FEE2E2'),
             'tampering': ('Tampering', '#BE122F', '#FEE2E2'),
-            'suspend': ('Suspended', '#F97607', '#FFF3CD'),
+            'suspend': ('Suspend', '#F97607', '#FFF3CD'),
             'clone_detected': ('Clone Detected', '#BE122F', '#FEE2E2'),
             'csrf_validation_failure': ('CSRF Failure', '#BE122F', '#FEE2E2'),
+            'unpair': ('Unpair', '#BE122F', '#FEE2E2'),
+            'deactivate': ('Deactivate', '#F97607', '#FFF3CD'),
+            'activate': ('Activate', '#166644', '#D1FAE5'),
+            'goodbye': ('Goodbye', '#325158', '#E0F2FE'),
+            'refresh_policy': ('Policy Refresh', '#325158', '#E0F2FE'),
         }
 
         def _actor(ev):
@@ -491,7 +520,7 @@ class Reporter:
             return rows
 
         cards = []
-        for ev in events[:3]:
+        for ev in events[:5]:
             event_type = ev.get('event_type', '')
             ts = (ev.get('timestamp', '')[:19].replace('T', ' ')) if ev.get('timestamp') else ''
             status = ev.get('status', '')
@@ -519,6 +548,13 @@ class Reporter:
             if event_type == 'sec_policy.create':
                 count = workloads.get('total_affected', 0)
                 extras.append(f"{count} workload(s) affected")
+            elif event_type in ('agents.unpair', 'workloads.unpair'):
+                count = workloads.get('total_affected', 0)
+                if count:
+                    extras.append(f"Workloads affected: {count}")
+                wl_name = (after or before).get('hostname') or (after or before).get('name') or ''
+                if wl_name:
+                    extras.append(f"Workload: {wl_name}")
             elif verb_key == 'create' and after:
                 name = after.get('name') or after.get('hostname') or ''
                 if name:
@@ -533,10 +569,20 @@ class Reporter:
                     extras.append(f"User: {username}")
                 if src_ip:
                     extras.append(f"IP: {src_ip}")
-            elif event_type.startswith('agent.'):
-                wl_name = (after or before).get('hostname') or (after or before).get('name') or ''
+            elif event_type.startswith(('agent.', 'agents.')):
+                resource = ev.get('resource') or {}
+                wl_name = (
+                    (resource.get('agent') or {}).get('hostname')
+                    or (resource.get('workload') or {}).get('name')
+                    or (after or before).get('hostname')
+                    or (after or before).get('name')
+                    or ''
+                )
                 if wl_name:
                     extras.append(f"Workload: {wl_name}")
+                src_ip = ev.get('src_ip') or ''
+                if src_ip:
+                    extras.append(f"IP: {src_ip}")
 
             status_color = '#166644' if status == 'success' else '#BE122F'
             diff_html = _diff_rows(before, after)
@@ -561,8 +607,8 @@ class Reporter:
             card += "</div>"
             cards.append(card)
 
-        if len(events) > 3:
-            cards.append(f"<div style='font-size:10px; color:#989A9B; padding:2px 6px;'>… and {len(events)-3} more event(s) in this alert</div>")
+        if len(events) > 5:
+            cards.append(f"<div style='font-size:10px; color:#989A9B; padding:2px 6px;'>… and {len(events)-5} more event(s) in this alert</div>")
 
         return "".join(cards)
 

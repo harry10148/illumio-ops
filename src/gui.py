@@ -171,6 +171,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     app = Flask(__name__, template_folder=os.path.join(_PKG_DIR, 'templates'), static_folder=os.path.join(_PKG_DIR, 'static'))
     app.config['JSON_AS_ASCII'] = False
     app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
     
     # Initialize session secret
     cm.load()
@@ -1163,7 +1164,11 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 "ex_dst_ip": d.get("ex_dst_ip", ""),
                 "port": d.get("port", ""),
                 "ex_port": d.get("ex_port", ""),
-                "proto": d.get("proto", "")
+                "proto": d.get("proto", ""),
+                "any_label": d.get("any_label", ""),
+                "any_ip": d.get("any_ip", ""),
+                "ex_any_label": d.get("ex_any_label", ""),
+                "ex_any_ip": d.get("ex_any_ip", ""),
             }
             results = base_ana.query_flows(params)
             
@@ -1215,7 +1220,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 "ex_src_ip": d.get("ex_src_ip"), "ex_dst_ip": d.get("ex_dst_ip"),
                 "ex_src_label": d.get("ex_src_label"), "ex_dst_label": d.get("ex_dst_label"),
                 "port": d.get("port"), "ex_port": d.get("ex_port"),
-                "proto": d.get("proto")
+                "proto": d.get("proto"),
+                "any_label": d.get("any_label"), "any_ip": d.get("any_ip"),
+                "ex_any_label": d.get("ex_any_label"), "ex_any_ip": d.get("ex_any_ip"),
             }
             results = base_ana.query_flows(params)
 

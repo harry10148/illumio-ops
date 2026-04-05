@@ -2,7 +2,7 @@
 
 > **[English](Security_Rules_Reference.md)** | **[繁體中文](Security_Rules_Reference_zh.md)**
 
-This document describes all built-in security detection rules included in Illumio PCE Ops's traffic report engine. Rules are evaluated automatically whenever a traffic report is generated and their results appear in the **Security Findings** section of every HTML and Excel report.
+This document describes all built-in security detection rules included in Illumio PCE Ops's traffic report engine. Rules are evaluated automatically whenever a traffic report is generated and their results appear in the **Security Findings** section of every HTML report.
 
 ---
 
@@ -31,6 +31,19 @@ All thresholds are configurable in **`config/report_config.yaml`** under the `th
 
 ---
 
+## Ransomware Risk Port Tiers
+
+The `report_config.yaml` defines four tiers of ransomware risk ports. These tiers are used by rules B001, B002, and B003.
+
+| Tier | Ports | Used by |
+|:---|:---|:---|
+| **critical** | 135 (RPC), 445 (SMB), 3389 (RDP), 5985/5986 (WinRM) | B001 |
+| **high** | 5938 (TeamViewer), 5900 (VNC), 137/138/139 (NetBIOS) | B002 |
+| **medium** | 22 (SSH), 2049 (NFS), 20/21 (FTP), 5353 (mDNS), 5355 (LLMNR), 80 (HTTP), 3702 (WSD), 1900 (SSDP), 23 (Telnet) | B003 |
+| **low** | 110 (POP3), 1723 (PPTP), 111 (SunRPC), 4444 (Metasploit) | Reserved for future rules |
+
+---
+
 ## B-Series — Baseline Rules
 
 ### B001 · Ransomware Risk Port `CRITICAL / HIGH / MEDIUM / INFO`
@@ -54,7 +67,7 @@ These are the exact ports used in EternalBlue, NotPetya, WannaCry, and the major
 
 | Severity | Condition |
 |:---|:---|
-| **CRITICAL** | Any flow crosses **environment boundaries** (e.g., Dev→Prod, Test→Prod) |
+| **CRITICAL** | Any flow crosses **environment boundaries** (e.g., Dev->Prod, Test->Prod) |
 | **HIGH** | Flow crosses a **/24 subnet boundary** and is explicitly `allowed` (not just test-mode) |
 | **MEDIUM** | Flows are **within the same /24 subnet** *or* exist only in test/visibility mode (not enforced) |
 | **INFO** | All flows are same-subnet **AND** all are test-mode — likely legitimate admin traffic |
@@ -83,7 +96,7 @@ Detects allowed flows on secondary remote-access and persistence ports:
 |:---|:---|:---|
 | 5938 | TCP/UDP | TeamViewer |
 | 5900 | TCP/UDP | VNC (Virtual Network Computing) |
-| 137 / 138 / 139 | UDP/TCP | NetBIOS Name Service / Datagram |
+| 137 / 138 / 139 | UDP/TCP | NetBIOS Name Service / Datagram / Session |
 
 **Why it matters:**
 Ransomware operators and APT groups use TeamViewer, VNC, and NetBIOS extensively for persistent remote control and C2 communication after initial compromise.
@@ -150,7 +163,7 @@ Total unmanaged-source flows exceed `unmanaged_connection_threshold` (default: *
 **Category:** Policy
 
 **What it checks:**
-Calculates `allowed_flows / total_flows × 100` as the policy coverage percentage. Triggers if this falls below the threshold.
+Calculates `allowed_flows / total_flows x 100` as the policy coverage percentage. Triggers if this falls below the threshold.
 
 **Why it matters:**
 Low coverage means the majority of observed traffic is either uncontrolled (no explicit rule) or blocked by default. In either case, the segmentation policy is incomplete and large sections of the network have no micro-segmentation protection.
@@ -238,7 +251,7 @@ Any flow's `bytes_total` exceeds the `high_bytes_percentile`-th percentile of th
 **Category:** Policy
 
 **What it checks:**
-Counts flows where `src_env != dst_env` (e.g., Production → Development, Staging → Production), excluding flows with empty environment labels.
+Counts flows where `src_env != dst_env` (e.g., Production -> Development, Staging -> Production), excluding flows with empty environment labels.
 
 **Why it matters:**
 Environment boundaries are your macro-segmentation layer. Excessive cross-environment traffic may indicate lateral movement from a compromised lower-security zone into production, or misconfigured applications bypassing environment isolation.
@@ -261,7 +274,7 @@ These rules focus specifically on the **attacker kill-chain after initial compro
 
 ---
 
-### L001 · Cleartext Protocol in Use `HIGH`
+### L001 · Cleartext Protocol in Use `HIGH / MEDIUM`
 
 **Category:** LateralMovement
 
@@ -277,7 +290,7 @@ Detects any traffic on cleartext / legacy protocols:
 Any attacker with network access can perform ARP poisoning or a MITM attack and capture credentials directly from Telnet/FTP sessions without breaking any encryption. These captured credentials are then immediately usable for lateral movement to any system where the same password is reused.
 
 **Trigger condition:**
-At least one flow on ports {23, 20, 21} exists. Severity escalates to HIGH if any such flows are explicitly `allowed`.
+At least one flow on ports {23, 20, 21} exists. Severity is **HIGH** if any such flows are explicitly `allowed`; **MEDIUM** if all are blocked or potentially_blocked.
 
 **Threshold key:** *(no threshold — triggers on any match)*
 
@@ -357,7 +370,7 @@ Database ports reachable from more than `db_unique_src_app_threshold` unique sou
 **Category:** LateralMovement
 
 **What it checks:**
-Detects `allowed` database flows (same port list as L003) where `src_env != dst_env`.
+Detects `allowed` database flows (same port list as L003: 1433, 3306, 5432, 1521, 27017, 6379, 9200, 5984, 50000) where `src_env != dst_env`.
 
 **Why it matters:**
 Environment boundaries are the macro-segmentation layer protecting Production from Development and Staging. A Dev application reaching a Production database directly bypasses all environment-level controls and is a direct path for an attacker who has compromised a lower-security environment to pivot into production data stores.
@@ -419,7 +432,7 @@ Builds a directed app→app communication graph using only `allowed` flows on la
 This is a direct implementation of the **detect-lateral-movement-paths** methodology from the Illumio MCP server. An application with high BFS reachability is the highest-value target for an attacker: compromising it grants potential access to every application in its reachable subgraph. These are the nodes where a single breach has the largest blast radius.
 
 **Trigger condition:**
-At least one application node can reach ≥ `blast_radius_threshold` other apps via lateral ports (default: **5**).
+At least one application node can reach >= `blast_radius_threshold` other apps via lateral ports (default: **5**).
 
 **Threshold key:** `blast_radius_threshold`
 
@@ -436,8 +449,8 @@ At least one application node can reach ≥ `blast_radius_threshold` other apps 
 
 **What it checks:**
 Detects non-blocked flows from unmanaged hosts (`src_managed = False`) on critical service ports:
-- Database ports (L003 list)
-- Identity ports (L005 list)
+- Database ports (L003 list: 1433, 3306, 5432, 1521, 27017, 6379, 9200, 5984, 50000)
+- Identity ports (L005 list: 88, 389, 636, 3268, 3269, 464)
 - Windows management ports: RPC (135), SMB (445), WinRM (5985/5986/47001)
 
 **Why it matters:**
@@ -507,7 +520,7 @@ Total bytes transferred from managed to unmanaged destinations exceeds `exfil_by
 **What it checks:**
 Detects `allowed` flows on lateral movement ports and Windows management ports between workloads in **different environments** (`src_env != dst_env`).
 
-Monitored ports: SMB (445), RDP (3389), WinRM (5985/5986/47001), RPC (135), SSH (22), TeamViewer (5938), VNC (5900/5901), Telnet (23).
+Monitored ports: SSH (22), Telnet (23), RPC (135), SMB (445), RDP (3389), VNC (5900), WinRM (5985/5986), TeamViewer (5938), WinRM alternate (47001).
 
 **Why it matters:**
 This is rated **CRITICAL** because it represents a complete macro-segmentation failure. Environment boundaries (Production / Development / Staging / DMZ) are your top-level security domains. If lateral movement ports are allowed to cross these boundaries, an attacker who compromises a low-security Development workload can directly apply the exact same lateral movement techniques — PsExec, WMI, RDP — to reach Production systems. The entire purpose of environment segmentation is defeated.
@@ -525,36 +538,80 @@ More than `cross_env_lateral_threshold` allowed flows using lateral/management p
 
 ---
 
+## Analysis Modules (Non-Rule)
+
+In addition to the B-series and L-series security rules, the traffic report includes three analysis modules that provide scoring and risk assessment. These modules do **not** generate `Finding` objects in the rules engine but appear as dedicated sections in the HTML report.
+
+### Module 13 · Enforcement Readiness Score
+
+Computes a 0-100 enforcement readiness score across five weighted factors:
+
+| Factor | Weight | Description |
+|:---|:---|:---|
+| Policy Coverage | 40 | Percentage of flows with `policy_decision = 'allowed'` |
+| Ringfence Ratio | 20 | Percentage of app-to-app flows where src and dst share the same app label |
+| Enforcement Mode | 20 | Percentage of managed workloads in `enforced` mode |
+| No Blocked Flows | 10 | Penalises blocked/PB flows proportionally |
+| Remote App Coverage | 10 | Percentage of remote-access-port flows (SSH, RDP, VNC, TeamViewer) that are `allowed` |
+
+Outputs a letter grade (A-F) and prioritised remediation recommendations.
+
+### Module 14 · Infrastructure Scoring
+
+Graph-based application criticality scoring using directed app-to-app communication analysis:
+
+- **In-degree**: number of unique apps that depend on this app (provider criticality)
+- **Out-degree**: number of unique apps this app communicates with (consumer blast radius)
+- **Infra Score**: weighted combination (60% provider, 40% consumer)
+- **Role classification**: Hub (high in+out), Provider, Consumer, Peer
+
+Identifies the highest-value targets for segmentation prioritisation.
+
+### Module 15 · Lateral Movement Risk Detection
+
+Dedicated lateral movement analysis module providing:
+
+- **Lateral port exposure summary**: flows on known lateral movement ports by service and policy decision
+- **Fan-out detection**: sources communicating to many destinations on lateral ports (threshold: 5+ unique destinations)
+- **App-level chain detection**: BFS reachability analysis up to 3 hops on allowed lateral-port connections
+- **Articulation proxy detection**: IP nodes with both high in-degree and out-degree on lateral ports (chokepoints)
+- **Per-source risk scoring**: 0-100 risk score per source IP based on connection volume, destination spread, port diversity, and blocked flow ratio
+
+Lateral ports monitored by this module: SMB (445), RPC (135), NetBIOS (139), RDP (3389), SSH (22), WinRM (5985/5986), Telnet (23), NFS (2049), RPC Portmapper (111), LDAP (389), LDAPS (636), Kerberos (88), MSSQL (1433), MySQL (3306), PostgreSQL (5432).
+
+---
+
 ## Threshold Configuration Reference
 
 All thresholds are in `config/report_config.yaml` under the `thresholds:` key.
 
 ```yaml
 thresholds:
-  # ── B-series ─────────────────────────────────────────────────────────────
+  # -- B-series ----------------------------------------------------------
   min_policy_coverage_pct: 30         # B005: trigger if coverage % below this
   lateral_movement_outbound_dst: 10   # B006: trigger if src contacts > N unique dst
   user_destination_threshold: 20      # B007: trigger if user reaches > N unique dst
   unmanaged_connection_threshold: 50  # B004: trigger if unmanaged src flows > N
   high_bytes_percentile: 95           # B008: anomaly if bytes > Nth percentile
+  high_bandwidth_percentile: 95       # bandwidth spike percentile (Module 11)
   cross_env_connection_threshold: 100 # B009: trigger if cross-env flows > N
 
-  # ── L-series ─────────────────────────────────────────────────────────────
+  # -- L-series ----------------------------------------------------------
   discovery_protocol_threshold: 10    # L002: min unblocked discovery flows to trigger
   db_unique_src_app_threshold: 5      # L003: alert if db reachable from > N source apps
   identity_unique_src_threshold: 3    # L005: alert if LDAP/Kerberos from > N source apps
   blast_radius_threshold: 5           # L006: alert if app reaches > N apps via lateral ports
   unmanaged_critical_threshold: 5     # L007: min unmanaged-to-critical-port flows
   pb_lateral_threshold: 10            # L008: min PB flows on lateral ports to alert
-  exfil_bytes_threshold_mb: 100       # L009: trigger if managed→unmanaged bytes > N MB
+  exfil_bytes_threshold_mb: 100       # L009: trigger if managed->unmanaged bytes > N MB
   cross_env_lateral_threshold: 5      # L010: min cross-env lateral flows to alert
 ```
 
 ### Tuning guidance
 
-- **High false-positive environment** (e.g., flat Dev network with many cross-app flows): Increase L003 `db_unique_src_app_threshold` to 10–15 and L005 `identity_unique_src_threshold` to 8–10.
+- **High false-positive environment** (e.g., flat Dev network with many cross-app flows): Increase L003 `db_unique_src_app_threshold` to 10-15 and L005 `identity_unique_src_threshold` to 8-10.
 - **Mature segmentation environment** (most workloads enforced): Lower B005 `min_policy_coverage_pct` to 80 to alert only when mature environments regress.
-- **Large data-transfer workloads** (backup servers, ETL): Increase `high_bytes_percentile` to 99 or increase `exfil_bytes_threshold_mb` to 500–1000.
+- **Large data-transfer workloads** (backup servers, ETL): Increase `high_bytes_percentile` to 99 or increase `exfil_bytes_threshold_mb` to 500-1000.
 - **Strict zero-tolerance environment**: Set `cross_env_lateral_threshold` to 1 so any cross-env lateral port flow triggers immediately.
 
 ---
@@ -577,45 +634,49 @@ semantic_rules:
     recommendation: "Block all lateral ports at PCI environment boundary immediately."
 ```
 
-> **Note:** Full semantic rule evaluation is planned for a future release. Currently, semantic rules are loaded and counted but evaluation logic is not yet active.
+> **Status:** Semantic rules are loaded from `config/semantic_config.yaml` when the file exists, but **advanced condition evaluation is not yet implemented**. The rules engine logs the number of loaded semantic rules but does not evaluate them against traffic data. Full semantic rule evaluation is planned for a future release.
 
 ---
 
 ## Port Reference
 
-All port numbers referenced by the security rules:
+All port numbers referenced by the security rules and analysis modules:
 
-| Port(s) | Service | Rules that reference it |
+| Port(s) | Service | Rules / Modules that reference it |
 |:---|:---|:---|
 | 20, 21 | FTP | B003, L001 |
-| 22 | SSH | B003, B006, L010 |
-| 23 | Telnet | L001, B003, B006, L010 |
+| 22 | SSH | B003, B006, L010, Mod15 |
+| 23 | Telnet | B003, B006, L001, L010, Mod15 |
 | 80 | HTTP | B003 |
-| 88 | Kerberos | L005 |
-| 135 | RPC / DCOM | B001, L007, L008, L010 |
+| 88 | Kerberos | L005, L007, L008, Mod15 |
+| 110 | POP3 | config: low tier |
+| 111 | SunRPC | config: low tier, Mod15 |
+| 135 | RPC / DCOM | B001, L007, L008, L010, Mod15 |
 | 137, 138 | NetBIOS NS/DGM | B002, L002 |
-| 139 | NetBIOS Session | B002 |
-| 389 | LDAP | L005 |
-| 445 | SMB | B001, L007, L008, L010 |
-| 464 | Kerberos Password | L005 |
-| 636 | LDAPS | L005 |
-| 1433 | MSSQL | L003, L004, L007 |
-| 1521 | Oracle | L003, L004 |
-| 1900 | SSDP | L002 |
-| 2049 | NFS | B003 |
-| 3268, 3269 | AD Global Catalog | L005 |
-| 3306 | MySQL | L003, L004, L007 |
-| 3389 | RDP | B001, B006, L010 |
-| 3702 | WSD | L002 |
-| 5353 | mDNS | L002 |
-| 5355 | LLMNR | L002 |
-| 5432 | PostgreSQL | L003, L004, L007 |
-| 5900, 5901 | VNC | B002, B006, L010 |
+| 139 | NetBIOS Session | B002, Mod15 |
+| 389 | LDAP | L005, L007, L008, Mod15 |
+| 445 | SMB | B001, B006, L007, L008, L010, Mod15 |
+| 464 | Kerberos Password | L005, L007, L008 |
+| 636 | LDAPS | L005, L007, L008, Mod15 |
+| 1433 | MSSQL | L003, L004, L007, L008, Mod15 |
+| 1521 | Oracle | L003, L004, L007, L008 |
+| 1723 | PPTP | config: low tier |
+| 1900 | SSDP | B003, L002 |
+| 2049 | NFS | B003, Mod15 |
+| 3268, 3269 | AD Global Catalog | L005, L007, L008 |
+| 3306 | MySQL | L003, L004, L007, L008, Mod15 |
+| 3389 | RDP | B001, B006, L010, Mod15 |
+| 3702 | WSD | B003, L002 |
+| 4444 | Metasploit | config: low tier |
+| 5353 | mDNS | B003, L002 |
+| 5355 | LLMNR | B003, L002 |
+| 5432 | PostgreSQL | L003, L004, L007, L008, Mod15 |
+| 5900 | VNC | B002, B006, L010 |
 | 5938 | TeamViewer | B002, B006, L010 |
-| 5984 | CouchDB | L003 |
-| 5985, 5986 | WinRM | B001, L007, L008, L010 |
-| 6379 | Redis | L003, L007 |
-| 9200 | Elasticsearch | L003 |
-| 27017 | MongoDB | L003, L004 |
+| 5984 | CouchDB | L003, L004, L007, L008 |
+| 5985, 5986 | WinRM | B001, B006, L007, L008, L010 |
+| 6379 | Redis | L003, L004, L007, L008 |
+| 9200 | Elasticsearch | L003, L004, L007, L008 |
+| 27017 | MongoDB | L003, L004, L007, L008 |
 | 47001 | WinRM alternate | L007, L008, L010 |
-| 50000 | IBM DB2 | L003 |
+| 50000 | IBM DB2 | L003, L004, L007, L008 |

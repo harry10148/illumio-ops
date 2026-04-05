@@ -136,6 +136,10 @@ async function runTrafficAnalyzer() {
   const expStr = document.getElementById('qt-expt').value.trim();
   const port = document.getElementById('qt-port').value.trim();
   const proto = document.getElementById('qt-proto').value;
+  const anyLabelStr = document.getElementById('qt-any-label').value.trim();
+  const anyIpStr = document.getElementById('qt-any-ip').value.trim();
+  const exAnyLabelStr = document.getElementById('qt-ex-any-label').value.trim();
+  const exAnyIpStr = document.getElementById('qt-ex-any-ip').value.trim();
 
   const bd = document.getElementById('qt-body');
   bd.innerHTML = renderSkeletonRow(8);
@@ -164,6 +168,10 @@ async function runTrafficAnalyzer() {
     if (port) payload.port = port;
     if (expStr) payload.ex_port = expStr;
     if (proto) payload.proto = proto;
+    if (anyLabelStr) payload.any_label = anyLabelStr;
+    if (anyIpStr) payload.any_ip = anyIpStr;
+    if (exAnyLabelStr) payload.ex_any_label = exAnyLabelStr;
+    if (exAnyIpStr) payload.ex_any_ip = exAnyIpStr;
 
     const r = await post('/api/quarantine/search', payload);
 
