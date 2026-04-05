@@ -220,7 +220,13 @@ function renderQtPage() {
     let chkBox = targetHref ? `<input type="checkbox" class="qt-chk" value="${targetHref}">` : `<span style="color:var(--dim);font-size:10px;">${_translations['gui_management_unmanaged'] || 'Unmanaged'}</span>`;
 
     const formatActor = (actor) => {
-      return `<strong style="font-size:11px;">${escapeHtml(actor.name)}</strong><br><small style="color:var(--dim);">${escapeHtml(actor.ip)}</small><div style="margin-top:2px;">${renderLabelsHtml(actor.labels)}</div>`;
+      let procStr = '';
+      if (actor.process || actor.user) {
+        let p = actor.process ? `<span style="color:var(--accent); font-weight:bold;"><i class="fas fa-microchip"></i> ${escapeHtml(actor.process)}</span>` : '';
+        let u = actor.user ? `<span style="color:var(--accent2);"><i class="fas fa-user"></i> ${escapeHtml(actor.user)}</span>` : '';
+        procStr = `<div style="font-size:10px; margin-top:4px;">${p}${p && u ? '<br>' : ''}${u}</div>`;
+      }
+      return `<strong style="font-size:11px;">${escapeHtml(actor.name)}</strong><br><small style="color:var(--dim);">${escapeHtml(actor.ip)}</small>${procStr}<div style="margin-top:2px;">${renderLabelsHtml(actor.labels)}</div>`;
     };
 
     const sort = document.getElementById('qt-sort').value;

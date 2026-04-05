@@ -592,27 +592,46 @@ class Analyzer:
                 elif p_int == 1: proto = "ICMP"
             except (ValueError, TypeError): pass
 
+            # Determine process/user attribution via flow_direction:
+            # - "inbound"  → captured by dst VEN → belongs to dst
+            # - "outbound" → captured by src VEN → belongs to src
+            svc_proc = svc.get('process_name') or ""
+            svc_user = svc.get('user_name') or ""
+            flow_dir = (f.get('flow_direction') or "").lower()
+            if flow_dir == "inbound":
+                src_proc, src_user = "", ""
+                dst_proc, dst_user = svc_proc, svc_user
+            elif flow_dir == "outbound":
+                src_proc, src_user = svc_proc, svc_user
+                dst_proc, dst_user = "", ""
+            else:
+                # Unknown direction: surface in service cell as fallback
+                src_proc, src_user = "", ""
+                dst_proc, dst_user = "", ""
+
             f_copy['source'] = {
                 "name": s_name,
                 "ip": src.get('ip'),
                 "href": src.get('workload', {}).get('href'),
                 "labels": src.get('workload', {}).get('labels', []),
+                "process": src_proc,
+                "user": src_user,
             }
             f_copy['destination'] = {
                 "name": d_name,
                 "ip": dst.get('ip'),
                 "href": dst.get('workload', {}).get('href'),
                 "labels": dst.get('workload', {}).get('labels', []),
+                "process": dst_proc,
+                "user": dst_user,
             }
-            # process_name/user_name are service-object attributes (VEN telemetry).
-            # They cannot be reliably attributed to src or dst without knowing
-            # which side has the active VEN; keep them in the service dict.
             f_copy['service'] = {
                 "port": port,
                 "proto": proto,
                 "name": svc.get("name") or getattr(svc, 'name', '') or f.get("sn") or "",
-                "process": svc.get('process_name') or "",
-                "user": svc.get('user_name') or "",
+                # Fallback: surface process/user in service cell when direction unknown
+                "process": svc_proc if not flow_dir else "",
+                "user": svc_user if not flow_dir else "",
             }
 
             bw_val, bw_note, _, _ = self.calculate_mbps(f)
