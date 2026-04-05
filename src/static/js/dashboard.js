@@ -756,7 +756,6 @@ async function loadDashboardSnapshot() {
     const kpis = s.kpis || [];
     const tk = kpis.find(k => k.label === 'Total Flows');
     const rk = kpis.find(k => k.label && k.label.toLowerCase().includes('ransomware'));
-    if (tk) { $('card-flows').style.display = 'block'; $('d-flows').textContent = tk.value; }
     if (rk) {
       $('card-ransom').style.display = 'block'; $('d-ransom').textContent = rk.value;
       let rc = 'var(--success)';
