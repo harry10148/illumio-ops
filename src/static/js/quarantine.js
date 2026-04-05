@@ -121,12 +121,17 @@ function applyQtFilters() {
   runTrafficAnalyzer(); // Automatically execute query with applied filters
 }
 
+// Reset pd radio to All when switching mode
+function qtSyncPdMode() {
+  const allRadio = document.querySelector('input[name="qt-pd-radio"][value=""]');
+  if (allRadio) allRadio.checked = true;
+}
+
 // --- Traffic Analyzer Endpoint ---
 async function runTrafficAnalyzer() {
+  const pdMode = document.querySelector('input[name="qt-pd-mode"]:checked')?.value || 'reported';
   const pdRadio = document.querySelector('input[name="qt-pd-radio"]:checked');
-  const pd = pdRadio ? pdRadio.value : "-1";
-  const draftPdRadio = document.querySelector('input[name="qt-draft-pd-radio"]:checked');
-  const draftPd = draftPdRadio ? draftPdRadio.value : "";
+  const pd = pdRadio ? pdRadio.value : "";
   const sort = document.getElementById('qt-sort').value;
   const search = document.getElementById('qt-search').value;
   const mins = parseInt(document.getElementById('qt-mins').value);
@@ -149,8 +154,14 @@ async function runTrafficAnalyzer() {
   updateBulkBar();
 
   try {
-    let payload = { mins, sort_by: sort, search: search, policy_decision: pd };
-    if (draftPd) payload.draft_policy_decision = draftPd;
+    // Mutually exclusive: Reported filter (server-side) OR Draft filter (client-side)
+    let payload = { mins, sort_by: sort, search: search };
+    if (pdMode === 'draft') {
+      payload.policy_decision = '-1';  // fetch all reported, filter draft client-side
+      if (pd) payload.draft_policy_decision = pd;
+    } else {
+      payload.policy_decision = pd || '-1';
+    }
 
     if (srcStr) {
       if (srcStr.includes('=')) payload.src_label = srcStr;

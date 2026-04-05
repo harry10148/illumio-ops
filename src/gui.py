@@ -1141,9 +1141,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
             end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
             
-            pd_val = str(d.get("policy_decision", "3"))
-            if pd_val == "1": pds = ["potentially_blocked"]
+            # policy_decision now accepts string values: "blocked", "potentially_blocked", "allowed", or "-1"/""=all
+            pd_val = str(d.get("policy_decision", "-1")).strip()
+            if pd_val == "blocked": pds = ["blocked"]
+            elif pd_val == "potentially_blocked": pds = ["potentially_blocked"]
+            elif pd_val == "allowed": pds = ["allowed"]
+            # legacy integer values kept for backwards compat
             elif pd_val == "2": pds = ["blocked"]
+            elif pd_val == "1": pds = ["potentially_blocked"]
             elif pd_val == "0": pds = ["allowed"]
             else: pds = ["blocked", "potentially_blocked", "allowed"]
 
