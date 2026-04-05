@@ -1078,9 +1078,14 @@ function _renderTop10Body(idx, data, total, ts) {
 
   let html = '';
   data.forEach((m, i) => {
-    const pBadge = m.pd === 2 ? `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${_translations['gui_pd_blocked'] || 'Blocked'}</span>` :
-      m.pd === 1 ? `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">${_translations['gui_pd_potential'] || 'Potential'}</span>` :
-        m.pd === 0 ? `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${_translations['gui_pd_allowed'] || 'Allowed'}</span>` : m.pd;
+    const pd_blocked = _translations['gui_pd_blocked'] || 'Blocked';
+    const pd_potential = _translations['gui_pd_potential'] || 'Potentially Blocked';
+    const pd_allowed = _translations['gui_pd_allowed'] || 'Allowed';
+    const pBadge = m.pd === 2 ? `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${pd_blocked}</span>` :
+      m.pd === 1 ? `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">${pd_potential}</span>` :
+        m.pd === 0 ? `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${pd_allowed}</span>` : m.pd;
+    const draftPdMap = { 'blocked': `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;"><span style="font-size:9px;opacity:0.8;">Draft </span>${pd_blocked}</span>`, 'potentially_blocked': `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;"><span style="font-size:9px;opacity:0.8;">Draft </span>${pd_potential}</span>`, 'allowed': `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;"><span style="font-size:9px;opacity:0.8;">Draft </span>${pd_allowed}</span>` };
+    const draftBadge = m.draft_pd && draftPdMap[m.draft_pd] ? `<div style="margin-top:3px;">${draftPdMap[m.draft_pd]}</div>` : '';
 
     const sLabels = renderLabelsHtml(m.s_labels);
     const dLabels = renderLabelsHtml(m.d_labels);
@@ -1124,7 +1129,7 @@ function _renderTop10Body(idx, data, total, ts) {
         <td>${formatActor(m.s_name, m.s_ip, m.s_href, sLabels, m.s_process, m.s_user)}</td>
         <td>${formatActor(m.d_name, m.d_ip, m.d_href, dLabels, m.d_process, m.d_user)}</td>
         <td>${svc_str}</td>
-        <td>${pBadge}</td>
+        <td>${pBadge}${draftBadge}</td>
         <td>${isoBtn}</td>
       </tr>`;
   });

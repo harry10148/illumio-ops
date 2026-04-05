@@ -260,14 +260,21 @@ function renderQtPage() {
     }
 
     const rawPd = item.policy_decision || '';
-    let pdBadge = '';
+    const rawDraftPd = item.draft_policy_decision || '';
     const pd_blocked = _translations['gui_pd_blocked'] || 'Blocked';
-    const pd_potential = _translations['gui_pd_potential'] || 'Potential';
+    const pd_potential = _translations['gui_pd_potential'] || 'Potentially Blocked';
     const pd_allowed = _translations['gui_pd_allowed'] || 'Allowed';
 
-    if (rawPd === 'blocked') pdBadge = `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${pd_blocked}</span>`;
-    else if (rawPd === 'potentially_blocked') pdBadge = `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">${pd_potential}</span>`;
-    else pdBadge = `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${pd_allowed}</span>`;
+    const makePdBadge = (pd, isReported) => {
+      const label = pd === 'blocked' ? pd_blocked : pd === 'potentially_blocked' ? pd_potential : pd_allowed;
+      const prefix = isReported ? '' : '<span style="font-size:9px;opacity:0.8;">Draft </span>';
+      if (pd === 'blocked') return `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${prefix}${label}</span>`;
+      if (pd === 'potentially_blocked') return `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">${prefix}${label}</span>`;
+      return `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${prefix}${label}</span>`;
+    };
+
+    let pdBadge = makePdBadge(rawPd, true);
+    let draftBadge = rawDraftPd ? `<div style="margin-top:3px;">${makePdBadge(rawDraftPd, false)}</div>` : '';
 
     let isoBtn = '';
     if (shref && dhref) isoBtn = `<button class="btn btn-secondary btn-sm" onclick="openQuarantineModal('${shref}', false, '${dhref}')"><span data-i18n="gui_btn_isolate">Isolate</span></button>`;
@@ -285,7 +292,7 @@ function renderQtPage() {
           <td>${formatActor(item.source)}</td>
           <td>${formatActor(item.destination)}</td>
           <td>${svc_str}</td>
-          <td>${pdBadge}</td>
+          <td>${pdBadge}${draftBadge}</td>
           <td>${isoBtn}</td>
         </tr>`;
   });

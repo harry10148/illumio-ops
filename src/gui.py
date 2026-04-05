@@ -1294,7 +1294,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     "svc": svc_str,
                     "svc_process": sv.get('process', ''),
                     "svc_user": sv.get('user', ''),
-                    "pd": pd_int
+                    "pd": pd_int,
+                    "draft_pd": item.get('draft_policy_decision', ''),
                 })
                 
             return jsonify({"ok": True, "data": top10, "total": len(sorted_v)})
