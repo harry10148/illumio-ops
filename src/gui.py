@@ -1211,10 +1211,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             def _run():
                 try:
                     scheduler.run_schedule(sched)
-                    now_str = datetime.datetime.utcnow().isoformat()
+                    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     scheduler._save_state(schedule_id, now_str, "success")
                 except Exception as e:
-                    now_str = datetime.datetime.utcnow().isoformat()
+                    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     scheduler._save_state(schedule_id, now_str, "failed", str(e))
                     logger.error(f"GUI-triggered schedule {schedule_id} failed: {e}", exc_info=True)
 
@@ -1251,10 +1251,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             base_ana = Analyzer(cm, api, Reporter(cm))
 
             mins = int(d.get("mins", 30))
-            now = datetime.datetime.utcnow()
+            now = datetime.datetime.now(datetime.timezone.utc)
             start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
             end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-            
+
             # policy_decision now accepts string values: "blocked", "potentially_blocked", "allowed", or "-1"/""=all
             pd_val = str(d.get("policy_decision", "-1")).strip()
             if pd_val == "blocked": pds = ["blocked"]
@@ -1316,10 +1316,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             base_ana = Analyzer(cm, api, Reporter(cm))
 
             mins = int(d.get("mins", 30))
-            now = datetime.datetime.utcnow()
+            now = datetime.datetime.now(datetime.timezone.utc)
             start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
             end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-            
+
             pd_val = int(d.get("pd", 3))
             if pd_val == 1: pds = ["potentially_blocked"]
             elif pd_val == 2: pds = ["blocked"]

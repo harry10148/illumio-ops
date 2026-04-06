@@ -633,7 +633,8 @@ class _RuleSchedulerCLI:
                 if ans == '1':
                     self.schedule_management_ui()
                 elif ans == '2':
-                    self.engine.check(silent=False)
+                    tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
+                    self.engine.check(silent=False, tz_str=tz_str)
                     input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue', default='Press Enter to continue...')} {Colors.GREEN}❯{Colors.ENDC} ")
                 elif ans == '3':
                     self._settings_submenu()
