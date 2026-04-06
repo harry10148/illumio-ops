@@ -79,29 +79,35 @@ def run_daemon_loop(interval_minutes: int):
             if cm.config.get("rule_scheduler", {}).get("enabled", True):
                 rule_check_interval = cm.config.get("rule_scheduler", {}).get("check_interval_seconds", 300)
                 if last_rule_check_time is None or (now - last_rule_check_time).total_seconds() >= rule_check_interval:
-                    from src.rule_scheduler import ScheduleDB, ScheduleEngine
-                    import os as _os
-                    _pkg_dir = _os.path.dirname(_os.path.abspath(__file__))
-                    _root_dir = _os.path.dirname(_pkg_dir)
-                    _db_path = _os.path.join(_root_dir, "config", "rule_schedules.json")
-                    rs_db = ScheduleDB(_db_path)
-                    rs_db.load()
-                    rs_api = ApiClient(cm)
-                    rs_engine = ScheduleEngine(rs_db, rs_api)
-                    _tz_str = cm.config.get('settings', {}).get('timezone', 'local')
-                    _rs_logs = rs_engine.check(silent=True, tz_str=_tz_str)
                     last_rule_check_time = now
                     _rs_mlog = _ML.get("rule_scheduler")
-                    for _msg in _rs_logs:
-                        import re as _re
-                        _clean = _re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', _msg)
-                        logger.info("[RuleScheduler] %s", _clean)
-                        _rs_mlog.info(_clean)
                     try:
-                        from src.gui import _append_rs_logs
-                        _append_rs_logs(_rs_logs)
-                    except Exception:
-                        pass
+                        from src.rule_scheduler import ScheduleDB, ScheduleEngine
+                        import os as _os
+                        _pkg_dir = _os.path.dirname(_os.path.abspath(__file__))
+                        _root_dir = _os.path.dirname(_pkg_dir)
+                        _db_path = _os.path.join(_root_dir, "config", "rule_schedules.json")
+                        rs_db = ScheduleDB(_db_path)
+                        rs_db.load()
+                        _tz_str = cm.config.get('settings', {}).get('timezone', 'local')
+                        logger.info("[RuleScheduler] Starting check (tz=%s, schedules=%d)", _tz_str, len(rs_db.get_all()))
+                        _rs_mlog.info(f"Starting rule scheduler check (tz={_tz_str}, schedules={len(rs_db.get_all())})")
+                        rs_api = ApiClient(cm)
+                        rs_engine = ScheduleEngine(rs_db, rs_api)
+                        _rs_logs = rs_engine.check(silent=True, tz_str=_tz_str)
+                        import re as _re
+                        for _msg in _rs_logs:
+                            _clean = _re.sub(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])', '', _msg)
+                            logger.info("[RuleScheduler] %s", _clean)
+                            _rs_mlog.info(_clean)
+                        try:
+                            from src.gui import _append_rs_logs
+                            _append_rs_logs(_rs_logs)
+                        except Exception:
+                            pass
+                    except Exception as _rs_err:
+                        logger.error("[RuleScheduler] Error during check: %s", _rs_err, exc_info=True)
+                        _rs_mlog.error(f"Error during check: {_rs_err}")
 
         except Exception as e:
             _mlog.error(f"Monitoring cycle error: {e}")

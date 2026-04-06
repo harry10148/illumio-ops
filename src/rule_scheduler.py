@@ -158,72 +158,76 @@ class ScheduleEngine:
         expired_hrefs = []
 
         for href, c in list(db_data.items()):
-            is_allow = (c.get('action', 'allow') == 'allow')
-            in_window = False
-            target = False
+            try:
+                is_allow = (c.get('action', 'allow') == 'allow')
+                in_window = False
+                target = False
 
-            if c['type'] == 'recurring':
-                days_list = [self.normalize_day(d) for d in c['days']]
-                day_match = curr_d in days_list
-                prev_day_match = prev_d in days_list
-                start_t, end_t = c['start'], c['end']
+                if c['type'] == 'recurring':
+                    days_list = [self.normalize_day(d) for d in c['days']]
+                    day_match = curr_d in days_list
+                    prev_day_match = prev_d in days_list
+                    start_t, end_t = c['start'], c['end']
 
-                if start_t <= end_t:
-                    # Normal window (e.g., 08:00-18:00)
-                    in_window = day_match and (start_t <= curr_t < end_t)
-                else:
-                    # Midnight wraparound (e.g., 22:00-06:00)
-                    in_window = (day_match and curr_t >= start_t) or \
-                                (prev_day_match and curr_t < end_t)
+                    if start_t <= end_t:
+                        # Normal window (e.g., 08:00-18:00)
+                        in_window = day_match and (start_t <= curr_t < end_t)
+                    else:
+                        # Midnight wraparound (e.g., 22:00-06:00)
+                        in_window = (day_match and curr_t >= start_t) or \
+                                    (prev_day_match and curr_t < end_t)
 
-                target = in_window if is_allow else (not in_window)
+                    target = in_window if is_allow else (not in_window)
 
-            elif c['type'] == 'one_time':
-                expire_dt = datetime.datetime.fromisoformat(c['expire_at'])
-                if now > expire_dt:
-                    log(f"{Colors.FAIL}[EXPIRED] {c['name']} (ID:{extract_id(href)}) {t('rs_expired', default='has expired.')}{Colors.ENDC}")
-                    self.api.toggle_and_provision(href, False, c.get('is_ruleset'))
-                    self.api.update_rule_note(href, "", remove=True)
-                    expired_hrefs.append(href)
+                elif c['type'] == 'one_time':
+                    expire_dt = datetime.datetime.fromisoformat(c['expire_at'])
+                    if now > expire_dt:
+                        log(f"{Colors.FAIL}[EXPIRED] {c['name']} (ID:{extract_id(href)}) {t('rs_expired', default='has expired.')}{Colors.ENDC}")
+                        self.api.toggle_and_provision(href, False, c.get('is_ruleset'))
+                        self.api.update_rule_note(href, "", remove=True)
+                        expired_hrefs.append(href)
+                        continue
+                    else:
+                        target = True
+
+                # Check PCE state (draft check first, covering parent ruleset natively)
+                if self.api.has_draft_changes(href):
+                    name_str = c.get('detail_name', c['name'])
+                    log(f"{Colors.FAIL}{t('rs_engine_skip_draft', name=name_str, id=extract_id(href))}{Colors.ENDC}")
+                    continue
+
+                # If no pending draft, check active state to determine toggle
+                status, data = self.api.get_live_item(href)
+                if status == 200 and data:
+                    # Clear deleted flag if item was previously marked deleted but is now found
+                    if c.get('pce_status') == 'deleted':
+                        c['pce_status'] = 'active'
+                        self.db.put(href, c)
+                    curr_status = data.get('enabled')
+                    if curr_status == target:
+                        r_name = c.get('detail_name', c['name'])
+                        log(f"[OK] {r_name} (ID:{extract_id(href)}) already in target state ({'enabled' if target else 'disabled'}), no action needed.")
+                    else:
+                        r_name = c.get('detail_name', c['name'])
+                        status_str = f"{Colors.GREEN}Enabled{Colors.ENDC}" if target else f"{Colors.FAIL}Disabled{Colors.ENDC}"
+                        log(f"[ACTION] {t('rs_toggle', default='Toggle')} -> {status_str} (ID: {Colors.CYAN}{extract_id(href)}{Colors.ENDC}) - {r_name}")
+                        if self.api.toggle_and_provision(href, target, c.get('is_ruleset')):
+                            log(f"{Colors.GREEN}[SUCCESS] {t('rs_provisioned', default='Provisioned successfully')}{Colors.ENDC}")
+                        else:
+                            log(f"{Colors.FAIL}[FAILED] Toggle/provision failed for {r_name} (ID:{extract_id(href)}){Colors.ENDC}")
+                elif status == 404:
+                    r_name = c.get('detail_name', c['name'])
+                    log(f"{Colors.WARNING}{t('rs_target_not_found', name=r_name, id=extract_id(href), default='[SKIP] {name} (ID:{id}) not found on PCE (deleted?). No action taken.')}{Colors.ENDC}")
+                    if c.get('pce_status') != 'deleted':
+                        c['pce_status'] = 'deleted'
+                        self.db.put(href, c)
                     continue
                 else:
-                    target = True
-
-            # Check PCE state (draft check first, covering parent ruleset natively)
-            if self.api.has_draft_changes(href):
-                name_str = c.get('detail_name', c['name'])
-                log(f"{Colors.FAIL}{t('rs_engine_skip_draft', name=name_str, id=extract_id(href))}{Colors.ENDC}")
-                continue
-
-            # If no pending draft, check active state to determine toggle
-            status, data = self.api.get_live_item(href)
-            if status == 200 and data:
-                # Clear deleted flag if item was previously marked deleted but is now found
-                if c.get('pce_status') == 'deleted':
-                    c['pce_status'] = 'active'
-                    self.db.put(href, c)
-                curr_status = data.get('enabled')
-                if curr_status == target:
                     r_name = c.get('detail_name', c['name'])
-                    log(f"[OK] {r_name} (ID:{extract_id(href)}) already in target state ({'enabled' if target else 'disabled'}), no action needed.")
-                else:
-                    r_name = c.get('detail_name', c['name'])
-                    status_str = f"{Colors.GREEN}Enabled{Colors.ENDC}" if target else f"{Colors.FAIL}Disabled{Colors.ENDC}"
-                    log(f"[ACTION] {t('rs_toggle', default='Toggle')} -> {status_str} (ID: {Colors.CYAN}{extract_id(href)}{Colors.ENDC}) - {r_name}")
-                    if self.api.toggle_and_provision(href, target, c.get('is_ruleset')):
-                        log(f"{Colors.GREEN}[SUCCESS] {t('rs_provisioned', default='Provisioned successfully')}{Colors.ENDC}")
-                    else:
-                        log(f"{Colors.FAIL}[FAILED] Toggle/provision failed for {r_name} (ID:{extract_id(href)}){Colors.ENDC}")
-            elif status == 404:
-                r_name = c.get('detail_name', c['name'])
-                log(f"{Colors.WARNING}{t('rs_target_not_found', name=r_name, id=extract_id(href), default='[SKIP] {name} (ID:{id}) not found on PCE (deleted?). No action taken.')}{Colors.ENDC}")
-                if c.get('pce_status') != 'deleted':
-                    c['pce_status'] = 'deleted'
-                    self.db.put(href, c)
-                continue
-            else:
-                r_name = c.get('detail_name', c['name'])
-                log(f"{Colors.FAIL}[ERROR] API returned HTTP {status} for {r_name} (ID:{extract_id(href)}). Check PCE credentials/connectivity.{Colors.ENDC}")
+                    log(f"{Colors.FAIL}[ERROR] API returned HTTP {status} for {r_name} (ID:{extract_id(href)}). Check PCE credentials/connectivity.{Colors.ENDC}")
+            except Exception as _item_err:
+                r_name = c.get('detail_name', c.get('name', href))
+                log(f"{Colors.FAIL}[ERROR] Exception processing {r_name} (ID:{extract_id(href)}): {_item_err}{Colors.ENDC}")
 
         # Clean up expired one-time schedules
         for h in expired_hrefs:
