@@ -65,7 +65,6 @@ async function loadSettings() {
   <div style="display:flex;gap:20px;margin-bottom:12px"><div class="chk"><label><input type="checkbox" id="s-amail" ${active.includes('mail') ? 'checked' : ''}> <span data-i18n="gui_mail">Mail</span></label></div><div class="chk"><label><input type="checkbox" id="s-aline" ${active.includes('line') ? 'checked' : ''}> <span data-i18n="gui_line">LINE</span></label></div><div class="chk"><label><input type="checkbox" id="s-awh" ${active.includes('webhook') ? 'checked' : ''}> <span data-i18n="gui_webhook">Webhook</span></label></div></div>
   <div class="form-row"><div class="form-group"><label data-i18n="gui_line_token">LINE Token</label><input id="s-ltok" value="${al.line_channel_access_token || ''}"></div><div class="form-group"><label data-i18n="gui_line_target_id">LINE Target ID</label><input id="s-ltgt" value="${al.line_target_id || ''}"></div></div>
   <div class="form-group"><label data-i18n="gui_webhook_url">Webhook URL</label><input id="s-whurl" value="${al.webhook_url || ''}"></div>
-  <div class="chk" style="margin-top:12px"><label><input type="checkbox" id="s-hc" ${st.enable_health_check !== false ? 'checked' : ''}> <span data-i18n="gui_enable_hc">Enable PCE Health Check</span></label></div>
 </fieldset>
 <fieldset><legend data-i18n="gui_lang_settings">Display & General</legend>
   <div class="form-row">
@@ -165,7 +164,7 @@ async function saveSettings() {
     email: { sender: $('s-sender').value, recipients: $('s-rcpt').value.split(',').map(s => s.trim()).filter(Boolean) },
     smtp: { host: $('s-smhost').value, port: parseInt($('s-smport').value) || 25, user: $('s-smuser').value, password: $('s-smpass').value, enable_tls: $('s-tls').checked, enable_auth: $('s-auth').checked },
     alerts: { active, line_channel_access_token: $('s-ltok').value, line_target_id: $('s-ltgt').value, webhook_url: $('s-whurl').value },
-    settings: { language: lang, theme: theme, timezone: $('s-timezone').value, enable_health_check: $('s-hc').checked },
+    settings: { language: lang, theme: theme, timezone: $('s-timezone').value },
     report: { output_dir: $('s-rpt-dir').value.trim(), retention_days: parseInt($('s-rpt-retention').value) || 0 }
   });
 

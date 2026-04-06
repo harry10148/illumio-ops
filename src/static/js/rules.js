@@ -31,11 +31,13 @@ async function loadRules() {
 
     let f = [];
     if (r.type === 'event') f.push('Event: ' + r.filter_value);
+    if (r.type === 'system') f.push('Check: ' + (r.filter_value || ''));
     if (r.pd !== undefined && r.pd !== null) f.push('PD:' + (pdm[r.pd] || r.pd));
     if (r.port) f.push('Port:' + r.port);
     if (r.src_label) f.push('Src:' + r.src_label); if (r.dst_label) f.push('Dst:' + r.dst_label);
     if (r.src_ip_in) f.push('SrcIP:' + r.src_ip_in); if (r.dst_ip_in) f.push('DstIP:' + r.dst_ip_in);
-    html += `<tr><td><input type="checkbox" class="r-chk" data-idx="${r.index}"></td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}">${cond}</td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | ')) || '—'}</td><td><button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="Edit Rule" title="Edit Rule">✏️</button></td></tr>`;
+    const editBtn = r.type !== 'system' ? `<button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="Edit Rule" title="Edit Rule">✏️</button>` : '';
+    html += `<tr><td><input type="checkbox" class="r-chk" data-idx="${r.index}"></td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}">${cond}</td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | ')) || '—'}</td><td>${editBtn}</td></tr>`;
   });
   $('r-body').innerHTML = html || `<tr><td colspan="7"><div class="empty-state"><svg aria-hidden="true"><use href="#icon-shield"></use></svg><h3>${_translations['gui_no_rules_title'] || 'No Rules Yet'}</h3><p>${_translations['gui_no_rules_add_one'] || 'Create your first monitoring rule using the buttons above.'}</p></div></td></tr>`;
   initTableResizers();

@@ -389,7 +389,6 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             "version": __version__,
             "api_url": _get_active_pce_url(cm),
             "rules_count": len(cm.config['rules']),
-            "health_check": cm.config['settings'].get('enable_health_check', True),
             "language": cm.config.get('settings', {}).get('language', 'en'),
             "theme": cm.config.get('settings', {}).get('theme', 'dark'),
             "timezone": cm.config.get('settings', {}).get('timezone', 'local'),
@@ -482,9 +481,6 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             "threshold_window": int(d.get('threshold_window', 10)),
             "cooldown_minutes": int(d.get('cooldown_minutes', 10))
         })
-        if d.get('enable_health_check') is not None:
-            cm.config['settings']['enable_health_check'] = bool(d['enable_health_check'])
-            cm.save()
         return jsonify({"ok": True})
 
     @app.route('/api/rules/traffic', methods=['POST'])
@@ -2843,7 +2839,6 @@ async function loadSettings(){
     <div class="form-group"><label data-i18n="gui_webhook_url">Webhook URL</label><input id="s-whurl" value="${al.webhook_url||''}"></div>
   </fieldset>
   <fieldset><legend data-i18n="gui_lang_settings">Display & General</legend>
-    <div class="chk" style="margin-bottom:12px"><label><input type="checkbox" id="s-hc" ${st.enable_health_check!==false?'checked':''}> <span data-i18n="gui_enable_hc">Enable PCE Health Check</span></label></div>
     <div class="form-row">
       <div class="form-group">
         <label data-i18n="gui_language">Language</label>
@@ -2872,7 +2867,7 @@ async function saveSettings(){
     email:{sender:$('s-sender').value,recipients:$('s-rcpt').value.split(',').map(s=>s.trim()).filter(Boolean)},
     smtp:{host:$('s-smhost').value,port:parseInt($('s-smport').value)||25,user:$('s-smuser').value,password:$('s-smpass').value,enable_tls:$('s-tls').checked,enable_auth:$('s-auth').checked},
     alerts:{active,line_channel_access_token:$('s-ltok').value,line_target_id:$('s-ltgt').value,webhook_url:$('s-whurl').value},
-    settings:{language:rv('s-lang'), theme: theme, enable_health_check:$('s-hc').checked}
+    settings:{language:rv('s-lang'), theme: theme, timezone:$('s-timezone') ? $('s-timezone').value : 'local'}
   });
   toast('Settings saved');
 }
