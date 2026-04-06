@@ -181,12 +181,6 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
             sel = str(cats.index(cat) + 1)
         if sel == "0":
             break
-        if sel == "H":
-            cm.config["settings"]["enable_health_check"] = not cm.config[
-                "settings"
-            ].get("enable_health_check", True)
-            cm.save()
-            continue
         if not sel.isdigit() or not (1 <= int(sel) <= len(cats)):
             continue
         _wizard_step(

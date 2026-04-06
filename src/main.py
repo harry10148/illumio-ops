@@ -282,14 +282,13 @@ def main_menu():
         cm.load()
 
         settings = cm.config.get("settings", {})
-        health_status = "ON" if settings.get("enable_health_check", True) else "OFF"
         current_lang = (settings.get("language", "en") or "en").upper()
         current_theme = (settings.get("theme", "dark") or "dark").capitalize()
         shortcuts_line = t("cli_shortcuts_compact")
 
         lines = [
             f"API: {cm.config['api']['url']} | Rules: {len(cm.config['rules'])}",
-            f"Health Check: {health_status} | Language: {current_lang} | Theme: {current_theme}",
+            f"Language: {current_lang} | Theme: {current_theme}",
             f"{Colors.DARK_GRAY}{shortcuts_line}{Colors.ENDC}",
             "-",
             t("main_menu_root_1"),

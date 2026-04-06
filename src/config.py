@@ -23,7 +23,7 @@ _DEFAULT_CONFIG = {
     },
     "email": {"sender": "monitor@localhost", "recipients": ["admin@example.com"]},
     "smtp": {"host": "localhost", "port": 25, "user": "", "password": "", "enable_auth": False, "enable_tls": False},
-    "settings": {"enable_health_check": True, "language": "en", "theme": "light"},
+    "settings": {"language": "en", "theme": "light"},
     "rules": [],
     "report": {
         "enabled": False,

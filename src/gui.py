@@ -385,10 +385,15 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         except Exception as e:
             logger.error(f"Error reading state file for cooldowns: {e}")
 
+        has_health_rule = any(
+            r.get("type") == "system" and r.get("filter_value") == "pce_health"
+            for r in cm.config.get("rules", [])
+        )
         return jsonify({
             "version": __version__,
             "api_url": _get_active_pce_url(cm),
             "rules_count": len(cm.config['rules']),
+            "health_check": has_health_rule,
             "language": cm.config.get('settings', {}).get('language', 'en'),
             "theme": cm.config.get('settings', {}).get('theme', 'dark'),
             "timezone": cm.config.get('settings', {}).get('timezone', 'local'),

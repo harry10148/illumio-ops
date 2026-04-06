@@ -279,31 +279,23 @@ class Analyzer:
 
     def run_analysis(self):
         logger.info("Starting analysis cycle.")
-        # 1. Health Check (system rules take priority; fallback to enable_health_check setting)
+        # 1. Health Check (only runs when a system rule with filter_value=pce_health is configured)
         pce_health_rules = [r for r in self.cm.config["rules"] if r.get("type") == "system" and r.get("filter_value") == "pce_health"]
-        run_health_check = bool(pce_health_rules) or self.cm.config["settings"].get("enable_health_check", True)
 
-        if run_health_check:
+        if pce_health_rules:
             print(f"{t('checking_pce_health')}...", end=" ", flush=True)
             h_status, h_msg = self.api.check_health()
             if h_status != 200:
                 print(f"{Colors.FAIL}{t('status_error')}{Colors.ENDC}")
                 logger.warning(f"PCE health check failed: {h_status} - {h_msg[:200]}")
-                if pce_health_rules:
-                    for rule in pce_health_rules:
-                        if self._check_cooldown(rule):
-                            self.reporter.add_health_alert({
-                                "time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                "rule": rule["name"],
-                                "status": str(h_status),
-                                "details": h_msg[:200]
-                            })
-                else:
-                    self.reporter.add_health_alert({
-                        "time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        "status": str(h_status),
-                        "details": h_msg[:200]
-                    })
+                for rule in pce_health_rules:
+                    if self._check_cooldown(rule):
+                        self.reporter.add_health_alert({
+                            "time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            "rule": rule["name"],
+                            "status": str(h_status),
+                            "details": h_msg[:200]
+                        })
             else:
                 print(f"{Colors.GREEN}{t('status_ok')}{Colors.ENDC}")
                 logger.info("PCE health check OK.")
