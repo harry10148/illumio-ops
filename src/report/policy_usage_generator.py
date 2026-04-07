@@ -50,11 +50,11 @@ class PolicyUsageGenerator:
             raise RuntimeError("api_client required for policy usage generation")
 
         if not end_date:
-            end_date = datetime.datetime.utcnow().isoformat() + "Z"
+            end_date = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
         if not start_date:
             start_date = (
-                datetime.datetime.utcnow() - datetime.timedelta(days=30)
-            ).isoformat() + "Z"
+                datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)
+            ).isoformat().replace("+00:00", "Z")
 
         # Compute lookback days from date range
         try:
@@ -153,7 +153,7 @@ class PolicyUsageGenerator:
         hit_hrefs = set(hit_counts.keys())
 
         # Use today as date range (CSV doesn't have this info)
-        today = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+        today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
 
         result = self._run_pipeline(
             flat_rules=flat_rules,

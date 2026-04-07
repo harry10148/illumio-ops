@@ -56,13 +56,13 @@ def _build_row(rule: dict, ruleset_map: dict, hit_count: int, api_client) -> dic
     consumers = _resolve_actors(rule.get("consumers", []), api_client)
     services  = _resolve_services(rule.get("ingress_services", []), api_client)
 
-    desc = rule.get("description", "") or "NA"
+    desc = rule.get("description", "") or "未填寫"
     ruleset_label = f"{rs_name} ({rs_id})" if rs_id else rs_name
 
     return {
         "No":          rule_no,
         "Rule ID":     rule_id,
-        "Type":        rule.get("_rule_type", "Allow"),
+        "Type":        rule.get("_rule_type", "允許"),
         "Description": desc,
         "Ruleset":     ruleset_label,
         "Destination": providers,
@@ -75,7 +75,7 @@ def _build_row(rule: dict, ruleset_map: dict, hit_count: int, api_client) -> dic
 
 def _resolve_actors(actors: list, api_client) -> str:
     if not actors:
-        return "Any"
+        return "任何"
     if api_client and hasattr(api_client, "resolve_actor_str"):
         try:
             return api_client.resolve_actor_str(actors)
@@ -95,12 +95,12 @@ def _resolve_actors(actors: list, api_client) -> str:
                 parts.append(str(a))
         else:
             parts.append(str(a))
-    return ", ".join(parts) if parts else "Any"
+    return ", ".join(parts) if parts else "任何"
 
 
 def _resolve_services(services: list, api_client) -> str:
     if not services:
-        return "All Services"
+        return "所有服務"
     if api_client and hasattr(api_client, "resolve_service_str"):
         try:
             return api_client.resolve_service_str(services)
@@ -116,4 +116,4 @@ def _resolve_services(services: list, api_client) -> str:
                 parts.append(s["href"].split("/")[-1])
         else:
             parts.append(str(s))
-    return ", ".join(parts) if parts else "All Services"
+    return ", ".join(parts) if parts else "所有服務"

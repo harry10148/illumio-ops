@@ -121,6 +121,22 @@ function applyQtFilters() {
   runTrafficAnalyzer(); // Automatically execute query with applied filters
 }
 
+function setTrafficQueryLoading(isLoading) {
+  const btn = document.getElementById('btn-run-traffic-query');
+  if (!btn) return;
+
+  if (isLoading) {
+    btn.disabled = true;
+    btn.dataset.prevHtml = btn.innerHTML;
+    btn.innerHTML = `<span class="btn-loading-dot"></span><span data-i18n="gui_querying">${_translations['gui_querying'] || 'Querying'}</span>`;
+    showSpinner('q-panel-traffic', _translations['gui_ta_loading_hint'] || 'Loading traffic data...');
+  } else {
+    btn.disabled = false;
+    if (btn.dataset.prevHtml) btn.innerHTML = btn.dataset.prevHtml;
+    hideSpinner('q-panel-traffic');
+  }
+}
+
 // --- Traffic Analyzer Endpoint ---
 async function runTrafficAnalyzer() {
   const pdRadio = document.querySelector('input[name="qt-pd-radio"]:checked');
@@ -147,6 +163,7 @@ async function runTrafficAnalyzer() {
   bd.innerHTML = renderSkeletonRow(8);
   document.getElementById('qt-chkall').checked = false;
   updateBulkBar();
+  setTrafficQueryLoading(true);
 
   try {
     let payload = { mins, sort_by: sort, search: search };
@@ -188,6 +205,8 @@ async function runTrafficAnalyzer() {
 
   } catch (err) {
     bd.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--danger);">Error: ${escapeHtml(err.message)}</td></tr>`;
+  } finally {
+    setTrafficQueryLoading(false);
   }
 }
 
@@ -282,8 +301,8 @@ function renderQtPage() {
     let draftBadge = rawDraftPd ? `<div style="margin-top:3px;">${makePdBadge(rawDraftPd, false)}</div>` : '';
 
     let isoBtn = '';
-    if (shref && dhref) isoBtn = `<button class="btn btn-secondary btn-sm" onclick="openQuarantineModal('${shref}', false, '${dhref}')"><span data-i18n="gui_btn_isolate">Isolate</span></button>`;
-    else if (shref || dhref) isoBtn = `<button class="btn btn-secondary btn-sm" onclick="openQuarantineModal('${shref || dhref}')"><span data-i18n="gui_btn_isolate">Isolate</span></button>`;
+    if (shref && dhref) isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${shref}', false, '${dhref}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || '隔離'}</span></button>`;
+    else if (shref || dhref) isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${shref || dhref}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || '隔離'}</span></button>`;
 
     let f_seen = item.timestamp_range ? item.timestamp_range.first_detected || "" : "";
     let l_seen = item.timestamp_range ? item.timestamp_range.last_detected || "" : "";
@@ -405,7 +424,7 @@ function renderQwPage() {
       }
     }
 
-    const mgmtText = w.managed ? (_translations['gui_management_managed'] || 'Managed') : (_translations['gui_management_unmanaged'] || 'Unmanaged');
+    const mgmtText = w.managed ? (_translations['gui_management_managed'] || 'managed') : (_translations['gui_management_unmanaged'] || 'unmanaged');
 
     html += `<tr>
           <td style="text-align:center;"><input type="checkbox" class="qw-chk" value="${href}"></td>
@@ -415,12 +434,12 @@ function renderQwPage() {
             </div>
             <div style="font-size:10px;color:var(--dim);margin-top:2px;margin-left:14px;">${escapeHtml(w.hostname)}</div>
           </td>
-          <td><span style="font-size:11px; color:${w.managed ? 'var(--success)' : 'var(--dim)'}">${mgmtText}</span></td>
+          <td><span style="font-size:11px; color:${w.managed ? 'var(--success)' : 'var(--dim)'}; font-weight:600;">${mgmtText}</span></td>
           <td>${ipStr}</td>
           <td style="font-size:11px;">${labelsHtml || '<span style="color:var(--dim);font-size:10px;">No Labels</span>'}</td>
           <td>
-            <button class="btn btn-secondary btn-sm" onclick="openQuarantineModal('${href}')"><span data-i18n="gui_btn_isolate">Isolate</span></button>
-            ${hasQuarantine ? `<span style="font-size:10px;color:var(--danger);font-weight:bold;margin-left:8px;">Isolated</span>` : ''}
+            <button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${href}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || '隔離'}</span></button>
+            ${hasQuarantine ? `<span style="font-size:10px;color:var(--danger);font-weight:bold;margin-left:8px;">${_translations['gui_isolated'] || '已隔離'}</span>` : ''}
           </td>
         </tr>`;
   });

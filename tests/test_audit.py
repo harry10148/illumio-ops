@@ -7,15 +7,15 @@ from src.report.audit_generator import AuditGenerator
 class DummyApiClient:
     def fetch_events(self, start_time_str, end_time_str=None, max_results=1000):
         # Fake some recent events
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc)
         return [
-            {'timestamp': (now - datetime.timedelta(minutes=5)).isoformat() + "Z", 
+            {'timestamp': (now - datetime.timedelta(minutes=5)).isoformat().replace("+00:00", "Z"),
              'event_type': 'user.login', 'severity': 'info', 'created_by': {'href': '/users/1'}},
-            {'timestamp': (now - datetime.timedelta(minutes=15)).isoformat() + "Z", 
+            {'timestamp': (now - datetime.timedelta(minutes=15)).isoformat().replace("+00:00", "Z"),
              'event_type': 'user.login_failed', 'severity': 'error'},
-            {'timestamp': (now - datetime.timedelta(minutes=30)).isoformat() + "Z", 
+            {'timestamp': (now - datetime.timedelta(minutes=30)).isoformat().replace("+00:00", "Z"),
              'event_type': 'system_health', 'severity': 'warning'},
-            {'timestamp': (now - datetime.timedelta(minutes=40)).isoformat() + "Z", 
+            {'timestamp': (now - datetime.timedelta(minutes=40)).isoformat().replace("+00:00", "Z"),
              'event_type': 'sec_rule.create', 'severity': 'info'}
         ]
 

@@ -4,10 +4,10 @@ import gc
 import os
 import sys
 import logging
-import tempfile
 from collections import Counter
 from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
+from src.state_store import load_state_file, update_state_file
 
 logger = logging.getLogger(__name__)
 
@@ -86,12 +86,12 @@ class Analyzer:
 
     def load_state(self):
         try:
-            with open(STATE_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                self.state.update(data)
-        except FileNotFoundError:
-            logger.info("State file not found, starting fresh.")
-        except (json.JSONDecodeError, IOError, OSError) as e:
+            data = load_state_file(STATE_FILE)
+            if not data:
+                logger.info("State file not found, starting fresh.")
+                return
+            self.state.update(data)
+        except Exception as e:
             logger.warning(f"Error loading state file: {e}. Starting fresh.")
 
     def save_state(self):
@@ -114,22 +114,12 @@ class Analyzer:
         self.state["history"] = new_history
 
         try:
-            # Atomic write using a temporary file
-            dir_name = os.path.dirname(STATE_FILE) or '.'
-            os.makedirs(dir_name, exist_ok=True)
-            fd, tmp_path = tempfile.mkstemp(dir=dir_name, suffix='.tmp')
-            try:
-                with os.fdopen(fd, 'w', encoding='utf-8') as f:
-                    json.dump(self.state, f, ensure_ascii=False)
-                # os.replace is atomic and will overwrite the destination if it exists
-                os.replace(tmp_path, STATE_FILE)
-            except Exception as inner_e:
-                logger.error(f"Failed to atomically write state file: {inner_e}")
-                try:
-                    os.unlink(tmp_path)
-                except OSError:
-                    pass
-                raise
+            def _merge(existing):
+                merged = dict(existing)
+                merged.update(self.state)
+                return merged
+
+            self.state = update_state_file(STATE_FILE, _merge)
         except (IOError, OSError) as e:
             logger.error(f"Error saving state: {e}")
 

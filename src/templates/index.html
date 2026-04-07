@@ -99,18 +99,18 @@
     </div>
     <div class="header-right">
       <div class="ui-pref" aria-label="Theme mode selector">
-        <label for="ui-theme-mode">Theme</label>
+        <label for="ui-theme-mode" data-i18n="gui_theme">Theme</label>
         <select id="ui-theme-mode" onchange="onUiThemeModeChange(this.value)">
-          <option value="auto">Auto</option>
-          <option value="dark">Dark</option>
-          <option value="light">Light</option>
+          <option value="auto" data-i18n="gui_auto">Auto</option>
+          <option value="dark" data-i18n="gui_dark">Dark</option>
+          <option value="light" data-i18n="gui_light">Light</option>
         </select>
       </div>
       <div class="ui-pref" aria-label="Density selector">
-        <label for="ui-density">Density</label>
+        <label for="ui-density" data-i18n="gui_density">Density</label>
         <select id="ui-density" onchange="onUiDensityChange(this.value)">
-          <option value="compact">Compact</option>
-          <option value="comfortable">Comfortable</option>
+          <option value="compact" data-i18n="gui_compact">Compact</option>
+          <option value="comfortable" data-i18n="gui_comfortable">Comfortable</option>
         </select>
       </div>
       <button class="btn btn-sm" onclick="mlOpen()" data-i18n="gui_ml_logs_btn" style="padding:3px 10px;">日誌</button>
@@ -227,7 +227,7 @@
               <use href="#icon-help-circle"></use>
             </svg> <span data-i18n="gui_param_guide">Guide</span>
           </button>
-          <button class="btn btn-primary" onclick="runTrafficAnalyzer()" style="height: 42px; align-self:flex-end;">
+          <button id="btn-run-traffic-query" class="btn btn-primary" onclick="runTrafficAnalyzer()" style="height: 42px; align-self:flex-end;">
             <svg class="icon">
               <use href="#icon-search"></use>
             </svg> <span data-i18n="gui_query_flow">Query Flow</span>
@@ -295,7 +295,7 @@
             <input id="qw-host" name="workload-hostname" autocomplete="workload-hostname" spellcheck="false"
               placeholder="Hostname match">
           </div>
-          <button class="btn btn-primary" onclick="runWorkloadSearch()" style="height: 42px; align-self:flex-end;">
+          <button id="btn-run-workload-search" class="btn btn-primary" onclick="runWorkloadSearch()" style="height: 42px; align-self:flex-end;">
             <svg class="icon">
               <use href="#icon-search"></use>
             </svg> <span data-i18n="gui_find">Find</span>
@@ -759,7 +759,7 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal('m-sched')" data-i18n="gui_gen_cancel">Cancel</button>
+        <button class="btn btn-secondary" onclick="closeModal('m-sched')" data-i18n="gui_gen_cancel">??</button>
         <button class="btn btn-success" onclick="saveSchedule()"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> <span data-i18n="gui_save">Save</span></button>
       </div>
     </div>
@@ -1451,7 +1451,7 @@
       </div>
       <div id="m-gen-filters" style="display:none; margin-top:10px;">
         <details>
-          <summary style="cursor:pointer; font-size:12px; color:var(--dim); padding:4px 0;" data-i18n="rpt_filter_toggle">▶ Traffic Filters (optional)</summary>
+          <summary style="cursor:pointer; font-size:12px; color:var(--dim); padding:4px 0;" data-i18n="rpt_filter_toggle">Traffic Filters (optional)</summary>
           <div style="margin-top:8px; padding:10px; background:var(--surface2,var(--bg2)); border-radius:6px; display:grid; grid-template-columns:1fr 1fr; gap:8px;">
             <div>
               <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_pd">Policy Decision</label>
@@ -1514,12 +1514,12 @@
         </details>
       </div>
       <p id="m-gen-note" style="display:none;font-size:0.85rem;color:var(--dim);margin-top:8px;" data-i18n="gui_gen_snapshot_note">
-        Live snapshot — queries all managed VENs' current status, no date range needed.
+        快照報表會直接讀取目前資料，不需要指定日期區間。
       </p>
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal('m-gen-report')" data-i18n="gui_gen_cancel">Cancel</button>
+        <button class="btn btn-secondary" onclick="closeModal('m-gen-report')" data-i18n="gui_gen_cancel">取消</button>
         <button class="btn btn-success" id="m-gen-confirm" onclick="confirmReportGen()">
-          <svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+          <svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg> <span data-i18n="gui_gen_generate">產生</span>
         </button>
       </div>
     </div>

@@ -19,39 +19,39 @@ def audit_executive_summary(results: dict, df: pd.DataFrame) -> dict:
     kpis = []
 
     # KPI 1: Total Events Processed
-    kpis.append({'label': 'Total Events', 'value': f"{len(df):,}"})
+    kpis.append({'label': '事件總數', 'value': f"{len(df):,}"})
 
     # KPI 2: System Health Events
     total_health = mod01.get('total_health_events', 0)
-    kpis.append({'label': 'System Health Events', 'value': f"{total_health:,}"})
+    kpis.append({'label': '系統健康事件', 'value': f"{total_health:,}"})
 
     # KPI 3: Security Concerns (tampering, suspend, clone)
     sec_concerns = mod01.get('security_concern_count', 0)
-    kpis.append({'label': 'Security Concerns', 'value': str(sec_concerns)})
+    kpis.append({'label': '安全疑慮', 'value': str(sec_concerns)})
 
     # KPI 4: Agent Connectivity Issues
     conn_issues = mod01.get('connectivity_event_count', 0)
-    kpis.append({'label': 'Agent Connectivity', 'value': str(conn_issues)})
+    kpis.append({'label': 'Agent 連線問題', 'value': str(conn_issues)})
 
     # KPI 5: Failed Logins
     failed_logins = mod02.get('failed_logins', 0)
-    kpis.append({'label': 'Failed Logins', 'value': str(failed_logins)})
+    kpis.append({'label': '登入失敗', 'value': str(failed_logins)})
 
     # KPI 6: Policy Provisions
     provisions = mod03.get('provision_count', 0)
-    kpis.append({'label': 'Policy Provisions', 'value': str(provisions)})
+    kpis.append({'label': 'Provision 次數', 'value': str(provisions)})
 
     # KPI 7: Rule Changes (Draft)
     rule_changes = mod03.get('rule_change_count', 0)
-    kpis.append({'label': 'Rule Changes (Draft)', 'value': str(rule_changes)})
+    kpis.append({'label': '規則變更（Draft）', 'value': str(rule_changes)})
 
     # KPI 8: High-Risk Events
-    kpis.append({'label': 'High-Risk Events', 'value': str(mod03.get('high_risk_count', 0))})
+    kpis.append({'label': '高風險事件', 'value': str(mod03.get('high_risk_count', 0))})
 
     # KPI 9: Total Workloads Affected (all provisions combined)
     total_wa = mod03.get('total_workloads_affected', 0)
     if total_wa > 0:
-        kpis.append({'label': 'Workloads Affected', 'value': f"{total_wa:,}"})
+        kpis.append({'label': '受影響工作負載', 'value': f"{total_wa:,}"})
 
     # KPI 10: Unique Admin Source IPs
     unique_ips = 0
@@ -59,7 +59,7 @@ def audit_executive_summary(results: dict, df: pd.DataFrame) -> dict:
         non_empty = df['src_ip'].astype(str).str.strip().replace('', pd.NA).dropna()
         unique_ips = int(non_empty.nunique())
     if unique_ips > 0:
-        kpis.append({'label': 'Unique Admin IPs', 'value': str(unique_ips)})
+        kpis.append({'label': '管理來源 IP 數', 'value': str(unique_ips)})
 
     # Top Event Types overall
     top_events = pd.DataFrame()
@@ -94,7 +94,7 @@ def audit_executive_summary(results: dict, df: pd.DataFrame) -> dict:
             if etype == 'sec_policy.create' and 'workloads_affected' in subset.columns:
                 total = subset['workloads_affected'].sum()
                 if total:
-                    extra = f" ({int(total)} workload(s) affected)"
+                    extra = f"（受影響工作負載 {int(total)} 台）"
 
             # Enrich with source IPs for admin-initiated events
             src_ips = []

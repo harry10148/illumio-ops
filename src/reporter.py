@@ -1,4 +1,4 @@
-import datetime
+﻿import datetime
 import json
 import html
 import smtplib
@@ -63,8 +63,20 @@ class Reporter:
         def esc(text):
             return html.escape(clean_ansi(text), quote=True)
 
+        snapshot_labels = {
+            "value": "數值",
+            "first_seen": "首次偵測",
+            "last_seen": "最後偵測",
+            "direction": "方向",
+            "source": "來源端",
+            "destination": "目的端",
+            "service": "服務",
+            "connections": "連線數",
+            "decision": "判定",
+        }
+
         if not data_list:
-            return "<div style='padding:10px 12px; color:#6b7280; font-size:12px;'>No data</div>"
+            return "<div style='padding:10px 12px; color:#6b7280; font-size:12px;'>暫無快照資料</div>"
 
         def actor_view(item, is_source=True):
             actor = item.get("source" if is_source else "destination", {})
@@ -101,12 +113,12 @@ class Reporter:
                 ]
             )
             proc_line = (
-                f"<div style='font-size:10px; color:#313638; margin-top:4px;'><strong>Proc:</strong> {esc(proc)}</div>"
+                f"<div style='font-size:10px; color:#313638; margin-top:4px;'><strong>程序:</strong> {esc(proc)}</div>"
                 if proc
                 else ""
             )
             user_line = (
-                f"<div style='font-size:10px; color:#6F7274;'><strong>User:</strong> {esc(user)}</div>"
+                f"<div style='font-size:10px; color:#6F7274;'><strong>使用者:</strong> {esc(user)}</div>"
                 if user
                 else ""
             )
@@ -117,14 +129,14 @@ class Reporter:
 
         table_html = "<table style='width:100%; border-collapse:collapse; font-family:\"Montserrat\",Arial,sans-serif; font-size:12px; border:1px solid #D6D7D7;'>"
         table_html += "<tr style='background-color:#1A2C32; color:#FFFFFF; text-align:left;'>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:96px;'>{esc(t('table_value'))}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:132px;'>{esc(t('table_first_seen'))} /<br>{esc(t('table_last_seen'))}</th>"
-        table_html += f"<th style='padding:10px 6px; border:1px solid #325158; width:44px; text-align:center;'>{esc(t('table_dir'))}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158;'>{esc(t('table_source'))}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158;'>{esc(t('table_destination'))}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:88px;'>{esc(t('table_service'))}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:74px; text-align:center;'>{esc(t('table_num_conns'))}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:88px;'>{esc(t('table_decision'))}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:96px;'>{snapshot_labels['value']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:132px;'>{snapshot_labels['first_seen']} /<br>{snapshot_labels['last_seen']}</th>"
+        table_html += f"<th style='padding:10px 6px; border:1px solid #325158; width:72px; text-align:center;'>{snapshot_labels['direction']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #325158;'>{snapshot_labels['source']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #325158;'>{snapshot_labels['destination']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:88px;'>{snapshot_labels['service']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:74px; text-align:center;'>{snapshot_labels['connections']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:88px;'>{snapshot_labels['decision']}</th>"
         table_html += "</tr>"
 
         for i, d in enumerate(data_list):
@@ -139,9 +151,9 @@ class Reporter:
             t_last = esc(ts_r.get("last_detected", "-").replace("T", " ").split(".")[0])
 
             direction = (
-                "IN"
+                "Inbound"
                 if d.get("flow_direction") == "inbound"
-                else "OUT"
+                else "Outbound"
                 if d.get("flow_direction") == "outbound"
                 else d.get("flow_direction", "-")
             )
@@ -151,9 +163,9 @@ class Reporter:
             proto_str = "TCP" if proto == 6 else "UDP" if proto == 17 else str(proto)
             count = d.get("num_connections") or d.get("count") or 1
             pd_map = {
-                "blocked": f"<span style='display:inline-block; color:white; background:#BE122F; padding:2px 8px; border-radius:4px; font-weight:700; font-size:10px;'>{esc(t('decision_blocked'))}</span>",
-                "potentially_blocked": f"<span style='display:inline-block; color:white; background:#F97607; padding:2px 8px; border-radius:4px; font-weight:700; font-size:10px;'>{esc(t('decision_potential'))}</span>",
-                "allowed": f"<span style='display:inline-block; color:white; background:#166644; padding:2px 8px; border-radius:4px; font-weight:700; font-size:10px;'>{esc(t('decision_allowed'))}</span>",
+                "blocked": "<span style='display:inline-block; color:white; background:#BE122F; padding:2px 8px; border-radius:4px; font-weight:700; font-size:10px;'>Blocked</span>",
+                "potentially_blocked": "<span style='display:inline-block; color:white; background:#F97607; padding:2px 8px; border-radius:4px; font-weight:700; font-size:10px;'>Potential</span>",
+                "allowed": "<span style='display:inline-block; color:white; background:#166644; padding:2px 8px; border-radius:4px; font-weight:700; font-size:10px;'>Allowed</span>",
             }
             decision = str(d.get("policy_decision")).lower()
             decision_html = pd_map.get(decision, esc(decision))
@@ -193,7 +205,7 @@ class Reporter:
                 body += clean_ansi(
                     f"[{a['time']}] {a['rule']} ({a.get('severity', '').upper()} x{a['count']})\n"
                 )
-                body += clean_ansi(f"Desc: {a['desc']}\n")
+                body += clean_ansi(f"說明: {a['desc']}\n")
             body += "\n"
 
         if self.traffic_alerts:
@@ -258,90 +270,175 @@ class Reporter:
             self._send_webhook(subj)
 
     def _build_line_message(self, subj: str) -> str:
-        """Build a LINE-optimised plain-text alert message (no long run-on lines)."""
+        """Build a LINE-friendly alert digest for fast triage."""
         import re
 
         def clean(text):
             return re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", str(text))
 
-        def fmt_talkers(raw: str) -> str:
-            """Split comma-separated Top Talkers into one entry per line."""
-            items = [s.strip() for s in raw.replace('<br>', ',').split(',') if s.strip()]
-            return '\n'.join(f"    • {clean(i)}" for i in items)
+        def compact(raw: str) -> str:
+            return re.sub(r"\s+", " ", clean(raw)).strip()
 
-        lines = [subj, f"產生時間: {self._now_str()}", "─" * 20]
+        def top_talkers(raw: str, limit: int = 2) -> list[str]:
+            items = [compact(s) for s in raw.replace("<br>", ",").split(",") if compact(s)]
+            return items[:limit]
+
+        def severity_label(value: str) -> str:
+            mapping = {
+                "crit": "重大",
+                "critical": "重大",
+                "emerg": "重大",
+                "alert": "高風險",
+                "err": "高風險",
+                "error": "高風險",
+                "warn": "警告",
+                "warning": "警告",
+                "info": "資訊",
+            }
+            return mapping.get(str(value).lower(), "資訊")
+
+        def event_recommendation(event_type: str) -> str:
+            recommendations = {
+                "agent.tampering": "先確認是否為授權變更，再檢查主機與防火牆設定。",
+                "agent.clone_detected": "檢查是否有重複或未授權的 VEN 映像。",
+                "agent.suspend": "確認暫停原因，並檢查是否影響策略落地。",
+                "agent.service_not_available": "確認 VEN 服務狀態與主機連線是否正常。",
+                "system_task.agent_missed_heartbeats_check": "優先確認 VEN 與 PCE 之間的連線品質。",
+                "system_task.agent_offline_check": "確認主機是否離線、關機或網路中斷。",
+                "request.authentication_failed": "檢查帳號與 API 使用來源，排除暴力嘗試。",
+                "request.authorization_failed": "確認權限設定與 API 呼叫來源是否合理。",
+                "sec_policy.create": "確認本次 Policy Provision 是否為預期操作。",
+            }
+            return recommendations.get(event_type, "請至 Web GUI 查看完整事件內容與上下文。")
+
+        def health_recommendation(status: str) -> str:
+            normalized = compact(status).lower()
+            if normalized in {"503", "error", "critical"}:
+                return "優先確認 PCE 健康狀態與核心服務可用性。"
+            return "建議檢查叢集節點負載與延遲狀況。"
+
+        def section_header(title: str, count: int) -> str:
+            return f"\n【{title}】共 {count} 筆"
+
+        def append_kv_block(lines: list[str], items: list[tuple[str, str]]):
+            for label, value in items:
+                if value:
+                    lines.append(f"{label}：{value}")
+
+        total_issues = (
+            len(self.health_alerts)
+            + len(self.event_alerts)
+            + len(self.traffic_alerts)
+            + len(self.metric_alerts)
+        )
+        lines = [
+            "Illumio 告警摘要",
+            f"產出時間：{self._now_str()}",
+            f"總告警數：{total_issues}",
+            f"健康告警：{len(self.health_alerts)}  安全事件：{len(self.event_alerts)}",
+            f"流量告警：{len(self.traffic_alerts)}  指標告警：{len(self.metric_alerts)}",
+            "請優先處理重大與高風險項目。",
+        ]
 
         if self.health_alerts:
-            lines.append(f"\n🔴 {t('health_alerts_header')}")
-            for a in self.health_alerts:
-                lines.append(f"  [{clean(a.get('time',''))}] {clean(a.get('status',''))}")
-                lines.append(f"  {clean(a.get('details',''))}")
+            lines.append(section_header("健康告警", len(self.health_alerts)))
+            for idx, a in enumerate(self.health_alerts[:2], start=1):
+                status = compact(a.get("status", ""))
+                label = "重大" if status in {"503", "error", "critical"} else "警告"
+                lines.append(f"{idx}. [{label}] {compact(a.get('rule', '健康檢查'))}")
+                append_kv_block(
+                    lines,
+                    [
+                        ("時間", compact(a.get("time", ""))),
+                        ("狀態", status),
+                        ("摘要", compact(a.get("details", ""))),
+                        ("建議", health_recommendation(status)),
+                    ],
+                )
+                lines.append("")
+            remaining = len(self.health_alerts) - 2
+            if remaining > 0:
+                lines.append(f"其餘 {remaining} 筆健康告警請至 GUI 查看。")
 
         if self.event_alerts:
-            lines.append(f"\n🟠 {t('security_events_header')}")
-            for a in self.event_alerts:
-                sev = clean(str(a.get('severity', '')).upper())
-                cnt = a.get('count', 0)
-                lines.append(f"  [{clean(a.get('time','')[:19])}] {clean(a.get('rule',''))} ({sev} ×{cnt})")
-                if a.get('desc'):
-                    lines.append(f"  {clean(a['desc'])}")
-                source = clean(a.get('source', ''))
-                if source and source != 'System':
-                    lines.append(f"  來源: {source}")
-                # Show first event details (username / IP / workload)
-                raw = a.get('raw_data') or []
-                if raw:
-                    ev0 = raw[0]
-                    event_type_0 = ev0.get('event_type', '')
-                    resource = ev0.get('resource') or {}
-                    res_user = (resource.get('user') or {}).get('username') or ''
-                    cb_user = ((ev0.get('created_by') or {}).get('user') or {}).get('username') or ''
-                    username = res_user or cb_user
-                    src_ip = ev0.get('src_ip') or ''
-                    if username:
-                        lines.append(f"  帳號: {clean(username)}")
-                    if src_ip:
-                        lines.append(f"  IP: {clean(src_ip)}")
-                    if event_type_0 in ('agents.unpair', 'workloads.unpair'):
-                        wa = ev0.get('workloads_affected') or {}
-                        count = wa.get('total_affected', 0)
-                        if count:
-                            lines.append(f"  影響工作負載: {count} 台")
-                    elif event_type_0.startswith('agent.'):
-                        rc = ev0.get('resource_changes') or {}
-                        if isinstance(rc, list):
-                            after_rc = {i['field']: i.get('after') for i in rc if isinstance(i, dict) and 'field' in i}
-                        else:
-                            after_rc = rc.get('after') or {} if isinstance(rc, dict) else {}
-                        hostname = (
-                            after_rc.get('hostname') or after_rc.get('name')
-                            or (resource.get('agent') or {}).get('hostname')
-                            or ''
-                        )
-                        if hostname:
-                            lines.append(f"  主機: {clean(hostname)}")
+            lines.append(section_header("安全事件", len(self.event_alerts)))
+            for idx, a in enumerate(self.event_alerts[:3], start=1):
+                raw = a.get("raw_data") or []
+                ev0 = raw[0] if raw else {}
+                event_type = compact(ev0.get("event_type", ""))
+                label = severity_label(a.get("severity", "info"))
+                source = compact(a.get("source", ""))
+                target = ""
+                resource = ev0.get("resource") or {}
+                if event_type.startswith(("agent.", "agents.")):
+                    target = (
+                        compact((resource.get("agent") or {}).get("hostname"))
+                        or compact((resource.get("workload") or {}).get("name"))
+                    )
+                elif event_type.startswith(("user.", "request.")):
+                    target = compact((resource.get("user") or {}).get("username"))
+                lines.append(f"{idx}. [{label}] {compact(a.get('rule', '事件告警'))}")
+                append_kv_block(
+                    lines,
+                    [
+                        ("時間", compact(a.get("time", ""))[:19]),
+                        ("來源", source),
+                        ("對象", target),
+                        ("摘要", compact(a.get("desc", ""))),
+                        ("建議", event_recommendation(event_type)),
+                    ],
+                )
+                if event_type:
+                    lines.append(f"事件類型：{event_type}")
+                lines.append("")
+            remaining = len(self.event_alerts) - 3
+            if remaining > 0:
+                lines.append(f"其餘 {remaining} 筆安全事件請至 Web GUI 查看完整內容。")
 
         if self.traffic_alerts:
-            lines.append(f"\n🛡 {t('traffic_alerts_header')}")
-            for a in self.traffic_alerts:
-                lines.append(f"  ▸ {clean(a.get('rule',''))}")
-                lines.append(f"    次數: {clean(a.get('count', 0))}  |  {clean(a.get('criteria',''))}")
-                talkers = fmt_talkers(a.get('details', ''))
+            lines.append(section_header("流量告警", len(self.traffic_alerts)))
+            for idx, a in enumerate(self.traffic_alerts[:2], start=1):
+                lines.append(f"{idx}. [警告] {compact(a.get('rule', '流量告警'))}")
+                append_kv_block(
+                    lines,
+                    [
+                        ("條件", compact(a.get("criteria", ""))),
+                        ("次數", compact(a.get("count", ""))),
+                        ("建議", "先確認來源端、目的端與連接埠是否符合預期。"),
+                    ],
+                )
+                talkers = top_talkers(a.get("details", ""))
                 if talkers:
-                    lines.append(f"    {t('traffic_toptalkers')}:")
-                    lines.append(talkers)
+                    lines.append("熱門連線：")
+                    lines.extend(f"- {item}" for item in talkers)
+                lines.append("")
+            remaining = len(self.traffic_alerts) - 2
+            if remaining > 0:
+                lines.append(f"其餘 {remaining} 筆流量告警請至 GUI 查看。")
 
         if self.metric_alerts:
-            lines.append(f"\n📊 {t('metric_alerts_header')}")
-            for a in self.metric_alerts:
-                lines.append(f"  ▸ {clean(a.get('rule',''))}")
-                lines.append(f"    值: {clean(a.get('count', 0))}  |  {clean(a.get('criteria',''))}")
-                talkers = fmt_talkers(a.get('details', ''))
+            lines.append(section_header("指標告警", len(self.metric_alerts)))
+            for idx, a in enumerate(self.metric_alerts[:2], start=1):
+                lines.append(f"{idx}. [警告] {compact(a.get('rule', '指標告警'))}")
+                append_kv_block(
+                    lines,
+                    [
+                        ("條件", compact(a.get("criteria", ""))),
+                        ("數值", compact(a.get("count", ""))),
+                        ("建議", "請檢查是否有尖峰流量、異常傳輸或資源使用失衡。"),
+                    ],
+                )
+                talkers = top_talkers(a.get("details", ""))
                 if talkers:
-                    lines.append(f"    {t('traffic_toptalkers')}:")
-                    lines.append(talkers)
+                    lines.append("熱門連線：")
+                    lines.extend(f"- {item}" for item in talkers)
+                lines.append("")
+            remaining = len(self.metric_alerts) - 2
+            if remaining > 0:
+                lines.append(f"其餘 {remaining} 筆指標告警請至 GUI 查看。")
 
-        return '\n'.join(lines)
+        lines.append("完整內容請至 Illumio PCE Ops Web GUI 查看。")
+        return "\n".join(line for line in lines if line is not None).strip()
 
     def _send_line(self, subj):
         token = self.cm.config.get("alerts", {}).get("line_channel_access_token", "")
@@ -437,33 +534,77 @@ class Reporter:
             return ""
 
         _RESOURCE_LABELS = {
-            'sec_rule': 'Security Rule', 'rule_set': 'Ruleset',
-            'sec_policy': 'Policy Provision', 'user': 'User Auth',
-            'request': 'API Auth', 'authz_csrf': 'CSRF Check',
-            'agent': 'VEN Agent', 'agents': 'VEN Agents',
-            'workload': 'Workload', 'workloads': 'Workloads',
-            'label': 'Label', 'ip_list': 'IP List',
-            'service': 'Service', 'ven': 'VEN',
-            'pairing_profile': 'Pairing Profile',
-            'authentication_settings': 'Auth Settings',
-            'firewall_settings': 'Firewall Settings',
+            'sec_rule': 'Security Rule',
+            'rule_set': 'Ruleset',
+            'sec_policy': 'Policy Provision',
+            'user': '使用者驗證',
+            'request': 'API 驗證',
+            'authz_csrf': 'CSRF 驗證',
+            'agent': 'VEN Agent',
+            'agents': 'VEN Agents',
+            'workload': '工作負載',
+            'workloads': '工作負載',
+            'system_task': '系統工作',
+            'lost_agent': 'Lost Agent',
+            'cluster': '叢集',
+            'api_key': 'API Key',
+            'pce_health': 'PCE 健康檢查',
+            'label': '標籤',
+            'ip_list': 'IP 清單',
+            'service': '服務',
+            'ven': 'VEN',
+            'pairing_profile': '配對設定檔',
+            'authentication_settings': '認證設定',
+            'firewall_settings': '防火牆設定',
         }
         _VERB_STYLE = {
-            'create': ('Created', '#166644', '#D1FAE5'),
-            'update': ('Updated', '#F97607', '#FFF3CD'),
-            'delete': ('Deleted', '#BE122F', '#FEE2E2'),
-            'sign_in': ('Sign-In', '#325158', '#E0F2FE'),
-            'sign_out': ('Sign-Out', '#325158', '#E0F2FE'),
-            'authentication_failed': ('Auth Fail', '#BE122F', '#FEE2E2'),
-            'tampering': ('Tampering', '#BE122F', '#FEE2E2'),
-            'suspend': ('Suspend', '#F97607', '#FFF3CD'),
-            'clone_detected': ('Clone Detected', '#BE122F', '#FEE2E2'),
-            'csrf_validation_failure': ('CSRF Failure', '#BE122F', '#FEE2E2'),
-            'unpair': ('Unpair', '#BE122F', '#FEE2E2'),
-            'deactivate': ('Deactivate', '#F97607', '#FFF3CD'),
-            'activate': ('Activate', '#166644', '#D1FAE5'),
-            'goodbye': ('Goodbye', '#325158', '#E0F2FE'),
-            'refresh_policy': ('Policy Refresh', '#325158', '#E0F2FE'),
+            'create': ('已建立', '#166644', '#D1FAE5'),
+            'update': ('已更新', '#F97607', '#FFF3CD'),
+            'delete': ('已刪除', '#BE122F', '#FEE2E2'),
+            'sign_in': ('登入', '#325158', '#E0F2FE'),
+            'sign_out': ('登出', '#325158', '#E0F2FE'),
+            'authentication_failed': ('驗證失敗', '#BE122F', '#FEE2E2'),
+            'tampering': ('遭竄改', '#BE122F', '#FEE2E2'),
+            'suspend': ('已暫停', '#F97607', '#FFF3CD'),
+            'clone_detected': ('偵測到複製', '#BE122F', '#FEE2E2'),
+            'csrf_validation_failure': ('CSRF 驗證失敗', '#BE122F', '#FEE2E2'),
+            'unpair': ('已解除配對', '#BE122F', '#FEE2E2'),
+            'deactivate': ('已停用', '#F97607', '#FFF3CD'),
+            'activate': ('已啟用', '#166644', '#D1FAE5'),
+            'goodbye': ('離線', '#325158', '#E0F2FE'),
+            'refresh_policy': ('Policy 重新整理', '#325158', '#E0F2FE'),
+            'agent_missed_heartbeats_check': ('心跳遺失檢查', '#F97607', '#FFF3CD'),
+            'agent_offline_check': ('離線檢查', '#F97607', '#FFF3CD'),
+            'missed_heartbeats_check': ('心跳遺失檢查', '#F97607', '#FFF3CD'),
+            'offline_check': ('離線檢查', '#F97607', '#FFF3CD'),
+            'found': ('已找回', '#166644', '#D1FAE5'),
+            'service_not_available': ('服務不可用', '#BE122F', '#FEE2E2'),
+            'authenticate': ('驗證成功', '#166644', '#D1FAE5'),
+            'login_session_terminated': ('登入工作階段終止', '#F97607', '#FFF3CD'),
+            'pce_session_terminated': ('PCE 工作階段終止', '#F97607', '#FFF3CD'),
+            'authorization_failed': ('授權失敗', '#BE122F', '#FEE2E2'),
+            'pce_health': ('健康檢查', '#F97607', '#FFF3CD'),
+        }
+        _STATUS_LABELS = {
+            'success': '成功',
+            'failure': '失敗',
+            'warn': '警告',
+            'warning': '警告',
+            'error': '錯誤',
+            'info': '資訊',
+        }
+        _FIELD_LABELS = {
+            'labels': '標籤',
+            'mode': '模式',
+            'name': '名稱',
+            'enabled': '啟用狀態',
+            'service': '服務',
+            'consumers': '來源端',
+            'provision_status': '佈署狀態',
+            'batch_id': '批次 ID',
+            'fqdns': 'FQDN',
+            'nodes': '節點數',
+            'service_status': '服務狀態',
         }
 
         def _actor(ev):
@@ -474,11 +615,11 @@ class Reporter:
             hostname = agent.get('hostname') or agent.get('name') or ''
             if username and hostname:
                 return f"{username} @ {hostname}"
-            return username or hostname or 'System'
+            return username or hostname or '系統'
 
         def _fmt_val(v):
             if v is None:
-                return '(none)'
+                return '無'
             if isinstance(v, bool):
                 return str(v).lower()
             if isinstance(v, dict):
@@ -489,10 +630,10 @@ class Reporter:
                 return href.strip('/').split('/')[-1] if href else json.dumps(v)[:60]
             if isinstance(v, list):
                 if not v:
-                    return '(empty)'
+                    return '空白'
                 first = v[0]
                 label = (first.get('name') or first.get('value') or str(first))[:40] if isinstance(first, dict) else str(first)[:40]
-                return f"{label}{f' (+{len(v)-1} more)' if len(v) > 1 else ''}"
+                return f"{label}{f'（另 {len(v)-1} 筆）' if len(v) > 1 else ''}"
             return str(v)[:120]
 
         def _diff_rows(before, after):
@@ -505,18 +646,19 @@ class Reporter:
                 return ''
             rows = "<table style='width:100%; border-collapse:collapse; margin-top:6px; font-size:10px;'>"
             rows += ("<tr>"
-                     "<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:24%;'>Field</th>"
-                     "<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:38%;'>Before</th>"
-                     "<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:38%;'>After</th>"
+                     "<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:24%;'>欄位</th>"
+                     "<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:38%;'>變更前</th>"
+                     "<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:38%;'>變更後</th>"
                      "</tr>")
             for k, bv, av in changes[:5]:
+                field_label = _FIELD_LABELS.get(k, k)
                 rows += (f"<tr>"
-                         f"<td style='padding:3px 6px; border-bottom:1px solid #E3D8C5; color:#989A9B;'>{esc(k)}</td>"
+                         f"<td style='padding:3px 6px; border-bottom:1px solid #E3D8C5; color:#989A9B;'>{esc(field_label)}</td>"
                          f"<td style='padding:3px 6px; border-bottom:1px solid #E3D8C5; color:#BE122F; word-break:break-word;'>{esc(_fmt_val(bv))}</td>"
                          f"<td style='padding:3px 6px; border-bottom:1px solid #E3D8C5; color:#166644; word-break:break-word;'>{esc(_fmt_val(av))}</td>"
                          f"</tr>")
             if len(changes) > 5:
-                rows += f"<tr><td colspan='3' style='padding:3px 6px; color:#989A9B;'>… {len(changes)-5} more field(s) changed</td></tr>"
+                rows += f"<tr><td colspan='3' style='padding:3px 6px; color:#989A9B;'>另有 {len(changes)-5} 個欄位異動</td></tr>"
             rows += "</table>"
             return rows
 
@@ -530,7 +672,7 @@ class Reporter:
             resource_prefix = event_type.split('.')[0] if '.' in event_type else event_type
             verb_key = event_type.split('.')[-1] if '.' in event_type else ''
             resource_label = _RESOURCE_LABELS.get(resource_prefix, resource_prefix.replace('_', ' ').title())
-            verb_label, verb_color, verb_bg = _VERB_STYLE.get(verb_key, (verb_key.replace('_', ' ').title() or 'Event', '#325158', '#E0F2FE'))
+            verb_label, verb_color, verb_bg = _VERB_STYLE.get(verb_key, (verb_key.replace('_', ' ').title() or '事件', '#325158', '#E0F2FE'))
 
             rc = ev.get('resource_changes')
             if isinstance(rc, list):
@@ -548,18 +690,18 @@ class Reporter:
             extras = []
             if event_type == 'sec_policy.create':
                 count = workloads.get('total_affected', 0)
-                extras.append(f"{count} workload(s) affected")
+                extras.append(f"影響工作負載: {count} 台")
             elif event_type in ('agents.unpair', 'workloads.unpair'):
                 count = workloads.get('total_affected', 0)
                 if count:
-                    extras.append(f"Workloads affected: {count}")
+                    extras.append(f"影響工作負載: {count} 台")
                 wl_name = (after or before).get('hostname') or (after or before).get('name') or ''
                 if wl_name:
-                    extras.append(f"Workload: {wl_name}")
+                    extras.append(f"工作負載: {wl_name}")
             elif verb_key == 'create' and after:
                 name = after.get('name') or after.get('hostname') or ''
                 if name:
-                    extras.append(f"Resource: {name}")
+                    extras.append(f"資源: {name}")
             elif event_type.startswith(('user.', 'request.')):
                 resource = ev.get('resource') or {}
                 res_user = (resource.get('user') or {}).get('username') or ''
@@ -567,7 +709,7 @@ class Reporter:
                 username = res_user or cb_user
                 src_ip = ev.get('src_ip') or ''
                 if username:
-                    extras.append(f"User: {username}")
+                    extras.append(f"帳號: {username}")
                 if src_ip:
                     extras.append(f"IP: {src_ip}")
             elif event_type.startswith(('agent.', 'agents.')):
@@ -580,12 +722,13 @@ class Reporter:
                     or ''
                 )
                 if wl_name:
-                    extras.append(f"Workload: {wl_name}")
+                    extras.append(f"工作負載: {wl_name}")
                 src_ip = ev.get('src_ip') or ''
                 if src_ip:
                     extras.append(f"IP: {src_ip}")
 
             status_color = '#166644' if status == 'success' else '#BE122F'
+            status_label = _STATUS_LABELS.get(status.lower(), status.upper())
             diff_html = _diff_rows(before, after)
 
             card = (
@@ -594,11 +737,11 @@ class Reporter:
                 f"<div style='display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:4px;'>"
                 f"<span style='background:{verb_bg}; color:{verb_color}; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;'>{esc(verb_label)}</span>"
                 f"<span style='background:#EDE9FE; color:#8B407A; padding:2px 6px; border-radius:4px; font-size:10px;'>{esc(resource_label)}</span>"
-                f"<span style='color:{status_color}; border:1px solid {status_color}; padding:1px 5px; border-radius:4px; font-size:10px;'>{esc(status.upper())}</span>"
+                f"<span style='color:{status_color}; border:1px solid {status_color}; padding:1px 5px; border-radius:4px; font-size:10px;'>{esc(status_label)}</span>"
                 f"<code style='font-size:10px; color:#8B407A; margin-left:2px;'>{esc(event_type)}</code>"
                 f"<span style='margin-left:auto; font-size:10px; color:#989A9B; white-space:nowrap;'>{esc(ts)}</span>"
                 f"</div>"
-                f"<div style='font-size:11px; color:#313638;'><strong>Actor:</strong> {esc(actor)}"
+                f"<div style='font-size:11px; color:#313638;'><strong>操作來源:</strong> {esc(actor)}"
             )
             if extras:
                 card += f"&nbsp; &bull; &nbsp;{esc(' | '.join(extras))}"
@@ -609,7 +752,7 @@ class Reporter:
             cards.append(card)
 
         if len(events) > 5:
-            cards.append(f"<div style='font-size:10px; color:#989A9B; padding:2px 6px;'>… and {len(events)-5} more event(s) in this alert</div>")
+            cards.append(f"<div style='font-size:10px; color:#989A9B; padding:2px 6px;'>此告警另含 {len(events)-5} 筆事件</div>")
 
         return "".join(cards)
 
@@ -629,50 +772,84 @@ class Reporter:
             return esc(normalized).replace("\n", "<br>")
 
         generated_at = self._now_str()
-        total_items = (
-            len(self.health_alerts)
-            + len(self.event_alerts)
-            + len(self.traffic_alerts)
-            + len(self.metric_alerts)
+        summary_items = [
+            ("健康告警", len(self.health_alerts), "#FDECEC", "#BE122F"),
+            ("安全事件", len(self.event_alerts), "#E5F2F9", "#1A2C32"),
+            ("流量告警", len(self.traffic_alerts), "#FFF0E3", "#FF5500"),
+            ("指標告警", len(self.metric_alerts), "#FFF5E8", "#F97607"),
+        ]
+        summary_html = "".join(
+            f"""
+        <div style="display:inline-block; width:44%; min-width:170px; margin:0 12px 12px 0; vertical-align:top; background:{bg}; border:1px solid rgba(49,54,56,0.08); border-radius:16px; padding:16px 18px; box-sizing:border-box;">
+          <div style="font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#6F7274; margin-bottom:8px;">{label}</div>
+          <div style="font-size:28px; line-height:1; font-weight:800; color:{fg};">{count}</div>
+        </div>
+"""
+            for label, count, bg, fg in summary_items
         )
+        severity_labels = {
+            "crit": "重大",
+            "critical": "重大",
+            "emerg": "緊急",
+            "alert": "高風險",
+            "err": "錯誤",
+            "error": "錯誤",
+            "warn": "警告",
+            "warning": "警告",
+            "info": "資訊",
+        }
         # ── Illumio brand palette ───────────────────────────────────────────
         # System Cyan 120/110/100: #1A2C32 / #24393F / #2D454C
         # Illumio Orange: #FF5500  |  Circuit Gold: #FFA22F / #F97607
         # Risk Red: #BE122F / #F43F51  |  Safeguard Green: #166644 / #299B65
         # Server Slate: #313638  |  Zero Trust Tan: #F7F4EE / #E3D8C5
         # Protocol Purple: #8B407A
-        section_style = "margin-top:24px; border:1px solid #D6D7D7; border-radius:12px; overflow:hidden; background:#FFFFFF;"
-        header_style = "padding:12px 16px; font-size:14px; font-weight:700; font-family:'Montserrat',Arial,sans-serif; text-transform:uppercase; letter-spacing:0.05em;"
+        section_style = "margin-top:28px; border:1px solid #E6E2D8; border-radius:20px; overflow:hidden; background:#FFFFFF; box-shadow:0 12px 28px rgba(26,44,50,0.08);"
+        header_style = "padding:16px 20px; font-size:15px; font-weight:800; font-family:'Montserrat',Arial,sans-serif; letter-spacing:0.02em;"
         table_style = "width:100%; border-collapse:collapse; table-layout:fixed;"
-        th_style = "text-align:left; padding:12px 10px; background:#F5F5F5; border-bottom:1px solid #D6D7D7; font-size:11px; color:#6F7274; font-family:'Montserrat',Arial,sans-serif; text-transform:uppercase; letter-spacing:0.04em;"
-        td_style = "padding:12px 10px; border-bottom:1px solid #EAEBEB; font-size:12px; color:#313638; vertical-align:top; word-break:break-word; font-family:'Montserrat',Arial,sans-serif;"
+        th_style = "text-align:left; padding:14px 14px; background:#F8F5EF; border-bottom:1px solid #E6E2D8; font-size:11px; color:#6F7274; font-family:'Montserrat',Arial,sans-serif; text-transform:uppercase; letter-spacing:0.08em;"
+        td_style = "padding:14px 14px; border-bottom:1px solid #F0ECE4; font-size:13px; color:#313638; vertical-align:top; word-break:break-word; font-family:'Montserrat',Arial,sans-serif; line-height:1.55;"
+        section_note_style = "padding:0 20px 18px 20px; font-size:12px; line-height:1.6; color:#6F7274; background:#FFFFFF;"
 
         body = f"""
 <html>
-<body style="margin:0; padding:0; background-color:#F5F5F5; font-family:'Montserrat',Arial,sans-serif;">
-  <div style="max-width:900px; margin:0 auto; padding:24px;">
-    <div style="background:#FFFFFF; border-radius:12px; padding:32px; border:1px solid #D6D7D7; box-shadow:0 4px 16px rgba(49,54,56,0.08);">
-      <div style="margin-bottom:24px; display:flex; align-items:center;">
-        <div style="background:#FF5500; color:#FFFFFF; padding:8px 16px; border-radius:8px; font-weight:700; font-size:18px;">PCE Ops</div>
-        <div style="margin-left:12px; color:#313638; font-size:14px; font-weight:500;">Security Alert System</div>
+<body style="margin:0; padding:0; background:#F3F0E9; font-family:'Montserrat',Arial,sans-serif; color:#313638;">
+  <div style="max-width:980px; margin:0 auto; padding:32px 20px 40px;">
+    <div style="background:#FFFFFF; border-radius:28px; overflow:hidden; border:1px solid #E6E2D8; box-shadow:0 20px 48px rgba(26,44,50,0.12);">
+      <div style="padding:32px 36px; background:linear-gradient(135deg, #FFF7F0 0%, #FFFFFF 48%, #F2F7F8 100%); border-bottom:1px solid #ECE7DD;">
+        <div style="display:flex; align-items:center; gap:14px; margin-bottom:20px;">
+          <div style="background:#FF5500; color:#FFFFFF; padding:10px 18px; border-radius:999px; font-weight:800; font-size:17px; letter-spacing:0.02em;">Illumio PCE Ops</div>
+          <div style="color:#6F7274; font-size:13px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase;">正式告警通知</div>
+        </div>
+        <div style="font-size:12px; color:#8C8E8F; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:10px;">告警摘要</div>
+        <h1 style="color:#1A2C32; font-size:32px; line-height:1.2; margin:0 0 12px 0; font-weight:800;">{esc(subj)}</h1>
+        <p style="color:#6F7274; font-size:14px; line-height:1.7; margin:0 0 16px 0;">本通知彙整近期健康狀態、安全事件、流量異常與指標異常，方便你快速掌握風險並安排後續處置。</p>
+        <div style="display:flex; flex-wrap:wrap; gap:18px; margin-bottom:22px;">
+          <div style="min-width:220px;">
+            <div style="font-size:11px; color:#8C8E8F; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">產出時間</div>
+            <div style="font-size:16px; font-weight:700; color:#24393F;">{esc(generated_at)}</div>
+          </div>
+          <div style="min-width:180px;">
+            <div style="font-size:11px; color:#8C8E8F; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">通知範圍</div>
+            <div style="font-size:16px; font-weight:700; color:#24393F;">健康 / 事件 / 流量 / 指標</div>
+          </div>
+        </div>
+        <div>{summary_html}</div>
       </div>
-      
-      <h1 style="color:#FF5500; font-size:24px; margin:0 0 8px 0; font-weight:700;">{esc(subj)}</h1>
-      <p style="color:#6F7274; font-size:13px; margin:0 0 24px 0;">{t('generated_at', time=generated_at)}</p>
-      
-      <div style="height:1px; background:#D6D7D7; margin-bottom:24px;"></div>
+      <div style="padding:8px 36px 36px;">
 """
 
         if self.health_alerts:
             body += f"""
       <div style="{section_style}">
-        <div style="{header_style} background:#BE122F; color:#FFFFFF;">🔴 {esc(t('health_alerts_header'))}</div>
+        <div style="{header_style} background:#BE122F; color:#FFFFFF;">{esc(t('health_alerts_header'))}</div>
+        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊彙整 PCE 或 Cluster 健康異常，適合優先確認是否影響連線品質、控制面或服務可用性。</div>
         <table style="{table_style}">
           <thead>
             <tr>
-              <th style="{th_style} width:140px;">{esc(t('health_time', default='Time'))}</th>
-              <th style="{th_style}">{esc(t('health_status', default='Status'))}</th>
-              <th style="{th_style}">{esc(t('health_details', default='Details'))}</th>
+              <th style="{th_style} width:140px;">{esc(t('health_time', default='時間'))}</th>
+              <th style="{th_style}">{esc(t('health_status', default='狀態'))}</th>
+              <th style="{th_style}">{esc(t('health_details', default='詳細資訊'))}</th>
             </tr>
           </thead>
           <tbody>
@@ -690,7 +867,8 @@ class Reporter:
         if self.event_alerts:
             body += f"""
       <div style="{section_style}">
-        <div style="{header_style} background:#1A2C32; color:#FFFFFF;">🟠 {esc(t('security_events_header'))}</div>
+        <div style="{header_style} background:#1A2C32; color:#FFFFFF;">{esc(t('security_events_header'))}</div>
+        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊列出近期重要事件與操作脈絡，協助你快速判斷是否需要追查帳號、工作負載或策略變更。</div>
         <table style="{table_style}">
           <thead>
             <tr>
@@ -704,29 +882,31 @@ class Reporter:
 """
             for a in self.event_alerts:
                 sev_color = "#BE122F" if a.get("severity") in ["crit", "emerg", "alert", "err", "error"] else "#F97607"
+                sev_label = severity_labels.get(str(a.get("severity", "")).lower(), str(a.get("severity", "")).upper())
                 body += f"""
             <tr>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(a.get('time',''))}</td>
               <td style="{td_style}"><strong>{esc(a.get('rule',''))}</strong><br><small style="color:#6F7274;">{esc(a.get('desc',''))}</small></td>
-              <td style="{td_style} text-align:center;"><span style="background:{sev_color}; color:#FFFFFF; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;">{esc(str(a.get('severity','')).upper())} ({esc(a.get('count',0))})</span></td>
+              <td style="{td_style} text-align:center;"><span style="background:{sev_color}; color:#FFFFFF; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;">{esc(sev_label)} ({esc(a.get('count',0))})</span></td>
               <td style="{td_style}">{esc(a.get('source',''))}</td>
             </tr>
 """
                 if a.get("raw_data"):
                     detail_html = self._render_event_detail_html(a.get("raw_data", []), esc)
-                    body += f"<tr><td colspan='4' style='padding:8px 10px; background:#F5F5F5; border-bottom:1px solid #D6D7D7;'>{detail_html}</td></tr>"
+                    body += f"<tr><td colspan='4' style='padding:14px 14px 16px; background:#FCFAF6; border-bottom:1px solid #E6E2D8;'>{detail_html}</td></tr>"
             body += "</tbody></table></div>"
 
         if self.traffic_alerts:
             body += f"""
       <div style="{section_style}">
-        <div style="{header_style} background:#FF5500; color:#FFFFFF;">🛡️ {esc(t('traffic_alerts_header'))}</div>
+        <div style="{header_style} background:#FF5500; color:#FFFFFF;">{esc(t('traffic_alerts_header'))}</div>
+        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊摘要異常流量與代表性連線，方便你從條件、熱門連線與快照資料判讀風險輪廓。</div>
         <table style="{table_style}">
           <thead>
             <tr>
               <th style="{th_style}">{esc(t('traffic_rule'))}</th>
               <th style="{th_style} width:80px; text-align:center;">{esc(t('traffic_count'))}</th>
-              <th style="{th_style}">{esc(t('traffic_criteria'))}</th>
+              <th style="{th_style}">條件</th>
             </tr>
           </thead>
           <tbody>
@@ -739,8 +919,8 @@ class Reporter:
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(a.get('criteria',''))}</td>
             </tr>
             <tr>
-              <td colspan="3" style="{td_style} background:#F5F5F5; font-size:11px; padding:12px;">
-                <div style="margin-bottom:8px;"><strong style="color:#313638;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(a.get('details',''))}</div>
+              <td colspan="3" style="{td_style} background:#FCFAF6; font-size:12px; padding:16px;">
+                <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #ECE7DD; border-radius:14px; background:#FFFFFF;"><strong style="color:#24393F;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(a.get('details',''))}</div>
                 {self.generate_pretty_snapshot_html(a.get('raw_data', []))}
               </td>
             </tr>
@@ -750,13 +930,14 @@ class Reporter:
         if self.metric_alerts:
             body += f"""
       <div style="{section_style}">
-        <div style="{header_style} background:#F97607; color:#FFFFFF;">📊 {esc(t('metric_alerts_header'))}</div>
+        <div style="{header_style} background:#F97607; color:#FFFFFF;">{esc(t('metric_alerts_header'))}</div>
+        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊整理高頻寬或高數值異常，適合用來快速發現尖峰行為、流量放大或資源使用失衡。</div>
         <table style="{table_style}">
           <thead>
             <tr>
               <th style="{th_style}">{esc(t('traffic_rule'))}</th>
-              <th style="{th_style} width:100px; text-align:center;">{esc(t('table_value'))}</th>
-              <th style="{th_style}">{esc(t('traffic_criteria'))}</th>
+              <th style="{th_style} width:100px; text-align:center;">數值</th>
+              <th style="{th_style}">條件</th>
             </tr>
           </thead>
           <tbody>
@@ -769,8 +950,8 @@ class Reporter:
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(a.get('criteria',''))}</td>
             </tr>
             <tr>
-              <td colspan="3" style="{td_style} background:#F5F5F5; font-size:11px; padding:12px;">
-                <div style="margin-bottom:8px;"><strong style="color:#313638;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(a.get('details',''))}</div>
+              <td colspan="3" style="{td_style} background:#FCFAF6; font-size:12px; padding:16px;">
+                <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #ECE7DD; border-radius:14px; background:#FFFFFF;"><strong style="color:#24393F;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(a.get('details',''))}</div>
                 {self.generate_pretty_snapshot_html(a.get('raw_data', []))}
               </td>
             </tr>
@@ -778,12 +959,13 @@ class Reporter:
             body += "</tbody></table></div>"
 
         body += """
-      <div style="margin-top:40px; padding-top:20px; border-top:1px solid #D6D7D7; text-align:center;">
-        <p style="color:#ADAFAF; font-size:11px; margin:0;">
-          This is an automated message from <strong>Illumio PCE Ops</strong>.<br>
-          Please do not reply to this email.
+      <div style="margin-top:32px; padding:24px 8px 4px; border-top:1px solid #ECE7DD; text-align:center;">
+        <p style="color:#8C8E8F; font-size:11px; line-height:1.8; margin:0;">
+          此通知由 <strong>Illumio PCE Ops</strong> 自動產生。<br>
+          請依你的告警流程進行確認與處置。
         </p>
       </div>
+    </div>
     </div>
   </div>
 </body>

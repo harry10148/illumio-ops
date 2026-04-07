@@ -32,11 +32,11 @@ def pu_executive_summary(results: dict, lookback_days: int) -> dict:
     rate    = mod01.get("hit_rate_pct", 0.0)
 
     kpis = [
-        {"label": "Total Active Rules",  "value": str(total)},
-        {"label": "Hit Rules",           "value": str(hit)},
-        {"label": "Unused Rules",        "value": str(unused)},
-        {"label": "Hit Rate",            "value": f"{rate}%"},
-        {"label": "Lookback Period",     "value": f"{lookback_days} days"},
+        {"label": "啟用規則總數", "value": str(total)},
+        {"label": "已命中規則", "value": str(hit)},
+        {"label": "未使用規則", "value": str(unused)},
+        {"label": "命中率", "value": f"{rate}%"},
+        {"label": "回溯期間", "value": f"{lookback_days} 天"},
     ]
 
     # Top rulesets by unused rule count

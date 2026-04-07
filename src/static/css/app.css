@@ -421,6 +421,29 @@
       transform: translateY(-1px);
     }
 
+    .btn:disabled {
+      opacity: .72;
+      cursor: wait;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-loading-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: currentColor;
+      display: inline-block;
+      margin-right: 8px;
+      animation: pulseDot 1s ease-in-out infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { transform: scale(.72); opacity: .45; }
+      50% { transform: scale(1); opacity: 1; }
+    }
+
     .btn-warn {
       background: var(--warn);
       color: #fff;

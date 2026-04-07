@@ -115,7 +115,7 @@ def test_api_security_endpoints(app_persistent):
         "username": "admin2",
         "old_password": "testpass",
         "new_password": "newpass",
-        "allowed_ips": ["10.0.0.0/8", "127.0.0.1", "localhost"]
+        "allowed_ips": ["10.0.0.0/8", "127.0.0.1", "192.168.1.0/24"]
     }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
     assert res.status_code == 200
     assert res.json['ok'] is True
@@ -125,3 +125,23 @@ def test_api_security_endpoints(app_persistent):
     res = client.post('/api/login', json={"username": "admin2", "password": "newpass"}, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
     assert res.status_code == 200
     assert res.json['ok'] is True
+
+
+def test_api_security_rejects_invalid_allowlist(client):
+    res_login = client.post('/api/login', json={
+        "username": "admin",
+        "password": "testpass"
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+
+    csrf_token = None
+    for cookie in res_login.headers.getlist('Set-Cookie'):
+        if 'csrf_token=' in cookie:
+            csrf_token = cookie.split('csrf_token=')[1].split(';')[0]
+
+    res = client.post('/api/security', json={
+        "allowed_ips": ["127.0.0.1", "localhost"]
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
+
+    assert res.status_code == 400
+    assert res.json["ok"] is False
+    assert "localhost" in res.json["error"]

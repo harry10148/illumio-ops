@@ -137,6 +137,10 @@ def safe_input(
                 continue
             _set_last_input_action("value")
             return val
+        except EOFError:
+            _set_last_input_action("cancel")
+            print()
+            return None
         except ValueError:
             _set_last_input_action("invalid")
             expected = "number" if value_type in (int, float) else str(value_type.__name__)

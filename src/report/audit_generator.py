@@ -413,9 +413,11 @@ class AuditGenerator:
             raise RuntimeError("api_client required for audit generation")
 
         if not end_date:
-            end_date = datetime.datetime.utcnow().isoformat() + "Z"
+            end_date = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
         if not start_date:
-            start_date = (datetime.datetime.utcnow() - datetime.timedelta(days=7)).isoformat() + "Z"
+            start_date = (
+                datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
+            ).isoformat().replace("+00:00", "Z")
 
         print(t("rpt_audit_querying", start=start_date, end=end_date))
         events = self.api.fetch_events(start_time_str=start_date, end_time_str=end_date)

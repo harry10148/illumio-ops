@@ -223,11 +223,11 @@ class VenStatusGenerator:
         df_lost_yest  = df_offline[mask_yest]  if len(mask_yest)  else df_offline.iloc[0:0]
 
         kpis = [
-            {'label': 'Total VENs',                    'value': str(len(df))},
-            {'label': 'Online',                         'value': str(len(df_online))},
-            {'label': 'Offline',                        'value': str(len(df_offline))},
-            {'label': 'Lost Connection (Last 24h)',     'value': str(len(df_lost_today))},
-            {'label': 'Lost Connection (24-48h ago)',   'value': str(len(df_lost_yest))},
+            {'label': 'VEN 總數', 'value': str(len(df))},
+            {'label': '在線', 'value': str(len(df_online))},
+            {'label': '離線', 'value': str(len(df_offline))},
+            {'label': '近 24 小時失聯', 'value': str(len(df_lost_today))},
+            {'label': '24-48 小時前失聯', 'value': str(len(df_lost_yest))},
         ]
 
         return {

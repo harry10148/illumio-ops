@@ -159,9 +159,11 @@ class ReportGenerator:
 
         # Default to last 7 days if not provided
         if not end_date:
-            end_date = datetime.datetime.utcnow().isoformat() + "Z"
+            end_date = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
         if not start_date:
-            start_date = (datetime.datetime.utcnow() - datetime.timedelta(days=7)).isoformat() + "Z"
+            start_date = (
+                datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
+            ).isoformat().replace("+00:00", "Z")
 
         logger.info("[ReportGenerator] Starting API-source report generation")
         print(t("rpt_querying_traffic", start=start_date, end=end_date))

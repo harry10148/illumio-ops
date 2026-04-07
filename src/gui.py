@@ -1,5 +1,5 @@
-"""
-Illumio PCE Ops — Flask Web GUI.
+﻿"""
+Illumio PCE Ops ??Flask Web GUI.
 Optional dependency: pip install flask
 
 Features full parity with CLI:
@@ -22,11 +22,13 @@ import struct
 try:
     from flask import Flask, request, jsonify, render_template, send_from_directory, session, redirect
     HAS_FLASK = True
+    FLASK_IMPORT_ERROR = ""
 except ImportError:
     HAS_FLASK = False
+    FLASK_IMPORT_ERROR = str(sys.exc_info()[1])
 
 from src.config import ConfigManager
-from src.i18n import t
+from src.i18n import t, get_messages
 from src import __version__
 
 logger = logging.getLogger(__name__)
@@ -38,16 +40,12 @@ def _strip_ansi(text: str) -> str:
     return _ANSI_RE.sub('', text)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Event Catalog (mirrors settings.py)
-# ═══════════════════════════════════════════════════════════════════════════════
-# We now dynamically import FULL_EVENT_CATALOG from src.settings inside the API route.
+# ????????????????????????????????????????????????????????????????????????????????# Event Catalog (mirrors settings.py)
+# ????????????????????????????????????????????????????????????????????????????????# We now dynamically import FULL_EVENT_CATALOG from src.settings inside the API route.
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Flask Application Factory
-# ═══════════════════════════════════════════════════════════════════════════════
-
+# ????????????????????????????????????????????????????????????????????????????????# Flask Application Factory
+# ????????????????????????????????????????????????????????????????????????????????
 def _hash_password(salt: str, password: str) -> str:
     return hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
 
@@ -72,10 +70,28 @@ def _check_ip_allowed(allowed_ips: list, remote_addr: str) -> bool:
             continue
     return False
 
+
+def _validate_allowed_ips(values) -> tuple[list, list]:
+    normalized = []
+    invalid = []
+    for raw in values or []:
+        item = str(raw or "").strip()
+        if not item:
+            continue
+        try:
+            if "/" in item:
+                ipaddress.ip_network(item, strict=False)
+            else:
+                ipaddress.ip_address(item)
+            normalized.append(item)
+        except ValueError:
+            invalid.append(item)
+    return normalized, invalid
+
 def _rst_drop():
     """Close the underlying TCP socket with RST (SO_LINGER 0) and raise to
     prevent Flask from sending any HTTP response.  To a port scanner the
-    connection appears reset — identical to 'connection refused' — so the
+    connection appears reset ??identical to 'connection refused' ??so the
     port does not register as an open HTTP service.
     """
     try:
@@ -94,7 +110,7 @@ def _rst_drop():
                     sock = obj
                     break
         if sock is not None:
-            # l_onoff=1, l_linger=0 → kernel sends RST on close, not FIN
+            # l_onoff=1, l_linger=0 ??kernel sends RST on close, not FIN
             sock.setsockopt(_socket.SOL_SOCKET, _socket.SO_LINGER,
                             struct.pack('ii', 1, 0))
             try:
@@ -103,7 +119,7 @@ def _rst_drop():
                 pass
     except Exception:
         pass
-    # Raise — Flask will attempt to write the 500 but the socket is gone
+    # Raise ??Flask will attempt to write the 500 but the socket is gone
     raise _RstDrop()
 
 
@@ -114,7 +130,7 @@ class _RstDrop(Exception):
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 _ROOT_DIR = os.path.dirname(_PKG_DIR)
 
-# ── Rule Scheduler log history (in-memory, thread-safe) ──────────────────────
+# ?? Rule Scheduler log history (in-memory, thread-safe) ??????????????????????
 _rs_log_history: list = []
 _rs_log_lock = threading.Lock()
 
@@ -209,7 +225,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
     @app.errorhandler(_RstDrop)
     def handle_rst_drop(e):
-        # Socket is already closed with RST — return an empty Response object
+        # Socket is already closed with RST ??return an empty Response object
         # so Flask stops processing without logging an unhandled error
         from flask import Response as _Resp
         return _Resp('', status=200)
@@ -219,7 +235,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         if request.endpoint == 'static' or request.path.startswith('/static/'):
             return
 
-        # IP Allowlist check — silently drop with TCP RST (no HTTP response)
+        # IP Allowlist check ??silently drop with TCP RST (no HTTP response)
         # so port scanners cannot detect an HTTP service on this port
         allowed_ips = cm.config.get("web_gui", {}).get("allowed_ips", [])
         if not _check_ip_allowed(allowed_ips, request.remote_addr):
@@ -251,14 +267,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         response.set_cookie('csrf_token', session['csrf_token'], httponly=False, samesite='Strict')
         return response
 
-    # ─── Frontend SPA ─────────────────────────────────────────────────────
+    # ??? Frontend SPA ?????????????????????????????????????????????????????
     @app.route('/')
     def index():
         cm.load()
         pce_url = _get_active_pce_url(cm)
         return render_template('index.html', pce_url=pce_url)
 
-    # ─── Auth Routes ──────────────────────────────────────────────────────
+    # ??? Auth Routes ??????????????????????????????????????????????????????
     @app.route('/login', methods=['GET'])
     def login_page():
         return render_template('login.html')
@@ -312,7 +328,13 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             gui_cfg["username"] = d["username"]
         
         if "allowed_ips" in d:
-            gui_cfg["allowed_ips"] = d["allowed_ips"]
+            allowed_ips, invalid_ips = _validate_allowed_ips(d["allowed_ips"])
+            if invalid_ips:
+                return jsonify({
+                    "ok": False,
+                    "error": f"Invalid allowlist entries: {', '.join(invalid_ips)}"
+                }), 400
+            gui_cfg["allowed_ips"] = allowed_ips
             
         if "new_password" in d and d["new_password"]:
             # Check old password if there's already one set
@@ -329,12 +351,12 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         cm.save()
         return jsonify({"ok": True})
 
-    # ─── API: Status ──────────────────────────────────────────────────────
+    # ??? API: Status ??????????????????????????????????????????????????????
     @app.route('/api/ui_translations')
     def api_ui_translations():
         lang = cm.config.get("settings", {}).get("language", "en")
-        from src.i18n import MESSAGES
-        ui_dict = {k: v for k, v in MESSAGES.get(lang, MESSAGES["en"]).items() if k.startswith("gui_")}
+        merged = get_messages(lang)
+        ui_dict = {k: v for k, v in merged.items() if k.startswith("gui_")}
         return jsonify(ui_dict)
 
     @app.route('/api/status')
@@ -419,7 +441,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         # Return catalog along with list of events that support status/severity filtering
         return jsonify({'catalog': translated_catalog, 'action_events': ACTION_EVENTS})
 
-    # ─── API: Rules CRUD ──────────────────────────────────────────────────
+    # ??? API: Rules CRUD ??????????????????????????????????????????????????
     @app.route('/api/rules')
     def api_rules():
         cm.load()
@@ -616,7 +638,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         cm.remove_rules_by_index([idx])
         return jsonify({"ok": True})
 
-    # ─── API: Settings ────────────────────────────────────────────────────
+    # ??? API: Settings ????????????????????????????????????????????????????
     @app.route('/api/settings')
     def api_get_settings():
         cm.load()
@@ -809,7 +831,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)})
 
-    # ─── API: Reports ──────────────────────────────────────────────────────
+    # ??? API: Reports ??????????????????????????????????????????????????????
     @app.route('/api/reports', methods=['GET'])
     def api_list_reports():
         cm.load()
@@ -1013,20 +1035,20 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             filenames = [os.path.basename(p) for p in paths]
             try:
                 if _arlog:
-                    _arlog.info(f"完成: {filenames}")
+                    _arlog.info(f"摰?: {filenames}")
             except Exception:
                 pass
             return jsonify({"ok": True, "files": filenames, "record_count": result.record_count})
         except Exception as e:
             try:
                 if _arlog:
-                    _arlog.error(f"Audit報表失敗: {e}")
+                    _arlog.error(f"Audit?梯”憭望?: {e}")
             except Exception:
                 pass
             logger.error(f"Audit generation failed: {e}", exc_info=True)
             return jsonify({"ok": False, "error": str(e)})
 
-    # ─── API: VEN Status Report ────────────────────────────────────────────
+    # ??? API: VEN Status Report ????????????????????????????????????????????
     @app.route('/api/ven_status_report/generate', methods=['POST'])
     def api_generate_ven_status_report():
         _vrlog = None
@@ -1056,20 +1078,20 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             kpis = result.module_results.get('kpis', [])
             try:
                 if _vrlog:
-                    _vrlog.info(f"完成: {filenames}")
+                    _vrlog.info(f"摰?: {filenames}")
             except Exception:
                 pass
             return jsonify({"ok": True, "files": filenames, "record_count": result.record_count, "kpis": kpis})
         except Exception as e:
             try:
                 if _vrlog:
-                    _vrlog.error(f"VEN報表失敗: {e}")
+                    _vrlog.error(f"VEN?梯”憭望?: {e}")
             except Exception:
                 pass
             logger.error(f"VEN status report failed: {e}", exc_info=True)
             return jsonify({"ok": False, "error": str(e)})
 
-    # ─── API: Policy Usage Report ──────────────────────────────────────────
+    # ??? API: Policy Usage Report ??????????????????????????????????????????
     @app.route('/api/policy_usage_report/generate', methods=['POST'])
     def api_generate_policy_usage_report():
         d = request.json or {}
@@ -1105,7 +1127,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
             try:
                 if _pulog:
-                    _pulog.info(f"完成: {filenames}")
+                    _pulog.info(f"摰?: {filenames}")
             except Exception:
                 pass
             return jsonify({"ok": True, "files": filenames,
@@ -1113,13 +1135,13 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         except Exception as e:
             try:
                 if _pulog:
-                    _pulog.error(f"PolicyUsage報表失敗: {e}")
+                    _pulog.error(f"PolicyUsage?梯”憭望?: {e}")
             except Exception:
                 pass
             logger.error(f"Policy usage report failed: {e}", exc_info=True)
             return jsonify({"ok": False, "error": str(e)})
 
-    # ─── API: Report Schedules ─────────────────────────────────────────────
+    # ??? API: Report Schedules ?????????????????????????????????????????????
 
     @app.route('/api/report-schedules', methods=['GET'])
     def api_list_report_schedules():
@@ -1241,7 +1263,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)}), 400
 
-    # ─── API: Traffic & Quarantine ─────────────────────────────────────────
+    # ??? API: Traffic & Quarantine ?????????????????????????????????????????
     @app.route('/api/quarantine/search', methods=['POST'])
     def api_quarantine_search():
         d = request.json or {}
@@ -1401,7 +1423,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     "val_fmt": val_fmt,
                     "first_seen": first_seen,
                     "last_seen": last_seen,
-                    "dir": "→",
+                    "dir": "<->",
                     "s_name": s_name,
                     "s_ip": s.get('ip', ''),
                     "s_href": s.get('href', ''),
@@ -1573,7 +1595,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             logger.error(f"Bulk Quarantine Error: {e}")
             return jsonify({"ok": False, "error": str(e)})
 
-    # ─── API: Actions ─────────────────────────────────────────────────────
+    # ??? API: Actions ?????????????????????????????????????????????????????
     @app.route('/api/actions/run', methods=['POST'])
     def api_run_once():
         try:
@@ -1666,7 +1688,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             os._exit(0)
         return jsonify({"ok": True})
 
-    # ─── Rule Scheduler API ────────────────────────────────────────────────
+    # ??? Rule Scheduler API ????????????????????????????????????????????????
 
     def extract_id(href):
         return href.split('/')[-1] if href else ""
@@ -1922,11 +1944,11 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             days_str = ",".join([d[:3] for d in db_entry['days']]) if len(db_entry['days']) < 7 else t('rs_action_everyday')
             act_str = t('rs_action_enable_in_window') if db_entry['action'] == 'allow' else t('rs_action_disable_in_window')
             tz_display = db_entry['timezone'] if db_entry['timezone'] != 'local' else 'Local'
-            note = f"[📅 {t('rs_sch_tag_recurring')}: {days_str} {db_entry['start']}-{db_entry['end']} ({tz_display}) {act_str}]"
+            note = f"[?? {t('rs_sch_tag_recurring')}: {days_str} {db_entry['start']}-{db_entry['end']} ({tz_display}) {act_str}]"
         else:
             db_entry['expire_at'] = data['expire_at']
             db_entry['timezone'] = data.get('timezone', 'local')
-            note = f"[⏳ {t('rs_sch_tag_expire')}: {data['expire_at'].replace('T', ' ')}]"
+            note = f"[??{t('rs_sch_tag_expire')}: {data['expire_at'].replace('T', ' ')}]"
 
         db.put(href, db_entry)
         api.update_rule_note(href, note)
@@ -1974,7 +1996,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             history = list(_rs_log_history)
         return jsonify({"ok": True, "history": history})
 
-    # ─── Module Log API ──────────────────────────────────────────────────────
+    # ??? Module Log API ??????????????????????????????????????????????????????
     @app.route('/api/logs')
     def api_log_list():
         from src.module_log import ModuleLog, MODULES
@@ -1995,19 +2017,19 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         ml = ModuleLog.get(module_name)
         return jsonify({"ok": True, "module": module_name, "entries": ml.get_recent(n)})
 
-    # ─── End Rule Scheduler API ────────────────────────────────────────────
+    # ??? End Rule Scheduler API ????????????????????????????????????????????
 
     return app
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Launch
-# ═══════════════════════════════════════════════════════════════════════════════
-
+# ????????????????????????????????????????????????????????????????????????????????# Launch
+# ????????????????????????????????????????????????????????????????????????????????
 def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_mode=False):
     if not HAS_FLASK:
         print("Flask is not installed. The Web GUI requires Flask.")
         print("Install it with:")
+        if FLASK_IMPORT_ERROR:
+            print(f"  Import error: {FLASK_IMPORT_ERROR}")
         print("  pip install flask")
         return
 
@@ -2018,7 +2040,7 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
     _ML.init(os.path.join(_ROOT_DIR, 'logs'))
 
     app = _create_app(cm, persistent_mode=persistent_mode)
-    print(f"\n  Illumio PCE Ops — Web GUI")
+    print(f"\n  Illumio PCE Ops ??Web GUI")
     print(f"  Open in browser: http://127.0.0.1:{port}")
     if persistent_mode:
         print(f"  Running in persistent mode (Press Ctrl+C to stop the entire daemon).")
@@ -2032,10 +2054,8 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
     app.run(host=host, port=port, debug=False, use_reloader=False)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Embedded SPA HTML
-# ═══════════════════════════════════════════════════════════════════════════════
-
+# ????????????????????????????????????????????????????????????????????????????????# Embedded SPA HTML
+# ????????????????????????????????????????????????????????????????????????????????
 _SPA_HTML = r'''<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2157,8 +2177,8 @@ legend { color:var(--accent2); font-weight:700; font-size:.9rem; padding:0 8px; 
 <body>
 
 <div class="header">
-  <h1 data-i18n="gui_title">◆ Illumio PCE Ops</h1>
-  <div style="display:flex;align-items:center;gap:14px"><span class="meta" id="hdr-meta">Loading...</span><button class="btn btn-danger btn-sm" onclick="stopGui()" title="Stop Web GUI" data-i18n="gui_stop">⏹ Stop</button></div>
+  <h1 data-i18n="gui_title">??Illumio PCE Ops</h1>
+  <div style="display:flex;align-items:center;gap:14px"><span class="meta" id="hdr-meta">Loading...</span><button class="btn btn-danger btn-sm" onclick="stopGui()" title="Stop Web GUI" data-i18n="gui_stop">??Stop</button></div>
 </div>
 
 <div class="tabs">
@@ -2168,12 +2188,12 @@ legend { color:var(--accent2); font-weight:700; font-size:.9rem; padding:0 8px; 
   <div class="tab" onclick="switchTab('actions')" data-i18n="gui_tab_actions">Actions</div>
 </div>
 
-<!-- ═══ Dashboard ═══ -->
+<!-- ????Dashboard ????-->
 <div class="panel active" id="p-dashboard">
   <div class="cards">
-    <div class="card"><div class="label" data-i18n="gui_active_rules">Active Rules</div><div class="value" id="d-rules">—</div></div>
-    <div class="card"><div class="label" data-i18n="gui_health_check">Health Check</div><div class="value" id="d-health">—</div></div>
-    <div class="card"><div class="label" data-i18n="gui_language">Language</div><div class="value" id="d-lang">—</div></div>
+    <div class="card"><div class="label" data-i18n="gui_active_rules">Active Rules</div><div class="value" id="d-rules">??/div></div>
+    <div class="card"><div class="label" data-i18n="gui_health_check">Health Check</div><div class="value" id="d-health">??/div></div>
+    <div class="card"><div class="label" data-i18n="gui_language">Language</div><div class="value" id="d-lang">??/div></div>
   </div>
   <fieldset id="cd-field" style="display:none;margin-bottom:14px;border:none;padding:0;">
     <div id="cd-list" class="cards" style="margin-bottom:0;"></div>
@@ -2184,8 +2204,8 @@ legend { color:var(--accent2); font-weight:700; font-size:.9rem; padding:0 8px; 
        <label data-i18n="gui_window_min" style="font-weight:600;color:var(--dim);font-size:0.85rem;">Window (min):</label>
        <input id="d-global-min" type="number" value="30" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--fg);padding:4px 8px;border-radius:4px;">
        <span style="flex:1"></span>
-       <button class="btn btn-warn btn-sm" onclick="openQueryModal()" data-i18n="gui_add_query_widget">➕ Add Query Widget</button>
-       <button class="btn btn-primary btn-sm" onclick="runAllQueries()" data-i18n="gui_run_all_queries">▶ Run All</button>
+       <button class="btn btn-warn btn-sm" onclick="openQueryModal()" data-i18n="gui_add_query_widget">??Add Query Widget</button>
+       <button class="btn btn-primary btn-sm" onclick="runAllQueries()" data-i18n="gui_run_all_queries">??Run All</button>
     </div>
     <div id="d-queries-container" style="display:flex;flex-direction:column;gap:16px;">
         <!-- Query Profile Tables generated dynamically -->
@@ -2193,17 +2213,17 @@ legend { color:var(--accent2); font-weight:700; font-size:.9rem; padding:0 8px; 
   </fieldset>
 </div>
 
-<!-- ═══ Rules ═══ -->
+<!-- ????Rules ????-->
 <div class="panel" id="p-rules">
   <div class="toolbar">
     <span style="font-size:1.1rem;font-weight:700;color:var(--accent2)" data-i18n="gui_tab_rules">Rules</span>
     <span class="badge" id="r-badge">0</span>
-    <button class="btn btn-sm" style="margin-left:8px;background:var(--dim);color:#fff" onclick="openModal('m-help')" data-i18n="gui_param_guide">📖 Parameter Guide</button>
+    <button class="btn btn-sm" style="margin-left:8px;background:var(--dim);color:#fff" onclick="openModal('m-help')" data-i18n="gui_param_guide">?? Parameter Guide</button>
     <div class="spacer"></div>
-    <button class="btn btn-warn btn-sm" onclick="openModal('m-event')" data-i18n="gui_add_event">📋 + Event</button>
-    <button class="btn btn-warn btn-sm" onclick="openModal('m-traffic')" data-i18n="gui_add_traffic">🚦 + Traffic</button>
-    <button class="btn btn-warn btn-sm" onclick="openModal('m-bw')" data-i18n="gui_add_bw">📊 + BW/Vol</button>
-    <button class="btn btn-danger btn-sm" onclick="deleteSelected()" data-i18n="gui_delete">🗑 Delete</button>
+    <button class="btn btn-warn btn-sm" onclick="openModal('m-event')" data-i18n="gui_add_event">?? + Event</button>
+    <button class="btn btn-warn btn-sm" onclick="openModal('m-traffic')" data-i18n="gui_add_traffic">? + Traffic</button>
+    <button class="btn btn-warn btn-sm" onclick="openModal('m-bw')" data-i18n="gui_add_bw">?? + BW/Vol</button>
+    <button class="btn btn-danger btn-sm" onclick="deleteSelected()" data-i18n="gui_delete">?? Delete</button>
   </div>
   <table class="rule-table">
     <thead><tr><th style="width:30px"><input type="checkbox" id="r-chkall" onchange="toggleAll(this)"></th><th data-i18n="gui_col_type">Type</th><th data-i18n="gui_col_name">Name</th><th style="width:110px" data-i18n="gui_col_status">Status</th><th data-i18n="gui_col_condition">Condition</th><th data-i18n="gui_col_filters">Filters</th><th style="width:50px" data-i18n="gui_col_edit">Edit</th></tr></thead>
@@ -2211,40 +2231,40 @@ legend { color:var(--accent2); font-weight:700; font-size:.9rem; padding:0 8px; 
   </table>
 </div>
 
-<!-- ═══ Settings ═══ -->
+<!-- ????Settings ????-->
 <div class="panel" id="p-settings">
   <div class="cards" style="margin-bottom:14px;">
-    <div class="card"><div class="label" data-i18n="gui_api_status">API Status</div><div class="value" id="d-api">—</div></div>
+    <div class="card"><div class="label" data-i18n="gui_api_status">API Status</div><div class="value" id="d-api">??/div></div>
   </div>
   <div style="display:flex;gap:8px;margin-bottom:14px;">
-    <button class="btn btn-primary" onclick="testConn()" data-i18n="gui_test_conn">🔗 Test Connection</button>
+    <button class="btn btn-primary" onclick="testConn()" data-i18n="gui_test_conn">?? Test Connection</button>
   </div>
   <div class="log-box" id="s-log" style="height:80px;margin-bottom:14px;font-size:0.85rem;">[Ready]</div>
   <div id="s-form"></div>
   <div style="text-align:right;margin-top:16px;">
-    <button class="btn btn-success" onclick="saveSettings()" data-i18n="gui_save_all">💾 Save All Settings</button>
+    <button class="btn btn-success" onclick="saveSettings()" data-i18n="gui_save_all">? Save All Settings</button>
   </div>
 </div>
 
-<!-- ═══ Actions ═══ -->
+<!-- ????Actions ????-->
 <div class="panel" id="p-actions">
   <div class="action-grid">
-    <div class="action-card"><h3 data-i18n="gui_run_once">▶ Run Monitor Once</h3><p data-i18n="gui_run_once_desc">Execute full cycle: Health → Fetch → Analyze → Alert</p><button class="btn btn-primary" onclick="runAction('run')" data-i18n="gui_run_btn">Run</button></div>
-    <div class="action-card"><h3 data-i18n="gui_debug_mode">🔍 Debug Mode</h3><p data-i18n="gui_debug_desc">Sandbox mode — no alerts, no state updates</p>
+    <div class="action-card"><h3 data-i18n="gui_run_once">??Run Monitor Once</h3><p data-i18n="gui_run_once_desc">Execute full cycle: Health ??Fetch ??Analyze ??Alert</p><button class="btn btn-primary" onclick="runAction('run')" data-i18n="gui_run_btn">Run</button></div>
+    <div class="action-card"><h3 data-i18n="gui_debug_mode">?? Debug Mode</h3><p data-i18n="gui_debug_desc">Sandbox mode ??no alerts, no state updates</p>
       <div class="form-row" style="margin-bottom:8px;">
         <div class="form-group"><label data-i18n="gui_window_min">Window (min)</label><input id="a-debug-mins" value="30"></div>
         <div class="form-group"><label data-i18n="gui_policy_dec">Policy Dec.</label><select id="a-debug-pd"><option value="1" data-i18n="gui_pd_blocked">Blocked</option><option value="2" data-i18n="gui_pd_allowed">Allowed</option><option value="3" data-i18n="gui_pd_all" selected>All</option></select></div>
       </div>
       <button class="btn btn-primary" onclick="runDebug()" data-i18n="gui_run_debug">Run Debug</button>
     </div>
-    <div class="action-card"><h3 data-i18n="gui_test_alert">📧 Send Test Alert</h3><p data-i18n="gui_test_alert_desc">Verify Email / LINE / Webhook delivery</p><button class="btn btn-primary" onclick="runAction('test-alert')" data-i18n="gui_send">Send</button></div>
-    <div class="action-card"><h3 data-i18n="gui_best_practices">📋 Load Best Practices</h3><p data-i18n="gui_best_practices_desc">Replace ALL existing rules with recommended defaults</p><button class="btn btn-danger" onclick="confirmBestPractices()" data-i18n="gui_load">Load</button></div>
+    <div class="action-card"><h3 data-i18n="gui_test_alert">? Send Test Alert</h3><p data-i18n="gui_test_alert_desc">Verify Email / LINE / Webhook delivery</p><button class="btn btn-primary" onclick="runAction('test-alert')" data-i18n="gui_send">Send</button></div>
+    <div class="action-card"><h3 data-i18n="gui_best_practices">?? Load Best Practices</h3><p data-i18n="gui_best_practices_desc">Replace ALL existing rules with recommended defaults</p><button class="btn btn-danger" onclick="confirmBestPractices()" data-i18n="gui_load">Load</button></div>
   </div>
   <h3 style="color:var(--accent2);margin-bottom:8px;" data-i18n="gui_output">Output</h3>
   <div class="log-box" id="a-log"></div>
 </div>
 
-<!-- ═══ Modals ═══ -->
+<!-- ????Modals ????-->
 <!-- Dashboard Query Profile Modal -->
 <div class="modal-bg" id="m-query"><div class="modal">
   <h2><span data-i18n="gui_add_query_widget" id="mq-title">Add Query Widget</span></h2>
@@ -2263,7 +2283,7 @@ legend { color:var(--accent2); font-weight:700; font-size:.9rem; padding:0 8px; 
   <fieldset><legend data-i18n="gui_excludes">Excludes (Optional)</legend>
     <div class="form-row-3"><div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="dq-expt" placeholder="e.g. 22"></div><div class="form-group"><label data-i18n="gui_ex_src">Exclude Source</label><input id="dq-exsrc" placeholder="e.g. env=Kube, 10.9.9.9"></div><div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="dq-exdst" placeholder="e.g. 8.8.8.8"></div></div>
   </fieldset>
-  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-query')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveDashboardQuery()" data-i18n="gui_save">💾 Save</button></div>
+  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-query')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveDashboardQuery()" data-i18n="gui_save">? Save</button></div>
 </div></div>
 
 <!-- Event -->
@@ -2279,7 +2299,7 @@ legend { color:var(--accent2); font-weight:700; font-size:.9rem; padding:0 8px; 
       <div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="ev-cd" type="number" value="10"></div>
     </div>
   </fieldset>
-  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-event')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveEvent()" data-i18n="gui_save">💾 Save</button></div>
+  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-event')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveEvent()" data-i18n="gui_save">? Save</button></div>
 </div></div>
 
 <!-- Traffic -->
@@ -2302,7 +2322,7 @@ legend { color:var(--accent2); font-weight:700; font-size:.9rem; padding:0 8px; 
   <fieldset><legend data-i18n="gui_threshold">Threshold</legend>
     <div class="form-row-3"><div class="form-group"><label data-i18n="gui_count">Count</label><input id="tr-cnt" type="number" value="10"></div><div class="form-group"><label data-i18n="gui_window_min">Window (min)</label><input id="tr-win" type="number" value="10"></div><div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="tr-cd" type="number" value="10"></div></div>
   </fieldset>
-  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-traffic')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveTraffic()" data-i18n="gui_save">💾 Save</button></div>
+  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-traffic')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveTraffic()" data-i18n="gui_save">? Save</button></div>
 </div></div>
 
 <!-- BW/Volume -->
@@ -2328,12 +2348,12 @@ legend { color:var(--accent2); font-weight:700; font-size:.9rem; padding:0 8px; 
   <fieldset><legend data-i18n="gui_threshold">Threshold</legend>
     <div class="form-row-3"><div class="form-group"><label data-i18n="gui_value">Value</label><input id="bw-val" type="number" value="100"></div><div class="form-group"><label data-i18n="gui_window_min">Window (min)</label><input id="bw-win" type="number" value="10"></div><div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="bw-cd" type="number" value="30"></div></div>
   </fieldset>
-  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-bw')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveBW()" data-i18n="gui_save">💾 Save</button></div>
+  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-bw')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveBW()" data-i18n="gui_save">? Save</button></div>
 </div></div>
 
 <!-- Help / Parameter Guide -->
 <div class="modal-bg" id="m-help"><div class="modal" style="max-width:600px;">
-  <h2><span data-i18n="gui_help_title">📖 Parameter Guide (API 25.2)</span></h2>
+  <h2><span data-i18n="gui_help_title">?? Parameter Guide (API 25.2)</span></h2>
   <div style="color:var(--dim);line-height:1.6;font-size:0.95rem;">
     <p data-i18n="gui_help_desc">Illumio PCE Ops leverages the standard Illumio Traffic Analysis REST API parameters.</p>
     <h3 style="color:#fff;margin-top:12px" data-i18n="gui_help_filters">Filters & Excludes</h3>
@@ -2356,7 +2376,7 @@ legend { color:var(--accent2); font-weight:700; font-size:.9rem; padding:0 8px; 
 <div class="toast" id="toast"></div>
 
 <script>
-/* ─── Helpers ─────────────────────────────────────────────────────── */
+/* ??? Helpers ??????????????????????????????????????????????????????? */
 const $=s=>document.getElementById(s);
 const api=async(url,opt)=>{const r=await fetch(url,opt);return r.json()};
 const post=(url,body)=>api(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -2374,6 +2394,15 @@ async function loadTranslations(){
     if(_translations[k]){
       if(el.tagName==='INPUT'&&el.type==='button') el.value=_translations[k];
       else el.textContent=_translations[k];
+    }
+  });
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const k=el.getAttribute('data-i18n');
+    if(!_translations[k]) return;
+    if(el.hasAttribute('title')) el.setAttribute('title', _translations[k]);
+    if(el.hasAttribute('placeholder') && !el.hasAttribute('data-keep-placeholder')) {
+      const cur = el.getAttribute('placeholder') || '';
+      if(cur && !/^e\.g\./i.test(cur)) el.setAttribute('placeholder', _translations[k]);
     }
   });
 }
@@ -2412,7 +2441,7 @@ function dlog(msg){const l=$('d-log');l.textContent+='\n['+new Date().toLocaleTi
 function slog(msg){const l=$('s-log');if(l){l.textContent+='\n['+new Date().toLocaleTimeString()+'] '+msg;l.scrollTop=l.scrollHeight}}
 function alog(msg){const l=$('a-log');l.textContent+='\n'+msg;l.scrollTop=l.scrollHeight}
 
-/* ─── Tabs ────────────────────────────────────────────────────────── */
+/* ??? Tabs ?????????????????????????????????????????????????????????? */
 function switchTab(id){
   document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',t.textContent.trim().toLowerCase().startsWith(id.slice(0,4)))});
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -2422,7 +2451,7 @@ function switchTab(id){
   if(id==='dashboard') loadDashboard();
 }
 
-/* ─── Dashboard ───────────────────────────────────────────────────── */
+/* ??? Dashboard ????????????????????????????????????????????????????? */
 async function loadDashboard(){
   const d=await api('/api/status');
   $('hdr-meta').textContent=`v${d.version} | ${d.api_url}`;
@@ -2436,7 +2465,7 @@ async function loadDashboard(){
     if (activeCds > 0) {
       const title = _translations['gui_cooldown_title'] || 'Rules in Cooldown';
       $('cd-field').style.display='block';
-      $('cd-list').innerHTML = `<div class="card" style="border-color:var(--warn);"><div class="label" style="color:var(--warn);"><span style="margin-right:4px;">⏳</span>${title}</div><div class="value" style="color:var(--warn);">${activeCds}</div></div>`;
+      $('cd-list').innerHTML = `<div class="card" style="border-color:var(--warn);"><div class="label" style="color:var(--warn);"><span style="margin-right:4px;">??/span>${title}</div><div class="value" style="color:var(--warn);">${activeCds}</div></div>`;
     } else {
       $('cd-field').style.display='none';
       $('cd-list').innerHTML='';
@@ -2450,10 +2479,18 @@ async function loadDashboard(){
   await loadDashboardQueries();
 }
 async function testConn(){
-  slog('Testing PCE connection...');
-  const r=await post('/api/actions/test-connection',{});
-  if(r.ok){$('d-api').textContent='Connected';$('d-api').className='value ok';slog('✅ Connected (HTTP '+r.status+')')}
-  else{$('d-api').textContent='Error';$('d-api').className='value err';slog('❌ '+( r.error||r.body))}
+  slog(_translations['gui_test_conn_running'] || '測試 PCE 連線中...');
+  const r = await post('/api/actions/test-connection', {});
+  if (r.ok) {
+    const okText = _translations['status_ok'] || '連線成功';
+    $('d-api').textContent = okText;
+    $('d-api').className = 'value ok';
+    slog(okText + ' (HTTP ' + r.status + ')');
+  } else {
+    $('d-api').textContent = _translations['status_error'] || '連線失敗';
+    $('d-api').className = 'value err';
+    slog(r.error || r.body);
+  }
 }
 
 let _dashboardQueries = [];
@@ -2494,7 +2531,7 @@ function renderDashboardQueries() {
                 <span style="font-size:10px;background:var(--dim);color:#fff;padding:2px 6px;border-radius:4px;margin-right:8px;">${rankLabel}</span>
                 <span style="flex:1"></span>
                 <span id="d-qstate-${i}" style="color:var(--dim);font-size:0.8rem;margin-right:12px;"></span>
-                <button class="btn btn-sm" style="background:var(--bg);border:1px solid var(--border);margin-right:6px;" onclick="openQueryModal(${i})">✏️</button>
+                <button class="btn btn-sm" style="background:var(--bg);border:1px solid var(--border);margin-right:6px;" onclick="openQueryModal(${i})">??</button>
                 <button class="btn btn-primary btn-sm" onclick="runTop10Query(${i})" data-i18n="gui_run_btn">Run</button>
              </div>
              
@@ -2534,7 +2571,7 @@ function openQueryModal(idx = -1) {
       $('dq-src').value = ''; $('dq-dst').value = '';
       $('dq-expt').value = ''; $('dq-exsrc').value = ''; $('dq-exdst').value = '';
   } else {
-      $('mq-title').textContent = 'Edit Query Widget';
+      mq-title.textContent = _translations['gui_edit_query_widget'] || 'Edit Query Widget';
       const q = _dashboardQueries[idx];
       $('dq-name').value = q.name || '';
       $('dq-rank').value = q.rank_by || 'count';
@@ -2591,18 +2628,18 @@ async function saveDashboardQuery() {
         if (m) m.classList.remove('show');
         await loadDashboardQueries(); 
     }
-    else alert("Error: " + r.error);
+    else alert((_translations['error_generic']||'Error: {error}').replace('{error}', r.error || 'Unknown error'));
 }
 
 async function deleteTop10Query(idx) {
-    if(!confirm("Delete this widget?")) return;
+    if(!confirm(_translations['gui_confirm_delete_widget'] || 'Delete this widget?')) return;
     const r = await fetch('/api/dashboard/queries/'+idx, {method:'DELETE'}).then(res => res.json());
     if(r.ok) { 
         const m = $('m-query');
         if (m) m.classList.remove('show');
         await loadDashboardQueries(); 
     }
-    else alert("Delete failed");
+    else alert(_translations['error_deleting'] || 'Delete failed');
 }
 
 async function runAllQueries() {
@@ -2630,9 +2667,9 @@ async function runTop10Query(idx){
     if(r.data && r.data.length){
       let html='';
       r.data.forEach((m,i)=>{
-        const pBadge = m.pd===2 ? `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">Blocked</span>` :
-                       m.pd===1 ? `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">Potential</span>` :
-                       m.pd===0 ? `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">Allowed</span>` : m.pd;
+        const pBadge = m.pd===2 ? `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${_translations['gui_pd_blocked']||'Blocked'}</span>` :
+                       m.pd===1 ? `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">${_translations['gui_pd_potential']||'Potential'}</span>` :
+                       m.pd===0 ? `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${_translations['gui_pd_allowed']||'Allowed'}</span>` : m.pd;
                        
         const formatLabel = (labels) => {
             if(!labels || !labels.length) return '';
@@ -2661,12 +2698,12 @@ async function runTop10Query(idx){
     }
     initTableResizers();
   } catch(e) {
-    ms.textContent = 'Error: '+e.message;
+    ms.textContent = (_translations['error_generic']||'Error: {error}').replace('{error}', e.message);
     bd.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--danger);padding:20px;">${_translations['gui_top10_error']||'Error querying data.'}</td></tr>`;
   }
 }
 
-/* ─── Rules ───────────────────────────────────────────────────────── */
+/* ??? Rules ????????????????????????????????????????????????????????? */
 let _catalog={};
 async function loadRules(){
   const rules=await api('/api/rules');
@@ -2686,9 +2723,9 @@ async function loadRules(){
     let statusHtml = '';
     if (r.cooldown_remaining > 0) {
       const rem = remTempl.replace('{mins}', r.cooldown_remaining);
-      statusHtml = `<span style="background:var(--warn);color:#1a2c32;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">⏳ ${cdTitle} (${rem})</span>`;
+      statusHtml = `<span style="background:var(--warn);color:#1a2c32;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">??${cdTitle} (${rem})</span>`;
     } else {
-      statusHtml = `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">✅ ${readyTitle}</span>`;
+      statusHtml = `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">??${readyTitle}</span>`;
     }
     
     let f=[];
@@ -2697,7 +2734,7 @@ async function loadRules(){
     if(r.port) f.push('Port:'+r.port);
     if(r.src_label) f.push('Src:'+r.src_label);if(r.dst_label) f.push('Dst:'+r.dst_label);
     if(r.src_ip_in) f.push('SrcIP:'+r.src_ip_in);if(r.dst_ip_in) f.push('DstIP:'+r.dst_ip_in);
-    html+=`<tr><td><input type="checkbox" class="r-chk" data-idx="${r.index}"></td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}">${cond}</td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | '))||'—'}</td><td><button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')">✏️</button></td></tr>`;
+    html+=`<tr><td><input type="checkbox" class="r-chk" data-idx="${r.index}"></td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}">${cond}</td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | '))||'??}</td><td><button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')">??</button></td></tr>`;
   });
   $('r-body').innerHTML=html||'<tr><td colspan="7" style="color:var(--dim);text-align:center;padding:24px">No rules. Add one above.</td></tr>';
   initTableResizers();
@@ -2705,10 +2742,10 @@ async function loadRules(){
 function toggleAll(el){document.querySelectorAll('.r-chk').forEach(c=>c.checked=el.checked)}
 async function deleteSelected(){
   const ids=[...document.querySelectorAll('.r-chk:checked')].map(c=>parseInt(c.dataset.idx)).sort((a,b)=>b-a);
-  if(!ids.length){toast('Select rules first','err');return}
-  if(!confirm('Delete '+ids.length+' rule(s)?'))return;
+  if(!ids.length){toast(_translations['gui_select_rules_first']||'Select rules first','err');return}
+  if(!confirm((_translations['confirm_delete']||'Delete {count} rules? (y/n)').replace('{count}', ids.length)))return;
   for(const i of ids) await del('/api/rules/'+i);
-  toast('Deleted');loadRules();loadDashboard();
+  toast(_translations['gui_deleted']||'Deleted');loadRules();loadDashboard();
 }
 function openModal(id,isEdit){
   _editIdx=isEdit??null;$(id).classList.add('show');if(id==='m-event'&&!Object.keys(_catalog).length)loadCatalog();
@@ -2737,11 +2774,11 @@ function populateEvents(){
   Object.entries(_catalog[cat]).forEach(([k,v])=>{const o=document.createElement('option');o.value=k;o.textContent=k+' ('+v+')';sel.appendChild(o)});
 }
 
-/* ─── Edit Rule ───────────────────────────────────────────────────── */
+/* ??? Edit Rule ????????????????????????????????????????????????????? */
 async function editRule(idx,type){
   try {
     const r=await api('/api/rules/'+idx);
-    if(!r || r.error){toast('Rule not found','err');return}
+    if(!r || r.error){toast(_translations['gui_rule_not_found']||'Rule not found','err');return}
     if(type==='event'){
       await loadCatalog();
       // Find and select category
@@ -2784,26 +2821,26 @@ async function editRule(idx,type){
     }
   } catch(e) {
     console.error(e);
-    alert('UI Error: ' + e.message);
+    alert((_translations['gui_ui_error']||'UI Error: ') + e.message);
   }
 }
 
 async function saveEvent(){
   const cat=$('ev-cat').value,ev=$('ev-type').value;
-  if(!cat||!ev){toast('Select category and event','err');return}
+  if(!cat||!ev){toast(_translations['gui_select_category_event']||'Select category and event','err');return}
   const name=(_catalog[cat]||{})[ev]||ev;
   const data={name,filter_value:ev,threshold_type:rv('ev-tt'),threshold_count:$('ev-cnt').value,threshold_window:$('ev-win').value,cooldown_minutes:$('ev-cd').value};
   if(_editIdx!==null) await put('/api/rules/'+_editIdx,data); else await post('/api/rules/event',data);
-  closeModal('m-event');toast('Event rule saved');loadRules();loadDashboard();
+  closeModal('m-event');toast(_translations['gui_event_rule_saved']||'Event rule saved');loadRules();loadDashboard();
 }
 async function saveTraffic(){
-  const name=$('tr-name').value.trim();if(!name){toast('Name required','err');return}
+  const name=$('tr-name').value.trim();if(!name){toast(_translations['gui_name_required']||'Name required','err');return}
   const data={name,pd:rv('tr-pd'),port:$('tr-port').value,proto:$('tr-proto').value,src:$('tr-src').value,dst:$('tr-dst').value,ex_port:$('tr-expt').value,ex_src:$('tr-exsrc').value,ex_dst:$('tr-exdst').value,threshold_count:$('tr-cnt').value,threshold_window:$('tr-win').value,cooldown_minutes:$('tr-cd').value};
   if(_editIdx!==null) await put('/api/rules/'+_editIdx,data); else await post('/api/rules/traffic',data);
-  closeModal('m-traffic');toast('Traffic rule saved');loadRules();loadDashboard();
+  closeModal('m-traffic');toast(_translations['gui_traffic_rule_saved']||'Traffic rule saved');loadRules();loadDashboard();
 }
 async function saveBW(){
-  const name=$('bw-name').value.trim();if(!name){toast('Name required','err');return}
+  const name=$('bw-name').value.trim();if(!name){toast(_translations['gui_name_required']||'Name required','err');return}
   const data={
     name,rule_type:rv('bw-mt'),pd:rv('bw-pd'),
     port:$('bw-port').value,src:$('bw-src').value,dst:$('bw-dst').value,
@@ -2811,16 +2848,16 @@ async function saveBW(){
     threshold_count:$('bw-val').value,threshold_window:$('bw-win').value,cooldown_minutes:$('bw-cd').value
   };
   if(_editIdx!==null) await put('/api/rules/'+_editIdx,{...data,type:data.rule_type}); else await post('/api/rules/bandwidth',data);
-  closeModal('m-bw');toast('Rule saved');loadRules();loadDashboard();
+  closeModal('m-bw');toast(_translations['gui_rule_saved']||'Rule saved');loadRules();loadDashboard();
 }
 
 function confirmBestPractices(){
-  if(!confirm('⚠️ WARNING: This will DELETE all existing rules and replace them with best practice defaults.\n\nAre you sure you want to continue?')) return;
-  if(!confirm('This action cannot be undone. Confirm once more to proceed.')) return;
+  if(!confirm(_translations['gui_bp_confirm_1'] || 'WARNING: This will DELETE all existing rules and replace them with best practice defaults. Continue?')) return;
+  if(!confirm(_translations['gui_bp_confirm_2'] || 'This action cannot be undone. Confirm once more to proceed.')) return;
   runAction('best-practices');
 }
 
-/* ─── Settings ────────────────────────────────────────────────────── */
+/* ??? Settings ?????????????????????????????????????????????????????? */
 let _settings={};
 async function loadSettings(){
   _settings=await api('/api/settings');
@@ -2839,7 +2876,7 @@ async function loadSettings(){
     <div style="display:flex;gap:20px"><div class="chk"><label><input type="checkbox" id="s-tls" ${sm.enable_tls?'checked':''}> STARTTLS</label></div><div class="chk"><label><input type="checkbox" id="s-auth" ${sm.enable_auth?'checked':''}> Auth</label></div></div>
   </fieldset>
   <fieldset><legend data-i18n="gui_alert_channels">Alert Channels</legend>
-    <div style="display:flex;gap:20px;margin-bottom:12px"><div class="chk"><label><input type="checkbox" id="s-amail" ${active.includes('mail')?'checked':''}> 📧 <span data-i18n="gui_mail">Mail</span></label></div><div class="chk"><label><input type="checkbox" id="s-aline" ${active.includes('line')?'checked':''}> 📱 <span data-i18n="gui_line">LINE</span></label></div><div class="chk"><label><input type="checkbox" id="s-awh" ${active.includes('webhook')?'checked':''}> 🔗 <span data-i18n="gui_webhook">Webhook</span></label></div></div>
+    <div style="display:flex;gap:20px;margin-bottom:12px"><div class="chk"><label><input type="checkbox" id="s-amail" ${active.includes('mail')?'checked':''}> ? <span data-i18n="gui_mail">Mail</span></label></div><div class="chk"><label><input type="checkbox" id="s-aline" ${active.includes('line')?'checked':''}> ? <span data-i18n="gui_line">LINE</span></label></div><div class="chk"><label><input type="checkbox" id="s-awh" ${active.includes('webhook')?'checked':''}> ?? <span data-i18n="gui_webhook">Webhook</span></label></div></div>
     <div class="form-row"><div class="form-group"><label data-i18n="gui_line_token">LINE Token</label><input id="s-ltok" value="${al.line_channel_access_token||''}"></div><div class="form-group"><label data-i18n="gui_line_target_id">LINE Target ID</label><input id="s-ltgt" value="${al.line_target_id||''}"></div></div>
     <div class="form-group"><label data-i18n="gui_webhook_url">Webhook URL</label><input id="s-whurl" value="${al.webhook_url||''}"></div>
   </fieldset>
@@ -2849,7 +2886,7 @@ async function loadSettings(){
         <label data-i18n="gui_language">Language</label>
         <div class="radio-group">
           <label><input type="radio" name="s-lang" value="en" ${st.language!=='zh_TW'?'checked':''}> <span data-i18n="gui_lang_en">English</span></label>
-          <label><input type="radio" name="s-lang" value="zh_TW" ${st.language==='zh_TW'?'checked':''}> <span data-i18n="gui_lang_zh">繁體中文</span></label>
+          <label><input type="radio" name="s-lang" value="zh_TW" ${st.language==='zh_TW'?'checked':''}> <span data-i18n="gui_lang_zh">蝜?銝剜?</span></label>
         </div>
       </div>
       <div class="form-group">
@@ -2874,32 +2911,35 @@ async function saveSettings(){
     alerts:{active,line_channel_access_token:$('s-ltok').value,line_target_id:$('s-ltgt').value,webhook_url:$('s-whurl').value},
     settings:{language:rv('s-lang'), theme: theme, timezone:$('s-timezone') ? $('s-timezone').value : 'local'}
   });
-  toast('Settings saved');
+  toast(_translations['gui_settings_saved'] || 'Settings saved');
 }
 
-/* ─── Actions ─────────────────────────────────────────────────────── */
+/* ??? Actions ??????????????????????????????????????????????????????? */
 async function runAction(name){
-  $('a-log').textContent='['+new Date().toLocaleTimeString()+'] Running '+name+'...';
+  const runningTpl = _translations['gui_action_running'] || '執行中：{name}...';
+  $('a-log').textContent='['+new Date().toLocaleTimeString()+'] '+runningTpl.replace('{name}', name);
   const r=await post('/api/actions/'+name,{});
-  alog(r.output||'Done.');
+  alog(r.output||(_translations['done']||'完成。'));
   if(name==='best-practices'){loadRules();loadDashboard()}
-  toast('✅ '+name+' completed');
+  const doneTpl = _translations['gui_action_completed'] || '已完成：{name}';
+  toast(doneTpl.replace('{name}', name));
 }
 async function runDebug(){
-  $('a-log').textContent='['+new Date().toLocaleTimeString()+'] Running debug mode...';
+  $('a-log').textContent='['+new Date().toLocaleTimeString()+'] '+(_translations['gui_debug_running']||'執行除錯模式中...');
   const r=await post('/api/actions/debug',{mins:$('a-debug-mins').value,pd_sel:$('a-debug-pd').value});
-  alog(r.output||'Done.');
-  toast('✅ Debug completed');
+  alog(r.output||(_translations['done']||'完成。'));
+  toast(_translations['gui_debug_completed']||'除錯模式執行完成');
 }
 
-/* ─── Init ────────────────────────────────────────────────────────── */
+/* ??? Init ?????????????????????????????????????????????????????????? */
 async function stopGui(){
-  if(!confirm('Stop the Web GUI server? The browser page will close.')) return;
+  if(!confirm(_translations['gui_stop_confirm'] || '要停止 Web GUI 伺服器嗎？此頁面將關閉操作功能。')) return;
   try{ await post('/api/shutdown',{}); } catch(e){}
-  document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px"><h1 style="color:var(--accent2)">Web GUI Stopped</h1><p style="color:var(--dim)">You may close this tab. Restart from CLI or use --gui.</p></div>';
+  document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px"><h1 style="color:var(--accent2)">'+(_translations['gui_stopped_title']||'Web GUI 已停止')+'</h1><p style="color:var(--dim)">'+(_translations['gui_stopped_hint']||'你可以關閉此分頁，並從 CLI 或使用 --gui 重新啟動。')+'</p></div>';
 }
 loadDashboard();
 testConn();
 </script>
 </body>
 </html>'''
+

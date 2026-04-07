@@ -26,8 +26,8 @@ def pu_overview(baseline_rules: list, hit_rule_hrefs: set) -> dict:
     hit_rate = round(hit / total * 100, 1) if total > 0 else 0.0
 
     summary_df = pd.DataFrame([
-        {"Status": "Hit",    "Count": hit,    "Percentage": f"{hit_rate}%"},
-        {"Status": "Unused", "Count": unused, "Percentage": f"{round(100 - hit_rate, 1)}%"},
+        {"Status": "已命中", "Count": hit, "Percentage": f"{hit_rate}%"},
+        {"Status": "未使用", "Count": unused, "Percentage": f"{round(100 - hit_rate, 1)}%"},
     ])
 
     return {

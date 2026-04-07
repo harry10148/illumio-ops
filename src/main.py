@@ -317,9 +317,11 @@ def main_menu():
         elif sel == 4:
             settings_menu(cm)
         elif sel == 5:
-            from src.gui import launch_gui, HAS_FLASK
+            from src.gui import launch_gui, HAS_FLASK, FLASK_IMPORT_ERROR
             if not HAS_FLASK:
                 print(f"{Colors.FAIL}{t('flask_not_available')}{Colors.ENDC}")
+                if FLASK_IMPORT_ERROR:
+                    print(f"Import error: {FLASK_IMPORT_ERROR}")
                 print(t("flask_install_hint"))
                 input(
                     f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} {Colors.GREEN}❯{Colors.ENDC} "
@@ -629,10 +631,12 @@ def main():
     elif args.monitor:
         run_daemon_loop(args.interval)
     elif args.gui:
-        from src.gui import launch_gui, HAS_FLASK
+        from src.gui import launch_gui, HAS_FLASK, FLASK_IMPORT_ERROR
 
         if not HAS_FLASK:
             print(t("report_requires_flask"))
+            if FLASK_IMPORT_ERROR:
+                print(f"Import error: {FLASK_IMPORT_ERROR}")
             print(t("cli_pip_install_hint", pkg="flask"))
             sys.exit(1)
         cm = ConfigManager()

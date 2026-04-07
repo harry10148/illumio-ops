@@ -14,6 +14,7 @@ import os
 import re
 
 from src.i18n import t
+from src.state_store import load_state_file, update_state_file
 
 logger = logging.getLogger(__name__)
 
@@ -61,33 +62,23 @@ class ReportScheduler:
 
     def _load_states(self) -> dict:
         """Load per-schedule state from state.json."""
-        if not os.path.exists(self._state_file):
-            return {}
-        try:
-            with open(self._state_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            return data.get(_STATE_KEY, {})
-        except Exception:
-            return {}
+        data = load_state_file(self._state_file)
+        return data.get(_STATE_KEY, {})
 
     def _save_state(self, schedule_id: int, last_run: str, status: str, error: str = ""):
         """Persist schedule execution result into state.json."""
         try:
-            os.makedirs(os.path.dirname(self._state_file), exist_ok=True)
-            data = {}
-            if os.path.exists(self._state_file):
-                with open(self._state_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-            states = data.setdefault(_STATE_KEY, {})
-            states[str(schedule_id)] = {
-                "last_run": last_run,
-                "status": status,
-                "error": error,
-            }
-            tmp = self._state_file + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
-            os.replace(tmp, self._state_file)
+            def _merge(existing):
+                data = dict(existing)
+                states = data.setdefault(_STATE_KEY, {})
+                states[str(schedule_id)] = {
+                    "last_run": last_run,
+                    "status": status,
+                    "error": error,
+                }
+                return data
+
+            update_state_file(self._state_file, _merge)
         except Exception as e:
             logger.error(f"Failed to save schedule state: {e}")
 

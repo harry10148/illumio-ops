@@ -14,10 +14,10 @@ logger = logging.getLogger(__name__)
 _MAX_ROWS = 1000
 
 CAVEAT = (
-    "Rules with zero traffic hits in the analysed period. "
-    "NOTE: This classification is limited by the PCE traffic retention period. "
-    "A rule that had hits older than the lookback window will appear as unused. "
-    "Review carefully before removing any rule."
+    "本分析期間內沒有任何流量命中的規則。"
+    "請注意，此分類仍受 PCE 流量保留期間限制。"
+    "若某規則僅在回溯範圍之前曾被命中，仍可能在本報表中顯示為未使用。"
+    "刪除任何規則前請務必再次確認。"
 )
 
 
@@ -76,13 +76,13 @@ def _build_unused_row(rule: dict, ruleset_map: dict, api_client) -> dict:
     if created_at and "T" in created_at:
         created_at = created_at[:10]
 
-    desc = rule.get("description", "") or "NA"
+    desc = rule.get("description", "") or "未填寫"
     ruleset_label = f"{rs_name} ({rs_id})" if rs_id else rs_name
 
     return {
         "No":          rule_no,
         "Rule ID":     rule_id,
-        "Type":        rule.get("_rule_type", "Allow"),
+        "Type":        rule.get("_rule_type", "允許"),
         "Description": desc,
         "Ruleset":     ruleset_label,
         "Destination": providers,
