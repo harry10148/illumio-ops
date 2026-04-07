@@ -167,4 +167,97 @@ def build_css(exporter_type: str) -> str:
         'ven':          VEN_CSS,
         'policy_usage': POLICY_USAGE_CSS,
     }.get(exporter_type, '')
-    return f"{FONT_LINK}\n{BASE_CSS}{extra}</style>\n"
+    
+    # Add table structural CSS required for resizing and filtering
+    TABLE_STRUCT_CSS = """
+  table { table-layout: fixed; border: 1px solid var(--slate-20); }
+  th { position: relative; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; 
+       padding-bottom: 32px !important; }
+  th .resizer { position: absolute; top: 0; right: 0; width: 4px; cursor: col-resize; user-select: none; height: 100%; z-index: 2; opacity: 0; transition: opacity 0.2s; }
+  th:hover .resizer { opacity: 1; background: var(--orange); }
+  th .resizer:active { opacity: 1; background: var(--orange); width: 6px; }
+  
+  .filter-input { 
+    position: absolute; bottom: 6px; left: 6px; right: 6px;
+    width: calc(100% - 12px); box-sizing: border-box; 
+    padding: 4px 8px 4px 20px; font-size: 10px; font-weight: normal; 
+    border: 1px solid var(--slate-20); border-radius: 4px; 
+    color: var(--slate); background: rgba(255,255,255,0.9) url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>') no-repeat 5px center;
+    display: block; cursor: text; outline: none;
+    transition: all 0.2s;
+  }
+  .filter-input:focus { border-color: var(--orange); background: #fff; box-shadow: 0 0 0 2px rgba(255,85,0,0.1); }
+  .filter-input::placeholder { color: var(--slate-50); font-style: italic; }
+"""
+    return f"{FONT_LINK}\n{BASE_CSS}{TABLE_STRUCT_CSS}{extra}</style>\n"
+
+TABLE_JS = """
+<script>
+// 1. Column Resizing
+document.querySelectorAll('th').forEach(th => {
+  const resizer = document.createElement('div');
+  resizer.classList.add('resizer');
+  th.appendChild(resizer);
+  let x, w;
+  const mouseDownHandler = (e) => {
+    e.stopPropagation(); // prevent sort
+    x = e.clientX;
+    const styles = window.getComputedStyle(th);
+    w = parseInt(styles.width, 10);
+    document.addEventListener('mousemove', mouseMoveHandler);
+    document.addEventListener('mouseup', mouseUpHandler);
+  };
+  const mouseMoveHandler = (e) => { th.style.width = `${w + e.clientX - x}px`; };
+  const mouseUpHandler = () => {
+    document.removeEventListener('mousemove', mouseMoveHandler);
+    document.removeEventListener('mouseup', mouseUpHandler);
+  };
+  resizer.addEventListener('mousedown', mouseDownHandler);
+});
+
+// 2. Table Sorting
+function sortTable(table, col) {
+  var rows = Array.from(table.querySelectorAll('tbody tr, tr:not(:first-child)'));
+  var asc = table.dataset.sortCol === String(col) && table.dataset.sortDir === 'asc';
+  rows.sort((a, b) => {
+    var av = a.cells[col] ? a.cells[col].innerText : '';
+    var bv = b.cells[col] ? b.cells[col].innerText : '';
+    var an = parseFloat(av.replace(/,/g, '')), bn = parseFloat(bv.replace(/,/g, ''));
+    if (!isNaN(an) && !isNaN(bn)) return asc ? bn - an : an - bn;
+    return asc ? bv.localeCompare(av) : av.localeCompare(bv);
+  });
+  rows.forEach(r => table.appendChild(r));
+  table.dataset.sortCol = col; table.dataset.sortDir = asc ? 'desc' : 'asc';
+}
+document.querySelectorAll('th').forEach((th, i) => {
+  th.addEventListener('click', (e) => {
+    if (e.target.tagName.toLowerCase() === 'input' || e.target.classList.contains('resizer')) return;
+    sortTable(th.closest('table'), Array.from(th.parentNode.children).indexOf(th));
+  });
+});
+
+// 3. Table Filtering
+document.querySelectorAll('th').forEach((th, i) => {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Filter...';
+  input.className = 'filter-input';
+  input.addEventListener('keyup', (e) => {
+    const table = th.closest('table');
+    const rows = Array.from(table.querySelectorAll('tbody tr, tr:not(:first-child)'));
+    const filters = Array.from(table.querySelectorAll('.filter-input')).map(inp => inp.value.toLowerCase());
+    rows.forEach(r => {
+      let show = true;
+      for(let c=0; c<filters.length; c++) {
+        if(!filters[c]) continue;
+        const cellText = (r.cells[c] ? r.cells[c].innerText.toLowerCase() : '');
+        if(!cellText.includes(filters[c])) { show = false; break; }
+      }
+      r.style.display = show ? '' : 'none';
+    });
+  });
+  input.addEventListener('click', e => e.stopPropagation()); // prevent sort
+  th.appendChild(input);
+});
+</script>
+"""

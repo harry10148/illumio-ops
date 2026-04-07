@@ -26,12 +26,13 @@ class Colors:
 
     _enabled = hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
-    HEADER = "\033[95m" if _enabled else ""
+    # Illumio Brand Colors (True Color RGB)
+    HEADER = "\033[38;2;255;85;0m" if _enabled else ""  # Illumio Orange
     BLUE = "\033[94m" if _enabled else ""
-    CYAN = "\033[96m" if _enabled else ""
-    GREEN = "\033[92m" if _enabled else ""
-    WARNING = "\033[93m" if _enabled else ""
-    FAIL = "\033[91m" if _enabled else ""
+    CYAN = "\033[38;2;148;206;229m" if _enabled else "" # Cloud Cerulean 120
+    GREEN = "\033[38;2;41;155;101m" if _enabled else "" # Safeguard Green 80
+    WARNING = "\033[38;2;255;162;47m" if _enabled else "" # Circuit Gold 100
+    FAIL = "\033[38;2;244;63;81m" if _enabled else ""    # Risk Red 80
     DARK_GRAY = "\033[90m" if _enabled else ""
     ENDC = "\033[0m" if _enabled else ""
     BOLD = "\033[1m" if _enabled else ""

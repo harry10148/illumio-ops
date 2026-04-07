@@ -5,22 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ t('login_title') }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
 
     :root {
-      --bg-page:   #F0F4F8;
+      --bg-page:   #F7F4EE; /* Zero Trust Tan 100 */
       --bg-card:   #FFFFFF;
-      --bg-input:  #F7F9FB;
-      --accent:    #E85C1A;
-      --accent-h:  #C44912;
-      --text:      #1A2733;
-      --muted:     #607080;
-      --border:    #D5DDE6;
+      --bg-input:  #F5F5F5; /* Server Slate 05 */
+      --accent:    #FF5500; /* Illumio Orange */
+      --accent-h:  #E54D00;
+      --text:      #313638; /* Server Slate 100 */
+      --muted:     #6F7274; /* Server Slate 70 */
+      --border:    #D6D7D7; /* Server Slate 20 */
       --shadow:    0 4px 24px rgba(0,0,0,0.10);
       --radius:    12px;
-      --danger:    #E02B2B;
+      --danger:    #BE122F; /* Risk Red 100 */
     }
 
     body {
@@ -30,7 +30,7 @@
       align-items: center;
       justify-content: center;
       background: var(--bg-page);
-      font-family: 'Inter', sans-serif;
+      font-family: 'FK Grotesk', Montserrat, Arial, sans-serif;
       color: var(--text);
     }
 
@@ -39,7 +39,7 @@
       content: '';
       position: fixed;
       inset: 0;
-      background: linear-gradient(135deg, #e0eaff 0%, #f0f4f8 50%, #fde8dc 100%);
+      background: linear-gradient(135deg, #F7F4EE 0%, #FFFFFF 100%);
       z-index: 0;
     }
 

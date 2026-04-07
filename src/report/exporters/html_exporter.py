@@ -18,31 +18,11 @@ import logging
 import pandas as pd
 
 from .report_i18n import make_i18n_js, lang_btn_html, COL_I18N as _COL_I18N
-from .report_css import build_css
+from .report_css import build_css, TABLE_JS
 
 logger = logging.getLogger(__name__)
 
 _CSS = build_css('traffic')
-
-_SORT_JS = """
-<script>
-function sortTable(table, col) {
-  var rows = Array.from(table.rows).slice(1);
-  var asc = table.dataset.sortCol === String(col) && table.dataset.sortDir === 'asc';
-  rows.sort((a, b) => {
-    var av = a.cells[col].innerText, bv = b.cells[col].innerText;
-    var an = parseFloat(av.replace(/,/g, '')), bn = parseFloat(bv.replace(/,/g, ''));
-    if (!isNaN(an) && !isNaN(bn)) return asc ? bn - an : an - bn;
-    return asc ? bv.localeCompare(av) : av.localeCompare(bv);
-  });
-  rows.forEach(r => table.appendChild(r));
-  table.dataset.sortCol = col; table.dataset.sortDir = asc ? 'desc' : 'asc';
-}
-document.querySelectorAll('th').forEach((th, i) => {
-  th.addEventListener('click', () => sortTable(th.closest('table'), i));
-});
-</script>
-"""
 
 
 def _fmt_bytes(b) -> str:
@@ -323,7 +303,7 @@ class HtmlExporter:
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
             '<title>Illumio Traffic Report</title>' + _CSS + '</head>\n'
             '<body>' + lang_btn_html() + nav_html + '<main>' + body + '</main>'
-            + _SORT_JS + make_i18n_js() + '</body></html>'
+            + TABLE_JS + make_i18n_js() + '</body></html>'
         )
 
     def _section(self, id_: str, i18n_key: str, title: str, content: str) -> str:

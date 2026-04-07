@@ -10,31 +10,11 @@ import logging
 import pandas as pd
 
 from .report_i18n import make_i18n_js, lang_btn_html, COL_I18N as _COL_I18N
-from .report_css import build_css
+from .report_css import build_css, TABLE_JS
 
 logger = logging.getLogger(__name__)
 
 _CSS = build_css('ven')
-
-_SORT_JS = """
-<script>
-document.querySelectorAll('th').forEach((th, i) => {
-  th.addEventListener('click', () => {
-    var table = th.closest('table');
-    var rows = Array.from(table.rows).slice(1);
-    var asc = table.dataset.sortCol === String(i) && table.dataset.sortDir === 'asc';
-    rows.sort((a, b) => {
-      var av = a.cells[i]?.innerText || '', bv = b.cells[i]?.innerText || '';
-      var an = parseFloat(av.replace(/,/g,'')), bn = parseFloat(bv.replace(/,/g,''));
-      if (!isNaN(an) && !isNaN(bn)) return asc ? bn - an : an - bn;
-      return asc ? bv.localeCompare(av) : av.localeCompare(bv);
-    });
-    rows.forEach(r => table.tBodies[0].appendChild(r));
-    table.dataset.sortCol = i; table.dataset.sortDir = asc ? 'desc' : 'asc';
-  });
-});
-</script>
-"""
 
 
 def _policy_sync_badge(val: str) -> str:
@@ -160,5 +140,5 @@ class VenHtmlExporter:
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
             '<title>Illumio VEN Status Report</title>' + _CSS + '</head>\n'
             '<body>' + lang_btn_html() + nav_html + '<main>' + body + '</main>'
-            + _SORT_JS + make_i18n_js() + '</body></html>'
+            + TABLE_JS + make_i18n_js() + '</body></html>'
         )

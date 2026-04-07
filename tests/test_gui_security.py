@@ -20,8 +20,7 @@ def temp_config_file():
 @pytest.fixture
 def app_persistent(temp_config_file):
     # Override ConfigManager path for testing
-    cm = ConfigManager()
-    cm.CONFIG_FILE = temp_config_file
+    cm = ConfigManager(config_file=temp_config_file)
     cm.load()
     
     # Setup test credentials
@@ -77,12 +76,12 @@ def test_ip_whitelist(app_persistent):
     client = app_persistent.test_client()
     
     # Mock remote_addr by directly calling request context
+    from src.gui import _RstDrop
+    import pytest
     with app_persistent.test_request_context('/', environ_base={'REMOTE_ADDR': '10.0.0.1'}):
-        app_persistent.preprocess_request()
-        # Should be forbidden
-        from flask import request
-        response = app_persistent.full_dispatch_request()
-        assert response.status_code == 403
+        # Should raise _RstDrop for blocked IP
+        with pytest.raises(_RstDrop):
+            app_persistent.preprocess_request()
 
     # Should allow 127.0.0.1 (in whitelist)
     with app_persistent.test_request_context('/', environ_base={'REMOTE_ADDR': '127.0.0.1'}):
@@ -95,11 +94,18 @@ def test_ip_whitelist(app_persistent):
         response = app_persistent.full_dispatch_request()
         assert response.status_code == 302
 
-def test_api_security_endpoints(client):
+def test_api_security_endpoints(app_persistent):
+    client = app_persistent.test_client()
     # Authenticate first
-    client.post('/api/login', json={"username": "admin", "password": "testpass"})
+    res_login = client.post('/api/login', json={"username": "admin", "password": "testpass"}, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
     
-    res = client.get('/api/security')
+    # Get CSRF token from cookies
+    csrf_token = None
+    for cookie in res_login.headers.getlist('Set-Cookie'):
+        if 'csrf_token=' in cookie:
+            csrf_token = cookie.split('csrf_token=')[1].split(';')[0]
+            
+    res = client.get('/api/security', environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
     assert res.status_code == 200
     assert res.json['username'] == 'admin'
     assert '127.0.0.1' in res.json['allowed_ips']
@@ -109,13 +115,13 @@ def test_api_security_endpoints(client):
         "username": "admin2",
         "old_password": "testpass",
         "new_password": "newpass",
-        "allowed_ips": ["10.0.0.0/8"]
-    })
+        "allowed_ips": ["10.0.0.0/8", "127.0.0.1", "localhost"]
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
     assert res.status_code == 200
     assert res.json['ok'] is True
     
     # Re-login with new password
     client.get('/logout')
-    res = client.post('/api/login', json={"username": "admin2", "password": "newpass"})
+    res = client.post('/api/login', json={"username": "admin2", "password": "newpass"}, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
     assert res.status_code == 200
     assert res.json['ok'] is True

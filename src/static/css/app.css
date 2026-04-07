@@ -50,18 +50,23 @@
     }
 
     [data-theme="light"] {
-      --bg: #F8FAFC;
-      --bg2: #FFFFFF;
-      --bg3: #F1F5F9;
-      --fg: #0F172A;
-      --dim: #64748B;
-      --accent: #EA580C;
-      --accent2: #F97316;
-      --success: #059669;
-      --warn: #D97706;
-      --danger: #DC2626;
-      --border: #E2E8F0;
-      --shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+      --bg:      #F5F5F5; /* Server Slate 05 */
+      --bg2:     #FFFFFF; /* White */
+      --bg3:     #EAEBEB; /* Server Slate 10 */
+      --fg:      #313638; /* Server Slate 100 */
+      --dim:     #6F7274; /* Server Slate 70 */
+      --accent:  #FF5500; /* Illumio Orange */
+      --accent2: #F97607; /* Circuit Gold 110 */
+      --success: #166644; /* Safeguard Green 100 */
+      --warn:    #F97607; /* Circuit Gold 110 */
+      --danger:  #BE122F; /* Risk Red 100 */
+      --border:  #D6D7D7; /* Server Slate 20 */
+      --shadow: 0 4px 16px rgba(49, 54, 56, 0.08);
+    }
+
+    [data-theme="light"] body::before,
+    [data-theme="light"] body::after {
+      opacity: 0.04;
     }
 
     * {
@@ -443,32 +448,33 @@
       transform: none;
       box-shadow: none;
     }
-
     /* Forms */
     .form-group {
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
 
     .form-group label {
       display: block;
       color: var(--dim);
-      font-size: .85rem;
-      margin-bottom: 6px;
-      font-weight: 700;
+      font-family: var(--header-font);
+      font-size: .8rem;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+      font-weight: 700;
     }
 
     .form-group input,
     .form-group select {
       width: 100%;
-      background: var(--bg);
+      background: var(--bg2);
       border: 1px solid var(--border);
       color: var(--fg);
-      padding: 10px 14px;
-      border-radius: 6px;
+      padding: 12px 14px;
+      border-radius: 8px;
       font-size: .95rem;
       transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02);
     }
 
     .form-group input:focus-visible,
@@ -487,13 +493,13 @@
     .form-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 16px;
+      gap: 24px;
     }
 
     .form-row-3 {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
-      gap: 16px;
+      gap: 24px;
     }
 
     /* Fieldset */

@@ -1142,11 +1142,11 @@ def web_gui_security_menu(cm: ConfigManager):
         )
         
         gui_cfg = cm.config.get("web_gui", {})
-        username = gui_cfg.get("username", "admin")
+        username = gui_cfg.get("username", "illumio")
         has_auth = bool(gui_cfg.get("password_hash"))
         allowed_ips = gui_cfg.get("allowed_ips", [])
         
-        auth_status = f"{Colors.GREEN}Configured{Colors.ENDC}" if has_auth else f"{Colors.FAIL}Not Set{Colors.ENDC}"
+        auth_status = f"{Colors.GREEN}Configured{Colors.ENDC}" if has_auth else f"{Colors.WARNING}Default (illumio){Colors.ENDC}"
         ips_list = ", ".join(allowed_ips) if allowed_ips else "All (No restriction)"
         
         print(f"  {t('wgs_username', default='Username')}:    {username}")
@@ -1167,15 +1167,6 @@ def web_gui_security_menu(cm: ConfigManager):
             if new_user:
                 cm.config["web_gui"]["username"] = new_user
                 
-            if has_auth:
-                old_pass = safe_input(t("wgs_old_pass", default="Old Password"), str, allow_cancel=True)
-                if not old_pass: continue
-                salt = gui_cfg.get("password_salt", "")
-                if _hash_pass(salt, old_pass) != gui_cfg.get("password_hash"):
-                    print(f"\n{Colors.FAIL}Invalid old password.{Colors.ENDC}")
-                    input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")
-                    continue
-                    
             new_pass = safe_input(t("wgs_new_pass", default="New Password"), str, allow_cancel=True)
             if new_pass:
                 salt = secrets.token_hex(8)

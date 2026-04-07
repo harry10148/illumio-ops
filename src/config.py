@@ -51,7 +51,7 @@ _DEFAULT_CONFIG = {
         "check_interval_seconds": 300
     },
     "web_gui": {
-        "username": "admin",
+        "username": "illumio",
         "password_hash": "",
         "password_salt": "",
         "secret_key": "",
@@ -258,7 +258,6 @@ class ConfigManager:
         return False
 
     def load_best_practices(self):
-        print(f"{Colors.BLUE}{t('loading_best_practices')}{Colors.ENDC}")
         self.config["rules"] = []
         ts = int(time.time())
         # type, name, threshold_type, threshold_count, threshold_window, cooldown_minutes, filter_status, filter_severity

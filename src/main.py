@@ -200,6 +200,7 @@ def rule_management_menu(cm):
             print(f"\n{Colors.WARNING}{t('warning_best_practices')}{Colors.ENDC}")
             confirm = safe_input(f"{t('confirm_continue')} (Y/N)", str)
             if confirm and confirm.strip().upper() == "Y":
+                print(f"{Colors.BLUE}{t('loading_best_practices')}{Colors.ENDC}")
                 cm.load_best_practices()
                 input(
                     f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('best_practice_loaded', default='Best practices loaded successfully! Press Enter to continue...')} {Colors.GREEN}❯{Colors.ENDC} "

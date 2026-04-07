@@ -38,20 +38,6 @@ def _strip_ansi(text: str) -> str:
     return _ANSI_RE.sub('', text)
 
 
-def _capture_stdout(func):
-    """Run func, capture its stdout, strip ANSI, return as string."""
-    buf = io.StringIO()
-    old = sys.stdout
-    sys.stdout = buf
-    try:
-        func()
-    except Exception as e:
-        buf.write(f"\nError: {e}\n")
-    finally:
-        sys.stdout = old
-    return _strip_ansi(buf.getvalue())
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # Event Catalog (mirrors settings.py)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -286,14 +272,18 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         cm.load()
         gui_cfg = cm.config.get("web_gui", {})
         
-        saved_username = gui_cfg.get("username", "admin")
+        saved_username = gui_cfg.get("username", "illumio")
         saved_hash = gui_cfg.get("password_hash", "")
         saved_salt = gui_cfg.get("password_salt", "")
         
-
-        if username == saved_username and _hash_password(saved_salt, password) == saved_hash:
-            session['logged_in'] = True
-            return jsonify({"ok": True})
+        if not saved_hash:
+            if username == saved_username and password == "illumio":
+                session['logged_in'] = True
+                return jsonify({"ok": True})
+        else:
+            if username == saved_username and _hash_password(saved_salt, password) == saved_hash:
+                session['logged_in'] = True
+                return jsonify({"ok": True})
             
         return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
 
@@ -307,7 +297,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         cm.load()
         gui_cfg = cm.config.get('web_gui', {})
         return jsonify({
-            "username": gui_cfg.get("username", "admin"),
+            "username": gui_cfg.get("username", "illumio"),
             "allowed_ips": gui_cfg.get("allowed_ips", []),
             "auth_setup": bool(gui_cfg.get("password_hash"))
         })
@@ -1591,33 +1581,29 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             _ML.get("actions").info("Manually triggered monitoring analysis")
         except Exception:
             pass
-        def work():
-            from src.api_client import ApiClient
-            from src.reporter import Reporter
-            from src.analyzer import Analyzer
-            api = ApiClient(cm)
-            rep = Reporter(cm)
-            ana = Analyzer(cm, api, rep)
-            ana.run_analysis()
-            rep.send_alerts()
-        output = _capture_stdout(work)
-        return jsonify({"ok": True, "output": output})
+        from src.api_client import ApiClient
+        from src.reporter import Reporter
+        from src.analyzer import Analyzer
+        api = ApiClient(cm)
+        rep = Reporter(cm)
+        ana = Analyzer(cm, api, rep)
+        ana.run_analysis()
+        rep.send_alerts()
+        return jsonify({"ok": True, "output": "Analysis cycle and alerts completed."})
 
     @app.route('/api/actions/debug', methods=['POST'])
     def api_debug():
         d = request.json or {}
         mins = int(d.get('mins', 30))
         pd_sel = int(d.get('pd_sel', 3))
-        def work():
-            from src.api_client import ApiClient
-            from src.reporter import Reporter
-            from src.analyzer import Analyzer
-            api = ApiClient(cm)
-            rep = Reporter(cm)
-            ana = Analyzer(cm, api, rep)
-            ana.run_debug_mode(mins=mins, pd_sel=pd_sel)
-        output = _capture_stdout(work)
-        return jsonify({"ok": True, "output": output})
+        from src.api_client import ApiClient
+        from src.reporter import Reporter
+        from src.analyzer import Analyzer
+        api = ApiClient(cm)
+        rep = Reporter(cm)
+        ana = Analyzer(cm, api, rep)
+        ana.run_debug_mode(mins=mins, pd_sel=pd_sel)
+        return jsonify({"ok": True, "output": "Debug mode execution completed. Check CLI or logs for details."})
 
     @app.route('/api/actions/test-alert', methods=['POST'])
     def api_test_alert():
@@ -1626,11 +1612,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             _ML.get("actions").info("Manually triggered test alert")
         except Exception:
             pass
-        def work():
-            from src.reporter import Reporter
-            Reporter(cm).send_alerts(force_test=True)
-        output = _capture_stdout(work)
-        return jsonify({"ok": True, "output": output})
+        from src.reporter import Reporter
+        Reporter(cm).send_alerts(force_test=True)
+        return jsonify({"ok": True, "output": "Test alerts sent."})
 
     @app.route('/api/actions/best-practices', methods=['POST'])
     def api_best_practices():
@@ -1639,7 +1623,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             _ML.get("actions").info("Load best practice rules")
         except Exception:
             pass
-        output = _capture_stdout(lambda: cm.load_best_practices())
+        cm.load_best_practices()
+        output = t('best_practice_loaded', default='Best practices loaded successfully!')
         return jsonify({"ok": True, "output": output})
 
     @app.route('/api/actions/test-connection', methods=['POST'])
