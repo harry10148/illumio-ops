@@ -15,6 +15,8 @@ import threading
 import logging
 import hashlib
 import ipaddress
+from contextlib import redirect_stdout
+from collections import Counter
 import secrets
 import socket as _socket
 import struct
@@ -30,6 +32,7 @@ except ImportError:
 from src.config import ConfigManager
 from src.i18n import t, get_messages
 from src import __version__
+from src.alerts import PLUGIN_METADATA, plugin_config_path, plugin_config_value
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +90,47 @@ def _validate_allowed_ips(values) -> tuple[list, list]:
         except ValueError:
             invalid.append(item)
     return normalized, invalid
+
+
+def _normalize_rule_throttle(raw_value):
+    value = str(raw_value or "").strip()
+    if not value:
+        return ""
+    try:
+        from src.events import parse_throttle
+    except Exception:
+        parse_throttle = None
+    if parse_throttle and not parse_throttle(value):
+        raise ValueError("Invalid throttle format. Use values like 2/10m or 5/1h.")
+    return value
+
+
+def _normalize_match_fields(raw_value):
+    if not raw_value:
+        return {}
+    if isinstance(raw_value, dict):
+        normalized = {}
+        for key, value in raw_value.items():
+            key_str = str(key or "").strip()
+            value_str = str(value or "").strip()
+            if key_str and value_str:
+                normalized[key_str] = value_str
+        return normalized
+    raise ValueError("match_fields must be an object of field-path to pattern.")
+
+
+def _is_workload_href(href: str) -> bool:
+    normalized = str(href or "").strip()
+    return bool(normalized) and "/workloads/" in normalized
+
+
+def _normalize_quarantine_hrefs(raw_hrefs) -> list[str]:
+    normalized: list[str] = []
+    for raw_href in raw_hrefs or []:
+        href = str(raw_href or "").strip()
+        if href and _is_workload_href(href) and href not in normalized:
+            normalized.append(href)
+    return normalized
 
 def _rst_drop():
     """Close the underlying TCP socket with RST (SO_LINGER 0) and raise to
@@ -188,6 +232,50 @@ def _resolve_state_file() -> str:
     return os.path.join(_ROOT_DIR, 'logs', 'state.json')
 
 
+def _plugin_config_roots() -> set[str]:
+    roots: set[str] = set()
+    for plugin_name, meta in PLUGIN_METADATA.items():
+        for field_key in meta.fields:
+            path = plugin_config_path(plugin_name, field_key)
+            if path:
+                roots.add(path[0])
+    return roots
+
+
+def _summarize_alert_channels(config: dict, dispatch_history: list) -> list[dict]:
+    active = set(config.get("alerts", {}).get("active", []) or [])
+    summaries = []
+    for name, meta in PLUGIN_METADATA.items():
+        required_missing = []
+        for key, field in meta.fields.items():
+            if not field.required:
+                continue
+            value = plugin_config_value(config, name, key)
+            if isinstance(value, list):
+                present = any(str(item or "").strip() for item in value)
+            elif isinstance(value, (int, float)):
+                present = True
+            else:
+                present = bool(str(value or "").strip()) if not isinstance(value, bool) else value
+            if not present:
+                required_missing.append(key)
+
+        latest = next((item for item in reversed(dispatch_history or []) if item.get("channel") == name), None)
+        summaries.append({
+            "name": name,
+            "display_name": meta.display_name,
+            "description": meta.description,
+            "enabled": name in active,
+            "configured": len(required_missing) == 0,
+            "missing_required": required_missing,
+            "last_status": latest.get("status", "") if latest else "",
+            "last_target": latest.get("target", "") if latest else "",
+            "last_timestamp": latest.get("timestamp", "") if latest else "",
+            "last_error": latest.get("error", "") if latest else "",
+        })
+    return summaries
+
+
 def _ok(data=None, **kw):
     """Standard success response: {"ok": true, ...}"""
     body = {"ok": True}
@@ -212,11 +300,67 @@ def _get_active_pce_url(cm: 'ConfigManager') -> str:
     return cm.config.get('api', {}).get('url', '')
 
 
+def _records_from_table(table, limit: int = 10) -> list[dict]:
+    try:
+        if table is None:
+            return []
+        if hasattr(table, "head") and hasattr(table, "to_dict"):
+            return table.head(limit).to_dict(orient="records")
+    except Exception:
+        return []
+    return []
+
+
+def _build_audit_dashboard_summary(result) -> dict:
+    mod00 = result.module_results.get("mod00", {}) if result else {}
+    mod01 = result.module_results.get("mod01", {}) if result else {}
+    mod03 = result.module_results.get("mod03", {}) if result else {}
+    attention_items = []
+    for item in (mod00.get("attention_items") or [])[:5]:
+        attention_items.append({
+            "risk": item.get("risk", "INFO"),
+            "event_type": item.get("event_type", ""),
+            "count": int(item.get("count", 0) or 0),
+            "summary": item.get("summary", ""),
+            "recommendation": item.get("recommendation", ""),
+        })
+
+    return {
+        "generated_at": mod00.get("generated_at") or getattr(result, "generated_at", datetime.datetime.now()).strftime("%Y-%m-%d %H:%M:%S"),
+        "record_count": int(getattr(result, "record_count", 0) or 0),
+        "date_range": list(getattr(result, "date_range", ("", "")) or ("", "")),
+        "kpis": mod00.get("kpis", [])[:8],
+        "attention_items": attention_items,
+        "top_events": _records_from_table(mod00.get("top_events_overall"), limit=10),
+        "health": {
+            "total_health_events": int(mod01.get("total_health_events", 0) or 0),
+            "security_concern_count": int(mod01.get("security_concern_count", 0) or 0),
+            "connectivity_event_count": int(mod01.get("connectivity_event_count", 0) or 0),
+        },
+        "policy": {
+            "provision_count": int(mod03.get("provision_count", 0) or 0),
+            "rule_change_count": int(mod03.get("rule_change_count", 0) or 0),
+            "high_risk_count": int(mod03.get("high_risk_count", 0) or 0),
+            "total_workloads_affected": int(mod03.get("total_workloads_affected", 0) or 0),
+        },
+    }
+
+
+def _write_audit_dashboard_summary(output_dir: str, result) -> str:
+    os.makedirs(output_dir, exist_ok=True)
+    summary_path = os.path.join(output_dir, "latest_audit_summary.json")
+    summary = _build_audit_dashboard_summary(result)
+    with open(summary_path, "w", encoding="utf-8") as fh:
+        json.dump(summary, fh, ensure_ascii=False, indent=2)
+    return summary_path
+
+
 def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     app = Flask(__name__, template_folder=os.path.join(_PKG_DIR, 'templates'), static_folder=os.path.join(_PKG_DIR, 'static'))
     app.config['JSON_AS_ASCII'] = False
     app.config['TEMPLATES_AUTO_RELOAD'] = True
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+    app.config['CM'] = cm
     
     # Initialize session secret
     cm.load()
@@ -362,7 +506,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     @app.route('/api/status')
     def api_status():
         cm.load()
-        
+        state = {}
         cooldowns = []
         try:
             STATE_FILE = _resolve_state_file()
@@ -409,7 +553,287 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             "language": cm.config.get('settings', {}).get('language', 'en'),
             "theme": cm.config.get('settings', {}).get('theme', 'dark'),
             "timezone": cm.config.get('settings', {}).get('timezone', 'local'),
-            "cooldowns": cooldowns
+            "cooldowns": cooldowns,
+            "event_watermark": state.get("event_watermark") or state.get("last_check"),
+            "event_overflow": state.get("event_overflow", {}),
+            "unknown_events": state.get("unknown_events", {}),
+            "event_parser_stats": state.get("event_parser_stats", {}),
+            "event_parser_samples": state.get("event_parser_samples", []),
+            "pce_stats": state.get("pce_stats", {}),
+            "throttle_state": state.get("throttle_state", {}),
+            "dispatch_history": state.get("dispatch_history", []),
+            "alert_channels": _summarize_alert_channels(cm.config, state.get("dispatch_history", [])),
+            "event_timeline": state.get("event_timeline", []),
+        })
+
+    @app.route('/api/events/viewer')
+    def api_events_viewer():
+        cm.load()
+        try:
+            from src.api_client import ApiClient, EventFetchError
+            from src.events import event_identity, format_utc, normalize_event, parse_event_timestamp
+            from src.settings import _event_category
+        except Exception as exc:
+            logger.error("Failed to load event viewer dependencies: %s", exc)
+            return _err(str(exc), 500)
+
+        try:
+            mins = max(5, min(int(request.args.get('mins', 60)), 10080))
+        except (TypeError, ValueError):
+            mins = 60
+        try:
+            limit = max(1, min(int(request.args.get('limit', 50)), 200))
+        except (TypeError, ValueError):
+            limit = 50
+        try:
+            offset = max(0, int(request.args.get('offset', 0)))
+        except (TypeError, ValueError):
+            offset = 0
+
+        search = str(request.args.get('search', '') or '').strip().lower()
+        category_filter = str(request.args.get('category', '') or '').strip()
+        type_group_filter = str(request.args.get('type_group', '') or '').strip()
+        event_type_filter = str(request.args.get('event_type', '') or '').strip()
+
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        since_utc = now_utc - datetime.timedelta(minutes=mins)
+        query_since = format_utc(since_utc)
+        query_until = format_utc(now_utc)
+        fetch_limit = min(max((offset + limit) * 4, 100), 5000)
+
+        api_client = ApiClient(cm)
+        try:
+            raw_events = api_client.fetch_events_strict(
+                start_time_str=query_since,
+                end_time_str=query_until,
+                max_results=fetch_limit,
+            )
+        except EventFetchError as exc:
+            logger.error("Event viewer fetch failed: %s - %s", exc.status, exc.message)
+            return _err(f"PCE event fetch failed ({exc.status}): {exc.message[:300]}", 502)
+        except Exception as exc:
+            logger.error("Event viewer fetch failed: %s", exc, exc_info=True)
+            return _err(f"PCE event fetch failed: {exc}", 502)
+
+        items = []
+        for raw_event in raw_events:
+            normalized = normalize_event(raw_event)
+            event_type = normalized.get("event_type") or raw_event.get("event_type") or ""
+            event_group = "*" if event_type == "*" else event_type.split(".", 1)[0]
+
+            if event_type_filter and event_type != event_type_filter:
+                continue
+            if type_group_filter and event_group != type_group_filter:
+                continue
+            if category_filter and _event_category(event_type) != category_filter:
+                continue
+
+            if search:
+                haystack = " ".join([
+                    event_type,
+                    normalized.get('actor', ''),
+                    normalized.get('target_name', ''),
+                    normalized.get('resource_name', ''),
+                    normalized.get('action', ''),
+                    normalized.get('source_ip', ''),
+                    json.dumps(raw_event, ensure_ascii=False, default=str),
+                ]).lower()
+                if search not in haystack:
+                    continue
+
+            items.append({
+                "event_id": event_identity(raw_event),
+                "timestamp": normalized.get("timestamp") or raw_event.get("timestamp"),
+                "event_type": event_type,
+                "status": normalized.get("status") or raw_event.get("status"),
+                "severity": normalized.get("severity") or raw_event.get("severity"),
+                "known_event_type": normalized.get("known_event_type"),
+                "parser_notes": normalized.get("parser_notes") or [],
+                "category": _event_category(event_type),
+                "type_group": event_group,
+                "normalized": normalized,
+                "raw": raw_event,
+            })
+
+        items.sort(
+            key=lambda item: parse_event_timestamp(item.get("timestamp")) or now_utc,
+            reverse=True,
+        )
+        visible_items = items[offset:offset + limit]
+
+        return jsonify({
+            "ok": True,
+            "items": visible_items,
+            "summary": {
+                "fetched_count": len(raw_events),
+                "matched_count": len(items),
+                "returned_count": len(visible_items),
+                "offset": offset,
+                "limit": limit,
+                "has_more": (offset + limit) < len(items),
+                "query_since": query_since,
+                "query_until": query_until,
+                "category": category_filter,
+                "type_group": type_group_filter,
+                "event_type": event_type_filter,
+            },
+        })
+
+    @app.route('/api/events/shadow_compare')
+    def api_events_shadow_compare():
+        cm.load()
+        try:
+            from src.api_client import ApiClient, EventFetchError
+            from src.events import compare_event_rules, format_utc
+        except Exception as exc:
+            logger.error("Failed to load shadow compare dependencies: %s", exc)
+            return _err(str(exc), 500)
+
+        try:
+            mins = max(5, min(int(request.args.get('mins', 60)), 10080))
+        except (TypeError, ValueError):
+            mins = 60
+        try:
+            limit = max(1, min(int(request.args.get('limit', 200)), 500))
+        except (TypeError, ValueError):
+            limit = 200
+
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        since_utc = now_utc - datetime.timedelta(minutes=mins)
+        query_since = format_utc(since_utc)
+        query_until = format_utc(now_utc)
+
+        api_client = ApiClient(cm)
+        try:
+            events = api_client.fetch_events_strict(
+                start_time_str=query_since,
+                end_time_str=query_until,
+                max_results=limit,
+            )
+        except EventFetchError as exc:
+            return _err(f"PCE event fetch failed ({exc.status}): {exc.message[:300]}", 502)
+        except Exception as exc:
+            return _err(f"PCE event fetch failed: {exc}", 502)
+
+        event_rules = [rule for rule in cm.config.get("rules", []) if rule.get("type") == "event"]
+        comparisons = compare_event_rules(event_rules, events)
+        divergent = [item for item in comparisons if item.get("status") != "same"]
+
+        return jsonify({
+            "ok": True,
+            "summary": {
+                "query_since": query_since,
+                "query_until": query_until,
+                "fetched_events": len(events),
+                "rule_count": len(event_rules),
+                "divergent_rules": len(divergent),
+            },
+            "items": comparisons,
+        })
+
+    @app.route('/api/events/rule_test')
+    def api_events_rule_test():
+        cm.load()
+        try:
+            from src.api_client import ApiClient, EventFetchError
+            from src.events import (
+                compare_event_rules,
+                event_identity,
+                format_utc,
+                matches_event_rule,
+                matches_event_rule_legacy,
+                normalize_event,
+            )
+        except Exception as exc:
+            logger.error("Failed to load rule test dependencies: %s", exc)
+            return _err(str(exc), 500)
+
+        try:
+            idx = int(request.args.get('idx', '-1'))
+        except (TypeError, ValueError):
+            return _err("invalid rule index", 400)
+        if idx < 0 or idx >= len(cm.config.get('rules', [])):
+            return _err("rule not found", 404)
+
+        rule = cm.config['rules'][idx]
+        if rule.get('type') != 'event':
+            return _err("rule is not an event rule", 400)
+
+        try:
+            mins = max(5, min(int(request.args.get('mins', 60)), 10080))
+        except (TypeError, ValueError):
+            mins = 60
+        try:
+            limit = max(1, min(int(request.args.get('limit', 300)), 500))
+        except (TypeError, ValueError):
+            limit = 300
+
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        since_utc = now_utc - datetime.timedelta(minutes=mins)
+        query_since = format_utc(since_utc)
+        query_until = format_utc(now_utc)
+
+        api_client = ApiClient(cm)
+        try:
+            events = api_client.fetch_events_strict(
+                start_time_str=query_since,
+                end_time_str=query_until,
+                max_results=limit,
+            )
+        except EventFetchError as exc:
+            return _err(f"PCE event fetch failed ({exc.status}): {exc.message[:300]}", 502)
+        except Exception as exc:
+            return _err(f"PCE event fetch failed: {exc}", 502)
+
+        event_lookup = {event_identity(event): event for event in events}
+        current_ids = {
+            event_identity(event)
+            for event in events
+            if matches_event_rule(rule, event)
+        }
+        legacy_ids = {
+            event_identity(event)
+            for event in events
+            if matches_event_rule_legacy(rule, event)
+        }
+        only_current = sorted(current_ids - legacy_ids)
+        only_legacy = sorted(legacy_ids - current_ids)
+        current_matches = sorted(current_ids)
+        comparison = compare_event_rules([rule], events)[0]
+
+        def _serialize(event_id):
+            raw_event = event_lookup.get(event_id, {})
+            return {
+                "event_id": event_id,
+                "timestamp": raw_event.get("timestamp"),
+                "event_type": raw_event.get("event_type"),
+                "normalized": normalize_event(raw_event),
+                "raw": raw_event,
+            }
+
+        return jsonify({
+            "ok": True,
+            "rule": {
+                "index": idx,
+                "id": rule.get("id"),
+                "name": rule.get("name"),
+                "filter_value": rule.get("filter_value"),
+                "filter_status": rule.get("filter_status"),
+                "filter_severity": rule.get("filter_severity"),
+                "match_fields": rule.get("match_fields") or rule.get("filter_match_fields") or {},
+            },
+            "summary": {
+                "query_since": query_since,
+                "query_until": query_until,
+                "fetched_events": len(events),
+                "current_count": len(current_ids),
+                "legacy_count": len(legacy_ids),
+                "delta": len(current_ids) - len(legacy_ids),
+                "status": comparison.get("status"),
+            },
+            "current_matches": [_serialize(event_id) for event_id in current_matches[:20]],
+            "only_current": [_serialize(event_id) for event_id in only_current[:10]],
+            "only_legacy": [_serialize(event_id) for event_id in only_legacy[:10]],
         })
 
     @app.route('/api/init_quarantine', methods=['POST'])
@@ -423,23 +847,50 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
     @app.route('/api/event-catalog')
     def api_event_catalog():
-        from src.settings import FULL_EVENT_CATALOG, ACTION_EVENTS
-        from src.i18n import t
-        # Build dictionary with translated names
+        from src.events.catalog import LOCAL_EXTENSION_EVENT_TYPES
+        from src.settings import FULL_EVENT_CATALOG, ACTION_EVENTS, SEVERITY_FILTER_EVENTS
+        from src.i18n import set_language, t
+
+        cm.load()
+        set_language(cm.config.get("settings", {}).get("language", "en"))
+
         translated_catalog = {}
+        categories = []
         for category, events in FULL_EVENT_CATALOG.items():
-            trans_cat = t('cat_' + category.replace(' ', '_').lower(), default=category)
-            # Combine Agent Health details
+            trans_cat = t('cat_' + category.replace(' ', '_').lower())
             if category == "Agent Health Detail":
                 trans_cat = t('cat_agent_health', default="Agent Health")
 
             if trans_cat not in translated_catalog:
                 translated_catalog[trans_cat] = {}
 
+            event_items = []
             for event_id, translation_key in events.items():
-                translated_catalog[trans_cat][event_id] = t(translation_key, default=translation_key)
-        # Return catalog along with list of events that support status/severity filtering
-        return jsonify({'catalog': translated_catalog, 'action_events': ACTION_EVENTS})
+                description = t(translation_key)
+                supports_status = event_id in ACTION_EVENTS
+                supports_severity = event_id in SEVERITY_FILTER_EVENTS or event_id == "*"
+                translated_catalog[trans_cat][event_id] = description
+                event_items.append({
+                    'id': event_id,
+                    'label': description,
+                    'description': description,
+                    'source': 'local_extension' if event_id in LOCAL_EXTENSION_EVENT_TYPES else 'vendor_baseline',
+                    'supports_status': supports_status,
+                    'supports_severity': supports_severity,
+                })
+
+            categories.append({
+                'id': category,
+                'label': trans_cat,
+                'events': event_items,
+            })
+
+        return jsonify({
+            'catalog': translated_catalog,
+            'categories': categories,
+            'action_events': ACTION_EVENTS,
+            'severity_filter_events': SEVERITY_FILTER_EVENTS,
+        })
 
     # ??? API: Rules CRUD ??????????????????????????????????????????????????
     @app.route('/api/rules')
@@ -448,12 +899,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         
         # Load state to get cooldowns
         alert_history = {}
+        throttle_state = {}
         try:
             STATE_FILE = _resolve_state_file()
             if os.path.exists(STATE_FILE):
                 with open(STATE_FILE, 'r', encoding='utf-8') as f:
                     state = json.load(f)
                     alert_history = state.get("alert_history", {})
+                    throttle_state = state.get("throttle_state", {})
         except Exception as e:
             logger.error(f"Error reading state file for rules: {e}")
 
@@ -476,6 +929,12 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 except Exception as e:
                     pass
             rule_out['cooldown_remaining'] = rem_mins
+            throttle_entry = throttle_state.get(rid, {})
+            rule_out['throttle_state'] = {
+                "cooldown_suppressed": int(throttle_entry.get("cooldown_suppressed", 0) or 0),
+                "throttle_suppressed": int(throttle_entry.get("throttle_suppressed", 0) or 0),
+                "next_allowed_at": throttle_entry.get("next_allowed_at", ""),
+            }
             rules.append(rule_out)
             
         return jsonify(rules)
@@ -483,41 +942,66 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     @app.route('/api/rules/event', methods=['POST'])
     def api_add_event_rule():
         d = request.json
+        try:
+            throttle = _normalize_rule_throttle(d.get('throttle', ''))
+            match_fields = _normalize_match_fields(d.get('match_fields'))
+        except ValueError as exc:
+            return _err(str(exc), 400)
         filter_value = d.get('filter_value', '')
         if filter_value == 'pce_health':
-            cm.add_or_update_rule({
-                "id": int(datetime.datetime.now().timestamp()),
-                "type": "system",
-                "name": d.get('name', ''),
-                "filter_value": "pce_health",
-                "desc": t('rule_pce_health_desc', default='PCE health check failed.'),
-                "rec": t('rule_pce_health_rec', default='Check PCE service status and network connectivity.'),
-                "threshold_type": d.get('threshold_type', 'immediate'),
-                "threshold_count": int(d.get('threshold_count', 1)),
-                "threshold_window": int(d.get('threshold_window', 10)),
-                "cooldown_minutes": int(d.get('cooldown_minutes', 30))
-            })
-        else:
-            cm.add_or_update_rule({
-                "id": int(datetime.datetime.now().timestamp()),
-                "type": "event",
-                "name": d.get('name', ''),
-                "filter_key": "event_type",
-                "filter_value": filter_value,
-                "filter_status": d.get('filter_status', 'all'),
-                "filter_severity": d.get('filter_severity', 'all'),
-                "desc": d.get('name', ''),
-                "rec": "Check Logs",
-                "threshold_type": d.get('threshold_type', 'immediate'),
-                "threshold_count": int(d.get('threshold_count', 1)),
-                "threshold_window": int(d.get('threshold_window', 10)),
-                "cooldown_minutes": int(d.get('cooldown_minutes', 10))
-            })
+            return _err("pce_health must be created from the system health rule form", 400)
+        cm.add_or_update_rule({
+            "id": int(datetime.datetime.now().timestamp()),
+            "type": "event",
+            "filter_key": "event_type",
+            "name": d.get('name', ''),
+            "filter_value": filter_value,
+            "filter_status": d.get('filter_status', 'all'),
+            "filter_severity": d.get('filter_severity', 'all'),
+            "desc": d.get('name', ''),
+            "rec": "Check Logs",
+            "threshold_type": d.get('threshold_type', 'immediate'),
+            "threshold_count": int(d.get('threshold_count', 1)),
+            "threshold_window": int(d.get('threshold_window', 10)),
+            "cooldown_minutes": int(d.get('cooldown_minutes', 10)),
+            "throttle": throttle,
+            "match_fields": match_fields,
+        })
+        return jsonify({"ok": True})
+
+    @app.route('/api/rules/system', methods=['POST'])
+    def api_add_system_rule():
+        d = request.json or {}
+        try:
+            throttle = _normalize_rule_throttle(d.get('throttle', ''))
+        except ValueError as exc:
+            return _err(str(exc), 400)
+        filter_value = str(d.get('filter_value') or 'pce_health').strip() or 'pce_health'
+        if filter_value != 'pce_health':
+            return _err("unsupported system rule type", 400)
+        cm.add_or_update_rule({
+            "id": int(datetime.datetime.now().timestamp()),
+            "type": "system",
+            "name": d.get('name') or t('rule_pce_health'),
+            "filter_value": "pce_health",
+            "desc": t('rule_pce_health_desc', default='PCE health check failed.'),
+            "rec": t('rule_pce_health_rec', default='Check PCE service status and network connectivity.'),
+            "threshold_type": "immediate",
+            "threshold_count": 1,
+            "threshold_window": 10,
+            "cooldown_minutes": int(d.get('cooldown_minutes', 30)),
+            "throttle": throttle,
+            "match_fields": {},
+        })
         return jsonify({"ok": True})
 
     @app.route('/api/rules/traffic', methods=['POST'])
     def api_add_traffic_rule():
         d = request.json
+        try:
+            throttle = _normalize_rule_throttle(d.get('throttle', ''))
+        except ValueError as exc:
+            return _err(str(exc), 400)
         src = (d.get('src') or '').strip()
         dst = (d.get('dst') or '').strip()
         src_label, src_ip = (src, None) if src and '=' in src else (None, src or None)
@@ -554,13 +1038,18 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             "threshold_type": "count",
             "threshold_count": int(d.get('threshold_count', 10)),
             "threshold_window": int(d.get('threshold_window', 10)),
-            "cooldown_minutes": int(d.get('cooldown_minutes', 10))
+            "cooldown_minutes": int(d.get('cooldown_minutes', 10)),
+            "throttle": throttle,
         })
         return jsonify({"ok": True})
 
     @app.route('/api/rules/bandwidth', methods=['POST'])
     def api_add_bw_rule():
         d = request.json
+        try:
+            throttle = _normalize_rule_throttle(d.get('throttle', ''))
+        except ValueError as exc:
+            return _err(str(exc), 400)
         src = (d.get('src') or '').strip()
         dst = (d.get('dst') or '').strip()
         src_label, src_ip = (src, None) if src and '=' in src else (None, src or None)
@@ -593,7 +1082,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             "threshold_type": "count",
             "threshold_count": float(d.get('threshold_count', 100)),
             "threshold_window": int(d.get('threshold_window', 10)),
-            "cooldown_minutes": int(d.get('cooldown_minutes', 30))
+            "cooldown_minutes": int(d.get('cooldown_minutes', 30)),
+            "throttle": throttle,
         })
         return jsonify({"ok": True})
 
@@ -609,6 +1099,16 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         d = request.json
         if 0 <= idx < len(cm.config['rules']):
             old = cm.config['rules'][idx]
+            if 'throttle' in d:
+                try:
+                    d['throttle'] = _normalize_rule_throttle(d.get('throttle', ''))
+                except ValueError as exc:
+                    return _err(str(exc), 400)
+            if 'match_fields' in d:
+                try:
+                    d['match_fields'] = _normalize_match_fields(d.get('match_fields'))
+                except ValueError as exc:
+                    return _err(str(exc), 400)
             old.update(d)
             # Re-parse label/ip fields for traffic and bw/vol
             for prefix in ('src', 'dst', 'ex_src', 'ex_dst'):
@@ -643,7 +1143,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     def api_get_settings():
         cm.load()
         rpt = cm.config.get("report", {})
-        return jsonify({
+        payload = {
             "api": cm.config.get("api", {}),
             "email": cm.config.get("email", {}),
             "smtp": cm.config.get("smtp", {}),
@@ -655,6 +1155,37 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             },
             "pce_profiles":   cm.get_pce_profiles(),
             "active_pce_id":  cm.get_active_pce_id(),
+        }
+        for root in _plugin_config_roots():
+            payload.setdefault(root, cm.config.get(root, {}))
+        return jsonify(payload)
+
+    @app.route('/api/alert-plugins')
+    def api_alert_plugins():
+        return jsonify({
+            "plugins": {
+                name: {
+                    "name": meta.name,
+                    "display_name": meta.display_name,
+                    "description": meta.description,
+                    "fields": [
+                        {
+                            "key": key,
+                            "label": field.label,
+                            "help": field.help,
+                            "required": field.required,
+                            "secret": field.secret,
+                            "placeholder": field.placeholder,
+                            "input_type": field.input_type,
+                            "value_type": field.value_type,
+                            "list_delimiter": field.list_delimiter,
+                            "config_path": list(plugin_config_path(name, key)),
+                        }
+                        for key, field in meta.fields.items()
+                    ],
+                }
+                for name, meta in PLUGIN_METADATA.items()
+            }
         })
 
     @app.route('/api/settings', methods=['POST'])
@@ -685,6 +1216,15 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     rpt_cfg['retention_days'] = max(0, int(rpt_in['retention_days']))
                 except (TypeError, ValueError):
                     pass
+        known_roots = {'api', 'email', 'smtp', 'alerts', 'settings', 'report', 'pce_profiles', 'active_pce_id'}
+        for root in _plugin_config_roots():
+            if root in known_roots or root not in d:
+                continue
+            incoming = d.get(root)
+            if isinstance(incoming, dict):
+                cm.config.setdefault(root, {}).update(incoming)
+            else:
+                cm.config[root] = incoming
         cm.sync_api_to_active_profile()
         cm.save()
         return jsonify({"ok": True})
@@ -828,6 +1368,20 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             with open(snapshot_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             return jsonify({"ok": True, "snapshot": data})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)})
+
+    @app.route('/api/dashboard/audit_summary', methods=['GET'])
+    def api_dashboard_audit_summary():
+        cm.load()
+        reports_dir = _resolve_reports_dir(cm)
+        summary_path = os.path.join(reports_dir, 'latest_audit_summary.json')
+        if not os.path.exists(summary_path):
+            return jsonify({"ok": False, "error": t("gui_dashboard_no_audit_summary", default="No audit report summary found.")})
+        try:
+            with open(summary_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return jsonify({"ok": True, "summary": data})
         except Exception as e:
             return jsonify({"ok": False, "error": str(e)})
 
@@ -1032,6 +1586,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             output_dir = _resolve_reports_dir(cm)
                 
             paths = gen.export(result, fmt='all', output_dir=output_dir)
+            _write_audit_dashboard_summary(output_dir, result)
             filenames = [os.path.basename(p) for p in paths]
             try:
                 if _arlog:
@@ -1528,6 +2083,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         href = d.get('href')
         level = d.get('level')  # Mild, Moderate, Severe
         try:
+            if not _is_workload_href(href):
+                return jsonify({"ok": False, "error": t("gui_q_invalid_target")})
             from src.api_client import ApiClient
             api = ApiClient(cm)
             
@@ -1560,18 +2117,24 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     @app.route('/api/quarantine/bulk_apply', methods=['POST'])
     def api_quarantine_bulk_apply():
         d = request.json or {}
-        hrefs = d.get('hrefs', [])
+        raw_hrefs = d.get('hrefs', [])
+        hrefs = _normalize_quarantine_hrefs(raw_hrefs)
         level = d.get('level')
         try:
+            if not hrefs:
+                return jsonify({"ok": False, "error": t("gui_q_no_targets")})
             from src.api_client import ApiClient
             api = ApiClient(cm)
             q_hrefs = api.check_and_create_quarantine_labels()
             target_label_href = q_hrefs.get(level)
 
-            results = {"success": 0, "failed": []}
+            invalid_count = sum(1 for h in (raw_hrefs or []) if str(h or "").strip() and not _is_workload_href(h))
+            results = {"success": 0, "failed": [], "skipped_invalid": invalid_count}
             import concurrent.futures
 
             def process_wl(href):
+                if not _is_workload_href(href):
+                    return href, False
                 wl = api.get_workload(href)
                 if not wl: return href, False
                 current_labels = wl.get("labels", [])
@@ -1624,8 +2187,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         api = ApiClient(cm)
         rep = Reporter(cm)
         ana = Analyzer(cm, api, rep)
-        ana.run_debug_mode(mins=mins, pd_sel=pd_sel)
-        return jsonify({"ok": True, "output": "Debug mode execution completed. Check CLI or logs for details."})
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            ana.run_debug_mode(mins=mins, pd_sel=pd_sel, interactive=False)
+        return jsonify({"ok": True, "output": _strip_ansi(buf.getvalue()).strip() or "Debug mode execution completed."})
 
     @app.route('/api/actions/test-alert', methods=['POST'])
     def api_test_alert():
@@ -1634,9 +2199,25 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             _ML.get("actions").info("Manually triggered test alert")
         except Exception:
             pass
+        data = request.json or {}
+        channel = str(data.get("channel", "") or "").strip()
+        channels = [channel] if channel else None
+        if channel and channel not in PLUGIN_METADATA:
+            return _err(f"Unknown alert channel: {channel}", 400)
+
         from src.reporter import Reporter
-        Reporter(cm).send_alerts(force_test=True)
-        return jsonify({"ok": True, "output": "Test alerts sent."})
+        results = Reporter(cm).send_alerts(force_test=True, channels=channels)
+        if channel and not results:
+            return _err(f"Channel {channel} is not active or produced no result.", 400)
+        status_text = ", ".join(
+            f"{item.get('channel', 'channel')}={item.get('status', 'unknown')}"
+            for item in results
+        ) or "no channels dispatched"
+        return jsonify({
+            "ok": True,
+            "output": f"Test alerts sent: {status_text}",
+            "results": results,
+        })
 
     @app.route('/api/actions/best-practices', methods=['POST'])
     def api_best_practices():
@@ -1645,9 +2226,19 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             _ML.get("actions").info("Load best practice rules")
         except Exception:
             pass
-        cm.load_best_practices()
-        output = t('best_practice_loaded', default='Best practices loaded successfully!')
-        return jsonify({"ok": True, "output": output})
+        data = request.json or {}
+        mode = str(data.get("mode", "append_missing") or "append_missing")
+        result = cm.apply_best_practices(mode=mode)
+        output = t(
+            'best_practice_loaded_summary',
+            default='Best practices applied: mode={mode}, added={added}, replaced={replaced}, skipped={skipped}, total={total}.',
+            mode=result["mode"],
+            added=result["added_count"],
+            replaced=result["replaced_count"],
+            skipped=result["skipped_count"],
+            total=result["total_rules"],
+        )
+        return jsonify({"ok": True, "output": output, "summary": result})
 
     @app.route('/api/actions/test-connection', methods=['POST'])
     def api_test_conn():
@@ -2053,893 +2644,4 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
 
     app.run(host=host, port=port, debug=False, use_reloader=False)
 
-
-# ????????????????????????????????????????????????????????????????????????????????# Embedded SPA HTML
-# ????????????????????????????????????????????????????????????????????????????????
-_SPA_HTML = r'''<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Illumio PCE Ops</title>
-<style>
-:root {
-  --bg: #1a2c32; --bg2: #24393f; --bg3: #2d454c;
-  --fg: #F5F5F5; --dim: #989A9B; --accent: #FF5500;
-  --accent2: #FFA22F; --success: #299b65; --warn: #FFB74A;
-  --danger: #f43f51; --border: #325158;
-  --radius: 10px; --shadow: 0 4px 24px rgba(0,0,0,.4);
-}
-[data-theme="light"] {
-  --bg: #F5F5F5; --bg2: #FFFFFF; --bg3: #EAEBEB;
-  --fg: #313638; --dim: #6F7274; --accent: #FF5500;
-  --accent2: #F97607; --success: #166644; --warn: #FFA22F;
-  --danger: #be122f; --border: #D6D7D7;
-  --shadow: 0 2px 10px rgba(0,0,0,.05);
-}
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Segoe UI',system-ui,-apple-system,sans-serif; background:var(--bg); color:var(--fg); min-height:100vh; }
-a { color:var(--accent2); }
-
-/* Header */
-.header { background:linear-gradient(135deg,var(--bg2),var(--bg3)); padding:16px 28px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); }
-.header h1 { font-size:1.3rem; font-weight:700; background:linear-gradient(135deg,var(--accent2),var(--success)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.header .meta { color:var(--dim); font-size:.85rem; }
-
-/* Tabs */
-.tabs { display:flex; gap:2px; background:var(--bg2); padding:6px 20px 0; border-bottom:1px solid var(--border); }
-.tab { padding:10px 22px; cursor:pointer; border-radius:var(--radius) var(--radius) 0 0; color:var(--dim); font-weight:600; font-size:.9rem; transition:.2s; border:1px solid transparent; border-bottom:none; }
-.tab:hover { color:var(--fg); background:var(--bg3); }
-.tab.active { color:var(--accent2); background:var(--bg); border-color:var(--border); }
-
-/* Panel */
-.panel { display:none; padding:24px; animation:fadeIn .2s; }
-.panel.active { display:block; }
-@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
-
-/* Cards */
-.cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:20px; }
-.card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:18px; text-align:center; }
-.card .label { color:var(--dim); font-size:.8rem; margin-bottom:6px; }
-.card .value { font-size:1.8rem; font-weight:700; color:var(--accent2); }
-.card .value.ok { color:var(--success); }
-.card .value.err { color:var(--danger); }
-
-/* Buttons */
-.btn { display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border:none; border-radius:8px; font-size:.88rem; font-weight:600; cursor:pointer; transition:.15s; }
-.btn-primary { background:var(--accent); color:#fff; }
-.btn-primary:hover { background:var(--accent2); color:#1a2c32; }
-.btn-success { background:#166644; color:#fff; }
-.btn-success:hover { background:var(--success); color:#fff; }
-.btn-danger { background:#be122f; color:#fff; }
-.btn-danger:hover { background:var(--danger); }
-.btn-warn { background:#d97706; color:#fff; }
-.btn-warn:hover { background:var(--warn); color:#1a2c32; }
-.btn-sm { padding:6px 12px; font-size:.8rem; }
-.btn:disabled { opacity:.5; cursor:not-allowed; }
-
-/* Forms */
-.form-group { margin-bottom:12px; }
-.form-group label { display:block; color:var(--dim); font-size:.82rem; margin-bottom:4px; font-weight:600; }
-.form-group input, .form-group select { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--fg); padding:8px 12px; border-radius:6px; font-size:.9rem; }
-.form-group input:focus, .form-group select:focus { outline:none; border-color:var(--accent); }
-.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
-
-/* Fieldset */
-fieldset { border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:16px; }
-legend { color:var(--accent2); font-weight:700; font-size:.9rem; padding:0 8px; }
-
-/* Table */
-.rule-table { width:100%; border-collapse:collapse; margin-top:12px; table-layout:fixed; }
-.rule-table th, .rule-table td { text-align:left; padding:10px 14px; border-bottom:1px solid var(--border); font-size:.88rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.rule-table th { color:var(--dim); font-weight:600; background:var(--bg2); position:relative; }
-.rule-table tr:hover td { background:var(--bg3); }
-.resizer { position:absolute; top:25%; right:0; width:4px; height:50%; cursor:col-resize; user-select:none; z-index:2; transition: background 0.2s; background:var(--border); border-radius:2px; }
-.resizer:hover, .resizer:active { background:var(--accent); width:6px; }
-
-/* Log */
-.log-box { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:14px; font-family:'Cascadia Code','Fira Code',monospace; font-size:.82rem; color:var(--fg); max-height:360px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; line-height:1.6; }
-
-/* Actions */
-.action-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:20px; }
-.action-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:18px; display:flex; flex-direction:column; gap:10px; }
-.action-card h3 { font-size:.95rem; color:var(--accent2); }
-.action-card p { font-size:.8rem; color:var(--dim); flex:1; }
-
-/* Modal */
-.modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:100; align-items:center; justify-content:center; }
-.modal-bg.show { display:flex; }
-.modal { background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:24px; width:560px; max-width:95vw; max-height:85vh; overflow-y:auto; box-shadow:var(--shadow); }
-.modal h2 { font-size:1.1rem; color:var(--accent2); margin-bottom:16px; }
-.modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:16px; }
-
-/* Toolbar */
-.toolbar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; align-items:center; }
-.toolbar .spacer { flex:1; }
-.badge { background:var(--accent); color:#fff; padding:2px 10px; border-radius:20px; font-size:.78rem; font-weight:700; }
-
-/* Radio group */
-.radio-group { display:flex; gap:12px; flex-wrap:wrap; }
-.radio-group label { display:flex; align-items:center; gap:4px; color:var(--fg); font-size:.88rem; cursor:pointer; }
-.radio-group input[type=radio] { accent-color:var(--accent); }
-
-/* Checkbox */
-.chk label { display:flex; align-items:center; gap:6px; color:var(--fg); font-size:.88rem; cursor:pointer; }
-.chk input[type=checkbox] { accent-color:var(--accent); }
-
-/* Toast */
-.toast { position:fixed; bottom:24px; right:24px; background:var(--success); color:#000; padding:12px 20px; border-radius:8px; font-weight:600; font-size:.88rem; z-index:200; opacity:0; transition:.3s; pointer-events:none; }
-.toast.show { opacity:1; }
-.toast.err { background:var(--danger); color:#fff; }
-</style>
-</head>
-<body>
-
-<div class="header">
-  <h1 data-i18n="gui_title">??Illumio PCE Ops</h1>
-  <div style="display:flex;align-items:center;gap:14px"><span class="meta" id="hdr-meta">Loading...</span><button class="btn btn-danger btn-sm" onclick="stopGui()" title="Stop Web GUI" data-i18n="gui_stop">??Stop</button></div>
-</div>
-
-<div class="tabs">
-  <div class="tab active" onclick="switchTab('dashboard')" data-i18n="gui_tab_dashboard">Dashboard</div>
-  <div class="tab" onclick="switchTab('rules')" data-i18n="gui_tab_rules">Rules</div>
-  <div class="tab" onclick="switchTab('settings')" data-i18n="gui_tab_settings">Settings</div>
-  <div class="tab" onclick="switchTab('actions')" data-i18n="gui_tab_actions">Actions</div>
-</div>
-
-<!-- ????Dashboard ????-->
-<div class="panel active" id="p-dashboard">
-  <div class="cards">
-    <div class="card"><div class="label" data-i18n="gui_active_rules">Active Rules</div><div class="value" id="d-rules">??/div></div>
-    <div class="card"><div class="label" data-i18n="gui_health_check">Health Check</div><div class="value" id="d-health">??/div></div>
-    <div class="card"><div class="label" data-i18n="gui_language">Language</div><div class="value" id="d-lang">??/div></div>
-  </div>
-  <fieldset id="cd-field" style="display:none;margin-bottom:14px;border:none;padding:0;">
-    <div id="cd-list" class="cards" style="margin-bottom:0;"></div>
-  </fieldset>
-  <fieldset style="margin-bottom:14px;">
-    <legend><span data-i18n="gui_top10_title" style="font-size:1.05rem;">Top 10 Query Report</span></legend>
-    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center;">
-       <label data-i18n="gui_window_min" style="font-weight:600;color:var(--dim);font-size:0.85rem;">Window (min):</label>
-       <input id="d-global-min" type="number" value="30" style="width:80px;background:var(--bg);border:1px solid var(--border);color:var(--fg);padding:4px 8px;border-radius:4px;">
-       <span style="flex:1"></span>
-       <button class="btn btn-warn btn-sm" onclick="openQueryModal()" data-i18n="gui_add_query_widget">??Add Query Widget</button>
-       <button class="btn btn-primary btn-sm" onclick="runAllQueries()" data-i18n="gui_run_all_queries">??Run All</button>
-    </div>
-    <div id="d-queries-container" style="display:flex;flex-direction:column;gap:16px;">
-        <!-- Query Profile Tables generated dynamically -->
-    </div>
-  </fieldset>
-</div>
-
-<!-- ????Rules ????-->
-<div class="panel" id="p-rules">
-  <div class="toolbar">
-    <span style="font-size:1.1rem;font-weight:700;color:var(--accent2)" data-i18n="gui_tab_rules">Rules</span>
-    <span class="badge" id="r-badge">0</span>
-    <button class="btn btn-sm" style="margin-left:8px;background:var(--dim);color:#fff" onclick="openModal('m-help')" data-i18n="gui_param_guide">?? Parameter Guide</button>
-    <div class="spacer"></div>
-    <button class="btn btn-warn btn-sm" onclick="openModal('m-event')" data-i18n="gui_add_event">?? + Event</button>
-    <button class="btn btn-warn btn-sm" onclick="openModal('m-traffic')" data-i18n="gui_add_traffic">? + Traffic</button>
-    <button class="btn btn-warn btn-sm" onclick="openModal('m-bw')" data-i18n="gui_add_bw">?? + BW/Vol</button>
-    <button class="btn btn-danger btn-sm" onclick="deleteSelected()" data-i18n="gui_delete">?? Delete</button>
-  </div>
-  <table class="rule-table">
-    <thead><tr><th style="width:30px"><input type="checkbox" id="r-chkall" onchange="toggleAll(this)"></th><th data-i18n="gui_col_type">Type</th><th data-i18n="gui_col_name">Name</th><th style="width:110px" data-i18n="gui_col_status">Status</th><th data-i18n="gui_col_condition">Condition</th><th data-i18n="gui_col_filters">Filters</th><th style="width:50px" data-i18n="gui_col_edit">Edit</th></tr></thead>
-    <tbody id="r-body"></tbody>
-  </table>
-</div>
-
-<!-- ????Settings ????-->
-<div class="panel" id="p-settings">
-  <div class="cards" style="margin-bottom:14px;">
-    <div class="card"><div class="label" data-i18n="gui_api_status">API Status</div><div class="value" id="d-api">??/div></div>
-  </div>
-  <div style="display:flex;gap:8px;margin-bottom:14px;">
-    <button class="btn btn-primary" onclick="testConn()" data-i18n="gui_test_conn">?? Test Connection</button>
-  </div>
-  <div class="log-box" id="s-log" style="height:80px;margin-bottom:14px;font-size:0.85rem;">[Ready]</div>
-  <div id="s-form"></div>
-  <div style="text-align:right;margin-top:16px;">
-    <button class="btn btn-success" onclick="saveSettings()" data-i18n="gui_save_all">? Save All Settings</button>
-  </div>
-</div>
-
-<!-- ????Actions ????-->
-<div class="panel" id="p-actions">
-  <div class="action-grid">
-    <div class="action-card"><h3 data-i18n="gui_run_once">??Run Monitor Once</h3><p data-i18n="gui_run_once_desc">Execute full cycle: Health ??Fetch ??Analyze ??Alert</p><button class="btn btn-primary" onclick="runAction('run')" data-i18n="gui_run_btn">Run</button></div>
-    <div class="action-card"><h3 data-i18n="gui_debug_mode">?? Debug Mode</h3><p data-i18n="gui_debug_desc">Sandbox mode ??no alerts, no state updates</p>
-      <div class="form-row" style="margin-bottom:8px;">
-        <div class="form-group"><label data-i18n="gui_window_min">Window (min)</label><input id="a-debug-mins" value="30"></div>
-        <div class="form-group"><label data-i18n="gui_policy_dec">Policy Dec.</label><select id="a-debug-pd"><option value="1" data-i18n="gui_pd_blocked">Blocked</option><option value="2" data-i18n="gui_pd_allowed">Allowed</option><option value="3" data-i18n="gui_pd_all" selected>All</option></select></div>
-      </div>
-      <button class="btn btn-primary" onclick="runDebug()" data-i18n="gui_run_debug">Run Debug</button>
-    </div>
-    <div class="action-card"><h3 data-i18n="gui_test_alert">? Send Test Alert</h3><p data-i18n="gui_test_alert_desc">Verify Email / LINE / Webhook delivery</p><button class="btn btn-primary" onclick="runAction('test-alert')" data-i18n="gui_send">Send</button></div>
-    <div class="action-card"><h3 data-i18n="gui_best_practices">?? Load Best Practices</h3><p data-i18n="gui_best_practices_desc">Replace ALL existing rules with recommended defaults</p><button class="btn btn-danger" onclick="confirmBestPractices()" data-i18n="gui_load">Load</button></div>
-  </div>
-  <h3 style="color:var(--accent2);margin-bottom:8px;" data-i18n="gui_output">Output</h3>
-  <div class="log-box" id="a-log"></div>
-</div>
-
-<!-- ????Modals ????-->
-<!-- Dashboard Query Profile Modal -->
-<div class="modal-bg" id="m-query"><div class="modal">
-  <h2><span data-i18n="gui_add_query_widget" id="mq-title">Add Query Widget</span></h2>
-  <input type="hidden" id="dq-idx" value="-1">
-  <div class="form-row"><div class="form-group"><label data-i18n="gui_query_widget_name">Widget Name</label><input id="dq-name" placeholder="E.g. Core Services Top Clients"></div><div class="form-group"><label data-i18n="gui_rank_by">Rank By</label><select id="dq-rank"><option value="count" data-i18n="gui_rank_count">Connection Count</option><option value="volume" data-i18n="gui_rank_volume">Total Volume (MB)</option><option value="bandwidth" data-i18n="gui_rank_bw">Max Bandwidth (Mbps)</option></select></div></div>
-  <fieldset><legend data-i18n="gui_policy_dec">Policy Decision</legend><div class="radio-group" id="dq-pd-group">
-    <label><input type="radio" name="dq-pd" value="3" checked> <span data-i18n="gui_pd_all">All</span></label>
-    <label><input type="radio" name="dq-pd" value="2"> <span data-i18n="gui_pd_blocked">Blocked</span></label>
-    <label><input type="radio" name="dq-pd" value="1"> <span data-i18n="gui_pd_potential">Potential</span></label>
-    <label><input type="radio" name="dq-pd" value="0"> <span data-i18n="gui_pd_allowed">Allowed</span></label>
-  </div></fieldset>
-  <fieldset><legend data-i18n="gui_col_filters">Filters</legend>
-    <div class="form-row"><div class="form-group"><label data-i18n="gui_port">Port</label><input id="dq-port" placeholder="e.g. 80, 443"></div><div class="form-group"><label data-i18n="gui_protocol">Protocol</label><select id="dq-proto"><option value="" data-i18n="gui_both">Both</option><option value="6" data-i18n="gui_tcp">TCP</option><option value="17" data-i18n="gui_udp">UDP</option></select></div></div>
-    <div class="form-row"><div class="form-group"><label data-i18n="gui_source">Source (Label/IP)</label><input id="dq-src" placeholder="e.g. role=Web, 10.0.0.0/8, 192.168.1.1"></div><div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="dq-dst" placeholder="e.g. app=DB, 10.1.1.5"></div></div>
-  </fieldset>
-  <fieldset><legend data-i18n="gui_excludes">Excludes (Optional)</legend>
-    <div class="form-row-3"><div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="dq-expt" placeholder="e.g. 22"></div><div class="form-group"><label data-i18n="gui_ex_src">Exclude Source</label><input id="dq-exsrc" placeholder="e.g. env=Kube, 10.9.9.9"></div><div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="dq-exdst" placeholder="e.g. 8.8.8.8"></div></div>
-  </fieldset>
-  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-query')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveDashboardQuery()" data-i18n="gui_save">? Save</button></div>
-</div></div>
-
-<!-- Event -->
-<div class="modal-bg" id="m-event"><div class="modal">
-  <h2><span data-i18n="gui_add_event_rule" id="me-title">Add Event Rule</span></h2>
-  <div class="form-group"><label data-i18n="gui_category">Category</label><select id="ev-cat" onchange="populateEvents()"><option value="" data-i18n="gui_select">Select...</option></select></div>
-  <div class="form-group"><label data-i18n="gui_event_type">Event Type</label><select id="ev-type"><option value="" data-i18n="gui_select_first">Select category first</option></select></div>
-  <fieldset><legend data-i18n="gui_threshold">Threshold</legend>
-    <div class="form-group"><label data-i18n="gui_type">Type</label><div class="radio-group"><label><input type="radio" name="ev-tt" value="immediate" checked> <span data-i18n="gui_tt_immediate">Immediate</span></label><label><input type="radio" name="ev-tt" value="count"> <span data-i18n="gui_tt_count">Cumulative</span></label></div></div>
-    <div class="form-row-3">
-      <div class="form-group"><label data-i18n="gui_count">Count</label><input id="ev-cnt" type="number" value="5"></div>
-      <div class="form-group"><label data-i18n="gui_window_min">Window (min)</label><input id="ev-win" type="number" value="10"></div>
-      <div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="ev-cd" type="number" value="10"></div>
-    </div>
-  </fieldset>
-  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-event')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveEvent()" data-i18n="gui_save">? Save</button></div>
-</div></div>
-
-<!-- Traffic -->
-<div class="modal-bg" id="m-traffic"><div class="modal">
-  <h2><span data-i18n="gui_add_traffic_rule" id="mt-title">Add Traffic Rule</span></h2>
-  <div class="form-group"><label data-i18n="gui_rule_name">Rule Name</label><input id="tr-name"></div>
-  <fieldset><legend data-i18n="gui_policy_dec">Policy Decision</legend><div class="radio-group">
-    <label><input type="radio" name="tr-pd" value="2" checked> <span data-i18n="gui_pd_blocked">Blocked</span></label>
-    <label><input type="radio" name="tr-pd" value="1"> <span data-i18n="gui_pd_potential">Potential</span></label>
-    <label><input type="radio" name="tr-pd" value="0"> <span data-i18n="gui_pd_allowed">Allowed</span></label>
-    <label><input type="radio" name="tr-pd" value="-1"> <span data-i18n="gui_pd_all">All</span></label>
-  </div></fieldset>
-  <fieldset><legend data-i18n="gui_col_filters">Filters</legend>
-    <div class="form-row"><div class="form-group"><label data-i18n="gui_port">Port</label><input id="tr-port" placeholder="e.g. 80, 443"></div><div class="form-group"><label data-i18n="gui_protocol">Protocol</label><select id="tr-proto"><option value="" data-i18n="gui_both">Both</option><option value="6" data-i18n="gui_tcp">TCP</option><option value="17" data-i18n="gui_udp">UDP</option></select></div></div>
-    <div class="form-row"><div class="form-group"><label data-i18n="gui_source">Source (Label/IP)</label><input id="tr-src" placeholder="e.g. role=Web, 10.0.0.0/8, 192.168.1.1"></div><div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="tr-dst" placeholder="e.g. app=DB, 10.1.1.5"></div></div>
-  </fieldset>
-  <fieldset><legend data-i18n="gui_excludes">Excludes (Optional)</legend>
-    <div class="form-row-3"><div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="tr-expt" placeholder="e.g. 22"></div><div class="form-group"><label data-i18n="gui_ex_src">Exclude Source</label><input id="tr-exsrc" placeholder="e.g. env=Kube, 10.9.9.9"></div><div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="tr-exdst" placeholder="e.g. 8.8.8.8"></div></div>
-  </fieldset>
-  <fieldset><legend data-i18n="gui_threshold">Threshold</legend>
-    <div class="form-row-3"><div class="form-group"><label data-i18n="gui_count">Count</label><input id="tr-cnt" type="number" value="10"></div><div class="form-group"><label data-i18n="gui_window_min">Window (min)</label><input id="tr-win" type="number" value="10"></div><div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="tr-cd" type="number" value="10"></div></div>
-  </fieldset>
-  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-traffic')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveTraffic()" data-i18n="gui_save">? Save</button></div>
-</div></div>
-
-<!-- BW/Volume -->
-<div class="modal-bg" id="m-bw"><div class="modal">
-  <h2><span data-i18n="gui_add_bw_rule" id="mb-title">Add Bandwidth / Volume Rule</span></h2>
-  <div class="form-group"><label data-i18n="gui_rule_name">Rule Name</label><input id="bw-name"></div>
-  <fieldset><legend data-i18n="gui_metric_type">Metric Type</legend><div class="radio-group">
-    <label><input type="radio" name="bw-mt" value="bandwidth" checked> <span data-i18n="gui_mt_bw">Bandwidth (Mbps, Max)</span></label>
-    <label><input type="radio" name="bw-mt" value="volume"> <span data-i18n="gui_mt_vol">Volume (MB, Sum)</span></label>
-  </div></fieldset>
-  <fieldset><legend data-i18n="gui_policy_dec">Policy Decision</legend><div class="radio-group">
-    <label><input type="radio" name="bw-pd" value="2"> <span data-i18n="gui_pd_blocked">Blocked</span></label>
-    <label><input type="radio" name="bw-pd" value="1"> <span data-i18n="gui_pd_potential">Potential</span></label>
-    <label><input type="radio" name="bw-pd" value="0"> <span data-i18n="gui_pd_allowed">Allowed</span></label>
-    <label><input type="radio" name="bw-pd" value="-1" checked> <span data-i18n="gui_pd_all">All</span></label>
-  </div></fieldset>
-  <fieldset><legend data-i18n="gui_col_filters">Filters</legend>
-    <div class="form-row-3"><div class="form-group"><label data-i18n="gui_port">Port</label><input id="bw-port" placeholder="e.g. 443"></div><div class="form-group"><label data-i18n="gui_source">Source (Label/IP)</label><input id="bw-src" placeholder="e.g. role=Web, 10.0.0.0/8"></div><div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="bw-dst" placeholder="e.g. app=DB, 10.1.1.5"></div></div>
-  </fieldset>
-  <fieldset><legend data-i18n="gui_excludes">Excludes (Optional)</legend>
-    <div class="form-row-3"><div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="bw-expt" placeholder="e.g. 22"></div><div class="form-group"><label data-i18n="gui_ex_src">Exclude Source</label><input id="bw-exsrc" placeholder="e.g. env=Kube, 10.9.9.9"></div><div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="bw-exdst" placeholder="e.g. 8.8.8.8"></div></div>
-  </fieldset>
-  <fieldset><legend data-i18n="gui_threshold">Threshold</legend>
-    <div class="form-row-3"><div class="form-group"><label data-i18n="gui_value">Value</label><input id="bw-val" type="number" value="100"></div><div class="form-group"><label data-i18n="gui_window_min">Window (min)</label><input id="bw-win" type="number" value="10"></div><div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="bw-cd" type="number" value="30"></div></div>
-  </fieldset>
-  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-bw')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveBW()" data-i18n="gui_save">? Save</button></div>
-</div></div>
-
-<!-- Help / Parameter Guide -->
-<div class="modal-bg" id="m-help"><div class="modal" style="max-width:600px;">
-  <h2><span data-i18n="gui_help_title">?? Parameter Guide (API 25.2)</span></h2>
-  <div style="color:var(--dim);line-height:1.6;font-size:0.95rem;">
-    <p data-i18n="gui_help_desc">Illumio PCE Ops leverages the standard Illumio Traffic Analysis REST API parameters.</p>
-    <h3 style="color:#fff;margin-top:12px" data-i18n="gui_help_filters">Filters & Excludes</h3>
-    <ul style="padding-left:20px;margin-bottom:12px">
-      <li data-i18n="gui_help_lf"><strong>Label format:</strong> <code>key=value</code> (e.g., <code>role=Web</code>, <code>env=Production</code>, <code>app=Database</code>). Must exactly match the PCE label keys and values.</li>
-      <li data-i18n="gui_help_ipf"><strong>IP List/CIDR format:</strong> Standard CIDR notation (e.g., <code>10.0.0.0/8</code>) or exact IPs (e.g., <code>192.168.1.50</code>).</li>
-      <li data-i18n="gui_help_pf"><strong>Port format:</strong> Integer port numbers (e.g., <code>80</code>, <code>443</code>, <code>3306</code>).</li>
-    </ul>
-
-    <h3 style="color:#fff;margin-top:12px" data-i18n="gui_help_pd">Policy Decisions</h3>
-    <ul style="padding-left:20px;margin-bottom:12px">
-      <li data-i18n="gui_help_pd_blk"><strong>Blocked:</strong> Traffic explicitly dropped by policy.</li>
-      <li data-i18n="gui_help_pd_pot"><strong>Potential:</strong> Traffic that <em>would</em> be blocked if the workload were placed into Enforced mode.</li>
-      <li data-i18n="gui_help_pd_all"><strong>Allowed:</strong> Traffic permitted by policy.</li>
-    </ul>
-  </div>
-  <div class="modal-actions"><button class="btn btn-primary" onclick="closeModal('m-help')" data-i18n="gui_help_close">Close window</button></div>
-</div></div>
-
-<div class="toast" id="toast"></div>
-
-<script>
-/* ??? Helpers ??????????????????????????????????????????????????????? */
-const $=s=>document.getElementById(s);
-const api=async(url,opt)=>{const r=await fetch(url,opt);return r.json()};
-const post=(url,body)=>api(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-const put=(url,body)=>api(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-const del=url=>api(url,{method:'DELETE'});
-const rv=name=>document.querySelector(`input[name="${name}"]:checked`)?.value;
-const setRv=(name,val)=>{const r=document.querySelector(`input[name="${name}"][value="${val}"]`);if(r)r.checked=true};
-let _editIdx=null; // null = add mode, number = edit mode
-let _translations={};
-
-async function loadTranslations(){
-  _translations=await api('/api/ui_translations');
-  document.querySelectorAll('[data-i18n]').forEach(el=>{
-    const k=el.getAttribute('data-i18n');
-    if(_translations[k]){
-      if(el.tagName==='INPUT'&&el.type==='button') el.value=_translations[k];
-      else el.textContent=_translations[k];
-    }
-  });
-  document.querySelectorAll('[data-i18n]').forEach(el=>{
-    const k=el.getAttribute('data-i18n');
-    if(!_translations[k]) return;
-    if(el.hasAttribute('title')) el.setAttribute('title', _translations[k]);
-    if(el.hasAttribute('placeholder') && !el.hasAttribute('data-keep-placeholder')) {
-      const cur = el.getAttribute('placeholder') || '';
-      if(cur && !/^e\.g\./i.test(cur)) el.setAttribute('placeholder', _translations[k]);
-    }
-  });
-}
-
-function initTableResizers() {
-  document.querySelectorAll('.rule-table').forEach(table => {
-    const ths = table.querySelectorAll('th');
-    ths.forEach(th => {
-      if (th.querySelector('.resizer')) return;
-      const resizer = document.createElement('div');
-      resizer.classList.add('resizer');
-      th.appendChild(resizer);
-      let startX, startWidth;
-      resizer.addEventListener('mousedown', function(e) {
-        startX = e.pageX;
-        startWidth = th.offsetWidth;
-        document.body.style.cursor = 'col-resize';
-        const onMouseMove = (e) => {
-          const newWidth = startWidth + (e.pageX - startX);
-          th.style.width = Math.max(newWidth, 30) + 'px';
-        };
-        const onMouseUp = () => {
-          document.body.style.cursor = 'default';
-          document.removeEventListener('mousemove', onMouseMove);
-          document.removeEventListener('mouseup', onMouseUp);
-        };
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
-      });
-    });
-  });
-}
-
-function toast(msg,err){const t=$('toast');t.textContent=msg;t.className='toast'+(err?' err':'')+' show';setTimeout(()=>t.className='toast',3000)}
-function dlog(msg){const l=$('d-log');l.textContent+='\n['+new Date().toLocaleTimeString()+'] '+msg;l.scrollTop=l.scrollHeight}
-function slog(msg){const l=$('s-log');if(l){l.textContent+='\n['+new Date().toLocaleTimeString()+'] '+msg;l.scrollTop=l.scrollHeight}}
-function alog(msg){const l=$('a-log');l.textContent+='\n'+msg;l.scrollTop=l.scrollHeight}
-
-/* ??? Tabs ?????????????????????????????????????????????????????????? */
-function switchTab(id){
-  document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',t.textContent.trim().toLowerCase().startsWith(id.slice(0,4)))});
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-  $('p-'+id).classList.add('active');
-  if(id==='rules') loadRules();
-  if(id==='settings') loadSettings();
-  if(id==='dashboard') loadDashboard();
-}
-
-/* ??? Dashboard ????????????????????????????????????????????????????? */
-async function loadDashboard(){
-  const d=await api('/api/status');
-  $('hdr-meta').textContent=`v${d.version} | ${d.api_url}`;
-  $('d-rules').textContent=d.rules_count;
-  $('d-health').textContent=d.health_check?'ON':'OFF';
-  $('d-lang').textContent=(d.language||'en').toUpperCase();
-  if(d.theme) document.documentElement.setAttribute('data-theme', d.theme);
-
-  if (d.cooldowns && d.cooldowns.length > 0) {
-    const activeCds = d.cooldowns.filter(c => c.remaining_mins > 0).length;
-    if (activeCds > 0) {
-      const title = _translations['gui_cooldown_title'] || 'Rules in Cooldown';
-      $('cd-field').style.display='block';
-      $('cd-list').innerHTML = `<div class="card" style="border-color:var(--warn);"><div class="label" style="color:var(--warn);"><span style="margin-right:4px;">??/span>${title}</div><div class="value" style="color:var(--warn);">${activeCds}</div></div>`;
-    } else {
-      $('cd-field').style.display='none';
-      $('cd-list').innerHTML='';
-    }
-  } else {
-    $('cd-field').style.display='none';
-    $('cd-list').innerHTML='';
-  }
-
-  await loadTranslations();
-  await loadDashboardQueries();
-}
-async function testConn(){
-  slog(_translations['gui_test_conn_running'] || '測試 PCE 連線中...');
-  const r = await post('/api/actions/test-connection', {});
-  if (r.ok) {
-    const okText = _translations['status_ok'] || '連線成功';
-    $('d-api').textContent = okText;
-    $('d-api').className = 'value ok';
-    slog(okText + ' (HTTP ' + r.status + ')');
-  } else {
-    $('d-api').textContent = _translations['status_error'] || '連線失敗';
-    $('d-api').className = 'value err';
-    slog(r.error || r.body);
-  }
-}
-
-let _dashboardQueries = [];
-
-async function loadDashboardQueries() {
-  const rt = await window.fetch('/api/dashboard/queries');
-  _dashboardQueries = await rt.json() || [];
-  renderDashboardQueries();
-}
-
-const escapeHtml = (unsafe) => {
-    return (unsafe || '').toString()
-         .replace(/&/g, "&amp;")
-         .replace(/</g, "&lt;")
-         .replace(/>/g, "&gt;")
-         .replace(/"/g, "&quot;")
-         .replace(/'/g, "&#039;");
-};
-
-function renderDashboardQueries() {
-  const container = $('d-queries-container');
-  let html = '';
-  if(_dashboardQueries.length === 0){
-      html = `<div style="text-align:center;padding:20px;color:var(--dim);font-size:0.9rem;">${_translations['gui_top10_empty']||'No data.'}</div>`;
-  } else {
-      _dashboardQueries.forEach((q, i) => {
-          let badgeColor = "var(--primary)";
-          if(q.pd === 2) badgeColor = "var(--danger)";
-          else if(q.pd === 1) badgeColor = "var(--warn)";
-          else if(q.pd === 0) badgeColor = "var(--success)";
-          
-          let rankLabel = q.rank_by === 'bandwidth' ? 'Max Bandwidth (Mbps)' : (q.rank_by === 'volume' ? 'Total Volume' : 'Connection Count');
-          html += `
-          <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;">
-             <div style="display:flex;align-items:center;min-height:30px;">
-                <strong style="margin-right:12px;font-size:0.95rem;color:var(--accent2);">${escapeHtml(q.name)}</strong>
-                <span style="font-size:10px;background:${badgeColor};color:#fff;padding:2px 6px;border-radius:4px;margin-right:8px;">PD: ${q.pd===3?'All':(q.pd===2?'Blocked':(q.pd===1?'Potential':'Allowed'))}</span>
-                <span style="font-size:10px;background:var(--dim);color:#fff;padding:2px 6px;border-radius:4px;margin-right:8px;">${rankLabel}</span>
-                <span style="flex:1"></span>
-                <span id="d-qstate-${i}" style="color:var(--dim);font-size:0.8rem;margin-right:12px;"></span>
-                <button class="btn btn-sm" style="background:var(--bg);border:1px solid var(--border);margin-right:6px;" onclick="openQueryModal(${i})">??</button>
-                <button class="btn btn-primary btn-sm" onclick="runTop10Query(${i})" data-i18n="gui_run_btn">Run</button>
-             </div>
-             
-             <table class="rule-table" style="margin-top:10px;border-top:1px solid var(--border);font-size:0.8rem;">
-              <thead><tr>
-                <th style="width:25px">#</th>
-                <th style="width:100px" data-i18n="gui_value">Value</th>
-                <th style="width:110px">First/Last Seen</th>
-                <th style="width:40px;text-align:center;">Dir</th>
-                <th>Source</th>
-                <th>Destination</th>
-                <th style="width:70px">Service</th>
-                <th style="width:70px" data-i18n="gui_policy_dec">Decision</th>
-              </tr></thead>
-              <tbody id="d-qbody-${i}">
-                <tr><td colspan="8" style="text-align:center;color:var(--dim);padding:20px;">${_translations['gui_top10_empty']||'No data. Click Run to query.'}</td></tr>
-              </tbody>
-             </table>
-          </div>`;
-      });
-  }
-  container.innerHTML = html;
-  initTableResizers();
-  
-  if (typeof applyLang === "function") applyLang();
-  else loadTranslations().catch(console.error);
-}
-
-function openQueryModal(idx = -1) {
-  $('dq-idx').value = idx;
-  if (idx < 0) {
-      $('mq-title').textContent = _translations['gui_add_query_widget'] || 'Add Query Widget';
-      $('dq-name').value = '';
-      $('dq-rank').value = 'count';
-      document.querySelector('input[name="dq-pd"][value="3"]').checked = true;
-      $('dq-port').value = ''; $('dq-proto').value = '';
-      $('dq-src').value = ''; $('dq-dst').value = '';
-      $('dq-expt').value = ''; $('dq-exsrc').value = ''; $('dq-exdst').value = '';
-  } else {
-      mq-title.textContent = _translations['gui_edit_query_widget'] || 'Edit Query Widget';
-      const q = _dashboardQueries[idx];
-      $('dq-name').value = q.name || '';
-      $('dq-rank').value = q.rank_by || 'count';
-      const pdRad = document.querySelector(`input[name="dq-pd"][value="${q.pd}"]`);
-      if(pdRad) pdRad.checked = true;
-      $('dq-port').value = q.port || ''; 
-      $('dq-proto').value = q.proto || '';
-      $('dq-src').value = (q.src_label||'')+(q.src_ip_in? (q.src_label? ', ':'')+q.src_ip_in : '');
-      $('dq-dst').value = (q.dst_label||'')+(q.dst_ip_in? (q.dst_label? ', ':'')+q.dst_ip_in : '');
-      $('dq-expt').value = q.ex_port || '';
-      $('dq-exsrc').value = (q.ex_src_label||'')+(q.ex_src_ip? (q.ex_src_label? ', ':'')+q.ex_src_ip : '');
-      $('dq-exdst').value = (q.ex_dst_label||'')+(q.ex_dst_ip? (q.ex_dst_label? ', ':'')+q.ex_dst_ip : '');
-  }
-  let btn = document.querySelector('#m-query .modal-actions');
-  let isEdit = idx >= 0;
-  if(isEdit && !document.getElementById('m-query-del')){
-    let delBtn = document.createElement('button');
-    delBtn.id = 'm-query-del';
-    delBtn.className = 'btn btn-danger';
-    delBtn.innerText = _translations['gui_delete'] || 'Delete';
-    delBtn.style.marginRight = 'auto';
-    delBtn.onclick = () => deleteTop10Query(idx);
-    btn.insertBefore(delBtn, btn.firstChild);
-  } else if (!isEdit && document.getElementById('m-query-del')) {
-    document.getElementById('m-query-del').remove();
-  }
-  
-  const m = $('m-query');
-  if (m) m.classList.add('show');
-}
-
-async function saveDashboardQuery() {
-    const idx = parseInt($('dq-idx').value);
-    const pdMatch = document.querySelector('input[name="dq-pd"]:checked');
-    const d = {
-        idx: idx >= 0 ? idx : null,
-        name: $('dq-name').value,
-        rank_by: $('dq-rank').value,
-        pd: pdMatch ? parseInt(pdMatch.value) : 3,
-        port: parseInt($('dq-port').value) || null,
-        proto: parseInt($('dq-proto').value) || null,
-        src: $('dq-src').value, dst: $('dq-dst').value,
-        ex_port: parseInt($('dq-expt').value) || null,
-        ex_src: $('dq-exsrc').value, ex_dst: $('dq-exdst').value
-    };
-    
-    // Quick API helper if not strictly using fetch directly
-    const r = await fetch('/api/dashboard/queries', {
-      method: 'POST', body: JSON.stringify(d), headers: {'Content-Type': 'application/json'}
-    }).then(res => res.json());
-    
-    if(r.ok) { 
-        const m = $('m-query');
-        if (m) m.classList.remove('show');
-        await loadDashboardQueries(); 
-    }
-    else alert((_translations['error_generic']||'Error: {error}').replace('{error}', r.error || 'Unknown error'));
-}
-
-async function deleteTop10Query(idx) {
-    if(!confirm(_translations['gui_confirm_delete_widget'] || 'Delete this widget?')) return;
-    const r = await fetch('/api/dashboard/queries/'+idx, {method:'DELETE'}).then(res => res.json());
-    if(r.ok) { 
-        const m = $('m-query');
-        if (m) m.classList.remove('show');
-        await loadDashboardQueries(); 
-    }
-    else alert(_translations['error_deleting'] || 'Delete failed');
-}
-
-async function runAllQueries() {
-    for(let i=0; i<_dashboardQueries.length; i++) {
-        await runTop10Query(i);
-    }
-}
-
-async function runTop10Query(idx){
-  const q = _dashboardQueries[idx];
-  const ms=$(`d-qstate-${idx}`), bd=$(`d-qbody-${idx}`);
-  if(!ms || !bd) return;
-  
-  const payload = { ...q, mins: parseInt($('d-global-min').value)||30 };
-  
-  ms.textContent = _translations['gui_top10_querying']||'Querying...'; 
-  bd.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:20px;">${_translations['gui_top10_loading']||'Loading...'}</td></tr>`;
-  
-  try {
-    const r = await fetch('/api/dashboard/top10', {
-      method: 'POST', body: JSON.stringify(payload), headers: {'Content-Type': 'application/json'}
-    }).then(res => res.json());
-    if(!r.ok) throw new Error(r.error||'Unknown error');
-    
-    if(r.data && r.data.length){
-      let html='';
-      r.data.forEach((m,i)=>{
-        const pBadge = m.pd===2 ? `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${_translations['gui_pd_blocked']||'Blocked'}</span>` :
-                       m.pd===1 ? `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">${_translations['gui_pd_potential']||'Potential'}</span>` :
-                       m.pd===0 ? `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${_translations['gui_pd_allowed']||'Allowed'}</span>` : m.pd;
-                       
-        const formatLabel = (labels) => {
-            if(!labels || !labels.length) return '';
-            return labels.map(l => `<span style="background:#e1ecf4;color:#2c5e77;padding:1px 4px;border-radius:4px;font-size:9px;margin-right:2px;display:inline-block;white-space:nowrap;margin-top:2px;">${escapeHtml(l.key)}:${escapeHtml(l.value)}</span>`).join('');
-        };
-        const sLabels = formatLabel(m.s_labels);
-        const dLabels = formatLabel(m.d_labels);
-                       
-        html+=`
-          <tr>
-            <td>${i+1}</td>
-            <td style="font-weight:bold;color:#6f42c1;">${m.val_fmt}</td>
-            <td style="font-size:10px;white-space:nowrap;">${m.first_seen}<br>${m.last_seen}</td>
-            <td style="text-align:center;">${m.dir}</td>
-            <td><strong style="font-size:11px;">${escapeHtml(m.s_name)}</strong><br><small style="color:var(--dim);">${escapeHtml(m.s_ip)}</small><br>${sLabels}</td>
-            <td><strong style="font-size:11px;">${escapeHtml(m.d_name)}</strong><br><small style="color:var(--dim);">${escapeHtml(m.d_ip)}</small><br>${dLabels}</td>
-            <td>${escapeHtml(m.svc)}</td>
-            <td>${pBadge}</td>
-          </tr>`;
-      });
-      bd.innerHTML=html;
-      ms.textContent = (_translations['gui_top10_found']||'Found {count} records. (Top 10)').replace('{count}', r.total);
-    } else {
-      bd.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:20px;">${_translations['gui_top10_no_records']||'No records found.'}</td></tr>`;
-      ms.textContent = _translations['gui_done']||'Done.';
-    }
-    initTableResizers();
-  } catch(e) {
-    ms.textContent = (_translations['error_generic']||'Error: {error}').replace('{error}', e.message);
-    bd.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--danger);padding:20px;">${_translations['gui_top10_error']||'Error querying data.'}</td></tr>`;
-  }
-}
-
-/* ??? Rules ????????????????????????????????????????????????????????? */
-let _catalog={};
-async function loadRules(){
-  const rules=await api('/api/rules');
-  $('r-badge').textContent=rules.length;
-  const pdm={2:'Blocked',1:'Potential',0:'Allowed','-1':'All'};
-  
-  const cdTitle = _translations['gui_cooldown_active'] || 'Cooldown';
-  const readyTitle = _translations['gui_cooldown_ready'] || 'Ready';
-  const remTempl = _translations['gui_cooldown_remaining'] || '{mins}m remaining';
-  
-  let html='';
-  rules.forEach(r=>{
-    const typ=r.type.charAt(0).toUpperCase()+r.type.slice(1);
-    const unit={volume:' MB',bandwidth:' Mbps',traffic:' conns'}[r.type]||'';
-    const cond='> '+r.threshold_count+unit+' (Win:'+r.threshold_window+'m CD:'+(r.cooldown_minutes||r.threshold_window)+'m)';
-    
-    let statusHtml = '';
-    if (r.cooldown_remaining > 0) {
-      const rem = remTempl.replace('{mins}', r.cooldown_remaining);
-      statusHtml = `<span style="background:var(--warn);color:#1a2c32;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">??${cdTitle} (${rem})</span>`;
-    } else {
-      statusHtml = `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">??${readyTitle}</span>`;
-    }
-    
-    let f=[];
-    if(r.type==='event') f.push('Event: '+r.filter_value);
-    if(r.pd!==undefined&&r.pd!==null) f.push('PD:'+( pdm[r.pd]||r.pd));
-    if(r.port) f.push('Port:'+r.port);
-    if(r.src_label) f.push('Src:'+r.src_label);if(r.dst_label) f.push('Dst:'+r.dst_label);
-    if(r.src_ip_in) f.push('SrcIP:'+r.src_ip_in);if(r.dst_ip_in) f.push('DstIP:'+r.dst_ip_in);
-    html+=`<tr><td><input type="checkbox" class="r-chk" data-idx="${r.index}"></td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}">${cond}</td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | '))||'??}</td><td><button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')">??</button></td></tr>`;
-  });
-  $('r-body').innerHTML=html||'<tr><td colspan="7" style="color:var(--dim);text-align:center;padding:24px">No rules. Add one above.</td></tr>';
-  initTableResizers();
-}
-function toggleAll(el){document.querySelectorAll('.r-chk').forEach(c=>c.checked=el.checked)}
-async function deleteSelected(){
-  const ids=[...document.querySelectorAll('.r-chk:checked')].map(c=>parseInt(c.dataset.idx)).sort((a,b)=>b-a);
-  if(!ids.length){toast(_translations['gui_select_rules_first']||'Select rules first','err');return}
-  if(!confirm((_translations['confirm_delete']||'Delete {count} rules? (y/n)').replace('{count}', ids.length)))return;
-  for(const i of ids) await del('/api/rules/'+i);
-  toast(_translations['gui_deleted']||'Deleted');loadRules();loadDashboard();
-}
-function openModal(id,isEdit){
-  _editIdx=isEdit??null;$(id).classList.add('show');if(id==='m-event'&&!Object.keys(_catalog).length)loadCatalog();
-  // Update modal title
-  let target;
-  if(id==='m-event') target=$('me-title');
-  else if(id==='m-traffic') target=$('mt-title');
-  else if(id==='m-bw') target=$('mb-title');
-  if(target){
-    const baseKey = id==='m-event'?'gui_add_event_rule':id==='m-traffic'?'gui_add_traffic_rule':'gui_add_bw_rule';
-    const editKey = id==='m-event'?'gui_edit_event_rule':id==='m-traffic'?'gui_edit_traffic_rule':'gui_edit_bw_rule';
-    const key = _editIdx!==null ? editKey : baseKey;
-    target.setAttribute('data-i18n', key);
-    if(_translations[key]) target.textContent=_translations[key];
-  }
-}
-function closeModal(id){$(id).classList.remove('show');_editIdx=null}
-async function loadCatalog(){
-  _catalog=await api('/api/event-catalog');
-  const sel=$('ev-cat');sel.innerHTML='<option value="">Select...</option>';
-  Object.keys(_catalog).forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)});
-}
-function populateEvents(){
-  const cat=$('ev-cat').value;const sel=$('ev-type');sel.innerHTML='';
-  if(!cat||!_catalog[cat]){sel.innerHTML='<option>Select category first</option>';return}
-  Object.entries(_catalog[cat]).forEach(([k,v])=>{const o=document.createElement('option');o.value=k;o.textContent=k+' ('+v+')';sel.appendChild(o)});
-}
-
-/* ??? Edit Rule ????????????????????????????????????????????????????? */
-async function editRule(idx,type){
-  try {
-    const r=await api('/api/rules/'+idx);
-    if(!r || r.error){toast(_translations['gui_rule_not_found']||'Rule not found','err');return}
-    if(type==='event'){
-      await loadCatalog();
-      // Find and select category
-      for(const[cat,evts] of Object.entries(_catalog)){
-        if(r.filter_value in evts){$('ev-cat').value=cat;populateEvents();$('ev-type').value=r.filter_value;break}
-      }
-      setRv('ev-tt',r.threshold_type||'immediate');
-      $('ev-cnt').value=r.threshold_count||5;
-      $('ev-win').value=r.threshold_window||10;
-      $('ev-cd').value=r.cooldown_minutes||10;
-      openModal('m-event',idx);
-    } else if(type==='traffic'){
-      $('tr-name').value=r.name||'';
-      setRv('tr-pd',String(r.pd??2));
-      $('tr-port').value=r.port||'';
-      $('tr-proto').value=r.proto?String(r.proto):'';
-      $('tr-src').value=r.src_label||r.src_ip_in||'';
-      $('tr-dst').value=r.dst_label||r.dst_ip_in||'';
-      $('tr-expt').value=r.ex_port||'';
-      $('tr-exsrc').value=r.ex_src_label||r.ex_src_ip||'';
-      $('tr-exdst').value=r.ex_dst_label||r.ex_dst_ip||'';
-      $('tr-cnt').value=r.threshold_count||10;
-      $('tr-win').value=r.threshold_window||10;
-      $('tr-cd').value=r.cooldown_minutes||10;
-      openModal('m-traffic',idx);
-    } else {
-      $('bw-name').value=r.name||'';
-      setRv('bw-mt',r.type||'bandwidth');
-      setRv('bw-pd',String(r.pd??-1));
-      $('bw-port').value=r.port||'';
-      $('bw-src').value=r.src_label||r.src_ip_in||'';
-      $('bw-dst').value=r.dst_label||r.dst_ip_in||'';
-      $('bw-expt').value=r.ex_port||'';
-      $('bw-exsrc').value=r.ex_src_label||r.ex_src_ip||'';
-      $('bw-exdst').value=r.ex_dst_label||r.ex_dst_ip||'';
-      $('bw-val').value=r.threshold_count||100;
-      $('bw-win').value=r.threshold_window||10;
-      $('bw-cd').value=r.cooldown_minutes||30;
-      openModal('m-bw',idx);
-    }
-  } catch(e) {
-    console.error(e);
-    alert((_translations['gui_ui_error']||'UI Error: ') + e.message);
-  }
-}
-
-async function saveEvent(){
-  const cat=$('ev-cat').value,ev=$('ev-type').value;
-  if(!cat||!ev){toast(_translations['gui_select_category_event']||'Select category and event','err');return}
-  const name=(_catalog[cat]||{})[ev]||ev;
-  const data={name,filter_value:ev,threshold_type:rv('ev-tt'),threshold_count:$('ev-cnt').value,threshold_window:$('ev-win').value,cooldown_minutes:$('ev-cd').value};
-  if(_editIdx!==null) await put('/api/rules/'+_editIdx,data); else await post('/api/rules/event',data);
-  closeModal('m-event');toast(_translations['gui_event_rule_saved']||'Event rule saved');loadRules();loadDashboard();
-}
-async function saveTraffic(){
-  const name=$('tr-name').value.trim();if(!name){toast(_translations['gui_name_required']||'Name required','err');return}
-  const data={name,pd:rv('tr-pd'),port:$('tr-port').value,proto:$('tr-proto').value,src:$('tr-src').value,dst:$('tr-dst').value,ex_port:$('tr-expt').value,ex_src:$('tr-exsrc').value,ex_dst:$('tr-exdst').value,threshold_count:$('tr-cnt').value,threshold_window:$('tr-win').value,cooldown_minutes:$('tr-cd').value};
-  if(_editIdx!==null) await put('/api/rules/'+_editIdx,data); else await post('/api/rules/traffic',data);
-  closeModal('m-traffic');toast(_translations['gui_traffic_rule_saved']||'Traffic rule saved');loadRules();loadDashboard();
-}
-async function saveBW(){
-  const name=$('bw-name').value.trim();if(!name){toast(_translations['gui_name_required']||'Name required','err');return}
-  const data={
-    name,rule_type:rv('bw-mt'),pd:rv('bw-pd'),
-    port:$('bw-port').value,src:$('bw-src').value,dst:$('bw-dst').value,
-    ex_port:$('bw-expt').value,ex_src:$('bw-exsrc').value,ex_dst:$('bw-exdst').value,
-    threshold_count:$('bw-val').value,threshold_window:$('bw-win').value,cooldown_minutes:$('bw-cd').value
-  };
-  if(_editIdx!==null) await put('/api/rules/'+_editIdx,{...data,type:data.rule_type}); else await post('/api/rules/bandwidth',data);
-  closeModal('m-bw');toast(_translations['gui_rule_saved']||'Rule saved');loadRules();loadDashboard();
-}
-
-function confirmBestPractices(){
-  if(!confirm(_translations['gui_bp_confirm_1'] || 'WARNING: This will DELETE all existing rules and replace them with best practice defaults. Continue?')) return;
-  if(!confirm(_translations['gui_bp_confirm_2'] || 'This action cannot be undone. Confirm once more to proceed.')) return;
-  runAction('best-practices');
-}
-
-/* ??? Settings ?????????????????????????????????????????????????????? */
-let _settings={};
-async function loadSettings(){
-  _settings=await api('/api/settings');
-  const s=_settings,a=s.api||{},e=s.email||{},sm=s.smtp||{},al=s.alerts||{},st=s.settings||{};
-  const active=al.active||[];
-  $('s-form').innerHTML=`
-  <fieldset><legend data-i18n="gui_api_conn">API Connection</legend>
-    <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${a.url||''}"></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${a.org_id||''}"></div></div>
-    <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${a.key||''}"></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${a.secret||''}"></div></div>
-    <div class="chk"><label><input type="checkbox" id="s-ssl" ${a.verify_ssl?'checked':''}> <span data-i18n="gui_verify_ssl">Verify SSL</span></label></div>
-  </fieldset>
-  <fieldset><legend data-i18n="gui_email_smtp">Email & SMTP</legend>
-    <div class="form-row"><div class="form-group"><label data-i18n="gui_sender">Sender</label><input id="s-sender" value="${e.sender||''}"></div><div class="form-group"><label data-i18n="gui_recipients">Recipients (comma)</label><input id="s-rcpt" value="${(e.recipients||[]).join(', ')}"></div></div>
-    <div class="form-row"><div class="form-group"><label data-i18n="gui_smtp_host">SMTP Host</label><input id="s-smhost" value="${sm.host||''}"></div><div class="form-group"><label data-i18n="gui_port">Port</label><input id="s-smport" value="${sm.port||25}"></div></div>
-    <div class="form-row"><div class="form-group"><label data-i18n="gui_user">User</label><input id="s-smuser" value="${sm.user||''}"></div><div class="form-group"><label data-i18n="gui_password">Password</label><input id="s-smpass" type="password" value="${sm.password||''}"></div></div>
-    <div style="display:flex;gap:20px"><div class="chk"><label><input type="checkbox" id="s-tls" ${sm.enable_tls?'checked':''}> STARTTLS</label></div><div class="chk"><label><input type="checkbox" id="s-auth" ${sm.enable_auth?'checked':''}> Auth</label></div></div>
-  </fieldset>
-  <fieldset><legend data-i18n="gui_alert_channels">Alert Channels</legend>
-    <div style="display:flex;gap:20px;margin-bottom:12px"><div class="chk"><label><input type="checkbox" id="s-amail" ${active.includes('mail')?'checked':''}> ? <span data-i18n="gui_mail">Mail</span></label></div><div class="chk"><label><input type="checkbox" id="s-aline" ${active.includes('line')?'checked':''}> ? <span data-i18n="gui_line">LINE</span></label></div><div class="chk"><label><input type="checkbox" id="s-awh" ${active.includes('webhook')?'checked':''}> ?? <span data-i18n="gui_webhook">Webhook</span></label></div></div>
-    <div class="form-row"><div class="form-group"><label data-i18n="gui_line_token">LINE Token</label><input id="s-ltok" value="${al.line_channel_access_token||''}"></div><div class="form-group"><label data-i18n="gui_line_target_id">LINE Target ID</label><input id="s-ltgt" value="${al.line_target_id||''}"></div></div>
-    <div class="form-group"><label data-i18n="gui_webhook_url">Webhook URL</label><input id="s-whurl" value="${al.webhook_url||''}"></div>
-  </fieldset>
-  <fieldset><legend data-i18n="gui_lang_settings">Display & General</legend>
-    <div class="form-row">
-      <div class="form-group">
-        <label data-i18n="gui_language">Language</label>
-        <div class="radio-group">
-          <label><input type="radio" name="s-lang" value="en" ${st.language!=='zh_TW'?'checked':''}> <span data-i18n="gui_lang_en">English</span></label>
-          <label><input type="radio" name="s-lang" value="zh_TW" ${st.language==='zh_TW'?'checked':''}> <span data-i18n="gui_lang_zh">蝜?銝剜?</span></label>
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Theme</label>
-        <div class="radio-group">
-          <label><input type="radio" name="s-theme" value="dark" ${st.theme!=='light'?'checked':''}> <span data-i18n="gui_theme_dark">Dark Theme</span></label>
-          <label><input type="radio" name="s-theme" value="light" ${st.theme==='light'?'checked':''}> <span data-i18n="gui_theme_light">Light Theme</span></label>
-        </div>
-      </div>
-    </div>
-  </fieldset>`;
-  await loadTranslations();
-}
-async function saveSettings(){
-  const active=[];if($('s-amail').checked)active.push('mail');if($('s-aline').checked)active.push('line');if($('s-awh').checked)active.push('webhook');
-  const theme = rv('s-theme');
-  document.documentElement.setAttribute('data-theme', theme);
-  await post('/api/settings',{
-    api:{url:$('s-url').value,org_id:$('s-org').value,key:$('s-key').value,secret:$('s-sec').value,verify_ssl:$('s-ssl').checked},
-    email:{sender:$('s-sender').value,recipients:$('s-rcpt').value.split(',').map(s=>s.trim()).filter(Boolean)},
-    smtp:{host:$('s-smhost').value,port:parseInt($('s-smport').value)||25,user:$('s-smuser').value,password:$('s-smpass').value,enable_tls:$('s-tls').checked,enable_auth:$('s-auth').checked},
-    alerts:{active,line_channel_access_token:$('s-ltok').value,line_target_id:$('s-ltgt').value,webhook_url:$('s-whurl').value},
-    settings:{language:rv('s-lang'), theme: theme, timezone:$('s-timezone') ? $('s-timezone').value : 'local'}
-  });
-  toast(_translations['gui_settings_saved'] || 'Settings saved');
-}
-
-/* ??? Actions ??????????????????????????????????????????????????????? */
-async function runAction(name){
-  const runningTpl = _translations['gui_action_running'] || '執行中：{name}...';
-  $('a-log').textContent='['+new Date().toLocaleTimeString()+'] '+runningTpl.replace('{name}', name);
-  const r=await post('/api/actions/'+name,{});
-  alog(r.output||(_translations['done']||'完成。'));
-  if(name==='best-practices'){loadRules();loadDashboard()}
-  const doneTpl = _translations['gui_action_completed'] || '已完成：{name}';
-  toast(doneTpl.replace('{name}', name));
-}
-async function runDebug(){
-  $('a-log').textContent='['+new Date().toLocaleTimeString()+'] '+(_translations['gui_debug_running']||'執行除錯模式中...');
-  const r=await post('/api/actions/debug',{mins:$('a-debug-mins').value,pd_sel:$('a-debug-pd').value});
-  alog(r.output||(_translations['done']||'完成。'));
-  toast(_translations['gui_debug_completed']||'除錯模式執行完成');
-}
-
-/* ??? Init ?????????????????????????????????????????????????????????? */
-async function stopGui(){
-  if(!confirm(_translations['gui_stop_confirm'] || '要停止 Web GUI 伺服器嗎？此頁面將關閉操作功能。')) return;
-  try{ await post('/api/shutdown',{}); } catch(e){}
-  document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;gap:12px"><h1 style="color:var(--accent2)">'+(_translations['gui_stopped_title']||'Web GUI 已停止')+'</h1><p style="color:var(--dim)">'+(_translations['gui_stopped_hint']||'你可以關閉此分頁，並從 CLI 或使用 --gui 重新啟動。')+'</p></div>';
-}
-loadDashboard();
-testConn();
-</script>
-</body>
-</html>'''
 

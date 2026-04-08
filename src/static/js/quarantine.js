@@ -21,12 +21,101 @@ function updateBulkBar() {
   // Check both traffic and workload tables for checks
   const checked = document.querySelectorAll('.qt-chk:checked, .qw-chk:checked');
   const bar = document.getElementById('bulk-bar');
+  const activePanel = document.querySelector('.panel.active');
+  const onTrafficWorkloadPage = activePanel && activePanel.id === 'p-traffic-workload';
+  if (!onTrafficWorkloadPage) {
+    bar.classList.remove('show');
+    return;
+  }
   if (checked.length > 0) {
     document.getElementById('bulk-sel-count').textContent = checked.length;
     bar.classList.add('show');
   } else {
     bar.classList.remove('show');
   }
+}
+
+function _qText(key, fallback) {
+  return (_translations && _translations[key]) || fallback;
+}
+
+function _buildQuarantineState(href, isBulk = false, altHref = null) {
+  const state = { pairs: [], standalone: [] };
+
+  const addPair = (sourceHref, destinationHref) => {
+    const source = String(sourceHref || '').trim();
+    const destination = String(destinationHref || '').trim();
+    if (!source && !destination) return;
+    if (state.pairs.some((pair) => pair.source === source && pair.destination === destination)) return;
+    state.pairs.push({ source, destination });
+  };
+
+  const addStandalone = (targetHref) => {
+    const normalized = String(targetHref || '').trim();
+    if (!normalized || state.standalone.includes(normalized)) return;
+    state.standalone.push(normalized);
+  };
+
+  if (isBulk) {
+    document.querySelectorAll('.qt-chk:checked').forEach((checkbox) => {
+      addPair(checkbox.dataset.srcHref, checkbox.dataset.dstHref);
+    });
+    document.querySelectorAll('.qw-chk:checked').forEach((checkbox) => {
+      addStandalone(checkbox.value || checkbox.dataset.href);
+    });
+  } else if (altHref && href && altHref !== href) {
+    addPair(href, altHref);
+  } else {
+    addStandalone(href);
+  }
+
+  return state;
+}
+
+function _currentQuarantineDirection() {
+  const selected = document.querySelector('input[name="q-dir"]:checked');
+  return selected ? selected.value : 'source';
+}
+
+function _computeQuarantineTargets(state, direction) {
+  const targets = [];
+  const pushUnique = (href) => {
+    const normalized = String(href || '').trim();
+    if (normalized && !targets.includes(normalized)) targets.push(normalized);
+  };
+
+  (state.standalone || []).forEach(pushUnique);
+  (state.pairs || []).forEach((pair) => {
+    if (!pair.source || !pair.destination || pair.source === pair.destination) {
+      pushUnique(pair.source || pair.destination);
+      return;
+    }
+    if (direction === 'both') {
+      pushUnique(pair.source);
+      pushUnique(pair.destination);
+      return;
+    }
+    if (direction === 'destination') {
+      pushUnique(pair.destination);
+      return;
+    }
+    pushUnique(pair.source);
+  });
+
+  return targets;
+}
+
+function refreshQuarantineTargets() {
+  const modal = document.getElementById('m-quarantine');
+  let state = { pairs: [], standalone: [] };
+  try {
+    state = JSON.parse(modal.dataset.qState || '{}');
+  } catch (e) { }
+
+  const targets = _computeQuarantineTargets(state, _currentQuarantineDirection());
+  document.getElementById('q-target-count').textContent = targets.length;
+  document.getElementById('q-target-hrefs').value = JSON.stringify(targets);
+  document.getElementById('btn-apply-q').disabled = targets.length === 0;
 }
 
 // Add event listeners to table bodies for dynamic checkbox listening
@@ -37,29 +126,22 @@ document.addEventListener('change', function (e) {
 });
 
 function openQuarantineModal(href, isBulk = false, altHref = null) {
-  let targetHrefs = [];
-  document.getElementById('q-direction-grp').style.display = 'none';
-
-  if (isBulk) {
-    const checked = document.querySelectorAll('.qt-chk:checked, .qw-chk:checked');
-    checked.forEach(c => {
-      let h = c.value || c.dataset.href;
-      if (h && !targetHrefs.includes(h)) targetHrefs.push(h);
-    });
-    if (targetHrefs.length === 0) return;
-  } else {
-    if (altHref && href && altHref !== href) {
-      // Traffic analyzer flow - need to pick source or dest
-      document.getElementById('q-direction-grp').style.display = 'block';
-      window._qTempHrefs = { source: href, destination: altHref };
-      targetHrefs = [document.querySelector('input[name="q-dir"]:checked').value === 'source' ? href : altHref];
-    } else {
-      targetHrefs = [href];
-    }
+  const state = _buildQuarantineState(href, isBulk, altHref);
+  if ((state.pairs || []).length === 0 && (state.standalone || []).length === 0) {
+    toast(_qText('gui_q_no_targets', 'No quarantine-eligible workloads were selected.'));
+    return;
   }
-  document.getElementById('q-target-count').textContent = targetHrefs.length;
-  document.getElementById('q-target-hrefs').value = JSON.stringify(targetHrefs);
 
+  const hasDualPair = (state.pairs || []).some((pair) => pair.source && pair.destination && pair.source !== pair.destination);
+  document.getElementById('q-direction-grp').style.display = hasDualPair ? 'block' : 'none';
+  const defaultDirection = isBulk && hasDualPair ? 'both' : 'source';
+  document.querySelectorAll('input[name="q-dir"]').forEach((radio) => {
+    radio.checked = radio.value === defaultDirection;
+  });
+
+  const modal = document.getElementById('m-quarantine');
+  modal.dataset.qState = JSON.stringify(state);
+  refreshQuarantineTargets();
   document.getElementById('m-quarantine').classList.add('show');
 }
 
@@ -68,11 +150,14 @@ async function applyQuarantine() {
   const rawHrefs = document.getElementById('q-target-hrefs').value;
   let hrefs = [];
   try { hrefs = JSON.parse(rawHrefs); } catch (e) { }
-  if (hrefs.length === 0) return;
+  if (hrefs.length === 0) {
+    toast(_qText('gui_q_no_targets', 'No quarantine-eligible workloads were selected.'));
+    return;
+  }
 
   const btn = document.getElementById('btn-apply-q');
   btn.disabled = true;
-  btn.innerHTML = `<svg class="icon"><use href="#icon-settings"></use></svg> Applying...`;
+  btn.innerHTML = `<svg class="icon"><use href="#icon-settings"></use></svg> ${_qText('gui_q_applying', 'Applying...')}`;
 
   try {
     let r;
@@ -83,7 +168,7 @@ async function applyQuarantine() {
     }
 
     if (r.ok || r.success) {
-      toast(`Isolated ${hrefs.length} workload(s) with ${sev} rules.`);
+      toast(_qText('gui_q_applied', 'Applied quarantine to {count} workload(s).').replace('{count}', hrefs.length).replace('{level}', sev));
       closeModal('m-quarantine');
       // Uncheck all
       document.querySelectorAll('.qt-chk, .qw-chk, #qt-chkall, #qw-chkall').forEach(c => c.checked = false);
@@ -99,7 +184,7 @@ async function applyQuarantine() {
     alert("Quarantine Apply Error: " + err.message);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = `Apply Isolation`;
+    btn.innerHTML = _qText('gui_q_apply', 'Apply Quarantine');
   }
 }
 
@@ -239,8 +324,10 @@ function renderQtPage() {
   pageData.forEach((item, idx) => {
     let shref = item.source.href;
     let dhref = item.destination.href;
-    let targetHref = shref || dhref || "";
-    let chkBox = targetHref ? `<input type="checkbox" class="qt-chk" value="${targetHref}">` : `<span style="color:var(--dim);font-size:10px;">${_translations['gui_management_unmanaged'] || 'Unmanaged'}</span>`;
+    let hasWorkloadTarget = !!(shref || dhref);
+    let chkBox = hasWorkloadTarget
+      ? `<input type="checkbox" class="qt-chk" data-src-href="${escapeHtml(shref || '')}" data-dst-href="${escapeHtml(dhref || '')}" value="${escapeHtml(shref || dhref || '')}">`
+      : `<span style="color:var(--dim);font-size:10px;">${_translations['gui_q_workload_only'] || 'Workload only'}</span>`;
 
     const formatActor = (actor) => {
       let procStr = '';
@@ -464,12 +551,7 @@ function qwPrevPage() {
 
 // Listen to Radio changes if isolating
 document.querySelectorAll('input[name="q-dir"]').forEach(radio => {
-  radio.addEventListener('change', (e) => {
-    if (window._qTempHrefs) {
-      let tgt = e.target.value === 'source' ? window._qTempHrefs.source : window._qTempHrefs.destination;
-      document.getElementById('q-target-hrefs').value = JSON.stringify([tgt]);
-    }
-  });
+  radio.addEventListener('change', refreshQuarantineTargets);
 });
 
 // Background initialization

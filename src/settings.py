@@ -1,5 +1,6 @@
 import os
 import datetime
+from src.events.catalog import KNOWN_EVENT_TYPES
 from src.utils import Colors, safe_input, draw_panel, draw_table, get_last_input_action
 from src.config import ConfigManager
 from src.i18n import t, set_language, get_language
@@ -48,7 +49,6 @@ FULL_EVENT_CATALOG = {
     },
     "System": {
         "cluster.update": "event_cluster_update",
-        "pce_health": "event_pce_health_check",
     },
 }
 
@@ -141,6 +141,201 @@ DISCOVERY_EVENTS = [
     "agent.suspend",
 ]
 
+_LEGACY_EVENT_CATALOG = FULL_EVENT_CATALOG
+_EVENT_CATEGORY_OVERRIDES = {
+    event_id: category
+    for category, events in _LEGACY_EVENT_CATALOG.items()
+    for event_id in events
+}
+_EVENT_DESCRIPTION_OVERRIDES = {
+    event_id: description
+    for events in _LEGACY_EVENT_CATALOG.values()
+    for event_id, description in events.items()
+}
+_CATEGORY_ORDER = [
+    "General",
+    "Agent Health",
+    "Agent Operations",
+    "Agent Security",
+    "User Access",
+    "Auth & API",
+    "Policy",
+    "Containers & Workloads",
+    "Network & Integrations",
+    "Platform & System",
+    "Inventory & Identity",
+]
+_HIDDEN_EVENT_TYPES = {
+    "agent.reguest_policy",
+}
+_STATUS_FILTER_EVENT_TYPES = {
+    "request.authentication_failed",
+    "request.authorization_failed",
+    "request.internal_server_error",
+    "request.service_unavailable",
+    "request.unknown_server_error",
+    "user.authenticate",
+    "user.login",
+    "user.logout",
+    "user.sign_in",
+    "user.sign_out",
+    "user.verify_mfa",
+}
+_SEVERITY_FILTER_EVENT_TYPES = set(_STATUS_FILTER_EVENT_TYPES)
+
+
+def _humanize_event_id(event_id: str) -> str:
+    if event_id == "*":
+        return "All events"
+    text = event_id.replace(".", " ").replace("_", " ").strip()
+    if not text:
+        return event_id
+    return " ".join(part.capitalize() for part in text.split())
+
+
+def _event_category(event_id: str) -> str:
+    if event_id == "*":
+        return "General"
+    if event_id.startswith(("ip_tables_rule.", "sec_policy_pending.")):
+        return "Policy"
+    if event_id.startswith(("security_principals.", "security_principal.")):
+        return "Inventory & Identity"
+    if event_id.startswith(("system_task.", "database.", "event_settings.", "settings.", "org.", "cluster.", "job.", "license.")):
+        return "Platform & System"
+    if event_id.startswith(("agent.", "agents.", "lost_agent.")):
+        if any(token in event_id for token in ("tampering", "clone", "missed_heartbeats", "offline")):
+            return "Agent Security"
+        if event_id.startswith((
+            "agent.generate_maintenance_token",
+            "agent.machine_identifier",
+            "agent.refresh_token",
+            "agent.reguest_policy",
+            "agent.request_policy",
+            "agent.request_upgrade",
+            "agent.update",
+            "agent.update_",
+            "agent.upload_",
+            "agent.activate",
+            "agent.deactivate",
+            "agent.unsuspend",
+            "agents.clear_conditions",
+            "agents.unpair",
+            "agent_support_report_request.",
+        )):
+            return "Agent Operations"
+        return "Agent Health"
+    if event_id in _EVENT_CATEGORY_OVERRIDES:
+        category = _EVENT_CATEGORY_OVERRIDES[event_id]
+        if category == "Agent Health Detail":
+            return "Agent Health"
+        if category == "System":
+            return "Platform & System"
+        return category
+    if event_id.startswith(("user.", "users.", "user_local_profile.")):
+        return "User Access"
+    if event_id.startswith((
+        "request.",
+        "api_key.",
+        "auth_security_principal.",
+        "authentication_settings.",
+        "ldap_config.",
+        "login_proxy_",
+        "password_policy.",
+        "radius_config.",
+        "saml_",
+        "security_principal.",
+    )):
+        return "Auth & API"
+    if event_id.startswith((
+        "rule_set.",
+        "rule_sets.",
+        "sec_rule.",
+        "sec_policy.",
+        "access_restriction.",
+        "enforcement_boundary.",
+        "firewall_settings.",
+        "ip_list.",
+        "ip_lists.",
+        "label.",
+        "label_group.",
+        "labels.",
+        "pairing_profile.",
+        "pairing_profiles.",
+        "permission.",
+        "service.",
+        "services.",
+        "service_binding.",
+        "service_bindings.",
+        "service_account.",
+        "trusted_proxy_ips.",
+    )):
+        return "Policy"
+    if event_id.startswith((
+        "container_cluster.",
+        "container_workload.",
+        "container_workload_profile.",
+        "ven_settings.",
+        "ven_software",
+        "workload.",
+        "workload_interface.",
+        "workload_interfaces.",
+        "workload_service_report.",
+        "workload_settings.",
+        "workloads.",
+    )):
+        return "Containers & Workloads"
+    if event_id.startswith((
+        "network.",
+        "network_device.",
+        "network_devices.",
+        "network_endpoint.",
+        "network_enforcement_node.",
+        "network_enforcement_nodes.",
+        "nfc.",
+        "secure_connect_gateway.",
+        "slb.",
+        "syslog_destination.",
+        "traffic_collector_setting.",
+        "virtual_server.",
+        "virtual_service.",
+        "virtual_services.",
+    )):
+        return "Network & Integrations"
+    if event_id.startswith((
+        "domain.",
+        "group.",
+        "resource.",
+        "support_report.",
+        "agent_support_report_request.",
+        "vulnerability.",
+        "vulnerability_report.",
+    )):
+        return "Inventory & Identity"
+    return "General"
+
+
+def _event_translation_key(event_id: str) -> str:
+    if event_id in _EVENT_DESCRIPTION_OVERRIDES:
+        return _EVENT_DESCRIPTION_OVERRIDES[event_id]
+    return "event_label_" + event_id.replace(".", "_")
+
+
+def _build_full_event_catalog() -> dict[str, dict[str, str]]:
+    buckets: dict[str, dict[str, str]] = {category: {} for category in _CATEGORY_ORDER}
+    for event_id in sorted({"*"} | set(KNOWN_EVENT_TYPES)):
+        if event_id in _HIDDEN_EVENT_TYPES:
+            continue
+        category = _event_category(event_id)
+        buckets.setdefault(category, {})
+        buckets[category][event_id] = _event_translation_key(event_id)
+    return {category: events for category, events in buckets.items() if events}
+
+
+FULL_EVENT_CATALOG = _build_full_event_catalog()
+ACTION_EVENTS = sorted(event_id for event_id in KNOWN_EVENT_TYPES if event_id in _STATUS_FILTER_EVENT_TYPES)
+SEVERITY_FILTER_EVENTS = sorted(event_id for event_id in KNOWN_EVENT_TYPES if event_id in _SEVERITY_FILTER_EVENT_TYPES)
+DISCOVERY_EVENTS = sorted(set(KNOWN_EVENT_TYPES) - set(ACTION_EVENTS))
+
 
 def add_event_menu(cm: ConfigManager, edit_rule=None):
     from src.utils import Colors, safe_input, draw_panel, draw_table
@@ -193,7 +388,8 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
         headers = [t("th_no"), t("th_event_type"), t("th_description")]
         rows = []
         for i, k in enumerate(evt_keys):
-            desc = t(FULL_EVENT_CATALOG[cat][k])
+            desc_key = FULL_EVENT_CATALOG[cat][k]
+            desc = t(desc_key, default=desc_key)
             display_k = k if k != "*" else t("all_events")
             rows.append([str(i + 1), display_k, desc])
         draw_table(headers, rows)
@@ -359,6 +555,85 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
             f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('rule_saved')} {Colors.GREEN}❯{Colors.ENDC} "
         )
         break
+
+
+def add_system_health_menu(cm: ConfigManager, edit_rule=None):
+    from src.utils import Colors, safe_input, draw_panel
+
+    os.system("cls" if os.name == "nt" else "clear")
+    title = (
+        t("menu_add_system_health_title", default="=== Add System Health Rule ===")
+        if not edit_rule
+        else t("modify_rule", name=edit_rule.get("name", ""))
+    )
+    draw_panel(title, _menu_hints("Rules > System Health"))
+
+    _wizard_step(1, 3, t("wiz_basic_setup"))
+    print("")
+
+    def_name = edit_rule.get("name", t("gui_system_health_pce")) if edit_rule else t("gui_system_health_pce")
+    name = safe_input(t("rule_name"), str, allow_cancel=True, hint=def_name)
+    if name is None:
+        return
+    if name == "":
+        name = def_name
+    if not name:
+        return
+
+    _wizard_step(2, 3, t("wiz_set_trigger"))
+    print(f"\n{Colors.CYAN}{t('gui_system_health_desc')}{Colors.ENDC}")
+    print(f"{Colors.DARK_GRAY}{t('gui_system_health_threshold_hint')}{Colors.ENDC}")
+
+    threshold = int(edit_rule.get("threshold_count", 1)) if edit_rule else 1
+    window = int(edit_rule.get("threshold_window", 10)) if edit_rule else 10
+    def_cd = int(edit_rule.get("cooldown_minutes", 30)) if edit_rule else 30
+    cd_in = safe_input(
+        t("cooldown_mins").format(win=window),
+        int,
+        allow_cancel=True,
+        hint=str(def_cd),
+        help_text=t("def_cooldown"),
+    )
+    if cd_in is None:
+        return
+    cooldown = int(cd_in) if cd_in != "" else def_cd
+
+    _wizard_step(3, 3, t("wiz_review_save"))
+    summary = [
+        f"{t('sum_type')}: system",
+        f"{t('sum_name')}: {name}",
+        f"{t('sum_event')}: pce_health",
+        f"{t('sum_trigger')}: immediate",
+        f"{t('sum_threshold')}: {threshold}",
+        f"{t('sum_window_cooldown')}: {window}m / {cooldown}m",
+    ]
+    if not _wizard_confirm(summary):
+        return
+
+    rid = (
+        edit_rule.get("id", int(datetime.datetime.now().timestamp()))
+        if edit_rule
+        else int(datetime.datetime.now().timestamp())
+    )
+    cm.add_or_update_rule(
+        {
+            "id": rid,
+            "type": "system",
+            "name": name,
+            "filter_key": "system_check",
+            "filter_value": "pce_health",
+            "desc": t("gui_system_health_desc"),
+            "rec": t("check_logs"),
+            "threshold_type": "immediate",
+            "threshold_count": threshold,
+            "threshold_window": window,
+            "cooldown_minutes": cooldown,
+            "throttle": edit_rule.get("throttle", "") if edit_rule else "",
+        }
+    )
+    input(
+        f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('rule_saved')} {Colors.GREEN}❯{Colors.ENDC} "
+    )
 
 
 def add_traffic_menu(cm: ConfigManager, edit_rule=None):
@@ -1017,6 +1292,8 @@ def manage_rules_menu(cm: ConfigManager):
                     cm.remove_rules_by_index([idx])
                     if rtype == "event":
                         add_event_menu(cm, edit_rule=rule)
+                    elif rtype == "system":
+                        add_system_health_menu(cm, edit_rule=rule)
                     elif rtype == "traffic":
                         add_traffic_menu(cm, edit_rule=rule)
                     elif rtype in ["bandwidth", "volume"]:

@@ -1,14 +1,22 @@
 ﻿import datetime
 import json
 import html
+import logging
+import os
+import re
 import smtplib
-import urllib.request
-import urllib.parse
-import urllib.error
-from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from src.alerts import build_output_plugin, get_output_registry, render_alert_template
+from src.events import normalize_event, persist_dispatch_results
 from src.utils import Colors
 from src.i18n import t
+
+logger = logging.getLogger(__name__)
+
+PKG_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(PKG_DIR)
+STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
 
 
 class Reporter:
@@ -18,6 +26,7 @@ class Reporter:
         self.event_alerts = []
         self.traffic_alerts = []
         self.metric_alerts = []
+        self.last_dispatch_results = []
 
     def _now_str(self) -> str:
         """Return current time formatted in the configured timezone."""
@@ -53,6 +62,252 @@ class Reporter:
 
     def add_metric_alert(self, alert):
         self.metric_alerts.append(alert)
+
+    def _get_output_plugin(self, name: str):
+        try:
+            return build_output_plugin(name, self.cm)
+        except KeyError:
+            logger.warning("Unknown alert output plugin requested: %s", name)
+            return None
+
+    def _active_pce_url(self) -> str:
+        active_id = self.cm.config.get("active_pce_id")
+        if active_id is not None:
+            for profile in self.cm.config.get("pce_profiles", []):
+                if profile.get("id") == active_id and profile.get("url"):
+                    return str(profile.get("url")).strip()
+        return str(self.cm.config.get("api", {}).get("url", "")).strip()
+
+    @staticmethod
+    def _clean_text(value) -> str:
+        return re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", str(value or ""))
+
+    @classmethod
+    def _compact_text(cls, value) -> str:
+        return re.sub(r"\s+", " ", cls._clean_text(value)).strip()
+
+    @staticmethod
+    def _severity_label(value: str) -> str:
+        mapping = {
+            "crit": "重大",
+            "critical": "重大",
+            "emerg": "重大",
+            "alert": "高風險",
+            "err": "錯誤",
+            "error": "錯誤",
+            "warn": "警告",
+            "warning": "警告",
+            "info": "資訊",
+        }
+        return mapping.get(str(value or "").lower(), str(value or "").upper() or "資訊")
+
+    @staticmethod
+    def _status_label(value: str) -> str:
+        mapping = {
+            "success": "成功",
+            "failure": "失敗",
+            "warning": "警告",
+            "warn": "警告",
+            "error": "錯誤",
+            "info": "資訊",
+        }
+        return mapping.get(str(value or "").lower(), str(value or "") or "N/A")
+
+    @staticmethod
+    def _event_recommendation(event_type: str) -> str:
+        recommendations = {
+            "agent.tampering": "先確認是否為授權變更，再檢查主機與防火牆設定。",
+            "agent.clone_detected": "檢查是否有重複或未授權的 VEN 映像。",
+            "agent.suspend": "確認暫停原因，並檢查是否影響策略落地。",
+            "agent.service_not_available": "確認 VEN 服務狀態與主機連線是否正常。",
+            "system_task.agent_missed_heartbeats_check": "優先確認 VEN 與 PCE 之間的連線品質。",
+            "system_task.agent_offline_check": "確認主機是否離線、關機或網路中斷。",
+            "request.authentication_failed": "檢查帳號與 API 使用來源，排除暴力嘗試。",
+            "request.authorization_failed": "確認權限設定與 API 呼叫來源是否合理。",
+            "sec_policy.create": "確認本次 Policy Provision 是否為預期操作。",
+        }
+        return recommendations.get(event_type, "請至 Web GUI 查看完整事件內容與上下文。")
+
+    def _event_console_link(self, event: dict) -> str:
+        href = str((event or {}).get("href", "") or "").strip()
+        base = self._active_pce_url().rstrip("/")
+        if not href or not base:
+            return ""
+        for suffix in ("/api/v2", "/api/v1", "/api"):
+            if base.endswith(suffix):
+                base = base[: -len(suffix)]
+                break
+        if "/orgs/" in href:
+            _, _, tail = href.partition("/orgs/")
+            _, _, href = tail.partition("/")
+            href = "/" + href if href else ""
+        return f"{base}/#{href}" if href else base
+
+    @staticmethod
+    def _summarize_notification_info(info) -> str:
+        if not isinstance(info, dict):
+            return ""
+        parts = []
+        for key, value in info.items():
+            if isinstance(value, dict):
+                inner = ", ".join(f"{k}={v}" for k, v in value.items())
+                parts.append(f"{key}: {inner}")
+            elif isinstance(value, list):
+                parts.append(f"{key}: {', '.join(str(v) for v in value[:4])}")
+            else:
+                parts.append(f"{key}: {value}")
+        return "; ".join(parts[:4])
+
+    def _build_resource_change_payload(self, entry: dict) -> dict:
+        resource = entry.get("resource") if isinstance(entry, dict) else {}
+        resource_type = ""
+        resource_name = ""
+        resource_href = ""
+        if isinstance(resource, dict):
+            for key, value in resource.items():
+                if isinstance(value, dict):
+                    resource_type = key
+                    resource_name = (
+                        value.get("name")
+                        or value.get("username")
+                        or value.get("hostname")
+                        or value.get("value")
+                        or ""
+                    )
+                    resource_href = value.get("href", "")
+                    break
+
+        changes = []
+        raw_changes = entry.get("changes") if isinstance(entry, dict) else {}
+        if isinstance(raw_changes, dict):
+            for field, diff in raw_changes.items():
+                if isinstance(diff, dict):
+                    before = diff.get("before")
+                    after = diff.get("after")
+                else:
+                    before = ""
+                    after = diff
+                changes.append({
+                    "field": str(field),
+                    "before": self._clean_text(before),
+                    "after": self._clean_text(after),
+                })
+        elif isinstance(entry, dict) and "field" in entry:
+            changes.append({
+                "field": str(entry.get("field")),
+                "before": self._clean_text(entry.get("before")),
+                "after": self._clean_text(entry.get("after")),
+            })
+
+        change_type = str((entry or {}).get("change_type", "") or "").strip() or ("update" if changes else "")
+        return {
+            "change_type": change_type,
+            "resource_type": resource_type,
+            "resource_name": self._clean_text(resource_name),
+            "resource_href": self._clean_text(resource_href),
+            "changes": changes,
+        }
+
+    def _build_notification_payload(self, entry: dict) -> dict:
+        info = entry.get("info") if isinstance(entry, dict) else {}
+        return {
+            "notification_type": self._clean_text((entry or {}).get("notification_type", "")),
+            "summary": self._summarize_notification_info(info),
+            "info": info if isinstance(info, dict) else {},
+        }
+
+    def _build_vendor_event_payloads(self, events: list, parsed_events: list | None = None) -> list[dict]:
+        payloads = []
+        parsed_by_event_id = {}
+        for item in parsed_events or []:
+            if isinstance(item, dict) and item.get("event_id"):
+                parsed_by_event_id[item["event_id"]] = item
+
+        for raw_event in events or []:
+            parsed = parsed_by_event_id.get(raw_event.get("href")) or normalize_event(raw_event)
+            action = raw_event.get("action") if isinstance(raw_event.get("action"), dict) else {}
+            resource_changes = [
+                self._build_resource_change_payload(item)
+                for item in (raw_event.get("resource_changes") or [])
+                if isinstance(item, dict)
+            ]
+            notifications = [
+                self._build_notification_payload(item)
+                for item in (raw_event.get("notifications") or [])
+                if isinstance(item, dict)
+            ]
+            payloads.append({
+                "event_id": parsed.get("event_id", ""),
+                "href": self._clean_text(raw_event.get("href", "")),
+                "pce_link": self._event_console_link(raw_event),
+                "timestamp": self._clean_text(parsed.get("timestamp") or raw_event.get("timestamp", "")),
+                "event_type": self._clean_text(parsed.get("event_type") or raw_event.get("event_type", "")),
+                "status": self._clean_text(parsed.get("status") or raw_event.get("status", "")),
+                "status_label": self._status_label(parsed.get("status") or raw_event.get("status", "")),
+                "severity": self._clean_text(parsed.get("severity") or raw_event.get("severity", "")),
+                "severity_label": self._severity_label(parsed.get("severity") or raw_event.get("severity", "")),
+                "created_by": self._clean_text(parsed.get("actor") or "System"),
+                "actor": self._clean_text(parsed.get("actor") or "System"),
+                "target_name": self._clean_text(parsed.get("target_name", "")),
+                "target_type": self._clean_text(parsed.get("target_type", "")),
+                "resource_name": self._clean_text(parsed.get("resource_name", "")),
+                "resource_type": self._clean_text(parsed.get("resource_type", "")),
+                "source_ip": self._clean_text(parsed.get("source_ip", "")),
+                "parser_notes": list(parsed.get("parser_notes") or []),
+                "known_event_type": bool(parsed.get("known_event_type")),
+                "action": {
+                    "api_method": self._clean_text(action.get("api_method") or parsed.get("action_method", "")),
+                    "api_endpoint": self._clean_text(action.get("api_endpoint") or parsed.get("action_path", "")),
+                    "label": self._clean_text(parsed.get("action", "")),
+                    "http_status_code": self._clean_text(action.get("http_status_code", "")),
+                    "src_ip": self._clean_text(action.get("src_ip") or parsed.get("source_ip", "")),
+                    "info": action.get("info") if isinstance(action.get("info"), dict) else {},
+                },
+                "resource_changes": resource_changes,
+                "resource_changes_count": len(resource_changes),
+                "notifications": notifications,
+                "notifications_count": len(notifications),
+                "recommendation": self._event_recommendation(parsed.get("event_type") or raw_event.get("event_type", "")),
+                "raw_event": raw_event,
+            })
+        return payloads
+
+    def _build_event_alert_payload(self, alert: dict) -> dict:
+        events = alert.get("raw_data") or []
+        parsed_events = alert.get("parsed_data") or []
+        vendor_events = self._build_vendor_event_payloads(events, parsed_events)
+        first = vendor_events[0] if vendor_events else {}
+        return {
+            "rule": self._clean_text(alert.get("rule", "")),
+            "desc": self._clean_text(alert.get("desc", "")),
+            "severity": self._clean_text(alert.get("severity", "")),
+            "severity_label": self._severity_label(alert.get("severity", "")),
+            "count": int(alert.get("count", len(vendor_events) or 0) or 0),
+            "time": self._clean_text(alert.get("time", "")),
+            "source": self._clean_text(alert.get("source") or first.get("actor", "")),
+            "target": self._clean_text(alert.get("target") or first.get("target_name", "")),
+            "resource_type": self._clean_text(alert.get("resource_type") or first.get("resource_type", "")),
+            "resource_name": self._clean_text(alert.get("resource_name") or first.get("resource_name", "")),
+            "action": self._clean_text(alert.get("action") or first.get("action", {}).get("label", "")),
+            "events": vendor_events,
+        }
+
+    def _build_all_event_alert_payloads(self) -> list[dict]:
+        return [self._build_event_alert_payload(alert) for alert in self.event_alerts]
+
+    def _build_webhook_payload(self, subj: str) -> dict:
+        rendered = render_alert_template(
+            "webhook_payload.json.tmpl",
+            subject_json=json.dumps(subj, ensure_ascii=False),
+            content_model_json=json.dumps("vendor_pretty_cool_events_baseline", ensure_ascii=False),
+            health_alerts_json=json.dumps(self.health_alerts, ensure_ascii=False),
+            event_alerts_json=json.dumps(self.event_alerts, ensure_ascii=False),
+            event_alert_payloads_json=json.dumps(self._build_all_event_alert_payloads(), ensure_ascii=False),
+            traffic_alerts_json=json.dumps(self.traffic_alerts, ensure_ascii=False),
+            metric_alerts_json=json.dumps(self.metric_alerts, ensure_ascii=False),
+            timestamp_json=json.dumps(datetime.datetime.now(datetime.timezone.utc).isoformat(), ensure_ascii=False),
+        )
+        return json.loads(rendered)
 
     def generate_pretty_snapshot_html(self, data_list):
         import re
@@ -231,7 +486,7 @@ class Reporter:
             body += "\n"
         return body
 
-    def send_alerts(self, force_test=False):
+    def send_alerts(self, force_test=False, channels=None):
         if (
             not any(
                 [
@@ -243,10 +498,14 @@ class Reporter:
             )
             and not force_test
         ):
-            return
+            self.last_dispatch_results = []
+            return []
 
         alerts_config = self.cm.config.get("alerts", {})
         active_channels = alerts_config.get("active", ["mail"])
+        if channels is not None:
+            requested = [str(channel).strip() for channel in channels if str(channel).strip()]
+            active_channels = [channel for channel in requested if channel in active_channels or force_test]
 
         total_issues = (
             len(self.health_alerts)
@@ -259,71 +518,70 @@ class Reporter:
             if force_test
             else t("mail_subject", count=total_issues)
         )
+        results = []
+        registry = get_output_registry()
+        ordered_channels = []
+        seen = set()
+        for channel in active_channels:
+            key = str(channel).strip()
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            ordered_channels.append(key)
 
-        if "mail" in active_channels:
-            self._send_mail(subj)
+        for channel in ordered_channels:
+            if channel not in registry:
+                logger.warning("Configured alert channel has no registered plugin: %s", channel)
+                results.append({
+                    "channel": channel,
+                    "status": "failed",
+                    "target": "",
+                    "error": "plugin unavailable",
+                })
+                continue
+            plugin = self._get_output_plugin(channel)
+            if not plugin:
+                results.append({
+                    "channel": channel,
+                    "status": "failed",
+                    "target": "",
+                    "error": "plugin unavailable",
+                })
+                continue
+            try:
+                results.append(plugin.send(self, subj))
+            except Exception as exc:
+                logger.exception("Alert plugin %s failed during send", channel)
+                results.append({
+                    "channel": channel,
+                    "status": "failed",
+                    "target": "",
+                    "error": str(exc),
+                })
 
-        if "line" in active_channels:
-            self._send_line(subj)
-
-        if "webhook" in active_channels:
-            self._send_webhook(subj)
+        self.last_dispatch_results = results
+        counts = {
+            "health": len(self.health_alerts),
+            "events": len(self.event_alerts),
+            "traffic": len(self.traffic_alerts),
+            "metrics": len(self.metric_alerts),
+        }
+        try:
+            persist_dispatch_results(
+                STATE_FILE,
+                results,
+                subject=subj,
+                counts=counts,
+                force_test=force_test,
+            )
+        except Exception as exc:
+            logger.warning("Failed to persist dispatch history: %s", exc)
+        return results
 
     def _build_line_message(self, subj: str) -> str:
-        """Build a LINE-friendly alert digest for fast triage."""
-        import re
-
-        def clean(text):
-            return re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", str(text))
-
-        def compact(raw: str) -> str:
-            return re.sub(r"\s+", " ", clean(raw)).strip()
-
-        def top_talkers(raw: str, limit: int = 2) -> list[str]:
-            items = [compact(s) for s in raw.replace("<br>", ",").split(",") if compact(s)]
-            return items[:limit]
-
-        def severity_label(value: str) -> str:
-            mapping = {
-                "crit": "重大",
-                "critical": "重大",
-                "emerg": "重大",
-                "alert": "高風險",
-                "err": "高風險",
-                "error": "高風險",
-                "warn": "警告",
-                "warning": "警告",
-                "info": "資訊",
-            }
-            return mapping.get(str(value).lower(), "資訊")
-
-        def event_recommendation(event_type: str) -> str:
-            recommendations = {
-                "agent.tampering": "先確認是否為授權變更，再檢查主機與防火牆設定。",
-                "agent.clone_detected": "檢查是否有重複或未授權的 VEN 映像。",
-                "agent.suspend": "確認暫停原因，並檢查是否影響策略落地。",
-                "agent.service_not_available": "確認 VEN 服務狀態與主機連線是否正常。",
-                "system_task.agent_missed_heartbeats_check": "優先確認 VEN 與 PCE 之間的連線品質。",
-                "system_task.agent_offline_check": "確認主機是否離線、關機或網路中斷。",
-                "request.authentication_failed": "檢查帳號與 API 使用來源，排除暴力嘗試。",
-                "request.authorization_failed": "確認權限設定與 API 呼叫來源是否合理。",
-                "sec_policy.create": "確認本次 Policy Provision 是否為預期操作。",
-            }
-            return recommendations.get(event_type, "請至 Web GUI 查看完整事件內容與上下文。")
-
-        def health_recommendation(status: str) -> str:
-            normalized = compact(status).lower()
-            if normalized in {"503", "error", "critical"}:
-                return "優先確認 PCE 健康狀態與核心服務可用性。"
-            return "建議檢查叢集節點負載與延遲狀況。"
-
+        """Build a LINE-friendly alert digest aligned to the vendor event content baseline."""
         def section_header(title: str, count: int) -> str:
             return f"\n【{title}】共 {count} 筆"
-
-        def append_kv_block(lines: list[str], items: list[tuple[str, str]]):
-            for label, value in items:
-                if value:
-                    lines.append(f"{label}：{value}")
 
         total_issues = (
             len(self.health_alerts)
@@ -331,204 +589,210 @@ class Reporter:
             + len(self.traffic_alerts)
             + len(self.metric_alerts)
         )
-        lines = [
-            "Illumio 告警摘要",
-            f"產出時間：{self._now_str()}",
-            f"總告警數：{total_issues}",
-            f"健康告警：{len(self.health_alerts)}  安全事件：{len(self.event_alerts)}",
-            f"流量告警：{len(self.traffic_alerts)}  指標告警：{len(self.metric_alerts)}",
-            "請優先處理重大與高風險項目。",
-        ]
-
+        health_section_lines = []
         if self.health_alerts:
-            lines.append(section_header("健康告警", len(self.health_alerts)))
-            for idx, a in enumerate(self.health_alerts[:2], start=1):
-                status = compact(a.get("status", ""))
-                label = "重大" if status in {"503", "error", "critical"} else "警告"
-                lines.append(f"{idx}. [{label}] {compact(a.get('rule', '健康檢查'))}")
-                append_kv_block(
-                    lines,
-                    [
-                        ("時間", compact(a.get("time", ""))),
-                        ("狀態", status),
-                        ("摘要", compact(a.get("details", ""))),
-                        ("建議", health_recommendation(status)),
-                    ],
-                )
-                lines.append("")
-            remaining = len(self.health_alerts) - 2
-            if remaining > 0:
-                lines.append(f"其餘 {remaining} 筆健康告警請至 GUI 查看。")
+            health_section_lines.append(section_header("健康告警", len(self.health_alerts)))
+            for idx, alert in enumerate(self.health_alerts[:2], start=1):
+                status = self._compact_text(alert.get("status", ""))
+                label = "重大" if status.lower() in {"503", "error", "critical"} else "警告"
+                health_section_lines.append(f"{idx}. [{label}] {self._compact_text(alert.get('rule', '健康檢查'))}")
+                health_section_lines.append(f"時間：{self._compact_text(alert.get('time', ''))}")
+                health_section_lines.append(f"摘要：{self._compact_text(alert.get('details', ''))}")
+                health_section_lines.append("")
 
+        event_section_lines = []
         if self.event_alerts:
-            lines.append(section_header("安全事件", len(self.event_alerts)))
-            for idx, a in enumerate(self.event_alerts[:3], start=1):
-                raw = a.get("raw_data") or []
-                ev0 = raw[0] if raw else {}
-                event_type = compact(ev0.get("event_type", ""))
-                label = severity_label(a.get("severity", "info"))
-                source = compact(a.get("source", ""))
-                target = ""
-                resource = ev0.get("resource") or {}
-                if event_type.startswith(("agent.", "agents.")):
-                    target = (
-                        compact((resource.get("agent") or {}).get("hostname"))
-                        or compact((resource.get("workload") or {}).get("name"))
-                    )
-                elif event_type.startswith(("user.", "request.")):
-                    target = compact((resource.get("user") or {}).get("username"))
-                lines.append(f"{idx}. [{label}] {compact(a.get('rule', '事件告警'))}")
-                append_kv_block(
-                    lines,
-                    [
-                        ("時間", compact(a.get("time", ""))[:19]),
-                        ("來源", source),
-                        ("對象", target),
-                        ("摘要", compact(a.get("desc", ""))),
-                        ("建議", event_recommendation(event_type)),
-                    ],
-                )
-                if event_type:
-                    lines.append(f"事件類型：{event_type}")
-                lines.append("")
+            event_section_lines.append(section_header("安全事件", len(self.event_alerts)))
+            for idx, alert in enumerate(self._build_all_event_alert_payloads()[:3], start=1):
+                first = alert["events"][0] if alert["events"] else {}
+                event_section_lines.append(f"{idx}. [{alert['severity_label']}] {alert['rule']}")
+                if first.get("event_type"):
+                    event_section_lines.append(f"事件：{first['event_type']}")
+                if first.get("timestamp"):
+                    event_section_lines.append(f"時間：{self._compact_text(first['timestamp'])[:19]}")
+                if first.get("created_by"):
+                    event_section_lines.append(f"建立者：{first['created_by']}")
+                if first.get("target_name"):
+                    event_section_lines.append(f"對象：{first['target_name']}")
+                if first.get("action", {}).get("label"):
+                    event_section_lines.append(f"動作：{first['action']['label']}")
+                if first.get("action", {}).get("src_ip"):
+                    event_section_lines.append(f"來源 IP：{first['action']['src_ip']}")
+                if first.get("resource_changes_count"):
+                    event_section_lines.append(f"異動：{first['resource_changes_count']} 筆")
+                if first.get("notifications_count"):
+                    event_section_lines.append(f"通知：{first['notifications_count']} 筆")
+                if alert.get("desc"):
+                    event_section_lines.append(f"摘要：{alert['desc']}")
+                if first.get("recommendation"):
+                    event_section_lines.append(f"建議：{first['recommendation']}")
+                if first.get("pce_link"):
+                    event_section_lines.append(f"PCE：{first['pce_link']}")
+                event_section_lines.append("")
             remaining = len(self.event_alerts) - 3
             if remaining > 0:
-                lines.append(f"其餘 {remaining} 筆安全事件請至 Web GUI 查看完整內容。")
+                event_section_lines.append(f"其餘 {remaining} 筆安全事件請至 Web GUI 查看完整內容。")
 
+        traffic_section_lines = []
         if self.traffic_alerts:
-            lines.append(section_header("流量告警", len(self.traffic_alerts)))
-            for idx, a in enumerate(self.traffic_alerts[:2], start=1):
-                lines.append(f"{idx}. [警告] {compact(a.get('rule', '流量告警'))}")
-                append_kv_block(
-                    lines,
-                    [
-                        ("條件", compact(a.get("criteria", ""))),
-                        ("次數", compact(a.get("count", ""))),
-                        ("建議", "先確認來源端、目的端與連接埠是否符合預期。"),
-                    ],
-                )
-                talkers = top_talkers(a.get("details", ""))
-                if talkers:
-                    lines.append("熱門連線：")
-                    lines.extend(f"- {item}" for item in talkers)
-                lines.append("")
-            remaining = len(self.traffic_alerts) - 2
-            if remaining > 0:
-                lines.append(f"其餘 {remaining} 筆流量告警請至 GUI 查看。")
+            traffic_section_lines.append(section_header("流量告警", len(self.traffic_alerts)))
+            for idx, alert in enumerate(self.traffic_alerts[:2], start=1):
+                traffic_section_lines.append(f"{idx}. [警告] {self._compact_text(alert.get('rule', '流量告警'))}")
+                if alert.get("criteria"):
+                    traffic_section_lines.append(f"條件：{self._compact_text(alert.get('criteria', ''))}")
+                if alert.get("count") is not None:
+                    traffic_section_lines.append(f"次數：{self._compact_text(alert.get('count', ''))}")
+                traffic_section_lines.append("")
 
+        metric_section_lines = []
         if self.metric_alerts:
-            lines.append(section_header("指標告警", len(self.metric_alerts)))
-            for idx, a in enumerate(self.metric_alerts[:2], start=1):
-                lines.append(f"{idx}. [警告] {compact(a.get('rule', '指標告警'))}")
-                append_kv_block(
-                    lines,
-                    [
-                        ("條件", compact(a.get("criteria", ""))),
-                        ("數值", compact(a.get("count", ""))),
-                        ("建議", "請檢查是否有尖峰流量、異常傳輸或資源使用失衡。"),
-                    ],
-                )
-                talkers = top_talkers(a.get("details", ""))
-                if talkers:
-                    lines.append("熱門連線：")
-                    lines.extend(f"- {item}" for item in talkers)
-                lines.append("")
-            remaining = len(self.metric_alerts) - 2
-            if remaining > 0:
-                lines.append(f"其餘 {remaining} 筆指標告警請至 GUI 查看。")
+            metric_section_lines.append(section_header("指標告警", len(self.metric_alerts)))
+            for idx, alert in enumerate(self.metric_alerts[:2], start=1):
+                metric_section_lines.append(f"{idx}. [警告] {self._compact_text(alert.get('rule', '指標告警'))}")
+                if alert.get("criteria"):
+                    metric_section_lines.append(f"條件：{self._compact_text(alert.get('criteria', ''))}")
+                if alert.get("count") is not None:
+                    metric_section_lines.append(f"數值：{self._compact_text(alert.get('count', ''))}")
+                metric_section_lines.append("")
 
-        lines.append("完整內容請至 Illumio PCE Ops Web GUI 查看。")
-        return "\n".join(line for line in lines if line is not None).strip()
+        return render_alert_template(
+            "line_digest.txt.tmpl",
+            subject=self._compact_text(subj),
+            generated_at=self._now_str(),
+            total_issues=str(total_issues),
+            health_count=str(len(self.health_alerts)),
+            event_count=str(len(self.event_alerts)),
+            traffic_count=str(len(self.traffic_alerts)),
+            metric_count=str(len(self.metric_alerts)),
+            health_section="\n".join(health_section_lines),
+            event_section="\n".join(event_section_lines),
+            traffic_section="\n".join(traffic_section_lines),
+            metric_section="\n".join(metric_section_lines),
+        ).strip()
 
     def _send_line(self, subj):
-        token = self.cm.config.get("alerts", {}).get("line_channel_access_token", "")
-        target_id = self.cm.config.get("alerts", {}).get("line_target_id", "")
-        if not token or not target_id:
-            print(f"{Colors.WARNING}{t('line_config_missing')}{Colors.ENDC}")
-            return
-
-        message_text = self._build_line_message(subj)
-        url = "https://api.line.me/v2/bot/message/push"
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        }
-
-        payload = {
-            "to": target_id,
-            "messages": [{"type": "text", "text": message_text}],
-        }
-        data = json.dumps(payload).encode("utf-8")
-
-        try:
-            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-            with urllib.request.urlopen(req) as response:
-                if response.status == 200:
-                    print(f"{Colors.GREEN}{t('line_alert_sent')}{Colors.ENDC}")
-                else:
-                    print(
-                        f"{Colors.FAIL}{t('line_alert_failed', error='', status=response.status)}{Colors.ENDC}"
-                    )
-        except urllib.error.HTTPError as e:
-            error_body = e.read().decode("utf-8")
-            print(
-                f"{Colors.FAIL}{t('line_alert_failed', error=f'{e} - {error_body}', status=e.code)}{Colors.ENDC}"
-            )
-        except Exception as e:
-            print(
-                f"{Colors.FAIL}{t('line_alert_failed', error=e, status='')}{Colors.ENDC}"
-            )
+        plugin = self._get_output_plugin("line")
+        if not plugin:
+            return {"channel": "line", "status": "failed", "target": "", "error": "plugin unavailable"}
+        return plugin.send(self, subj)
 
     def _send_webhook(self, subj):
-        webhook_url = self.cm.config.get("alerts", {}).get("webhook_url", "")
-        if not webhook_url:
-            print(f"{Colors.WARNING}{t('webhook_url_missing')}{Colors.ENDC}")
-            return
+        plugin = self._get_output_plugin("webhook")
+        if not plugin:
+            return {"channel": "webhook", "status": "failed", "target": "", "error": "plugin unavailable"}
+        return plugin.send(self, subj)
 
-        payload = {
-            "subject": subj,
-            "health_alerts": self.health_alerts,
-            "event_alerts": self.event_alerts,
-            "traffic_alerts": self.traffic_alerts,
-            "metric_alerts": self.metric_alerts,
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        }
+    def _render_vendor_event_detail_html(self, alert: dict, esc) -> str:
+        payload = self._build_event_alert_payload(alert)
+        if not payload["events"]:
+            return ""
 
-        headers = {"Content-Type": "application/json"}
-        data = json.dumps(payload).encode("utf-8")
-
-        try:
-            req = urllib.request.Request(
-                webhook_url, data=data, headers=headers, method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=10) as response:
-                if response.status in [200, 201, 202, 204]:
-                    print(f"{Colors.GREEN}{t('webhook_alert_sent')}{Colors.ENDC}")
-                else:
-                    print(
-                        f"{Colors.FAIL}{t('webhook_alert_failed', error='', status=response.status)}{Colors.ENDC}"
+        sections = []
+        for event in payload["events"][:5]:
+            action = event.get("action", {})
+            meta_cells = []
+            for label, value in (
+                ("Time", event.get("timestamp")),
+                ("Status", event.get("status_label")),
+                ("Severity", event.get("severity_label")),
+                ("Created By", event.get("created_by")),
+            ):
+                if value:
+                    meta_cells.append(
+                        f"<td style='padding:8px 10px;border:1px solid #E6E2D8;font-size:12px;vertical-align:top;'><strong style='display:block;color:#6F7274;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;'>{label}</strong>{esc(value)}</td>"
                     )
-        except urllib.error.HTTPError as e:
-            try:
-                error_body = e.read().decode("utf-8")
-            except Exception:
-                error_body = "Could not read error body"
-            print(
-                f"{Colors.FAIL}{t('webhook_alert_failed', error=f'{e} - {error_body}', status=e.code)}{Colors.ENDC}"
+
+            action_rows = []
+            for label, value in (
+                ("Endpoint", " ".join(part for part in [action.get("api_method"), action.get("api_endpoint")] if part).strip()),
+                ("Source IP", action.get("src_ip")),
+                ("HTTP Status", action.get("http_status_code")),
+                ("Target", event.get("target_name")),
+                ("Resource", event.get("resource_name")),
+            ):
+                if value:
+                    action_rows.append(
+                        f"<tr><td style='padding:6px 8px;color:#6F7274;width:26%;border-bottom:1px solid #F0ECE4;'>{label}</td><td style='padding:6px 8px;border-bottom:1px solid #F0ECE4;word-break:break-word;'>{esc(value)}</td></tr>"
+                    )
+            if isinstance(action.get("info"), dict):
+                for key, value in list(action["info"].items())[:4]:
+                    action_rows.append(
+                        f"<tr><td style='padding:6px 8px;color:#6F7274;width:26%;border-bottom:1px solid #F0ECE4;'>{esc(key)}</td><td style='padding:6px 8px;border-bottom:1px solid #F0ECE4;word-break:break-word;'>{esc(value)}</td></tr>"
+                    )
+
+            change_blocks = []
+            for change in event.get("resource_changes", [])[:3]:
+                diff_rows = []
+                for diff in change.get("changes", [])[:5]:
+                    diff_rows.append(
+                        f"<tr><td style='padding:4px 6px;border-bottom:1px solid #F0ECE4;color:#6F7274;'>{esc(diff.get('field', ''))}</td><td style='padding:4px 6px;border-bottom:1px solid #F0ECE4;color:#BE122F;'>{esc(diff.get('before', '')) or '—'}</td><td style='padding:4px 6px;border-bottom:1px solid #F0ECE4;color:#166644;'>{esc(diff.get('after', '')) or '—'}</td></tr>"
+                    )
+                diff_table = (
+                    "<table style='width:100%;border-collapse:collapse;font-size:11px;margin-top:6px;'>"
+                    "<tr><th style='text-align:left;padding:4px 6px;background:#F8F5EF;'>Field</th><th style='text-align:left;padding:4px 6px;background:#F8F5EF;'>Before</th><th style='text-align:left;padding:4px 6px;background:#F8F5EF;'>After</th></tr>"
+                    + "".join(diff_rows)
+                    + "</table>"
+                ) if diff_rows else ""
+                change_blocks.append(
+                    f"<div style='padding:10px 12px;border:1px solid #E6E2D8;border-radius:10px;background:#FFFFFF;margin-top:8px;'>"
+                    f"<div style='font-size:12px;font-weight:700;color:#24393F;'>{esc(change.get('change_type', 'update').upper())} {esc(change.get('resource_type', 'resource'))}</div>"
+                    f"<div style='font-size:12px;color:#6F7274;margin-top:4px;'>{esc(change.get('resource_name', ''))}</div>"
+                    f"{diff_table}</div>"
+                )
+
+            notification_blocks = []
+            for notification in event.get("notifications", [])[:3]:
+                notification_blocks.append(
+                    f"<div style='padding:10px 12px;border:1px solid #E6E2D8;border-radius:10px;background:#FFFFFF;margin-top:8px;'>"
+                    f"<div style='font-size:12px;font-weight:700;color:#24393F;'>{esc(notification.get('notification_type', 'notification'))}</div>"
+                    f"<div style='font-size:12px;color:#6F7274;margin-top:4px;word-break:break-word;'>{esc(notification.get('summary', ''))}</div>"
+                    f"</div>"
+                )
+
+            parser_notes = ""
+            if event.get("parser_notes"):
+                parser_notes = f"<div style='margin-top:10px;font-size:11px;color:#8B407A;'>Parser Notes: {esc(', '.join(event.get('parser_notes', [])))}</div>"
+
+            pce_link = ""
+            if event.get("pce_link"):
+                pce_link = (
+                    f"<div style='margin-top:12px;'><a href='{esc(event['pce_link'])}' "
+                    f"style='display:inline-block;background:#1A2C32;color:#FFFFFF;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:700;'>View on PCE</a></div>"
+                )
+            resource_changes_html = ""
+            if event.get("resource_changes_count"):
+                resource_changes_html = (
+                    f"<div style='margin-top:12px;'><div style='font-size:12px;font-weight:800;color:#24393F;'>"
+                    f"Resource Changes ({event.get('resource_changes_count', 0)})</div>{''.join(change_blocks)}</div>"
+                )
+            notifications_html = ""
+            if event.get("notifications_count"):
+                notifications_html = (
+                    f"<div style='margin-top:12px;'><div style='font-size:12px;font-weight:800;color:#24393F;'>"
+                    f"Notifications ({event.get('notifications_count', 0)})</div>{''.join(notification_blocks)}</div>"
+                )
+
+            sections.append(
+                f"<div style='margin-top:14px;padding:16px;border:1px solid #E6E2D8;border-radius:16px;background:#FFFDFC;'>"
+                f"<div style='padding:12px 14px;background:#1A2C32;color:#FFFFFF;border-radius:12px 12px 0 0;font-size:16px;font-weight:800;'>{esc(event.get('event_type', 'event'))}</div>"
+                f"<table style='width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #E6E2D8;border-top:none;'><tr>{''.join(meta_cells)}</tr></table>"
+                f"<div style='margin-top:10px;'>"
+                f"<div style='font-size:12px;font-weight:800;color:#24393F;margin-bottom:6px;'>API Action</div>"
+                f"<table style='width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #E6E2D8;border-radius:10px;overflow:hidden;'>{''.join(action_rows) or '<tr><td style=\"padding:8px 10px;color:#6F7274;\">No action details</td></tr>'}</table>"
+                f"</div>"
+                f"{resource_changes_html}"
+                f"{notifications_html}"
+                f"{parser_notes}{pce_link}</div>"
             )
-        except (urllib.error.URLError, TimeoutError) as e:
-            print(
-                f"{Colors.FAIL}{t('webhook_alert_failed', error=f'Connection Error/Timeout: {e}', status='')}{Colors.ENDC}"
-            )
-        except Exception as e:
-            print(
-                f"{Colors.FAIL}{t('webhook_alert_failed', error=e, status='')}{Colors.ENDC}"
-            )
+
+        if len(payload["events"]) > 5:
+            sections.append(f"<div style='margin-top:8px;font-size:11px;color:#6F7274;'>此告警另含 {len(payload['events']) - 5} 筆事件未展開。</div>")
+        return "".join(sections)
 
     # ── Event detail renderer ────────────────────────────────────────────────
 
     @staticmethod
-    def _render_event_detail_html(events: list, esc) -> str:
+    def _render_event_detail_html(events: list, esc, parsed_events: list | None = None) -> str:
         """Convert raw Illumio event list into structured human-readable HTML cards."""
         if not events:
             return ""
@@ -607,16 +871,6 @@ class Reporter:
             'service_status': '服務狀態',
         }
 
-        def _actor(ev):
-            cb = ev.get('created_by') or {}
-            user = (cb.get('user') or {})
-            agent = (cb.get('agent') or {})
-            username = user.get('username') or user.get('name') or ''
-            hostname = agent.get('hostname') or agent.get('name') or ''
-            if username and hostname:
-                return f"{username} @ {hostname}"
-            return username or hostname or '系統'
-
         def _fmt_val(v):
             if v is None:
                 return '無'
@@ -663,11 +917,17 @@ class Reporter:
             return rows
 
         cards = []
+        parsed_map = {}
+        for item in parsed_events or []:
+            if isinstance(item, dict) and item.get("event_id"):
+                parsed_map[item["event_id"]] = item
+
         for ev in events[:5]:
-            event_type = ev.get('event_type', '')
-            ts = (ev.get('timestamp', '')[:19].replace('T', ' ')) if ev.get('timestamp') else ''
+            parsed = parsed_map.get(ev.get("href")) or normalize_event(ev)
+            event_type = parsed.get('event_type', '') or ev.get('event_type', '')
+            ts = (parsed.get('timestamp', '')[:19].replace('T', ' ')) if parsed.get('timestamp') else ''
             status = ev.get('status', '')
-            actor = _actor(ev)
+            actor = parsed.get('actor', 'System')
 
             resource_prefix = event_type.split('.')[0] if '.' in event_type else event_type
             verb_key = event_type.split('.')[-1] if '.' in event_type else ''
@@ -689,43 +949,31 @@ class Reporter:
             # Human-readable summary line
             extras = []
             if event_type == 'sec_policy.create':
-                count = workloads.get('total_affected', 0)
+                count = parsed.get('workloads_affected') or workloads.get('total_affected', 0)
                 extras.append(f"影響工作負載: {count} 台")
             elif event_type in ('agents.unpair', 'workloads.unpair'):
-                count = workloads.get('total_affected', 0)
+                count = parsed.get('workloads_affected') or workloads.get('total_affected', 0)
                 if count:
                     extras.append(f"影響工作負載: {count} 台")
-                wl_name = (after or before).get('hostname') or (after or before).get('name') or ''
+                wl_name = parsed.get('target_name') or (after or before).get('hostname') or (after or before).get('name') or ''
                 if wl_name:
                     extras.append(f"工作負載: {wl_name}")
+            elif parsed.get('resource_name') and parsed.get('resource_name') != parsed.get('target_name'):
+                extras.append(f"資源: {parsed.get('resource_name')}")
             elif verb_key == 'create' and after:
                 name = after.get('name') or after.get('hostname') or ''
                 if name:
                     extras.append(f"資源: {name}")
-            elif event_type.startswith(('user.', 'request.')):
-                resource = ev.get('resource') or {}
-                res_user = (resource.get('user') or {}).get('username') or ''
-                cb_user = ((ev.get('created_by') or {}).get('user') or {}).get('username') or ''
-                username = res_user or cb_user
-                src_ip = ev.get('src_ip') or ''
-                if username:
-                    extras.append(f"帳號: {username}")
-                if src_ip:
-                    extras.append(f"IP: {src_ip}")
-            elif event_type.startswith(('agent.', 'agents.')):
-                resource = ev.get('resource') or {}
-                wl_name = (
-                    (resource.get('agent') or {}).get('hostname')
-                    or (resource.get('workload') or {}).get('name')
-                    or (after or before).get('hostname')
-                    or (after or before).get('name')
-                    or ''
-                )
-                if wl_name:
-                    extras.append(f"工作負載: {wl_name}")
-                src_ip = ev.get('src_ip') or ''
-                if src_ip:
-                    extras.append(f"IP: {src_ip}")
+            if event_type.startswith(('user.', 'request.')) and parsed.get('target_name'):
+                extras.append(f"帳號: {parsed.get('target_name')}")
+            elif event_type.startswith(('agent.', 'agents.')) and parsed.get('target_name'):
+                extras.append(f"工作負載: {parsed.get('target_name')}")
+            if parsed.get('source_ip'):
+                extras.append(f"IP: {parsed.get('source_ip')}")
+            if parsed.get('action'):
+                extras.append(f"動作: {parsed.get('action')}")
+            if parsed.get('parser_notes'):
+                extras.append("解析註記: " + ", ".join(parsed.get('parser_notes')))
 
             status_color = '#166644' if status == 'success' else '#BE122F'
             status_label = _STATUS_LABELS.get(status.lower(), status.upper())
@@ -758,12 +1006,7 @@ class Reporter:
 
     # ── Mail sender ──────────────────────────────────────────────────────────
 
-    def _send_mail(self, subj):
-        cfg = self.cm.config["email"]
-        if not cfg["recipients"]:
-            print(f"{Colors.WARNING}{t('no_recipients')}{Colors.ENDC}")
-            return
-
+    def _build_mail_html(self, subj):
         def esc(text):
             return html.escape(str(text), quote=True)
 
@@ -798,12 +1041,6 @@ class Reporter:
             "warning": "警告",
             "info": "資訊",
         }
-        # ── Illumio brand palette ───────────────────────────────────────────
-        # System Cyan 120/110/100: #1A2C32 / #24393F / #2D454C
-        # Illumio Orange: #FF5500  |  Circuit Gold: #FFA22F / #F97607
-        # Risk Red: #BE122F / #F43F51  |  Safeguard Green: #166644 / #299B65
-        # Server Slate: #313638  |  Zero Trust Tan: #F7F4EE / #E3D8C5
-        # Protocol Purple: #8B407A
         section_style = "margin-top:28px; border:1px solid #E6E2D8; border-radius:20px; overflow:hidden; background:#FFFFFF; box-shadow:0 12px 28px rgba(26,44,50,0.08);"
         header_style = "padding:16px 20px; font-size:15px; font-weight:800; font-family:'Montserrat',Arial,sans-serif; letter-spacing:0.02em;"
         table_style = "width:100%; border-collapse:collapse; table-layout:fixed;"
@@ -811,36 +1048,20 @@ class Reporter:
         td_style = "padding:14px 14px; border-bottom:1px solid #F0ECE4; font-size:13px; color:#313638; vertical-align:top; word-break:break-word; font-family:'Montserrat',Arial,sans-serif; line-height:1.55;"
         section_note_style = "padding:0 20px 18px 20px; font-size:12px; line-height:1.6; color:#6F7274; background:#FFFFFF;"
 
-        body = f"""
-<html>
-<body style="margin:0; padding:0; background:#F3F0E9; font-family:'Montserrat',Arial,sans-serif; color:#313638;">
-  <div style="max-width:980px; margin:0 auto; padding:32px 20px 40px;">
-    <div style="background:#FFFFFF; border-radius:28px; overflow:hidden; border:1px solid #E6E2D8; box-shadow:0 20px 48px rgba(26,44,50,0.12);">
-      <div style="padding:32px 36px; background:linear-gradient(135deg, #FFF7F0 0%, #FFFFFF 48%, #F2F7F8 100%); border-bottom:1px solid #ECE7DD;">
-        <div style="display:flex; align-items:center; gap:14px; margin-bottom:20px;">
-          <div style="background:#FF5500; color:#FFFFFF; padding:10px 18px; border-radius:999px; font-weight:800; font-size:17px; letter-spacing:0.02em;">Illumio PCE Ops</div>
-          <div style="color:#6F7274; font-size:13px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase;">正式告警通知</div>
-        </div>
-        <div style="font-size:12px; color:#8C8E8F; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:10px;">告警摘要</div>
-        <h1 style="color:#1A2C32; font-size:32px; line-height:1.2; margin:0 0 12px 0; font-weight:800;">{esc(subj)}</h1>
-        <p style="color:#6F7274; font-size:14px; line-height:1.7; margin:0 0 16px 0;">本通知彙整近期健康狀態、安全事件、流量異常與指標異常，方便你快速掌握風險並安排後續處置。</p>
-        <div style="display:flex; flex-wrap:wrap; gap:18px; margin-bottom:22px;">
-          <div style="min-width:220px;">
-            <div style="font-size:11px; color:#8C8E8F; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">產出時間</div>
-            <div style="font-size:16px; font-weight:700; color:#24393F;">{esc(generated_at)}</div>
-          </div>
-          <div style="min-width:180px;">
-            <div style="font-size:11px; color:#8C8E8F; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">通知範圍</div>
-            <div style="font-size:16px; font-weight:700; color:#24393F;">健康 / 事件 / 流量 / 指標</div>
-          </div>
-        </div>
-        <div>{summary_html}</div>
-      </div>
-      <div style="padding:8px 36px 36px;">
-"""
-
+        health_section_html = ""
         if self.health_alerts:
-            body += f"""
+            rows = []
+            for alert in self.health_alerts:
+                rows.append(
+                    f"""
+            <tr>
+              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('time',''))}</td>
+              <td style="{td_style} font-weight:700; color:#BE122F;">{esc(alert.get('status',''))}</td>
+              <td style="{td_style}">{fmt_multiline(alert.get('details',''))}</td>
+            </tr>
+"""
+                )
+            health_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#BE122F; color:#FFFFFF;">{esc(t('health_alerts_header'))}</div>
         <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊彙整 PCE 或 Cluster 健康異常，適合優先確認是否影響連線品質、控制面或服務可用性。</div>
@@ -853,19 +1074,31 @@ class Reporter:
             </tr>
           </thead>
           <tbody>
+{''.join(rows)}
+          </tbody>
+        </table>
+      </div>
 """
-            for a in self.health_alerts:
-                body += f"""
+
+        event_section_html = ""
+        if self.event_alerts:
+            rows = []
+            for alert in self.event_alerts:
+                sev_color = "#BE122F" if alert.get("severity") in ["crit", "emerg", "alert", "err", "error"] else "#F97607"
+                sev_label = severity_labels.get(str(alert.get("severity", "")).lower(), str(alert.get("severity", "")).upper())
+                row_html = f"""
             <tr>
-              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(a.get('time',''))}</td>
-              <td style="{td_style} font-weight:700; color:#BE122F;">{esc(a.get('status',''))}</td>
-              <td style="{td_style}">{fmt_multiline(a.get('details',''))}</td>
+              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('time',''))}</td>
+              <td style="{td_style}"><strong>{esc(alert.get('rule',''))}</strong><br><small style="color:#6F7274;">{esc(alert.get('desc',''))}</small></td>
+              <td style="{td_style} text-align:center;"><span style="background:{sev_color}; color:#FFFFFF; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;">{esc(sev_label)} ({esc(alert.get('count',0))})</span></td>
+              <td style="{td_style}">{esc(alert.get('source',''))}</td>
             </tr>
 """
-            body += "</tbody></table></div>"
-
-        if self.event_alerts:
-            body += f"""
+                if alert.get("raw_data"):
+                    detail_html = self._render_vendor_event_detail_html(alert, esc)
+                    row_html += f"<tr><td colspan='4' style='padding:14px 14px 16px; background:#FCFAF6; border-bottom:1px solid #E6E2D8;'>{detail_html}</td></tr>"
+                rows.append(row_html)
+            event_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#1A2C32; color:#FFFFFF;">{esc(t('security_events_header'))}</div>
         <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊列出近期重要事件與操作脈絡，協助你快速判斷是否需要追查帳號、工作負載或策略變更。</div>
@@ -879,25 +1112,32 @@ class Reporter:
             </tr>
           </thead>
           <tbody>
+{''.join(rows)}
+          </tbody>
+        </table>
+      </div>
 """
-            for a in self.event_alerts:
-                sev_color = "#BE122F" if a.get("severity") in ["crit", "emerg", "alert", "err", "error"] else "#F97607"
-                sev_label = severity_labels.get(str(a.get("severity", "")).lower(), str(a.get("severity", "")).upper())
-                body += f"""
+
+        traffic_section_html = ""
+        if self.traffic_alerts:
+            rows = []
+            for alert in self.traffic_alerts:
+                rows.append(
+                    f"""
             <tr>
-              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(a.get('time',''))}</td>
-              <td style="{td_style}"><strong>{esc(a.get('rule',''))}</strong><br><small style="color:#6F7274;">{esc(a.get('desc',''))}</small></td>
-              <td style="{td_style} text-align:center;"><span style="background:{sev_color}; color:#FFFFFF; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;">{esc(sev_label)} ({esc(a.get('count',0))})</span></td>
-              <td style="{td_style}">{esc(a.get('source',''))}</td>
+              <td style="{td_style} font-weight:700; color:#FF5500;">{esc(alert.get('rule',''))}</td>
+              <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(alert.get('count',0))}</td>
+              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('criteria',''))}</td>
+            </tr>
+            <tr>
+              <td colspan="3" style="{td_style} background:#FCFAF6; font-size:12px; padding:16px;">
+                <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #ECE7DD; border-radius:14px; background:#FFFFFF;"><strong style="color:#24393F;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(alert.get('details',''))}</div>
+                {self.generate_pretty_snapshot_html(alert.get('raw_data', []))}
+              </td>
             </tr>
 """
-                if a.get("raw_data"):
-                    detail_html = self._render_event_detail_html(a.get("raw_data", []), esc)
-                    body += f"<tr><td colspan='4' style='padding:14px 14px 16px; background:#FCFAF6; border-bottom:1px solid #E6E2D8;'>{detail_html}</td></tr>"
-            body += "</tbody></table></div>"
-
-        if self.traffic_alerts:
-            body += f"""
+                )
+            traffic_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#FF5500; color:#FFFFFF;">{esc(t('traffic_alerts_header'))}</div>
         <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊摘要異常流量與代表性連線，方便你從條件、熱門連線與快照資料判讀風險輪廓。</div>
@@ -910,25 +1150,32 @@ class Reporter:
             </tr>
           </thead>
           <tbody>
+{''.join(rows)}
+          </tbody>
+        </table>
+      </div>
 """
-            for a in self.traffic_alerts:
-                body += f"""
+
+        metric_section_html = ""
+        if self.metric_alerts:
+            rows = []
+            for alert in self.metric_alerts:
+                rows.append(
+                    f"""
             <tr>
-              <td style="{td_style} font-weight:700; color:#FF5500;">{esc(a.get('rule',''))}</td>
-              <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(a.get('count',0))}</td>
-              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(a.get('criteria',''))}</td>
+              <td style="{td_style} font-weight:700; color:#313638;">{esc(alert.get('rule',''))}</td>
+              <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(alert.get('count',0))}</td>
+              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('criteria',''))}</td>
             </tr>
             <tr>
               <td colspan="3" style="{td_style} background:#FCFAF6; font-size:12px; padding:16px;">
-                <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #ECE7DD; border-radius:14px; background:#FFFFFF;"><strong style="color:#24393F;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(a.get('details',''))}</div>
-                {self.generate_pretty_snapshot_html(a.get('raw_data', []))}
+                <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #ECE7DD; border-radius:14px; background:#FFFFFF;"><strong style="color:#24393F;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(alert.get('details',''))}</div>
+                {self.generate_pretty_snapshot_html(alert.get('raw_data', []))}
               </td>
             </tr>
 """
-            body += "</tbody></table></div>"
-
-        if self.metric_alerts:
-            body += f"""
+                )
+            metric_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#F97607; color:#FFFFFF;">{esc(t('metric_alerts_header'))}</div>
         <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊整理高頻寬或高數值異常，適合用來快速發現尖峰行為、流量放大或資源使用失衡。</div>
@@ -941,61 +1188,28 @@ class Reporter:
             </tr>
           </thead>
           <tbody>
-"""
-            for a in self.metric_alerts:
-                body += f"""
-            <tr>
-              <td style="{td_style} font-weight:700; color:#313638;">{esc(a.get('rule',''))}</td>
-              <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(a.get('count',0))}</td>
-              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(a.get('criteria',''))}</td>
-            </tr>
-            <tr>
-              <td colspan="3" style="{td_style} background:#FCFAF6; font-size:12px; padding:16px;">
-                <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #ECE7DD; border-radius:14px; background:#FFFFFF;"><strong style="color:#24393F;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(a.get('details',''))}</div>
-                {self.generate_pretty_snapshot_html(a.get('raw_data', []))}
-              </td>
-            </tr>
-"""
-            body += "</tbody></table></div>"
-
-        body += """
-      <div style="margin-top:32px; padding:24px 8px 4px; border-top:1px solid #ECE7DD; text-align:center;">
-        <p style="color:#8C8E8F; font-size:11px; line-height:1.8; margin:0;">
-          此通知由 <strong>Illumio PCE Ops</strong> 自動產生。<br>
-          請依你的告警流程進行確認與處置。
-        </p>
+{''.join(rows)}
+          </tbody>
+        </table>
       </div>
-    </div>
-    </div>
-  </div>
-</body>
-</html>
 """
 
-        msg = MIMEMultipart()
-        msg["Subject"] = subj
-        msg["From"] = cfg["sender"]
-        msg["To"] = ",".join(cfg["recipients"])
-        msg.attach(MIMEText(body, "html"))
-        try:
-            smtp_conf = self.cm.config.get("smtp", {})
-            host = smtp_conf.get("host", "localhost")
-            port = int(smtp_conf.get("port", 25))
+        return render_alert_template(
+            "mail_wrapper.html.tmpl",
+            subject_html=esc(subj),
+            generated_at_html=esc(generated_at),
+            summary_html=summary_html,
+            health_section_html=health_section_html,
+            event_section_html=event_section_html,
+            traffic_section_html=traffic_section_html,
+            metric_section_html=metric_section_html,
+        )
 
-            s = smtplib.SMTP(host, port)
-            s.ehlo()
-            if smtp_conf.get("enable_tls"):
-                s.starttls()
-                s.ehlo()
-
-            if smtp_conf.get("enable_auth"):
-                s.login(smtp_conf.get("user"), smtp_conf.get("password"))
-
-            s.sendmail(cfg["sender"], cfg["recipients"], msg.as_string())
-            s.quit()
-            print(f"{Colors.GREEN}{t('mail_sent', host=host, port=port)}{Colors.ENDC}")
-        except Exception as e:
-            print(f"{Colors.FAIL}{t('mail_failed', error=e)}{Colors.ENDC}")
+    def _send_mail(self, subj):
+        plugin = self._get_output_plugin("mail")
+        if not plugin:
+            return {"channel": "mail", "status": "failed", "target": "", "error": "plugin unavailable"}
+        return plugin.send(self, subj)
 
     def send_scheduled_report_email(self, subject, html_body, attachment_paths=None,
                                      custom_recipients=None):

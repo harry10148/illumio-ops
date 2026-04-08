@@ -203,6 +203,82 @@
       text-overflow: ellipsis;
     }
 
+    .event-viewer-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .event-viewer-aside {
+      position: sticky;
+      top: 18px;
+    }
+
+    .event-detail-panels {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .code-panel {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    .code-panel-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 700;
+      color: var(--accent2);
+      background: linear-gradient(90deg, rgba(255,85,0,.08), transparent);
+    }
+
+    .code-panel pre {
+      margin: 0;
+      padding: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 420px;
+      overflow: auto;
+      font-size: 12px;
+      line-height: 1.5;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .ev-badge {
+      display: inline-block;
+      margin: 0 4px 4px 0;
+      padding: 2px 7px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    #ev-body tr.is-selected td {
+      background: rgba(255, 162, 47, 0.12);
+    }
+
+    @media (max-width: 1080px) {
+      .event-viewer-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .event-viewer-aside {
+        position: static;
+      }
+    }
+
+    @media (max-width: 780px) {
+      .event-detail-panels {
+        grid-template-columns: 1fr;
+      }
+    }
+
     .header-right {
       display: flex;
       align-items: center;
@@ -1174,6 +1250,49 @@
       font-size: .75rem;
       color: var(--dim);
       white-space: nowrap;
+    }
+
+    /* Rules page rhythm */
+    #p-rules .rs-tab-bar {
+      margin-bottom: 18px;
+    }
+
+    #p-rules .toolbar {
+      gap: 12px 10px;
+      margin-bottom: 16px;
+      padding: 4px 0 2px;
+      align-items: center;
+    }
+
+    #p-rules .badge {
+      min-width: 36px;
+      text-align: center;
+      padding: 4px 12px;
+    }
+
+    #p-rules .rules-search {
+      margin-left: 0;
+      flex: 0 1 280px;
+      min-width: 220px;
+    }
+
+    #p-rules .rules-search input {
+      width: 100%;
+      min-width: 0;
+      height: 34px;
+    }
+
+    #p-rules .toolbar .spacer {
+      min-width: 16px;
+    }
+
+    #p-rules .rule-table {
+      margin-top: 4px;
+    }
+
+    #p-rules .rule-table th,
+    #p-rules .rule-table td {
+      vertical-align: middle;
     }
     mark { background: color-mix(in srgb, var(--accent2) 35%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
 

@@ -1,0 +1,40 @@
+<html>
+<body style="margin:0; padding:0; background:#F3F0E9; font-family:'Montserrat',Arial,sans-serif; color:#313638;">
+  <div style="max-width:980px; margin:0 auto; padding:32px 20px 40px;">
+    <div style="background:#FFFFFF; border-radius:28px; overflow:hidden; border:1px solid #E6E2D8; box-shadow:0 20px 48px rgba(26,44,50,0.12);">
+      <div style="padding:32px 36px; background:linear-gradient(135deg, #FFF7F0 0%, #FFFFFF 48%, #F2F7F8 100%); border-bottom:1px solid #ECE7DD;">
+        <div style="display:flex; align-items:center; gap:14px; margin-bottom:20px;">
+          <div style="background:#FF5500; color:#FFFFFF; padding:10px 18px; border-radius:999px; font-weight:800; font-size:17px; letter-spacing:0.02em;">Illumio PCE Ops</div>
+          <div style="color:#6F7274; font-size:13px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase;">正式告警通知</div>
+        </div>
+        <div style="font-size:12px; color:#8C8E8F; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:10px;">告警摘要</div>
+        <h1 style="color:#1A2C32; font-size:32px; line-height:1.2; margin:0 0 12px 0; font-weight:800;">$subject_html</h1>
+        <p style="color:#6F7274; font-size:14px; line-height:1.7; margin:0 0 16px 0;">本通知彙整近期健康狀態、安全事件、流量異常與指標異常，方便你快速掌握風險並安排後續處置。</p>
+        <div style="display:flex; flex-wrap:wrap; gap:18px; margin-bottom:22px;">
+          <div style="min-width:220px;">
+            <div style="font-size:11px; color:#8C8E8F; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">產出時間</div>
+            <div style="font-size:16px; font-weight:700; color:#24393F;">$generated_at_html</div>
+          </div>
+          <div style="min-width:180px;">
+            <div style="font-size:11px; color:#8C8E8F; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px;">通知範圍</div>
+            <div style="font-size:16px; font-weight:700; color:#24393F;">健康 / 事件 / 流量 / 指標</div>
+          </div>
+        </div>
+        <div>$summary_html</div>
+      </div>
+      <div style="padding:8px 36px 36px;">
+$health_section_html
+$event_section_html
+$traffic_section_html
+$metric_section_html
+        <div style="margin-top:32px; padding:24px 8px 4px; border-top:1px solid #ECE7DD; text-align:center;">
+          <p style="color:#8C8E8F; font-size:11px; line-height:1.8; margin:0;">
+            此通知由 <strong>Illumio PCE Ops</strong> 自動產生。<br>
+            請依你的告警流程進行確認與處置。
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

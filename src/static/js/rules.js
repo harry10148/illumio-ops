@@ -4,7 +4,52 @@ function onEvTtChange() {
   $('ev-cnt-wrap').style.display = isCount ? '' : 'none';
   $('ev-win-wrap').style.display = isCount ? '' : 'none';
 }
-let _catalog = {}, _actionEvents = [];
+
+function onBwMetricTypeChange() {
+  const type = rv('bw-mt') || 'bandwidth';
+  const label = $('bw-val-label');
+  const input = $('bw-val');
+  const help = $('bw-val-help');
+  if (!label || !input || !help) return;
+
+  if (type === 'volume') {
+    label.textContent = _translations['gui_bw_value_volume'] || 'Threshold (MB)';
+    input.placeholder = _translations['gui_bw_placeholder_volume'] || 'e.g. 500 MB';
+    help.textContent = _translations['gui_bw_help_volume'] || 'Use MB for accumulated transfer volume threshold.';
+  } else {
+    label.textContent = _translations['gui_bw_value_bandwidth'] || 'Threshold (Mbps)';
+    input.placeholder = _translations['gui_bw_placeholder_bandwidth'] || 'e.g. 100 Mbps';
+    help.textContent = _translations['gui_bw_help_bandwidth'] || 'Use Mbps for peak bandwidth threshold.';
+  }
+}
+
+function _serializeMatchFields(matchFields) {
+  return Object.entries(matchFields || {}).map(([key, value]) => `${key}=${value}`).join('\n');
+}
+
+function _parseMatchFields(text) {
+  const result = {};
+  for (const rawLine of String(text || '').split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const idx = line.indexOf('=');
+    if (idx <= 0) {
+      const msg = (_translations['gui_ev_matcher_invalid'] || 'Invalid field matcher: {line}').replace('{line}', line);
+      throw new Error(msg);
+    }
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 1).trim();
+    if (!key || !value) {
+      const msg = (_translations['gui_ev_matcher_invalid'] || 'Invalid field matcher: {line}').replace('{line}', line);
+      throw new Error(msg);
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
+let _catalog = {}, _actionEvents = [], _severityFilterEvents = [];
+let _catalogCategories = [], _eventMetaById = {};
 async function loadRules() {
   showSkeleton('r-body', 7);
   const rules = await api('/api/rules');
@@ -19,7 +64,10 @@ async function loadRules() {
   rules.forEach(r => {
     const typ = r.type.charAt(0).toUpperCase() + r.type.slice(1);
     const unit = { volume: ' MB', bandwidth: ' Mbps', traffic: ' conns' }[r.type] || '';
-    const cond = '> ' + r.threshold_count + unit + ' (Win:' + r.threshold_window + 'm CD:' + (r.cooldown_minutes || r.threshold_window) + 'm)';
+    const throttleLabel = r.throttle ? ' TH:' + r.throttle : '';
+    const cond = '> ' + r.threshold_count + unit + ' (Win:' + r.threshold_window + 'm CD:' + (r.cooldown_minutes || r.threshold_window) + 'm' + throttleLabel + ')';
+    const suppressedCount = ((r.throttle_state && r.throttle_state.cooldown_suppressed) || 0) + ((r.throttle_state && r.throttle_state.throttle_suppressed) || 0);
+    const nextAllowedAt = r.throttle_state && r.throttle_state.next_allowed_at ? formatDateZ(r.throttle_state.next_allowed_at) : '';
 
     let statusHtml = '';
     if (r.cooldown_remaining > 0) {
@@ -28,19 +76,31 @@ async function loadRules() {
     } else {
       statusHtml = `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">✅ ${readyTitle}</span>`;
     }
+    if (suppressedCount > 0) {
+      const detail = nextAllowedAt ? ` until ${nextAllowedAt}` : '';
+      statusHtml += `<div style="margin-top:4px;color:var(--dim);font-size:0.75rem;">Suppressed ${suppressedCount}${escapeHtml(detail)}</div>`;
+    }
 
     let f = [];
     if (r.type === 'event') f.push('Event: ' + r.filter_value);
-    if (r.type === 'system') f.push('Check: ' + (r.filter_value || ''));
+    if (r.type === 'system') {
+      const healthLabel = _translations['gui_system_health_type'] || 'Health Check';
+      const pceLabel = _translations['gui_system_health_pce'] || 'PCE API Health';
+      f.push(healthLabel + ': ' + (r.filter_value === 'pce_health' ? pceLabel : (r.filter_value || '')));
+    }
     if (r.pd !== undefined && r.pd !== null) f.push('PD:' + (pdm[r.pd] || r.pd));
     if (r.port) f.push('Port:' + r.port);
     if (r.src_label) f.push('Src:' + r.src_label); if (r.dst_label) f.push('Dst:' + r.dst_label);
     if (r.src_ip_in) f.push('SrcIP:' + r.src_ip_in); if (r.dst_ip_in) f.push('DstIP:' + r.dst_ip_in);
-    const editBtn = r.type !== 'system' ? `<button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="Edit Rule" title="Edit Rule">✏️</button>` : '';
+    if (r.throttle) f.push('Throttle:' + r.throttle);
+    if (suppressedCount > 0) f.push('Suppressed:' + suppressedCount);
+    if (r.match_fields && Object.keys(r.match_fields).length) f.push('Match:' + Object.keys(r.match_fields).join(', '));
+    const editBtn = `<button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="Edit Rule" title="Edit Rule">✏️</button>`;
     html += `<tr><td><input type="checkbox" class="r-chk" data-idx="${r.index}"></td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}">${cond}</td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | ')) || '—'}</td><td>${editBtn}</td></tr>`;
   });
   $('r-body').innerHTML = html || `<tr><td colspan="7"><div class="empty-state"><svg aria-hidden="true"><use href="#icon-shield"></use></svg><h3>${_translations['gui_no_rules_title'] || 'No Rules Yet'}</h3><p>${_translations['gui_no_rules_add_one'] || 'Create your first monitoring rule using the buttons above.'}</p></div></td></tr>`;
   initTableResizers();
+  if (typeof loadAlertTestActions === 'function') loadAlertTestActions();
 }
 function toggleAll(el) { document.querySelectorAll('.r-chk').forEach(c => c.checked = el.checked) }
 async function deleteSelected() {
@@ -53,16 +113,37 @@ async function deleteSelected() {
 function openModal(id, isEdit) {
   _editIdx = isEdit ?? null; $(id).classList.add('show');
   if (id === 'm-event' && !Object.keys(_catalog).length) loadCatalog();
-  if (id === 'm-event' && _editIdx === null) { updateEventFilters(); onEvTtChange(); }
+  if (id === 'm-event' && _editIdx === null) {
+    $('ev-status').value = 'all';
+    $('ev-severity').value = 'all';
+    $('ev-match-fields').value = '';
+    $('ev-throttle').value = '';
+    $('ev-advanced').open = false;
+    updateEventFilters();
+    onEvTtChange();
+  }
   if (id === 'm-event' && _editIdx !== null) { onEvTtChange(); }
+  if (id === 'm-traffic' && _editIdx === null) $('tr-throttle').value = '';
+  if (id === 'm-bw' && _editIdx === null) {
+    $('bw-throttle').value = '';
+    setRv('bw-mt', 'bandwidth');
+    onBwMetricTypeChange();
+  }
+  if (id === 'm-system' && _editIdx === null) {
+    $('sys-name').value = _translations['rule_pce_health'] || 'PCE Health';
+    $('sys-type').value = 'pce_health';
+    $('sys-cd').value = 30;
+    $('sys-throttle').value = '';
+  }
   // Update modal title
   let target;
   if (id === 'm-event') target = $('me-title');
   else if (id === 'm-traffic') target = $('mt-title');
   else if (id === 'm-bw') target = $('mb-title');
+  else if (id === 'm-system') target = $('ms-title');
   if (target) {
-    const baseKey = id === 'm-event' ? 'gui_add_event_rule' : id === 'm-traffic' ? 'gui_add_traffic_rule' : 'gui_add_bw_rule';
-    const editKey = id === 'm-event' ? 'gui_edit_event_rule' : id === 'm-traffic' ? 'gui_edit_traffic_rule' : 'gui_edit_bw_rule';
+    const baseKey = id === 'm-event' ? 'gui_add_event_rule' : id === 'm-traffic' ? 'gui_add_traffic_rule' : id === 'm-bw' ? 'gui_add_bw_rule' : 'gui_add_system_health_rule';
+    const editKey = id === 'm-event' ? 'gui_edit_event_rule' : id === 'm-traffic' ? 'gui_edit_traffic_rule' : id === 'm-bw' ? 'gui_edit_bw_rule' : 'gui_edit_system_health_rule';
     const key = _editIdx !== null ? editKey : baseKey;
     target.setAttribute('data-i18n', key);
     if (_translations[key]) target.textContent = _translations[key];
@@ -142,25 +223,105 @@ function hideSpinner(containerId) {
 async function loadCatalog() {
   const resp = await api('/api/event-catalog');
   _catalog = resp.catalog || resp;
+  _catalogCategories = resp.categories || [];
   _actionEvents = resp.action_events || [];
+  _severityFilterEvents = resp.severity_filter_events || [];
+  _eventMetaById = {};
+  if (_catalogCategories.length) {
+    _catalogCategories.forEach(category => {
+      (category.events || []).forEach(event => {
+        _eventMetaById[event.id] = { ...event, category_id: category.id, category_label: category.label };
+      });
+    });
+  } else {
+    Object.entries(_catalog).forEach(([categoryLabel, events]) => {
+      Object.entries(events || {}).forEach(([eventId, description]) => {
+        _eventMetaById[eventId] = {
+          id: eventId,
+          label: description,
+          description,
+          source: 'vendor_baseline',
+          supports_status: _actionEvents.includes(eventId),
+          supports_severity: _severityFilterEvents.includes(eventId),
+          category_id: categoryLabel,
+          category_label: categoryLabel
+        };
+      });
+    });
+    _catalogCategories = Object.keys(_catalog).map(label => ({ id: label, label, events: Object.keys(_catalog[label] || {}).map(id => _eventMetaById[id]) }));
+  }
   const sel = $('ev-cat'); sel.innerHTML = '<option value="" data-i18n="gui_select">Select...</option>';
-  Object.keys(_catalog).forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o) });
+  _catalogCategories.forEach(category => {
+    const o = document.createElement('option');
+    o.value = category.id;
+    o.textContent = category.label;
+    sel.appendChild(o);
+  });
 }
 function populateEvents() {
-  const cat = $('ev-cat').value; const sel = $('ev-type'); sel.innerHTML = '';
-  if (!cat || !_catalog[cat]) { sel.innerHTML = '<option data-i18n="gui_select_category_first">Select category first</option>'; applyI18n(sel); updateEventFilters(); return }
-  Object.entries(_catalog[cat]).forEach(([k, v]) => { const o = document.createElement('option'); o.value = k; o.textContent = k + ' (' + v + ')'; sel.appendChild(o) });
+  const cat = $('ev-cat').value;
+  const sel = $('ev-type');
+  sel.innerHTML = '';
+  const category = _catalogCategories.find(item => item.id === cat);
+  if (!cat || !category) {
+    sel.innerHTML = '<option data-i18n="gui_select_category_first">Select category first</option>';
+    applyI18n(sel);
+    updateEventFilters();
+    return;
+  }
+  (category.events || []).forEach(meta => {
+    const o = document.createElement('option');
+    o.value = meta.id;
+    o.textContent = meta.label && meta.label !== meta.id
+      ? `${meta.id} | ${meta.label}`
+      : meta.id;
+    sel.appendChild(o);
+  });
   updateEventFilters();
 }
+
+function _renderEventInfo(eventId) {
+  const box = $('ev-info');
+  if (!box) return;
+  if (!eventId) {
+    box.style.display = 'none';
+    $('ev-info-id').textContent = '';
+    $('ev-info-title').textContent = '';
+    $('ev-info-desc').textContent = '';
+    $('ev-info-capabilities').textContent = '';
+    $('ev-info-badges').innerHTML = '';
+    return;
+  }
+
+  const meta = _eventMetaById[eventId] || {};
+  const badges = [];
+  if (meta.supports_status) badges.push(`<span style="padding:2px 8px;border-radius:999px;font-size:.72rem;font-weight:700;background:#EFF6FF;color:#1D4ED8;border:1px solid #93C5FD;">${_translations['gui_ev_status_filter_badge'] || 'Status Filter'}</span>`);
+  if (meta.supports_severity) badges.push(`<span style="padding:2px 8px;border-radius:999px;font-size:.72rem;font-weight:700;background:#FEF2F2;color:#B91C1C;border:1px solid #FCA5A5;">${_translations['gui_ev_severity_filter_badge'] || 'Severity Filter'}</span>`);
+
+  const title = meta.label || eventId;
+  const desc = (meta.description && meta.description !== title) ? meta.description : '';
+  $('ev-info-id').textContent = eventId;
+  $('ev-info-title').textContent = title;
+  $('ev-info-desc').textContent = desc;
+  $('ev-info-desc').style.display = desc ? '' : 'none';
+  $('ev-info-capabilities').textContent = meta.supports_status || meta.supports_severity
+    ? (_translations['gui_ev_capability_filters'] || 'This event supports status or severity filtering. Use advanced matchers only when you need field-level precision.')
+    : (_translations['gui_ev_capability_basic'] || 'This event is usually best monitored by event type alone. Use advanced matchers only if you need to target a specific actor, IP, or nested field.');
+  $('ev-info-badges').innerHTML = badges.join('');
+  box.style.display = '';
+}
+
 function updateEventFilters() {
   const ev = $('ev-type').value;
-  const showStatus = !!ev && _actionEvents.includes(ev);
-  const showSeverity = !!ev && (_actionEvents.includes(ev) || ev === '*');
+  const meta = _eventMetaById[ev] || {};
+  const showStatus = !!ev && !!meta.supports_status;
+  const showSeverity = !!ev && !!meta.supports_severity;
   $('ev-filter-row').style.display = (showStatus || showSeverity) ? '' : 'none';
   $('ev-status-group').style.display = showStatus ? '' : 'none';
   $('ev-severity-group').style.display = showSeverity ? '' : 'none';
   if (!showStatus) $('ev-status').value = 'all';
   if (!showSeverity) $('ev-severity').value = 'all';
+  _renderEventInfo(ev);
 }
 
 /* ─── Edit Rule ───────────────────────────────────────────────────── */
@@ -171,18 +332,32 @@ async function editRule(idx, type) {
     if (type === 'event') {
       await loadCatalog();
       // Find and select category
-      for (const [cat, evts] of Object.entries(_catalog)) {
-        if (r.filter_value in evts) { $('ev-cat').value = cat; populateEvents(); $('ev-type').value = r.filter_value; break }
+      for (const category of _catalogCategories) {
+        if ((category.events || []).some(event => event.id === r.filter_value)) {
+          $('ev-cat').value = category.id;
+          populateEvents();
+          $('ev-type').value = r.filter_value;
+          break;
+        }
       }
       updateEventFilters();
       $('ev-status').value = r.filter_status || 'all';
       $('ev-severity').value = r.filter_severity || 'all';
+      $('ev-match-fields').value = _serializeMatchFields(r.match_fields || {});
       setRv('ev-tt', r.threshold_type || 'immediate');
       onEvTtChange();
       $('ev-cnt').value = r.threshold_count || 5;
       $('ev-win').value = r.threshold_window || 10;
       $('ev-cd').value = r.cooldown_minutes || 10;
+      $('ev-throttle').value = r.throttle || '';
+      $('ev-advanced').open = !!(r.match_fields && Object.keys(r.match_fields).length);
       openModal('m-event', idx);
+    } else if (type === 'system') {
+      $('sys-name').value = r.name || (_translations['rule_pce_health'] || 'PCE Health');
+      $('sys-type').value = r.filter_value || 'pce_health';
+      $('sys-cd').value = r.cooldown_minutes || 30;
+      $('sys-throttle').value = r.throttle || '';
+      openModal('m-system', idx);
     } else if (type === 'traffic') {
       $('tr-name').value = r.name || '';
       setRv('tr-pd', String(r.pd ?? 2));
@@ -196,10 +371,12 @@ async function editRule(idx, type) {
       $('tr-cnt').value = r.threshold_count || 10;
       $('tr-win').value = r.threshold_window || 10;
       $('tr-cd').value = r.cooldown_minutes || 10;
+      $('tr-throttle').value = r.throttle || '';
       openModal('m-traffic', idx);
     } else {
       $('bw-name').value = r.name || '';
       setRv('bw-mt', r.type || 'bandwidth');
+      onBwMetricTypeChange();
       setRv('bw-pd', String(r.pd ?? -1));
       $('bw-port').value = r.port || '';
       $('bw-src').value = r.src_label || r.src_ip_in || '';
@@ -210,6 +387,7 @@ async function editRule(idx, type) {
       $('bw-val').value = r.threshold_count || 100;
       $('bw-win').value = r.threshold_window || 10;
       $('bw-cd').value = r.cooldown_minutes || 30;
+      $('bw-throttle').value = r.throttle || '';
       openModal('m-bw', idx);
     }
   } catch (e) {
@@ -221,14 +399,48 @@ async function editRule(idx, type) {
 async function saveEvent() {
   const cat = $('ev-cat').value, ev = $('ev-type').value;
   if (!cat || !ev) { toast(_translations['gui_msg_select_cat_event'] || 'Select category and event', 'err'); return }
-  const name = (_catalog[cat] || {})[ev] || ev;
-  const data = { name, filter_value: ev, filter_status: $('ev-status').value || 'all', filter_severity: $('ev-severity').value || 'all', threshold_type: rv('ev-tt'), threshold_count: $('ev-cnt').value, threshold_window: $('ev-win').value, cooldown_minutes: $('ev-cd').value };
+  const meta = _eventMetaById[ev] || {};
+  const name = meta.label || meta.description || ev;
+  let matchFields;
+  try {
+    matchFields = _parseMatchFields($('ev-match-fields').value);
+  } catch (error) {
+    toast(error.message, 'err');
+    return;
+  }
+  const data = {
+    name,
+    filter_value: ev,
+    filter_status: $('ev-status').value || 'all',
+    filter_severity: $('ev-severity').value || 'all',
+    match_fields: matchFields,
+    threshold_type: rv('ev-tt'),
+    threshold_count: $('ev-cnt').value,
+    threshold_window: $('ev-win').value,
+    cooldown_minutes: $('ev-cd').value,
+    throttle: $('ev-throttle').value.trim()
+  };
   if (_editIdx !== null) await put('/api/rules/' + _editIdx, data); else await post('/api/rules/event', data);
   closeModal('m-event'); toast(_translations['gui_msg_event_rule_saved'] || 'Event rule saved'); loadRules(); loadDashboard();
 }
+async function saveSystemRule() {
+  const name = $('sys-name').value.trim() || (_translations['rule_pce_health'] || 'PCE Health');
+  const data = {
+    name,
+    filter_value: $('sys-type').value || 'pce_health',
+    cooldown_minutes: $('sys-cd').value || 30,
+    throttle: $('sys-throttle').value.trim()
+  };
+  if (_editIdx !== null) {
+    await put('/api/rules/' + _editIdx, data);
+  } else {
+    await post('/api/rules/system', data);
+  }
+  closeModal('m-system'); toast(_translations['gui_msg_system_rule_saved'] || 'System health rule saved'); loadRules(); loadDashboard();
+}
 async function saveTraffic() {
   const name = $('tr-name').value.trim(); if (!name) { toast(_translations['gui_msg_name_required'] || 'Name required', 'err'); return }
-  const data = { name, pd: rv('tr-pd'), port: $('tr-port').value, proto: $('tr-proto').value, src: $('tr-src').value, dst: $('tr-dst').value, ex_port: $('tr-expt').value, ex_src: $('tr-exsrc').value, ex_dst: $('tr-exdst').value, threshold_count: $('tr-cnt').value, threshold_window: $('tr-win').value, cooldown_minutes: $('tr-cd').value };
+  const data = { name, pd: rv('tr-pd'), port: $('tr-port').value, proto: $('tr-proto').value, src: $('tr-src').value, dst: $('tr-dst').value, ex_port: $('tr-expt').value, ex_src: $('tr-exsrc').value, ex_dst: $('tr-exdst').value, threshold_count: $('tr-cnt').value, threshold_window: $('tr-win').value, cooldown_minutes: $('tr-cd').value, throttle: $('tr-throttle').value.trim() };
   if (_editIdx !== null) await put('/api/rules/' + _editIdx, data); else await post('/api/rules/traffic', data);
   closeModal('m-traffic'); toast(_translations['gui_msg_traffic_rule_saved'] || 'Traffic rule saved'); loadRules(); loadDashboard();
 }
@@ -238,14 +450,35 @@ async function saveBW() {
     name, rule_type: rv('bw-mt'), pd: rv('bw-pd'),
     port: $('bw-port').value, src: $('bw-src').value, dst: $('bw-dst').value,
     ex_port: $('bw-expt').value, ex_src: $('bw-exsrc').value, ex_dst: $('bw-exdst').value,
-    threshold_count: $('bw-val').value, threshold_window: $('bw-win').value, cooldown_minutes: $('bw-cd').value
+    threshold_count: $('bw-val').value, threshold_window: $('bw-win').value, cooldown_minutes: $('bw-cd').value, throttle: $('bw-throttle').value.trim()
   };
   if (_editIdx !== null) await put('/api/rules/' + _editIdx, { ...data, type: data.rule_type }); else await post('/api/rules/bandwidth', data);
   closeModal('m-bw'); toast(_translations['gui_msg_rule_saved'] || 'Rule saved'); loadRules(); loadDashboard();
 }
 
 function confirmBestPractices() {
-  if (!confirm((_translations['gui_warn_best_practices'] || '⚠️ WARNING: This will DELETE all existing rules and replace them with best practice defaults.\n\nAre you sure you want to continue?').replace(/\\n/g, '\n'))) return;
-  if (!confirm(_translations['gui_confirm_best_practices'] || 'This action cannot be undone. Confirm once more to proceed.')) return;
-  runAction('best-practices');
+  const promptText = (
+    _translations['gui_best_practices_mode_prompt'] ||
+    'Choose best-practice mode:\\n1 = append missing only (recommended)\\n2 = replace all current rules\\n\\nA backup of current rules will be created first.'
+  ).replace(/\\n/g, '\n');
+  const choice = window.prompt(promptText, '1');
+  if (choice === null) return;
+
+  const normalized = String(choice).trim().toLowerCase();
+  let mode = '';
+  if (['1', 'append', 'append_missing', 'safe'].includes(normalized)) mode = 'append_missing';
+  if (['2', 'replace', 'overwrite'].includes(normalized)) mode = 'replace';
+  if (!mode) {
+    toast(_translations['gui_best_practices_mode_invalid'] || 'Invalid best-practice mode.', 'err');
+    return;
+  }
+
+  if (mode === 'replace') {
+    if (!confirm((_translations['gui_warn_best_practices'] || 'This will replace all current rules with best-practice defaults. A backup will be created first.').replace(/\\n/g, '\n'))) return;
+    if (!confirm(_translations['gui_confirm_best_practices'] || 'Confirm replace-all best practices.')) return;
+  } else if (!confirm((_translations['gui_best_practices_append_confirm'] || 'This will append only missing best-practice rules and keep your existing rules. A backup will be created first.').replace(/\\n/g, '\n'))) {
+    return;
+  }
+
+  runAction('best-practices', { mode });
 }

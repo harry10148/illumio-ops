@@ -1,0 +1,227 @@
+[
+  {
+    "href": "/orgs/1/events/replay-user-session-terminated",
+    "timestamp": "2026-04-08T03:34:04.220Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": { "system": {} },
+    "event_type": "user.pce_session_terminated",
+    "status": null,
+    "severity": "info",
+    "action": null,
+    "resource_changes": [],
+    "notifications": [
+      {
+        "notification_type": "user.pce_session_terminated",
+        "info": {
+          "reason": "timeout",
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/replay-user-create-session",
+    "timestamp": "2026-04-08T03:01:02.673Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": { "system": {} },
+    "event_type": "user.create_session",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "api_endpoint": "/api/v2/users/create_session",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "FILTERED"
+    },
+    "resource_changes": [],
+    "notifications": [
+      {
+        "notification_type": "user.pce_session_created",
+        "info": {
+          "user": {
+            "href": "/users/11",
+            "username": "admin@lab.local"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "href": "/orgs/1/events/replay-cluster-applied",
+    "timestamp": "2026-04-08T00:04:55.296Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "container_cluster": {
+        "href": "/orgs/1/container_clusters/cluster-1",
+        "name": "local_k8s"
+      }
+    },
+    "event_type": "container_cluster.security_policy_applied",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "api_endpoint": "/api/v2/orgs/1/container_clusters/cluster-1/security_policy_applied",
+      "api_method": "PUT",
+      "http_status_code": 200,
+      "src_ip": "172.16.15.121"
+    },
+    "resource_changes": [],
+    "notifications": []
+  },
+  {
+    "href": "/orgs/1/events/replay-cluster-acks",
+    "timestamp": "2026-04-08T00:03:46.028Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "container_cluster": {
+        "href": "/orgs/1/container_clusters/cluster-1",
+        "name": "local_k8s"
+      }
+    },
+    "event_type": "container_cluster.security_policy_acks",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "api_endpoint": "/api/v2/orgs/1/container_clusters/cluster-1/security_policy_acks",
+      "api_method": "PUT",
+      "http_status_code": 204,
+      "src_ip": "172.16.15.121"
+    },
+    "resource_changes": [
+      {
+        "resource": {
+          "container_cluster": {
+            "href": "/orgs/1/container_clusters/cluster-1",
+            "name": "local_k8s"
+          }
+        },
+        "changes": {
+          "security_policy_set_digest": {
+            "before": "old-digest",
+            "after": "new-digest"
+          }
+        },
+        "change_type": "update"
+      }
+    ],
+    "notifications": []
+  },
+  {
+    "href": "/orgs/1/events/replay-agent-upload-rules",
+    "timestamp": "2026-04-08T03:29:55.511Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "agent": {
+        "href": "/orgs/1/agents/1228",
+        "hostname": null
+      }
+    },
+    "event_type": "agent.upload_existing_ip_table_rules",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "api_endpoint": "FILTERED",
+      "api_method": "POST",
+      "http_status_code": 204,
+      "src_ip": "172.16.15.170"
+    },
+    "resource_changes": [],
+    "notifications": []
+  },
+  {
+    "href": "/orgs/1/events/replay-policy-create",
+    "timestamp": "2026-04-08T00:03:44.250Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "sec_policy.create",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "api_endpoint": "/api/v2/orgs/1/sec_policy",
+      "api_method": "POST",
+      "http_status_code": 201,
+      "src_ip": "172.16.15.106"
+    },
+    "resource_changes": [
+      {
+        "resource": {
+          "sec_policy": {
+            "href": "/orgs/1/sec_policy/539",
+            "commit_message": "Auto-Scheduler: Status/Note Update",
+            "version": 539,
+            "modified_objects": {
+              "rulesets": {
+                "/orgs/1/sec_policy/draft/rule_sets/471": {
+                  "action": "modified",
+                  "name": "CoreServices | VMware"
+                }
+              }
+            }
+          }
+        },
+        "changes": {
+          "commit_message": {
+            "before": null,
+            "after": "Auto-Scheduler: Status/Note Update"
+          },
+          "version": {
+            "before": null,
+            "after": 539
+          },
+          "workloads_affected": {
+            "before": null,
+            "after": 69
+          }
+        },
+        "change_type": "create"
+      }
+    ],
+    "notifications": []
+  },
+  {
+    "href": "/orgs/1/events/replay-rule-set-update",
+    "timestamp": "2026-04-08T00:03:43.973Z",
+    "pce_fqdn": "pce.lab.local",
+    "created_by": {
+      "user": {
+        "href": "/users/11",
+        "username": "admin@lab.local"
+      }
+    },
+    "event_type": "rule_set.update",
+    "status": "success",
+    "severity": "info",
+    "action": {
+      "api_endpoint": "/api/v2/orgs/1/sec_policy/draft/rule_sets/471",
+      "api_method": "PUT",
+      "http_status_code": 204,
+      "src_ip": "172.16.15.106"
+    },
+    "resource_changes": [
+      {
+        "resource": {
+          "rule_set": {
+            "href": "/orgs/1/sec_policy/draft/rule_sets/471",
+            "name": "CoreServices | VMware"
+          }
+        },
+        "changes": {
+          "enabled": {
+            "before": false,
+            "after": true
+          }
+        },
+        "change_type": "update"
+      }
+    ],
+    "notifications": []
+  }
+]

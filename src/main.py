@@ -11,6 +11,7 @@ from src.reporter import Reporter
 from src.settings import (
     settings_menu,
     add_event_menu,
+    add_system_health_menu,
     add_traffic_menu,
     add_bandwidth_volume_menu,
     manage_rules_menu,
@@ -177,26 +178,25 @@ def rule_management_menu(cm):
             t("main_menu_6"),
             t("main_menu_7"),
             t("main_menu_8"),
+            t("main_menu_13"),
             t("main_menu_0")
         ]
         draw_panel("Illumio PCE Ops", lines)
-        sel = safe_input(f"\n{t('please_select')}", int, range(0, 9))
+        sel = safe_input(f"\n{t('please_select')}", int, range(0, 10))
 
         if sel is None or sel == 0:
             break
         elif sel == 1:
             add_event_menu(cm)
         elif sel == 2:
-            from src.settings import add_traffic_menu
-            # We'll update add_traffic_menu to have its own start screen in settings.py later.
-            add_traffic_menu(cm)
+            add_system_health_menu(cm)
         elif sel == 3:
-            from src.settings import add_bandwidth_volume_menu
-            # We'll update add_bandwidth_volume_menu to have its own start screen in settings.py later.
-            add_bandwidth_volume_menu(cm)
+            add_traffic_menu(cm)
         elif sel == 4:
-            manage_rules_menu(cm)
+            add_bandwidth_volume_menu(cm)
         elif sel == 5:
+            manage_rules_menu(cm)
+        elif sel == 6:
             print(f"\n{Colors.WARNING}{t('warning_best_practices')}{Colors.ENDC}")
             confirm = safe_input(f"{t('confirm_continue')} (Y/N)", str)
             if confirm and confirm.strip().upper() == "Y":
@@ -209,12 +209,12 @@ def rule_management_menu(cm):
                 input(
                     f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('operation_cancelled', default='Operation cancelled. Press Enter to continue...')} {Colors.GREEN}❯{Colors.ENDC} "
                 )
-        elif sel == 6:
+        elif sel == 7:
             Reporter(cm).send_alerts(force_test=True)
             input(
                 f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('done_msg')} {Colors.GREEN}❯{Colors.ENDC} "
             )
-        elif sel == 7:
+        elif sel == 8:
             api = ApiClient(cm)
             rep = Reporter(cm)
             ana = Analyzer(cm, api, rep)
@@ -223,7 +223,7 @@ def rule_management_menu(cm):
             input(
                 f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} {Colors.GREEN}❯{Colors.ENDC} "
             )
-        elif sel == 8:
+        elif sel == 9:
             api = ApiClient(cm)
             rep = Reporter(cm)
             ana = Analyzer(cm, api, rep)

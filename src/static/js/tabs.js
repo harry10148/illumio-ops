@@ -10,7 +10,13 @@ function switchTab(id, updateUrl = true) {
   if (id === 'rules') loadRules();
   if (id === 'settings') loadSettings();
   if (id === 'dashboard') loadDashboard();
+  if (id === 'traffic-workload') {
+    if (typeof ensureTrafficWorkloadLayout === 'function') ensureTrafficWorkloadLayout();
+    if (typeof loadDashboardQueries === 'function') loadDashboardQueries();
+  }
+  if (id === 'events') loadEventViewer(true);
   if (id === 'reports') loadReports();
   if (id === 'rule-scheduler') rsLoadTab();
+  if (typeof updateBulkBar === 'function') updateBulkBar();
   if (updateUrl) updateUrlState('tab', id);
 }

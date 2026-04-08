@@ -28,21 +28,27 @@ def render_df_table(
     if df is None or (hasattr(df, "empty") and df.empty):
         return f'<p class="note" data-i18n="{no_data_key}">No data</p>'
 
+    columns = list(df.columns)
+    interactive = len(columns) >= 3
+    table_class = "report-table report-table--interactive" if interactive else "report-table"
+
     html_parts = [
         '<div class="report-table-panel">',
-        '<div class="report-table-hint" data-i18n="rpt_table_hint">Sort • Resize</div>',
         '<div class="report-table-wrap">',
-        '<table class="report-table">',
-        '<colgroup>',
+        (
+            f'<table class="{table_class}" '
+            f'data-interactive="{str(interactive).lower()}" '
+            f'data-column-count="{len(columns)}">'
+        ),
+        "<colgroup>",
     ]
 
-    columns = list(df.columns)
     for _ in columns:
         html_parts.append('<col style="width: 160px; min-width: 96px;">')
 
     html_parts.extend([
-        '</colgroup>',
-        '<thead><tr>',
+        "</colgroup>",
+        "<thead><tr>",
     ])
     for col in columns:
         i18n_key = col_i18n.get(col)
@@ -61,10 +67,7 @@ def render_df_table(
             attr_str = row_attrs(row) or ""
         html_parts.append(f"<tr{attr_str}>")
         for col in columns:
-            if render_cell:
-                cell_html = render_cell(col, row[col], row)
-            else:
-                cell_html = _default_cell(row[col])
+            cell_html = render_cell(col, row[col], row) if render_cell else _default_cell(row[col])
             html_parts.append(f"<td>{cell_html}</td>")
         html_parts.append("</tr>")
 

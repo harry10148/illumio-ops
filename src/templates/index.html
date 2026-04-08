@@ -113,7 +113,7 @@
           <option value="comfortable" data-i18n="gui_comfortable">Comfortable</option>
         </select>
       </div>
-      <button class="btn btn-sm" onclick="mlOpen()" data-i18n="gui_ml_logs_btn" style="padding:3px 10px;">日誌</button>
+      <button class="btn btn-sm" onclick="mlOpen()" data-i18n="gui_ml_logs_btn" style="padding:3px 10px;">?亥?</button>
       <button class="btn btn-secondary btn-sm" onclick="stopGui()" title="Stop Web GUI" data-i18n="gui_stop">
         <svg class="icon" aria-hidden="true" focusable="false">
           <use href="#icon-stop"></use>
@@ -126,7 +126,17 @@
     <button class="tab active" type="button" role="tab" aria-selected="true" aria-controls="p-dashboard" data-tab="dashboard" onclick="switchTab('dashboard')" data-i18n="gui_tab_dashboard">
       <svg class="icon">
         <use href="#icon-activity"></use>
-      </svg> Traffic & Quarantine
+      </svg> 總覽
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-traffic-workload" data-tab="traffic-workload" onclick="switchTab('traffic-workload')" data-i18n="gui_tab_traffic_workload">
+      <svg class="icon">
+        <use href="#icon-search"></use>
+      </svg> 流量與工作負載
+    </button>
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-events" data-tab="events" onclick="switchTab('events')">
+      <svg class="icon">
+        <use href="#icon-search"></use>
+      </svg> <span data-i18n="gui_tab_events">Event Viewer</span>
     </button>
     <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-rules" data-tab="rules" onclick="switchTab('rules')" data-i18n="gui_tab_rules">
       <svg class="icon">
@@ -152,11 +162,35 @@
 
   <main id="main-content">
 
-  <!-- ═══ Traffic & Quarantine (Dashboard Tab) ═══ -->
+  <!-- ????Traffic & Quarantine (Dashboard Tab) ????-->
   <div class="panel active" id="p-dashboard">
 
     <!-- Top level stats -->
     <div class="cards">
+      <div class="card">
+        <div class="label">Rules</div>
+        <div class="value" id="d-rules">-</div>
+      </div>
+      <div class="card">
+        <div class="label">Health Rule</div>
+        <div class="value" id="d-health">-</div>
+      </div>
+      <div class="card">
+        <div class="label">Event Poll</div>
+        <div class="value" id="d-event-poll">-</div>
+      </div>
+      <div class="card">
+        <div class="label">Last Dispatch</div>
+        <div class="value" id="d-dispatch">-</div>
+      </div>
+      <div class="card">
+        <div class="label">Unknown Types</div>
+        <div class="value" id="d-unknown">-</div>
+      </div>
+      <div class="card">
+        <div class="label">Suppressed</div>
+        <div class="value" id="d-suppressed">-</div>
+      </div>
       <div class="card" id="card-ransom" style="display:none">
         <div class="label">Ransomware Exp</div>
         <div class="value" id="d-ransom">—</div>
@@ -181,7 +215,7 @@
       </button>
       <button class="sub-nav-btn" onclick="switchQTab('legacy')" id="qbtn-legacy"
         style="margin-left:auto; opacity: 0.7;">
-        <span data-i18n="gui_top10_widgets">Top 10 Widgets</span>
+        <span data-i18n="gui_top10_widgets">Rankings</span>
       </button>
     </div>
 
@@ -203,7 +237,7 @@
           <div class="form-group" style="margin-bottom:0;">
             <label data-i18n="gui_filter_details">Filter Details</label>
             <input id="qt-search" name="traffic-search" autocomplete="off" spellcheck="false"
-              placeholder="Quick Search String…" style="width: 150px;" data-i18n="gui_quick_search_placeholder">
+              placeholder="Quick Search String?? style="width: 150px;" data-i18n="gui_quick_search_placeholder">
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label data-i18n="gui_sort_by">Sort By</label>
@@ -344,7 +378,7 @@
     <!-- Legacy Dashboards -->
     <div id="q-panel-legacy" class="q-panel">
 
-      <!-- ── Latest Traffic Report Summary ─────────────────────────────── -->
+      <!-- ?? Latest Traffic Report Summary ??????????????????????????????? -->
       <fieldset id="snap-fieldset" style="margin-bottom:18px;">
         <legend style="font-size:1.05rem;" data-i18n="gui_snap_title">Latest Traffic Report Summary</legend>
         <div id="snap-placeholder" style="text-align:center;padding:24px;color:var(--dim);font-size:0.9rem;" data-i18n="gui_snap_no_data">
@@ -352,8 +386,8 @@
         </div>
         <div id="snap-content" style="display:none;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-            <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_generated">Generated:</span> <span id="snap-generated-at">—</span></span>
-            <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_date_range">Date Range:</span> <span id="snap-date-range">—</span></span>
+            <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_generated">Generated:</span> <span id="snap-generated-at">??/span></span>
+            <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_date_range">Date Range:</span> <span id="snap-date-range">??/span></span>
           </div>
 
           <!-- KPI Cards -->
@@ -377,7 +411,7 @@
               <table class="rule-table" style="font-size:0.8rem;">
                 <thead><tr><th data-i18n="gui_snap_col_decision">Decision</th><th data-i18n="gui_snap_col_flows">Flows</th></tr></thead>
                 <tbody id="snap-policy-body">
-                  <tr><td colspan="2" style="text-align:center;color:var(--dim);">—</td></tr>
+                  <tr><td colspan="2" style="text-align:center;color:var(--dim);">??/td></tr>
                 </tbody>
               </table>
             </div>
@@ -386,7 +420,7 @@
               <table class="rule-table" style="font-size:0.8rem;">
                 <thead><tr><th data-i18n="gui_snap_col_port">Port</th><th data-i18n="gui_snap_col_flow_count">Flow Count</th></tr></thead>
                 <tbody id="snap-ports-body">
-                  <tr><td colspan="2" style="text-align:center;color:var(--dim);">—</td></tr>
+                  <tr><td colspan="2" style="text-align:center;color:var(--dim);">??/td></tr>
                 </tbody>
               </table>
             </div>
@@ -398,7 +432,7 @@
             <table class="rule-table" style="font-size:0.8rem;">
               <thead><tr><th>Flow</th><th data-i18n="gui_snap_col_decision">Decision</th><th data-i18n="gui_snap_col_connections">Connections</th><th data-i18n="gui_snap_col_recommendation">Recommendation</th></tr></thead>
               <tbody id="snap-uncovered-body">
-                <tr><td colspan="4" style="text-align:center;color:var(--dim);padding:12px;">—</td></tr>
+                <tr><td colspan="4" style="text-align:center;color:var(--dim);padding:12px;">??/td></tr>
               </tbody>
             </table>
           </div>
@@ -409,7 +443,7 @@
             <table class="rule-table" style="font-size:0.8rem;">
               <thead><tr><th data-i18n="gui_snap_col_src_ip">Src IP</th><th data-i18n="gui_snap_col_dst_ip">Dst IP</th><th data-i18n="gui_snap_col_port">Port</th><th data-i18n="gui_snap_col_bytes">Bytes Total</th><th data-i18n="gui_snap_col_decision">Decision</th></tr></thead>
               <tbody id="snap-bw-body">
-                <tr><td colspan="5" style="text-align:center;color:var(--dim);padding:12px;">—</td></tr>
+                <tr><td colspan="5" style="text-align:center;color:var(--dim);padding:12px;">??/td></tr>
               </tbody>
             </table>
           </div>
@@ -417,7 +451,7 @@
       </fieldset>
 
       <fieldset style="margin-bottom:14px;">
-        <legend><span data-i18n="gui_top10_title" style="font-size:1.05rem;">Top 10 Query Report</span></legend>
+        <legend><span data-i18n="gui_top10_title" style="font-size:1.05rem;">Ranking Summary</span></legend>
         <div style="display:flex;gap:12px;margin-bottom:16px;align-items:center;">
           <label data-i18n="gui_window_min"
             style="font-weight:700;color:var(--dim);font-size:0.85rem;text-transform:uppercase;">Window (min):</label>
@@ -439,6 +473,8 @@
 
   </div>
 
+  <div class="panel" id="p-traffic-workload"></div>
+
   <!-- Floating Bulk Quarantine Action Bar -->
   <div class="floating-action-bar" id="bulk-bar">
     <div style="color:var(--fg); font-size:1rem;">
@@ -451,14 +487,107 @@
     </button>
   </div>
 
-  <!-- ═══ Rules ═══ -->
+  <!-- ????Rules ????-->
+  <div class="panel" id="p-events">
+    <fieldset>
+      <legend data-i18n="gui_event_viewer">Event Viewer</legend>
+      <div class="toolbar" style="align-items:flex-end; flex-wrap:wrap;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label data-i18n="gui_window">Window</label>
+          <select id="ev-mins" style="width:120px;">
+            <option value="15" data-i18n="gui_ev_window_15m">Last 15m</option>
+            <option value="60" selected data-i18n="gui_ev_window_1h">Last 1h</option>
+            <option value="360" data-i18n="gui_ev_window_6h">Last 6h</option>
+            <option value="1440" data-i18n="gui_ev_window_24h">Last 24h</option>
+            <option value="10080" data-i18n="gui_ev_window_7d">Last 7d</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label data-i18n="gui_rows">Rows</label>
+          <select id="ev-limit" style="width:100px;">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="200">200</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width:180px;">
+          <label data-i18n="gui_category">Category</label>
+          <select id="ev-category" onchange="onEventViewerCategoryChange()" style="width:180px;">
+            <option value="" data-i18n="gui_ev_all_categories">All Categories</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width:180px;">
+          <label data-i18n="gui_ev_type_group">Type Group</label>
+          <select id="ev-group" onchange="onEventViewerGroupChange()" style="width:180px;">
+            <option value="" data-i18n="gui_ev_all_groups">All Groups</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width:220px;">
+          <label data-i18n="gui_event_type">Event Type</label>
+          <select id="ev-type" onchange="loadEventViewer(true)" style="width:220px;">
+            <option value="" data-i18n="gui_ev_all_event_types">All Event Types</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:0; min-width:240px; flex:1;">
+          <label data-i18n="gui_search">Search</label>
+          <input id="ev-search" data-i18n-placeholder="gui_ev_search_placeholder" placeholder="event type, actor, target, IP, action..." onkeydown="if(event.key==='Enter') loadEventViewer(true)">
+        </div>
+        <button class="btn btn-primary" onclick="loadEventViewer(true)" style="height:42px;" data-i18n="gui_refresh">
+          <svg class="icon"><use href="#icon-search"></use></svg> Refresh
+        </button>
+        <button class="btn btn-secondary" onclick="loadMoreEventViewer()" style="height:42px;display:none;" id="ev-load-more-top" data-i18n="gui_load_more">
+          Load More
+        </button>
+      </div>
+      <div style="margin-top:12px; color:var(--dim); font-size:12px;" id="ev-meta" data-i18n="gui_ev_ready">Ready.</div>
+    </fieldset>
+
+    <div class="event-viewer-layout">
+      <div>
+        <div class="table-container">
+          <table class="rule-table">
+            <thead>
+              <tr>
+                <th style="width:150px;" data-i18n="gui_time">Time</th>
+                <th style="width:220px;" data-i18n="gui_event">Event</th>
+                <th style="width:110px;" data-i18n="gui_col_status">Status</th>
+                <th data-i18n="gui_actor">Actor</th>
+                <th data-i18n="gui_target">Target</th>
+                <th data-i18n="gui_action">Action</th>
+              </tr>
+            </thead>
+            <tbody id="ev-body">
+              <tr><td colspan="6" style="text-align:center;padding:36px;color:var(--dim);" data-i18n="gui_ev_load_prompt">Load events to inspect raw event data.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+          <button class="btn btn-secondary" onclick="loadMoreEventViewer()" id="ev-load-more-bottom" style="display:none;" data-i18n="gui_load_more">Load More</button>
+        </div>
+      </div>
+
+      <div class="event-viewer-aside">
+        <div class="code-panel">
+          <div class="code-panel-head" data-i18n="gui_ev_parsed_event">Parsed Event</div>
+          <pre id="ev-normalized" data-i18n="gui_ev_select_parsed">Select an event row to inspect parsed event data.</pre>
+        </div>
+        <div class="code-panel" style="margin-top:16px;">
+          <div class="code-panel-head" data-i18n="gui_ev_raw_event">Raw Event</div>
+          <pre id="ev-raw" data-i18n="gui_ev_select_raw">Select an event row to inspect raw PCE JSON.</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="panel" id="p-rules">
     <div class="rs-tab-bar">
       <button class="btn btn-primary rs-active" onclick="rulesSubTab('rules')" id="rules-tab-rules" data-i18n="gui_tab_rules">Rules</button>
       <button class="btn" onclick="rulesSubTab('actions')" id="rules-tab-actions" data-i18n="gui_tab_actions">Actions</button>
     </div>
 
-    <!-- ── Rules sub-view ── -->
+    <!-- ?? Rules sub-view ?? -->
     <div id="rules-sv-rules" class="rules-subview">
       <div class="toolbar">
         <span class="badge" id="r-badge">0</span>
@@ -471,8 +600,9 @@
           data-i18n="gui_param_guide"><svg class="icon" aria-hidden="true"><use href="#icon-help-circle"></use></svg> Parameter Guide</button>
         <div class="spacer"></div>
         <button class="btn btn-warn btn-sm" onclick="openModal('m-event')" data-i18n="gui_add_event"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> + Event</button>
-        <button class="btn btn-warn btn-sm" onclick="openModal('m-traffic')" data-i18n="gui_add_traffic"><svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg> + Traffic</button>
-        <button class="btn btn-warn btn-sm" onclick="openModal('m-bw')" data-i18n="gui_add_bw"><svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg> + BW/Vol</button>
+        <button class="btn btn-warn btn-sm" onclick="openModal('m-system')" data-i18n="gui_add_system_health"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg> + System Health</button>
+        <button class="btn btn-warn btn-sm" onclick="openModal('m-traffic')" data-i18n="gui_add_traffic"><svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg> + Connection Count</button>
+        <button class="btn btn-warn btn-sm" onclick="openModal('m-bw')" data-i18n="gui_add_bw"><svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg> + Bandwidth / Transfer</button>
         <button class="btn btn-danger btn-sm" onclick="deleteSelected()" data-i18n="gui_delete"><svg class="icon" aria-hidden="true"><use href="#icon-cross"></use></svg> Delete</button>
       </div>
       <table class="rule-table">
@@ -491,17 +621,17 @@
       </table>
     </div>
 
-    <!-- ── Actions sub-view ── -->
+    <!-- ?? Actions sub-view ?? -->
     <div id="rules-sv-actions" class="rules-subview" style="display:none;">
       <div class="action-grid">
         <div class="action-card">
           <h3 data-i18n="gui_run_once"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg> Run Monitor Once</h3>
-          <p data-i18n="gui_run_once_desc">Execute full cycle: Health → Fetch → Analyze → Alert</p><button
+          <p data-i18n="gui_run_once_desc">Execute full cycle: Health ??Fetch ??Analyze ??Alert</p><button
             class="btn btn-primary" onclick="runAction('run')" data-i18n="gui_run_btn">Run</button>
         </div>
         <div class="action-card">
           <h3 data-i18n="gui_debug_mode"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg> Debug Mode</h3>
-          <p data-i18n="gui_debug_desc">Sandbox mode — no alerts, no state updates</p>
+          <p data-i18n="gui_debug_desc">Sandbox mode ??no alerts, no state updates</p>
           <div class="form-row" style="margin-bottom:8px;">
             <div class="form-group"><label data-i18n="gui_window_min">Window (min)</label><input id="a-debug-mins" value="30"></div>
             <div class="form-group"><label data-i18n="gui_policy_dec">Policy Dec.</label><select id="a-debug-pd">
@@ -514,12 +644,15 @@
         </div>
         <div class="action-card">
           <h3 data-i18n="gui_test_alert"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Send Test Alert</h3>
-          <p data-i18n="gui_test_alert_desc">Verify Email / LINE / Webhook delivery</p><button class="btn btn-primary"
-            onclick="runAction('test-alert')" data-i18n="gui_send">Send</button>
+          <p data-i18n="gui_test_alert_desc">Verify Email / LINE / Webhook delivery</p>
+          <div id="a-test-alert-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 8px;">
+            <button class="btn btn-primary" onclick="runAction('test-alert')" data-i18n="gui_send">Send</button>
+          </div>
+          <div id="a-test-alert-status" style="color:var(--dim);font-size:0.82rem;line-height:1.6;">Loading alert channel status...</div>
         </div>
         <div class="action-card">
           <h3 data-i18n="gui_best_practices"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg> Load Best Practices</h3>
-          <p data-i18n="gui_best_practices_desc">Replace ALL existing rules with recommended defaults</p><button
+          <p data-i18n="gui_best_practices_desc">Append missing recommended rules by default, or replace all after confirmation</p><button
             class="btn btn-danger" onclick="confirmBestPractices()" data-i18n="gui_load">Load</button>
         </div>
       </div>
@@ -528,15 +661,15 @@
     </div>
   </div>
 
-  <!-- ═══ Settings ═══ -->
-  <!-- ═══ Reports ═══ -->
+  <!-- ????Settings ????-->
+  <!-- ????Reports ????-->
   <div class="panel" id="p-reports">
     <div class="rs-tab-bar">
       <button class="btn btn-primary rs-active" onclick="reportsSubTab('list')" id="reports-tab-list" data-i18n="gui_tab_reports">Reports</button>
       <button class="btn" onclick="reportsSubTab('schedules')" id="reports-tab-schedules" data-i18n="gui_tab_report_schedules">Report Schedules</button>
     </div>
 
-    <!-- ── Reports list sub-view ── -->
+    <!-- ?? Reports list sub-view ?? -->
     <div id="reports-sv-list" class="reports-subview">
       <div class="toolbar" style="gap:8px;flex-wrap:wrap;">
         <button class="btn btn-danger btn-sm" id="btn-bulk-del-reports" onclick="deleteSelectedReports()" style="display:none;">
@@ -574,7 +707,7 @@
       </div>
     </div>
 
-    <!-- ── Report Schedules sub-view ── -->
+    <!-- ?? Report Schedules sub-view ?? -->
     <div id="reports-sv-schedules" class="reports-subview" style="display:none;">
       <div class="toolbar" style="gap:8px;flex-wrap:wrap;margin-bottom:14px;">
         <div class="spacer"></div>
@@ -612,7 +745,7 @@
 
       <div class="form-group">
         <label data-i18n="gui_sched_name">Schedule Name</label>
-        <input type="text" id="sched-name" placeholder="e.g.: Weekly Traffic Report" style="width:100%;">
+        <input type="text" id="sched-name" placeholder="e.g.: Weekly Traffic Report" data-i18n-placeholder="gui_sched_name_placeholder" style="width:100%;">
       </div>
 
       <div class="form-row">
@@ -647,13 +780,13 @@
         <div class="form-group" id="row-day-of-week" style="display:none;">
           <label data-i18n="gui_sched_day_of_week">Day of Week</label>
           <select id="sched-dow" style="width:100%;">
-            <option value="monday">Monday</option>
-            <option value="tuesday">Tuesday</option>
-            <option value="wednesday">Wednesday</option>
-            <option value="thursday">Thursday</option>
-            <option value="friday">Friday</option>
-            <option value="saturday">Saturday</option>
-            <option value="sunday">Sunday</option>
+            <option value="monday" data-i18n="gui_rs_mon">Monday</option>
+            <option value="tuesday" data-i18n="gui_rs_tue">Tuesday</option>
+            <option value="wednesday" data-i18n="gui_rs_wed">Wednesday</option>
+            <option value="thursday" data-i18n="gui_rs_thu">Thursday</option>
+            <option value="friday" data-i18n="gui_rs_fri">Friday</option>
+            <option value="saturday" data-i18n="gui_rs_sat">Saturday</option>
+            <option value="sunday" data-i18n="gui_rs_sun">Sunday</option>
           </select>
         </div>
         <div class="form-group" id="row-day-of-month" style="display:none;">
@@ -677,7 +810,7 @@
         </div>
         <div class="form-group">
           <label data-i18n="gui_sched_max_reports">Max Stored Reports</label>
-          <input type="number" id="sched-max-reports" min="1" max="365" value="30" style="width:100%;" title="Keep only the N most recent report files for this schedule type. Older files are deleted automatically.">
+          <input type="number" id="sched-max-reports" min="1" max="365" value="30" style="width:100%;" data-i18n-title="gui_sched_max_reports_hint" title="Keep only the N most recent report files for this schedule type. Older files are deleted automatically.">
         </div>
       </div>
       <div class="form-group">
@@ -692,7 +825,7 @@
       <div id="row-recipients" style="display:none;" class="form-group">
         <label data-i18n="gui_sched_recipients">Custom Recipients (leave blank to use default)</label>
         <textarea id="sched-recipients" rows="3" style="width:100%;resize:vertical;"
-          placeholder="one@example.com&#10;two@example.com"></textarea>
+          placeholder="one@example.com&#10;two@example.com" data-i18n-placeholder="gui_sched_recipients_placeholder"></textarea>
         <small style="color:var(--dim)" data-i18n="gui_sched_recipients_hint">One email per line.</small>
       </div>
 
@@ -783,20 +916,20 @@
   </div>
 
 
-  <!-- ═══ Rule Scheduler ═══ -->
+  <!-- ????Rule Scheduler ????-->
   <div class="panel" id="p-rule-scheduler">
 
     <!-- Scoped inline styles for Rule Scheduler -->
     <style>
       /* Split-pane layout */
-      #rs-split{display:flex;height:calc(100vh - 240px);min-height:400px;gap:0;position:relative;}
-      #rs-left{width:45%;min-width:200px;overflow:auto;border-right:2px solid var(--border);padding-right:0;}
-      #rs-right{flex:1;overflow:auto;padding-left:12px;}
-      #rs-resizer{width:6px;cursor:col-resize;background:var(--border);flex-shrink:0;transition:background .2s;}
-      #rs-resizer:hover,#rs-resizer.active{background:var(--accent);}
+        #rs-split{display:flex;height:calc(100vh - 250px);min-height:420px;gap:18px;position:relative;align-items:stretch;margin-top:6px;}
+        #rs-left{width:41%;min-width:240px;overflow:auto;padding-right:4px;}
+        #rs-right{flex:1;overflow:auto;padding-left:4px;}
+        #rs-resizer{width:8px;cursor:col-resize;flex-shrink:0;transition:all .2s;border-radius:999px;background:linear-gradient(90deg, transparent 0, transparent 40%, var(--accent) 40%, var(--accent) 60%, transparent 60%, transparent 100%);}
+        #rs-resizer:hover,#rs-resizer.active{filter:brightness(1.05);box-shadow:0 0 0 3px rgba(255,106,0,.10);}
 
-      /* Glass-card panels */
-      .rs-glass{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:12px;backdrop-filter:blur(6px);}
+        /* Glass-card panels */
+        .rs-glass{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--radius);padding:18px 18px 16px;margin-bottom:16px;backdrop-filter:blur(6px);}
 
       /* Badge styles */
       .rs-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.75rem;font-weight:600;line-height:1.4;vertical-align:middle;}
@@ -836,42 +969,48 @@
       #p-rule-scheduler td input[type="checkbox"]{max-width:none;}
 
       /* Sub-tab bar */
-      .rs-tab-bar{display:flex;gap:6px;margin-bottom:14px;border-bottom:2px solid var(--border);padding-bottom:8px;}
-      .rs-tab-bar .btn.rs-active{border-bottom:3px solid var(--accent);font-weight:700;}
+        .rs-tab-bar{display:flex;gap:8px;margin-bottom:18px;border-bottom:2px solid var(--border);padding-bottom:12px;}
+        .rs-tab-bar .btn.rs-active{border-bottom:3px solid var(--accent);font-weight:700;}
 
-      /* Search bar */
-      .rs-search-bar{display:flex;gap:8px;margin-bottom:12px;align-items:center;}
-      .rs-search-bar input{flex:1;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--fg);font-size:.9rem;}
+        /* Search bar */
+        .rs-search-bar{display:flex;gap:10px;margin-bottom:18px;align-items:center;flex-wrap:wrap;padding:2px 0 4px;}
+        .rs-search-bar input{flex:1;padding:9px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--fg);font-size:.9rem;}
+        .rs-search-bar select,
+        .rs-search-bar .btn{min-height:36px;}
 
       /* Right panel placeholder */
-      .rs-placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:var(--dim);font-size:1rem;opacity:.7;}
+        .rs-placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:var(--dim);font-size:1rem;opacity:.7;padding:28px 20px;border:1px dashed var(--border);border-radius:var(--radius);background:color-mix(in srgb, var(--bg2) 88%, transparent);}
 
       /* Edit button in schedule table */
       .rs-edit-btn{cursor:pointer;color:var(--accent2);background:none;border:1px solid var(--accent2);border-radius:var(--radius);padding:2px 10px;font-size:.78rem;}
       .rs-edit-btn:hover{background:var(--accent2);color:#000;}
-    </style>
+
+        #rs-left .table-container,
+        #rs-right .table-container{border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);margin-top:0;box-shadow:0 2px 12px rgba(0,0,0,.04);}
+        #rs-detail{padding-top:2px;}
+      </style>
 
     <!-- Sub-tabs -->
     <div class="rs-tab-bar">
       <button class="btn btn-primary rs-active" onclick="rsSubTab('browse')" id="rs-tab-browse" data-i18n="gui_rs_browse_add">Browse & Add</button>
       <button class="btn" onclick="rsSubTab('schedules')" id="rs-tab-schedules" data-i18n="gui_rs_schedules">Schedules</button>
-      <button class="btn" onclick="rsSubTab('logs')" id="rs-tab-logs" data-i18n="gui_rs_logs">執行動作</button>
+      <button class="btn" onclick="rsSubTab('logs')" id="rs-tab-logs" data-i18n="gui_rs_logs">?瑁???</button>
     </div>
 
-    <!-- ── Browse & Add sub-view ── -->
+    <!-- ?? Browse & Add sub-view ?? -->
     <div id="rs-browse" class="rs-subview">
       <div class="rs-search-bar">
         <select id="rs-search-scope" style="padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--fg);font-size:.85rem;">
-          <option value="rs_name" data-i18n="gui_rs_scope_rs_name">規則集名稱</option>
-          <option value="rs_id"   data-i18n="gui_rs_scope_rs_id">規則集 ID</option>
-          <option value="rule_id" data-i18n="gui_rs_scope_rule_id">規則 ID</option>
-          <option value="rule_desc" data-i18n="gui_rs_scope_rule_desc">規則描述</option>
+          <option value="rs_name" data-i18n="gui_rs_scope_rs_name">閬???蝔?/option>
+          <option value="rs_id"   data-i18n="gui_rs_scope_rs_id">閬???ID</option>
+          <option value="rule_id" data-i18n="gui_rs_scope_rule_id">閬? ID</option>
+          <option value="rule_desc" data-i18n="gui_rs_scope_rule_desc">閬??膩</option>
         </select>
         <input id="rs-search" style="max-width:300px;" placeholder="" data-i18n-placeholder="gui_rs_search_placeholder" onkeydown="if(event.key==='Enter')rsDoSearch()">
         <button class="btn btn-primary" onclick="rsDoSearch()" data-i18n="gui_rs_search_btn">Search</button>
         <button class="btn" onclick="rsResetSearch()" data-i18n="gui_rs_refresh_all">Refresh All</button>
       </div>
-      <div style="margin:-4px 0 8px;font-size:.78rem;color:var(--dim);">
+      <div style="margin:0 0 12px;font-size:.78rem;color:var(--dim);padding-left:2px;">
         <span class="rs-mark-rs">★</span> = <span data-i18n="gui_rs_legend_rs">RS scheduled</span> &nbsp;
         <span class="rs-mark-child">●</span> = <span data-i18n="gui_rs_legend_child">Rule scheduled</span>
       </div>
@@ -879,7 +1018,7 @@
       <div id="rs-split">
         <!-- Left: RuleSets list -->
         <div id="rs-left">
-          <div class="table-container" style="border:none;height:100%;overflow:auto;">
+          <div class="table-container" style="height:100%;overflow:auto;">
             <table class="rule-table">
               <thead>
                 <tr>
@@ -908,7 +1047,7 @@
               <h3 style="color:var(--accent2);margin:0 0 4px 0;font-size:1rem;" id="rs-detail-title"></h3>
               <div style="color:var(--dim);font-size:.8rem;" id="rs-detail-meta"></div>
             </div>
-            <div class="table-container" style="border:none;overflow:auto;max-height:calc(100vh - 360px);">
+            <div class="table-container" style="overflow:auto;max-height:calc(100vh - 372px);">
               <table class="rule-table">
                 <thead>
                   <tr>
@@ -933,7 +1072,7 @@
       </div>
     </div>
 
-    <!-- ── Schedules sub-view ── -->
+    <!-- ?? Schedules sub-view ?? -->
     <div id="rs-schedules" class="rs-subview" style="display:none;">
       <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
         <button class="btn btn-primary" onclick="rsLoadSchedules()" data-i18n="gui_rs_refresh_btn">Refresh</button>
@@ -962,7 +1101,7 @@
       </div>
     </div>
 
-    <!-- ── Logs sub-view ── -->
+    <!-- ?? Logs sub-view ?? -->
     <div id="rs-logs" class="rs-subview" style="display:none;">
       <div style="display:flex;gap:8px;margin-bottom:12px;">
         <button class="btn btn-primary" onclick="rsRunCheck()" data-i18n="gui_rs_run_check">Run Manual Check</button>
@@ -976,21 +1115,21 @@
     <div id="rs-detail-popup"><span class="popup-close" onclick="rsClosePopup()">&times;</span><div class="popup-title" id="rs-popup-title"></div><div id="rs-popup-body"></div></div>
   </div>
 
-  <!-- ═══ Module Log Viewer Modal ═══ -->
+  <!-- ????Module Log Viewer Modal ????-->
   <div id="ml-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;align-items:center;justify-content:center;">
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;width:min(860px,95vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">
       <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">
-        <span style="font-weight:600;font-size:1rem;" data-i18n="gui_ml_title">執行日誌</span>
+        <span style="font-weight:600;font-size:1rem;" data-i18n="gui_ml_title">?瑁??亥?</span>
         <select id="ml-module-select" class="form-control" style="width:auto;min-width:150px;" onchange="mlLoadLogs()"></select>
-        <button class="btn btn-sm" onclick="mlLoadLogs()" data-i18n="gui_rs_refresh">重新整理</button>
+        <button class="btn btn-sm" onclick="mlLoadLogs()" data-i18n="gui_rs_refresh">??渡?</button>
         <span style="flex:1"></span>
-        <button class="btn btn-sm" onclick="mlClose()" style="padding:2px 10px;">✕</button>
+        <button class="btn btn-sm" onclick="mlClose()" style="padding:2px 10px;">??/button>
       </div>
       <div id="ml-log-output" class="log-box" style="flex:1;overflow:auto;padding:14px 16px;font-family:'Courier New',Consolas,monospace;font-size:.8rem;white-space:pre-wrap;min-height:320px;" data-i18n="gui_rs_log_ready">Ready.</div>
     </div>
   </div>
 
-  <!-- ═══ Modals ═══ -->
+  <!-- ????Modals ????-->
 
   <!-- Rule Scheduler Schedule Modal -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="m-rs-schedule">
@@ -1213,13 +1352,14 @@
   <!-- Quarantine Action Modal -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="m-quarantine">
     <div class="modal" style="max-width:500px">
-      <h2><svg class="icon">
+      <h2 data-i18n="gui_q_title"><svg class="icon">
           <use href="#icon-alert"></use>
         </svg> Apply Quarantine</h2>
       <div style="margin-bottom:20px; color:var(--fg); line-height:1.5;">
-        You are about to isolate <strong id="q-target-count" style="color:var(--accent2)">1</strong> workload(s).
-        <br><small style="color:var(--dim)">This action applies an Illumio Label that modifies the workload's policy
-          scope.</small>
+        <span data-i18n="gui_q_desc_prefix">You are about to isolate</span>
+        <strong id="q-target-count" style="color:var(--accent2)">1</strong>
+        <span data-i18n="gui_q_desc_suffix">workload(s).</span>
+        <br><small style="color:var(--dim)" data-i18n="gui_q_desc_line2">Only workload objects can receive quarantine labels. Managed and unmanaged workloads are supported.</small>
       </div>
       <input type="hidden" id="q-target-hrefs" value="">
       <div class="form-group" id="q-direction-grp" style="display:none; margin-bottom: 12px;">
@@ -1229,23 +1369,23 @@
               data-i18n="gui_q_src">Source Workload</span></label>
           <label style="cursor:pointer;"><input type="radio" name="q-dir" value="destination"> <span
               data-i18n="gui_q_dst">Destination Workload</span></label>
+          <label style="cursor:pointer;"><input type="radio" name="q-dir" value="both"> <span
+              data-i18n="gui_q_both">Both Workloads</span></label>
         </div>
+        <small style="display:block;margin-top:6px;color:var(--dim);" data-i18n="gui_q_direction_hint">This option only affects flow rows. Items selected from workload search are always isolated directly.</small>
       </div>
       <div class="form-group">
         <label data-i18n="gui_q_sev">Isolation Severity Level</label>
         <select id="q-severity" class="severity-select">
-          <option value="Mild" style="color:var(--accent2)" data-i18n="gui_opt_mild">Mild (Block External Inbound, Allow
-            Outbound/Internal)
+          <option value="Mild" style="color:var(--accent2)" data-i18n="gui_opt_mild">Mild
           </option>
-          <option value="Moderate" style="color:var(--warn)" data-i18n="gui_opt_moderate">Moderate (Block All Inbound,
-            Allow Outbound)</option>
-          <option value="Severe" style="color:var(--danger)" data-i18n="gui_opt_severe">Severe (Full Isolation - Block
-            All Inbound/Outbound)
+          <option value="Moderate" style="color:var(--warn)" data-i18n="gui_opt_moderate">Moderate</option>
+          <option value="Severe" style="color:var(--danger)" data-i18n="gui_opt_severe">Severe
           </option>
         </select>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal('m-quarantine')">Cancel</button>
+        <button class="btn btn-secondary" onclick="closeModal('m-quarantine')" data-i18n="gui_cancel">Cancel</button>
         <button class="btn btn-danger" id="btn-apply-q" onclick="applyQuarantine()" data-i18n="gui_q_apply">Apply
           Quarantine</button>
       </div>
@@ -1258,11 +1398,20 @@
       <h2><span data-i18n="gui_add_event_rule" id="me-title">Add Event Rule</span></h2>
       <div class="form-group"><label data-i18n="gui_category">Category</label><select id="ev-cat"
           onchange="populateEvents()">
-          <option value="" data-i18n="gui_select">Select…</option>
+          <option value="" data-i18n="gui_select">Select??/option>
         </select></div>
       <div class="form-group"><label data-i18n="gui_event_type">Event Type</label><select id="ev-type" onchange="updateEventFilters()">
           <option value="" data-i18n="gui_select_category_first">Select category first</option>
         </select></div>
+      <div id="ev-info" style="display:none;margin:-4px 0 14px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+          <code id="ev-info-id" style="font-size:.82rem;"></code>
+          <div id="ev-info-badges" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+        </div>
+        <div id="ev-info-title" style="margin-top:8px;font-weight:700;"></div>
+        <div id="ev-info-desc" style="margin-top:4px;color:var(--dim);font-size:.9rem;line-height:1.55;"></div>
+        <div id="ev-info-capabilities" style="margin-top:8px;color:var(--dim);font-size:.8rem;"></div>
+      </div>
       <div class="form-row" id="ev-filter-row" style="display:none">
         <div class="form-group" id="ev-status-group"><label data-i18n="gui_ev_status_filter">Status Filter</label>
           <select id="ev-status">
@@ -1273,10 +1422,19 @@
         <div class="form-group" id="ev-severity-group"><label data-i18n="gui_ev_severity_filter">Severity Filter</label>
           <select id="ev-severity">
             <option value="all" data-i18n="gui_ev_severity_all">All</option>
+            <option value="info" data-i18n="gui_ev_severity_info">Info</option>
             <option value="error" data-i18n="gui_ev_severity_error">Error</option>
             <option value="warning" data-i18n="gui_ev_severity_warning">Warning</option>
           </select></div>
       </div>
+      <details id="ev-advanced" style="margin-bottom:14px;">
+        <summary style="cursor:pointer;font-weight:600;color:var(--dim);" data-i18n="gui_ev_advanced_filters">Advanced Filters (Optional)</summary>
+        <div class="form-group" style="margin-top:12px;">
+          <label data-i18n="gui_ev_field_matchers">Field Matchers</label>
+          <textarea id="ev-match-fields" rows="4" data-i18n-placeholder="gui_ev_matchers_placeholder" placeholder="created_by.user.username=admin@example.com&#10;action.src_ip=10.0.0.*"></textarea>
+          <small id="ev-match-help" style="color:var(--dim);display:block;margin-top:6px;" data-i18n="gui_ev_field_matchers_hint">Most rules do not need this. Use one matcher per line in the format field.path=pattern.</small>
+        </div>
+      </details>
       <fieldset>
         <legend data-i18n="gui_threshold">Threshold</legend>
         <div class="form-group"><label data-i18n="gui_type">Type</label>
@@ -1292,6 +1450,11 @@
           <div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="ev-cd" type="number"
               value="10"></div>
         </div>
+        <div class="form-group"><label data-i18n="gui_ev_throttle">Throttle</label><input id="ev-throttle" data-i18n-placeholder="gui_ev_throttle_placeholder" placeholder="e.g. 2/10m or 5/1h"></div>
+        <details style="margin-top:6px;">
+          <summary style="cursor:pointer;color:var(--dim);font-size:.85rem;" data-i18n="gui_ev_threshold_help_title">How threshold and throttle work</summary>
+          <div style="margin-top:8px;color:var(--dim);font-size:.85rem;line-height:1.65;" data-i18n="gui_ev_threshold_help_body">Immediate means every matching event is eligible to alert. Cumulative means the event must occur N times within the window first. Cooldown pauses repeats after an alert is sent. Throttle adds an extra cap such as 2 alerts per 10 minutes and is usually only needed for noisy rules.</div>
+        </details>
       </fieldset>
       <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-event')"
           data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveEvent()"
@@ -1299,10 +1462,43 @@
     </div>
   </div>
 
+  <!-- System Health -->
+  <div class="modal-bg" role="dialog" aria-modal="true" id="m-system">
+    <div class="modal">
+      <h2><span data-i18n="gui_add_system_health_rule" id="ms-title">Add System Health Rule</span></h2>
+      <div class="form-group">
+        <label data-i18n="gui_rule_name">Rule Name</label>
+        <input id="sys-name">
+      </div>
+      <div class="form-group">
+        <label data-i18n="gui_system_health_type">Health Check</label>
+        <select id="sys-type" disabled>
+          <option value="pce_health" data-i18n="gui_system_health_pce">PCE API Health</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div id="sys-info" style="padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);color:var(--dim);line-height:1.6;">
+          <div style="font-weight:700;color:var(--fg);margin-bottom:6px;" data-i18n="gui_system_health_pce">PCE API Health</div>
+          <div data-i18n="gui_system_health_desc">When the PCE health check fails, send an alert so you can verify PCE service status and network reachability.</div>
+        </div>
+      </div>
+      <fieldset>
+        <legend data-i18n="gui_threshold">Threshold</legend>
+        <div style="color:var(--dim);font-size:.9rem;line-height:1.6;margin-bottom:12px;" data-i18n="gui_system_health_threshold_hint">This rule triggers immediately when the health check fails. Only cooldown and throttle are configurable.</div>
+        <div class="form-row-2">
+          <div class="form-group"><label data-i18n="gui_cooldown">Cooldown (mins)</label><input id="sys-cd" type="number" value="30"></div>
+          <div class="form-group"><label data-i18n="gui_ev_throttle">Throttle</label><input id="sys-throttle" data-i18n-placeholder="gui_ev_throttle_placeholder" placeholder="e.g. 2/10m or 5/1h"></div>
+        </div>
+      </fieldset>
+      <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-system')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveSystemRule()" data-i18n="gui_save"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Save</button></div>
+    </div>
+  </div>
+
   <!-- Traffic -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="m-traffic">
     <div class="modal">
-      <h2><span data-i18n="gui_add_traffic_rule" id="mt-title">Add Traffic Rule</span></h2>
+      <h2><span data-i18n="gui_add_traffic_rule" id="mt-title">Add Connection Count Rule</span></h2>
+      <div style="color:var(--dim);font-size:.9rem;line-height:1.6;margin:-4px 0 12px;" data-i18n="gui_traffic_rule_desc">This rule monitors whether connection counts rise abnormally.</div>
       <div class="form-group"><label data-i18n="gui_rule_name">Rule Name</label><input id="tr-name"></div>
       <fieldset>
         <legend data-i18n="gui_policy_dec">Policy Decision</legend>
@@ -1353,6 +1549,7 @@
           <div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="tr-cd" type="number"
               value="10"></div>
         </div>
+        <div class="form-group"><label>Throttle</label><input id="tr-throttle" placeholder="e.g. 2/10m or 5/1h"></div>
       </fieldset>
       <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-traffic')"
           data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveTraffic()"
@@ -1363,14 +1560,15 @@
   <!-- BW/Volume -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="m-bw">
     <div class="modal">
-      <h2><span data-i18n="gui_add_bw_rule" id="mb-title">Add Bandwidth / Volume Rule</span></h2>
+      <h2><span data-i18n="gui_add_bw_rule" id="mb-title">Add Bandwidth / Transfer Rule</span></h2>
+      <div style="color:var(--dim);font-size:.9rem;line-height:1.6;margin:-4px 0 12px;" data-i18n="gui_bw_rule_desc">This rule monitors bandwidth peaks or transfer volume, not connection counts.</div>
       <div class="form-group"><label data-i18n="gui_rule_name">Rule Name</label><input id="bw-name"></div>
       <fieldset>
         <legend data-i18n="gui_metric_type">Metric Type</legend>
         <div class="radio-group">
-          <label><input type="radio" name="bw-mt" value="bandwidth" checked> <span data-i18n="gui_mt_bw">Bandwidth
+          <label><input type="radio" name="bw-mt" value="bandwidth" checked onchange="onBwMetricTypeChange()"> <span data-i18n="gui_mt_bw">Bandwidth
               (Mbps, Max)</span></label>
-          <label><input type="radio" name="bw-mt" value="volume"> <span data-i18n="gui_mt_vol">Volume (MB,
+          <label><input type="radio" name="bw-mt" value="volume" onchange="onBwMetricTypeChange()"> <span data-i18n="gui_mt_vol">Transfer Volume (MB,
               Sum)</span></label>
         </div>
       </fieldset>
@@ -1408,13 +1606,16 @@
       <fieldset>
         <legend data-i18n="gui_threshold">Threshold</legend>
         <div class="form-row-3">
-          <div class="form-group"><label data-i18n="gui_value">Value</label><input id="bw-val" type="number"
+          <div class="form-group"><label id="bw-val-label" data-i18n="gui_bw_value_bandwidth">Threshold (Mbps)</label><input id="bw-val" type="number"
+              data-i18n-placeholder="gui_bw_placeholder_bandwidth" placeholder="e.g. 100 Mbps"
               value="100"></div>
           <div class="form-group"><label data-i18n="gui_window_min">Window (min)</label><input id="bw-win" type="number"
               value="10"></div>
           <div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="bw-cd" type="number"
               value="30"></div>
         </div>
+        <div id="bw-val-help" style="color:var(--dim);font-size:.82rem;margin-top:4px;" data-i18n="gui_bw_help_bandwidth">Use Mbps for peak bandwidth threshold.</div>
+        <div class="form-group"><label>Throttle</label><input id="bw-throttle" placeholder="e.g. 2/10m or 5/1h"></div>
       </fieldset>
       <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-bw')"
           data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveBW()"
@@ -1514,12 +1715,11 @@
         </details>
       </div>
       <p id="m-gen-note" style="display:none;font-size:0.85rem;color:var(--dim);margin-top:8px;" data-i18n="gui_gen_snapshot_note">
-        快照報表會直接讀取目前資料，不需要指定日期區間。
-      </p>
+        敹怎?梯”??亥??????銝?閬?摰????      </p>
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal('m-gen-report')" data-i18n="gui_gen_cancel">取消</button>
+        <button class="btn btn-secondary" onclick="closeModal('m-gen-report')" data-i18n="gui_gen_cancel">??</button>
         <button class="btn btn-success" id="m-gen-confirm" onclick="confirmReportGen()">
-          <svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg> <span data-i18n="gui_gen_generate">產生</span>
+          <svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg> <span data-i18n="gui_gen_generate">?Ｙ?</span>
         </button>
       </div>
     </div>
@@ -1604,6 +1804,8 @@
   <script src="/static/js/utils.js"></script>
   <script src="/static/js/tabs.js"></script>
   <script src="/static/js/dashboard.js"></script>
+  <script src="/static/js/dashboard_v2.js"></script>
+  <script src="/static/js/events.js"></script>
   <script src="/static/js/rules.js"></script>
   <script src="/static/js/settings.js"></script>
   <script src="/static/js/actions.js"></script>

@@ -11,13 +11,13 @@ Enhanced field extraction from Illumio PCE event JSON:
   - agent hostname for agent-originated events
 """
 import datetime
-import html
 import logging
 import os
 import pandas as pd
 from dataclasses import dataclass, field
 from typing import Optional
 
+from src.events import normalize_event
 from src.i18n import t
 
 logger = logging.getLogger(__name__)
@@ -353,6 +353,30 @@ def _extract_notifications_detail(raw_notifications) -> str:
     return '; '.join(details[:4])
 
 
+def _extract_supplied_username(raw_notifications) -> str:
+    """Extract the username supplied during failed auth flows."""
+    if not isinstance(raw_notifications, (list, tuple)) or not raw_notifications:
+        return ''
+
+    for notification in raw_notifications:
+        if not isinstance(notification, dict):
+            continue
+        info = notification.get('info', {})
+        if not isinstance(info, dict):
+            continue
+        username = info.get('supplied_username')
+        if username:
+            return str(username).strip()
+    return ''
+
+
+def _stringify_parser_notes(value) -> str:
+    if not isinstance(value, (list, tuple)):
+        return ''
+    notes = [str(note).strip() for note in value if str(note).strip()]
+    return '; '.join(notes)
+
+
 def _extract_workloads_affected_from_event(row) -> int:
     """Extract workloads_affected from resource_changes and notifications.
 
@@ -435,44 +459,116 @@ class AuditGenerator:
     def _build_dataframe(events: list) -> pd.DataFrame:
         """Build a DataFrame from raw PCE event JSON list, flattening nested fields."""
         df = pd.DataFrame(events)
+        normalized_events = [normalize_event(event) for event in events]
+        normalized_df = pd.DataFrame(normalized_events)
 
-        # ── Preserve raw nested columns for module use, then flatten ─────────
-        # Keep raw resource_changes & notifications for module-level extraction
-        # (mod03 uses resource_changes for workloads_affected)
-
-        # 1. created_by → readable string + agent_hostname
         if 'created_by' in df.columns:
+            df['created_by_raw'] = df['created_by']
+        if 'action' in df.columns:
+            df['action_raw'] = df['action']
+
+        normalized_columns = (
+            'event_id',
+            'category',
+            'verb',
+            'actor',
+            'actor_type',
+            'actor_user',
+            'actor_agent',
+            'source',
+            'source_ip',
+            'target_type',
+            'target_name',
+            'resource_type',
+            'resource_name',
+            'action',
+            'action_method',
+            'action_path',
+            'workloads_affected',
+            'known_event_type',
+            'parser_notes',
+            'resource_changes_count',
+            'notifications_count',
+        )
+        for column in normalized_columns:
+            if column in normalized_df.columns:
+                df[column] = normalized_df[column]
+
+        # 1. actor / created_by
+        if 'actor' in df.columns:
+            df['created_by'] = df['actor'].fillna('').astype(str)
+        elif 'created_by' in df.columns:
             raw_cb = df['created_by']
             df['agent_hostname'] = raw_cb.apply(_extract_agent_hostname)
             df['created_by'] = raw_cb.apply(_extract_created_by)
+            df['actor'] = df['created_by']
         else:
-            df['agent_hostname'] = ''
+            df['actor'] = ''
+            df['created_by'] = ''
 
-        # 2. action → src_ip, api_method, api_endpoint
-        if 'action' in df.columns:
-            raw_action = df['action']
-            df['src_ip'] = raw_action.apply(_extract_src_ip)
-            df['api_method'] = raw_action.apply(_extract_api_method)
-            df['api_endpoint'] = raw_action.apply(_extract_api_endpoint)
-        else:
-            df['src_ip'] = ''
-            df['api_method'] = ''
-            df['api_endpoint'] = ''
+        if 'agent_hostname' not in df.columns:
+            if 'created_by_raw' in df.columns:
+                df['agent_hostname'] = df['created_by_raw'].apply(_extract_agent_hostname)
+            else:
+                df['agent_hostname'] = ''
 
-        # 3. notifications → notification_detail
+        # 2. action / source IP aliases
+        if 'source_ip' not in df.columns:
+            if 'action_raw' in df.columns:
+                df['source_ip'] = df['action_raw'].apply(_extract_src_ip)
+            else:
+                df['source_ip'] = ''
+        df['src_ip'] = df['source_ip'].fillna('').astype(str)
+
+        if 'action_method' not in df.columns:
+            if 'action_raw' in df.columns:
+                df['action_method'] = df['action_raw'].apply(_extract_api_method)
+            else:
+                df['action_method'] = ''
+        if 'action_path' not in df.columns:
+            if 'action_raw' in df.columns:
+                df['action_path'] = df['action_raw'].apply(_extract_api_endpoint)
+            else:
+                df['action_path'] = ''
+        if 'action' not in df.columns:
+            df['action'] = ''
+
+        df['api_method'] = df['action_method'].fillna('').astype(str)
+        df['api_endpoint'] = df['action_path'].fillna('').astype(str)
+
+        # 3. notifications
         if 'notifications' in df.columns:
-            df['notification_detail'] = df['notifications'].apply(
-                _extract_notifications_detail
-            )
+            df['notification_detail'] = df['notifications'].apply(_extract_notifications_detail)
+            df['supplied_username'] = df['notifications'].apply(_extract_supplied_username)
         else:
             df['notification_detail'] = ''
+            df['supplied_username'] = ''
 
-        # 4. workloads_affected (unified from both sources) — must be before change_detail
-        df['workloads_affected'] = df.apply(
-            _extract_workloads_affected_from_event, axis=1
+        # 4. parser completeness fields
+        if 'parser_notes' in df.columns:
+            df['parser_note_count'] = df['parser_notes'].apply(
+                lambda value: len(value) if isinstance(value, (list, tuple)) else 0
+            )
+            df['parser_notes'] = df['parser_notes'].apply(_stringify_parser_notes)
+        else:
+            df['parser_notes'] = ''
+            df['parser_note_count'] = 0
+        if 'known_event_type' not in df.columns:
+            df['known_event_type'] = False
+
+        # 5. workloads_affected (parser first, raw fallback)
+        if 'workloads_affected' not in df.columns:
+            df['workloads_affected'] = 0
+        fallback_wa = df.apply(_extract_workloads_affected_from_event, axis=1)
+        df['workloads_affected'] = (
+            pd.to_numeric(df['workloads_affected'], errors='coerce')
+            .fillna(0)
+            .astype(int)
         )
+        fallback_wa = pd.to_numeric(fallback_wa, errors='coerce').fillna(0).astype(int)
+        df.loc[df['workloads_affected'] <= 0, 'workloads_affected'] = fallback_wa[df['workloads_affected'] <= 0]
 
-        # 5. change_detail: draft events → before/after field diffs;
+        # 6. change_detail: draft events → before/after field diffs;
         #    provision events → commit_message + object_counts (no field diffs exist)
         if 'resource_changes' in df.columns:
             if 'event_type' in df.columns:
@@ -492,7 +588,15 @@ class AuditGenerator:
         else:
             df['change_detail'] = ''
 
-        # 6. pce_fqdn (keep as-is if present)
+        # 7. convenience aliases + defaults
+        if 'target_name' not in df.columns:
+            df['target_name'] = ''
+        if 'resource_name' not in df.columns:
+            df['resource_name'] = ''
+        if 'source' not in df.columns:
+            df['source'] = df['actor']
+
+        # 8. pce_fqdn (keep as-is if present)
         if 'pce_fqdn' not in df.columns:
             df['pce_fqdn'] = ''
 
@@ -515,7 +619,7 @@ class AuditGenerator:
         for mod_id, fn in _MODS:
             try:
                 results[mod_id] = fn()
-                print(f"[Audit Report]   {mod_id} ✓", end='  \\r', flush=True)
+                print(f"[Audit Report]   {mod_id} OK", end="  \r", flush=True)
             except Exception as e:
                 logger.warning(f"{mod_id} failed: {e}")
                 results[mod_id] = {'error': str(e)}

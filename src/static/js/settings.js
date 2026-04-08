@@ -1,16 +1,180 @@
 /* ─── Settings ────────────────────────────────────────────────────── */
 let _settings = {};
 let _security = {};
+let _alertPlugins = {};
+
+function _pluginInputId(pluginName, key) {
+  return `s-plugin-${pluginName}-${String(key).replace(/[^a-zA-Z0-9]+/g, '-')}`;
+}
+
+function _pluginFieldMeta(pluginName, key) {
+  const plugin = _alertPlugins[pluginName] || {};
+  return (plugin.fields || []).find(item => item.key === key) || null;
+}
+
+function _getNestedValue(source, path) {
+  return (path || []).reduce((acc, part) => (acc && acc[part] !== undefined ? acc[part] : undefined), source);
+}
+
+function _setNestedValue(target, path, value) {
+  let cursor = target;
+  for (let i = 0; i < path.length - 1; i += 1) {
+    const part = path[i];
+    if (!cursor[part] || typeof cursor[part] !== 'object') cursor[part] = {};
+    cursor = cursor[part];
+  }
+  cursor[path[path.length - 1]] = value;
+}
+
+function _pluginFieldBinding(pluginName, key) {
+  const field = _pluginFieldMeta(pluginName, key);
+  return Array.isArray(field?.config_path) ? field.config_path : null;
+}
+
+function _pluginFieldValueType(field) {
+  if (!field) return 'string';
+  if (field.value_type) return field.value_type;
+  if (field.input_type === 'checkbox') return 'boolean';
+  if (field.input_type === 'number') return 'integer';
+  if (field.input_type === 'list') return 'string_list';
+  return 'string';
+}
+
+function _pluginFieldValue(pluginName, key, settings) {
+  const field = _pluginFieldMeta(pluginName, key);
+  const binding = _pluginFieldBinding(pluginName, key);
+  if (!binding) return '';
+  const value = _getNestedValue(settings, binding);
+  const valueType = _pluginFieldValueType(field);
+  if (valueType === 'string_list') {
+    const delimiter = field?.list_delimiter || ',';
+    return Array.isArray(value) ? value.join(`${delimiter} `) : (value ?? '');
+  }
+  if (valueType === 'boolean') return !!value;
+  return value ?? '';
+}
+
+function _renderPluginField(pluginName, field, settings) {
+  const inputId = _pluginInputId(pluginName, field.key);
+  const currentValue = _pluginFieldValue(pluginName, field.key, settings);
+  const inputType = field.input_type || (field.secret ? 'password' : 'text');
+  const helpHtml = field.help ? `<div style="color:var(--dim);font-size:0.82em;margin-top:6px;line-height:1.5;">${escapeHtml(field.help)}</div>` : '';
+  const requiredBadge = field.required ? '<span style="color:var(--danger);font-size:0.78em;margin-left:6px;">required</span>' : '';
+
+  if (inputType === 'checkbox') {
+    return `
+      <div class="chk" style="margin-top:8px;">
+        <label>
+          <input type="checkbox" id="${inputId}" ${currentValue ? 'checked' : ''}>
+          <span>${escapeHtml(field.label || field.key)}</span>${requiredBadge}
+        </label>
+        ${helpHtml}
+      </div>
+    `;
+  }
+
+  if (inputType === 'list') {
+    return `
+      <div class="form-group">
+        <label>${escapeHtml(field.label || field.key)}${requiredBadge}</label>
+        <textarea
+          id="${inputId}"
+          rows="2"
+          placeholder="${escapeHtml(field.placeholder || '')}"
+        >${escapeHtml(String(currentValue ?? ''))}</textarea>
+        ${helpHtml}
+      </div>
+    `;
+  }
+
+  const htmlType = field.secret ? 'password' : (inputType === 'number' ? 'number' : 'text');
+  return `
+    <div class="form-group">
+      <label>${escapeHtml(field.label || field.key)}${requiredBadge}</label>
+      <input
+        id="${inputId}"
+        type="${htmlType}"
+        value="${escapeHtml(String(currentValue ?? ''))}"
+        placeholder="${escapeHtml(field.placeholder || '')}"
+      >
+      ${helpHtml}
+    </div>
+  `;
+}
+
+function _renderAlertPluginCards(active, settings) {
+  return Object.entries(_alertPlugins).map(([pluginName, plugin]) => {
+    const fields = plugin.fields || [];
+    const rows = [];
+    for (let i = 0; i < fields.length; i += 2) {
+      rows.push(`
+        <div class="form-row">
+          ${_renderPluginField(pluginName, fields[i], settings)}
+          ${fields[i + 1] ? _renderPluginField(pluginName, fields[i + 1], settings) : '<div class="form-group"></div>'}
+        </div>
+      `);
+    }
+    return `
+      <div class="card" style="margin-top:10px; padding:16px 18px;">
+        <div style="display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:10px;">
+          <div>
+            <div style="font-weight:800; color:var(--fg);">${escapeHtml(plugin.display_name || plugin.name || pluginName)}</div>
+            <div style="color:var(--dim); font-size:0.88em; line-height:1.6; margin-top:4px;">${escapeHtml(plugin.description || '')}</div>
+          </div>
+          <div class="chk" style="margin:0;">
+            <label>
+              <input type="checkbox" id="s-plugin-enabled-${pluginName}" ${active.includes(pluginName) ? 'checked' : ''}>
+              <span>Enabled</span>
+            </label>
+          </div>
+        </div>
+        ${rows.join('')}
+      </div>
+    `;
+  }).join('');
+}
+
+function _collectAlertPluginConfig() {
+  const payload = { active: [], email: {}, smtp: {}, alerts: {} };
+  Object.entries(_alertPlugins).forEach(([pluginName, plugin]) => {
+    if ($(`s-plugin-enabled-${pluginName}`)?.checked) payload.active.push(pluginName);
+    (plugin.fields || []).forEach(field => {
+      const input = $(_pluginInputId(pluginName, field.key));
+      if (!input) return;
+      const binding = _pluginFieldBinding(pluginName, field.key);
+      if (!binding) return;
+      const valueType = _pluginFieldValueType(field);
+      let value;
+      if (valueType === 'boolean') {
+        value = !!input.checked;
+      } else if (valueType === 'integer') {
+        const parsed = parseInt(input.value, 10);
+        value = Number.isFinite(parsed) ? parsed : null;
+      } else if (valueType === 'number') {
+        const parsed = Number(input.value);
+        value = Number.isFinite(parsed) ? parsed : null;
+      } else if (valueType === 'string_list') {
+        const delimiter = field.list_delimiter || ',';
+        value = String(input.value || '').split(delimiter).map(s => s.trim()).filter(Boolean);
+      } else {
+        value = input.value;
+      }
+      _setNestedValue(payload, binding, value);
+    });
+  });
+  return payload;
+}
+
 async function loadSettings() {
   _settings = await api('/api/settings');
   try { _security = await api('/api/security'); } catch (e) { _security = {}; }
+  try { _alertPlugins = (await api('/api/alert-plugins')).plugins || {}; } catch (e) { _alertPlugins = {}; }
 
   const s = _settings, a = s.api || {}, e = s.email || {}, sm = s.smtp || {}, al = s.alerts || {}, st = s.settings || {}, rpt = s.report || {};
   const sec = _security || {};
   const active = al.active || [];
   const profiles = s.pce_profiles || [];
   const activePceId = s.active_pce_id || null;
-
   const profileOptions = profiles.map(p =>
     `<option value="${p.id}" ${p.id === activePceId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
   ).join('');
@@ -55,16 +219,8 @@ async function loadSettings() {
   <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${a.key || ''}"></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${a.secret || ''}"></div></div>
   <div class="chk"><label><input type="checkbox" id="s-ssl" ${a.verify_ssl ? 'checked' : ''}> <span data-i18n="gui_verify_ssl">Verify SSL</span></label></div>
 </fieldset>
-<fieldset><legend data-i18n="gui_email_smtp">Email & SMTP</legend>
-  <div class="form-row"><div class="form-group"><label data-i18n="gui_sender">Sender</label><input id="s-sender" value="${e.sender || ''}"></div><div class="form-group"><label data-i18n="gui_recipients">Recipients (comma)</label><input id="s-rcpt" value="${(e.recipients || []).join(', ')}"></div></div>
-  <div class="form-row"><div class="form-group"><label data-i18n="gui_smtp_host">SMTP Host</label><input id="s-smhost" value="${sm.host || ''}"></div><div class="form-group"><label data-i18n="gui_port">Port</label><input id="s-smport" value="${sm.port || 25}"></div></div>
-  <div class="form-row"><div class="form-group"><label data-i18n="gui_user">User</label><input id="s-smuser" value="${sm.user || ''}"></div><div class="form-group"><label data-i18n="gui_password">Password</label><input id="s-smpass" type="password" value="${sm.password || ''}"></div></div>
-  <div style="display:flex;gap:20px"><div class="chk"><label><input type="checkbox" id="s-tls" ${sm.enable_tls ? 'checked' : ''}> STARTTLS</label></div><div class="chk"><label><input type="checkbox" id="s-auth" ${sm.enable_auth ? 'checked' : ''}> Auth</label></div></div>
-</fieldset>
 <fieldset><legend data-i18n="gui_alert_channels">Alert Channels</legend>
-  <div style="display:flex;gap:20px;margin-bottom:12px"><div class="chk"><label><input type="checkbox" id="s-amail" ${active.includes('mail') ? 'checked' : ''}> <span data-i18n="gui_mail">Mail</span></label></div><div class="chk"><label><input type="checkbox" id="s-aline" ${active.includes('line') ? 'checked' : ''}> <span data-i18n="gui_line">LINE</span></label></div><div class="chk"><label><input type="checkbox" id="s-awh" ${active.includes('webhook') ? 'checked' : ''}> <span data-i18n="gui_webhook">Webhook</span></label></div></div>
-  <div class="form-row"><div class="form-group"><label data-i18n="gui_line_token">LINE Token</label><input id="s-ltok" value="${al.line_channel_access_token || ''}"></div><div class="form-group"><label data-i18n="gui_line_target_id">LINE Target ID</label><input id="s-ltgt" value="${al.line_target_id || ''}"></div></div>
-  <div class="form-group"><label data-i18n="gui_webhook_url">Webhook URL</label><input id="s-whurl" value="${al.webhook_url || ''}"></div>
+  ${_renderAlertPluginCards(active, s)}
 </fieldset>
 <fieldset><legend data-i18n="gui_lang_settings">Display & General</legend>
   <div class="form-row">
@@ -155,18 +311,21 @@ async function loadSettings() {
   await loadTranslations();
 }
 async function saveSettings() {
-  const active = []; if ($('s-amail').checked) active.push('mail'); if ($('s-aline').checked) active.push('line'); if ($('s-awh').checked) active.push('webhook');
+  const pluginConfig = _collectAlertPluginConfig();
   const theme = rv('s-theme');
   const lang = rv('s-lang');
   applyThemeMode(getStoredThemeMode());
-  await post('/api/settings', {
+  const settingsPayload = {
     api: { url: $('s-url').value, org_id: $('s-org').value, key: $('s-key').value, secret: $('s-sec').value, verify_ssl: $('s-ssl').checked },
-    email: { sender: $('s-sender').value, recipients: $('s-rcpt').value.split(',').map(s => s.trim()).filter(Boolean) },
-    smtp: { host: $('s-smhost').value, port: parseInt($('s-smport').value) || 25, user: $('s-smuser').value, password: $('s-smpass').value, enable_tls: $('s-tls').checked, enable_auth: $('s-auth').checked },
-    alerts: { active, line_channel_access_token: $('s-ltok').value, line_target_id: $('s-ltgt').value, webhook_url: $('s-whurl').value },
     settings: { language: lang, theme: theme, timezone: $('s-timezone').value },
     report: { output_dir: $('s-rpt-dir').value.trim(), retention_days: parseInt($('s-rpt-retention').value) || 0 }
+  };
+  Object.entries(pluginConfig).forEach(([key, value]) => {
+    if (key === 'active') return;
+    settingsPayload[key] = value;
   });
+  settingsPayload.alerts = { ...(settingsPayload.alerts || {}), active: pluginConfig.active };
+  await post('/api/settings', settingsPayload);
 
   const ips_raw = $('s-sec-ips').value.split(',').map(s => s.trim()).filter(Boolean);
   await post('/api/security', {

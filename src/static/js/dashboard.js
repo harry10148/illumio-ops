@@ -1,4 +1,132 @@
 /* ─── Dashboard ───────────────────────────────────────────────────── */
+function _dashboardCardTone(el, tone = '') {
+  if (!el) return;
+  el.className = tone ? `value ${tone}` : 'value';
+}
+
+function _dashboardSetCard(id, value, tone = '') {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = value;
+  _dashboardCardTone(el, tone);
+}
+
+function _buildAuditSummaryFieldset() {
+  const fieldset = document.createElement('fieldset');
+  fieldset.id = 'audit-fieldset';
+  fieldset.style.marginBottom = '18px';
+  fieldset.innerHTML = `
+    <legend style="font-size:1.05rem;" data-i18n="gui_dashboard_audit_summary">Latest Audit Report Summary</legend>
+    <div id="audit-placeholder" style="text-align:center;padding:24px;color:var(--dim);font-size:0.9rem;" data-i18n="gui_dashboard_no_audit_summary">
+      No audit report summary found. Generate an Audit Report to populate this section.
+    </div>
+    <div id="audit-content" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_generated">Generated:</span> <span id="audit-generated-at">-</span></span>
+        <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_date_range">Date Range:</span> <span id="audit-date-range">-</span></span>
+      </div>
+      <div id="audit-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px;"></div>
+      <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:14px;">
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_dashboard_audit_attention">Attention Required</div>
+          <table class="rule-table" style="font-size:0.8rem;">
+            <thead>
+              <tr>
+                <th style="width:90px" data-i18n="gui_snap_col_severity">Severity</th>
+                <th data-i18n="gui_event_type">Event Type</th>
+                <th data-i18n="gui_summary">Summary</th>
+              </tr>
+            </thead>
+            <tbody id="audit-attention-body">
+              <tr><td colspan="3" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_no_data">No data</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_dashboard_audit_top_events">Top Event Types</div>
+          <table class="rule-table" style="font-size:0.8rem;">
+            <thead>
+              <tr>
+                <th data-i18n="gui_event_type">Event Type</th>
+                <th data-i18n="gui_count">Count</th>
+              </tr>
+            </thead>
+            <tbody id="audit-top-events-body">
+              <tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_no_data">No data</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  return fieldset;
+}
+
+function ensureTrafficWorkloadLayout() {
+  const panel = $('p-traffic-workload');
+  const dashboard = $('p-dashboard');
+  if (!panel || !dashboard || panel.dataset.layoutReady === '1') return;
+
+  const subNav = dashboard.querySelector('.sub-nav');
+  const trafficPanel = $('q-panel-traffic');
+  const workloadPanel = $('q-panel-workloads');
+  const legacyButton = $('qbtn-legacy');
+  const legacyPanel = $('q-panel-legacy');
+  const snapshotFieldset = $('snap-fieldset');
+
+  if (snapshotFieldset && legacyPanel && snapshotFieldset.parentElement === legacyPanel) {
+    dashboard.insertBefore(snapshotFieldset, legacyPanel);
+  }
+  if (subNav) panel.appendChild(subNav);
+  if (trafficPanel) panel.appendChild(trafficPanel);
+  if (workloadPanel) panel.appendChild(workloadPanel);
+  if (legacyButton) panel.querySelector('.sub-nav')?.appendChild(legacyButton);
+  if (legacyPanel) panel.appendChild(legacyPanel);
+
+  panel.dataset.layoutReady = '1';
+}
+
+function ensureDashboardLayout() {
+  const dashboard = $('p-dashboard');
+  if (!dashboard || dashboard.dataset.layoutReady === '1') return;
+
+  const cards = dashboard.querySelectorAll('.cards .card');
+  if (cards[0]) {
+    const label = cards[0].querySelector('.label');
+    if (label) label.textContent = _translations['gui_dashboard_rules'] || 'Rules';
+  }
+  if (cards[1]) {
+    const label = cards[1].querySelector('.label');
+    const value = cards[1].querySelector('.value');
+    if (label) label.textContent = _translations['gui_dashboard_cooldown'] || 'Cooldown';
+    if (value) value.id = 'd-cooldown';
+  }
+  if (cards[2]) {
+    const label = cards[2].querySelector('.label');
+    const value = cards[2].querySelector('.value');
+    if (label) label.textContent = _translations['gui_dashboard_pce_health'] || 'PCE Health';
+    if (value) value.id = 'd-pce-health';
+  }
+  cards.forEach((card, idx) => {
+    if (idx > 2) card.style.display = 'none';
+  });
+
+  const cdField = $('cd-field');
+  if (cdField) cdField.style.display = 'none';
+
+  if (!$('audit-fieldset')) {
+    const snapFieldset = $('snap-fieldset');
+    const auditFieldset = _buildAuditSummaryFieldset();
+    if (snapFieldset) {
+      snapFieldset.insertAdjacentElement('afterend', auditFieldset);
+    } else {
+      dashboard.appendChild(auditFieldset);
+    }
+  }
+
+  dashboard.dataset.layoutReady = '1';
+}
+
 function formatBytes(bytes) {
   if (bytes == null || isNaN(bytes)) return '—';
   bytes = parseFloat(bytes);
@@ -730,9 +858,34 @@ async function loadDashboard() {
       if (_urlEl && d.api_url) _urlEl.textContent = d.api_url;
       const _badge = $('hdr-meta');
       if (_badge) _badge.title = `PCE: ${d.api_url || _urlEl?.textContent}  |  v${d.version}`;
-      $('d-rules').textContent = d.rules_count;
-      $('d-health').textContent = d.health_check ? 'ON' : 'OFF';
-      $('d-lang').textContent = (d.language || 'en').toUpperCase();
+      const pceStats = d.pce_stats || {};
+      const dispatchHistory = Array.isArray(d.dispatch_history) ? d.dispatch_history : [];
+      const latestDispatch = dispatchHistory.length ? dispatchHistory[dispatchHistory.length - 1] : null;
+      const unknownTotal = Object.values(d.unknown_events || {}).reduce((total, entry) => {
+        if (entry && typeof entry === 'object') return total + (parseInt(entry.count, 10) || 0);
+        return total + (parseInt(entry, 10) || 0);
+      }, 0);
+      const suppressedTotal = Object.values(d.throttle_state || {}).reduce((total, entry) => {
+        const cooldown = parseInt(entry.cooldown_suppressed, 10) || 0;
+        const throttle = parseInt(entry.throttle_suppressed, 10) || 0;
+        return total + cooldown + throttle;
+      }, 0);
+      const setCard = (id, value, tone = '') => {
+        const el = $(id);
+        if (!el) return;
+        el.textContent = value;
+        el.className = tone ? `value ${tone}` : 'value';
+      };
+      const eventPollStatus = String(pceStats.event_poll_status || 'unknown').toUpperCase();
+      const dispatchStatus = latestDispatch
+        ? `${String(latestDispatch.channel || 'dispatch').toUpperCase()} ${String(latestDispatch.status || 'unknown').toUpperCase()}`
+        : 'NONE';
+      setCard('d-rules', String(d.rules_count ?? 0));
+      setCard('d-health', d.health_check ? 'ON' : 'OFF', d.health_check ? 'ok' : 'warn');
+      setCard('d-event-poll', eventPollStatus, (pceStats.event_poll_status || '').toLowerCase() === 'ok' ? 'ok' : '');
+      setCard('d-dispatch', dispatchStatus, latestDispatch && latestDispatch.status === 'success' ? 'ok' : '');
+      setCard('d-unknown', String(unknownTotal), unknownTotal > 0 ? 'warn' : 'ok');
+      setCard('d-suppressed', String(suppressedTotal), suppressedTotal > 0 ? 'warn' : 'ok');
       if (d.timezone) _timezone = d.timezone;
       applyThemeMode(getStoredThemeMode());
 

@@ -1,7 +1,5 @@
-"""
-src/report/exporters/audit_html_exporter.py
-Self-contained HTML report for the Audit & System Events Report.
-"""
+"""Self-contained HTML report for the Audit & System Events Report."""
+
 from __future__ import annotations
 
 import datetime
@@ -96,8 +94,13 @@ class AuditHtmlExporter:
             rec = item.get("recommendation", "")
             actors = item.get("actors", [])
             actors_str = ", ".join(str(a) for a in actors[:3]) if actors else "N/A"
+            targets = item.get("targets", [])
+            targets_str = ", ".join(str(a) for a in targets[:3]) if targets else ""
+            resources = item.get("resources", [])
+            resources_str = ", ".join(str(a) for a in resources[:3]) if resources else ""
             src_ips = item.get("src_ips", [])
             src_ips_str = ", ".join(str(ip) for ip in src_ips[:3]) if src_ips else ""
+
             html += (
                 f"<div style='border-left:4px solid {color}; background:{bg}; "
                 f"padding:10px 14px; margin-bottom:8px; border-radius:0 6px 6px 0;'>"
@@ -110,8 +113,15 @@ class AuditHtmlExporter:
                 f"<div style='font-size:11px; color:#989A9B;'>"
                 f"<strong style='color:#313638;' data-i18n='rpt_au_actor'>Actor:</strong> {actors_str}"
                 + (f" &nbsp;|&nbsp; <strong style='color:#313638;'>IP:</strong> {src_ips_str}" if src_ips_str else "")
-                + f"</div>"
-                f"<div style='font-size:11px; color:#325158; margin-top:3px;'>"
+                + "</div>"
+                + (
+                    f"<div style='font-size:11px; color:#989A9B; margin-top:3px;'>"
+                    f"<strong style='color:#313638;'>Target:</strong> {targets_str}"
+                    + (f" &nbsp;|&nbsp; <strong style='color:#313638;'>Resource:</strong> {resources_str}" if resources_str else "")
+                    + "</div>"
+                    if targets_str or resources_str else ""
+                )
+                + f"<div style='font-size:11px; color:#325158; margin-top:3px;'>"
                 f"<strong data-i18n='rpt_au_rec'>Recommendation:</strong> {rec}"
                 f"</div>"
                 f"</div>"
@@ -213,7 +223,7 @@ class AuditHtmlExporter:
             return ""
         return '<h2 data-i18n="rpt_au_severity_dist">Severity Distribution</h2>' + _df_to_html(sev_df)
 
-    def _mod01_html(self):
+    def _mod01_html(self) -> str:
         m = self._r.get("mod01", {})
         if "error" in m:
             return f'<p class="note">{m["error"]}</p>'
@@ -221,7 +231,7 @@ class AuditHtmlExporter:
         sec_count = m.get("security_concern_count", 0)
         conn_count = m.get("connectivity_event_count", 0)
         html = (
-            self._subnote("本節聚焦系統健康、Agent 狀態與安全疑慮事件，方便快速辨識需要優先處理的主機、連線異常與可疑變更。")
+            self._subnote("This section focuses on platform health, agent connectivity, and host-level security events. Use actor, target, source IP, and parser notes together when validating whether an event needs investigation.")
             + '<p><span data-i18n="rpt_au_total_health">Total Health Events:</span> <b>'
             + str(m.get("total_health_events", 0))
             + "</b> &nbsp;|&nbsp; "
@@ -237,10 +247,8 @@ class AuditHtmlExporter:
         html += (
             '<div class="bp-box" data-i18n-html="rpt_au_bp_health">'
             "<b>Illumio Best Practice:</b> Monitor system_health events for severity changes "
-            "(Warning / Error / Fatal). Investigate agent.tampering and agent.suspend events "
-            "immediately, because unintended suspensions or firewall tampering may indicate workload compromise. "
-            "Track agent_missed_heartbeats_check (3+ missed = 15 min) and agent_offline_check "
-            "(12 missed = removed from policy)."
+            "(Warning / Error / Fatal). Investigate agent.tampering and agent.suspend events immediately. "
+            "Track missed heartbeats and offline checks to catch workloads that silently fall out of policy."
             "</div>"
         )
 
@@ -257,7 +265,7 @@ class AuditHtmlExporter:
         conn_df = m.get("connectivity_events")
         if conn_df is not None and not conn_df.empty:
             html += (
-                self._subnote("這些事件用來觀察 Agent 心跳、連線與上線狀態，適合用來追蹤離線、心跳中斷與重新連線的趨勢。")
+                self._subnote("Connectivity events highlight agents that stopped checking in, were removed from policy, or require re-pairing. The parsed target and resource columns help identify the affected workload quickly.")
                 + '<h3 data-i18n="rpt_au_connectivity_title">Agent Connectivity Events</h3>'
                 + _df_to_html(conn_df, show_risk=True)
             )
@@ -267,7 +275,7 @@ class AuditHtmlExporter:
         html += '<h3 data-i18n="rpt_au_recent">Recent Events (up to 50)</h3>' + _df_to_html(m.get("recent"), show_risk=True)
         return html
 
-    def _mod02_html(self):
+    def _mod02_html(self) -> str:
         m = self._r.get("mod02", {})
         if "error" in m:
             return f'<p class="note">{m["error"]}</p>'
@@ -275,7 +283,7 @@ class AuditHtmlExporter:
         failed = m.get("failed_logins", 0)
         unique_ips = m.get("unique_src_ips", 0)
         html = (
-            self._subnote("本節整理登入、驗證與管理者來源 IP，方便比對異常登入、暴力嘗試與非預期管理來源。")
+            self._subnote("User activity now relies on parsed principals and actions. The report prefers the affected user account as the main identity, then falls back to the actor when the target is unavailable.")
             + '<p><span data-i18n="rpt_au_total_user">Total User Events:</span> <b>'
             + str(m.get("total_user_events", 0))
             + "</b> &nbsp;|&nbsp; "
@@ -299,18 +307,11 @@ class AuditHtmlExporter:
             "the same user or sudden spikes in authentication events."
             "</div>"
         )
-        html += (
-            '<div class="bp-box" data-i18n-html="rpt_au_src_ip_note">'
-            "<b>Source IP Tracking:</b> The <code>src_ip</code> column shows where the admin/API "
-            "connected from. Multiple logins or policy changes from unexpected IPs may indicate "
-            "compromised credentials or insider threats."
-            "</div>"
-        )
 
         failed_detail = m.get("failed_login_detail")
         if failed_detail is not None and not (hasattr(failed_detail, "empty") and failed_detail.empty):
             html += (
-                self._subnote("失敗登入明細已納入來源 IP 與通知脈絡，適合用來追查暴力破解、誤設告警與異常管理行為。")
+                self._subnote("Failed authentication rows are enriched with the parsed target user, source IP, supplied username, and action path. Review repeated failures by user or by source IP.")
                 + '<h3 data-i18n="rpt_au_failed_detail">Failed Login Details</h3>'
                 '<p class="note note-warn" data-i18n="rpt_au_failed_detail_desc">'
                 "Enriched with source IP and notification context. "
@@ -338,32 +339,15 @@ class AuditHtmlExporter:
             "<div style='font-weight:700; font-size:12px; color:#92400E; margin-bottom:8px;' "
             "data-i18n='rpt_au_lifecycle_draft_title'>1 Draft Changes (Not Yet Enforced)</div>"
             "<div style='font-size:12px; color:#374151; line-height:1.7;' data-i18n-html='rpt_au_lifecycle_draft_body'>"
-            "When an admin creates, edits, or deletes a rule in the PCE console <b>without clicking Provision</b>, "
-            "the system logs <code>rule_set.*</code> and <code>sec_rule.*</code> events. "
-            "These only represent changes to the policy <em>draft</em>; "
-            "<b>no firewall rules have been pushed to any VEN yet.</b><br><br>"
-            "<b>Watch for:</b> Broad scopes such as <em>All Applications / All Environments / All Locations</em> "
-            "(displayed as <code>null</code> in the API). A draft with such scope, once provisioned, "
-            "could affect a large number of workloads."
-            "</div>"
-            "<div style='margin-top:10px; padding:8px; background:#FEF3C7; border-radius:4px; font-size:11px; color:#78350F;'>"
-            "<b>Event types:</b> <code>rule_set.create</code>, <code>rule_set.update</code>, "
-            "<code>rule_set.delete</code>, <code>sec_rule.create</code>, <code>sec_rule.update</code>, "
-            "<code>sec_rule.delete</code>"
+            "Draft events such as <code>rule_set.*</code> and <code>sec_rule.*</code> only represent policy edits. "
+            "<b>No firewall rules are pushed yet.</b> Review broad scopes carefully before the next provision."
             "</div></div>"
             "<div style='padding:14px 16px; background:#F0FDF4;'>"
             "<div style='font-weight:700; font-size:12px; color:#065F46; margin-bottom:8px;' "
             "data-i18n='rpt_au_lifecycle_prov_title'>2 Provision (Policy Goes Live)</div>"
             "<div style='font-size:12px; color:#374151; line-height:1.7;' data-i18n-html='rpt_au_lifecycle_prov_body'>"
-            "When an admin clicks <b>Provision</b>, all draft changes are packaged into a new versioned policy "
-            "and pushed to workload VENs. The PCE logs a <code>sec_policy.create</code> event, "
-            "not <code>update</code>, because each provision creates a <em>new policy version</em>.<br><br>"
-            "<b>Key field:</b> <code>workloads_affected</code>, "
-            "how many hosts received the new policy. A surprisingly large number signals unexpectedly broad scope. "
-            "<b>If this was not a planned large-scale change, investigate immediately.</b>"
-            "</div>"
-            "<div style='margin-top:10px; padding:8px; background:#D1FAE5; border-radius:4px; font-size:11px; color:#065F46;'>"
-            "<b>Event type:</b> <code>sec_policy.create</code> &nbsp;(each provision = new version number)"
+            "A <code>sec_policy.create</code> event means draft changes were packaged into a new policy version and pushed to workloads. "
+            "Use <code>workloads_affected</code> to verify rollout impact."
             "</div></div></div></details>"
         )
 
@@ -384,6 +368,7 @@ class AuditHtmlExporter:
             et = item.get("event_type", "")
             actor = item.get("actor", "N/A")
             src_ip = item.get("src_ip", "")
+            resource_name = item.get("resource_name", "")
             status = item.get("status", "")
             html += (
                 f"<div style='display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 10px; background:#FFF5F5; "
@@ -393,6 +378,7 @@ class AuditHtmlExporter:
                 f"<code style='font-size:11px; background:#FEE2E2; padding:2px 6px; border-radius:3px; color:#7F1D1D;'>{et}</code>"
                 f"<span style='font-size:11px; color:#6B7280;'>{ts}</span>"
                 f"<span style='font-size:11px; color:#6B7280;'>by <b>{actor}</b></span>"
+                + (f"<span style='font-size:11px; color:#6B7280;'>resource <b>{resource_name}</b></span>" if resource_name else "")
                 + (f"<span style='font-size:11px; color:#6B7280;'>from <code>{src_ip}</code></span>" if src_ip else "")
                 + (f"<span style='font-size:11px; color:#6B7280;'>| {status}</span>" if status else "")
                 + "</div>"
@@ -400,7 +386,7 @@ class AuditHtmlExporter:
         html += "</div>"
         return html
 
-    def _mod03_html(self):
+    def _mod03_html(self) -> str:
         m = self._r.get("mod03", {})
         if "error" in m:
             return f'<p class="note">{m["error"]}</p>'
@@ -412,7 +398,7 @@ class AuditHtmlExporter:
         high_impact = m.get("high_impact_provisions", [])
 
         html = (
-            self._subnote("本節聚焦 Policy 編輯與 Provision 事件，目的是快速辨識高影響變更、草稿異動與可能過寬的套用範圍。")
+            self._subnote("Policy events now surface the parsed actor, target, resource, action, and change summary together. This makes it easier to separate draft edits from provisions that actually impacted workloads.")
             + '<p><span data-i18n="rpt_au_total_policy">Total Policy Events:</span> <b>'
             + str(m.get("total_policy_events", 0))
             + "</b> &nbsp;|&nbsp; "
@@ -431,17 +417,13 @@ class AuditHtmlExporter:
         html += self._lifecycle_concept_box()
         html += (
             '<div class="bp-box" data-i18n-html="rpt_au_bp_policy">'
-            "<b>Illumio Best Practice:</b> Review rule_set and sec_rule changes for overly broad scopes "
-            "(null HREF = All Applications/Environments/Locations). When sec_policy.create (provision) "
-            "events occur, check workloads_affected; a high number may indicate unintended policy impact. "
-            "Monitor sec_rule.delete events to detect unauthorized policy weakening."
+            "<b>Illumio Best Practice:</b> Review rule_set and sec_rule changes for overly broad scopes. "
+            "When sec_policy.create events occur, check workloads_affected and change_detail to confirm rollout impact."
             "</div>"
         )
         html += (
             '<div class="bp-box" data-i18n-html="rpt_au_change_detail_note">'
-            "<b>Change Tracking:</b> The <code>change_detail</code> column shows before/after values "
-            "for modified resources. Look for changes to broad scopes (null = All) or sensitive labels "
-            "(Production, PCI)."
+            "<b>Change Tracking:</b> The <code>change_detail</code> column summarizes parsed before/after values, commit metadata, and impacted objects."
             "</div>"
         )
         html += self._high_impact_provisions_html(high_impact, threshold)
@@ -449,14 +431,13 @@ class AuditHtmlExporter:
         provisions = m.get("provisions")
         if provisions is not None and not (hasattr(provisions, "empty") and provisions.empty):
             html += (
-                self._subnote("Provision 事件代表草稿變更已正式推送到生效中的 Policy，建議優先檢視影響範圍、操作者與變更內容。")
+                self._subnote("Provision rows show rollout impact directly. Use workloads affected, actor, source IP, resource name, and change detail together to validate whether a large policy change was expected.")
                 + '<h3 data-i18n="rpt_au_provision_title">Policy Provision Events</h3>'
                 '<p class="note note-warn" data-i18n="rpt_au_provision_desc">'
                 "Policy provisions push draft changes to active enforcement. "
                 "Review for unintended scope or excessive workload impact.</p>"
                 '<p class="note" style="font-size:.82rem">'
-                "<b>change_detail</b> 可用來比對變更前後差異；<code>commit_message</code> 可輔助理解本次 Provision 的目的；"
-                "<code>object_counts</code> 則能快速看出受影響的 rule_sets、ip_lists 與 services 規模。"
+                "<b>change_detail</b> summarizes commit message, version, modified object counts, and impacted resources for provision events."
                 "</p>"
                 + _df_to_html(provisions, show_risk=True)
             )
@@ -464,14 +445,13 @@ class AuditHtmlExporter:
         draft_events = m.get("draft_events")
         if draft_events is not None and not (hasattr(draft_events, "empty") and draft_events.empty):
             html += (
-                self._subnote("Draft 變更尚未正式生效，但能提前反映管理者即將調整的 Policy 範圍與方向，適合做變更前盤點。")
+                self._subnote("Draft changes represent edits that have not been provisioned yet. Use target, resource, action, and change detail to review scope before the next provision.")
                 + '<h3 data-i18n="rpt_au_draft_section">Draft Rule Changes</h3>'
                 '<p class="note" data-i18n="rpt_au_draft_desc">'
                 "These events represent policy edits in draft state. No enforcement changes have "
                 "occurred yet; they only take effect after Provision.</p>"
                 '<p class="note" style="font-size:.82rem">'
-                "<b>change_detail</b> 常會帶出 ruleset 或 sec_rule 的 href，例如 <code>rule_sets/471/sec_rules/1234</code>，"
-                "可用來回查變更對象與前後差異。"
+                "<b>change_detail</b> summarizes field-level before/after values for draft edits so policy reviewers can inspect scope and intent without opening raw JSON."
                 "</p>"
                 + _df_to_html(draft_events, show_risk=True)
             )
@@ -479,7 +459,7 @@ class AuditHtmlExporter:
         per_user = m.get("per_user")
         if per_user is not None and not (hasattr(per_user, "empty") and per_user.empty):
             html += (
-                self._subnote("依操作者彙整 Policy 變更，可快速看出誰最常調整規則、誰執行大規模 Provision，以及是否存在異常帳號活動。")
+                self._subnote("This breakdown groups policy activity by parsed actor so admin-driven changes, system tasks, and agent-originated operations are easier to distinguish.")
                 + '<h3 data-i18n="rpt_au_per_user_policy">Changes by User</h3>'
                 + _df_to_html(per_user)
             )

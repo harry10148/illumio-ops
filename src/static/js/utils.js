@@ -243,7 +243,7 @@ document.addEventListener('click', function (e) {
 async function init() {
   const params = new URLSearchParams(window.location.search);
   const tab = params.get('tab');
-  const validTabs = ['dashboard', 'rules', 'reports', 'settings', 'rule-scheduler'];
+  const validTabs = ['dashboard', 'traffic-workload', 'events', 'rules', 'reports', 'settings', 'rule-scheduler'];
   const initialTab = (tab && validTabs.includes(tab)) ? tab : 'dashboard';
   switchTab(initialTab, false);
   const qtab = params.get('qtab');
@@ -252,6 +252,7 @@ async function init() {
   }
   // Refresh dashboard status every 30s
   setInterval(() => { if (document.querySelector('.tab.active[data-tab="dashboard"]')) loadDashboard(); }, 30000);
+  setInterval(() => { if (document.querySelector('.tab.active[data-tab="events"]')) loadEventViewer(true); }, 45000);
 }
 
 document.addEventListener('DOMContentLoaded', init);
@@ -262,28 +263,49 @@ function hideAll() {
 
 async function loadTranslations() {
   _translations = await api('/api/ui_translations');
-  document.querySelectorAll('[data-i18n]').forEach(el => {
-    const k = el.getAttribute('data-i18n');
-    if (_translations[k]) {
-      if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
-        if (el.type === 'button') el.value = _translations[k];
-        else if (el.placeholder !== undefined) el.placeholder = _translations[k];
+  applyI18n(document);
+  initTableResizers();
+}
+
+function applyI18n(root = document) {
+  const scope = root && root.querySelectorAll ? root : document;
+  const nodes = [];
+  if (scope !== document && scope.hasAttribute) nodes.push(scope);
+  nodes.push(...scope.querySelectorAll('[data-i18n],[data-i18n-html],[data-i18n-placeholder],[data-i18n-title]'));
+
+  nodes.forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (key && _translations[key]) {
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+        if (el.type === 'button' || el.type === 'submit') el.value = _translations[key];
+        else if (el.placeholder !== undefined) el.placeholder = _translations[key];
       } else {
         const icon = el.querySelector('svg');
         if (icon) {
           const textNodes = Array.from(el.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
-          if (textNodes.length) {
-            textNodes[textNodes.length - 1].textContent = ' ' + _translations[k];
-          } else {
-            el.appendChild(document.createTextNode(' ' + _translations[k]));
-          }
+          if (textNodes.length) textNodes[textNodes.length - 1].textContent = ' ' + _translations[key];
+          else el.appendChild(document.createTextNode(' ' + _translations[key]));
         } else {
-          el.textContent = _translations[k];
+          el.textContent = _translations[key];
         }
       }
     }
+
+    const htmlKey = el.getAttribute('data-i18n-html');
+    if (htmlKey && _translations[htmlKey]) {
+      el.innerHTML = _translations[htmlKey];
+    }
+
+    const placeholderKey = el.getAttribute('data-i18n-placeholder');
+    if (placeholderKey && _translations[placeholderKey] && el.placeholder !== undefined) {
+      el.placeholder = _translations[placeholderKey];
+    }
+
+    const titleKey = el.getAttribute('data-i18n-title');
+    if (titleKey && _translations[titleKey]) {
+      el.title = _translations[titleKey];
+    }
   });
-  initTableResizers();
 }
 
 function initTableResizers() {

@@ -5,6 +5,18 @@ import os
 import sys
 import logging
 from collections import Counter
+from src.events import (
+    AlertThrottler,
+    EventPoller,
+    StatsTracker,
+    ensure_monitoring_state,
+    event_identity,
+    format_utc,
+    is_known_event_type,
+    matches_event_rule,
+    normalize_event,
+    parse_event_timestamp,
+)
 from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
 from src.state_store import load_state_file, update_state_file
@@ -77,12 +89,24 @@ class Analyzer:
         self.cm = config_manager
         self.api = api_client
         self.reporter = reporter
+        now_str = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         self.state = {
-            "last_check": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+            "last_check": now_str,
+            "event_watermark": now_str,
             "history": {},
-            "alert_history": {}
+            "alert_history": {},
+            "event_seen": {},
+            "event_overflow": {},
+            "unknown_events": {},
+            "event_parser_stats": {},
+            "event_parser_samples": [],
         }
+        ensure_monitoring_state(self.state)
+        self.event_poller = EventPoller(self.api)
         self.load_state()
+        ensure_monitoring_state(self.state)
+        self.stats = StatsTracker(self.state)
+        self.alert_throttler = AlertThrottler(self.state)
 
     def load_state(self):
         try:
@@ -91,13 +115,30 @@ class Analyzer:
                 logger.info("State file not found, starting fresh.")
                 return
             self.state.update(data)
+            if not self.state.get("event_watermark"):
+                self.state["event_watermark"] = self.state.get("last_check")
+            if not isinstance(self.state.get("history"), dict):
+                self.state["history"] = {}
+            if not isinstance(self.state.get("alert_history"), dict):
+                self.state["alert_history"] = {}
+            if not isinstance(self.state.get("event_seen"), dict):
+                self.state["event_seen"] = {}
+            if not isinstance(self.state.get("event_overflow"), dict):
+                self.state["event_overflow"] = {}
+            if not isinstance(self.state.get("unknown_events"), dict):
+                self.state["unknown_events"] = {}
+            if not isinstance(self.state.get("event_parser_stats"), dict):
+                self.state["event_parser_stats"] = {}
+            if not isinstance(self.state.get("event_parser_samples"), list):
+                self.state["event_parser_samples"] = []
+            ensure_monitoring_state(self.state)
         except Exception as e:
             logger.warning(f"Error loading state file: {e}. Starting fresh.")
 
     def save_state(self):
-        self.state["last_check"] = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
-        # Prune history
         now = datetime.datetime.now(datetime.timezone.utc)
+        self.state["last_check"] = self.state.get("event_watermark") or format_utc(now)
+
         cutoff = now - datetime.timedelta(hours=2)
         new_history = {}
         for rid, records in self.state.get("history", {}).items():
@@ -112,6 +153,29 @@ class Analyzer:
             if valid:
                 new_history[rid] = valid
         self.state["history"] = new_history
+
+        seen_cutoff = now - datetime.timedelta(hours=4)
+        new_seen = {}
+        for event_id, ts_str in self.state.get("event_seen", {}).items():
+            try:
+                ts = datetime.datetime.strptime(ts_str, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
+                if ts > seen_cutoff:
+                    new_seen[event_id] = ts_str
+            except (TypeError, ValueError):
+                continue
+        self.state["event_seen"] = new_seen
+        self.state["event_parser_samples"] = list(self.state.get("event_parser_samples", []))[-10:]
+        self.stats.prune(now)
+        self.alert_throttler.prune(now)
+
+        unknown_events = self.state.get("unknown_events", {})
+        if isinstance(unknown_events, dict) and len(unknown_events) > 100:
+            ranked = sorted(
+                unknown_events.items(),
+                key=lambda item: (item[1].get("last_seen", ""), item[1].get("count", 0)),
+                reverse=True,
+            )
+            self.state["unknown_events"] = dict(ranked[:100])
 
         try:
             def _merge(existing):
@@ -267,6 +331,108 @@ class Analyzer:
         port = svc.get('port', 'All') or flow.get('dst_port', 'All')
         return f"{s_name} -> {d_name} [{port}]"
 
+    def _record_event_matches(self, rule_id, events, now_utc):
+        rid = str(rule_id)
+        if rid not in self.state["history"]:
+            self.state["history"][rid] = []
+
+        for event in events:
+            event_ts = parse_event_timestamp(event.get("timestamp")) or now_utc
+            self.state["history"][rid].append({
+                "t": format_utc(event_ts),
+                "event_id": event_identity(event),
+            })
+
+    def _event_count_in_window(self, rule_id, window_start):
+        total = 0
+        for rec in self.state.get("history", {}).get(str(rule_id), []):
+            try:
+                ts = datetime.datetime.strptime(rec['t'], '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
+            except (KeyError, ValueError):
+                continue
+            if ts <= window_start:
+                continue
+            total += int(rec.get('c', 1))
+        return total
+
+    def _fetch_event_batch(self):
+        watermark = self.state.get("event_watermark") or self.state.get("last_check")
+        seen_events = self.state.get("event_seen", {})
+        batch = self.event_poller.fetch_batch(watermark, seen_events=seen_events)
+        self.state["event_seen"] = batch.seen_events
+        self.state["event_watermark"] = batch.next_watermark
+        if batch.overflow_risk:
+            self.state["event_overflow"] = {
+                "detected_at": format_utc(datetime.datetime.now(datetime.timezone.utc)),
+                "query_since": batch.query_since,
+                "query_until": batch.query_until,
+                "raw_count": batch.raw_count,
+                "max_results": self.event_poller.max_results,
+            }
+        else:
+            self.state["event_overflow"] = {}
+        return batch
+
+    def _update_parser_observability(self, normalized_events):
+        total = len(normalized_events)
+        known = sum(1 for event in normalized_events if event.get("known_event_type"))
+        stats = {
+            "last_batch_total": total,
+            "last_batch_known": known,
+            "last_batch_unknown": total - known,
+            "actor_resolved": sum(1 for event in normalized_events if event.get("actor") and event.get("actor") != "System"),
+            "target_resolved": sum(1 for event in normalized_events if event.get("target_name")),
+            "resource_resolved": sum(1 for event in normalized_events if event.get("resource_name")),
+            "action_resolved": sum(1 for event in normalized_events if event.get("action")),
+            "source_ip_resolved": sum(1 for event in normalized_events if event.get("source_ip")),
+            "parser_note_count": sum(len(event.get("parser_notes") or []) for event in normalized_events),
+        }
+        self.state["event_parser_stats"] = stats
+        pce_stats = self.state.setdefault("pce_stats", {})
+        pce_stats["last_batch_unknown"] = stats["last_batch_unknown"]
+        pce_stats["last_batch_notes"] = stats["parser_note_count"]
+
+        samples = list(self.state.get("event_parser_samples", []))
+        for event in normalized_events:
+            samples.append({
+                "timestamp": event.get("timestamp"),
+                "event_type": event.get("event_type"),
+                "actor": event.get("actor"),
+                "source_ip": event.get("source_ip"),
+                "target_type": event.get("target_type"),
+                "target_name": event.get("target_name"),
+                "resource_type": event.get("resource_type"),
+                "resource_name": event.get("resource_name"),
+                "action": event.get("action"),
+                "known_event_type": event.get("known_event_type"),
+                "parser_notes": event.get("parser_notes") or [],
+            })
+        self.state["event_parser_samples"] = samples[-10:]
+
+        unknown_events = self.state.setdefault("unknown_events", {})
+        for event in normalized_events:
+            event_type = event.get("event_type") or "(missing)"
+            if is_known_event_type(event_type):
+                continue
+            entry = unknown_events.get(event_type, {
+                "count": 0,
+                "first_seen": event.get("timestamp"),
+                "last_seen": event.get("timestamp"),
+                "sample": {},
+            })
+            entry["count"] += 1
+            entry["last_seen"] = event.get("timestamp") or entry.get("last_seen")
+            entry["sample"] = {
+                "actor": event.get("actor"),
+                "source_ip": event.get("source_ip"),
+                "target_name": event.get("target_name"),
+                "resource_type": event.get("resource_type"),
+                "resource_name": event.get("resource_name"),
+                "action": event.get("action"),
+                "parser_notes": event.get("parser_notes") or [],
+            }
+            unknown_events[event_type] = entry
+
     def run_analysis(self):
         logger.info("Starting analysis cycle.")
         # 1. Health Check (only runs when a system rule with filter_value=pce_health is configured)
@@ -278,6 +444,7 @@ class Analyzer:
             if h_status != 200:
                 print(f"{Colors.FAIL}{t('status_error')}{Colors.ENDC}")
                 logger.warning(f"PCE health check failed: {h_status} - {h_msg[:200]}")
+                self.stats.record_pce_error("health", h_msg[:200], status=h_status)
                 for rule in pce_health_rules:
                     if self._check_cooldown(rule):
                         self.reporter.add_health_alert({
@@ -289,71 +456,79 @@ class Analyzer:
             else:
                 print(f"{Colors.GREEN}{t('status_ok')}{Colors.ENDC}")
                 logger.info("PCE health check OK.")
+                self.stats.record_pce_success("health", status=h_status, message=h_msg[:120])
 
         # 2. Events
         print(f"{t('checking_events')}...")
-        events = self.api.fetch_events(self.state["last_check"])
+        events = []
+        try:
+            event_batch = self._fetch_event_batch()
+            events = event_batch.events
+            self.stats.record_pce_success("events", status=200, message=f"fetched={len(events)}")
+            if event_batch.overflow_risk:
+                logger.warning(
+                    "Event polling reached max_results=%s between %s and %s; additional events may exist.",
+                    self.event_poller.max_results,
+                    event_batch.query_since,
+                    event_batch.query_until,
+                )
+        except Exception as e:
+            logger.error(f"Event polling failed; watermark preserved at {self.state.get('event_watermark')}: {e}")
+            print(f"{Colors.FAIL}{t('api_fetch_events_error', error=str(e))}{Colors.ENDC}")
+            self.stats.record_pce_error("events", str(e))
+
         if events:
             print(t('found_events', count=len(events)))
             logger.info(f"Found {len(events)} events.")
             now_utc = datetime.datetime.now(datetime.timezone.utc)
-            for rule in [r for r in self.cm.config["rules"] if r["type"] == "event"]:
-                # Enhanced filtering with status and severity
-                matches = []
-                for e in events:
-                    filter_vals = [x.strip() for x in rule["filter_value"].split(',')]
-                    if "*" not in filter_vals and e.get("event_type") not in filter_vals:
-                        continue
-                        
-                    # Status Filter
-                    r_status = rule.get("filter_status", "all")
-                    if r_status != "all" and e.get("status") != r_status:
-                        continue
-                        
-                    # Severity Filter
-                    r_sev = rule.get("filter_severity", "all")
-                    if r_sev != "all" and e.get("severity") != r_sev:
-                        continue
-                        
-                    matches.append(e)
+            normalized_by_id = {}
+            for event in events:
+                normalized = normalize_event(event)
+                normalized_by_id[event_identity(event)] = normalized
+            self._update_parser_observability(list(normalized_by_id.values()))
+            self.stats.record_event_batch(
+                events,
+                unknown_count=self.state.get("event_parser_stats", {}).get("last_batch_unknown", 0),
+                parser_note_count=self.state.get("event_parser_stats", {}).get("parser_note_count", 0),
+                overflow_risk=bool(self.state.get("event_overflow")),
+                query_since=event_batch.query_since if "event_batch" in locals() else "",
+                query_until=event_batch.query_until if "event_batch" in locals() else "",
+            )
 
-                # Event History Logic for 'count' threshold
+            for rule in [r for r in self.cm.config["rules"] if r["type"] == "event"]:
+                matches = [e for e in events if matches_event_rule(rule, e)]
+
                 if matches:
-                    rid = str(rule["id"])
-                    if rid not in self.state["history"]:
-                        self.state["history"][rid] = []
-                    self.state["history"][rid].append({"t": now_utc.strftime('%Y-%m-%dT%H:%M:%SZ'), "c": len(matches)})
+                    self._record_event_matches(rule["id"], matches, now_utc)
 
                 # Check Threshold
                 count_val = len(matches)
                 if rule["threshold_type"] == "count":
                     win_minutes = rule.get("threshold_window", 10)
                     win_start = now_utc - datetime.timedelta(minutes=win_minutes)
-                    count_val = sum(
-                        rec['c'] for rec in self.state.get("history", {}).get(str(rule["id"]), [])
-                        if datetime.datetime.strptime(rec['t'], '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc) > win_start
-                    )
+                    count_val = self._event_count_in_window(rule["id"], win_start)
 
                 if count_val >= rule["threshold_count"] and count_val > 0:
                     if self._check_cooldown(rule):
+                        self.stats.record_rule_trigger(rule, match_count=count_val, metric_value=count_val)
                         first = matches[0] if matches else {}
-                        cb = first.get("created_by") or {}
-                        resource = first.get("resource") or {}
-                        src_ip = first.get("src_ip") or ""
-                        # For user/request events, resource.user.username is the attempted account
-                        res_user = (resource.get("user") or {}).get("username") or ""
-                        cb_user = (cb.get("user") or {}).get("username") or ""
-                        cb_agent = (cb.get("agent") or {}).get("hostname") or ""
-                        actor = res_user or cb_user or cb_agent or "System"
-                        source = actor + (f" | {src_ip}" if src_ip else "")
+                        first_norm = normalized_by_id.get(event_identity(first)) or normalize_event(first)
                         self.reporter.add_event_alert({
                             "time": first.get("timestamp", "N/A"),
                             "rule": rule["name"],
                             "desc": rule.get("desc"),
-                            "severity": first.get("severity", "info"),
+                            "severity": first_norm.get("severity") or first.get("severity", "info"),
                             "count": count_val,
-                            "source": source,
-                            "raw_data": matches[:5]
+                            "source": first_norm.get("source", ""),
+                            "target": first_norm.get("target_name", ""),
+                            "resource_type": first_norm.get("resource_type", ""),
+                            "resource_name": first_norm.get("resource_name", ""),
+                            "action": first_norm.get("action", ""),
+                            "raw_data": matches[:5],
+                            "parsed_data": [
+                                normalized_by_id.get(event_identity(event)) or normalize_event(event)
+                                for event in matches[:5]
+                            ],
                         })
 
         # 3. Traffic
@@ -434,6 +609,7 @@ class Analyzer:
                     if is_trigger and self._check_cooldown(rule):
                         res['top_matches'].sort(key=lambda x: x.get('_metric_val', 0), reverse=True)
                         top_10 = res['top_matches'][:10]
+                        self.stats.record_rule_trigger(rule, match_count=len(top_10), metric_value=val)
 
                         ctr = Counter([self.get_traffic_details_key(m) for m in top_10])
                         details = "<br>".join([f"{k}: {v}" for k, v in ctr.most_common(10)])
@@ -466,11 +642,32 @@ class Analyzer:
             try:
                 last_dt = datetime.datetime.strptime(last_alert, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
                 if (now_utc - last_dt).total_seconds() < (cd_minutes * 60):
+                    next_allowed_at = last_dt + datetime.timedelta(minutes=cd_minutes)
+                    self.alert_throttler.record_cooldown_suppressed(rule, now_utc, next_allowed_at=next_allowed_at)
+                    self.stats.record_suppression(
+                        rule,
+                        "cooldown",
+                        cooldown_minutes=cd_minutes,
+                        next_allowed_at=format_utc(next_allowed_at),
+                    )
                     print(f"{Colors.WARNING}{t('alert_cooldown', rule=rule['name'])}{Colors.ENDC}")
                     logger.info(f"Rule '{rule['name']}' in cooldown.")
                     return False
             except ValueError:
                 pass
+
+        allowed, throttle_meta = self.alert_throttler.allow(rule, now_utc)
+        if not allowed:
+            self.stats.record_suppression(
+                rule,
+                "throttle",
+                throttle=throttle_meta.get("throttle", ""),
+                next_allowed_at=throttle_meta.get("next_allowed_at", ""),
+                suppressed=throttle_meta.get("suppressed", 0),
+            )
+            print(f"{Colors.WARNING}{rule['name']} suppressed by throttle {throttle_meta.get('throttle', '')}{Colors.ENDC}")
+            logger.info("Rule '%s' suppressed by throttle %s.", rule["name"], throttle_meta.get("throttle"))
+            return False
 
         print(f"{Colors.FAIL}{t('alert_trigger', rule=rule['name'])}{Colors.ENDC}")
         logger.warning(f"Alert triggered: {rule['name']}")
@@ -669,7 +866,7 @@ class Analyzer:
         matches.sort(key=lambda x: x.get('_metric_val', 0), reverse=True)
         return matches[:500]
 
-    def run_debug_mode(self, mins=None, pd_sel=None):
+    def run_debug_mode(self, mins=None, pd_sel=None, interactive=None):
         print(f"\n{Colors.HEADER}{t('debug_mode_title')}{Colors.ENDC}")
 
         # Auto-detect minutes if not provided
@@ -726,7 +923,12 @@ class Analyzer:
 
         for rule in self.cm.config["rules"]:
             rtype = rule.get("type", "event")
-            r_label = t('event_rule') if rtype == "event" else t('traffic_rule')
+            if rtype == "event":
+                r_label = t('event_rule')
+            elif rtype == "system":
+                r_label = t('gui_system_health_type', default='System Rule')
+            else:
+                r_label = t('traffic_rule')
             print(f"\n{Colors.CYAN}--- {r_label}: {rule['name']} ({rtype.upper()}) ---{Colors.ENDC}")
             
             rule_win = rule.get("threshold_window", 10)
@@ -746,16 +948,10 @@ class Analyzer:
                             except ValueError: pass
 
                     if e_time and e_time < rule_start: continue
-                    
-                    filter_vals = [x.strip() for x in rule["filter_value"].split(',')]
-                    if e.get("event_type") not in filter_vals: continue
-                    
-                    # Filters
-                    r_status = rule.get("filter_status", "all")
-                    if r_status != "all" and e.get("status") != r_status: continue
-                    r_sev = rule.get("filter_severity", "all")
-                    if r_sev != "all" and e.get("severity") != r_sev: continue
-                    
+
+                    if not matches_event_rule(rule, e):
+                        continue
+
                     matches.append(e)
                 
                 print(t('time_filter_results', total=len(events), win=rule_win, rem=len(matches)))
@@ -769,10 +965,32 @@ class Analyzer:
                 if matches:
                     print(t('samples_top10'))
                     for i, m in enumerate(matches[:10]):
-                        msg = m.get('message', 'No message')
+                        parsed = normalize_event(m)
+                        msg = parsed.get('action') or m.get('message', 'No message')
+                        actor = parsed.get('actor') or m.get('created_by', {}).get('user', {}).get('username', '')
+                        target = parsed.get('target_name') or ''
                         m_status = m.get('status', 'N/A')
                         m_ts = m.get('timestamp', 'N/A')[-13:-1] # Show HH:MM:SS.ms
-                        print(f"     [{i+1}] {m_ts} | {m_status} | {msg[:80]}")
+                        context = f" | {actor}" if actor else ""
+                        if target:
+                            context += f" -> {target}"
+                        print(f"     [{i+1}] {m_ts} | {m_status}{context} | {msg[:80]}")
+
+            elif rtype == "system":
+                health_type = rule.get("filter_value", "pce_health")
+                h_status = None
+                h_msg = ""
+                if health_type == "pce_health" and hasattr(self.api, "check_health"):
+                    h_status, h_msg = self.api.check_health()
+                is_trigger = h_status not in (200, "200")
+                threshold = float(rule.get("threshold_count", 1))
+                status = f"{Colors.FAIL}{t('would_trigger')}{Colors.ENDC}" if is_trigger else f"{Colors.GREEN}{t('pass')}{Colors.ENDC}"
+                print(f"  -> {t('checking_health')}")
+                print(f"  -> Health Check: {health_type}")
+                print(f"  -> Status: {h_status if h_status is not None else 'N/A'}")
+                print(t('eval_result', status=status, threshold=int(threshold)))
+                if h_msg:
+                    print(f"  -> Details: {h_msg[:200]}")
 
             else:
                 # Traffic / BW / Vol Logic
@@ -819,10 +1037,10 @@ class Analyzer:
                         key = self.get_traffic_details_key(m)
                         print(f"     [{i+1}] {key} Value: {m.get('_metric_fmt')} (PD:{m.get('policy_decision')})")
 
-        # Handle GUI/Non-interactive mode (stdin/stdout capture)
-        is_gui = hasattr(sys.stdout, 'getvalue')
-        
-        if not is_gui:
+        if interactive is None:
+            interactive = not hasattr(sys.stdout, 'getvalue')
+
+        if interactive:
             save_sel = safe_input(f"\n{t('save_debug_query')}", str, allow_cancel=True)
             if save_sel and save_sel.lower() == 'y':
                 dump = {
@@ -838,5 +1056,5 @@ class Analyzer:
                     json.dump(dump, f, indent=2, ensure_ascii=False)
                 print(f"\n{Colors.GREEN}{t('file_saved', path=path)}{Colors.ENDC}")
 
-        if not is_gui:
+        if interactive:
             print(f"\n{Colors.GREEN}{t('debug_done')}{Colors.ENDC}")

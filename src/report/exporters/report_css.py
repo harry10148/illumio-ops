@@ -49,7 +49,6 @@ BASE_CSS = """\
   .report-hero .kpi-card { background: rgba(255,255,255,.96); box-shadow: none; border-top-color: var(--gold); }
 
   .report-table-panel { margin: 12px 0 18px; border: 1px solid rgba(50,81,88,.14); border-radius: 14px; overflow: hidden; background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(247,244,238,.92)); box-shadow: 0 10px 24px rgba(26,44,50,.08); }
-  .report-table-hint { padding: 10px 14px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--slate-50); background: linear-gradient(90deg, rgba(26,44,50,.05), rgba(255,85,0,.08)); border-bottom: 1px solid rgba(50,81,88,.08); }
   .report-table-wrap { overflow: auto; max-width: 100%; }
   .report-table { min-width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px; }
   .report-table thead th { background: var(--cyan-110); color: #fff; position: sticky; top: 0; z-index: 2; min-width: 120px; padding: 12px 28px 12px 12px; vertical-align: middle; border-right: 1px solid rgba(255,255,255,.08); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -61,6 +60,7 @@ BASE_CSS = """\
   .report-table tbody tr:hover td { background: var(--tan-120); }
 
   .th-label { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 18px; }
+  .report-table--interactive thead th { cursor: pointer; user-select: none; }
   .sort-indicator { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-size: 11px; opacity: .72; pointer-events: none; }
   .col-resizer { position: absolute; top: 0; right: 0; width: 8px; height: 100%; cursor: col-resize; background: transparent; }
   .col-resizer:hover, .col-resizer.is-active { background: linear-gradient(180deg, rgba(255,162,47,.0), rgba(255,85,0,.75), rgba(255,162,47,.0)); }
@@ -199,8 +199,10 @@ function sortTable(table, col) {
 }
 
 function initReportTable(table) {
+  if (!table || table.dataset.interactive !== 'true') return;
   const headers = Array.from(table.querySelectorAll('thead th'));
   const cols = Array.from(table.querySelectorAll('colgroup col'));
+  if (headers.length < 3) return;
   headers.forEach(th => {
     if (!th.querySelector('.th-label')) {
       const label = document.createElement('span');

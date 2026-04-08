@@ -19,6 +19,15 @@ MAX_RETRIES = 3
 RETRY_BACKOFF_BASE = 2  # seconds
 
 
+class EventFetchError(RuntimeError):
+    """Raised when the PCE events API cannot be fetched safely."""
+
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
+        self.message = message
+
+
 def _extract_id(href):
     """Extract the last segment from an Illumio HREF path."""
     return href.split('/')[-1] if href else ""
@@ -113,23 +122,44 @@ class ApiClient:
             logger.error(f"Health check failed: {e}")
             return 0, str(e)
 
+    def _build_events_url(self, start_time_str, end_time_str=None, max_results=5000):
+        params = {
+            "timestamp[gte]": start_time_str,
+            "max_results": max_results,
+        }
+        if end_time_str:
+            params["timestamp[lte]"] = end_time_str
+        return f"{self.base_url}/events?{urllib.parse.urlencode(params)}"
+
+    def fetch_events_strict(self, start_time_str, end_time_str=None, max_results=5000):
+        """Fetch PCE events or raise an exception on any fetch/parsing error."""
+        url = self._build_events_url(start_time_str, end_time_str=end_time_str, max_results=max_results)
+        status, body = self._request(url, timeout=30)
+        if status != 200:
+            err_msg = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
+            raise EventFetchError(status, err_msg[:1000])
+
+        try:
+            data = json.loads(body)
+        except Exception as exc:
+            raise EventFetchError(status, f"Invalid events JSON: {exc}") from exc
+
+        if not isinstance(data, list):
+            raise EventFetchError(status, f"Unexpected events payload type: {type(data).__name__}")
+
+        return data
+
     def fetch_events(self, start_time_str, end_time_str=None, max_results=5000):
         try:
-            p = {
-                "timestamp[gte]": start_time_str,
-                "max_results": max_results
-            }
-            if end_time_str:
-                p["timestamp[lte]"] = end_time_str
-            params = urllib.parse.urlencode(p)
-            url = f"{self.base_url}/events?{params}"
-            status, body = self._request(url, timeout=30)
-            if status != 200:
-                err_msg = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
-                logger.error(f"Get Events Failed: {status} - {err_msg}")
-                print(f"{Colors.FAIL}{t('api_get_events_failed', status=status, error=err_msg[:500])}{Colors.ENDC}")
-                return []
-            return json.loads(body)
+            return self.fetch_events_strict(
+                start_time_str,
+                end_time_str=end_time_str,
+                max_results=max_results,
+            )
+        except EventFetchError as e:
+            logger.error(f"Get Events Failed: {e.status} - {e.message}")
+            print(f"{Colors.FAIL}{t('api_get_events_failed', status=e.status, error=e.message[:500])}{Colors.ENDC}")
+            return []
         except Exception as e:
             logger.error(f"Fetch Events Error: {e}")
             print(f"{Colors.FAIL}{t('api_fetch_events_error', error=str(e))}{Colors.ENDC}")
