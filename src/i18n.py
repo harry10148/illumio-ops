@@ -135,6 +135,7 @@ _ZH_EXPLICIT: dict[str, str] = {
     "main_menu_6": " 6. 發送測試告警",
     "main_menu_7": " 7. 執行分析並發送告警",
     "main_menu_8": " 8. 規則模擬與除錯模式",
+    "main_menu_13": " 9. 新增系統健康規則",
     "main_menu_9": " 1. 產生流量分析報表",
     "main_menu_10": " 2. 產生稽核報表",
     "main_menu_11": " 3. 產生 VEN 狀態報表",
