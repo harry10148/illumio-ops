@@ -11,6 +11,7 @@ Enhanced field extraction from Illumio PCE event JSON:
   - agent hostname for agent-originated events
 """
 import datetime
+import json
 import logging
 import os
 import pandas as pd
@@ -19,6 +20,12 @@ from typing import Optional
 
 from src.events import normalize_event
 from src.i18n import t
+from src.report.dashboard_summaries import write_audit_dashboard_summary
+from src.report.report_metadata import (
+    attack_summary_counts,
+    build_attack_summary_brief,
+    extract_attack_summary,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -645,6 +652,7 @@ class AuditGenerator:
                 date_range=result.date_range
             ).export(output_dir)
             paths.append(path)
+            self._write_report_metadata(path, result, file_format='html')
             print(t("rpt_audit_html_saved", path=path))
         if fmt in ('csv', 'all'):
             # Include full raw event data alongside module results
@@ -653,5 +661,35 @@ class AuditGenerator:
                 export_data['raw_events'] = result.dataframe
             path = CsvExporter(export_data, report_label='Audit').export(output_dir)
             paths.append(path)
+            self._write_report_metadata(path, result, file_format='csv')
             print(t("rpt_audit_csv_saved", path=path))
+        try:
+            write_audit_dashboard_summary(output_dir, result)
+        except Exception as exc:
+            logger.warning(f"[AuditGenerator] Failed to write dashboard summary: {exc}")
         return paths
+
+    def _build_report_metadata(self, result: AuditReportResult, file_format: str) -> dict:
+        mod00 = result.module_results.get('mod00', {}) if isinstance(result.module_results, dict) else {}
+        attack_summary = extract_attack_summary(result.module_results, top_n=5)
+        counts = attack_summary_counts(attack_summary)
+        summary = build_attack_summary_brief(counts)
+        if not summary:
+            summary = f"audit events {int(getattr(result, 'record_count', 0) or 0)}"
+        return {
+            "report_type": "audit",
+            "file_format": file_format,
+            "generated_at": getattr(result, "generated_at", datetime.datetime.now()).isoformat(),
+            "record_count": int(getattr(result, "record_count", 0) or 0),
+            "date_range": list(getattr(result, "date_range", ("", "")) or ("", "")),
+            "kpis": mod00.get("kpis", []),
+            "summary": summary,
+            "attack_summary": attack_summary,
+            "attack_summary_counts": counts,
+        }
+
+    def _write_report_metadata(self, report_path: str, result: AuditReportResult, file_format: str):
+        metadata_path = report_path + ".metadata.json"
+        payload = self._build_report_metadata(result, file_format=file_format)
+        with open(metadata_path, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, ensure_ascii=False)

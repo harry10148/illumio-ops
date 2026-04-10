@@ -62,6 +62,64 @@ function _buildAuditSummaryFieldset() {
   return fieldset;
 }
 
+function _buildPolicyUsageSummaryFieldset() {
+  const fieldset = document.createElement('fieldset');
+  fieldset.id = 'policy-usage-fieldset';
+  fieldset.style.marginBottom = '18px';
+  fieldset.innerHTML = `
+    <legend style="font-size:1.05rem;">Latest Policy Usage Summary</legend>
+    <div id="policy-usage-placeholder" style="text-align:center;padding:24px;color:var(--dim);font-size:0.9rem;">
+      No policy usage report summary found. Generate a Policy Usage Report to populate this section.
+    </div>
+    <div id="policy-usage-content" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+        <span style="color:var(--dim);font-size:0.82rem;"><span>Generated:</span> <span id="policy-usage-generated-at">-</span></span>
+        <span style="color:var(--dim);font-size:0.82rem;"><span>Date Range:</span> <span id="policy-usage-date-range">-</span></span>
+      </div>
+      <div id="policy-usage-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px;"></div>
+      <div style="margin-bottom:16px;">
+        <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);">Top Hit Ports</div>
+        <table class="rule-table" style="font-size:0.8rem;">
+          <thead><tr><th>Port / Proto</th><th>Flows</th></tr></thead>
+          <tbody id="policy-usage-top-ports-body">
+            <tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;">No data</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);">Pending Rules</div>
+          <table class="rule-table" style="font-size:0.8rem;">
+            <thead><tr><th>Rule</th><th>Ruleset</th></tr></thead>
+            <tbody id="policy-usage-pending-body">
+              <tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;">No data</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);">Failed Rules</div>
+          <table class="rule-table" style="font-size:0.8rem;">
+            <thead><tr><th>Rule</th><th>Ruleset</th></tr></thead>
+            <tbody id="policy-usage-failed-body">
+              <tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;">No data</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div>
+          <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);">Reused Rules</div>
+          <table class="rule-table" style="font-size:0.8rem;">
+            <thead><tr><th>Rule</th><th>Ruleset</th></tr></thead>
+            <tbody id="policy-usage-reused-body">
+              <tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;">No data</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  return fieldset;
+}
+
 function ensureTrafficWorkloadLayout() {
   const panel = $('p-traffic-workload');
   const dashboard = $('p-dashboard');
@@ -124,6 +182,16 @@ function ensureDashboardLayout() {
     }
   }
 
+  if (!$('policy-usage-fieldset')) {
+    const auditFieldset = $('audit-fieldset');
+    const policyUsageFieldset = _buildPolicyUsageSummaryFieldset();
+    if (auditFieldset) {
+      auditFieldset.insertAdjacentElement('afterend', policyUsageFieldset);
+    } else {
+      dashboard.appendChild(policyUsageFieldset);
+    }
+  }
+
   dashboard.dataset.layoutReady = '1';
 }
 
@@ -158,6 +226,12 @@ async function loadReports() {
   r.reports.forEach(rp => {
     const d = new Date(rp.mtime*1000).toLocaleString();
     const sz = (rp.size/1024).toFixed(1)+' KB';
+    const attackMeta = _buildAttackSummaryMeta(rp.attack_summary_counts || {});
+    const metaLine = rp.report_type === 'policy_usage'
+      ? (_buildPolicyUsageReportMeta(rp) + attackMeta)
+      : (rp.summary
+          ? `<div style="font-size:0.76rem;color:var(--dim);margin-top:4px;">${escapeHtml(rp.summary)}</div>${attackMeta}`
+          : attackMeta);
     const viewLabel = _translations['gui_btn_view'] || '檢視';
     const downloadLabel = _translations['gui_btn_download'] || '下載';
     const deleteLabel = _translations['gui_btn_delete'] || '刪除';
@@ -170,7 +244,7 @@ async function loadReports() {
     const delBtn = `<button class="btn btn-sm btn-danger" onclick="deleteReport('${escapeHtml(rp.filename)}')" title="${deleteLabel}" aria-label="${deleteLabel}" style="padding:4px 8px;line-height:1;">&times;</button>`;
     tbody.innerHTML += `<tr>
       <td><input type="checkbox" class="rt-chk" value="${escapeHtml(rp.filename)}" onchange="onReportCheckChange()"></td>
-      <td>${escapeHtml(rp.filename)}</td>
+      <td><div>${escapeHtml(rp.filename)}</div>${metaLine}</td>
       <td>${d}</td>
       <td>${sz}</td>
       <td><div style="display:flex;gap:6px;align-items:center;">${actionBtn}${delBtn}</div></td>
@@ -474,6 +548,81 @@ function _updateGenStep(msg) {
   if (el) el.textContent = msg;
 }
 
+function _formatPolicyUsageExecutionSummary(stats, notes) {
+  const s = stats || {};
+  const parts = [];
+  if ((s.cached_rules || 0) > 0) parts.push(`cache ${s.cached_rules}`);
+  if ((s.submitted_rules || 0) > 0) parts.push(`new ${s.submitted_rules}`);
+  if ((s.pending_jobs || 0) > 0) parts.push(`pending ${s.pending_jobs}`);
+  if ((s.failed_jobs || 0) > 0) parts.push(`failed ${s.failed_jobs}`);
+  if (!parts.length && Array.isArray(notes) && notes.length) return notes[0];
+  return parts.join(' | ');
+}
+
+function _formatPolicyUsageRuleLabel(item) {
+  const it = item || {};
+  return it.rule_no || it.rule_id || it.ruleset_name || it.description || it.rule_href || 'rule';
+}
+
+function _formatPolicyUsageDetailPreview(stats, maxItems = 2) {
+  const s = stats || {};
+  const segments = [];
+  const pushSegment = (label, items) => {
+    if (!Array.isArray(items) || !items.length) return;
+    const preview = items.slice(0, maxItems).map(_formatPolicyUsageRuleLabel).join(', ');
+    const suffix = items.length > maxItems ? ` +${items.length - maxItems}` : '';
+    segments.push(`${label}: ${preview}${suffix}`);
+  };
+  pushSegment('pending', s.pending_rule_details || []);
+  pushSegment('failed', s.failed_rule_details || []);
+  pushSegment('reused', s.reused_rule_details || []);
+  return segments.join(' | ');
+}
+
+function _buildPolicyUsageReportMeta(rp) {
+  const stats = Object.assign({}, rp.execution_stats || {});
+  if (!stats.reused_rule_details && Array.isArray(rp.reused_rule_details)) stats.reused_rule_details = rp.reused_rule_details;
+  if (!stats.pending_rule_details && Array.isArray(rp.pending_rule_details)) stats.pending_rule_details = rp.pending_rule_details;
+  if (!stats.failed_rule_details && Array.isArray(rp.failed_rule_details)) stats.failed_rule_details = rp.failed_rule_details;
+
+  const summary = _formatPolicyUsageExecutionSummary(stats, []);
+  const detailPreview = _formatPolicyUsageDetailPreview(stats);
+  const badges = [];
+  if ((stats.cached_rules || 0) > 0) badges.push(`<span style="display:inline-block;padding:2px 7px;border-radius:999px;background:#edf7ed;color:#1b5e20;font-size:0.72rem;">cache ${stats.cached_rules}</span>`);
+  if ((stats.submitted_rules || 0) > 0) badges.push(`<span style="display:inline-block;padding:2px 7px;border-radius:999px;background:#e3f2fd;color:#0d47a1;font-size:0.72rem;">new ${stats.submitted_rules}</span>`);
+  if ((stats.pending_jobs || 0) > 0) badges.push(`<span style="display:inline-block;padding:2px 7px;border-radius:999px;background:#fff4e5;color:#8a4b00;font-size:0.72rem;">pending ${stats.pending_jobs}</span>`);
+  if ((stats.failed_jobs || 0) > 0) badges.push(`<span style="display:inline-block;padding:2px 7px;border-radius:999px;background:#fdecea;color:#b42318;font-size:0.72rem;">failed ${stats.failed_jobs}</span>`);
+
+  const lines = [];
+  if (badges.length) lines.push(`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">${badges.join('')}</div>`);
+  if (detailPreview) lines.push(`<div style="font-size:0.76rem;color:var(--dim);margin-top:4px;">${escapeHtml(detailPreview)}</div>`);
+  else if (summary) lines.push(`<div style="font-size:0.76rem;color:var(--dim);margin-top:4px;">${escapeHtml(summary)}</div>`);
+  else if (rp.summary) lines.push(`<div style="font-size:0.76rem;color:var(--dim);margin-top:4px;">${escapeHtml(rp.summary)}</div>`);
+  return lines.join('');
+}
+
+function _buildAttackSummaryMeta(counts) {
+  const c = counts || {};
+  const boundary = c.boundary_breaches || 0;
+  const pivot = c.suspicious_pivot_behavior || 0;
+  const blast = c.blast_radius || 0;
+  const blind = c.blind_spots || 0;
+  const actions = c.action_matrix || 0;
+  const total = boundary + pivot + blast + blind + actions;
+  if (!total) return '';
+
+  const badges = [
+    `B ${boundary}`,
+    `P ${pivot}`,
+    `R ${blast}`,
+    `S ${blind}`,
+    `A ${actions}`,
+  ]
+    .map(t => `<span style="display:inline-block;padding:2px 6px;border-radius:999px;background:#1a2c32;color:#d6d7d7;font-size:0.7rem;">${escapeHtml(t)}</span>`)
+    .join('');
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;" title="Attack/攻擊摘要">${badges}</div>`;
+}
+
 function _hideGenProgress(success, msg) {
   const el = document.getElementById('_gen-progress-overlay');
   if (!el) return;
@@ -558,7 +707,7 @@ async function confirmReportGen() {
   if      (_genReportType === 'traffic')      await _doGenerateTraffic();
   else if (_genReportType === 'audit')        await _doGenerateAudit();
   else if (_genReportType === 'ven')          await _doGenerateVen();
-  else if (_genReportType === 'policy_usage') await _doGeneratePolicyUsage();
+  else if (_genReportType === 'policy_usage') await _doGeneratePolicyUsageClean();
 }
 
 function _collectReportFilters() {
@@ -849,6 +998,34 @@ async function _doGeneratePolicyUsage() {
   }
 }
 
+async function _doGeneratePolicyUsageClean() {
+  _updateGenStep(_translations['gui_gen_step_fetching'] || 'Fetching policy data from PCE…');
+  try {
+    const start = $('m-gen-start') ? $('m-gen-start').value : null;
+    const end   = $('m-gen-end')   ? $('m-gen-end').value   : null;
+    const r = await post('/api/policy_usage_report/generate', { start_date: start, end_date: end });
+    if (r.ok) {
+      const kpiText = (r.kpis || []).map(k => `${k.label}: ${k.value}`).join(' | ');
+      const execText = _formatPolicyUsageExecutionSummary(r.execution_stats, r.execution_notes);
+      const detailText = _formatPolicyUsageDetailPreview({
+        reused_rule_details: r.reused_rule_details || [],
+        pending_rule_details: r.pending_rule_details || [],
+        failed_rule_details: r.failed_rule_details || [],
+      }, 3);
+      const summaryText = [kpiText, execText, detailText].filter(Boolean).join(' | ');
+      _hideGenProgress(true, summaryText || '完成');
+      toast(`Policy 使用報表已產生：${r.record_count} 筆${summaryText ? ` (${summaryText})` : ''}`);
+      loadReports();
+    } else {
+      _hideGenProgress(false, r.error || '產生 Policy 使用報表失敗');
+      toast(r.error || '產生 Policy 使用報表失敗', 'err');
+    }
+  } catch (e) {
+    _hideGenProgress(false, e.message);
+    toast('產生 Policy 使用報表時發生錯誤：' + e.message, 'err');
+  }
+}
+
 async function loadDashboard() {
   // Status section — failures must not block queries/translations from loading
   try {
@@ -911,6 +1088,7 @@ async function loadDashboard() {
   await loadTranslations();
   await loadDashboardQueries();
   await loadDashboardSnapshot();
+  await loadDashboardPolicyUsageSummary();
 }
 
 async function loadDashboardSnapshot() {
@@ -1049,6 +1227,76 @@ async function loadDashboardSnapshot() {
     console.warn('Dashboard Snapshot Error:', e);
   }
 }
+
+async function loadDashboardPolicyUsageSummary() {
+  try {
+    const r = await api('/api/dashboard/policy_usage_summary');
+    if (!r || !r.ok || !r.summary) return;
+    const s = r.summary;
+
+    const placeholder = $('policy-usage-placeholder');
+    const content = $('policy-usage-content');
+    if (placeholder) placeholder.style.display = 'none';
+    if (content) content.style.display = 'block';
+
+    if ($('policy-usage-generated-at')) $('policy-usage-generated-at').textContent = s.generated_at || '-';
+    if ($('policy-usage-date-range')) $('policy-usage-date-range').textContent = (s.date_range || []).join(' ~ ') || '-';
+
+    const stats = s.execution_stats || {};
+    const cards = [
+      ['Hit Rules', stats.hit_rules || 0],
+      ['Unused Rules', stats.unused_rules || 0],
+      ['Cached Reuse', stats.cached_rules || 0],
+      ['New Queries', stats.submitted_rules || 0],
+      ['Pending Jobs', stats.pending_jobs || 0],
+      ['Failed Jobs', stats.failed_jobs || 0],
+    ];
+    const grid = $('policy-usage-kpi-grid');
+    if (grid) {
+      grid.innerHTML = cards.map(([label, value]) =>
+        `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
+          <div style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;">${escapeHtml(String(label))}</div>
+          <div style="font-size:1.1rem;font-weight:700;margin-top:4px;color:var(--fg);">${escapeHtml(String(value))}</div>
+        </div>`
+      ).join('');
+    }
+
+    const renderRows = (bodyId, rows) => {
+      const body = $(bodyId);
+      if (!body) return;
+      if (!rows || !rows.length) {
+        body.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;">No data</td></tr>';
+        return;
+      }
+      body.innerHTML = rows.map(row => {
+        const rule = _formatPolicyUsageRuleLabel(row);
+        const ruleset = row.ruleset_name || '—';
+        return `<tr><td>${escapeHtml(String(rule))}</td><td>${escapeHtml(String(ruleset))}</td></tr>`;
+      }).join('');
+    };
+
+    const topPortsBody = $('policy-usage-top-ports-body');
+    if (topPortsBody) {
+      const topPorts = s.top_hit_ports || [];
+      if (!topPorts.length) {
+        topPortsBody.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;">No data</td></tr>';
+      } else {
+        topPortsBody.innerHTML = topPorts.map(item => {
+          const label = item.port_proto || '-';
+          const count = item.flow_count || 0;
+          return `<tr><td>${escapeHtml(String(label))}</td><td>${escapeHtml(String(count))}</td></tr>`;
+        }).join('');
+      }
+    }
+
+    renderRows('policy-usage-pending-body', s.pending_rule_details || []);
+    renderRows('policy-usage-failed-body', s.failed_rule_details || []);
+    renderRows('policy-usage-reused-body', s.reused_rule_details || []);
+  } catch (e) {
+    console.warn('Policy Usage Summary Error:', e);
+  }
+}
+
 async function testConn() {
   slog(_translations['gui_test_conn_running'] || '測試 PCE 連線中...');
   const r = await post('/api/actions/test-connection', {});

@@ -1,262 +1,382 @@
-"""Module 15: Lateral Movement Risk Detection."""
+"""Module 15: Deterministic graph-centric lateral movement risk."""
 from __future__ import annotations
-import pandas as pd
+
 from collections import defaultdict, deque
 
+import pandas as pd
 
-# Ports commonly exploited for lateral movement
+from .attack_posture import build_app_display, make_posture_item, rank_posture_items
+
+
 _LATERAL_PORTS = {
-    445: 'SMB',
-    135: 'RPC',
-    139: 'NetBIOS',
-    3389: 'RDP',
-    22: 'SSH',
-    5985: 'WinRM-HTTP',
-    5986: 'WinRM-HTTPS',
-    23: 'Telnet',
-    2049: 'NFS',
-    111: 'RPC Portmapper',
-    389: 'LDAP',
-    636: 'LDAPS',
-    88: 'Kerberos',
-    1433: 'MSSQL',
-    3306: 'MySQL',
-    5432: 'PostgreSQL',
+    445: "SMB",
+    135: "RPC",
+    139: "NetBIOS",
+    3389: "RDP",
+    22: "SSH",
+    5985: "WinRM-HTTP",
+    5986: "WinRM-HTTPS",
+    23: "Telnet",
+    2049: "NFS",
+    111: "RPC Portmapper",
+    389: "LDAP",
+    636: "LDAPS",
+    88: "Kerberos",
+    1433: "MSSQL",
+    3306: "MySQL",
+    5432: "PostgreSQL",
 }
 
 
-def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20) -> dict:
-    """
-    Detect lateral movement risk patterns in traffic data.
+def _normalize_key_series(df: pd.DataFrame, app_col: str, env_col: str) -> pd.Series:
+    app = df.get(app_col, pd.Series(index=df.index, dtype=object)).fillna("").astype(str).str.strip().str.lower()
+    env = df.get(env_col, pd.Series(index=df.index, dtype=object)).fillna("").astype(str).str.strip().str.lower()
+    app = app.where(app != "", "unlabeled")
+    env = env.where(env != "", "unlabeled")
+    return app + "|" + env
 
-    Methodology:
-    1. Lateral-port exposure: flows on known lateral movement ports
-    2. Fan-out detection: single source talking to many destinations on lateral ports
-       (classic lateral movement scanning / worm propagation pattern)
-    3. Chain detection: A→B→C paths on lateral ports (reachability via BFS)
-    4. Articulation points (proxy via high connectivity): nodes whose removal would
-       disconnect large segments (critical chokepoints)
-    5. Risk scoring per source IP and per application
 
-    Returns risk scores, top risky flows, fan-out offenders, and chain paths.
-    """
+def _articulation_points(nodes: list[str], graph: dict[str, set[str]]) -> set[str]:
+    # Tarjan articulation point algorithm on undirected graph.
+    if not nodes:
+        return set()
+    ids: dict[str, int] = {}
+    low: dict[str, int] = {}
+    parent: dict[str, str | None] = {}
+    out_edges: dict[str, int] = defaultdict(int)
+    points: set[str] = set()
+    current_id = 0
+
+    def dfs(at: str):
+        nonlocal current_id
+        current_id += 1
+        ids[at] = current_id
+        low[at] = current_id
+
+        for to in graph.get(at, set()):
+            if to == parent.get(at):
+                continue
+            if to not in ids:
+                parent[to] = at
+                out_edges[at] += 1
+                dfs(to)
+                low[at] = min(low[at], low[to])
+                if parent.get(at) is not None and ids[at] <= low[to]:
+                    points.add(at)
+            else:
+                low[at] = min(low[at], ids[to])
+
+    for node in nodes:
+        if node not in ids:
+            parent[node] = None
+            dfs(node)
+            if out_edges[node] > 1:
+                points.add(node)
+    return points
+
+
+def _bfs_reachability(source: str, adjacency: dict[str, set[str]], max_depth: int) -> dict[str, list[str]]:
+    paths: dict[str, list[str]] = {}
+    q: deque[tuple[str, list[str]]] = deque([(source, [source])])
+    while q:
+        node, path = q.popleft()
+        if len(path) - 1 >= max_depth:
+            continue
+        for nxt in sorted(adjacency.get(node, set())):
+            if nxt in path:
+                continue
+            new_path = path + [nxt]
+            if nxt not in paths:
+                paths[nxt] = new_path
+            q.append((nxt, new_path))
+    return paths
+
+
+def _path_weight(path: list[str], edge_weights: dict[tuple[str, str], int]) -> int:
+    total = 0
+    for i in range(len(path) - 1):
+        total += int(edge_weights.get((path[i], path[i + 1]), 0))
+    return total
+
+
+def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4) -> dict:
     if df.empty:
-        return {'error': 'No data'}
+        return {"error": "No data"}
 
-    # ── Lateral port flows ─────────────────────────────────────────────────────
-    lateral = df[df['port'].isin(_LATERAL_PORTS)].copy()
-    lateral['service'] = lateral['port'].map(_LATERAL_PORTS)
-    total_lateral = len(lateral)
-    lateral_pct = round(total_lateral / len(df) * 100, 1) if len(df) else 0
+    work = df.copy()
+    work["port"] = pd.to_numeric(work.get("port", -1), errors="coerce").fillna(-1).astype(int)
+    work["policy_decision"] = work.get("policy_decision", "").fillna("").astype(str).str.lower()
+    work["num_connections"] = pd.to_numeric(work.get("num_connections", 1), errors="coerce").fillna(1).astype(int)
+    work["src_key"] = _normalize_key_series(work, "src_app", "src_env")
+    work["dst_key"] = _normalize_key_series(work, "dst_app", "dst_env")
 
-    # ── Lateral port summary by service ───────────────────────────────────────
-    service_summary = (lateral.groupby(['port', 'service', 'policy_decision'])
-                       .agg(connections=('num_connections', 'sum'),
-                            unique_src=('src_ip', 'nunique'),
-                            unique_dst=('dst_ip', 'nunique'))
-                       .reset_index()
-                       .nlargest(top_n, 'connections')
-                       .rename(columns={'port': 'Port', 'service': 'Service',
-                                        'policy_decision': 'Decision',
-                                        'connections': 'Connections',
-                                        'unique_src': 'Unique Sources',
-                                        'unique_dst': 'Unique Destinations'}))
+    lateral = work[work["port"].isin(_LATERAL_PORTS)].copy()
+    lateral["service"] = lateral["port"].map(_LATERAL_PORTS)
+    if lateral.empty:
+        return {
+            "total_lateral_flows": 0,
+            "lateral_pct": 0.0,
+            "service_summary": pd.DataFrame(),
+            "fan_out_sources": pd.DataFrame(),
+            "app_chains": pd.DataFrame(),
+            "bridge_nodes": pd.DataFrame(),
+            "top_reachable_nodes": pd.DataFrame(),
+            "attack_paths": pd.DataFrame(),
+            "allowed_lateral_flows": pd.DataFrame(),
+            "source_risk_scores": pd.DataFrame(),
+            "attack_posture_items": [],
+        }
 
-    # ── Fan-out detection: sources with high destination spread ───────────────
-    fan_out = _detect_fan_out(lateral, top_n=top_n)
+    lateral_pct = round(len(lateral) / max(1, len(work)) * 100, 1)
+    service_summary = (
+        lateral.groupby(["port", "service", "policy_decision"])
+        .agg(
+            connections=("num_connections", "sum"),
+            unique_src=("src_key", "nunique"),
+            unique_dst=("dst_key", "nunique"),
+        )
+        .reset_index()
+        .rename(
+            columns={
+                "port": "Port",
+                "service": "Service",
+                "policy_decision": "Decision",
+                "connections": "Connections",
+                "unique_src": "Unique Sources",
+                "unique_dst": "Unique Destinations",
+            }
+        )
+        .sort_values(by=["Connections", "Port"], ascending=[False, True])
+        .head(top_n)
+        .reset_index(drop=True)
+    )
 
-    # ── App-level lateral path chains (BFS reachability) ─────────────────────
-    app_chains = _detect_app_chains(lateral, max_depth=3, top_n=top_n)
+    traversable = lateral[lateral["policy_decision"].isin(["allowed", "potentially_blocked"])].copy()
+    traversable = traversable[traversable["src_key"] != traversable["dst_key"]]
 
-    # ── Articulation proxies: high betweenness nodes ──────────────────────────
-    articulation = _detect_articulation_proxies(lateral, top_n=top_n)
+    edge_weights: dict[tuple[str, str], int] = defaultdict(int)
+    adjacency: dict[str, set[str]] = defaultdict(set)
+    undirected: dict[str, set[str]] = defaultdict(set)
+    for _, row in traversable.iterrows():
+        src = str(row["src_key"])
+        dst = str(row["dst_key"])
+        edge_weights[(src, dst)] += int(row["num_connections"])
+    for (src, dst), _w in edge_weights.items():
+        adjacency[src].add(dst)
+        undirected[src].add(dst)
+        undirected[dst].add(src)
 
-    # ── Per-source risk scoring ────────────────────────────────────────────────
-    source_risk = _score_sources(lateral, top_n=top_n)
+    nodes = sorted(set(undirected.keys()) | {n for neigh in undirected.values() for n in neigh})
+    articulation = _articulation_points(nodes, undirected)
 
-    # ── Allowed lateral flows (highest risk — explicit permits for LM ports) ──
-    allowed_lateral = (lateral[lateral['policy_decision'] == 'allowed']
-                       .groupby(['src_app', 'dst_app', 'port', 'service'])
-                       .agg(connections=('num_connections', 'sum'),
-                            unique_src=('src_ip', 'nunique'))
-                       .reset_index()
-                       .nlargest(top_n, 'connections')
-                       .rename(columns={'src_app': 'Source App', 'dst_app': 'Destination App',
-                                        'port': 'Port', 'service': 'Service',
-                                        'connections': 'Connections',
-                                        'unique_src': 'Unique Sources'}))
+    reach_rows: list[dict] = []
+    path_rows: list[dict] = []
+    bridge_rows: list[dict] = []
+    attack_items: list[dict] = []
+
+    max_reach = 1
+    reach_cache: dict[str, dict[str, list[str]]] = {}
+    for node in nodes:
+        reached = _bfs_reachability(node, adjacency, max_depth=max_depth)
+        reach_cache[node] = reached
+        max_reach = max(max_reach, len(reached))
+
+    for node in nodes:
+        app, env = node.split("|", 1)
+        reached = reach_cache.get(node, {})
+        reach_count = len(reached)
+        reach_score = round((reach_count / max_reach) * 100.0, 1) if max_reach else 0.0
+        bridge_score = round((60.0 if node in articulation else 0.0) + (reach_score * 0.4), 1)
+
+        reach_rows.append(
+            {
+                "Source App (Env)": build_app_display(app, env),
+                "app_env_key": node,
+                "Reachable App Count": reach_count,
+                "Max Depth Used": max_depth,
+                "Reachability Score": reach_score,
+            }
+        )
+        bridge_rows.append(
+            {
+                "App (Env)": build_app_display(app, env),
+                "app_env_key": node,
+                "Articulation Point": "Yes" if node in articulation else "No",
+                "Reachable App Count": reach_count,
+                "Bridge Score": bridge_score,
+            }
+        )
+
+        if node in articulation and reach_count >= 2:
+            attack_items.append(
+                make_posture_item(
+                    scope="traffic_report",
+                    framework="microseg_attack",
+                    app=app,
+                    env=env,
+                    finding_kind="suspicious_pivot",
+                    attack_stage="pivot",
+                    confidence="high",
+                    recommended_action_code="RESTRICT_TRANSIT_NODE_ACCESS",
+                    severity="CRITICAL" if reach_count >= 6 else "HIGH",
+                    evidence={"reachability_count": reach_count, "bridge_score": bridge_score},
+                )
+            )
+        if reach_count >= 4:
+            attack_items.append(
+                make_posture_item(
+                    scope="traffic_report",
+                    framework="microseg_attack",
+                    app=app,
+                    env=env,
+                    finding_kind="blast_radius",
+                    attack_stage="blast_radius",
+                    confidence="medium",
+                    recommended_action_code="TIGHTEN_LATERAL_POLICY",
+                    severity="HIGH",
+                    evidence={"reachability_count": reach_count, "max_depth": max_depth},
+                )
+            )
+
+        for target, path in reached.items():
+            if len(path) <= 2:
+                continue
+            tgt_app, tgt_env = target.split("|", 1)
+            path_rows.append(
+                {
+                    "Source App (Env)": build_app_display(app, env),
+                    "Source App Env Key": node,
+                    "Target App (Env)": build_app_display(tgt_app, tgt_env),
+                    "Target App Env Key": target,
+                    "Path Depth": len(path) - 1,
+                    "Path": " -> ".join(build_app_display(*hop.split("|", 1)) for hop in path),
+                    "Path Connection Weight": _path_weight(path, edge_weights),
+                }
+            )
+
+    top_reachable_nodes = (
+        pd.DataFrame(reach_rows)
+        .sort_values(by=["Reachable App Count", "app_env_key"], ascending=[False, True])
+        .head(top_n)
+        .reset_index(drop=True)
+        if reach_rows
+        else pd.DataFrame()
+    )
+    bridge_nodes = (
+        pd.DataFrame(bridge_rows)
+        .sort_values(by=["Bridge Score", "app_env_key"], ascending=[False, True])
+        .head(top_n)
+        .reset_index(drop=True)
+        if bridge_rows
+        else pd.DataFrame()
+    )
+    attack_paths = (
+        pd.DataFrame(path_rows)
+        .sort_values(by=["Path Depth", "Path Connection Weight", "Source App Env Key"], ascending=[False, False, True])
+        .head(top_n)
+        .reset_index(drop=True)
+        if path_rows
+        else pd.DataFrame()
+    )
+    app_chains = top_reachable_nodes.copy() if not top_reachable_nodes.empty else pd.DataFrame()
+
+    allowed_lateral_flows = (
+        lateral[lateral["policy_decision"] == "allowed"]
+        .groupby(["src_key", "dst_key", "port", "service"])
+        .agg(connections=("num_connections", "sum"))
+        .reset_index()
+        .rename(
+            columns={
+                "src_key": "Source App Env Key",
+                "dst_key": "Destination App Env Key",
+                "port": "Port",
+                "service": "Service",
+                "connections": "Connections",
+            }
+        )
+        .sort_values(by=["Connections", "Source App Env Key"], ascending=[False, True])
+        .head(top_n)
+        .reset_index(drop=True)
+    )
+    if not allowed_lateral_flows.empty:
+        allowed_lateral_flows["Source App (Env)"] = allowed_lateral_flows["Source App Env Key"].apply(
+            lambda v: build_app_display(*str(v).split("|", 1))
+        )
+        allowed_lateral_flows["Destination App (Env)"] = allowed_lateral_flows["Destination App Env Key"].apply(
+            lambda v: build_app_display(*str(v).split("|", 1))
+        )
+
+    fan_out_sources = (
+        traversable.groupby("src_key")
+        .agg(
+            unique_dst=("dst_key", "nunique"),
+            unique_ports=("port", "nunique"),
+            connections=("num_connections", "sum"),
+        )
+        .reset_index()
+        .rename(
+            columns={
+                "src_key": "Source App Env Key",
+                "unique_dst": "Unique Destinations",
+                "unique_ports": "Lateral Ports",
+                "connections": "Connections",
+            }
+        )
+        .sort_values(by=["Unique Destinations", "Source App Env Key"], ascending=[False, True])
+        .head(top_n)
+        .reset_index(drop=True)
+        if not traversable.empty
+        else pd.DataFrame()
+    )
+    if not fan_out_sources.empty:
+        fan_out_sources["Source App (Env)"] = fan_out_sources["Source App Env Key"].apply(
+            lambda v: build_app_display(*str(v).split("|", 1))
+        )
+
+    source_risk_scores = (
+        bridge_nodes[["App (Env)", "app_env_key", "Bridge Score", "Reachable App Count"]]
+        .rename(columns={"Bridge Score": "Risk Score"})
+        .copy()
+    )
+    if not source_risk_scores.empty:
+        source_risk_scores["Risk Level"] = source_risk_scores["Risk Score"].apply(
+            lambda s: "Critical" if s >= 85 else ("High" if s >= 60 else ("Medium" if s >= 35 else "Low"))
+        )
+
+    if "src_managed" in traversable.columns and "dst_managed" in traversable.columns:
+        unmanaged_reach = traversable[
+            (~traversable["src_managed"].fillna(False).astype(bool))
+            | (~traversable["dst_managed"].fillna(False).astype(bool))
+        ]
+        for key, group in unmanaged_reach.groupby("src_key"):
+            app, env = str(key).split("|", 1)
+            attack_items.append(
+                make_posture_item(
+                    scope="traffic_report",
+                    framework="microseg_attack",
+                    app=app,
+                    env=env,
+                    finding_kind="blind_spot",
+                    attack_stage="exposure",
+                    confidence="medium",
+                    recommended_action_code="ONBOARD_UNMANAGED",
+                    severity="HIGH" if len(group) >= 3 else "MEDIUM",
+                    evidence={"unmanaged_traversable_flows": int(len(group))},
+                )
+            )
 
     return {
-        'total_lateral_flows': total_lateral,
-        'lateral_pct': lateral_pct,
-        'service_summary': service_summary,
-        'fan_out_sources': fan_out,
-        'app_chains': app_chains,
-        'articulation_proxies': articulation,
-        'source_risk_scores': source_risk,
-        'allowed_lateral_flows': allowed_lateral,
+        "total_lateral_flows": int(len(lateral)),
+        "lateral_pct": lateral_pct,
+        "service_summary": service_summary,
+        "fan_out_sources": fan_out_sources,
+        "app_chains": app_chains,
+        "bridge_nodes": bridge_nodes,
+        "top_reachable_nodes": top_reachable_nodes,
+        "attack_paths": attack_paths,
+        "articulation_proxies": bridge_nodes,
+        "source_risk_scores": source_risk_scores,
+        "allowed_lateral_flows": allowed_lateral_flows,
+        "attack_posture_items": rank_posture_items(attack_items)[: max(top_n, 10)],
     }
 
-
-def _detect_fan_out(lateral: pd.DataFrame, threshold: int = 5,
-                    top_n: int = 20) -> pd.DataFrame:
-    """Sources communicating to many destinations on lateral ports — high fan-out = suspicious."""
-    if lateral.empty:
-        return pd.DataFrame()
-    fan = (lateral.groupby('src_ip')
-           .agg(unique_dst=('dst_ip', 'nunique'),
-                unique_ports=('port', 'nunique'),
-                connections=('num_connections', 'sum'),
-                services=('service', lambda x: ', '.join(sorted(set(x)))))
-           .reset_index()
-           .query(f'unique_dst >= {threshold}')
-           .nlargest(top_n, 'unique_dst')
-           .rename(columns={'src_ip': 'Source IP', 'unique_dst': 'Unique Destinations',
-                            'unique_ports': 'Lateral Ports', 'connections': 'Connections',
-                            'services': 'Services'}))
-    # Add risk tier
-    if not fan.empty:
-        fan['Risk'] = fan['Unique Destinations'].apply(
-            lambda x: 'Critical' if x >= 20 else ('High' if x >= 10 else 'Medium'))
-    return fan.reset_index(drop=True)
-
-
-def _detect_app_chains(lateral: pd.DataFrame, max_depth: int = 3,
-                       top_n: int = 20) -> pd.DataFrame:
-    """
-    BFS from each app node: find apps reachable within max_depth hops on lateral ports.
-    High reachability = high blast radius if that app is compromised.
-    """
-    if lateral.empty:
-        return pd.DataFrame()
-
-    # Build app→app adjacency (only allowed flows for reachability)
-    allowed = lateral[lateral['policy_decision'] == 'allowed']
-    if allowed.empty:
-        return pd.DataFrame()
-
-    adj: dict[str, set[str]] = defaultdict(set)
-    for _, row in allowed.iterrows():
-        src = str(row.get('src_app') or '')
-        dst = str(row.get('dst_app') or '')
-        if src and dst and src != dst:
-            adj[src].add(dst)
-
-    if not adj:
-        return pd.DataFrame()
-
-    rows = []
-    all_nodes = set(adj.keys()) | {d for dsts in adj.values() for d in dsts}
-
-    for start in all_nodes:
-        visited: set[str] = {start}
-        queue: deque[tuple[str, int]] = deque([(start, 0)])
-        reachable = []
-        while queue:
-            node, depth = queue.popleft()
-            if depth >= max_depth:
-                continue
-            for neighbor in adj.get(node, set()):
-                if neighbor not in visited:
-                    visited.add(neighbor)
-                    reachable.append(neighbor)
-                    queue.append((neighbor, depth + 1))
-        rows.append({
-            'Source App': start,
-            'Reachable Apps (lateral)': len(reachable),
-            'Max Depth': max_depth,
-            'Apps in Blast Radius': ', '.join(sorted(reachable)[:5]) + ('...' if len(reachable) > 5 else ''),
-        })
-
-    chains = (pd.DataFrame(rows)
-              .query('`Reachable Apps (lateral)` > 0')
-              .nlargest(top_n, 'Reachable Apps (lateral)')
-              .reset_index(drop=True))
-    return chains
-
-
-def _detect_articulation_proxies(lateral: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
-    """
-    Proxy for articulation points: IP nodes with both high in-degree and out-degree
-    on lateral ports are likely chokepoints — disrupting them would affect many paths.
-    """
-    if lateral.empty:
-        return pd.DataFrame()
-
-    in_deg: dict[str, int] = defaultdict(int)
-    out_deg: dict[str, int] = defaultdict(int)
-    in_conn: dict[str, int] = defaultdict(int)
-    out_conn: dict[str, int] = defaultdict(int)
-
-    for _, row in lateral.iterrows():
-        src = str(row.get('src_ip') or '')
-        dst = str(row.get('dst_ip') or '')
-        w = int(row.get('num_connections', 1))
-        if src:
-            out_deg[src] += 1
-            out_conn[src] += w
-        if dst:
-            in_deg[dst] += 1
-            in_conn[dst] += w
-
-    all_ips = set(in_deg) | set(out_deg)
-    rows = []
-    for ip in all_ips:
-        ind = in_deg.get(ip, 0)
-        outd = out_deg.get(ip, 0)
-        if ind >= 2 and outd >= 2:
-            rows.append({
-                'IP': ip,
-                'In-Degree': ind,
-                'Out-Degree': outd,
-                'Connections In': in_conn.get(ip, 0),
-                'Connections Out': out_conn.get(ip, 0),
-                'Chokepoint Score': ind + outd,
-            })
-
-    if not rows:
-        return pd.DataFrame()
-
-    return (pd.DataFrame(rows)
-            .nlargest(top_n, 'Chokepoint Score')
-            .reset_index(drop=True))
-
-
-def _score_sources(lateral: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
-    """Score each source IP by lateral movement risk (0-100)."""
-    if lateral.empty:
-        return pd.DataFrame()
-
-    src_stats = (lateral.groupby('src_ip')
-                 .agg(connections=('num_connections', 'sum'),
-                      unique_dst=('dst_ip', 'nunique'),
-                      unique_ports=('port', 'nunique'),
-                      allowed=('policy_decision', lambda x: (x == 'allowed').sum()),
-                      blocked=('policy_decision', lambda x: (x.isin(['blocked', 'potentially_blocked'])).sum()),
-                      services=('service', lambda x: ', '.join(sorted(set(x)))))
-                 .reset_index())
-
-    max_conn = src_stats['connections'].max() or 1
-    max_dst = src_stats['unique_dst'].max() or 1
-    max_ports = src_stats['unique_ports'].max() or 1
-
-    def _score(row):
-        conn_score = (row['connections'] / max_conn) * 30
-        dst_score = (row['unique_dst'] / max_dst) * 40
-        port_score = (row['unique_ports'] / max_ports) * 20
-        # Penalty: if many flows are blocked → active scanning
-        total = row['connections'] or 1
-        block_ratio = row['blocked'] / total
-        block_penalty = block_ratio * 10
-        return round(conn_score + dst_score + port_score + block_penalty, 1)
-
-    src_stats['Risk Score'] = src_stats.apply(_score, axis=1)
-    src_stats['Risk Level'] = src_stats['Risk Score'].apply(
-        lambda s: 'Critical' if s >= 70 else ('High' if s >= 50 else ('Medium' if s >= 30 else 'Low')))
-
-    return (src_stats.nlargest(top_n, 'Risk Score')
-            .rename(columns={'src_ip': 'Source IP', 'connections': 'Connections',
-                             'unique_dst': 'Unique Destinations', 'unique_ports': 'Lateral Ports',
-                             'allowed': 'Allowed', 'blocked': 'Blocked/PB',
-                             'services': 'Services'})
-            .reset_index(drop=True))

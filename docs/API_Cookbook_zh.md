@@ -658,3 +658,91 @@ print(f"刪除結果: {res.json()}")
 | 列出 Ruleset（排程器） | `/api/rule_scheduler/rulesets` | GET | — | `200` + `{items}` |
 | 列出排程規則 | `/api/rule_scheduler/schedules` | GET | — | `200` + `{items}` |
 | 新增排程規則 | `/api/rule_scheduler/schedules` | POST | `{ruleset_href, ...}` | `200` + `{ok, id}` |
+---
+
+## 更新版 Traffic Filter 參數說明
+
+目前 `Analyzer.query_flows()` 與 `ApiClient.build_traffic_query_spec()` 會把查詢條件分成三類：
+
+- `native_filters`：直接下推到 PCE async Explorer query
+- `fallback_filters`：流量下載後在 client 端做補過濾
+- `report_only_filters`：只影響搜尋、排序、分頁或 draft 比對
+
+### Native filters
+
+這些條件會直接縮小 PCE 端結果集，也是 raw Explorer CSV export 唯一接受的 filter 類型。
+
+| 參數 | 型別 | 範例 | 說明 |
+|:---|:---|:---|:---|
+| `src_label`, `dst_label` | `key:value` 字串 | `role:web` | 解析成 label href 後下推 |
+| `src_labels`, `dst_labels` | `key:value` 陣列 | `["env:prod", "app:web"]` | 同側多個 label |
+| `src_label_group`, `dst_label_group` | 名稱或 href | `Critical Apps` | 解析成 label group href |
+| `src_label_groups`, `dst_label_groups` | 名稱或 href 陣列 | `["Critical Apps", "PCI Apps"]` | 多個 label group |
+| `src_ip_in`, `src_ip`, `dst_ip_in`, `dst_ip` | IP、workload href、IP list 名稱/href | `10.0.0.5`, `corp-net` | 支援 literal IP 或 resolver actor |
+| `ex_src_label`, `ex_dst_label` | `key:value` 字串 | `env:dev` | 排除 label |
+| `ex_src_labels`, `ex_dst_labels` | `key:value` 陣列 | `["role:test"]` | 排除多個 label |
+| `ex_src_label_group`, `ex_dst_label_group` | 名稱或 href | `Legacy Apps` | 排除 label group |
+| `ex_src_label_groups`, `ex_dst_label_groups` | 名稱或 href 陣列 | `["Legacy Apps"]` | 排除多個 label group |
+| `ex_src_ip`, `ex_dst_ip` | IP、workload href、IP list 名稱/href | `10.20.0.0/16` | 排除 actor/IP |
+| `port`, `proto` | int 或字串 | `443`, `6` | 單一 service port/protocol |
+| `port_range`, `ex_port_range` | range 字串或 tuple | `"8080-8090/6"` | 單一 port range |
+| `port_ranges`, `ex_port_ranges` | range 陣列 | `["1000-2000/6"]` | 多個 port range |
+| `ex_port` | int 或字串 | `22` | 排除 port |
+| `process_name`, `windows_service_name` | 字串 | `nginx`, `WinRM` | service 側 process / service filter |
+| `ex_process_name`, `ex_windows_service_name` | 字串 | `sshd` | 排除 service 側 process / service |
+| `query_operator` | `and` 或 `or` | `or` | 對應 `sources_destinations_query_op` |
+| `exclude_workloads_from_ip_list_query` | bool | `true` | 原樣帶入 async payload |
+| `src_ams`, `dst_ams` | bool | `true` | 在 include 側加入 `actors:"ams"` |
+| `ex_src_ams`, `ex_dst_ams` | bool | `true` | 在 exclude 側加入 `actors:"ams"` |
+| `transmission_excludes`, `ex_transmission` | 字串或陣列 | `["broadcast", "multicast"]` | 支援 `unicast` / `broadcast` / `multicast` |
+| `src_include_groups`, `dst_include_groups` | actor group 陣列 | `[["role:web", "env:prod"], ["ams"]]` | 外層 OR，內層 AND |
+
+### Fallback filters
+
+這些條件保留在 client-side，因為它們是 `source or destination` 的 either-side 語意，不適合直接映射成單一 Explorer payload。
+
+| 參數 | 型別 | 範例 | 說明 |
+|:---|:---|:---|:---|
+| `any_label` | `key:value` 字串 | `app:web` | 來源或目的任一側有 label 即命中 |
+| `any_ip` | IP/CIDR/字串 | `10.0.0.5` | 任一側 IP 命中即可 |
+| `ex_any_label` | `key:value` 字串 | `env:dev` | 任一側命中即排除 |
+| `ex_any_ip` | IP/CIDR/字串 | `172.16.0.0/16` | 任一側命中即排除 |
+
+### Report-only filters
+
+這些條件不會影響 PCE query body。
+
+| 參數 | 型別 | 範例 | 說明 |
+|:---|:---|:---|:---|
+| `search` | 字串 | `db01` | 對名稱、IP、port、process、user 做文字比對 |
+| `sort_by` | 字串 | `bandwidth` | `bandwidth`、`volume`、`connections` |
+| `draft_policy_decision` | 字串 | `blocked_no_rule` | 需要 `compute_draft=True` 路徑 |
+| `page`, `page_size`, `limit`, `offset` | int | `100` | UI / 報表分頁用途 |
+
+### 混合使用範例
+
+```python
+results = ana.query_flows({
+    "start_time": "2026-04-01T00:00:00Z",
+    "end_time": "2026-04-01T23:59:59Z",
+    "policy_decisions": ["blocked", "potentially_blocked"],
+    "src_label_group": "Critical Apps",
+    "dst_ip_in": "corp-net",
+    "src_ams": True,
+    "transmission_excludes": ["broadcast", "multicast"],
+    "port_range": "8000-8100/6",
+    "any_label": "env:prod",
+    "search": "nginx",
+    "sort_by": "bandwidth",
+})
+```
+
+上面這個例子中：
+
+- `src_label_group`、`dst_ip_in`、`src_ams`、`transmission_excludes`、`port_range` 會 native 下推
+- `any_label` 會走 fallback
+- `search` 與 `sort_by` 屬於 report-only
+
+### Raw Explorer CSV export 限制
+
+`ApiClient.export_traffic_query_csv()` 只接受能完整解析成 `native_filters` 的條件。如果某個 filter 最後仍留在 `fallback_filters` 或 `report_only_filters`，raw CSV export 會直接拒絕，而不是悄悄改變查詢語意。

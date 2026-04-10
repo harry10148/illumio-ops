@@ -941,3 +941,67 @@ def test_dashboard_audit_summary_route(client, app_persistent, tmp_path):
     assert res.json["ok"] is True
     assert res.json["summary"]["record_count"] == 42
     assert res.json["summary"]["attention_items"][0]["event_type"] == "agent.tampering"
+
+
+def test_dashboard_policy_usage_summary_route_missing_message(client, app_persistent, tmp_path):
+    login = client.post('/api/login', json={
+        "username": "admin",
+        "password": "testpass"
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert login.status_code == 200
+
+    cm = app_persistent.config["CM"]
+    cm.config["report"] = {"output_dir": str(tmp_path)}
+    cm.save()
+
+    res = client.get('/api/dashboard/policy_usage_summary', environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert res.status_code == 200
+    assert res.json["ok"] is False
+    assert "No policy usage report summary found" in res.json["error"]
+
+
+def test_reports_route_surfaces_attack_metadata(client, app_persistent, tmp_path):
+    login = client.post('/api/login', json={
+        "username": "admin",
+        "password": "testpass"
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert login.status_code == 200
+
+    cm = app_persistent.config["CM"]
+    cm.config["report"] = {"output_dir": str(tmp_path)}
+    cm.save()
+
+    report_path = tmp_path / "Illumio_Traffic_Report_test.html"
+    report_path.write_text("<html></html>", encoding="utf-8")
+    metadata = {
+        "report_type": "traffic",
+        "summary": "deterministic test summary",
+        "attack_summary": {
+            "boundary_breaches": [{"finding": "Boundary breach test", "action": "Contain"}],
+            "suspicious_pivot_behavior": [],
+            "blast_radius": [],
+            "blind_spots": [],
+            "action_matrix": [],
+        },
+        "attack_summary_counts": {
+            "boundary_breaches": 1,
+            "suspicious_pivot_behavior": 0,
+            "blast_radius": 0,
+            "blind_spots": 0,
+            "action_matrix": 0,
+        },
+    }
+    (tmp_path / "Illumio_Traffic_Report_test.html.metadata.json").write_text(
+        json.dumps(metadata),
+        encoding="utf-8",
+    )
+
+    res = client.get('/api/reports', environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert res.status_code == 200
+    assert res.json["ok"] is True
+    reports = res.json["reports"]
+    assert reports
+    first = reports[0]
+    assert first["report_type"] == "traffic"
+    assert "attack_summary" in first
+    assert first["attack_summary_counts"]["boundary_breaches"] == 1

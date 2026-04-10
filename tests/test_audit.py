@@ -1,7 +1,10 @@
 import datetime
+import json
+import os
+import tempfile
 from unittest.mock import MagicMock
 
-from src.report.audit_generator import AuditGenerator
+from src.report.audit_generator import AuditGenerator, AuditReportResult
 
 
 def _sample_events():
@@ -127,3 +130,38 @@ def test_audit_pipeline_surfaces_parser_enrichment_in_modules():
     kpi_labels = {item["label"] for item in mod00["kpis"]}
     assert "Unknown Event Types" in kpi_labels
     assert "Parser Notes" in kpi_labels
+
+
+def test_audit_export_writes_metadata_and_dashboard_summary():
+    generator = _generator()
+    result = AuditReportResult(
+        record_count=6,
+        date_range=("2026-04-01", "2026-04-02"),
+        module_results={
+            "mod00": {
+                "kpis": [{"label": "Total Events", "value": "6"}],
+                "boundary_breaches": [{"finding": "Scope breach changes", "action": "Review boundary policy"}],
+                "suspicious_pivot_behavior": [],
+                "blast_radius": [],
+                "blind_spots": [{"finding": "Unknown parser events", "action": "Normalize event schema"}],
+                "action_matrix": [{"action": "Harden policy review process", "priority": 80}],
+            }
+        },
+        dataframe=None,
+    )
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        paths = generator.export(result, fmt="csv", output_dir=tmpdir)
+        assert len(paths) == 1
+
+        metadata_path = paths[0] + ".metadata.json"
+        assert os.path.exists(metadata_path)
+        with open(metadata_path, "r", encoding="utf-8") as fh:
+            metadata = json.load(fh)
+
+        assert metadata["report_type"] == "audit"
+        assert "attack_summary" in metadata
+        assert metadata["attack_summary_counts"]["boundary_breaches"] == 1
+
+        summary_path = os.path.join(tmpdir, "latest_audit_summary.json")
+        assert os.path.exists(summary_path)

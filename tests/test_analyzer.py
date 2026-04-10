@@ -2,6 +2,7 @@ import unittest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock
 from src.analyzer import Analyzer
+from src.api_client import TrafficQuerySpec
 from src.config import ConfigManager
 
 class TestAnalyzer(unittest.TestCase):
@@ -68,6 +69,29 @@ class TestAnalyzer(unittest.TestCase):
         past = now - timedelta(minutes=15)
         self.analyzer.state['alert_history']['rule1'] = past.strftime('%Y-%m-%dT%H:%M:%SZ')
         self.assertTrue(self.analyzer._check_cooldown(rule))
+
+    def test_query_flows_passes_filters_to_api_layer(self):
+        self.mock_api.execute_traffic_query_stream.return_value = iter([])
+        self.mock_api.build_traffic_query_spec.side_effect = lambda filters: TrafficQuerySpec(
+            raw_filters=dict(filters),
+            native_filters={"src_label": filters.get("src_label"), "dst_ip_in": filters.get("dst_ip_in"), "port": filters.get("port")},
+            fallback_filters={},
+            report_only_filters={},
+        )
+
+        self.analyzer.query_flows({
+            "start_time": "2026-04-01T00:00:00Z",
+            "end_time": "2026-04-01T00:30:00Z",
+            "src_label": "role:web",
+            "dst_ip_in": "10.0.0.5",
+            "port": 443,
+        })
+
+        _, kwargs = self.mock_api.execute_traffic_query_stream.call_args
+        self.assertIsInstance(kwargs["filters"], TrafficQuerySpec)
+        self.assertEqual(kwargs["filters"].native_filters["src_label"], "role:web")
+        self.assertEqual(kwargs["filters"].native_filters["dst_ip_in"], "10.0.0.5")
+        self.assertEqual(kwargs["filters"].native_filters["port"], 443)
 
 if __name__ == '__main__':
     unittest.main()

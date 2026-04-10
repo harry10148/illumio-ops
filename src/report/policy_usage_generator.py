@@ -12,12 +12,20 @@ Approach (per-rule async query, matching workloader rule-usage):
 Also supports importing workloader CSV output via generate_from_csv().
 """
 import datetime
+import json
 import logging
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 
 from src.i18n import t
+from src.report.dashboard_summaries import write_policy_usage_dashboard_summary
+from src.report.report_metadata import (
+    attack_summary_counts,
+    build_attack_summary_brief,
+    extract_attack_summary,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +38,7 @@ class PolicyUsageResult:
     lookback_days: int = 30
     module_results: dict = field(default_factory=dict)
     dataframe: object = None       # flat rules DataFrame for CSV export
+    execution_stats: dict = field(default_factory=dict)
 
 
 class PolicyUsageGenerator:
@@ -85,7 +94,7 @@ class PolicyUsageGenerator:
 
         # Step 3 — per-rule async traffic queries
         print(t("rpt_pu_fetching_traffic", start=start_date[:10], end=end_date[:10]))
-        hit_hrefs, hit_counts = self._extract_hit_data(flat_rules, start_date, end_date)
+        hit_hrefs, hit_counts, execution_stats = self._extract_hit_data(flat_rules, start_date, end_date)
         print(t("rpt_pu_flows_processed", hit=len(hit_hrefs)))
 
         # Step 4 — run analysis pipeline
@@ -97,6 +106,7 @@ class PolicyUsageGenerator:
             start_date=start_date,
             end_date=end_date,
             lookback_days=lookback_days,
+            execution_stats=execution_stats,
         )
         print(t("rpt_pu_complete"))
         return result
@@ -149,8 +159,53 @@ class PolicyUsageGenerator:
                 pass
             if flows > 0:
                 hit_counts[rule_href] = flows
+                rule['_flows_by_port'] = self._parse_flows_by_port(row.get('flows_by_port', ''))
 
         hit_hrefs = set(hit_counts.keys())
+        port_totals = {}
+        hit_rule_port_details = []
+        for rule in flat_rules:
+            href = rule.get('href', '')
+            if href not in hit_hrefs:
+                continue
+            flows_by_port = dict(rule.get('_flows_by_port', {}) or {})
+            for port_proto, count in flows_by_port.items():
+                port_totals[port_proto] = port_totals.get(port_proto, 0) + int(count or 0)
+            hit_rule_port_details.append({
+                "rule_href": href,
+                "rule_id": rule.get("_rule_id", ""),
+                "rule_no": rule.get("_rule_no", ""),
+                "ruleset_href": rule.get("_ruleset_href", ""),
+                "ruleset_name": rule.get("_ruleset_name", ""),
+                "description": rule.get("description", ""),
+                "status": "hit",
+                "hit_count": int(hit_counts.get(href, 0) or 0),
+                "flows_by_port": flows_by_port,
+                "top_hit_ports": "; ".join(
+                    f"{port_proto} ({count})"
+                    for port_proto, count in sorted(flows_by_port.items(), key=lambda item: (-item[1], item[0]))[:3]
+                ),
+            })
+
+        execution_stats = {
+            "cached_rules": 0,
+            "submitted_rules": 0,
+            "pending_jobs": 0,
+            "failed_jobs": 0,
+            "completed_jobs": 0,
+            "downloaded_jobs": 0,
+            "hit_rules": len(hit_hrefs),
+            "unused_rules": len(flat_rules) - len(hit_hrefs),
+            "flows_by_port_totals": port_totals,
+            "top_hit_ports": [
+                {"port_proto": port_proto, "flow_count": count}
+                for port_proto, count in sorted(port_totals.items(), key=lambda item: (-item[1], item[0]))[:10]
+            ],
+            "hit_rule_port_details": hit_rule_port_details,
+            "reused_rule_details": [],
+            "pending_rule_details": [],
+            "failed_rule_details": [],
+        }
 
         # Use today as date range (CSV doesn't have this info)
         today = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
@@ -163,6 +218,7 @@ class PolicyUsageGenerator:
             start_date=today,
             end_date=today,
             lookback_days=0,
+            execution_stats=execution_stats,
         )
         return result
 
@@ -186,26 +242,86 @@ class PolicyUsageGenerator:
                 lookback_days=result.lookback_days,
             ).export(output_dir)
             paths.append(path)
+            self._write_report_metadata(path, result, file_format='html')
             print(t("rpt_pu_html_saved", path=path))
 
         if fmt in ('csv', 'all'):
             mod02 = result.module_results.get('mod02', {})
             mod03 = result.module_results.get('mod03', {})
             export_data = {}
+            execution = result.execution_stats or {}
             hit_df = mod02.get('hit_df')
             unused_df = mod03.get('unused_df')
+            top_ports_df = mod02.get('top_ports_df')
             if hit_df is not None and not hit_df.empty:
                 export_data['hit_rules'] = hit_df
             if unused_df is not None and not unused_df.empty:
                 export_data['unused_rules'] = unused_df
+            if top_ports_df is not None and not top_ports_df.empty:
+                export_data['top_hit_ports'] = top_ports_df
             if result.dataframe is not None and not result.dataframe.empty:
                 export_data['raw_rules'] = result.dataframe
+            if execution.get('reused_rule_details'):
+                export_data['execution_reused_rules'] = execution['reused_rule_details']
+            if execution.get('pending_rule_details'):
+                export_data['execution_pending_rules'] = execution['pending_rule_details']
+            if execution.get('failed_rule_details'):
+                export_data['execution_failed_rules'] = execution['failed_rule_details']
+            if execution.get('hit_rule_port_details'):
+                export_data['hit_rule_port_details'] = execution['hit_rule_port_details']
             if export_data:
                 path = CsvExporter(export_data, report_label='Policy_Usage').export(output_dir)
                 paths.append(path)
+                self._write_report_metadata(path, result, file_format='csv')
                 print(t("rpt_pu_csv_saved", path=path))
 
+        try:
+            write_policy_usage_dashboard_summary(output_dir, result)
+        except Exception as exc:
+            logger.warning(f"[PolicyUsageGenerator] Failed to write dashboard summary: {exc}")
         return paths
+
+    def _build_report_metadata(self, result: PolicyUsageResult, file_format: str) -> dict:
+        mod00 = result.module_results.get('mod00', {}) if isinstance(result.module_results, dict) else {}
+        execution = result.execution_stats or mod00.get('execution_stats', {}) or {}
+        notes = mod00.get('execution_notes', []) or []
+        summary_bits = []
+        if execution.get('cached_rules'):
+            summary_bits.append(f"cache {execution['cached_rules']}")
+        if execution.get('submitted_rules'):
+            summary_bits.append(f"new {execution['submitted_rules']}")
+        if execution.get('pending_jobs'):
+            summary_bits.append(f"pending {execution['pending_jobs']}")
+        if execution.get('failed_jobs'):
+            summary_bits.append(f"failed {execution['failed_jobs']}")
+        attack_summary = extract_attack_summary(result.module_results, top_n=5)
+        counts = attack_summary_counts(attack_summary)
+        attack_brief = build_attack_summary_brief(counts)
+        if attack_brief:
+            summary_bits.append(attack_brief)
+        return {
+            "report_type": "policy_usage",
+            "file_format": file_format,
+            "generated_at": getattr(result, "generated_at", datetime.datetime.now()).isoformat(),
+            "record_count": int(getattr(result, "record_count", 0) or 0),
+            "date_range": list(getattr(result, "date_range", ("", "")) or ("", "")),
+            "kpis": mod00.get('kpis', []),
+            "execution_stats": execution,
+            "top_hit_ports": execution.get("top_hit_ports", []),
+            "reused_rule_details": execution.get("reused_rule_details", []),
+            "pending_rule_details": execution.get("pending_rule_details", []),
+            "failed_rule_details": execution.get("failed_rule_details", []),
+            "execution_notes": notes,
+            "attack_summary": attack_summary,
+            "attack_summary_counts": counts,
+            "summary": " | ".join(summary_bits),
+        }
+
+    def _write_report_metadata(self, report_path: str, result: PolicyUsageResult, file_format: str):
+        metadata_path = report_path + ".metadata.json"
+        payload = self._build_report_metadata(result, file_format=file_format)
+        with open(metadata_path, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, ensure_ascii=False)
 
     # ── Internal helpers ───────────────────────────────────────────────────────
 
@@ -274,7 +390,42 @@ class PolicyUsageGenerator:
             on_progress=_on_progress,
         )
         print()   # newline after progress line
-        return hit_hrefs, hit_counts
+        return hit_hrefs, hit_counts, self.api.get_last_rule_usage_batch_stats()
+
+    @staticmethod
+    def _parse_flows_by_port(value) -> dict:
+        if isinstance(value, dict):
+            parsed = {}
+            for key, count in value.items():
+                try:
+                    parsed[str(key)] = int(count or 0)
+                except (TypeError, ValueError):
+                    continue
+            return parsed
+
+        text = str(value or "").strip()
+        if not text:
+            return {}
+
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict):
+                parsed = {}
+                for key, count in data.items():
+                    try:
+                        parsed[str(key)] = int(count or 0)
+                    except (TypeError, ValueError):
+                        continue
+                return parsed
+        except Exception:
+            pass
+
+        parsed = {}
+        for match in re.finditer(r"([^;]+?)\s+\((\d+)\)", text):
+            label = " ".join(match.group(1).strip().split())
+            label = label.replace(" TCP", "/tcp").replace(" UDP", "/udp").replace(" ICMP", "/icmp")
+            parsed[label] = int(match.group(2))
+        return parsed
 
     def _run_pipeline(
         self,
@@ -285,6 +436,7 @@ class PolicyUsageGenerator:
         start_date: str,
         end_date: str,
         lookback_days: int,
+        execution_stats: dict | None = None,
     ) -> PolicyUsageResult:
         import pandas as pd
         from src.report.analysis.policy_usage.pu_mod01_overview import pu_overview
@@ -294,8 +446,9 @@ class PolicyUsageGenerator:
 
         results = {}
         results['mod01'] = pu_overview(flat_rules, hit_hrefs)
-        results['mod02'] = pu_hit_detail(flat_rules, ruleset_map, hit_counts, self.api)
-        results['mod03'] = pu_unused_detail(flat_rules, ruleset_map, hit_hrefs, self.api)
+        results['mod02'] = pu_hit_detail(flat_rules, ruleset_map, hit_counts, execution_stats or {}, self.api)
+        results['mod03'] = pu_unused_detail(flat_rules, ruleset_map, hit_hrefs, execution_stats or {}, self.api)
+        results['meta'] = {'execution_stats': execution_stats or {}}
         results['mod00'] = pu_executive_summary(results, lookback_days)
 
         # Build flat DataFrame for CSV raw_rules sheet
@@ -321,4 +474,5 @@ class PolicyUsageGenerator:
             lookback_days=lookback_days,
             module_results=results,
             dataframe=df,
+            execution_stats=execution_stats or {},
         )

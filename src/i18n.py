@@ -32,6 +32,7 @@ def _load_en_messages() -> dict[str, str]:
 
 
 EN_MESSAGES = _load_en_messages()
+_PLACEHOLDER_VALUE_RE = re.compile(r"^(?:Rpt|GUI|Gui|Sched)\b")
 
 _ZH_EXPLICIT: dict[str, str] = {
     "gui_tab_dashboard": "總覽",
@@ -41,6 +42,7 @@ _ZH_EXPLICIT: dict[str, str] = {
     "gui_dashboard_pce_health": "PCE 健康狀況",
     "gui_dashboard_audit_summary": "最新 Audit Report 摘要",
     "gui_dashboard_no_audit_summary": "目前沒有 Audit Report 摘要，請先產生 Audit Report。",
+    "gui_dashboard_no_policy_usage_summary": "目前沒有 Policy 使用報表摘要，請先產生 Policy 使用報表。",
     "gui_dashboard_audit_attention": "需優先關注",
     "gui_dashboard_audit_top_events": "主要事件類型",
     "hint_return": "(輸入 0 返回上一層)",
@@ -135,6 +137,7 @@ _ZH_EXPLICIT: dict[str, str] = {
     "main_menu_6": " 6. 發送測試告警",
     "main_menu_7": " 7. 執行分析並發送告警",
     "main_menu_8": " 8. 規則模擬與除錯模式",
+    "main_menu_13": " 9. 新增系統健康規則",
     "main_menu_9": " 1. 產生流量分析報表",
     "main_menu_10": " 2. 產生稽核報表",
     "main_menu_11": " 3. 產生 VEN 狀態報表",
@@ -685,6 +688,19 @@ _ZH_EXPLICIT: dict[str, str] = {
     "rpt_email_audit_subject": "Illumio 稽核與事件報表",
     "rpt_email_ven_subject": "Illumio VEN 狀態報表",
     "rpt_email_pu_subject": "Illumio Policy 使用報表",
+    "rpt_email_key_metrics": "關鍵指標",
+    "rpt_email_kpi_title": "關鍵指標",
+    "rpt_email_scheduled_report": "排程報表",
+    "rpt_email_attached_files": "附件檔案",
+    "rpt_email_security_findings": "安全發現",
+    "rpt_email_records": "紀錄數：{count}",
+    "rpt_email_period": "期間：{start} ~ {end}",
+    "rpt_email_key_findings": "關鍵發現",
+    "rpt_email_no_findings": "沒有關鍵發現。",
+    "rpt_email_source_api": "資料來源：Illumio API",
+    "rpt_email_footer": "由 Illumio PCE Ops 產生",
+    "rpt_email_sent": "報表 Email 已寄送。",
+    "rpt_email_failed": "報表 Email 寄送失敗：{error}",
 }
 
 _ZH_EXPLICIT["gui_top10_widgets"] = "排行總覽"
@@ -696,6 +712,9 @@ _SKIP_TOKENS = {
 }
 
 _TOKEN_MAP_EN = {
+    "rpt": "Report",
+    "tr": "Traffic",
+    "au": "Audit",
     "rs": "Ruleset",
     "pu": "Policy Usage",
     "ven": "VEN",
@@ -715,6 +734,9 @@ _TOKEN_MAP_EN = {
     "tcp": "TCP",
     "udp": "UDP",
     "pce": "PCE",
+    "kpi": "KPI",
+    "btn": "Button",
+    "ev": "Event",
     "access": "Access",
     "agent": "Agent",
     "authentication": "Authentication",
@@ -803,8 +825,8 @@ _TOKEN_MAP_EN = {
     "workload": "Workload",
     "workloads": "Workloads",
     "rule": "Rule",
-    "label": "標籤",
-    "labels": "標籤",
+    "label": "Label",
+    "labels": "Labels",
 }
 
 _TOKEN_MAP_ZH = {
@@ -1168,9 +1190,6 @@ _PHRASE_OVERRIDES = {
     "No report schedules.": "目前沒有報表排程。",
 }
 
-MESSAGES = {"en": EN_MESSAGES, "zh_TW": {}}
-
-
 def _humanize_key_en(key: str) -> str:
     if key.startswith("event_label_"):
         key = key[len("event_label_"):]
@@ -1183,6 +1202,24 @@ def _humanize_key_en(key: str) -> str:
     for part in parts:
         words.append(_TOKEN_MAP_EN.get(part.lower(), part.replace("-", " ").title()))
     return " ".join(words).strip()
+
+
+@lru_cache(maxsize=1)
+def _normalized_en_messages() -> dict[str, str]:
+    normalized: dict[str, str] = {}
+    for key, value in dict(EN_MESSAGES).items():
+        if not isinstance(value, str):
+            normalized[key] = value
+            continue
+        stripped = value.strip()
+        if not stripped:
+            normalized[key] = _humanize_key_en(key)
+            continue
+        if _PLACEHOLDER_VALUE_RE.match(stripped):
+            normalized[key] = _humanize_key_en(key)
+            continue
+        normalized[key] = value
+    return normalized
 
 
 def _needs_space(prev: str, curr: str) -> bool:
@@ -1318,9 +1355,10 @@ def _discover_keys() -> set[str]:
 
 @lru_cache(maxsize=2)
 def _build_messages(lang: str) -> dict[str, str]:
-    all_keys = set(EN_MESSAGES) | _discover_keys()
+    en_messages = _normalized_en_messages()
+    all_keys = set(en_messages) | _discover_keys()
     if lang == "en":
-        base = dict(EN_MESSAGES)
+        base = dict(en_messages)
         for key in all_keys:
             base.setdefault(key, _humanize_key_en(key))
         return base
@@ -1330,7 +1368,7 @@ def _build_messages(lang: str) -> dict[str, str]:
         if key in _ZH_EXPLICIT:
             base[key] = _ZH_EXPLICIT[key]
             continue
-        en_text = EN_MESSAGES.get(key)
+        en_text = en_messages.get(key)
         if en_text:
             translated = _translate_text(en_text)
             if translated and translated != en_text:
@@ -1351,7 +1389,7 @@ def t(key: str, **kwargs) -> str:
     default_val = kwargs.pop("default", None)
     text = get_messages(_current_lang).get(key)
     if text is None:
-        text = EN_MESSAGES.get(key)
+        text = _normalized_en_messages().get(key)
     if text is None:
         if default_val is not None:
             text = default_val

@@ -57,8 +57,8 @@ class PolicyUsageHtmlExporter:
         ts = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
         filename = f"illumio_policy_usage_report_{ts}.html"
         filepath = os.path.join(output_dir, filename)
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(self._build())
+        with open(filepath, "w", encoding="utf-8") as fh:
+            fh.write(self._build())
         logger.info("[PolicyUsageHtmlExporter] Saved: %s", filepath)
         return filepath
 
@@ -93,33 +93,35 @@ class PolicyUsageHtmlExporter:
             + "</p></div>"
             + self._summary_pills(mod00)
             + self._kpi_html(mod00.get("kpis", []))
+            + self._execution_html(mod00)
             + self._attention_html(mod00.get("attention_items", []))
+            + self._attack_summary_html(mod00)
             + "</section>\n"
             + self._section(
                 "overview",
                 "rpt_pu_sec_overview",
-                "1 · Policy Usage Overview",
+                "1. Policy Usage Overview",
                 self._mod01_html(),
-                "顯示回溯期間內各規則集的整體使用狀態。",
+                "Baseline coverage and usage rate for the selected lookback window.",
             )
             + "\n"
             + self._section(
                 "hit-rules",
                 "rpt_pu_sec_hit",
-                "2 · Hit Rules Detail",
+                "2. Hit Rules Detail",
                 self._mod02_html(),
-                "列出分析期間內實際被流量命中的規則。",
+                "Rules that observed traffic during the lookback window, including their dominant hit ports.",
             )
             + "\n"
             + self._section(
                 "unused-rules",
                 "rpt_pu_sec_unused",
-                "3 · Unused Rules Detail",
+                "3. Unused Rules Detail",
                 self._mod03_html(),
-                "列出本次資料中未被命中的規則，刪除前請先確認是否僅受保留期間限制。",
+                "Rules without observed hits in the selected window, shown with expected services for review.",
             )
             + "\n"
-            + '<footer><span data-i18n="rpt_pu_footer">Illumio PCE Ops — Policy Usage Report</span>'
+            + '<footer><span data-i18n="rpt_pu_footer">Illumio PCE Ops - Policy Usage Report</span>'
             + " &middot; "
             + today_str
             + "</footer>"
@@ -198,6 +200,82 @@ class PolicyUsageHtmlExporter:
             + "</div>"
         )
 
+    def _execution_html(self, mod00: dict) -> str:
+        stats = mod00.get("execution_stats", {}) or {}
+        notes = mod00.get("execution_notes", []) or []
+        if not stats and not notes:
+            return ""
+
+        rows = [
+            ("Cached summaries", stats.get("cached_rules", 0)),
+            ("New queries", stats.get("submitted_rules", 0)),
+            ("Completed jobs", stats.get("completed_jobs", 0)),
+            ("Pending jobs", stats.get("pending_jobs", 0)),
+            ("Failed jobs", stats.get("failed_jobs", 0)),
+        ]
+        metrics_html = "".join(
+            '<div class="attention-row">'
+            f'<span>{label}</span><span class="badge-hit">{value}</span>'
+            "</div>"
+            for label, value in rows
+        )
+        notes_html = "".join(f"<li>{note}</li>" for note in notes)
+        if notes_html:
+            notes_html = f'<ul style="margin:10px 0 0 18px;">{notes_html}</ul>'
+        return (
+            '<div class="attention-box">'
+            '<h4>Query Execution</h4>'
+            + metrics_html
+            + notes_html
+            + "</div>"
+        )
+
+    def _attack_summary_html(self, mod00: dict) -> str:
+        def _rows(section_items):
+            if not section_items:
+                return '<p class="note">No data</p>'
+            return "".join(
+                "<p style='margin-bottom:8px'><span class='badge badge-"
+                + str(item.get("severity", "INFO"))
+                + "'>"
+                + str(item.get("severity", "INFO"))
+                + "</span>&nbsp;"
+                + str(item.get("finding", ""))
+                + (("<br><span style='color:#718096;font-size:12px;'>"
+                    + str(item.get("finding_zh", ""))
+                    + "</span>") if item.get("finding_zh") else "")
+                + " <em style='color:#718096'>&rarr; "
+                + str(item.get("action", ""))
+                + "</em>"
+                + (("<br><span style='color:#718096;font-size:12px;'><em>&rarr; "
+                    + str(item.get("action_zh", ""))
+                    + "</em></span>") if item.get("action_zh") else "")
+                + "</p>"
+                for item in section_items[:3]
+            )
+
+        action_matrix = mod00.get("action_matrix", []) or []
+        action_html = "".join(
+            "<p style='margin-bottom:8px'><b>"
+            + str(item.get("action_code", ""))
+            + "</b>: "
+            + str(item.get("action", ""))
+            + (("<br><span style='color:#718096;font-size:12px;'>"
+                + str(item.get("action_zh", ""))
+                + "</span>") if item.get("action_zh") else "")
+            + "</p>"
+            for item in action_matrix[:3]
+        ) or '<p class="note">No data</p>'
+
+        return (
+            '<h2 data-i18n="rpt_tr_attack_summary">Attack Summary</h2>'
+            '<h3 data-i18n="rpt_tr_boundary_breaches">Boundary Breaches</h3>' + _rows(mod00.get("boundary_breaches", []))
+            + '<h3 data-i18n="rpt_tr_suspicious_pivot_behavior">Suspicious Pivot Behavior</h3>' + _rows(mod00.get("suspicious_pivot_behavior", []))
+            + '<h3 data-i18n="rpt_tr_blast_radius">Blast Radius</h3>' + _rows(mod00.get("blast_radius", []))
+            + '<h3 data-i18n="rpt_tr_blind_spots">Blind Spots</h3>' + _rows(mod00.get("blind_spots", []))
+            + '<h3 data-i18n="rpt_tr_action_matrix">Action Matrix</h3>' + action_html
+        )
+
     def _mod01_html(self) -> str:
         mod01 = self._r.get("mod01", {})
         total = mod01.get("total_rules", 0)
@@ -207,7 +285,6 @@ class PolicyUsageHtmlExporter:
         summary_df = mod01.get("summary_df")
 
         stats = (
-            '<p class="section-intro">先用這組數字確認目前啟用規則中，有多少在回溯期間內實際被命中，這能幫助你快速掌握 Policy 的活躍程度。</p>'
             "<p>"
             f'<span data-i18n="rpt_pu_total_rules">Total Active Rules</span>: <strong>{total}</strong> &nbsp;|&nbsp; '
             f'<span class="badge-hit" data-i18n="rpt_pu_hit_rules">Hit Rules</span> {hit} &nbsp;|&nbsp; '
@@ -220,11 +297,20 @@ class PolicyUsageHtmlExporter:
     def _mod02_html(self) -> str:
         mod02 = self._r.get("mod02", {})
         hit_df = mod02.get("hit_df")
+        top_ports_df = mod02.get("top_ports_df")
         count = mod02.get("record_count", 0)
-        note = f'<p style="color:#718096;font-size:12px;">{count} 筆規則</p>' if count else ""
+        note = f'<p style="color:#718096;font-size:12px;">{count} rows</p>' if count else ""
+        top_ports_html = ""
+        if top_ports_df is not None and not getattr(top_ports_df, "empty", True):
+            top_ports_html = (
+                '<div class="attention-box">'
+                '<h4>Top Hit Ports</h4>'
+                + _df_to_html(top_ports_df)
+                + "</div>"
+            )
         if hit_df is None or (hasattr(hit_df, "empty") and hit_df.empty):
-            return '<p class="note" data-i18n="rpt_pu_no_hit_rules">No rules were hit during this period.</p>'
-        return note + '<p class="section-intro">這張表列出有實際流量命中的規則，適合用來辨識真正承載業務流量的核心 Policy。</p>' + _df_to_html(hit_df)
+            return top_ports_html + '<p class="note" data-i18n="rpt_pu_no_hit_rules">No rules were hit during this period.</p>'
+        return top_ports_html + note + _df_to_html(hit_df)
 
     def _mod03_html(self) -> str:
         mod03 = self._r.get("mod03", {})
@@ -247,5 +333,5 @@ class PolicyUsageHtmlExporter:
                 + '<p class="note" data-i18n="rpt_pu_no_unused_rules">All rules had traffic hits; no unused rules found.</p>'
             )
 
-        note = f'<p style="color:#718096;font-size:12px;">{count} 筆規則</p>' if count else ""
-        return caveat_html + note + '<p class="section-intro">這張表列出本次回溯期間內沒有命中的規則，適合做為精簡 Policy 前的候選清單，但不應直接視為可刪除項目。</p>' + _df_to_html(unused_df)
+        note = f'<p style="color:#718096;font-size:12px;">{count} rows</p>' if count else ""
+        return caveat_html + note + _df_to_html(unused_df)

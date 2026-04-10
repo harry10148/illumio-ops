@@ -456,6 +456,16 @@ for suffix, pair in {
 }.items():
     STRINGS[f"rpt_col_{suffix}"] = _entry(*pair)
 
+for key, pair in {
+    "rpt_tr_attack_summary": ("Attack Summary", "攻擊摘要"),
+    "rpt_tr_boundary_breaches": ("Boundary Breaches", "邊界突破"),
+    "rpt_tr_suspicious_pivot_behavior": ("Suspicious Pivot Behavior", "可疑橫向樞紐行為"),
+    "rpt_tr_blast_radius": ("Blast Radius", "擴散半徑"),
+    "rpt_tr_blind_spots": ("Blind Spots", "盲點"),
+    "rpt_tr_action_matrix": ("Action Matrix", "行動矩陣"),
+}.items():
+    STRINGS[key] = _entry(pair[0], pair[1])
+
 
 def make_i18n_js() -> str:
     strings_json = json.dumps(STRINGS, ensure_ascii=False, indent=2)

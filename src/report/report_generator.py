@@ -24,6 +24,11 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from src.i18n import t
+from src.report.report_metadata import (
+    attack_summary_counts,
+    build_attack_summary_brief,
+    extract_attack_summary,
+)
 from src.report.tz_utils import parse_tz as _parse_tz, fmt_tz_now as _fmt_tz_now
 
 logger = logging.getLogger(__name__)
@@ -82,6 +87,11 @@ def _build_snapshot(module_results: dict) -> dict:
         'generated_at': mod12.get('generated_at', ''),
         'kpis':         mod12.get('kpis', []),
         'key_findings': mod12.get('key_findings', []),
+        'boundary_breaches': mod12.get('boundary_breaches', []),
+        'suspicious_pivot_behavior': mod12.get('suspicious_pivot_behavior', []),
+        'blast_radius': mod12.get('blast_radius', []),
+        'blind_spots': mod12.get('blind_spots', []),
+        'action_matrix': mod12.get('action_matrix', []),
         # mod01 scalars
         'total_flows':          _safe_val(mod01.get('total_flows', 0)),
         'total_connections':    _safe_val(mod01.get('total_connections', 0)),
@@ -126,6 +136,7 @@ class ReportResult:
     module_results: dict = field(default_factory=dict)
     findings: list = field(default_factory=list)
     dataframe: object = None       # pd.DataFrame, optional
+    query_context: dict = field(default_factory=dict)
 
 
 # ─── Generator ───────────────────────────────────────────────────────────────
@@ -167,6 +178,7 @@ class ReportGenerator:
 
         logger.info("[ReportGenerator] Starting API-source report generation")
         print(t("rpt_querying_traffic", start=start_date, end=end_date))
+        policy_decisions = list((filters or {}).get("policy_decisions") or ["blocked", "potentially_blocked", "allowed"])
 
         records = self.api.fetch_traffic_for_report(
             start_time_str=start_date, end_time_str=end_date, filters=filters)
@@ -174,11 +186,31 @@ class ReportGenerator:
         if not records:
             logger.warning("[ReportGenerator] No records returned from API")
             print(t("rpt_no_traffic_data"))
-            return ReportResult(data_source='api', record_count=0)
+            return ReportResult(
+                data_source='api',
+                record_count=0,
+                query_context={
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "filters": dict(filters or {}),
+                    "policy_decisions": policy_decisions,
+                    "query_diagnostics": self.api.get_last_traffic_query_diagnostics() if self.api else {},
+                },
+            )
 
         print(t("rpt_records_received", count=f"{len(records):,}"))
         df = self._parse_api(records)
-        return self._run_pipeline(df, source='api')
+        return self._run_pipeline(
+            df,
+            source='api',
+            query_context={
+                "start_date": start_date,
+                "end_date": end_date,
+                "filters": dict(filters or {}),
+                "policy_decisions": policy_decisions,
+                "query_diagnostics": self.api.get_last_traffic_query_diagnostics() if self.api else {},
+            },
+        )
 
     def generate_from_csv(self, csv_path: str) -> ReportResult:
         """Parse a CSV file from the PCE UI export and run the analysis pipeline."""
@@ -209,18 +241,51 @@ class ReportGenerator:
 
         paths = []
 
-        if fmt in ('html', 'all'):
+        if fmt in ('html', 'all', 'all_raw'):
             path = HtmlExporter(result.module_results).export(output_dir)
             paths.append(path)
+            self._write_report_metadata(path, self._build_report_metadata(result, file_format="html"))
             print(t("rpt_html_saved", path=path))
 
-        if fmt in ('csv', 'all'):
+        if fmt in ('csv', 'all', 'all_raw'):
             export_data = dict(result.module_results)
             if result.dataframe is not None and not result.dataframe.empty:
                 export_data['raw_traffic'] = result.dataframe
             path = CsvExporter(export_data, report_label='Traffic').export(output_dir)
             paths.append(path)
+            self._write_report_metadata(path, self._build_report_metadata(result, file_format="csv"))
             print(t("rpt_csv_saved", path=path))
+
+        if fmt in ('raw_csv', 'all_raw'):
+            if result.data_source != 'api' or not result.query_context:
+                raise ValueError("Raw Explorer CSV export is only supported for API-sourced traffic reports")
+            if self.api is None:
+                raise RuntimeError("api_client is required for raw Explorer CSV export")
+            raw_export = self.api.export_traffic_query_csv(
+                start_time_str=result.query_context.get("start_date"),
+                end_time_str=result.query_context.get("end_date"),
+                policy_decisions=result.query_context.get("policy_decisions"),
+                filters=result.query_context.get("filters"),
+                output_dir=output_dir,
+            )
+            paths.append(raw_export["path"])
+            self._write_report_metadata(
+                raw_export["path"],
+                {
+                    "report_type": "traffic_raw_csv",
+                    "file_format": "raw_csv",
+                    "generated_at": result.generated_at.isoformat(),
+                    "record_count": int(raw_export.get("row_count", 0) or 0),
+                    "date_range": list(result.date_range),
+                    "summary": "Raw Explorer CSV export",
+                    "query_diagnostics": raw_export.get("query_diagnostics", {}),
+                    "policy_decisions": raw_export.get("policy_decisions", []),
+                    "filters": raw_export.get("filters", {}),
+                    "job_href": raw_export.get("job_href", ""),
+                    "compute_draft": raw_export.get("compute_draft", False),
+                },
+            )
+            print(f"Raw Explorer CSV saved: {raw_export['path']}")
 
         # Save snapshot for Web UI Dashboard directly
         try:
@@ -247,7 +312,7 @@ class ReportGenerator:
 
     # ── private — pipeline ───────────────────────────────────────────────────
 
-    def _run_pipeline(self, df, source: str) -> ReportResult:
+    def _run_pipeline(self, df, source: str, query_context: Optional[dict] = None) -> ReportResult:
         """Validate → Rules → 12 modules → wrap result."""
         import pandas as pd
         from src.report.parsers.validators import validate, coerce
@@ -294,7 +359,34 @@ class ReportGenerator:
             module_results=results,
             findings=findings,
             dataframe=df,
+            query_context=dict(query_context or {}),
         )
+
+    @staticmethod
+    def _write_report_metadata(report_path: str, payload: dict):
+        import json
+
+        with open(report_path + ".metadata.json", "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, ensure_ascii=False)
+
+    def _build_report_metadata(self, result: ReportResult, file_format: str) -> dict:
+        mod12 = result.module_results.get("mod12", {}) if isinstance(result.module_results, dict) else {}
+        attack_summary = extract_attack_summary(result.module_results, top_n=5)
+        counts = attack_summary_counts(attack_summary)
+        summary = build_attack_summary_brief(counts)
+        if not summary:
+            summary = f"traffic records {int(getattr(result, 'record_count', 0) or 0)}"
+        return {
+            "report_type": "traffic",
+            "file_format": file_format,
+            "generated_at": getattr(result, "generated_at", datetime.datetime.now()).isoformat(),
+            "record_count": int(getattr(result, "record_count", 0) or 0),
+            "date_range": list(getattr(result, "date_range", ("", "")) or ("", "")),
+            "kpis": mod12.get("kpis", []),
+            "summary": summary,
+            "attack_summary": attack_summary,
+            "attack_summary_counts": counts,
+        }
 
     def _run_modules(self, df, findings: list) -> dict:
         """Execute all registered analysis modules via the module registry."""
@@ -369,6 +461,11 @@ class ReportGenerator:
         """Build a compact HTML email body from the executive summary."""
         kpis = mod12.get('kpis', [])
         findings = mod12.get('key_findings', [])
+        boundary_breaches = mod12.get('boundary_breaches', [])
+        suspicious_pivot = mod12.get('suspicious_pivot_behavior', [])
+        blast_radius = mod12.get('blast_radius', [])
+        blind_spots = mod12.get('blind_spots', [])
+        action_matrix = mod12.get('action_matrix', [])
 
         def _sev_bg(sev):
             if sev == 'CRITICAL': return '#BE122F'
@@ -391,6 +488,34 @@ class ReportGenerator:
             f'</tr>'
             for f in findings
         )
+        attack_rows = []
+        for title, items in [
+            ("Boundary Breaches", boundary_breaches),
+            ("Suspicious Pivot Behavior", suspicious_pivot),
+            ("Blast Radius", blast_radius),
+            ("Blind Spots", blind_spots),
+        ]:
+            if items:
+                sample = items[0]
+                attack_rows.append(
+                    f'<tr>'
+                    f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">{title}</td>'
+                    f'<td style="padding:4px 10px;color:#313638">{sample.get("finding","")}</td>'
+                    f'<td style="padding:4px 10px;color:#989A9B"><em>{sample.get("action","")}</em>'
+                    + (f'<br><span style="font-size:11px">{sample.get("action_zh","")}</span>' if sample.get("action_zh") else '')
+                    + '</td>'
+                    f'</tr>'
+                )
+        if action_matrix:
+            top_action = action_matrix[0]
+            attack_rows.append(
+                f'<tr>'
+                f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">Action Matrix</td>'
+                f'<td style="padding:4px 10px;color:#313638">{top_action.get("action","")}</td>'
+                f'<td style="padding:4px 10px;color:#989A9B"><em>{top_action.get("action_zh","")}</em></td>'
+                f'</tr>'
+            )
+        attack_rows_html = "".join(attack_rows)
 
         return f"""
 <html><body style="margin:0;padding:0;background:#F7F4EE;font-family:'Montserrat',Arial,sans-serif;color:#313638;line-height:1.5">
@@ -408,6 +533,10 @@ class ReportGenerator:
       <h3 style="color:#1A2C32;font-size:13px;font-weight:600;margin:0 0 8px;border-bottom:2px solid #FF5500;padding-bottom:5px">{t("rpt_email_key_findings")}</h3>
       <table border="0" cellpadding="0" cellspacing="3" style="border-collapse:separate;border-spacing:0 3px;width:100%">
         {finding_rows or f'<tr><td colspan="3" style="padding:8px;color:#989A9B">{t("rpt_email_no_findings")}</td></tr>'}
+      </table>
+      <h3 style="color:#1A2C32;font-size:13px;font-weight:600;margin:16px 0 8px;border-bottom:2px solid #FF5500;padding-bottom:5px">Attack Summary / 攻擊摘要</h3>
+      <table border="0" cellpadding="0" cellspacing="3" style="border-collapse:separate;border-spacing:0 3px;width:100%">
+        {attack_rows_html or '<tr><td colspan="3" style="padding:8px;color:#989A9B">No attack posture findings.</td></tr>'}
       </table>
     </div>
     <div style="background:#F7F4EE;padding:12px 20px;border-top:1px solid #E3D8C5;text-align:center;color:#989A9B;font-size:11px">

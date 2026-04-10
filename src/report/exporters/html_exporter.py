@@ -258,6 +258,7 @@ class HtmlExporter:
             kf.get('action', '') + '</em></p>'
             for kf in mod12.get('key_findings', [])
         ) or '<p class="note" data-i18n="rpt_no_findings">No key findings.</p>'
+        attack_summary_html = self._attack_summary_html(mod12)
 
         generated_at = mod12.get('generated_at', '')
         today_str = str(datetime.date.today())
@@ -280,6 +281,7 @@ class HtmlExporter:
             '<h2 data-i18n="rpt_key_metrics">Key Metrics</h2>'
             '<div class="kpi-grid">' + kpi_cards + '</div>'
             '<h2 data-i18n="rpt_key_findings">Key Findings</h2>' + key_findings_html +
+            attack_summary_html +
             '</section>\n' +
             self._section('overview', 'rpt_tr_sec_overview', '1 \u00b7 Traffic Overview', self._mod01_html(), '先從整體流量規模、Policy 覆蓋率與熱門通訊埠建立基準視角，方便後續判讀各模組結果。') + '\n' +
             self._section('policy', 'rpt_tr_sec_policy', '2 \u00b7 Policy Decisions', self._mod02_html(), '拆解 Allow、Blocked 與 Potentially Blocked 的比例與細節，用來判斷目前 Policy 的實際落地程度。') + '\n' +
@@ -320,6 +322,39 @@ class HtmlExporter:
 
     def _subnote(self, text: str) -> str:
         return f'<p class="note" style="font-size:12px;">{text}</p>'
+
+    def _attack_summary_html(self, mod12: dict) -> str:
+        def _rows(section_items):
+            if not section_items:
+                return '<p class="note">No data</p>'
+            return ''.join(
+                '<p style="margin-bottom:8px"><span class="badge badge-' +
+                str(item.get('severity', 'INFO')) + '">' + str(item.get('severity', 'INFO')) +
+                '</span>&nbsp;' + str(item.get('finding', '')) +
+                (('<br><span style="color:#718096;font-size:12px;">' + str(item.get('finding_zh', '')) + '</span>') if item.get('finding_zh') else '') +
+                ' <em style="color:#718096">&rarr; ' + str(item.get('action', '')) + '</em>' +
+                (('<br><span style="color:#718096;font-size:12px;"><em>&rarr; ' + str(item.get('action_zh', '')) + '</em></span>') if item.get('action_zh') else '') +
+                '</p>'
+                for item in section_items[:3]
+            )
+
+        action_matrix = mod12.get('action_matrix', []) or []
+        action_html = ''.join(
+            '<p style="margin-bottom:8px"><b>' + str(item.get('action_code', '')) + '</b>: ' +
+            str(item.get('action', '')) +
+            (('<br><span style="color:#718096;font-size:12px;">' + str(item.get('action_zh', '')) + '</span>') if item.get('action_zh') else '') +
+            '</p>'
+            for item in action_matrix[:3]
+        ) or '<p class="note">No data</p>'
+
+        return (
+            '<h2 data-i18n="rpt_tr_attack_summary">Attack Summary</h2>'
+            '<h3 data-i18n="rpt_tr_boundary_breaches">Boundary Breaches</h3>' + _rows(mod12.get('boundary_breaches', [])) +
+            '<h3 data-i18n="rpt_tr_suspicious_pivot_behavior">Suspicious Pivot Behavior</h3>' + _rows(mod12.get('suspicious_pivot_behavior', [])) +
+            '<h3 data-i18n="rpt_tr_blast_radius">Blast Radius</h3>' + _rows(mod12.get('blast_radius', [])) +
+            '<h3 data-i18n="rpt_tr_blind_spots">Blind Spots</h3>' + _rows(mod12.get('blind_spots', [])) +
+            '<h3 data-i18n="rpt_tr_action_matrix">Action Matrix</h3>' + action_html
+        )
 
     def _mod01_summary_table(self, mod01: dict) -> str:
         df = pd.DataFrame(
@@ -693,6 +728,7 @@ class HtmlExporter:
                        'D': '#F97316', 'F': '#EF4444'}.get(grade, '#6B7280')
         factor_table = m.get('factor_table')
         recommendations = m.get('recommendations')
+        app_env_scores = m.get('app_env_scores')
         score_bar = _progress_bar(score)
         html = (
             self._subnote('readiness 分數用來評估目前環境是否適合進一步提高 enforcement 強度，分數越高通常代表收斂程度越好。') +
@@ -705,6 +741,8 @@ class HtmlExporter:
             + '<h4 data-i18n="rpt_tr_score_breakdown">Score Breakdown by Factor</h4>'
             + _df_to_html(factor_table)
         )
+        if app_env_scores is not None and not app_env_scores.empty:
+            html += '<h4>App(env) Readiness Ranking</h4>' + _df_to_html(app_env_scores)
         if recommendations is not None and not recommendations.empty:
             html += '<h4 data-i18n="rpt_tr_remediation_rec">Remediation Recommendations</h4>' + _df_to_html(recommendations)
         return html
@@ -751,6 +789,15 @@ class HtmlExporter:
         source_risk = m.get('source_risk_scores')
         if source_risk is not None and not source_risk.empty:
             html += '<h4 data-i18n="rpt_tr_top_risk_sources">Top High-Risk Sources</h4>' + _df_to_html(source_risk)
+        bridge_nodes = m.get('bridge_nodes')
+        if bridge_nodes is not None and not bridge_nodes.empty:
+            html += '<h4>Bridge Nodes (Articulation)</h4>' + _df_to_html(bridge_nodes)
+        reachable_nodes = m.get('top_reachable_nodes')
+        if reachable_nodes is not None and not reachable_nodes.empty:
+            html += '<h4>Top Reachable Nodes</h4>' + _df_to_html(reachable_nodes)
+        attack_paths = m.get('attack_paths')
+        if attack_paths is not None and not attack_paths.empty:
+            html += '<h4>Attack Paths (Depth-Bounded)</h4>' + _df_to_html(attack_paths)
         app_chains = m.get('app_chains')
         if app_chains is not None and not app_chains.empty:
             html += '<h4 data-i18n="rpt_tr_app_chains">Lateral Movement App Chains (BFS Paths)</h4>' + _df_to_html(app_chains)

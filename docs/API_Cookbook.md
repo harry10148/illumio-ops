@@ -707,3 +707,91 @@ print("Switched active PCE to DR site")
 > **Base URL Pattern (PCE Direct)**: `https://<pce_host>:<port>/api/v2/orgs/<org_id>/...`
 > **Auth (PCE Direct)**: HTTP Basic with API Key as username and Secret as password.
 > **Auth (Tool GUI)**: Session cookie obtained from `/api/login`.
+---
+
+## Updated Traffic Filter Reference
+
+The current `Analyzer.query_flows()` and `ApiClient.build_traffic_query_spec()` path separates filters into three execution classes:
+
+- `native_filters`: pushed into the PCE async Explorer query
+- `fallback_filters`: evaluated client-side after flow download
+- `report_only_filters`: used only for sorting, search, pagination, or draft comparison
+
+### Native filters
+
+These reduce the server-side result set and are also the only filters accepted by raw Explorer CSV export.
+
+| Filter Key | Type | Example | Notes |
+|:---|:---|:---|:---|
+| `src_label`, `dst_label` | `key:value` string | `role:web` | Resolved to label href |
+| `src_labels`, `dst_labels` | list of `key:value` | `["env:prod", "app:web"]` | Multiple values on the same side |
+| `src_label_group`, `dst_label_group` | name or href | `Critical Apps` | Resolved to label group href |
+| `src_label_groups`, `dst_label_groups` | list of names or hrefs | `["Critical Apps", "PCI Apps"]` | Multiple group filters |
+| `src_ip_in`, `src_ip`, `dst_ip_in`, `dst_ip` | IP, workload href, or IP list name/href | `10.0.0.5`, `corp-net` | Supports IP literal or resolved actor |
+| `ex_src_label`, `ex_dst_label` | `key:value` string | `env:dev` | Exclude by label |
+| `ex_src_labels`, `ex_dst_labels` | list of `key:value` | `["role:test"]` | Exclude multiple labels |
+| `ex_src_label_group`, `ex_dst_label_group` | name or href | `Legacy Apps` | Exclude by label group |
+| `ex_src_label_groups`, `ex_dst_label_groups` | list of names or hrefs | `["Legacy Apps"]` | Exclude multiple label groups |
+| `ex_src_ip`, `ex_dst_ip` | IP, workload href, or IP list name/href | `10.20.0.0/16` | Exclude actor/IP |
+| `port`, `proto` | int or string | `443`, `6` | Single service port/protocol |
+| `port_range`, `ex_port_range` | range string or tuple | `"8080-8090/6"` | One range expression |
+| `port_ranges`, `ex_port_ranges` | list of range strings or tuples | `["1000-2000/6"]` | Multiple range expressions |
+| `ex_port` | int or string | `22` | Exclude a port |
+| `process_name`, `windows_service_name` | string | `nginx`, `WinRM` | Service-side process/service filters |
+| `ex_process_name`, `ex_windows_service_name` | string | `sshd` | Exclude service-side process/service |
+| `query_operator` | `and` or `or` | `or` | Maps to `sources_destinations_query_op` |
+| `exclude_workloads_from_ip_list_query` | bool | `true` | Passed through to async payload |
+| `src_ams`, `dst_ams` | bool | `true` | Adds `actors:"ams"` to include side |
+| `ex_src_ams`, `ex_dst_ams` | bool | `true` | Adds `actors:"ams"` to exclude side |
+| `transmission_excludes`, `ex_transmission` | string or list | `["broadcast", "multicast"]` | Filters by `unicast`/`broadcast`/`multicast` |
+| `src_include_groups`, `dst_include_groups` | list of actor groups | `[["role:web", "env:prod"], ["ams"]]` | Outer list is OR, inner list is AND |
+
+### Fallback filters
+
+These are intentionally kept client-side because they express either-side semantics that do not map cleanly to Explorer payloads.
+
+| Filter Key | Type | Example | Notes |
+|:---|:---|:---|:---|
+| `any_label` | `key:value` string | `app:web` | Match if source or destination has the label |
+| `any_ip` | IP/CIDR/string | `10.0.0.5` | Match if source or destination matches |
+| `ex_any_label` | `key:value` string | `env:dev` | Exclude if either side matches |
+| `ex_any_ip` | IP/CIDR/string | `172.16.0.0/16` | Exclude if either side matches |
+
+### Report-only filters
+
+These do not alter the PCE query body.
+
+| Filter Key | Type | Example | Notes |
+|:---|:---|:---|:---|
+| `search` | string | `db01` | Text match across names, IPs, ports, process, and user |
+| `sort_by` | string | `bandwidth` | `bandwidth`, `volume`, or `connections` |
+| `draft_policy_decision` | string | `blocked_no_rule` | Requires `compute_draft=True` query path |
+| `page`, `page_size`, `limit`, `offset` | int | `100` | UI/report pagination only |
+
+### Example: mixed native and fallback filters
+
+```python
+results = ana.query_flows({
+    "start_time": "2026-04-01T00:00:00Z",
+    "end_time": "2026-04-01T23:59:59Z",
+    "policy_decisions": ["blocked", "potentially_blocked"],
+    "src_label_group": "Critical Apps",
+    "dst_ip_in": "corp-net",
+    "src_ams": True,
+    "transmission_excludes": ["broadcast", "multicast"],
+    "port_range": "8000-8100/6",
+    "any_label": "env:prod",
+    "search": "nginx",
+    "sort_by": "bandwidth",
+})
+```
+
+In that example:
+
+- `src_label_group`, `dst_ip_in`, `src_ams`, `transmission_excludes`, and `port_range` are native
+- `any_label` is fallback
+- `search` and `sort_by` are report-only
+
+### Raw Explorer CSV export constraint
+
+`ApiClient.export_traffic_query_csv()` accepts only filters that resolve fully as `native_filters`. If a filter remains in `fallback_filters` or `report_only_filters`, the raw CSV export will reject the request instead of silently changing query semantics.

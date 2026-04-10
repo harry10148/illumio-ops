@@ -704,32 +704,57 @@ class Analyzer:
             elif p == "blocked": strict_pd.add("blocked")
             elif p == "allowed": strict_pd.add("allowed")
         
-        draft_pd_filter = (params.get("draft_policy_decision") or "").strip().lower()
+        query_filters = {
+            "port": params.get("port"),
+            "proto": params.get("proto"),
+            "port_range": params.get("port_range"),
+            "ex_port": params.get("ex_port"),
+            "ex_port_range": params.get("ex_port_range"),
+            "src_label": params.get("src_label"),
+            "src_label_group": params.get("src_label_group"),
+            "src_label_groups": params.get("src_label_groups"),
+            "dst_label": params.get("dst_label"),
+            "dst_label_group": params.get("dst_label_group"),
+            "dst_label_groups": params.get("dst_label_groups"),
+            "src_ip_in": params.get("src_ip_in"),
+            "dst_ip_in": params.get("dst_ip_in"),
+            "ex_src_label": params.get("ex_src_label"),
+            "ex_src_label_group": params.get("ex_src_label_group"),
+            "ex_src_label_groups": params.get("ex_src_label_groups"),
+            "ex_dst_label": params.get("ex_dst_label"),
+            "ex_dst_label_group": params.get("ex_dst_label_group"),
+            "ex_dst_label_groups": params.get("ex_dst_label_groups"),
+            "ex_src_ip": params.get("ex_src_ip"),
+            "ex_dst_ip": params.get("ex_dst_ip"),
+            "any_label": params.get("any_label"),
+            "any_ip": params.get("any_ip"),
+            "ex_any_label": params.get("ex_any_label"),
+            "ex_any_ip": params.get("ex_any_ip"),
+            "src_ams": params.get("src_ams"),
+            "dst_ams": params.get("dst_ams"),
+            "ex_src_ams": params.get("ex_src_ams"),
+            "ex_dst_ams": params.get("ex_dst_ams"),
+            "transmission_excludes": params.get("transmission_excludes") or params.get("ex_transmission"),
+            "src_include_groups": params.get("src_include_groups"),
+            "dst_include_groups": params.get("dst_include_groups"),
+            "search": params.get("search"),
+            "sort_by": params.get("sort_by"),
+            "draft_policy_decision": params.get("draft_policy_decision"),
+        }
+        query_spec = self.api.build_traffic_query_spec(query_filters)
+        draft_pd_filter = (query_spec.report_only_filters.get("draft_policy_decision") or "").strip().lower()
 
         # When filtering by draft policy decision, always query all reported PDs
         # because the draft EB may affect flows whose reported PD is "allowed".
         query_pds = pds if not draft_pd_filter else ["blocked", "potentially_blocked", "allowed"]
 
         traffic_stream = self.api.execute_traffic_query_stream(
-            start_time, end_time, query_pds, compute_draft=bool(draft_pd_filter)
+            start_time, end_time, query_pds, filters=query_spec, compute_draft=bool(draft_pd_filter)
         )
         if not traffic_stream:
             return []
 
-        search_query = params.get("search", "").lower()
-
-        rule = {
-            "type": "bandwidth",
-            "pd": -1,
-            "port": params.get("port"), "proto": params.get("proto"),
-            "src_label": params.get("src_label"), "dst_label": params.get("dst_label"),
-            "src_ip_in": params.get("src_ip_in"), "dst_ip_in": params.get("dst_ip_in"),
-            "ex_port": params.get("ex_port"),
-            "ex_src_label": params.get("ex_src_label"), "ex_dst_label": params.get("ex_dst_label"),
-            "ex_src_ip": params.get("ex_src_ip"), "ex_dst_ip": params.get("ex_dst_ip"),
-            "any_label": params.get("any_label"), "any_ip": params.get("any_ip"),
-            "ex_any_label": params.get("ex_any_label"), "ex_any_ip": params.get("ex_any_ip"),
-        }
+        search_query = str(query_spec.report_only_filters.get("search", "") or "").lower()
 
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         try:
@@ -738,8 +763,10 @@ class Analyzer:
             start_dt = now_dt - datetime.timedelta(minutes=30)
             
         matches = []
-        sort_by = params.get("sort_by", "bandwidth")
+        sort_by = query_spec.report_only_filters.get("sort_by", "bandwidth")
+        rule = {**query_spec.native_filters, **query_spec.fallback_filters}
         rule["type"] = sort_by if sort_by in ["bandwidth", "volume"] else "connections"
+        rule["pd"] = -1
 
         for f in traffic_stream:
             if strict_pd and f.get("policy_decision") not in strict_pd:
