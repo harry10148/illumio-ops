@@ -222,12 +222,14 @@ class VenStatusGenerator:
         df_lost_today = df_offline[mask_today] if len(mask_today) else df_offline.iloc[0:0]
         df_lost_yest  = df_offline[mask_yest]  if len(mask_yest)  else df_offline.iloc[0:0]
 
+        # KPI labels are resolved by the HTML exporter using report_i18n.STRINGS.
+        # Generator only stores the i18n key + value so rendering stays lang-aware.
         kpis = [
-            {'label': 'VEN 總數', 'value': str(len(df))},
-            {'label': '在線', 'value': str(len(df_online))},
-            {'label': '離線', 'value': str(len(df_offline))},
-            {'label': '近 24 小時失聯', 'value': str(len(df_lost_today))},
-            {'label': '24-48 小時前失聯', 'value': str(len(df_lost_yest))},
+            {'i18n_key': 'rpt_ven_kpi_total', 'value': str(len(df))},
+            {'i18n_key': 'rpt_ven_kpi_online', 'value': str(len(df_online))},
+            {'i18n_key': 'rpt_ven_kpi_offline', 'value': str(len(df_offline))},
+            {'i18n_key': 'rpt_ven_kpi_lost_24h', 'value': str(len(df_lost_today))},
+            {'i18n_key': 'rpt_ven_kpi_lost_48h', 'value': str(len(df_lost_yest))},
         ]
 
         return {

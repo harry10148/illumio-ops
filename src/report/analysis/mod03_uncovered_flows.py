@@ -128,9 +128,12 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20) -> dict:
 
 
 def _port_gap_ranking(df: pd.DataFrame, uncovered: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
-    """Ranks ports by number of uncovered flows; shows total vs uncovered and gap %."""
-    port_total = df[df['port'] > 0].groupby('port')['num_connections'].sum()
-    port_unc = uncovered[uncovered['port'] > 0].groupby('port')['num_connections'].sum()
+    """Ranks (port, proto) by number of uncovered flows; shows total vs uncovered and gap %."""
+    has_proto = 'proto' in df.columns
+    keys = ['port', 'proto'] if has_proto else ['port']
+
+    port_total = df[df['port'] > 0].groupby(keys)['num_connections'].sum()
+    port_unc = uncovered[uncovered['port'] > 0].groupby(keys)['num_connections'].sum()
 
     result = pd.DataFrame({'Total': port_total, 'Uncovered': port_unc}).fillna(0)
     result['Gap %'] = (result['Uncovered'] / result['Total'].replace(0, 1) * 100).round(1)
@@ -138,22 +141,39 @@ def _port_gap_ranking(df: pd.DataFrame, uncovered: pd.DataFrame, top_n: int = 20
               .sort_values('Uncovered', ascending=False)
               .head(top_n)
               .reset_index()
-              .rename(columns={'port': 'Port', 'Total': 'Total Flows',
-                               'Uncovered': 'Uncovered Flows'}))
+              .rename(columns={'port': 'Port', 'proto': 'Proto',
+                               'Total': 'Total Flows', 'Uncovered': 'Uncovered Flows'}))
+    if 'Port' in result.columns:
+        result['Port'] = result['Port'].astype('Int64')
+    for c in ('Total Flows', 'Uncovered Flows'):
+        if c in result.columns:
+            result[c] = result[c].astype('Int64')
+    if 'Proto' in result.columns and result['Proto'].astype(str).str.strip().eq('').all():
+        result = result.drop(columns=['Proto'])
     return result
 
 
 def _service_gap_ranking(uncovered: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
-    """Top dst_app + port combinations with uncovered flows — surfaces missing policy rules."""
+    """Top (dst_app, port, proto) combinations with uncovered flows — surfaces missing policy rules."""
     if uncovered.empty:
         return pd.DataFrame()
+    has_proto = 'proto' in uncovered.columns
+    keys = ['dst_app', 'port', 'proto', 'policy_decision'] if has_proto else ['dst_app', 'port', 'policy_decision']
+    rename = {'dst_app': 'Destination App', 'port': 'Port', 'proto': 'Proto',
+              'policy_decision': 'Decision', 'connections': 'Connections',
+              'unique_src_apps': 'Unique Source Apps'}
     svc = (uncovered[uncovered['port'] > 0]
-           .groupby(['dst_app', 'port', 'policy_decision'])
+           .groupby(keys)
            .agg(connections=('num_connections', 'sum'),
                 unique_src_apps=('src_app', 'nunique'))
            .reset_index()
            .nlargest(top_n, 'connections')
-           .rename(columns={'dst_app': 'Destination App', 'port': 'Port',
-                            'policy_decision': 'Decision', 'connections': 'Connections',
-                            'unique_src_apps': 'Unique Source Apps'}))
+           .rename(columns=rename))
+    if 'Port' in svc.columns:
+        svc['Port'] = svc['Port'].astype('Int64')
+    for c in ('Connections', 'Unique Source Apps'):
+        if c in svc.columns:
+            svc[c] = svc[c].astype('Int64')
+    if 'Proto' in svc.columns and svc['Proto'].astype(str).str.strip().eq('').all():
+        svc = svc.drop(columns=['Proto'])
     return svc

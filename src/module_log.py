@@ -12,12 +12,23 @@ from logging.handlers import RotatingFileHandler
 
 _ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
-MODULES = {
-    "monitor":          "監控分析",
-    "rule_scheduler":   "規則排程",
-    "report_scheduler": "報表排程",
-    "reports":          "報表產生",
-    "actions":          "手動操作",
+# Module labels resolved via i18n at display time; keep EN as authoritative
+# fallback so log viewers still read correctly without translations loaded.
+MODULES: dict[str, str] = {
+    "monitor":          "Monitor & Analysis",
+    "rule_scheduler":   "Rule Scheduler",
+    "report_scheduler": "Report Scheduler",
+    "reports":          "Report Generation",
+    "actions":          "Manual Actions",
+}
+
+# i18n key for each module; the GUI resolves via `t()` / `_translations[...]`.
+MODULE_I18N_KEYS: dict[str, str] = {
+    "monitor":          "gui_ml_mod_monitor",
+    "rule_scheduler":   "gui_ml_mod_rule_scheduler",
+    "report_scheduler": "gui_ml_mod_report_scheduler",
+    "reports":          "gui_ml_mod_reports",
+    "actions":          "gui_ml_mod_actions",
 }
 
 
@@ -100,6 +111,7 @@ class ModuleLog:
                 {
                     "name": k,
                     "label": MODULES.get(k, k),
+                    "i18n_key": MODULE_I18N_KEYS.get(k, ""),
                     "count": len(cls._registry[k]._buffer),
                 }
                 for k in cls._registry

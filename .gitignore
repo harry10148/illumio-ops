@@ -60,3 +60,6 @@ debug_dump.json
 debug_events.json
 find_api.py
 grep_out.txt
+
+# Local preview output from manual report renders
+.tmp_preview/

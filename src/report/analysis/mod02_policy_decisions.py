@@ -29,10 +29,8 @@ def policy_decision_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
                          .rename(columns={'flow_pair': 'Flow (src_app→dst_app)',
                                           'num_connections': 'Connections'}))
 
-        # Top ports
-        top_ports = (sub[sub['port'] > 0].groupby('port')['num_connections'].sum()
-                     .nlargest(top_n).reset_index()
-                     .rename(columns={'port': 'Port', 'num_connections': 'Connections'}))
+        # Top ports (by port + proto, flattened so reset_index produces both columns)
+        top_ports = _top_ports_table(sub, top_n=top_n)
 
         # Managed ratio
         managed_count = int(sub['src_managed'].sum())
@@ -46,18 +44,13 @@ def policy_decision_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
 
         # Per-direction top ports
         top_inbound_ports = (
-            sub[inbound_mask & (sub['port'] > 0)]
-            .groupby('port')['num_connections'].sum()
-            .nlargest(10).reset_index()
-            .rename(columns={'port': 'Port', 'num_connections': 'Connections'})
-        ) if inbound_count > 0 else pd.DataFrame()
-
+            _top_ports_table(sub[inbound_mask], top_n=10)
+            if inbound_count > 0 else pd.DataFrame()
+        )
         top_outbound_ports = (
-            sub[outbound_mask & (sub['port'] > 0)]
-            .groupby('port')['num_connections'].sum()
-            .nlargest(10).reset_index()
-            .rename(columns={'port': 'Port', 'num_connections': 'Connections'})
-        ) if outbound_count > 0 else pd.DataFrame()
+            _top_ports_table(sub[outbound_mask], top_n=10)
+            if outbound_count > 0 else pd.DataFrame()
+        )
 
         results[decision] = {
             'count': len(sub),
@@ -91,26 +84,86 @@ def policy_decision_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
     return results
 
 
+def _top_ports_table(sub: pd.DataFrame, top_n: int) -> pd.DataFrame:
+    """Top N (port [, proto]) by connection count, as an int-typed DataFrame.
+
+    Drops Proto column entirely if the input has no proto dimension (or all
+    protos are empty), so downstream tables stay tidy.
+    """
+    filt = sub[sub['port'] > 0]
+    if filt.empty:
+        return pd.DataFrame()
+
+    has_proto = 'proto' in filt.columns
+    group_keys = ['port', 'proto'] if has_proto else ['port']
+
+    grouped = (
+        filt.groupby(group_keys)['num_connections'].sum()
+        .nlargest(top_n).reset_index()
+    )
+    rename_map = {'port': 'Port', 'num_connections': 'Connections'}
+    if has_proto:
+        rename_map['proto'] = 'Proto'
+    grouped = grouped.rename(columns=rename_map)
+    grouped['Port'] = grouped['Port'].astype('Int64')
+    grouped['Connections'] = grouped['Connections'].astype('Int64')
+
+    if 'Proto' in grouped.columns and grouped['Proto'].astype(str).str.strip().eq('').all():
+        grouped = grouped.drop(columns=['Proto'])
+    return grouped
+
+
 def _compute_port_coverage(df: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
-    """For each high-traffic port: allowed vs blocked counts and coverage %."""
+    """For each high-traffic (port, proto): allowed / blocked / potentially_blocked
+    counts and coverage %.
+
+    Notes on semantics:
+    - blocked = explicit deny rule matched, OR enforced mode with no allow match
+      (firewall actually dropped the traffic)
+    - potentially_blocked = no matching rule AND workload in visibility/test mode
+      (traffic flowed through; would be dropped if enforcement were on)
+    These must stay in separate columns — conflating them hides real policy gaps.
+    """
     port_df = df[df['port'] > 0].copy()
     if port_df.empty:
         return pd.DataFrame()
 
-    grouped = port_df.groupby(['port', 'policy_decision'])['num_connections'].sum().unstack(fill_value=0)
+    has_proto = 'proto' in port_df.columns
+    group_keys = ['port', 'proto'] if has_proto else ['port']
+
+    grouped = (
+        port_df.groupby(group_keys + ['policy_decision'])['num_connections']
+        .sum()
+        .unstack(fill_value=0)
+    )
     allowed = grouped.get('allowed', pd.Series(0, index=grouped.index))
     blocked = grouped.get('blocked', pd.Series(0, index=grouped.index))
     pb = grouped.get('potentially_blocked', pd.Series(0, index=grouped.index))
 
-    total_per_port = grouped.sum(axis=1)
-    coverage = (allowed / total_per_port.replace(0, 1) * 100).round(1)
+    total_per_key = grouped.sum(axis=1)
+    coverage = (allowed / total_per_key.replace(0, 1) * 100).round(1)
+
+    # grouped.index is a MultiIndex when has_proto — unpack to columns
+    if has_proto:
+        ports = [idx[0] for idx in grouped.index]
+        protos = [idx[1] for idx in grouped.index]
+    else:
+        ports = list(grouped.index)
+        protos = [''] * len(ports)
 
     result = pd.DataFrame({
-        'Port': grouped.index,
-        'Total Flows': total_per_port.values,
-        'Allowed': allowed.values,
-        'Blocked': (blocked + pb).values,
+        'Port': pd.array(ports, dtype='Int64'),
+        'Proto': protos,
+        'Total Flows': pd.array(total_per_key.values, dtype='Int64'),
+        'Allowed': pd.array(allowed.values, dtype='Int64'),
+        'Blocked': pd.array(blocked.values, dtype='Int64'),
+        'Potentially Blocked': pd.array(pb.values, dtype='Int64'),
         'Coverage %': coverage.values,
     }).sort_values('Total Flows', ascending=False).head(top_n).reset_index(drop=True)
+
+    # Drop Proto column entirely if every value is empty (keeps output clean
+    # when upstream data has no proto dimension).
+    if not has_proto or result['Proto'].astype(str).str.strip().eq('').all():
+        result = result.drop(columns=['Proto'])
 
     return result

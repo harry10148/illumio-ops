@@ -694,7 +694,7 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None):
     if pd_sel == "":
         pd_sel = def_pd
 
-    # 選單對應: 1=Blocked(pd=2), 2=Potential(pd=0), 3=Allowed(pd=1), 4=All(pd=-1)
+    # Menu mapping: 1=Blocked(pd=2), 2=Potential(pd=0), 3=Allowed(pd=1), 4=All(pd=-1)
     if pd_sel == 1:
         target_pd = 2
     elif pd_sel == 2:

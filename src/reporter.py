@@ -86,47 +86,65 @@ class Reporter:
     def _compact_text(cls, value) -> str:
         return re.sub(r"\s+", " ", cls._clean_text(value)).strip()
 
-    @staticmethod
-    def _severity_label(value: str) -> str:
-        mapping = {
-            "crit": "重大",
-            "critical": "重大",
-            "emerg": "重大",
-            "alert": "高風險",
-            "err": "錯誤",
-            "error": "錯誤",
-            "warn": "警告",
-            "warning": "警告",
-            "info": "資訊",
-        }
-        return mapping.get(str(value or "").lower(), str(value or "").upper() or "資訊")
+    # ------------------------------------------------------------------ #
+    # i18n-backed label helpers. Each dict maps a domain value (severity /
+    # status / event_type) to an i18n key; `t()` resolves it lang-aware.
+    # Everything flows through here so alert emails match the user's
+    # language setting instead of being hardcoded zh_TW.
+    # ------------------------------------------------------------------ #
 
-    @staticmethod
-    def _status_label(value: str) -> str:
-        mapping = {
-            "success": "成功",
-            "failure": "失敗",
-            "warning": "警告",
-            "warn": "警告",
-            "error": "錯誤",
-            "info": "資訊",
-        }
-        return mapping.get(str(value or "").lower(), str(value or "") or "N/A")
+    _SEVERITY_I18N_KEYS: dict[str, str] = {
+        "crit":     "alert_sev_critical",
+        "critical": "alert_sev_critical",
+        "emerg":    "alert_sev_critical",
+        "alert":    "alert_sev_high",
+        "err":      "alert_sev_error",
+        "error":    "alert_sev_error",
+        "warn":     "alert_sev_warning",
+        "warning":  "alert_sev_warning",
+        "info":     "alert_sev_info",
+    }
 
-    @staticmethod
-    def _event_recommendation(event_type: str) -> str:
-        recommendations = {
-            "agent.tampering": "先確認是否為授權變更，再檢查主機與防火牆設定。",
-            "agent.clone_detected": "檢查是否有重複或未授權的 VEN 映像。",
-            "agent.suspend": "確認暫停原因，並檢查是否影響策略落地。",
-            "agent.service_not_available": "確認 VEN 服務狀態與主機連線是否正常。",
-            "system_task.agent_missed_heartbeats_check": "優先確認 VEN 與 PCE 之間的連線品質。",
-            "system_task.agent_offline_check": "確認主機是否離線、關機或網路中斷。",
-            "request.authentication_failed": "檢查帳號與 API 使用來源，排除暴力嘗試。",
-            "request.authorization_failed": "確認權限設定與 API 呼叫來源是否合理。",
-            "sec_policy.create": "確認本次 Policy Provision 是否為預期操作。",
-        }
-        return recommendations.get(event_type, "請至 Web GUI 查看完整事件內容與上下文。")
+    _STATUS_I18N_KEYS: dict[str, str] = {
+        "success": "alert_status_success",
+        "failure": "alert_status_failure",
+        "warning": "alert_status_warning",
+        "warn":    "alert_status_warning",
+        "error":   "alert_status_error",
+        "info":    "alert_status_info",
+    }
+
+    # event_type → recommendation i18n key
+    _REC_I18N_KEYS: dict[str, str] = {
+        "agent.tampering":                          "alert_rec_agent_tampering",
+        "agent.clone_detected":                     "alert_rec_agent_clone_detected",
+        "agent.suspend":                            "alert_rec_agent_suspend",
+        "agent.service_not_available":              "alert_rec_agent_service_not_available",
+        "system_task.agent_missed_heartbeats_check":"alert_rec_agent_missed_heartbeats_check",
+        "system_task.agent_offline_check":          "alert_rec_agent_offline_check",
+        "request.authentication_failed":            "alert_rec_request_authentication_failed",
+        "request.authorization_failed":             "alert_rec_request_authorization_failed",
+        "sec_policy.create":                        "alert_rec_sec_policy_create",
+    }
+
+    @classmethod
+    def _severity_label(cls, value: str) -> str:
+        key = cls._SEVERITY_I18N_KEYS.get(str(value or "").lower())
+        if key:
+            return t(key)
+        return str(value or "").upper() or t("alert_sev_info")
+
+    @classmethod
+    def _status_label(cls, value: str) -> str:
+        key = cls._STATUS_I18N_KEYS.get(str(value or "").lower())
+        if key:
+            return t(key)
+        return str(value or "") or "N/A"
+
+    @classmethod
+    def _event_recommendation(cls, event_type: str) -> str:
+        key = cls._REC_I18N_KEYS.get(event_type)
+        return t(key) if key else t("alert_rec_default")
 
     def _event_console_link(self, event: dict) -> str:
         href = str((event or {}).get("href", "") or "").strip()
@@ -318,20 +336,23 @@ class Reporter:
         def esc(text):
             return html.escape(clean_ansi(text), quote=True)
 
+        # Snapshot column labels resolved via i18n so alert emails follow
+        # the user's language setting.
         snapshot_labels = {
-            "value": "數值",
-            "first_seen": "首次偵測",
-            "last_seen": "最後偵測",
-            "direction": "方向",
-            "source": "來源端",
-            "destination": "目的端",
-            "service": "服務",
-            "connections": "連線數",
-            "decision": "判定",
+            "value":        t("alert_snap_col_value"),
+            "first_seen":   t("alert_snap_col_first_seen"),
+            "last_seen":    t("alert_snap_col_last_seen"),
+            "direction":    t("alert_snap_col_direction"),
+            "source":       t("alert_snap_col_source"),
+            "destination":  t("alert_snap_col_destination"),
+            "service":      t("alert_snap_col_service"),
+            "connections":  t("alert_snap_col_connections"),
+            "decision":     t("alert_snap_col_decision"),
         }
 
         if not data_list:
-            return "<div style='padding:10px 12px; color:#6b7280; font-size:12px;'>暫無快照資料</div>"
+            no_data = esc(t("alert_snap_no_data"))
+            return f"<div style='padding:10px 12px; color:#6b7280; font-size:12px;'>{no_data}</div>"
 
         def actor_view(item, is_source=True):
             actor = item.get("source" if is_source else "destination", {})
@@ -367,13 +388,15 @@ class Reporter:
                     for l in labels
                 ]
             )
+            proc_label = esc(t("alert_snap_process"))
+            user_label = esc(t("alert_snap_user"))
             proc_line = (
-                f"<div style='font-size:10px; color:#313638; margin-top:4px;'><strong>程序:</strong> {esc(proc)}</div>"
+                f"<div style='font-size:10px; color:#313638; margin-top:4px;'><strong>{proc_label}:</strong> {esc(proc)}</div>"
                 if proc
                 else ""
             )
             user_line = (
-                f"<div style='font-size:10px; color:#6F7274;'><strong>使用者:</strong> {esc(user)}</div>"
+                f"<div style='font-size:10px; color:#6F7274;'><strong>{user_label}:</strong> {esc(user)}</div>"
                 if user
                 else ""
             )
@@ -456,11 +479,12 @@ class Reporter:
 
         if self.event_alerts:
             body += f"{t('security_events_header')}\n"
+            desc_label = t("alert_field_desc")
             for a in self.event_alerts:
                 body += clean_ansi(
                     f"[{a['time']}] {a['rule']} ({a.get('severity', '').upper()} x{a['count']})\n"
                 )
-                body += clean_ansi(f"說明: {a['desc']}\n")
+                body += clean_ansi(f"{desc_label}: {a['desc']}\n")
             body += "\n"
 
         if self.traffic_alerts:
@@ -580,8 +604,10 @@ class Reporter:
 
     def _build_line_message(self, subj: str) -> str:
         """Build a LINE-friendly alert digest aligned to the vendor event content baseline."""
+        records = t("alert_field_records")
+
         def section_header(title: str, count: int) -> str:
-            return f"\n【{title}】共 {count} 筆"
+            return f"\n【{title}】{count} {records}"
 
         total_issues = (
             len(self.health_alerts)
@@ -589,70 +615,92 @@ class Reporter:
             + len(self.traffic_alerts)
             + len(self.metric_alerts)
         )
+        # Pre-resolve labels once per call so each section loop stays compact.
+        time_lbl       = t("alert_field_time")
+        summary_lbl    = t("alert_field_summary")
+        event_lbl      = t("alert_field_event")
+        created_by_lbl = t("alert_field_created_by")
+        target_lbl     = t("alert_field_target")
+        action_lbl     = t("alert_field_action")
+        src_ip_lbl     = t("alert_field_src_ip")
+        changes_lbl    = t("alert_field_changes")
+        notif_lbl      = t("alert_field_notifications")
+        rec_lbl        = t("alert_field_recommendation")
+        cond_lbl       = t("alert_field_condition")
+        count_lbl      = t("alert_field_count")
+        value_lbl      = t("alert_field_metric_value")
+        sev_crit       = t("alert_sev_critical")
+        sev_warn       = t("alert_sev_warning")
+
         health_section_lines = []
         if self.health_alerts:
-            health_section_lines.append(section_header("健康告警", len(self.health_alerts)))
+            health_section_lines.append(section_header(t("alert_sec_health"), len(self.health_alerts)))
+            rule_fallback = t("alert_field_health_rule_fallback")
             for idx, alert in enumerate(self.health_alerts[:2], start=1):
                 status = self._compact_text(alert.get("status", ""))
-                label = "重大" if status.lower() in {"503", "error", "critical"} else "警告"
-                health_section_lines.append(f"{idx}. [{label}] {self._compact_text(alert.get('rule', '健康檢查'))}")
-                health_section_lines.append(f"時間：{self._compact_text(alert.get('time', ''))}")
-                health_section_lines.append(f"摘要：{self._compact_text(alert.get('details', ''))}")
+                label = sev_crit if status.lower() in {"503", "error", "critical"} else sev_warn
+                health_section_lines.append(f"{idx}. [{label}] {self._compact_text(alert.get('rule', rule_fallback))}")
+                health_section_lines.append(f"{time_lbl}：{self._compact_text(alert.get('time', ''))}")
+                health_section_lines.append(f"{summary_lbl}：{self._compact_text(alert.get('details', ''))}")
                 health_section_lines.append("")
 
         event_section_lines = []
         if self.event_alerts:
-            event_section_lines.append(section_header("安全事件", len(self.event_alerts)))
+            event_section_lines.append(section_header(t("alert_sec_event"), len(self.event_alerts)))
             for idx, alert in enumerate(self._build_all_event_alert_payloads()[:3], start=1):
                 first = alert["events"][0] if alert["events"] else {}
                 event_section_lines.append(f"{idx}. [{alert['severity_label']}] {alert['rule']}")
                 if first.get("event_type"):
-                    event_section_lines.append(f"事件：{first['event_type']}")
+                    event_section_lines.append(f"{event_lbl}：{first['event_type']}")
                 if first.get("timestamp"):
-                    event_section_lines.append(f"時間：{self._compact_text(first['timestamp'])[:19]}")
+                    event_section_lines.append(f"{time_lbl}：{self._compact_text(first['timestamp'])[:19]}")
                 if first.get("created_by"):
-                    event_section_lines.append(f"建立者：{first['created_by']}")
+                    event_section_lines.append(f"{created_by_lbl}：{first['created_by']}")
                 if first.get("target_name"):
-                    event_section_lines.append(f"對象：{first['target_name']}")
+                    event_section_lines.append(f"{target_lbl}：{first['target_name']}")
                 if first.get("action", {}).get("label"):
-                    event_section_lines.append(f"動作：{first['action']['label']}")
+                    event_section_lines.append(f"{action_lbl}：{first['action']['label']}")
                 if first.get("action", {}).get("src_ip"):
-                    event_section_lines.append(f"來源 IP：{first['action']['src_ip']}")
+                    event_section_lines.append(f"{src_ip_lbl}：{first['action']['src_ip']}")
                 if first.get("resource_changes_count"):
-                    event_section_lines.append(f"異動：{first['resource_changes_count']} 筆")
+                    event_section_lines.append(f"{changes_lbl}：{first['resource_changes_count']} {records}")
                 if first.get("notifications_count"):
-                    event_section_lines.append(f"通知：{first['notifications_count']} 筆")
+                    event_section_lines.append(f"{notif_lbl}：{first['notifications_count']} {records}")
                 if alert.get("desc"):
-                    event_section_lines.append(f"摘要：{alert['desc']}")
+                    event_section_lines.append(f"{summary_lbl}：{alert['desc']}")
                 if first.get("recommendation"):
-                    event_section_lines.append(f"建議：{first['recommendation']}")
+                    event_section_lines.append(f"{rec_lbl}：{first['recommendation']}")
                 if first.get("pce_link"):
                     event_section_lines.append(f"PCE：{first['pce_link']}")
                 event_section_lines.append("")
             remaining = len(self.event_alerts) - 3
             if remaining > 0:
-                event_section_lines.append(f"其餘 {remaining} 筆安全事件請至 Web GUI 查看完整內容。")
+                event_section_lines.append(
+                    t("alert_field_remaining_events", count=remaining)
+                )
 
         traffic_section_lines = []
         if self.traffic_alerts:
-            traffic_section_lines.append(section_header("流量告警", len(self.traffic_alerts)))
+            traffic_section_lines.append(section_header(t("alert_sec_traffic"), len(self.traffic_alerts)))
+            traffic_fallback = t("alert_field_traffic_rule_fallback")
             for idx, alert in enumerate(self.traffic_alerts[:2], start=1):
-                traffic_section_lines.append(f"{idx}. [警告] {self._compact_text(alert.get('rule', '流量告警'))}")
+                traffic_section_lines.append(f"{idx}. [{sev_warn}] {self._compact_text(alert.get('rule', traffic_fallback))}")
                 if alert.get("criteria"):
-                    traffic_section_lines.append(f"條件：{self._compact_text(alert.get('criteria', ''))}")
+                    traffic_section_lines.append(f"{cond_lbl}：{self._compact_text(alert.get('criteria', ''))}")
                 if alert.get("count") is not None:
-                    traffic_section_lines.append(f"次數：{self._compact_text(alert.get('count', ''))}")
+                    traffic_section_lines.append(f"{count_lbl}：{self._compact_text(alert.get('count', ''))}")
                 traffic_section_lines.append("")
 
         metric_section_lines = []
         if self.metric_alerts:
-            metric_section_lines.append(section_header("指標告警", len(self.metric_alerts)))
+            metric_section_lines.append(section_header(t("alert_sec_metric"), len(self.metric_alerts)))
+            metric_fallback = t("alert_field_metric_rule_fallback")
             for idx, alert in enumerate(self.metric_alerts[:2], start=1):
-                metric_section_lines.append(f"{idx}. [警告] {self._compact_text(alert.get('rule', '指標告警'))}")
+                metric_section_lines.append(f"{idx}. [{sev_warn}] {self._compact_text(alert.get('rule', metric_fallback))}")
                 if alert.get("criteria"):
-                    metric_section_lines.append(f"條件：{self._compact_text(alert.get('criteria', ''))}")
+                    metric_section_lines.append(f"{cond_lbl}：{self._compact_text(alert.get('criteria', ''))}")
                 if alert.get("count") is not None:
-                    metric_section_lines.append(f"數值：{self._compact_text(alert.get('count', ''))}")
+                    metric_section_lines.append(f"{value_lbl}：{self._compact_text(alert.get('count', ''))}")
                 metric_section_lines.append("")
 
         return render_alert_template(
@@ -786,7 +834,10 @@ class Reporter:
             )
 
         if len(payload["events"]) > 5:
-            sections.append(f"<div style='margin-top:8px;font-size:11px;color:#6F7274;'>此告警另含 {len(payload['events']) - 5} 筆事件未展開。</div>")
+            tail = esc(t("alert_field_event_tail", count=len(payload["events"]) - 5))
+            sections.append(
+                f"<div style='margin-top:8px;font-size:11px;color:#6F7274;'>{tail}</div>"
+            )
         return "".join(sections)
 
     # ── Event detail renderer ────────────────────────────────────────────────
@@ -797,83 +848,101 @@ class Reporter:
         if not events:
             return ""
 
-        _RESOURCE_LABELS = {
-            'sec_rule': 'Security Rule',
+        # i18n keys for resource types → category labels (lang-aware).
+        _RESOURCE_I18N = {
+            'sec_rule': 'Security Rule',           # Illumio term, stays English
             'rule_set': 'Ruleset',
             'sec_policy': 'Policy Provision',
-            'user': '使用者驗證',
-            'request': 'API 驗證',
-            'authz_csrf': 'CSRF 驗證',
+            'user':        ('alert_cat_user',),
+            'request':     ('alert_cat_request',),
+            'authz_csrf':  ('alert_cat_authz_csrf',),
             'agent': 'VEN Agent',
             'agents': 'VEN Agents',
-            'workload': '工作負載',
-            'workloads': '工作負載',
-            'system_task': '系統工作',
+            'workload':    ('alert_cat_workload',),
+            'workloads':   ('alert_cat_workloads',),
+            'system_task': ('alert_cat_system_task',),
             'lost_agent': 'Lost Agent',
-            'cluster': '叢集',
+            'cluster':     ('alert_cat_cluster',),
             'api_key': 'API Key',
-            'pce_health': 'PCE 健康檢查',
-            'label': '標籤',
-            'ip_list': 'IP 清單',
-            'service': '服務',
+            'pce_health':  ('alert_cat_pce_health',),
+            'label':       ('alert_cat_label',),
+            'ip_list':     ('alert_cat_ip_list',),
+            'service':     ('alert_cat_service',),
             'ven': 'VEN',
-            'pairing_profile': '配對設定檔',
-            'authentication_settings': '認證設定',
-            'firewall_settings': '防火牆設定',
+            'pairing_profile':         ('alert_cat_pairing_profile',),
+            'authentication_settings': ('alert_cat_authentication_settings',),
+            'firewall_settings':       ('alert_cat_firewall_settings',),
+        }
+        _RESOURCE_LABELS = {
+            k: (t(v[0]) if isinstance(v, tuple) else v)
+            for k, v in _RESOURCE_I18N.items()
+        }
+
+        # verb → (label, fg color, bg color); label resolved via i18n key.
+        _VERB_META = {
+            'create':                       ('alert_verb_create',                   '#166644', '#D1FAE5'),
+            'update':                       ('alert_verb_update',                   '#F97607', '#FFF3CD'),
+            'delete':                       ('alert_verb_delete',                   '#BE122F', '#FEE2E2'),
+            'sign_in':                      ('alert_verb_sign_in',                  '#325158', '#E0F2FE'),
+            'sign_out':                     ('alert_verb_sign_out',                 '#325158', '#E0F2FE'),
+            'authentication_failed':        ('alert_verb_authentication_failed',    '#BE122F', '#FEE2E2'),
+            'tampering':                    ('alert_verb_tampering',                '#BE122F', '#FEE2E2'),
+            'suspend':                      ('alert_verb_suspend',                  '#F97607', '#FFF3CD'),
+            'clone_detected':               ('alert_verb_clone_detected',           '#BE122F', '#FEE2E2'),
+            'csrf_validation_failure':      ('alert_verb_csrf_validation_failure',  '#BE122F', '#FEE2E2'),
+            'unpair':                       ('alert_verb_unpair',                   '#BE122F', '#FEE2E2'),
+            'deactivate':                   ('alert_verb_deactivate',               '#F97607', '#FFF3CD'),
+            'activate':                     ('alert_verb_activate',                 '#166644', '#D1FAE5'),
+            'goodbye':                      ('alert_verb_goodbye',                  '#325158', '#E0F2FE'),
+            'refresh_policy':               ('alert_verb_refresh_policy',           '#325158', '#E0F2FE'),
+            'agent_missed_heartbeats_check':('alert_verb_missed_heartbeats_check',  '#F97607', '#FFF3CD'),
+            'agent_offline_check':          ('alert_verb_offline_check',            '#F97607', '#FFF3CD'),
+            'missed_heartbeats_check':      ('alert_verb_missed_heartbeats_check',  '#F97607', '#FFF3CD'),
+            'offline_check':                ('alert_verb_offline_check',            '#F97607', '#FFF3CD'),
+            'found':                        ('alert_verb_found',                    '#166644', '#D1FAE5'),
+            'service_not_available':        ('alert_verb_service_not_available',    '#BE122F', '#FEE2E2'),
+            'authenticate':                 ('alert_verb_authenticate',             '#166644', '#D1FAE5'),
+            'login_session_terminated':     ('alert_verb_login_session_terminated', '#F97607', '#FFF3CD'),
+            'pce_session_terminated':       ('alert_verb_pce_session_terminated',   '#F97607', '#FFF3CD'),
+            'authorization_failed':         ('alert_verb_authorization_failed',     '#BE122F', '#FEE2E2'),
+            'pce_health':                   ('alert_verb_pce_health',               '#F97607', '#FFF3CD'),
         }
         _VERB_STYLE = {
-            'create': ('已建立', '#166644', '#D1FAE5'),
-            'update': ('已更新', '#F97607', '#FFF3CD'),
-            'delete': ('已刪除', '#BE122F', '#FEE2E2'),
-            'sign_in': ('登入', '#325158', '#E0F2FE'),
-            'sign_out': ('登出', '#325158', '#E0F2FE'),
-            'authentication_failed': ('驗證失敗', '#BE122F', '#FEE2E2'),
-            'tampering': ('遭竄改', '#BE122F', '#FEE2E2'),
-            'suspend': ('已暫停', '#F97607', '#FFF3CD'),
-            'clone_detected': ('偵測到複製', '#BE122F', '#FEE2E2'),
-            'csrf_validation_failure': ('CSRF 驗證失敗', '#BE122F', '#FEE2E2'),
-            'unpair': ('已解除配對', '#BE122F', '#FEE2E2'),
-            'deactivate': ('已停用', '#F97607', '#FFF3CD'),
-            'activate': ('已啟用', '#166644', '#D1FAE5'),
-            'goodbye': ('離線', '#325158', '#E0F2FE'),
-            'refresh_policy': ('Policy 重新整理', '#325158', '#E0F2FE'),
-            'agent_missed_heartbeats_check': ('心跳遺失檢查', '#F97607', '#FFF3CD'),
-            'agent_offline_check': ('離線檢查', '#F97607', '#FFF3CD'),
-            'missed_heartbeats_check': ('心跳遺失檢查', '#F97607', '#FFF3CD'),
-            'offline_check': ('離線檢查', '#F97607', '#FFF3CD'),
-            'found': ('已找回', '#166644', '#D1FAE5'),
-            'service_not_available': ('服務不可用', '#BE122F', '#FEE2E2'),
-            'authenticate': ('驗證成功', '#166644', '#D1FAE5'),
-            'login_session_terminated': ('登入工作階段終止', '#F97607', '#FFF3CD'),
-            'pce_session_terminated': ('PCE 工作階段終止', '#F97607', '#FFF3CD'),
-            'authorization_failed': ('授權失敗', '#BE122F', '#FEE2E2'),
-            'pce_health': ('健康檢查', '#F97607', '#FFF3CD'),
+            verb: (t(key), fg, bg) for verb, (key, fg, bg) in _VERB_META.items()
         }
+
         _STATUS_LABELS = {
-            'success': '成功',
-            'failure': '失敗',
-            'warn': '警告',
-            'warning': '警告',
-            'error': '錯誤',
-            'info': '資訊',
+            'success': t('alert_status_success'),
+            'failure': t('alert_status_failure'),
+            'warn':    t('alert_status_warning'),
+            'warning': t('alert_status_warning'),
+            'error':   t('alert_status_error'),
+            'info':    t('alert_status_info'),
         }
         _FIELD_LABELS = {
-            'labels': '標籤',
-            'mode': '模式',
-            'name': '名稱',
-            'enabled': '啟用狀態',
-            'service': '服務',
-            'consumers': '來源端',
-            'provision_status': '佈署狀態',
-            'batch_id': '批次 ID',
-            'fqdns': 'FQDN',
-            'nodes': '節點數',
-            'service_status': '服務狀態',
+            'labels':           t('alert_rfield_labels'),
+            'mode':             t('alert_rfield_mode'),
+            'name':             t('alert_rfield_name'),
+            'enabled':          t('alert_rfield_enabled'),
+            'service':          t('alert_rfield_service'),
+            'consumers':        t('alert_rfield_consumers'),
+            'provision_status': t('alert_rfield_provision_status'),
+            'batch_id':         t('alert_rfield_batch_id'),
+            'fqdns':            'FQDN',
+            'nodes':            t('alert_rfield_nodes'),
+            'service_status':   t('alert_rfield_service_status'),
         }
+
+        _CHANGE_NONE = t('alert_change_none')
+        _CHANGE_EMPTY = t('alert_change_empty')
+        _COL_FIELD  = t('alert_change_col_field')
+        _COL_BEFORE = t('alert_change_col_before')
+        _COL_AFTER  = t('alert_change_col_after')
+        _EVT_FALLBACK = t('alert_verb_event_fallback')
 
         def _fmt_val(v):
             if v is None:
-                return '無'
+                return _CHANGE_NONE
             if isinstance(v, bool):
                 return str(v).lower()
             if isinstance(v, dict):
@@ -884,10 +953,11 @@ class Reporter:
                 return href.strip('/').split('/')[-1] if href else json.dumps(v)[:60]
             if isinstance(v, list):
                 if not v:
-                    return '空白'
+                    return _CHANGE_EMPTY
                 first = v[0]
                 label = (first.get('name') or first.get('value') or str(first))[:40] if isinstance(first, dict) else str(first)[:40]
-                return f"{label}{f'（另 {len(v)-1} 筆）' if len(v) > 1 else ''}"
+                suffix = t('alert_change_more_rows', count=len(v) - 1) if len(v) > 1 else ''
+                return f"{label}{suffix}"
             return str(v)[:120]
 
         def _diff_rows(before, after):
@@ -900,9 +970,9 @@ class Reporter:
                 return ''
             rows = "<table style='width:100%; border-collapse:collapse; margin-top:6px; font-size:10px;'>"
             rows += ("<tr>"
-                     "<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:24%;'>欄位</th>"
-                     "<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:38%;'>變更前</th>"
-                     "<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:38%;'>變更後</th>"
+                     f"<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:24%;'>{esc(_COL_FIELD)}</th>"
+                     f"<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:38%;'>{esc(_COL_BEFORE)}</th>"
+                     f"<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:38%;'>{esc(_COL_AFTER)}</th>"
                      "</tr>")
             for k, bv, av in changes[:5]:
                 field_label = _FIELD_LABELS.get(k, k)
@@ -912,7 +982,8 @@ class Reporter:
                          f"<td style='padding:3px 6px; border-bottom:1px solid #E3D8C5; color:#166644; word-break:break-word;'>{esc(_fmt_val(av))}</td>"
                          f"</tr>")
             if len(changes) > 5:
-                rows += f"<tr><td colspan='3' style='padding:3px 6px; color:#989A9B;'>另有 {len(changes)-5} 個欄位異動</td></tr>"
+                overflow = esc(t('alert_field_changes_overflow', count=len(changes) - 5))
+                rows += f"<tr><td colspan='3' style='padding:3px 6px; color:#989A9B;'>{overflow}</td></tr>"
             rows += "</table>"
             return rows
 
@@ -932,7 +1003,10 @@ class Reporter:
             resource_prefix = event_type.split('.')[0] if '.' in event_type else event_type
             verb_key = event_type.split('.')[-1] if '.' in event_type else ''
             resource_label = _RESOURCE_LABELS.get(resource_prefix, resource_prefix.replace('_', ' ').title())
-            verb_label, verb_color, verb_bg = _VERB_STYLE.get(verb_key, (verb_key.replace('_', ' ').title() or '事件', '#325158', '#E0F2FE'))
+            verb_label, verb_color, verb_bg = _VERB_STYLE.get(
+                verb_key,
+                (verb_key.replace('_', ' ').title() or _EVT_FALLBACK, '#325158', '#E0F2FE'),
+            )
 
             rc = ev.get('resource_changes')
             if isinstance(rc, list):
@@ -950,30 +1024,30 @@ class Reporter:
             extras = []
             if event_type == 'sec_policy.create':
                 count = parsed.get('workloads_affected') or workloads.get('total_affected', 0)
-                extras.append(f"影響工作負載: {count} 台")
+                extras.append(t('alert_ext_workloads_affected', count=count))
             elif event_type in ('agents.unpair', 'workloads.unpair'):
                 count = parsed.get('workloads_affected') or workloads.get('total_affected', 0)
                 if count:
-                    extras.append(f"影響工作負載: {count} 台")
+                    extras.append(t('alert_ext_workloads_affected', count=count))
                 wl_name = parsed.get('target_name') or (after or before).get('hostname') or (after or before).get('name') or ''
                 if wl_name:
-                    extras.append(f"工作負載: {wl_name}")
+                    extras.append(t('alert_ext_workload_affected_one', name=wl_name))
             elif parsed.get('resource_name') and parsed.get('resource_name') != parsed.get('target_name'):
-                extras.append(f"資源: {parsed.get('resource_name')}")
+                extras.append(t('alert_ext_resource', name=parsed.get('resource_name')))
             elif verb_key == 'create' and after:
                 name = after.get('name') or after.get('hostname') or ''
                 if name:
-                    extras.append(f"資源: {name}")
+                    extras.append(t('alert_ext_resource', name=name))
             if event_type.startswith(('user.', 'request.')) and parsed.get('target_name'):
-                extras.append(f"帳號: {parsed.get('target_name')}")
+                extras.append(t('alert_ext_account', name=parsed.get('target_name')))
             elif event_type.startswith(('agent.', 'agents.')) and parsed.get('target_name'):
-                extras.append(f"工作負載: {parsed.get('target_name')}")
+                extras.append(t('alert_ext_workload_affected_one', name=parsed.get('target_name')))
             if parsed.get('source_ip'):
                 extras.append(f"IP: {parsed.get('source_ip')}")
             if parsed.get('action'):
-                extras.append(f"動作: {parsed.get('action')}")
+                extras.append(t('alert_ext_action', name=parsed.get('action')))
             if parsed.get('parser_notes'):
-                extras.append("解析註記: " + ", ".join(parsed.get('parser_notes')))
+                extras.append(t('alert_ext_parser_notes', notes=", ".join(parsed.get('parser_notes'))))
 
             status_color = '#166644' if status == 'success' else '#BE122F'
             status_label = _STATUS_LABELS.get(status.lower(), status.upper())
@@ -989,7 +1063,7 @@ class Reporter:
                 f"<code style='font-size:10px; color:#8B407A; margin-left:2px;'>{esc(event_type)}</code>"
                 f"<span style='margin-left:auto; font-size:10px; color:#989A9B; white-space:nowrap;'>{esc(ts)}</span>"
                 f"</div>"
-                f"<div style='font-size:11px; color:#313638;'><strong>操作來源:</strong> {esc(actor)}"
+                f"<div style='font-size:11px; color:#313638;'>{esc(t('alert_ext_source', source=actor))}"
             )
             if extras:
                 card += f"&nbsp; &bull; &nbsp;{esc(' | '.join(extras))}"
@@ -1000,7 +1074,10 @@ class Reporter:
             cards.append(card)
 
         if len(events) > 5:
-            cards.append(f"<div style='font-size:10px; color:#989A9B; padding:2px 6px;'>此告警另含 {len(events)-5} 筆事件</div>")
+            tail_short = esc(t('alert_field_event_tail_short', count=len(events) - 5))
+            cards.append(
+                f"<div style='font-size:10px; color:#989A9B; padding:2px 6px;'>{tail_short}</div>"
+            )
 
         return "".join(cards)
 
@@ -1016,10 +1093,10 @@ class Reporter:
 
         generated_at = self._now_str()
         summary_items = [
-            ("健康告警", len(self.health_alerts), "#FDECEC", "#BE122F"),
-            ("安全事件", len(self.event_alerts), "#E5F2F9", "#1A2C32"),
-            ("流量告警", len(self.traffic_alerts), "#FFF0E3", "#FF5500"),
-            ("指標告警", len(self.metric_alerts), "#FFF5E8", "#F97607"),
+            (t("alert_sec_health"),  len(self.health_alerts), "#FDECEC", "#BE122F"),
+            (t("alert_sec_event"),   len(self.event_alerts),  "#E5F2F9", "#1A2C32"),
+            (t("alert_sec_traffic"), len(self.traffic_alerts),"#FFF0E3", "#FF5500"),
+            (t("alert_sec_metric"),  len(self.metric_alerts), "#FFF5E8", "#F97607"),
         ]
         summary_html = "".join(
             f"""
@@ -1030,16 +1107,18 @@ class Reporter:
 """
             for label, count, bg, fg in summary_items
         )
+        # Severity labels re-resolved here since the HTML body may be built
+        # independently of `_severity_label()` callers.
         severity_labels = {
-            "crit": "重大",
-            "critical": "重大",
-            "emerg": "緊急",
-            "alert": "高風險",
-            "err": "錯誤",
-            "error": "錯誤",
-            "warn": "警告",
-            "warning": "警告",
-            "info": "資訊",
+            "crit":     t("alert_sev_critical"),
+            "critical": t("alert_sev_critical"),
+            "emerg":    t("alert_sev_emerg"),
+            "alert":    t("alert_sev_high"),
+            "err":      t("alert_sev_error"),
+            "error":    t("alert_sev_error"),
+            "warn":     t("alert_sev_warning"),
+            "warning":  t("alert_sev_warning"),
+            "info":     t("alert_sev_info"),
         }
         section_style = "margin-top:28px; border:1px solid #E6E2D8; border-radius:20px; overflow:hidden; background:#FFFFFF; box-shadow:0 12px 28px rgba(26,44,50,0.08);"
         header_style = "padding:16px 20px; font-size:15px; font-weight:800; font-family:'Montserrat',Arial,sans-serif; letter-spacing:0.02em;"
@@ -1064,13 +1143,13 @@ class Reporter:
             health_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#BE122F; color:#FFFFFF;">{esc(t('health_alerts_header'))}</div>
-        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊彙整 PCE 或 Cluster 健康異常，適合優先確認是否影響連線品質、控制面或服務可用性。</div>
+        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">{esc(t('alert_note_health'))}</div>
         <table style="{table_style}">
           <thead>
             <tr>
-              <th style="{th_style} width:140px;">{esc(t('health_time', default='時間'))}</th>
-              <th style="{th_style}">{esc(t('health_status', default='狀態'))}</th>
-              <th style="{th_style}">{esc(t('health_details', default='詳細資訊'))}</th>
+              <th style="{th_style} width:140px;">{esc(t('health_time'))}</th>
+              <th style="{th_style}">{esc(t('health_status'))}</th>
+              <th style="{th_style}">{esc(t('health_details'))}</th>
             </tr>
           </thead>
           <tbody>
@@ -1101,7 +1180,7 @@ class Reporter:
             event_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#1A2C32; color:#FFFFFF;">{esc(t('security_events_header'))}</div>
-        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊列出近期重要事件與操作脈絡，協助你快速判斷是否需要追查帳號、工作負載或策略變更。</div>
+        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">{esc(t('alert_note_event'))}</div>
         <table style="{table_style}">
           <thead>
             <tr>
@@ -1140,13 +1219,13 @@ class Reporter:
             traffic_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#FF5500; color:#FFFFFF;">{esc(t('traffic_alerts_header'))}</div>
-        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊摘要異常流量與代表性連線，方便你從條件、熱門連線與快照資料判讀風險輪廓。</div>
+        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">{esc(t('alert_note_traffic'))}</div>
         <table style="{table_style}">
           <thead>
             <tr>
               <th style="{th_style}">{esc(t('traffic_rule'))}</th>
               <th style="{th_style} width:80px; text-align:center;">{esc(t('traffic_count'))}</th>
-              <th style="{th_style}">條件</th>
+              <th style="{th_style}">{esc(t('alert_field_condition'))}</th>
             </tr>
           </thead>
           <tbody>
@@ -1178,13 +1257,13 @@ class Reporter:
             metric_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#F97607; color:#FFFFFF;">{esc(t('metric_alerts_header'))}</div>
-        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">此區塊整理高頻寬或高數值異常，適合用來快速發現尖峰行為、流量放大或資源使用失衡。</div>
+        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">{esc(t('alert_note_metric'))}</div>
         <table style="{table_style}">
           <thead>
             <tr>
               <th style="{th_style}">{esc(t('traffic_rule'))}</th>
-              <th style="{th_style} width:100px; text-align:center;">數值</th>
-              <th style="{th_style}">條件</th>
+              <th style="{th_style} width:100px; text-align:center;">{esc(t('alert_field_metric_value'))}</th>
+              <th style="{th_style}">{esc(t('alert_field_condition'))}</th>
             </tr>
           </thead>
           <tbody>

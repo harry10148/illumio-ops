@@ -1,9 +1,10 @@
 # Project Status — illumio_ops
 
-**As of:** 2026-04-13  
+**As of:** 2026-04-18  
 **Version:** v3.2.0  
 **Branch:** main  
-**Code Review Date:** 2026-04-13
+**Code Review Date:** 2026-04-13  
+**i18n Overhaul:** 2026-04-18 — see Task.md i18n-P1..P7 (all done)
 
 ---
 

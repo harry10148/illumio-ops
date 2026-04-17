@@ -48,6 +48,9 @@ def user_process_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
             pivot_data.index.isin(top_user_list),
             pivot_data.columns.isin(top_app_list)
         ]
+        # unstack(fill_value=0) preserves int if the source is int, but be explicit
+        # so reports don't accidentally render "5.0 connections".
+        pivot_data = pivot_data.astype('Int64')
         result['user_dst_matrix'] = pivot_data.reset_index()
 
     # Top processes

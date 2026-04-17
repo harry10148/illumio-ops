@@ -905,9 +905,9 @@ class Analyzer:
 
         if mins is None:
             mins_input = safe_input(t('query_past_mins'), int, allow_cancel=True)
-            if mins_input is None:  # 使用者按 0 返回
+            if mins_input is None:  # user pressed 0 to go back
                 return
-            if mins_input == '' or mins_input == 0:  # 使用者按 Enter 或輸入 0，使用預設
+            if mins_input == '' or mins_input == 0:  # user pressed Enter or typed 0 → use default
                 mins = max_win + 2
             else:
                 mins = int(mins_input)
@@ -932,9 +932,9 @@ class Analyzer:
             print(f"2. {t('pd_2_allowed_only', default='Allowed Only')}")
             print(f"3. {t('pd_3_all', default='All (Blocked + Potential + Allowed)')} [{t('nav_default', default='Default')}]")
             pd_input = safe_input(t('please_select'), int, range(0, 4), allow_cancel=True)
-            if pd_input is None: return  # 使用者按 0 返回
+            if pd_input is None: return  # user pressed 0 to go back
             if pd_input == '' or pd_input == 0:
-                pd_sel = 3  # 預設: All
+                pd_sel = 3  # default: All
             else:
                 pd_sel = int(pd_input)
 

@@ -1725,14 +1725,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             filenames = [os.path.basename(p) for p in paths]
             try:
                 if _arlog:
-                    _arlog.info(f"摰?: {filenames}")
+                    _arlog.info(f"Saved: {filenames}")
             except Exception:
                 pass
             return jsonify({"ok": True, "files": filenames, "record_count": result.record_count})
         except Exception as e:
             try:
                 if _arlog:
-                    _arlog.error(f"Audit?梯”憭望?: {e}")
+                    _arlog.error(f"Audit report generation failed: {e}")
             except Exception:
                 pass
             logger.error(f"Audit generation failed: {e}", exc_info=True)
@@ -1768,14 +1768,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             kpis = result.module_results.get('kpis', [])
             try:
                 if _vrlog:
-                    _vrlog.info(f"摰?: {filenames}")
+                    _vrlog.info(f"Saved: {filenames}")
             except Exception:
                 pass
             return jsonify({"ok": True, "files": filenames, "record_count": result.record_count, "kpis": kpis})
         except Exception as e:
             try:
                 if _vrlog:
-                    _vrlog.error(f"VEN?梯”憭望?: {e}")
+                    _vrlog.error(f"VEN status report generation failed: {e}")
             except Exception:
                 pass
             logger.error(f"VEN status report failed: {e}", exc_info=True)
@@ -1821,7 +1821,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
             try:
                 if _pulog:
-                    _pulog.info(f"摰?: {filenames}")
+                    _pulog.info(f"Saved: {filenames}")
             except Exception:
                 pass
             return jsonify({"ok": True, "files": filenames,
@@ -1833,7 +1833,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         except Exception as e:
             try:
                 if _pulog:
-                    _pulog.error(f"PolicyUsage?梯”憭望?: {e}")
+                    _pulog.error(f"Policy usage report generation failed: {e}")
             except Exception:
                 pass
             logger.error(f"Policy usage report failed: {e}", exc_info=True)

@@ -31,12 +31,11 @@ def _policy_sync_badge(val: str) -> str:
 
 
 def _df_to_html(df, no_data_key: str = "rpt_no_records") -> str:
-    if df is None or (hasattr(df, "empty") and df.empty):
-        return f'<p class="note" data-i18n="{no_data_key}">No records</p>'
+    # Empty case is rendered by the shared renderer for consistent panel chrome.
 
     def _render_cell(col, val, _row):
         val_str = "" if val is None or str(val) in ("None", "nan") else str(val)
-        if col == "Policy Sync":
+        if str(col).strip().lower().replace(" ", "_") == "policy_sync":
             return _policy_sync_badge(val_str)
         return val_str
 
@@ -79,13 +78,26 @@ class VenHtmlExporter:
             "</nav>"
         )
 
-        kpi_cards = "".join(
-            '<div class="kpi-card">'
-            f'<div class="kpi-label">{k["label"]}</div>'
-            f'<div class="kpi-value">{k["value"]}</div>'
-            "</div>"
-            for k in kpis
-        )
+        # KPI labels are i18n keys resolved against STRINGS; applyI18n() swaps
+        # textContent on lang toggle. Render EN initially so the pre-JS view
+        # reads correctly.
+        def _kpi_label(k: dict) -> tuple[str, str]:
+            key = k.get("i18n_key") or ""
+            entry = STRINGS.get(key, {}) if key else {}
+            en = entry.get("en", key) if isinstance(entry, dict) else key
+            return key, en
+
+        kpi_cards_parts = []
+        for k in kpis:
+            key, label_en = _kpi_label(k)
+            i18n_attr = f' data-i18n="{key}"' if key else ""
+            kpi_cards_parts.append(
+                '<div class="kpi-card">'
+                f'<div class="kpi-label"{i18n_attr}>{label_en}</div>'
+                f'<div class="kpi-value">{k["value"]}</div>'
+                "</div>"
+            )
+        kpi_cards = "".join(kpi_cards_parts)
 
         df_online = self._r.get("online")
         df_offline = self._r.get("offline")
@@ -107,13 +119,13 @@ class VenHtmlExporter:
             + self._summary_pills(online_count, offline_count, today_count, yest_count)
             + f'<div class="kpi-grid">{kpi_cards}</div>'
             + "</section>\n"
-            + self._section("online", "rpt_ven_sec_online", f"Online VENs ({online_count})", _df_to_html(df_online), "目前持續回報心跳且可正常套用策略的工作負載。這張表適合拿來確認健康資產清單與版本狀態。", "online")
+            + self._section("online", "rpt_ven_sec_online_title", "Online VENs", online_count, _df_to_html(df_online), "rpt_ven_sec_online_intro", "online")
             + "\n"
-            + self._section("offline", "rpt_ven_sec_offline", f"Offline VENs ({offline_count})", _df_to_html(df_offline), "目前未正常回報的工作負載，請檢查連線、Agent 狀態或是否已除役。這張表通常是排查資產可視性問題的起點。", "offline")
+            + self._section("offline", "rpt_ven_sec_offline_title", "Offline VENs", offline_count, _df_to_html(df_offline), "rpt_ven_sec_offline_intro", "offline")
             + "\n"
-            + self._section("lost-today", "rpt_ven_sec_lost_today", f"Lost Connection in Last 24h ({today_count})", _df_to_html(df_today), "近 24 小時內失聯，建議優先排查。這些通常最有機會對應到新發生的網路、Agent 或主機異常。", "offline")
+            + self._section("lost-today", "rpt_ven_sec_lost_today_title", "Lost Connection in Last 24h", today_count, _df_to_html(df_today), "rpt_ven_sec_lost_today_intro", "offline")
             + "\n"
-            + self._section("lost-yest", "rpt_ven_sec_lost_yest", f"Lost Connection 24-48h Ago ({yest_count})", _df_to_html(df_yest), "已失聯超過一天，但仍屬近期事件，建議在成為陳舊資產前完成確認。這張表可用來追蹤持續未恢復的中短期異常。", "warn")
+            + self._section("lost-yest", "rpt_ven_sec_lost_yest_title", "Lost Connection 24-48h Ago", yest_count, _df_to_html(df_yest), "rpt_ven_sec_lost_yest_intro", "warn")
             + "\n"
             + '<footer><span data-i18n="rpt_ven_footer">Illumio PCE Ops — VEN Status Report</span> &middot; '
             + today_str
@@ -157,16 +169,25 @@ class VenHtmlExporter:
     def _section(
         self,
         id_: str,
-        i18n_key: str,
-        title: str,
+        title_key: str,
+        title_en: str,
+        count: int,
         content: str,
-        intro: str = "",
+        intro_key: str = "",
         extra_class: str = "",
     ) -> str:
-        intro_html = f'<p class="section-intro">{intro}</p>' if intro else ""
+        # Section heading renders "Title (count)"; applyI18n swaps the title
+        # text on lang toggle, count is appended as a static span alongside.
+        intro_html = ""
+        if intro_key:
+            entry = STRINGS.get(intro_key, {})
+            intro_en = entry.get("en", "") if isinstance(entry, dict) else ""
+            intro_html = (
+                f'<p class="section-intro" data-i18n="{intro_key}">{intro_en}</p>'
+            )
         cls = f"card {extra_class}".strip()
         return (
             f'<section id="{id_}" class="{cls}">'
-            f'<h2 data-i18n="{i18n_key}">{title}</h2>'
+            f'<h2><span data-i18n="{title_key}">{title_en}</span> ({count})</h2>'
             f"{intro_html}{content}</section>"
         )

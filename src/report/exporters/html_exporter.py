@@ -117,6 +117,77 @@ def _format_evidence(evidence: dict) -> str:
     return '<div class="finding-evidence">' + ''.join(pills) + '</div>'
 
 
+# Metrics whose direction polarity is inverted (up = good).
+_GOOD_UP_KEYWORDS = ('coverage', 'readiness', 'maturity')
+
+
+def _trend_chip(direction: str, delta: float, delta_pct: float | None, metric: str) -> str:
+    """Render a tabular trend chip with arrow + signed delta + percentage."""
+    arrow = {"up": "\u2191", "down": "\u2193", "flat": "\u2192"}.get(direction, "")
+    metric_lower = (metric or '').lower()
+    inverted = any(k in metric_lower for k in _GOOD_UP_KEYWORDS)
+
+    if direction == 'flat':
+        chip_cls = 'trend-chip trend-chip--flat'
+    elif inverted:
+        chip_cls = f'trend-chip trend-chip--good-{direction}'
+    else:
+        chip_cls = f'trend-chip trend-chip--{direction}'
+
+    pct_str = f' ({delta_pct:+.1f}%)' if delta_pct is not None else ''
+    return (
+        f'<span class="{chip_cls}">'
+        f'<span class="trend-arrow">{arrow}</span>{delta:+,.1f}{pct_str}'
+        f'</span>'
+    )
+
+
+def _trend_deltas_section(deltas: list | None) -> str:
+    """Heading + chip-bearing table; or a friendly first-run note when empty."""
+    heading = '<h3 data-i18n="rpt_tr_trend_heading">Trend vs Previous Report</h3>'
+    if not deltas:
+        return (
+            heading
+            + '<div class="trend-empty-note" data-trend-empty="true">'
+            '<span class="trend-empty-dot" aria-hidden="true"></span>'
+            '<span data-i18n="rpt_tr_trend_empty">'
+            'No previous snapshot — trend will appear from the next report onward.'
+            '</span>'
+            '</div>'
+        )
+
+    rows = []
+    for d in deltas:
+        rows.append({
+            'Metric': d.get('metric', ''),
+            'Previous': d.get('previous', 0),
+            'Current': d.get('current', 0),
+            'Delta': d,  # carry the raw entry through; renderer formats as chip
+        })
+    df = pd.DataFrame(rows)
+
+    def _render_cell(col, val, _row):
+        if col == 'Delta':
+            return _trend_chip(
+                direction=val.get('direction', ''),
+                delta=float(val.get('delta', 0) or 0),
+                delta_pct=val.get('delta_pct'),
+                metric=val.get('metric', ''),
+            )
+        if col in ('Previous', 'Current'):
+            try:
+                return f'{float(val):,.1f}'
+            except (TypeError, ValueError):
+                return str(val) if val is not None else ''
+        return str(val) if val is not None else ''
+
+    return heading + render_df_table(
+        df,
+        col_i18n=_COL_I18N,
+        render_cell=_render_cell,
+    )
+
+
 # Rule descriptions: human-readable explanation of what each built-in rule checks
 _RULE_DESCRIPTIONS = {
     # ── Ransomware exposure ────────────────────────────────────────────────────
@@ -171,26 +242,63 @@ _RULE_DESCRIPTIONS = {
 }
 
 
+_SEVERITY_TOKENS = {'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'}
+
+# Column-name fragments that should render as integers (strip trailing ".0"
+# when dtype was promoted to float by pandas groupby/unstack).
+_INT_COL_KEYWORDS = ('port', '連接埠', 'flow count', 'connections', 'flows',
+                     'allowed', 'blocked', 'count')
+
+
+def _norm_col(name) -> str:
+    """Normalize a column name for tolerant matching (case-insensitive, trimmed)."""
+    return str(name).strip().lower().replace(' ', '_')
+
+
+def _fmt_int_cell(val) -> str:
+    """Format an integer-valued cell with thousands separators; bare floats like
+    53.0 render as '53', not '53.0'. Falls back to str(val) on non-numerics."""
+    if val is None:
+        return ''
+    try:
+        f = float(val)
+    except (TypeError, ValueError):
+        return str(val)
+    if f != f:  # NaN
+        return ''
+    if f.is_integer():
+        return f'{int(f):,}'
+    return f'{f:,.1f}'
+
+
 def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
                 no_data_key: str = "rpt_no_data") -> str:
-    if df is None or (hasattr(df, 'empty') and df.empty):
-        return f'<p class="note" data-i18n="{no_data_key}">No data</p>'
+    # Empty-case rendering is handled inside render_df_table() so the panel
+    # chrome stays consistent across data-bearing and empty sections.
 
-    # Determine which columns contain raw byte values (auto-format them)
-    byte_cols = {col for col in df.columns
-                 if any(kw in col.lower() for kw in _BYTE_COL_KEYWORDS)}
-    # Determine which columns contain Mbps bandwidth values (auto-scale units)
-    bw_cols = {col for col in df.columns
-               if any(kw in col.lower() for kw in _BW_COL_KEYWORDS)}
+    # Determine which columns contain raw byte / bandwidth / integer-count values
+    if df is None or (hasattr(df, 'empty') and df.empty):
+        byte_cols = bw_cols = int_cols = set()
+    else:
+        byte_cols = {col for col in df.columns
+                     if any(kw in str(col).lower() for kw in _BYTE_COL_KEYWORDS)}
+        bw_cols = {col for col in df.columns
+                   if any(kw in str(col).lower() for kw in _BW_COL_KEYWORDS)}
+        int_cols = {col for col in df.columns
+                    if any(kw in str(col).lower() for kw in _INT_COL_KEYWORDS)
+                    and col not in byte_cols and col not in bw_cols}
+
+    sev_target = _norm_col(severity_col) if severity_col else None
 
     def _render_cell(col, val, _row):
-        if severity_col and col == severity_col and str(val).upper() in (
-                'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'):
+        if sev_target and _norm_col(col) == sev_target and str(val).upper() in _SEVERITY_TOKENS:
             return f'<span class="badge badge-{str(val).upper()}">{val}</span>'
         if col in byte_cols:
             return _fmt_bytes(val)
         if col in bw_cols:
             return _fmt_bw(val)
+        if col in int_cols:
+            return _fmt_int_cell(val)
         return '' if val is None else str(val)
 
     return render_df_table(
@@ -325,21 +433,34 @@ class HtmlExporter:
             '<h2 data-i18n="rpt_key_findings">Key Findings</h2>' + key_findings_html +
             attack_summary_html +
             '</section>\n' +
-            self._section('overview', 'rpt_tr_sec_overview', '1 \u00b7 Traffic Overview', self._mod01_html(), '先從整體流量規模、Policy 覆蓋率與熱門通訊埠建立基準視角，方便後續判讀各模組結果。') + '\n' +
-            self._section('policy', 'rpt_tr_sec_policy', '2 \u00b7 Policy Decisions', self._mod02_html(), '拆解 Allow、Blocked 與 Potentially Blocked 的比例與細節，用來判斷目前 Policy 的實際落地程度。') + '\n' +
-            self._section('uncovered', 'rpt_tr_sec_uncovered', '3 \u00b7 Uncovered Flows', self._mod03_html(), '聚焦尚未被有效 Policy 覆蓋的流量，協助找出應優先補強的服務與通訊方向。') + '\n' +
-            self._section('ransomware', 'rpt_tr_sec_ransomware', '4 \u00b7 Ransomware Exposure', self._mod04_html(), '檢查與勒索軟體常見攻擊鏈相關的高風險通訊埠、允許流量與主機曝露情況。') + '\n' +
+            self._section('overview', 'rpt_tr_sec_overview', '1 \u00b7 Traffic Overview', self._mod01_html(),
+                          'rpt_tr_sec_overview_intro', 'Start from overall traffic scale, Policy coverage, and top Ports to set a baseline for reading the rest of the report.') + '\n' +
+            self._section('policy', 'rpt_tr_sec_policy', '2 \u00b7 Policy Decisions', self._mod02_html(),
+                          'rpt_tr_sec_policy_intro', 'Break down the ratios and details of Allowed, Blocked, and Potentially Blocked to gauge how Policy is actually landing.') + '\n' +
+            self._section('uncovered', 'rpt_tr_sec_uncovered', '3 \u00b7 Uncovered Flows', self._mod03_html(),
+                          'rpt_tr_sec_uncovered_intro', 'Focus on traffic not yet covered by effective Policy, helping prioritise which Services and directions to tighten first.') + '\n' +
+            self._section('ransomware', 'rpt_tr_sec_ransomware', '4 \u00b7 Ransomware Exposure', self._mod04_html(),
+                          'rpt_tr_sec_ransomware_intro', 'Check high-risk Ports, Allowed flows, and host exposure commonly tied to ransomware attack chains.') + '\n' +
             # mod05 (Remote Access) consolidated into mod15 (Lateral Movement)
 
-            self._section('user', 'rpt_tr_sec_user', '6 \u00b7 User &amp; Process', self._mod06_html(), '從使用者與程序視角補充流量背景，協助判斷這些連線是否符合既有操作模式。') + '\n' +
-            self._section('matrix', 'rpt_tr_sec_matrix', '7 \u00b7 Cross-Label Matrix', self._mod07_html(), '以 Label 維度觀察跨群組互通情況，適合用來找出原本不應頻繁互動的區段。') + '\n' +
-            self._section('unmanaged', 'rpt_tr_sec_unmanaged', '8 \u00b7 Unmanaged Hosts', self._mod08_html(), '盤點未受 VEN 管理的主機流量，這些主機通常位於可視性與控管邊界之外。') + '\n' +
-            self._section('distribution', 'rpt_tr_sec_distribution','9 \u00b7 Traffic Distribution', self._mod09_html(), '觀察整體流量在通訊埠與協定上的分佈，快速辨識高集中度或異常偏高的類型。') + '\n' +
-            self._section('allowed', 'rpt_tr_sec_allowed', '10 \u00b7 Allowed Traffic', self._mod10_html(), '聚焦目前被明確允許的流量，確認哪些是業務必要路徑，哪些則應再做稽核。') + '\n' +
-            self._section('bandwidth', 'rpt_tr_sec_bandwidth', '11 \u00b7 Bandwidth &amp; Volume', self._mod11_html(), '從頻寬與資料量角度檢視高傳輸流量，用來辨識大型備份、批次作業或疑似資料外流。') + '\n' +
-            self._section('readiness', 'rpt_tr_sec_readiness', '13 \u00b7 Enforcement Readiness', self._mod13_html(), '將多個訊號彙整成 readiness 分數，協助評估是否適合提高 enforcement 強度。') + '\n' +
-            self._section('infrastructure','rpt_tr_sec_infrastructure','14 \u00b7 Infrastructure Scoring', self._mod14_html(), '從應用通訊關係辨識關鍵節點與高影響範圍的基礎架構角色。') + '\n' +
-            self._section('lateral', 'rpt_tr_sec_lateral', '15 \u00b7 Lateral Movement', self._mod15_html(), '專門觀察與橫向移動有關的路徑、服務與來源，協助辨識擴散風險。') + '\n' +
+            self._section('user', 'rpt_tr_sec_user', '6 \u00b7 User &amp; Process', self._mod06_html(),
+                          'rpt_tr_sec_user_intro', 'Add user and process context to traffic to judge whether these connections match existing operational patterns.') + '\n' +
+            self._section('matrix', 'rpt_tr_sec_matrix', '7 \u00b7 Cross-Label Matrix', self._mod07_html(),
+                          'rpt_tr_sec_matrix_intro', 'Observe cross-group communication by Label dimension, useful for surfacing segments that should not interact frequently.') + '\n' +
+            self._section('unmanaged', 'rpt_tr_sec_unmanaged', '8 \u00b7 Unmanaged Hosts', self._mod08_html(),
+                          'rpt_tr_sec_unmanaged_intro', 'Inventory traffic involving hosts not managed by VEN; these typically sit outside the visibility and control boundary.') + '\n' +
+            self._section('distribution', 'rpt_tr_sec_distribution','9 \u00b7 Traffic Distribution', self._mod09_html(),
+                          'rpt_tr_sec_distribution_intro', 'Observe how overall traffic is distributed across Ports and protocols to quickly spot concentration or unexpected highs.') + '\n' +
+            self._section('allowed', 'rpt_tr_sec_allowed', '10 \u00b7 Allowed Traffic', self._mod10_html(),
+                          'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.') + '\n' +
+            self._section('bandwidth', 'rpt_tr_sec_bandwidth', '11 \u00b7 Bandwidth &amp; Volume', self._mod11_html(),
+                          'rpt_tr_sec_bandwidth_intro', 'Review high-volume flows by bandwidth and data volume to identify large backups, batch jobs, or suspected exfiltration.') + '\n' +
+            self._section('readiness', 'rpt_tr_sec_readiness', '13 \u00b7 Enforcement Readiness', self._mod13_html(),
+                          'rpt_tr_sec_readiness_intro', 'Aggregate multiple signals into a readiness score to help assess whether it is safe to tighten Enforcement.') + '\n' +
+            self._section('infrastructure','rpt_tr_sec_infrastructure','14 \u00b7 Infrastructure Scoring', self._mod14_html(),
+                          'rpt_tr_sec_infrastructure_intro', 'Identify critical nodes and infrastructure roles with large blast radius from application communication patterns.') + '\n' +
+            self._section('lateral', 'rpt_tr_sec_lateral', '15 \u00b7 Lateral Movement', self._mod15_html(),
+                          'rpt_tr_sec_lateral_intro', 'Focus on paths, Services, and sources tied to lateral movement to surface spread risk.') + '\n' +
             '<section id="findings" class="card">'
             '<h2><span data-i18n="rpt_tr_sec_findings">Security Findings</span> (' + n_findings + ')</h2>'
             + self._findings_html() +
@@ -355,8 +476,25 @@ class HtmlExporter:
             + TABLE_JS + make_i18n_js() + '</body></html>'
         )
 
-    def _section(self, id_: str, i18n_key: str, title: str, content: str, intro: str = '') -> str:
-        intro_html = f'<p class="section-intro">{intro}</p>' if intro else ''
+    def _section(
+        self,
+        id_: str,
+        i18n_key: str,
+        title: str,
+        content: str,
+        intro_key: str = '',
+        intro_en: str = '',
+    ) -> str:
+        """Emit a report section with translatable h2 title and intro.
+
+        Both the title and intro paragraphs carry ``data-i18n``; applyI18n()
+        swaps textContent on language toggle. Initial render uses English so
+        the no-JS path reads correctly.
+        """
+        intro_html = (
+            f'<p class="section-intro" data-i18n="{intro_key}">{intro_en}</p>'
+            if intro_key else ''
+        )
         return (
             f'<section id="{id_}" class="card">'
             f'<h2 data-i18n="{i18n_key}">{title}</h2>'
@@ -364,42 +502,23 @@ class HtmlExporter:
         )
 
     def _trend_deltas_html(self) -> str:
-        """Render trend delta indicators if a previous snapshot exists."""
-        deltas = self._r.get("_trend_deltas")
-        if not deltas:
-            return ""
-        rows = []
-        for d in deltas:
-            arrow = {"up": "\u2191", "down": "\u2193", "flat": "\u2192"}.get(d["direction"], "")
-            color = "#E53E3E" if d["direction"] == "up" else "#38A169" if d["direction"] == "down" else "#718096"
-            # For security metrics, up is bad (red), down is good (green)
-            # For coverage metrics, up is good — override color
-            metric_lower = d["metric"].lower()
-            if "coverage" in metric_lower or "readiness" in metric_lower or "maturity" in metric_lower:
-                color = "#38A169" if d["direction"] == "up" else "#E53E3E" if d["direction"] == "down" else "#718096"
-            pct_str = f' ({d["delta_pct"]:+.1f}%)' if d.get("delta_pct") is not None else ""
-            rows.append(
-                f'<tr><td>{d["metric"]}</td>'
-                f'<td style="text-align:right;padding:6px 12px">{d["previous"]:,.1f}</td>'
-                f'<td style="text-align:right;padding:6px 12px">{d["current"]:,.1f}</td>'
-                f'<td style="text-align:right;padding:6px 12px;color:{color};font-weight:700">'
-                f'{arrow} {d["delta"]:+,.1f}{pct_str}</td></tr>'
-            )
-        return (
-            '<h3 data-i18n="rpt_tr_trend_heading">Trend vs Previous Report</h3>'
-            '<table class="trend-table" style="width:auto;min-width:420px;max-width:680px;border-collapse:collapse;margin-bottom:16px;font-size:13px">'
-            '<thead><tr>'
-            '<th style="text-align:left;padding:8px 12px">Metric</th>'
-            '<th style="text-align:right;padding:8px 12px">Previous</th>'
-            '<th style="text-align:right;padding:8px 12px">Current</th>'
-            '<th style="text-align:right;padding:8px 12px">Delta</th>'
-            '</tr></thead><tbody>'
-            + ''.join(rows)
-            + '</tbody></table>'
-        )
+        """Render trend deltas via the shared table renderer + chip cells.
 
-    def _subnote(self, text: str) -> str:
-        return f'<p class="note" style="font-size:12px;">{text}</p>'
+        When no prior snapshot exists, emits a soft 'first-run' note instead
+        of being silently empty (so the section feels intentional, not broken).
+        """
+        return _trend_deltas_section(self._r.get("_trend_deltas"))
+
+    def _subnote(self, i18n_key: str, en_text: str) -> str:
+        """Render a small annotation paragraph with i18n support.
+
+        Emits ``data-i18n`` so applyI18n() swaps textContent on language toggle,
+        and includes the English fallback as initial text for the no-JS path.
+        """
+        return (
+            f'<p class="note" style="font-size:12px;" '
+            f'data-i18n="{i18n_key}">{en_text}</p>'
+        )
 
     def _attack_summary_html(self, mod12: dict) -> str:
         def _rows(section_items):
@@ -465,32 +584,21 @@ class HtmlExporter:
 
     def _mod01_html(self):
         m = self._r.get('mod01', {})
-        kv_html = (
-            '<tr><td><b><span data-i18n="rpt_tr_policy_coverage">Policy Coverage</span></b></td>'
-            '<td>' + str(m.get('policy_coverage_pct', 0)) + '%</td></tr>'
-            '<tr><td><b><span data-i18n="rpt_tr_flow_breakdown">Allowed / Blocked / Potential</span></b></td>'
-            '<td>' + str(m.get('allowed_flows', 0)) + ' / ' + str(m.get('blocked_flows', 0)) + ' / ' +
-            str(m.get('potentially_blocked_flows', 0)) + '</td></tr>'
-            '<tr><td><b><span data-i18n="rpt_tr_total_data">Total Data</span></b></td>'
-            '<td>' + _fmt_bytes(m.get('total_mb', 0) * 1024 * 1024) + '</td></tr>'
-            '<tr><td><b><span data-i18n="rpt_tr_date_range">Date Range</span></b></td>'
-            '<td>' + str(m.get('date_range', '')) + '</td></tr>'
-        )
         return (
-            self._subnote('這張摘要表先交代流量規模、Policy 覆蓋率與觀測期間，方便你建立本次報表的整體背景。')
+            self._subnote('rpt_tr_mod01_intro', 'This summary frames traffic scale, Policy coverage, and observation period so the rest of the report has context.')
             + self._mod01_summary_table(m)
-            + self._subnote('熱門通訊埠表可快速看出目前環境最常出現的服務，並判斷是否有不符合預期的活動。')
+            + self._subnote('rpt_tr_top_ports_subnote', 'Top Ports shows which Services dominate the environment and helps spot unexpected activity.')
             + '<h3 data-i18n="rpt_tr_top_ports">Top Ports</h3>'
             + _df_to_html(m.get('top_ports'))
         )
 
     def _mod02_html(self):
         m = self._r.get('mod02', {})
-        out = self._subnote('先看整體決策分佈，理解目前流量有多少被 Allow、Blocked 或仍停留在 Potentially Blocked。') + _df_to_html(m.get('summary'))
+        out = self._subnote('rpt_tr_mod02_intro', 'Start with the decision breakdown to see how much traffic is Allowed vs Blocked vs Potentially Blocked.') + _df_to_html(m.get('summary'))
         # Per-port coverage table
         pc = m.get('port_coverage')
         if pc is not None and hasattr(pc, 'empty') and not pc.empty:
-            out += self._subnote('各通訊埠覆蓋率可用來找出哪些服務已具備較完整的 Policy，哪些仍有明顯缺口。') + '<h3 data-i18n="rpt_tr_port_coverage">Per-Port Coverage</h3>' + _df_to_html(pc)
+            out += self._subnote('rpt_tr_port_coverage_subnote', 'Per-Port Coverage surfaces which Services already have solid Policy and which still have gaps.') + '<h3 data-i18n="rpt_tr_port_coverage">Per-Port Coverage</h3>' + _df_to_html(pc)
         for d in ('allowed', 'blocked', 'potentially_blocked'):
             dm = m.get(d, {})
             if not isinstance(dm, dict) or dm.get('count', 0) == 0:
@@ -547,16 +655,16 @@ class HtmlExporter:
         )
         out = (
             stats
-            + self._subnote('未覆蓋流量排行用來指出目前最需要補 Policy 的流向，通常應優先處理量大或敏感度高的服務。')
+            + self._subnote('rpt_tr_top_uncovered_subnote', 'Top uncovered flows highlight where Policy most urgently needs filling, usually by volume or sensitivity.')
             + '<h3 data-i18n="rpt_tr_top_uncovered">Top Uncovered Flows</h3>'
             + _df_to_html(m.get('top_flows'))
         )
         up = m.get('uncovered_ports')
         if up is not None and hasattr(up, 'empty') and not up.empty:
-            out += self._subnote('通訊埠缺口排行有助於從服務面向盤點缺口，適合直接轉成補強清單。') + '<h3 data-i18n="rpt_tr_port_gaps">Port Gap Ranking</h3>' + _df_to_html(up)
+            out += self._subnote('rpt_tr_port_gaps_subnote', 'The Port gap ranking helps you inventory gaps by Service and turn them directly into a remediation list.') + '<h3 data-i18n="rpt_tr_port_gaps">Port Gap Ranking</h3>' + _df_to_html(up)
         us = m.get('uncovered_services')
         if us is not None and hasattr(us, 'empty') and not us.empty:
-            out += self._subnote('未覆蓋服務把應用與通訊埠綁在一起看，更適合做為後續 Policy 設計的輸入。') + '<h3 data-i18n="rpt_tr_service_gaps">Uncovered Services (App + Port)</h3>' + _df_to_html(us)
+            out += self._subnote('rpt_tr_service_gaps_subnote', 'Uncovered Services tie apps and Ports together, making a better input for future Policy design.') + '<h3 data-i18n="rpt_tr_service_gaps">Uncovered Services (App + Port)</h3>' + _df_to_html(us)
         out += '<h3 data-i18n="rpt_tr_by_rec">By Recommendation Category</h3>' + _df_to_html(m.get('by_recommendation'))
         return out
 
@@ -574,9 +682,9 @@ class HtmlExporter:
             out += (
                 '<div style="background:#fff3cd;border-left:4px solid var(--gold);'
                 'padding:12px 16px;margin:12px 0;border-radius:4px">'
-                '<b><span data-i18n="rpt_tr_investigation_title">⚠ 需要調查的目標主機</span></b><br>'
+                '<b><span data-i18n="rpt_tr_investigation_title">⚠ Hosts Requiring Investigation</span></b><br>'
                 '<span style="font-size:12px" data-i18n="rpt_tr_investigation_desc">'
-                '以下目標主機在重大或高風險通訊埠上有被允許的流量，應進行驗證或考慮封鎖。'
+                'The following destination hosts have Allowed traffic on critical or high-risk Ports. Verify whether this is expected, or block the traffic.'
                 '</span>'
                 '</div>'
                 + _df_to_html(part_e, 'Risk Level')
@@ -585,7 +693,7 @@ class HtmlExporter:
             out += (
                 '<div style="background:#d4edda;border-left:4px solid var(--green-80);'
                 'padding:12px 16px;margin:12px 0;border-radius:4px">'
-                '<b data-i18n="rpt_tr_no_investigation">✅ 未發現重大/高風險通訊埠上的允許流量。</b>'
+                '<b data-i18n="rpt_tr_no_investigation">✅ No Allowed traffic on critical/high-risk Ports detected.</b>'
                 '</div>'
             )
 
@@ -596,7 +704,7 @@ class HtmlExporter:
             + _df_to_html(m.get('part_b_per_port'), 'Risk Level') +
             '<h3 data-i18n="rpt_tr_host_exposure">Host Exposure Ranking</h3>'
             + '<p class="note" style="font-size:11px" data-i18n="rpt_tr_host_exposure_note">'
-            '依接觸風險通訊埠數量排序的目標主機，包含所有決策（含阻斷）。</p>'
+            'Destination hosts ranked by number of risk-Port touches, across all decisions including blocks.</p>'
             + _df_to_html(m.get('part_d_host_exposure'))
         )
         return out
@@ -606,9 +714,9 @@ class HtmlExporter:
         if not isinstance(m, dict) or m.get('total_lateral_flows', 0) == 0:
             return '<p class="note" data-i18n="rpt_no_lateral">No lateral movement traffic found.</p>'
         return (
-            self._subnote('先看各服務在遠端管理情境下的活動量，判斷哪些協定最常被拿來做維運或遠端連線。')
+            self._subnote('rpt_tr_remote_services_subnote', 'Service-level activity in remote-management scenarios shows which protocols are most used for ops or remote sessions.')
             + _df_to_html(m.get('by_service'))
-            + self._subnote('Top Talkers 用來找出最常參與這些連線的來源或目的端，適合核對是否為已知管理節點。')
+            + self._subnote('rpt_tr_remote_talkers_subnote', 'Top Talkers surfaces the most active sources or destinations so you can cross-check against known admin nodes.')
             + '<h3 data-i18n="rpt_tr_top_talkers">Top Talkers</h3>'
             + _df_to_html(m.get('top_talkers'))
         )
@@ -619,9 +727,9 @@ class HtmlExporter:
             return f'<p class="note">{m["note"]}</p>'
         out = ''
         if m.get('user_data_available'):
-            out += self._subnote('使用者排行用來辨識哪些帳號最常出現在這批流量中，可協助判斷是否符合既有操作模式。') + '<h3 data-i18n="rpt_tr_top_users">Top Users</h3>' + _df_to_html(m.get('top_users'))
+            out += self._subnote('rpt_tr_top_users_subnote', 'Top Users identifies which accounts appear most often in this traffic, helping confirm whether behaviour matches existing patterns.') + '<h3 data-i18n="rpt_tr_top_users">Top Users</h3>' + _df_to_html(m.get('top_users'))
         if m.get('process_data_available'):
-            out += self._subnote('程序排行可協助釐清實際發起連線的程式，方便區分正常服務與值得追查的背景程序。') + '<h3 data-i18n="rpt_tr_top_processes">Top Processes</h3>' + _df_to_html(m.get('top_processes'))
+            out += self._subnote('rpt_tr_top_processes_subnote', 'Top Processes narrows down the binaries that initiated connections, separating normal services from background processes worth investigating.') + '<h3 data-i18n="rpt_tr_top_processes">Top Processes</h3>' + _df_to_html(m.get('top_processes'))
         return out or '<p class="note" data-i18n="rpt_no_user_proc">No user/process data.</p>'
 
     def _mod07_html(self):
@@ -645,7 +753,7 @@ class HtmlExporter:
             + _cov_stat('<span data-i18n="rpt_tr_unique_unmanaged_src">Unique Unmanaged Src</span>', str(m.get('unique_unmanaged_src', 0)))
             + _cov_stat('<span data-i18n="rpt_tr_unique_unmanaged_dst">Unique Unmanaged Dst</span>', str(m.get('unique_unmanaged_dst', 0)))
             + '</div>'
-            + self._subnote('先看非受管流量的整體規模，再往下確認哪些來源最活躍，以及它們主要打到哪些受管服務。')
+            + self._subnote('rpt_tr_unmanaged_subnote', 'Start with the scale of unmanaged traffic, then drill into which sources are most active and which managed Services they target.')
             + '<h3 data-i18n="rpt_tr_top_unmanaged">Top Unmanaged Sources</h3>'
             + _df_to_html(m.get('top_unmanaged_src'))
         )
@@ -666,7 +774,7 @@ class HtmlExporter:
     def _mod09_html(self):
         m = self._r.get('mod09', {})
         return (
-            self._subnote('流量分佈表主要用來看整體結構，適合確認是否存在過度集中的服務或突然升高的協定活動。')
+            self._subnote('rpt_tr_distribution_subnote', 'Distribution tables are mainly for shape — good for spotting concentration around a single Service or sudden spikes in a protocol.')
             + '<h3 data-i18n="rpt_tr_port_dist">Port Distribution</h3>'
             + _df_to_html(m.get('port_distribution')) +
             '<h3 data-i18n="rpt_tr_proto_dist">Protocol Distribution</h3>'
@@ -678,9 +786,9 @@ class HtmlExporter:
         if m.get('note'):
             return f'<p class="note">{m["note"]}</p>'
         return (
-            self._subnote('先看目前被明確允許的主要應用流向，確認哪些是業務必要路徑。')
+            self._subnote('rpt_tr_allowed_flows_subnote', 'Focus on explicitly Allowed top flows and verify they are required business paths.')
             + _df_to_html(m.get('top_app_flows'))
-            + self._subnote('Audit Flags 會列出雖然已被允許，但仍值得再人工檢視的流量。')
+            + self._subnote('rpt_tr_audit_flags_subnote', 'Audit Flags lists traffic that is Allowed but still worth a human review.')
             + '<h3><span data-i18n="rpt_tr_audit_flags">Audit Flags</span> (' +
             str(m.get('audit_flag_count', 0)) + ')</h3>'
             + _df_to_html(m.get('audit_flags'))
@@ -709,7 +817,7 @@ class HtmlExporter:
                              _fmt_bw(p95_bw))
         out += '</div>'
 
-        out += self._subnote('先從總傳輸量與峰值頻寬掌握整體資料移動規模，再往下看哪些流量最值得優先檢查。')
+        out += self._subnote('rpt_tr_bandwidth_subnote', 'Start from total volume and peak bandwidth to size overall data movement, then drill into which flows to inspect first.')
         out += ('<h3 data-i18n="rpt_tr_top_by_bytes">Top by Total Bytes</h3>'
                 + _df_to_html(m.get('top_by_bytes')))
 
@@ -728,7 +836,7 @@ class HtmlExporter:
                 f'<h3><span data-i18n="rpt_tr_anomalies">Anomalies (High Bytes/Conn)</span>'
                 f'{thresh_str}</h3>'
                 '<p class="note" style="font-size:11px" data-i18n="rpt_tr_anomalies_note">'
-                '每連線傳輸量高於 P95 的流量（僅計算連線數 &gt; 1），可能為大量傳輸或資料外洩候選項目。'
+                'Flows whose bytes-per-connection exceed P95 (only where connection count &gt; 1); candidates for large transfers or exfiltration.'
                 '</p>'
                 + _df_to_html(anom)
             )
@@ -856,7 +964,7 @@ class HtmlExporter:
             )
 
         html = (
-            self._subnote('readiness 分數用來評估目前環境是否適合進一步提高 enforcement 強度，分數越高通常代表收斂程度越好。') +
+            self._subnote('rpt_tr_readiness_subnote', 'The readiness score estimates how ready the environment is to tighten Enforcement; a higher score usually means tighter convergence.') +
             f'<div style="display:flex;align-items:center;gap:24px;margin-bottom:16px;">'
             f'<div style="font-size:48px;font-weight:700;color:{grade_color};">{grade}</div>'
             f'<div style="flex:1;">'
@@ -901,7 +1009,7 @@ class HtmlExporter:
             return f'<p class="note">{m["error"]}</p>'
         total = m.get('total_lateral_flows', 0)
         pct = m.get('lateral_pct', 0)
-        html = (self._subnote('本區涵蓋所有與橫向移動有關的分析，包含 IP 層級的主機連線模式與 App(Env) 層級的圖論風險評估。') + f'<p><span data-i18n="rpt_tr_lateral_flows">Lateral movement port flows:</span> '
+        html = (self._subnote('rpt_tr_lateral_intro', 'Covers all lateral-movement analysis including IP-level host connection patterns and App(Env)-level graph risk scoring.') + f'<p><span data-i18n="rpt_tr_lateral_flows">Lateral movement port flows:</span> '
                 f'<b>{total:,}</b> ({pct}% <span data-i18n="rpt_tr_lateral_pct">of all flows</span>)</p>')
         service_summary = m.get('service_summary')
         if service_summary is not None and not service_summary.empty:
@@ -911,7 +1019,7 @@ class HtmlExporter:
         ip_talkers = m.get('ip_top_talkers')
         if ip_talkers is not None and not ip_talkers.empty:
             html += (
-                self._subnote('IP Top Talkers 用來找出最常參與橫向移動連線的來源主機，適合核對是否為已知管理節點。')
+                self._subnote('rpt_tr_lateral_talkers_subnote', 'IP Top Talkers finds the hosts most active in lateral traffic, handy for checking whether they match known admin nodes.')
                 + '<h4 data-i18n="rpt_tr_ip_top_talkers">IP Top Talkers (Host-Level)</h4>'
                 + _df_to_html(ip_talkers)
             )

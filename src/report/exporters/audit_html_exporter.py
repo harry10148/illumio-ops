@@ -8,6 +8,7 @@ import os
 
 import pandas as pd
 
+from .html_exporter import _trend_deltas_section
 from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
@@ -19,16 +20,24 @@ logger = logging.getLogger(__name__)
 _CSS = build_css("audit")
 
 
-def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False) -> str:
-    if df is None or (hasattr(df, "empty") and df.empty):
-        return f'<p class="note" data-i18n="{no_data_key}">No data</p>'
+def _norm_col(name) -> str:
+    """Tolerant column-name match: case-insensitive, whitespace/dash collapsed."""
+    return str(name).strip().lower().replace(" ", "_").replace("-", "_")
 
-    has_event_type = show_risk and "event_type" in df.columns
+
+def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False) -> str:
+    # Empty-state rendering is delegated to render_df_table for consistent panel chrome.
+    event_type_col = None
+    if show_risk and df is not None and not (hasattr(df, "empty") and df.empty):
+        for c in df.columns:
+            if _norm_col(c) == "event_type":
+                event_type_col = c
+                break
 
     def _row_attrs(row):
-        risk_level = "INFO"
-        if has_event_type:
-            risk_level = get_risk(str(row["event_type"]))[0]
+        if not event_type_col:
+            return ""
+        risk_level = get_risk(str(row[event_type_col]))[0]
         if risk_level == "CRITICAL":
             return " style='background:#FEF2F2;'"
         if risk_level == "HIGH":
@@ -36,8 +45,8 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False) -
         return ""
 
     def _render_cell(col, val, row):
-        if has_event_type and col == "event_type":
-            risk_level = get_risk(str(row["event_type"]))[0]
+        if event_type_col and col == event_type_col:
+            risk_level = get_risk(str(row[event_type_col]))[0]
             color = RISK_COLOR.get(risk_level, "#989A9B")
             bg = RISK_BG.get(risk_level, "#F9FAFB")
             badge = (
@@ -220,40 +229,19 @@ class AuditHtmlExporter:
         return f'<section id="{id_}" class="card"><h2 data-i18n="{i18n_key}">{title}</h2>{intro_html}{content}</section>'
 
     def _trend_deltas_html(self) -> str:
-        """Render trend delta indicators if a previous snapshot exists."""
-        deltas = self._r.get("_trend_deltas")
-        if not deltas:
-            return ""
-        rows = []
-        for d in deltas:
-            arrow = {
-                "up": "\u2191", "down": "\u2193", "flat": "\u2192"
-            }.get(d["direction"], "")
-            # For security concern counts, up = bad (red); for coverage, up = good (green)
-            color = "#E53E3E" if d["direction"] == "up" else "#38A169" if d["direction"] == "down" else "#718096"
-            pct_str = f' ({d["delta_pct"]:+.1f}%)' if d.get("delta_pct") is not None else ""
-            rows.append(
-                f'<tr><td>{d["metric"]}</td>'
-                f'<td style="text-align:right;padding:6px 12px">{d["previous"]:,.1f}</td>'
-                f'<td style="text-align:right;padding:6px 12px">{d["current"]:,.1f}</td>'
-                f'<td style="text-align:right;padding:6px 12px;color:{color};font-weight:700">'
-                f'{arrow} {d["delta"]:+,.1f}{pct_str}</td></tr>'
-            )
-        return (
-            '<h3 data-i18n="rpt_tr_trend_heading">Trend vs Previous Report</h3>'
-            '<table class="trend-table" style="width:auto;min-width:420px;max-width:680px;border-collapse:collapse;margin-bottom:16px;font-size:13px">'
-            '<thead><tr>'
-            '<th style="text-align:left;padding:8px 12px">Metric</th>'
-            '<th style="text-align:right;padding:8px 12px">Previous</th>'
-            '<th style="text-align:right;padding:8px 12px">Current</th>'
-            '<th style="text-align:right;padding:8px 12px">Delta</th>'
-            '</tr></thead><tbody>'
-            + ''.join(rows)
-            + '</tbody></table>'
-        )
+        """Render trend deltas via shared chip-bearing renderer."""
+        return _trend_deltas_section(self._r.get("_trend_deltas"))
 
-    def _subnote(self, text: str) -> str:
-        return f'<p class="note" style="font-size:12px;">{text}</p>'
+    def _subnote(self, i18n_key: str, en_text: str) -> str:
+        """Render a small annotation paragraph.
+
+        Emits ``data-i18n`` so applyI18n() swaps textContent on language toggle,
+        and includes the English fallback as initial text for the no-JS path.
+        """
+        return (
+            f'<p class="note" style="font-size:12px;" '
+            f'data-i18n="{i18n_key}">{en_text}</p>'
+        )
 
     def _attack_summary_html(self, mod00: dict) -> str:
         def _rows(section_items):
@@ -315,7 +303,7 @@ class AuditHtmlExporter:
         sec_count = m.get("security_concern_count", 0)
         conn_count = m.get("connectivity_event_count", 0)
         html = (
-            self._subnote("本節聚焦於平台健康狀況、Agent 連線問題與主機層級安全事件。建議將 actor、target、來源 IP 與 parser notes 合併參照，以確認事件是否需要進一步調查。")
+            self._subnote("rpt_au_mod01_intro", "This section covers platform health, agent connectivity issues, and host-level security events. Cross-reference actor, target, source IP, and parser notes to decide if an event needs deeper investigation.")
             + '<p><span data-i18n="rpt_au_total_health">Total Health Events:</span> <b>'
             + str(m.get("total_health_events", 0))
             + "</b> &nbsp;|&nbsp; "
@@ -349,7 +337,7 @@ class AuditHtmlExporter:
         conn_df = m.get("connectivity_events")
         if conn_df is not None and not conn_df.empty:
             html += (
-                self._subnote("連線事件會列出停止回報心跳、已從 Policy 移除或需要重新配對的 Agent。可透過 target 與 resource 欄位快速辨識受影響的 Workload。")
+                self._subnote("rpt_au_connectivity_subnote", "Connectivity events list agents that stopped sending heartbeats, were removed from Policy, or need re-pairing. Use target and resource columns to quickly identify the affected Workload.")
                 + '<h3 data-i18n="rpt_au_connectivity_title">Agent Connectivity Events</h3>'
                 + _df_to_html(conn_df, show_risk=True)
             )
@@ -367,7 +355,7 @@ class AuditHtmlExporter:
         failed = m.get("failed_logins", 0)
         unique_ips = m.get("unique_src_ips", 0)
         html = (
-            self._subnote("使用者活動分析以解析後的 principal 與動作為主。報表優先使用受影響的使用者帳號作為主要身分，若目標無法取得則改用 actor 欄位。")
+            self._subnote("rpt_au_mod02_intro", "User activity analysis focuses on parsed principal and action. The report prefers the affected user account as the primary identity, falling back to the actor field when the target cannot be resolved.")
             + '<p><span data-i18n="rpt_au_total_user">Total User Events:</span> <b>'
             + str(m.get("total_user_events", 0))
             + "</b> &nbsp;|&nbsp; "
@@ -395,7 +383,7 @@ class AuditHtmlExporter:
         failed_detail = m.get("failed_login_detail")
         if failed_detail is not None and not (hasattr(failed_detail, "empty") and failed_detail.empty):
             html += (
-                self._subnote("登入失敗記錄已補充解析後的目標使用者、來源 IP、提供的帳號與動作路徑。建議依使用者或來源 IP 交叉確認是否有重複失敗的模式。")
+                self._subnote("rpt_au_failed_detail_subnote", "Failed login records include the parsed target user, source IP, supplied username, and action path. Cross-check by user or source IP to spot repeated-failure patterns.")
                 + '<h3 data-i18n="rpt_au_failed_detail">Failed Login Details</h3>'
                 '<p class="note note-warn" data-i18n="rpt_au_failed_detail_desc">'
                 "Enriched with source IP and notification context. "
@@ -482,7 +470,7 @@ class AuditHtmlExporter:
         high_impact = m.get("high_impact_provisions", [])
 
         html = (
-            self._subnote("Policy 事件現在會同時呈現解析後的 actor、target、resource、動作與變更摘要，方便區分 Draft 編輯與實際影響 Workload 的 Provision 操作。")
+            self._subnote("rpt_au_mod03_intro", "Policy events now expose the parsed actor, target, resource, action, and change summary together, making it easier to separate Draft edits from Provision operations that actually affect Workloads.")
             + '<p><span data-i18n="rpt_au_total_policy">Total Policy Events:</span> <b>'
             + str(m.get("total_policy_events", 0))
             + "</b> &nbsp;|&nbsp; "
@@ -515,13 +503,13 @@ class AuditHtmlExporter:
         provisions = m.get("provisions")
         if provisions is not None and not (hasattr(provisions, "empty") and provisions.empty):
             html += (
-                self._subnote("Provision 記錄會直接顯示部署影響範圍。建議同時對照 workloads affected、actor、來源 IP、resource 名稱與 change detail，確認大型 Policy 變更是否符合預期。")
+                self._subnote("rpt_au_provision_subnote", "Provision records show deployment impact directly. Cross-reference workloads affected, actor, source IP, resource name, and change detail to confirm that large Policy changes are expected.")
                 + '<h3 data-i18n="rpt_au_provision_title">Policy Provision Events</h3>'
                 '<p class="note note-warn" data-i18n="rpt_au_provision_desc">'
                 "Policy provisions push draft changes to active enforcement. "
                 "Review for unintended scope or excessive workload impact.</p>"
-                '<p class="note" style="font-size:.82rem">'
-                "<b>change_detail</b> 摘要列出 Provision 事件的 commit 訊息、版本、異動物件數量與受影響資源。"
+                '<p class="note" style="font-size:.82rem" data-i18n-html="rpt_au_provision_change_detail_note">'
+                "The <b>change_detail</b> summary shows commit messages, versions, and counts of changed and affected resources for Provision events."
                 "</p>"
                 + _df_to_html(provisions, show_risk=True)
             )
@@ -529,13 +517,13 @@ class AuditHtmlExporter:
         draft_events = m.get("draft_events")
         if draft_events is not None and not (hasattr(draft_events, "empty") and draft_events.empty):
             html += (
-                self._subnote("Draft 變更代表尚未 Provision 的編輯內容。在下次 Provision 前，建議透過 target、resource、動作與 change detail 確認變更範圍是否適當。")
+                self._subnote("rpt_au_draft_subnote", "Draft changes are edits that have not been provisioned yet. Before the next Provision, review target, resource, action, and change detail to confirm scope.")
                 + '<h3 data-i18n="rpt_au_draft_section">Draft Rule Changes</h3>'
                 '<p class="note" data-i18n="rpt_au_draft_desc">'
                 "These events represent policy edits in draft state. No enforcement changes have "
                 "occurred yet; they only take effect after Provision.</p>"
-                '<p class="note" style="font-size:.82rem">'
-                "<b>change_detail</b> 彙整 Draft 編輯的欄位層級前後差異，方便稽核人員不必開啟原始 JSON 就能確認變更範圍與意圖。"
+                '<p class="note" style="font-size:.82rem" data-i18n-html="rpt_au_draft_change_detail_note">'
+                "The <b>change_detail</b> summary aggregates field-level before/after differences for Draft edits, so auditors can verify scope and intent without opening raw JSON."
                 "</p>"
                 + _df_to_html(draft_events, show_risk=True)
             )
@@ -543,7 +531,7 @@ class AuditHtmlExporter:
         per_user = m.get("per_user")
         if per_user is not None and not (hasattr(per_user, "empty") and per_user.empty):
             html += (
-                self._subnote("此表依解析後的 actor 彙整 Policy 活動，方便區分管理員操作、系統任務與 Agent 主動觸發的動作。")
+                self._subnote("rpt_au_per_user_policy_subnote", "This table aggregates Policy activity by parsed actor, separating admin operations, system tasks, and actions initiated by the Agent itself.")
                 + '<h3 data-i18n="rpt_au_per_user_policy">Changes by User</h3>'
                 + _df_to_html(per_user)
             )
@@ -562,10 +550,17 @@ class AuditHtmlExporter:
         total_oh = m.get("total_off_hours", 0)
         window = m.get("window_minutes", 30)
 
+        # Correlation window is dynamic; put the number between two
+        # translatable spans so applyI18n swaps prefix/suffix without touching
+        # the value.
         html = (
-            self._subnote(
-                f"本區分析事件之間的時序關聯（{window} 分鐘窗口），偵測典型攻擊鏈模式，"
-                "例如驗證失敗後的 Policy 異動、暴力破解嘗試、以及非上班時段的高風險操作。"
+            self._subnote("rpt_au_mod04_intro", "This section analyses temporal correlation between events, detecting typical attack-chain patterns such as Policy changes after auth failures, brute-force attempts, and high-risk off-hours operations.")
+            + (
+                '<p class="note" style="font-size:12px;">'
+                '<span data-i18n="rpt_au_mod04_window_prefix">Correlation window:</span> '
+                f'<b>{window}</b> '
+                '<span data-i18n="rpt_au_mod04_window_suffix">minutes</span>'
+                '</p>'
             )
             + f'<p><span data-i18n="rpt_au_corr_summary">Correlated Sequences:</span> <b>{total_corr}</b>'
             + f' &nbsp;|&nbsp; <span data-i18n="rpt_au_brute_force">Brute Force Detections:</span> <b>{total_bf}</b>'

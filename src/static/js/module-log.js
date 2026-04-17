@@ -33,9 +33,18 @@ async function mlLoadModules() {
     const sel = $('ml-module-select');
     if (!sel) return;
     const modules = data.modules || [];
-    sel.innerHTML = modules.map(m =>
-      `<option value="${m.name}">${m.label || m.name}${m.count ? ' (' + m.count + ')' : ''}</option>`
-    ).join('');
+    // Rebuild options via DOM to keep text safe and allow data-i18n.
+    while (sel.firstChild) sel.removeChild(sel.firstChild);
+    modules.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      const key = m.i18n_key || '';
+      const label = (key && _translations[key]) || m.label || m.name;
+      const count = m.count ? ' (' + m.count + ')' : '';
+      opt.textContent = label + count;
+      if (key) opt.setAttribute('data-i18n', key);
+      sel.appendChild(opt);
+    });
     if (_mlCurrentModule) sel.value = _mlCurrentModule;
   } catch (e) { /* ignore */ }
 }

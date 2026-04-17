@@ -388,8 +388,8 @@ function renderQtPage() {
     let draftBadge = rawDraftPd ? `<div style="margin-top:3px;">${makePdBadge(rawDraftPd, false)}</div>` : '';
 
     let isoBtn = '';
-    if (shref && dhref) isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${shref}', false, '${dhref}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || '隔離'}</span></button>`;
-    else if (shref || dhref) isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${shref || dhref}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || '隔離'}</span></button>`;
+    if (shref && dhref) isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${shref}', false, '${dhref}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || 'Isolate'}</span></button>`;
+    else if (shref || dhref) isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${shref || dhref}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || 'Isolate'}</span></button>`;
 
     let f_seen = item.timestamp_range ? item.timestamp_range.first_detected || "" : "";
     let l_seen = item.timestamp_range ? item.timestamp_range.last_detected || "" : "";
@@ -525,8 +525,8 @@ function renderQwPage() {
           <td>${ipStr}</td>
           <td style="font-size:11px;">${labelsHtml || '<span style="color:var(--dim);font-size:10px;">No Labels</span>'}</td>
           <td>
-            <button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${href}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || '隔離'}</span></button>
-            ${hasQuarantine ? `<span style="font-size:10px;color:var(--danger);font-weight:bold;margin-left:8px;">${_translations['gui_isolated'] || '已隔離'}</span>` : ''}
+            <button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${href}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || 'Isolate'}</span></button>
+            ${hasQuarantine ? `<span style="font-size:10px;color:var(--danger);font-weight:bold;margin-left:8px;">${_translations['gui_isolated'] || 'Isolated'}</span>` : ''}
           </td>
         </tr>`;
   });

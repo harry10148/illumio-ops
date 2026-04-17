@@ -50,10 +50,16 @@ def bandwidth_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
                      .rename(columns={'src_env': 'Source Env', 'bytes_total': 'Bytes Total'}))
     result['top_env_bytes'] = top_env_bytes
 
-    # Top by port
-    top_port_bytes = (has_bytes[has_bytes['port'] > 0].groupby('port')['bytes_total'].sum()
+    # Top by (port, proto) — int-typed port column
+    _port_keys = ['port', 'proto'] if 'proto' in has_bytes.columns else ['port']
+    top_port_bytes = (has_bytes[has_bytes['port'] > 0].groupby(_port_keys)['bytes_total'].sum()
                       .reset_index().nlargest(top_n, 'bytes_total')
-                      .rename(columns={'port': 'Port', 'bytes_total': 'Bytes Total'}))
+                      .rename(columns={'port': 'Port', 'proto': 'Proto',
+                                       'bytes_total': 'Bytes Total'}))
+    if 'Port' in top_port_bytes.columns:
+        top_port_bytes['Port'] = top_port_bytes['Port'].astype('Int64')
+    if 'Proto' in top_port_bytes.columns and top_port_bytes['Proto'].astype(str).str.strip().eq('').all():
+        top_port_bytes = top_port_bytes.drop(columns=['Proto'])
     result['top_port_bytes'] = top_port_bytes
 
     # Bandwidth stats

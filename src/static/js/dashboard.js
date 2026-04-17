@@ -232,9 +232,9 @@ async function loadReports() {
       : (rp.summary
           ? `<div style="font-size:0.76rem;color:var(--dim);margin-top:4px;">${escapeHtml(rp.summary)}</div>${attackMeta}`
           : attackMeta);
-    const viewLabel = _translations['gui_btn_view'] || '檢視';
-    const downloadLabel = _translations['gui_btn_download'] || '下載';
-    const deleteLabel = _translations['gui_btn_delete'] || '刪除';
+    const viewLabel = _translations['gui_btn_view'] || 'View';
+    const downloadLabel = _translations['gui_btn_download'] || 'Download';
+    const deleteLabel = _translations['gui_btn_delete'] || 'Delete';
     let actionBtn = '';
     if(rp.filename.endsWith('.html')) {
       actionBtn = `<a href="/reports/${escapeHtml(rp.filename)}" target="_blank" class="btn btn-sm btn-secondary">${viewLabel}</a>`;
@@ -329,21 +329,21 @@ function renderSchedules() {
     return;
   }
   const typeLabels = {
-    traffic: _translations['gui_sched_rt_traffic'] || '流量',
-    audit: _translations['gui_sched_rt_audit'] || '稽核',
-    ven_status: _translations['gui_sched_rt_ven'] || 'VEN 狀態',
-    policy_usage: _translations['gui_sched_rt_pu'] || 'Policy 使用',
+    traffic: _translations['gui_sched_rt_traffic'] || 'Traffic',
+    audit: _translations['gui_sched_rt_audit'] || 'Audit',
+    ven_status: _translations['gui_sched_rt_ven'] || 'VEN Status',
+    policy_usage: _translations['gui_sched_rt_pu'] || 'Policy Usage',
   };
   tbody.innerHTML = _schedules.map(s => {
     const typeLabel = typeLabels[s.report_type] || s.report_type;
     const freqBaseMap = {
-      daily: _translations['gui_sched_freq_daily'] || '每日',
-      weekly: _translations['gui_sched_freq_weekly'] || '每週',
-      monthly: _translations['gui_sched_freq_monthly'] || '每月',
+      daily: _translations['gui_sched_freq_daily'] || 'Daily',
+      weekly: _translations['gui_sched_freq_weekly'] || 'Weekly',
+      monthly: _translations['gui_sched_freq_monthly'] || 'Monthly',
     };
     let freq = freqBaseMap[s.schedule_type] || s.schedule_type;
     if (s.schedule_type === 'weekly') freq += ` (${s.day_of_week || ''})`;
-    else if (s.schedule_type === 'monthly') freq += ` (${_translations['gui_sched_day_of_month'] || '每月第'} ${s.day_of_month || 1} ${_translations['gui_day'] || '天'})`;
+    else if (s.schedule_type === 'monthly') freq += ` (${_translations['gui_sched_day_of_month'] || 'Day of month'} ${s.day_of_month || 1})`;
     const tzLabel = s.timezone && s.timezone !== 'local' ? s.timezone : _tzDisplayLabel();
     freq += ` ${String(s.hour||0).padStart(2,'0')}:${String(s.minute||0).padStart(2,'0')} (${tzLabel})`;
 
@@ -354,8 +354,8 @@ function renderSchedules() {
     else statusBadge = `<span style="color:var(--dim);">${_translations['gui_sched_status_never']||'Never run'}</span>`;
 
     const enabledBadge = s.enabled
-      ? `<span style="color:var(--green);font-weight:700;">${_translations['sched_enabled_short'] || '啟用'}</span>`
-      : `<span style="color:var(--dim);">${_translations['sched_disabled_short'] || '停用'}</span>`;
+      ? `<span style="color:var(--green);font-weight:700;">${_translations['sched_enabled_short'] || 'Enabled'}</span>`
+      : `<span style="color:var(--dim);">${_translations['sched_disabled_short'] || 'Disabled'}</span>`;
 
     const toggleLabel = s.enabled ? (_translations['gui_sched_disable']||'Disable') : (_translations['gui_sched_enable']||'Enable');
     return `<tr>
@@ -620,7 +620,8 @@ function _buildAttackSummaryMeta(counts) {
   ]
     .map(t => `<span style="display:inline-block;padding:2px 6px;border-radius:999px;background:#1a2c32;color:#d6d7d7;font-size:0.7rem;">${escapeHtml(t)}</span>`)
     .join('');
-  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;" title="Attack/攻擊摘要">${badges}</div>`;
+  const title = _translations['gui_attack_summary_title'] || 'Attack Summary';
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;" title="${title}">${badges}</div>`;
 }
 
 function _hideGenProgress(success, msg) {
@@ -644,10 +645,10 @@ let _genReportType = null;
 function openReportGenModal(type) {
   _genReportType = type;
   const meta = {
-    traffic:      { titleKey: 'gui_gen_traffic_title', title: '產生流量報表',         icon: '#icon-play',   dates: true  },
-    audit:        { titleKey: 'gui_gen_audit_title',   title: '產生稽核報表',         icon: '#icon-shield', dates: true  },
-    ven:          { titleKey: 'gui_gen_ven_title',     title: '產生 VEN 狀態報表',    icon: '#icon-cpu',    dates: false },
-    policy_usage: { titleKey: 'gui_gen_pu_title',      title: '產生 Policy 使用報表', icon: '#icon-shield', dates: true  },
+    traffic:      { titleKey: 'gui_gen_traffic_title', title: 'Generate Traffic Report',      icon: '#icon-play',   dates: true  },
+    audit:        { titleKey: 'gui_gen_audit_title',   title: 'Generate Audit Report',        icon: '#icon-shield', dates: true  },
+    ven:          { titleKey: 'gui_gen_ven_title',     title: 'Generate VEN Status Report',   icon: '#icon-cpu',    dates: false },
+    policy_usage: { titleKey: 'gui_gen_pu_title',      title: 'Generate Policy Usage Report', icon: '#icon-shield', dates: true  },
   };
   const m = meta[type] || meta.traffic;
   $('m-gen-title').innerHTML =
@@ -697,12 +698,12 @@ function toggleTrafficSource() {
 
 async function confirmReportGen() {
   const typeLabels = {
-    traffic:      _translations['gui_gen_traffic_title'] || '產生流量報表',
-    audit:        _translations['gui_gen_audit_title']   || '產生稽核報表',
-    ven:          _translations['gui_gen_ven_title']     || '產生 VEN 狀態報表',
-    policy_usage: _translations['gui_gen_pu_title']      || '產生 Policy 使用報表',
+    traffic:      _translations['gui_gen_traffic_title'] || 'Generate Traffic Report',
+    audit:        _translations['gui_gen_audit_title']   || 'Generate Audit Report',
+    ven:          _translations['gui_gen_ven_title']     || 'Generate VEN Status Report',
+    policy_usage: _translations['gui_gen_pu_title']      || 'Generate Policy Usage Report',
   };
-  _showGenProgress(typeLabels[_genReportType] || '產生報表');
+  _showGenProgress(typeLabels[_genReportType] || _translations['gui_gen_fallback_title'] || 'Generate report');
   closeModal('m-gen-report');
   if      (_genReportType === 'traffic')      await _doGenerateTraffic();
   else if (_genReportType === 'audit')        await _doGenerateAudit();
@@ -866,8 +867,9 @@ async function _doGenerateTraffic() {
     if (src === 'csv') {
       const fileInput = $('m-gen-csv-file');
       if (!fileInput.files || fileInput.files.length === 0) {
-        _hideGenProgress(false, '請先選擇 CSV 檔案');
-        toast(_translations['gui_err_no_csv'] || '請先選擇 CSV 檔案', 'err');
+        const msg = _translations['gui_csv_required'] || 'CSV file required';
+        _hideGenProgress(false, msg);
+        toast(_translations['gui_err_no_csv'] || 'No CSV file uploaded.', 'err');
         return;
       }
       _updateGenStep(_translations['gui_gen_step_parsing'] || 'Parsing CSV file…');
@@ -886,17 +888,19 @@ async function _doGenerateTraffic() {
       if (r.ok) {
         const msg = `${r.record_count} flows`;
         _hideGenProgress(true, msg);
-        toast(`流量報表已產生：${msg}`);
+        toast((_translations['gui_toast_traffic_done'] || 'Traffic report generated: {msg}').replace('{msg}', msg));
         loadReports();
       } else {
-        _hideGenProgress(false, r.error || '產生流量報表失敗');
-        toast(r.error || '產生流量報表失敗', 'err');
+        const fail = _translations['gui_toast_traffic_fail'] || 'Traffic report generation failed';
+        _hideGenProgress(false, r.error || fail);
+        toast(r.error || fail, 'err');
       }
     } else {
       const startVal = $('m-gen-start').value, endVal = $('m-gen-end').value;
       if (!startVal || !endVal || startVal > endVal) {
-        _hideGenProgress(false, '日期範圍無效');
-        toast(_translations['gui_invalid_date_range'] || 'Invalid date range.', 'err');
+        const msg = _translations['gui_invalid_date_range'] || 'Invalid date range.';
+        _hideGenProgress(false, msg);
+        toast(msg, 'err');
         return;
       }
       const startDate = new Date(startVal + 'T00:00:00Z').toISOString();
@@ -916,24 +920,26 @@ async function _doGenerateTraffic() {
       if (r.ok) {
         const msg = `${r.record_count} flows`;
         _hideGenProgress(true, msg);
-        toast(`流量報表已產生：${msg}`);
+        toast((_translations['gui_toast_traffic_done'] || 'Traffic report generated: {msg}').replace('{msg}', msg));
         loadReports();
       } else {
-        _hideGenProgress(false, r.error || '產生流量報表失敗');
-        toast(r.error || '產生流量報表失敗', 'err');
+        const fail = _translations['gui_toast_traffic_fail'] || 'Traffic report generation failed';
+        _hideGenProgress(false, r.error || fail);
+        toast(r.error || fail, 'err');
       }
     }
   } catch(e) {
     _hideGenProgress(false, e.message);
-    toast('產生流量報表時發生錯誤：' + e.message, 'err');
+    toast((_translations['gui_toast_traffic_error'] || 'Error generating traffic report: {error}').replace('{error}', e.message), 'err');
   }
 }
 
 async function _doGenerateAudit() {
   const startVal = $('m-gen-start').value, endVal = $('m-gen-end').value;
   if (!startVal || !endVal || startVal > endVal) {
-    _hideGenProgress(false, '日期範圍無效');
-    toast(_translations['gui_invalid_date_range'] || 'Invalid date range.', 'err');
+    const msg = _translations['gui_invalid_date_range'] || 'Invalid date range.';
+    _hideGenProgress(false, msg);
+    toast(msg, 'err');
     return;
   }
   const startDate = new Date(startVal + 'T00:00:00Z').toISOString();
@@ -946,15 +952,16 @@ async function _doGenerateAudit() {
     if (r.ok) {
       const msg = `${r.record_count} events`;
       _hideGenProgress(true, msg);
-      toast(`稽核報表已產生：${msg}`);
+      toast((_translations['gui_toast_audit_done'] || 'Audit report generated: {msg}').replace('{msg}', msg));
       loadReports();
     } else {
-      _hideGenProgress(false, r.error || '產生稽核報表失敗');
-      toast(r.error || '產生稽核報表失敗', 'err');
+      const fail = _translations['gui_toast_audit_fail'] || 'Audit report generation failed';
+      _hideGenProgress(false, r.error || fail);
+      toast(r.error || fail, 'err');
     }
   } catch(e) {
     _hideGenProgress(false, e.message);
-    toast('產生稽核報表時發生錯誤：' + e.message, 'err');
+    toast((_translations['gui_toast_audit_error'] || 'Error generating audit report: {error}').replace('{error}', e.message), 'err');
   }
 }
 
@@ -964,16 +971,20 @@ async function _doGenerateVen() {
     const r = await post('/api/ven_status_report/generate', {});
     if (r.ok) {
       const kpiText = (r.kpis || []).map(k => `${k.label}: ${k.value}`).join(' | ');
-      _hideGenProgress(true, kpiText || '完成');
-      toast(`VEN 狀態報表已產生${kpiText ? `：${kpiText}` : ''}`);
+      _hideGenProgress(true, kpiText || (_translations['gui_gen_done'] || 'Done'));
+      const doneMsg = kpiText
+        ? (_translations['gui_toast_ven_done_kpi'] || 'VEN status report generated: {kpi}').replace('{kpi}', kpiText)
+        : (_translations['gui_toast_ven_done'] || 'VEN status report generated');
+      toast(doneMsg);
       loadReports();
     } else {
-      _hideGenProgress(false, r.error || '產生 VEN 狀態報表失敗');
-      toast(r.error || '產生 VEN 狀態報表失敗', 'err');
+      const fail = _translations['gui_toast_ven_fail'] || 'VEN status report generation failed';
+      _hideGenProgress(false, r.error || fail);
+      toast(r.error || fail, 'err');
     }
   } catch(e) {
     _hideGenProgress(false, e.message);
-    toast('產生 VEN 狀態報表時發生錯誤：' + e.message, 'err');
+    toast((_translations['gui_toast_ven_error'] || 'Error generating VEN status report: {error}').replace('{error}', e.message), 'err');
   }
 }
 
@@ -985,16 +996,17 @@ async function _doGeneratePolicyUsage() {
     const r = await post('/api/policy_usage_report/generate', { start_date: start, end_date: end });
     if (r.ok) {
       const kpiText = (r.kpis || []).map(k => `${k.label}: ${k.value}`).join(' | ');
-      _hideGenProgress(true, kpiText || '完成');
-      toast(`Policy 使用報表已產生：${r.record_count} 筆`);
+      _hideGenProgress(true, kpiText || (_translations['gui_gen_done'] || 'Done'));
+      toast((_translations['gui_toast_pu_done'] || 'Policy Usage report generated: {count} records').replace('{count}', r.record_count));
       loadReports();
     } else {
-      _hideGenProgress(false, r.error || '產生 Policy 使用報表失敗');
-      toast(r.error || '產生 Policy 使用報表失敗', 'err');
+      const fail = _translations['gui_toast_pu_fail'] || 'Policy Usage report generation failed';
+      _hideGenProgress(false, r.error || fail);
+      toast(r.error || fail, 'err');
     }
   } catch(e) {
     _hideGenProgress(false, e.message);
-    toast('產生 Policy 使用報表時發生錯誤：' + e.message, 'err');
+    toast((_translations['gui_toast_pu_error'] || 'Error generating Policy Usage report: {error}').replace('{error}', e.message), 'err');
   }
 }
 
@@ -1013,16 +1025,23 @@ async function _doGeneratePolicyUsageClean() {
         failed_rule_details: r.failed_rule_details || [],
       }, 3);
       const summaryText = [kpiText, execText, detailText].filter(Boolean).join(' | ');
-      _hideGenProgress(true, summaryText || '完成');
-      toast(`Policy 使用報表已產生：${r.record_count} 筆${summaryText ? ` (${summaryText})` : ''}`);
+      _hideGenProgress(true, summaryText || (_translations['gui_gen_done'] || 'Done'));
+      const doneMsg = summaryText
+        ? (_translations['gui_toast_pu_done_detail'] || 'Policy Usage report generated: {count} records ({detail})')
+            .replace('{count}', r.record_count)
+            .replace('{detail}', summaryText)
+        : (_translations['gui_toast_pu_done'] || 'Policy Usage report generated: {count} records')
+            .replace('{count}', r.record_count);
+      toast(doneMsg);
       loadReports();
     } else {
-      _hideGenProgress(false, r.error || '產生 Policy 使用報表失敗');
-      toast(r.error || '產生 Policy 使用報表失敗', 'err');
+      const fail = _translations['gui_toast_pu_fail'] || 'Policy Usage report generation failed';
+      _hideGenProgress(false, r.error || fail);
+      toast(r.error || fail, 'err');
     }
   } catch (e) {
     _hideGenProgress(false, e.message);
-    toast('產生 Policy 使用報表時發生錯誤：' + e.message, 'err');
+    toast((_translations['gui_toast_pu_error'] || 'Error generating Policy Usage report: {error}').replace('{error}', e.message), 'err');
   }
 }
 
@@ -1298,15 +1317,15 @@ async function loadDashboardPolicyUsageSummary() {
 }
 
 async function testConn() {
-  slog(_translations['gui_test_conn_running'] || '測試 PCE 連線中...');
+  slog(_translations['gui_test_conn_running'] || 'Testing PCE connection...');
   const r = await post('/api/actions/test-connection', {});
   if (r.ok) {
-    const okText = _translations['status_ok'] || '連線成功';
+    const okText = _translations['status_ok'] || 'Connected';
     $('d-api').textContent = okText;
     $('d-api').className = 'value ok';
     slog(okText + ' (HTTP ' + r.status + ')');
   } else {
-    $('d-api').textContent = _translations['status_error'] || '連線失敗';
+    $('d-api').textContent = _translations['status_error'] || 'Error';
     $('d-api').className = 'value err';
     slog(r.error || r.body);
   }
@@ -1383,7 +1402,7 @@ function openQueryModal(idx = -1) {
     $('dq-any-label').value = ''; $('dq-any-ip').value = '';
     $('dq-ex-any-label').value = ''; $('dq-ex-any-ip').value = '';
   } else {
-    $('mq-title').textContent = _translations['gui_edit_query_widget'] || '編輯查詢元件';
+    $('mq-title').textContent = _translations['gui_edit_query_widget'] || 'Edit Query Widget';
     const q = _dashboardQueries[idx];
     $('dq-name').value = q.name || '';
     $('dq-rank').value = q.rank_by || 'count';
@@ -1446,11 +1465,11 @@ async function saveDashboardQuery() {
     if (m) m.classList.remove('show');
     await loadDashboardQueries();
   }
-  else alert((_translations['error_generic'] || '錯誤：{error}').replace('{error}', r.error));
+  else alert((_translations['error_generic'] || 'Error: {error}').replace('{error}', r.error));
 }
 
 async function deleteTop10Query(idx) {
-  if (!confirm(_translations['gui_confirm_delete_widget'] || '要刪除此元件嗎？')) return;
+  if (!confirm(_translations['gui_confirm_delete_widget'] || 'Delete this widget?')) return;
   const r = await fetch('/api/dashboard/queries/' + idx, { method: 'DELETE', headers: { 'X-CSRF-Token': _csrfToken() } }).then(res => res.json());
   if (r.ok) {
     _clearAllTop10Cache();
@@ -1458,7 +1477,7 @@ async function deleteTop10Query(idx) {
     if (m) m.classList.remove('show');
     await loadDashboardQueries();
   }
-  else alert(_translations['error_deleting'] || '刪除失敗');
+  else alert(_translations['error_deleting'] || 'Delete failed');
 }
 
 /* ── Top 10 cache helpers ── */
@@ -1514,9 +1533,9 @@ function _renderTop10Body(idx, data, total, ts) {
 
     let isoBtn = '';
     if (m.s_href && m.d_href) {
-      isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${m.s_href}', false, '${m.d_href}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || '隔離'}</span></button>`;
+      isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${m.s_href}', false, '${m.d_href}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || 'Isolate'}</span></button>`;
     } else if (m.s_href || m.d_href) {
-      isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${m.s_href || m.d_href}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || '隔離'}</span></button>`;
+      isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${m.s_href || m.d_href}')"><span data-i18n="gui_btn_isolate">${_translations['gui_btn_isolate'] || 'Isolate'}</span></button>`;
     }
 
     const formatActor = (name, ip, href, labelsHtml, process, user) => {
@@ -1591,7 +1610,7 @@ async function runTop10Query(idx) {
       ms.textContent = (_translations['gui_done'] || 'Done.') + '  (' + _fmtCacheTs(Date.now()) + ')';
     }
   } catch (e) {
-    ms.textContent = (_translations['error_generic'] || '錯誤：{error}').replace('{error}', e.message);
+    ms.textContent = (_translations['error_generic'] || 'Error: {error}').replace('{error}', e.message);
     bd.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--danger);padding:20px;">${_translations['gui_top10_error'] || 'Error querying data.'}</td></tr>`;
   }
 }

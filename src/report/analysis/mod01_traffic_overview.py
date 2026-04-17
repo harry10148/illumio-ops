@@ -32,11 +32,24 @@ def traffic_overview(df: pd.DataFrame) -> dict:
     last = df['last_detected'].max()
     date_range = f"{first.date() if pd.notna(first) else 'N/A'} → {last.date() if pd.notna(last) else 'N/A'}"
 
-    # Top ports (by flow count)
-    top_ports = (df[df['port'] > 0]['port']
-                 .value_counts().head(10)
-                 .reset_index()
-                 .rename(columns={'port': 'Port', 'count': 'Flow Count'}))
+    # Top ports (by flow count) — group by (port, proto) when available so the
+    # table shows e.g. "53 / UDP" rather than a bare port number. Counts and
+    # ports stay int-typed so rendered cells are "53" not "53.0".
+    _port_df = df[df['port'] > 0]
+    if _port_df.empty:
+        top_ports = pd.DataFrame()
+    else:
+        has_proto = 'proto' in _port_df.columns
+        group_keys = ['port', 'proto'] if has_proto else ['port']
+        top_ports = (
+            _port_df.groupby(group_keys).size()
+            .nlargest(10).reset_index(name='Flow Count')
+            .rename(columns={'port': 'Port', 'proto': 'Proto'})
+        )
+        top_ports['Port'] = top_ports['Port'].astype('Int64')
+        top_ports['Flow Count'] = top_ports['Flow Count'].astype('Int64')
+        if 'Proto' in top_ports.columns and top_ports['Proto'].astype(str).str.strip().eq('').all():
+            top_ports = top_ports.drop(columns=['Proto'])
 
     # Top protocols
     top_protos = (df[df['proto'] != '']['proto']

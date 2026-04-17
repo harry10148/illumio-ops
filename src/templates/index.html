@@ -114,7 +114,7 @@
           <option value="comfortable" data-i18n="gui_comfortable">Comfortable</option>
         </select>
       </div>
-      <button class="btn btn-sm" onclick="mlOpen()" data-i18n="gui_ml_logs_btn" style="padding:3px 10px;">?亥?</button>
+      <button class="btn btn-sm" onclick="mlOpen()" data-i18n="gui_ml_logs_btn" style="padding:3px 10px;">Logs</button>
       <button class="btn btn-secondary btn-sm" onclick="stopGui()" title="Stop Web GUI" data-i18n="gui_stop">
         <svg class="icon" aria-hidden="true" focusable="false">
           <use href="#icon-stop"></use>
@@ -127,12 +127,12 @@
     <button class="tab active" type="button" role="tab" aria-selected="true" aria-controls="p-dashboard" data-tab="dashboard" onclick="switchTab('dashboard')" data-i18n="gui_tab_dashboard">
       <svg class="icon">
         <use href="#icon-activity"></use>
-      </svg> 總覽
+      </svg> Dashboard
     </button>
     <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-traffic-workload" data-tab="traffic-workload" onclick="switchTab('traffic-workload')" data-i18n="gui_tab_traffic_workload">
       <svg class="icon">
         <use href="#icon-search"></use>
-      </svg> 流量與工作負載
+      </svg> Traffic & Workloads
     </button>
     <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-events" data-tab="events" onclick="switchTab('events')">
       <svg class="icon">
@@ -163,7 +163,7 @@
 
   <main id="main-content">
 
-  <!-- ????Traffic & Quarantine (Dashboard Tab) ????-->
+  <!-- Traffic & Quarantine (Dashboard Tab) -->
   <div class="panel active" id="p-dashboard">
 
     <!-- Top level stats -->
@@ -488,7 +488,7 @@
     </button>
   </div>
 
-  <!-- ????Rules ????-->
+  <!-- Rules -->
   <div class="panel" id="p-events">
     <fieldset>
       <legend data-i18n="gui_event_viewer">Event Viewer</legend>
@@ -662,8 +662,8 @@
     </div>
   </div>
 
-  <!-- ????Settings ????-->
-  <!-- ????Reports ????-->
+  <!-- Settings -->
+  <!-- Reports -->
   <div class="panel" id="p-reports">
     <div class="rs-tab-bar">
       <button class="btn btn-primary rs-active" onclick="reportsSubTab('list')" id="reports-tab-list" data-i18n="gui_tab_reports">Reports</button>
@@ -917,7 +917,7 @@
   </div>
 
 
-  <!-- ????Rule Scheduler ????-->
+  <!-- Rule Scheduler -->
   <div class="panel" id="p-rule-scheduler">
 
     <!-- Scoped inline styles for Rule Scheduler -->
@@ -995,17 +995,17 @@
     <div class="rs-tab-bar">
       <button class="btn btn-primary rs-active" onclick="rsSubTab('browse')" id="rs-tab-browse" data-i18n="gui_rs_browse_add">Browse & Add</button>
       <button class="btn" onclick="rsSubTab('schedules')" id="rs-tab-schedules" data-i18n="gui_rs_schedules">Schedules</button>
-      <button class="btn" onclick="rsSubTab('logs')" id="rs-tab-logs" data-i18n="gui_rs_logs">?瑁???</button>
+      <button class="btn" onclick="rsSubTab('logs')" id="rs-tab-logs" data-i18n="gui_rs_logs">Ruleset Logs</button>
     </div>
 
     <!-- ?? Browse & Add sub-view ?? -->
     <div id="rs-browse" class="rs-subview">
       <div class="rs-search-bar">
         <select id="rs-search-scope" style="padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);color:var(--fg);font-size:.85rem;">
-          <option value="rs_name" data-i18n="gui_rs_scope_rs_name">閬???蝔?/option>
-          <option value="rs_id"   data-i18n="gui_rs_scope_rs_id">閬???ID</option>
-          <option value="rule_id" data-i18n="gui_rs_scope_rule_id">閬? ID</option>
-          <option value="rule_desc" data-i18n="gui_rs_scope_rule_desc">閬??膩</option>
+          <option value="rs_name" data-i18n="gui_rs_scope_rs_name">Ruleset Name</option>
+          <option value="rs_id"   data-i18n="gui_rs_scope_rs_id">Ruleset Scope Ruleset ID</option>
+          <option value="rule_id" data-i18n="gui_rs_scope_rule_id">Ruleset Scope Rule ID</option>
+          <option value="rule_desc" data-i18n="gui_rs_scope_rule_desc">Ruleset Scope Rule Desc</option>
         </select>
         <input id="rs-search" style="max-width:300px;" placeholder="" data-i18n-placeholder="gui_rs_search_placeholder" onkeydown="if(event.key==='Enter')rsDoSearch()">
         <button class="btn btn-primary" onclick="rsDoSearch()" data-i18n="gui_rs_search_btn">Search</button>
@@ -1116,13 +1116,13 @@
     <div id="rs-detail-popup"><span class="popup-close" onclick="rsClosePopup()">&times;</span><div class="popup-title" id="rs-popup-title"></div><div id="rs-popup-body"></div></div>
   </div>
 
-  <!-- ????Module Log Viewer Modal ????-->
+  <!-- Module Log Viewer Modal -->
   <div id="ml-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;align-items:center;justify-content:center;">
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;width:min(860px,95vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">
       <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">
-        <span style="font-weight:600;font-size:1rem;" data-i18n="gui_ml_title">?瑁??亥?</span>
+        <span style="font-weight:600;font-size:1rem;" data-i18n="gui_ml_title">Module Logs</span>
         <select id="ml-module-select" class="form-control" style="width:auto;min-width:150px;" onchange="mlLoadLogs()"></select>
-        <button class="btn btn-sm" onclick="mlLoadLogs()" data-i18n="gui_rs_refresh">??渡?</button>
+        <button class="btn btn-sm" onclick="mlLoadLogs()" data-i18n="gui_rs_refresh">Ruleset Refresh</button>
         <span style="flex:1"></span>
         <button class="btn btn-sm" onclick="mlClose()" style="padding:2px 10px;">??/button>
       </div>
@@ -1130,7 +1130,7 @@
     </div>
   </div>
 
-  <!-- ????Modals ????-->
+  <!-- Modals -->
 
   <!-- Rule Scheduler Schedule Modal -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="m-rs-schedule">
@@ -1715,10 +1715,9 @@
           </div>
         </details>
       </div>
-      <p id="m-gen-note" style="display:none;font-size:0.85rem;color:var(--dim);margin-top:8px;" data-i18n="gui_gen_snapshot_note">
-        敹怎?梯”??亥??????銝?閬?摰????      </p>
+      <p id="m-gen-note" style="display:none;font-size:0.85rem;color:var(--dim);margin-top:8px;" data-i18n="gui_gen_snapshot_note">Gen Snapshot Note</p>
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal('m-gen-report')" data-i18n="gui_gen_cancel">??</button>
+        <button class="btn btn-secondary" onclick="closeModal('m-gen-report')" data-i18n="gui_gen_cancel">Cancel</button>
         <button class="btn btn-success" id="m-gen-confirm" onclick="confirmReportGen()">
           <svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg> <span data-i18n="gui_gen_generate">?Ｙ?</span>
         </button>

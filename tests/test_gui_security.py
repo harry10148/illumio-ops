@@ -427,9 +427,11 @@ def test_event_catalog_endpoint_returns_translated_labels_and_correct_categories
 
         categories = response.json["categories"]
         category_labels = {category["id"]: category["label"] for category in categories}
-        assert category_labels["Policy"] == "策略"
+        # Policy and Workload stay English in zh_TW per the glossary whitelist
+        # (user-configured terms to preserve in both locales).
+        assert category_labels["Policy"] == "Policy"
         assert category_labels["Agent Operations"] == "Agent 操作"
-        assert category_labels["Containers & Workloads"] == "容器與工作負載"
+        assert category_labels["Containers & Workloads"] == "容器與 Workload"
 
         all_events = {
             event["id"]: {**event, "category_id": category["id"]}

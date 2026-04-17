@@ -29,9 +29,9 @@ def cross_label_flow_matrix(df: pd.DataFrame, top_n: int = 20) -> dict:
         cross_count = int(sub['is_cross'].sum())
         same_count = len(sub) - cross_count
 
-        # Value × value matrix (connections)
+        # Value × value matrix (connections). Cast to Int64 so cells render "5" not "5.0".
         matrix = (sub.groupby([src_col, dst_col])['num_connections']
-                  .sum().unstack(fill_value=0))
+                  .sum().unstack(fill_value=0).astype('Int64'))
         # Keep top_n src and dst values
         top_src = sub.groupby(src_col)['num_connections'].sum().nlargest(top_n).index
         top_dst = sub.groupby(dst_col)['num_connections'].sum().nlargest(top_n).index
@@ -47,6 +47,8 @@ def cross_label_flow_matrix(df: pd.DataFrame, top_n: int = 20) -> dict:
                      .rename(columns={src_col: f'Src {key.capitalize()}',
                                       dst_col: f'Dst {key.capitalize()}',
                                       'num_connections': 'Connections'}))
+        if 'Connections' in top_cross.columns:
+            top_cross['Connections'] = top_cross['Connections'].astype('Int64')
 
         matrices[key] = {
             'same_value_flows': same_count,

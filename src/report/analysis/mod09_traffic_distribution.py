@@ -31,14 +31,22 @@ def traffic_distribution(df: pd.DataFrame, top_n: int = 20) -> dict:
                 label_dist[f'{side}_{key}'] = dist
     result['label_distribution'] = label_dist
 
-    # Port / service distribution
-    port_dist = (df[df['port'] > 0].groupby('port').agg(
+    # Port / service distribution (group by port+proto so TCP/53 vs UDP/53 are distinct)
+    _port_keys = ['port', 'proto'] if 'proto' in df.columns else ['port']
+    port_dist = (df[df['port'] > 0].groupby(_port_keys).agg(
         connections=('num_connections', 'sum'),
         unique_src=('src_ip', 'nunique'),
         unique_dst=('dst_ip', 'nunique'),
     ).reset_index().nlargest(top_n, 'connections')
-    .rename(columns={'port': 'Port', 'connections': 'Connections',
+    .rename(columns={'port': 'Port', 'proto': 'Proto', 'connections': 'Connections',
                      'unique_src': 'Unique Src', 'unique_dst': 'Unique Dst'}))
+    if 'Port' in port_dist.columns:
+        port_dist['Port'] = port_dist['Port'].astype('Int64')
+    for c in ('Connections', 'Unique Src', 'Unique Dst'):
+        if c in port_dist.columns:
+            port_dist[c] = port_dist[c].astype('Int64')
+    if 'Proto' in port_dist.columns and port_dist['Proto'].astype(str).str.strip().eq('').all():
+        port_dist = port_dist.drop(columns=['Proto'])
     result['port_distribution'] = port_dist
 
     # Role→Role flow patterns (src_role × dst_role)

@@ -171,9 +171,9 @@ async function rsFetchRulesets() {
     }
     data.items.forEach(rs => {
       const schMark = rs.schedule_type === 1
-        ? '<span class="rs-mark-rs" title="' + (_translations.gui_rs_sch_badge_sched || '已排程') + '">★</span>'
+        ? '<span class="rs-mark-rs" title="' + (_translations.gui_rs_sch_badge_sched || 'Scheduled') + '">★</span>'
         : rs.schedule_type === 2
-          ? '<span class="rs-mark-child" title="' + (_translations.gui_rs_sch_badge_child || '子規則排程') + '">●</span>'
+          ? '<span class="rs-mark-child" title="' + (_translations.gui_rs_sch_badge_child || 'Child Schedule') + '">●</span>'
           : '';
       const provBadge = rs.provision_state === 'DRAFT'
         ? '<span class="rs-badge rs-badge-draft">DRAFT</span>'
@@ -236,9 +236,9 @@ async function rsViewRuleset(rsId) {
     const statusBadge = rsRow.enabled
       ? '<span class="rs-badge rs-badge-on">ON</span>'
       : '<span class="rs-badge rs-badge-off">OFF</span>';
-    const schRsBadge = rsRow.is_scheduled ? ' &nbsp; <span class="rs-mark-rs" title="' + (_translations.gui_rs_sch_badge_sched || '已排程') + '">★ ' + (_translations.gui_rs_sch_badge_sched || '已排程') + '</span>' : '';
+    const schRsBadge = rsRow.is_scheduled ? ' &nbsp; <span class="rs-mark-rs" title="' + (_translations.gui_rs_sch_badge_sched || 'Scheduled') + '">★ ' + (_translations.gui_rs_sch_badge_sched || 'Scheduled') + '</span>' : '';
     $('rs-detail-meta').innerHTML = 'ID: ' + rsRow.id + ' &nbsp; ' + provBadge + ' &nbsp; ' + statusBadge + schRsBadge +
-      ' &nbsp; <button class="btn btn-sm btn-primary" onclick="rsOpenScheduleModal(\'' + jsStr(rsRow.href) + '\',\'' + jsStr(rsRow.name) + '\',true,\'' + jsStr(rsRow.name) + '\')">' + (_translations.gui_rs_schedule_rs_btn || '建立 Ruleset 排程') + '</button>';
+      ' &nbsp; <button class="btn btn-sm btn-primary" onclick="rsOpenScheduleModal(\'' + jsStr(rsRow.href) + '\',\'' + jsStr(rsRow.name) + '\',true,\'' + jsStr(rsRow.name) + '\')">' + (_translations.gui_rs_schedule_rs_btn || 'Schedule Ruleset') + '</button>';
 
     const tbody = $('rs-rules-body');
     tbody.innerHTML = '';
@@ -251,7 +251,7 @@ async function rsViewRuleset(rsId) {
       const st = r.enabled
         ? '<span class="rs-badge rs-badge-on">ON</span>'
         : '<span class="rs-badge rs-badge-off">OFF</span>';
-      const schIcon = r.is_scheduled ? '<span class="rs-mark-child" title="' + (_translations.gui_rs_sch_badge_child || '子規則排程') + '">●</span>' : '';
+      const schIcon = r.is_scheduled ? '<span class="rs-mark-child" title="' + (_translations.gui_rs_sch_badge_child || 'Child Schedule') + '">●</span>' : '';
       const descLabel = _translations.gui_rs_col_desc || 'Description';
       const noDesc = _translations.gui_rs_no_desc || '(no desc)';
       const descHtml = r.description
@@ -426,7 +426,7 @@ async function rsLoadSchedules() {
       const typeStr = s.is_ruleset ? (T.gui_rs_type_ruleset || 'RuleSet') : (T.gui_rs_type_rule || 'Rule');
       // Live status badge
       const liveBadge = s.pce_status === 'deleted'
-        ? '<span class="rs-badge rs-badge-deleted">' + (_translations.gui_rs_status_deleted || '已刪除') + '</span>'
+        ? '<span class="rs-badge rs-badge-deleted">' + (_translations.gui_rs_status_deleted || 'Deleted') + '</span>'
         : s.live_enabled === true
           ? '<span class="rs-badge rs-badge-on">ON</span>'
           : s.live_enabled === false

@@ -20,12 +20,11 @@ _CSS = build_css("policy_usage")
 
 
 def _df_to_html(df, no_data_key: str = "rpt_no_data") -> str:
-    if df is None or (hasattr(df, "empty") and df.empty):
-        return f'<p class="note" data-i18n="{no_data_key}">No data</p>'
+    # Empty case is rendered by the shared renderer for consistent panel chrome.
 
     def _render_cell(col, val, _row):
         val_str = str(val) if val is not None else ""
-        if col == "Enabled":
+        if str(col).strip().lower() == "enabled":
             if val_str.lower() in ("true", "1", "yes"):
                 return '<span class="badge-hit" data-i18n="rpt_yes">Yes</span>'
             return '<span class="badge-unused" data-i18n="rpt_no">No</span>'
