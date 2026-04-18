@@ -1,9 +1,9 @@
 # Project Status — illumio_ops
 
 **As of:** 2026-04-18  
-**Version:** v3.5.2-scheduler (Phase 6 complete)  
-**Branch:** upgrade/phase-6-scheduler-aps  
-**Phase:** 6 of 9 — APScheduler daemon unification complete  
+**Version:** v3.5.0-websec + v3.5.2-scheduler (merging in sequence)  
+**Branch:** upgrade/phase-4-web-security (about to merge)  
+**Phase:** 4 & 6 of 9 complete (Phase 5 next)  
 **Code Review Date:** 2026-04-13  
 **i18n Overhaul:** 2026-04-18 — see Task.md i18n-P1..P7 (all done)
 
@@ -11,7 +11,7 @@
 
 ## Phase 6 Complete (2026-04-18)
 
-Phase 6 — APScheduler daemon unification — on `upgrade/phase-6-scheduler-aps`.
+Phase 6 — APScheduler daemon unification — merged to main as `v3.5.2-scheduler`.
 
 | Task | Status |
 |---|---|
@@ -19,17 +19,31 @@ Phase 6 — APScheduler daemon unification — on `upgrade/phase-6-scheduler-aps
 | `src/scheduler/jobs.py` — 3 job callables (monitor, report, rule) | ✅ |
 | `run_daemon_loop` migrated to BackgroundScheduler | ✅ |
 | ApiClient `_cache_lock` (RLock) wrapping all 5 TTLCache mutation sites | ✅ |
-| `tests/test_daemon_contract.py` — signature lock (2 tests) | ✅ |
-| `tests/test_scheduler_setup.py` — factory + job config (8 tests) | ✅ |
-| `tests/test_scheduler_integration.py` — lifecycle + dispatch + shutdown (6 tests) | ✅ |
-| `tests/test_api_client_thread_safety.py` — concurrent cache safety (4 tests) | ✅ |
-| Test count: baseline 192 → 212 (+20 new, 0 regressions) | ✅ |
-| i18n audit: 0 findings | ✅ |
+| Signal handlers (SIGINT/SIGTERM) registered for graceful shutdown | ✅ |
+| Test count: +21 new tests (213 total), 0 regressions | ✅ |
 | A3 daemon blocking: resolved ✅ | ✅ |
 | Phase 2 TTLCache NOTE: resolved ✅ | ✅ |
 | Shutdown < 10s: verified ✅ | ✅ |
 
 ---
+
+## Phase 4 Complete (2026-04-18)
+
+Phase 4 — Web GUI security hardening — on branch `upgrade/phase-4-web-security`.
+
+| Task | Status |
+|---|---|
+| `build_app(cm)` factory extracted from `launch_gui` | ✅ |
+| flask-login: `AdminUser` + current_user-based session auth | ✅ |
+| flask-wtf: `CSRFProtect` replaces ~60 LOC self-rolled CSRF | ✅ |
+| flask-limiter: `5/minute` on `/api/login`, memory storage | ✅ |
+| flask-talisman: CSP + X-Frame-Options + Permissions-Policy + nosniff | ✅ |
+| argon2id: `hash_password_argon2` + `verify_and_upgrade_password` | ✅ |
+| Silent PBKDF2→argon2id upgrade on first successful login | ✅ |
+| `src/auth_models.py` — `AdminUser`, `LoginForm` | ✅ |
+| 429 JSON errorhandler (API contract consistency) | ✅ |
+| Test count: 192 baseline → 210 (+18 new, 0 regressions) | ✅ |
+| i18n audit: 0 findings | ✅ |
 
 ## Phase 3 Complete (2026-04-18)
 
@@ -146,11 +160,11 @@ deploy/                     systemd (Ubuntu/RHEL) + NSSM (Windows) service confi
 
 | ID | Severity | Issue | Location |
 |---|---|---|---|
-| S1 | **HIGH** | SHA256 password hashing (no bcrypt/argon2) | `config.py:112`, `gui.py:58-59` |
+| S1 | ✅ **RESOLVED** | argon2id via argon2-cffi; PBKDF2 silent upgrade on login | Phase 4 |
 | S2 | **HIGH** | Hardcoded default password fallback ("illumio") | `gui.py:406` |
 | S3 | **HIGH** | SMTP password stored plaintext in config.json | `config.py:25`, `alerts/plugins.py:45` |
-| S4 | **MEDIUM** | CSRF token exposed in non-httponly cookie | `gui.py:377` |
-| S5 | **MEDIUM** | No login rate limiting (brute force possible) | `gui.py:392-414` |
+| S4 | ✅ **RESOLVED** | flask-wtf CSRFProtect; token via X-CSRF-Token header | Phase 4 |
+| S5 | ✅ **RESOLVED** | flask-limiter 5/minute on /api/login | Phase 4 |
 | S6 | **MEDIUM** | SSL verification disableable via config | `api_client.py:140-144` |
 | S7 | **LOW** | Silent exception swallowing in critical paths | `api_client.py`, `analyzer.py`, `gui.py` |
 
@@ -196,7 +210,7 @@ deploy/                     systemd (Ubuntu/RHEL) + NSSM (Windows) service confi
 
 | ID | Issue | Location |
 |---|---|---|
-| T1 | `_rs_log_history` list reads not synchronized | `gui.py:184-197` |
+| T1 | ✅ **RESOLVED** | `_login_attempts` / `_LOGIN_ATTEMPTS` removed; flask-limiter handles it | Phase 4 |
 | T2 | Module-level globals (`_current_lang`, `_registry`) not thread-safe | `i18n.py`, `module_log.py` |
 | T3 | ✅ **RESOLVED** | Daemon loop blocking — APScheduler ThreadPoolExecutor (Phase 6) | `src/scheduler/` |
 
@@ -223,7 +237,7 @@ deploy/                     systemd (Ubuntu/RHEL) + NSSM (Windows) service confi
 | rich, questionary, click, humanize | Phase 1 (CLI UX) | ✓ |
 | requests, orjson, cachetools | Phase 2 (HTTP + cache) | ✓ **used** |
 | pydantic, pydantic-settings | Phase 3 (Settings) | ✓ |
-| flask-wtf, flask-limiter, flask-talisman, flask-login, argon2-cffi | Phase 4 (Web security) | ✓ |
+| flask-wtf, flask-limiter, flask-talisman, flask-login, argon2-cffi | Phase 4 (Web security) | ✓ **used** |
 | openpyxl, weasyprint, matplotlib, plotly, pygments | Phase 5 (Reports) | ✓ |
 | APScheduler | Phase 6 (Scheduler) | ✓ **used** |
 | loguru | Phase 7 (Logging) | ✓ |
@@ -246,7 +260,7 @@ pytest, pytest-cov, responses, freezegun, ruff, mypy, build, pyinstaller
 
 ## Key Risks
 
-1. Password security (SHA256 → should be bcrypt/argon2)
+1. ~~Password security (SHA256 → should be bcrypt/argon2)~~ **Resolved Phase 4 — argon2id**
 2. No dependency version pinning — production drift risk
 3. Single-threaded daemon — blocking risk under load
 4. God class pattern in api_client.py (2542 LOC)

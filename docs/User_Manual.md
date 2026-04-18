@@ -299,10 +299,11 @@ Default credentials: **username `illumio`** / **password `illumio`**.
 
 ### 4.1 Authentication
 
-- **Password hashing**: PBKDF2-HMAC-SHA256 with 260,000 iterations (Python stdlib, no external dependency)
-- **Login rate limiting**: 5 attempts per IP per 60 seconds (HTTP 429 on excess)
-- **CSRF protection**: Synchronizer token pattern via `<meta>` tag injection (no XSS-readable cookie)
-- **Session Management**: Secure signed cookies are used (secret key is automatically generated in `config.json`).
+- **Password hashing**: argon2id via argon2-cffi (memory-hard, OWASP-recommended). Legacy PBKDF2 hashes automatically upgrade to argon2id on next successful login — no manual action needed.
+- **Login rate limiting**: 5 attempts per IP per minute (HTTP 429 on excess) via flask-limiter.
+- **CSRF protection**: flask-wtf CSRFProtect — token delivered via `X-CSRF-Token` response header and `<meta>` tag; validated on all state-changing requests (POST/PUT/DELETE).
+- **Security headers**: flask-talisman sets `Content-Security-Policy`, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`. HSTS activates automatically when TLS is enabled.
+- **Session Management**: flask-login session protection (`strong` mode); secure signed cookies (secret key auto-generated in `config.json`).
 - **Configuration**: Change credentials via **CLI Menu 7. Web GUI Security** or Web GUI **Settings** page.
 - **SMTP credentials**: Set `ILLUMIO_SMTP_PASSWORD` environment variable to avoid storing passwords in config file
 

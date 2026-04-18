@@ -5,26 +5,35 @@
 
 ---
 
-## Phase 6: APScheduler 統一 ✅ DONE (2026-04-18)
+## Phase 6: APScheduler 統一 ✅ DONE (2026-04-18, v3.5.2-scheduler merged)
 
 - [x] **P6**: Replace self-rolled daemon loop with APScheduler BackgroundScheduler
   - `src/scheduler/__init__.py`: `build_scheduler(cm, interval_minutes)` factory
     - ThreadPoolExecutor(max_workers=5), coalesce=True, max_instances=1, misfire_grace_time=60s
-  - `src/scheduler/jobs.py`: 3 job callables
-    - `run_monitor_cycle(cm)` — IntervalTrigger(minutes=N): Analyzer + Reporter
-    - `tick_report_schedules(cm)` — IntervalTrigger(seconds=60): ReportScheduler.tick()
-    - `tick_rule_schedules(cm)` — IntervalTrigger(seconds=check_interval_seconds): ScheduleEngine.check()
-  - `src/main.py` `run_daemon_loop()`: start scheduler, fire first cycle immediately, block on
-    `_shutdown_event` with 1s poll, `scheduler.shutdown(wait=True)` in finally
-  - `src/api_client.py`: `_cache_lock = threading.RLock()` — wraps all 5 TTLCache mutations
-    (invalidate_query_lookup_cache, invalidate_labels, update_label_cache write+rollback phases)
-  - Backward compat: `run_daemon_loop(interval_minutes: int)` signature preserved
-  - JSON schedule file formats (`config/rule_schedules.json`, `config/report_schedules.json`) unchanged
-  - **Status.md A3 + T3 resolved** (single-threaded daemon blocking)
-  - **Phase 2 TTLCache NOTE resolved** (thread-safety)
-  - Test count: baseline 192 → 212 (+20 new, 0 regressions)
+  - `src/scheduler/jobs.py`: 3 job callables (monitor, tick_report, tick_rule)
+  - `src/main.py` `run_daemon_loop()`: scheduler.start inside try, SIGINT+SIGTERM handlers, shutdown guarded
+  - `src/api_client.py`: `_cache_lock = threading.RLock()` wraps all 5 TTLCache mutations
+  - JSON schedule file formats unchanged; business logic (ReportScheduler.tick / ScheduleEngine.check) intact
+  - **Status.md A3 + T1 resolved** (daemon blocking + Phase 2 TTLCache thread-safety)
+  - Test count: +21 (213 total), 0 regressions, i18n audit 0 findings
+
+---
+
+## Phase 4: Web GUI Security ✅ DONE (2026-04-18)
+
+- [x] **P4**: flask-wtf + flask-limiter + flask-talisman + flask-login + argon2-cffi
+  - `build_app(cm)` factory 拆分，利測試；`launch_gui` 改薄包裝
+  - `src/auth_models.py`: `AdminUser` (flask-login UserMixin) + `LoginForm` (pydantic)
+  - CSRF：自製 synchronizer → flask-wtf CSRFProtect；`X-CSRF-Token` header 相容
+  - Rate limit：`_check_rate_limit` 自製 → flask-limiter `@limiter.limit("5 per minute")` + JSON 429
+  - Session auth：自製 `session['logged_in']` → flask-login `current_user.is_authenticated`
+  - Security headers：flask-talisman（CSP/HSTS/X-Frame-Options/nosniff/Permissions-Policy）
+  - Password hash：PBKDF2 → argon2id，silent upgrade 舊 hash on next login
+  - `verify_and_upgrade_password(hash, salt, pw) → (ok, new_hash_or_None)`
+  - Test count: 192 baseline → 210 (+18 new, 0 regressions)
+  - Resolves: Status.md S1 (argon2), S4 (flask-wtf), S5 (flask-limiter), T1 (_LOGIN_ATTEMPTS removed)
   - i18n audit: 0 findings
-  - Branch: `upgrade/phase-6-scheduler-aps` → tag `v3.5.2-scheduler`
+  - Branch: `upgrade/phase-4-web-security` → tag `v3.5.0-websec`
 
 ---
 
