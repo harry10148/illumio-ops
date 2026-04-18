@@ -377,6 +377,26 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         admin_name = cm.config.get("web_gui", {}).get("username", "illumio")
         return AdminUser(admin_name) if user_id == admin_name else None
 
+    # ── flask-wtf CSRF setup ───────────────────────────────────────────────────
+    from flask_wtf.csrf import CSRFProtect, generate_csrf
+
+    app.config["WTF_CSRF_ENABLED"] = True
+    app.config["WTF_CSRF_TIME_LIMIT"] = 3600  # 1 hour
+    app.config["WTF_CSRF_CHECK_DEFAULT"] = True
+    # Accept both X-CSRFToken (flask-wtf default) and X-CSRF-Token (legacy SPA header)
+    app.config["WTF_CSRF_HEADERS"] = ["X-CSRFToken", "X-CSRF-Token"]
+
+    csrf = CSRFProtect(app)
+
+    @app.context_processor
+    def inject_csrf():
+        return dict(csrf_token=generate_csrf)
+
+    # SPA endpoint to refresh tokens without full reload
+    @app.route('/api/csrf-token')
+    def api_csrf_token():
+        return jsonify({"csrf_token": generate_csrf()})
+
     @app.errorhandler(_RstDrop)
     def handle_rst_drop(e):
         # Socket is already closed with RST ??return an empty Response object
@@ -398,41 +418,23 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
         # Auth check (always enforced for all GUI modes)
         # Bypass login routes
-        if request.path in ['/login', '/api/login', '/logout']:
+        if request.path in ['/login', '/api/login', '/logout', '/api/csrf-token']:
             return
         if not current_user.is_authenticated:
             if request.path.startswith('/api/'):
                 return _err(t("gui_err_unauthorized"), 401)
             return redirect('/login')
 
-        # Ensure a CSRF token exists in the session for all authenticated requests
-        if 'csrf_token' not in session:
-            session['csrf_token'] = secrets.token_hex(32)
-
-        # CSRF protection for state-changing requests
-        if request.method in ('POST', 'PUT', 'DELETE'):
-            # Exempt login (session not yet established)
-            if request.path == '/api/login':
-                return
-            token = request.headers.get('X-CSRF-Token', '')
-            if not token or token != session.get('csrf_token'):
-                return _err("CSRF token missing or invalid", 403)
-
     @app.after_request
-    def inject_csrf_cookie(response):
-        if 'csrf_token' not in session:
-            session['csrf_token'] = secrets.token_hex(32)
-        # The CSRF token is injected into index.html via a <meta> tag (synchronizer token
-        # pattern). The cookie is no longer needed for CSRF; remove it if present.
-        response.delete_cookie('csrf_token')
-        # Security headers
-        response.headers['X-Frame-Options'] = 'DENY'
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    def add_security_headers(response):
+        # Security headers (talisman will add CSP/HSTS in Task 7; keep fallbacks here)
+        response.headers.setdefault('X-Frame-Options', 'DENY')
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+        response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
         _tls_cfg = cm.config.get("web_gui", {}).get("tls", {})
         if _tls_cfg.get("enabled"):
-            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+            response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
         return response
 
     # ??? Frontend SPA ?????????????????????????????????????????????????????
@@ -440,9 +442,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     def index():
         cm.load()
         pce_url = _get_active_pce_url(cm)
-        if 'csrf_token' not in session:
-            session['csrf_token'] = secrets.token_hex(32)
-        return render_template('index.html', pce_url=pce_url, csrf_token=session['csrf_token'])
+        # csrf_token() is a Jinja2 global injected by flask-wtf CSRFProtect
+        return render_template('index.html', pce_url=pce_url)
 
     # ??? Auth Routes ??????????????????????????????????????????????????????
     @app.route('/login', methods=['GET'])
@@ -450,6 +451,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         return render_template('login.html')
 
     @app.route('/api/login', methods=['POST'])
+    @csrf.exempt
     def api_login():
         from pydantic import ValidationError as _ValidationError
         remote = request.remote_addr or ""
@@ -480,8 +482,6 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
         if username == saved_username and verify_password(saved_hash, saved_salt, password):
             login_user(AdminUser(username))
-            if 'csrf_token' not in session:
-                session['csrf_token'] = secrets.token_hex(32)
             # Upgrade legacy SHA256 hash to PBKDF2 on successful login
             if not saved_hash.startswith("pbkdf2:"):
                 new_salt = secrets.token_hex(16)
@@ -493,7 +493,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             if gui_cfg.get("_initial_password"):
                 del gui_cfg["_initial_password"]
                 cm.save()
-            return jsonify({"ok": True, "csrf_token": session['csrf_token']})
+            return jsonify({"ok": True, "csrf_token": generate_csrf()})
 
         _record_failed_login(remote)
         return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
