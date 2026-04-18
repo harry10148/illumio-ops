@@ -114,13 +114,17 @@ class ApiClient:
         self.base_url = f"{self.api_cfg['url']}/api/v2/orgs/{self.api_cfg['org_id']}"
         self._auth_header = self._build_auth_header()
         self._ssl_ctx = self._build_ssl_context()
-        # Caches for rule scheduler features (TTL controlled by _query_lookup_cache_ttl_seconds)
-        self.label_cache = {}
+        # Caches for rule scheduler features — TTLCache expires stale data after 15 min (Phase 2 Q5 fix)
+        import time as _time
+        from cachetools import TTLCache as _TTLCache
+        _LABEL_CACHE_TTL_SECONDS = 900  # 15 minutes — Phase 2 Q5 fix
+        # Use time.time (wall clock) so freezegun can control expiry in tests
+        self.label_cache = _TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=_time.time)
         self.ruleset_cache = []
-        self.service_ports_cache = {}  # {service_href: [{"port":N,"proto":P}, ...]}
-        self._label_href_cache = {}    # {"key:value": href}
-        self._label_group_href_cache = {}  # {"name": href}
-        self._iplist_href_cache = {}   # {"name": href}
+        self.service_ports_cache = _TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=_time.time)
+        self._label_href_cache = _TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=_time.time)
+        self._label_group_href_cache = _TTLCache(maxsize=1000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=_time.time)
+        self._iplist_href_cache = _TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=_time.time)
         self.last_traffic_query_diagnostics = {}
         self.last_rule_usage_batch_stats = {}
         self._root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -286,11 +290,11 @@ class ApiClient:
 
     def invalidate_query_lookup_cache(self):
         """Clear cached label/service/IP-list/label-group lookups."""
-        self.label_cache = {}
-        self.service_ports_cache = {}
-        self._label_href_cache = {}
-        self._label_group_href_cache = {}
-        self._iplist_href_cache = {}
+        self.label_cache.clear()
+        self.service_ports_cache.clear()
+        self._label_href_cache.clear()
+        self._label_group_href_cache.clear()
+        self._iplist_href_cache.clear()
         self._query_lookup_cache_refreshed_at = 0.0
 
     def _query_lookup_cache_is_stale(self):
@@ -1601,16 +1605,28 @@ class ApiClient:
                         self.service_ports_cache[i['href'].replace('/draft/', '/active/')] = port_defs
             self._query_lookup_cache_refreshed_at = time.time()
         except Exception as e:
-            (
-                self.label_cache,
-                self.service_ports_cache,
-                self._label_href_cache,
-                self._label_group_href_cache,
-                self._iplist_href_cache,
-                self._query_lookup_cache_refreshed_at,
-            ) = previous_state
+            # Restore previous state — update caches in-place to preserve TTLCache instances
+            prev_label, prev_svc, prev_href, prev_grp, prev_ip, prev_ts = previous_state
+            self.label_cache.clear()
+            self.label_cache.update(prev_label)
+            self.service_ports_cache.clear()
+            self.service_ports_cache.update(prev_svc)
+            self._label_href_cache.clear()
+            self._label_href_cache.update(prev_href)
+            self._label_group_href_cache.clear()
+            self._label_group_href_cache.update(prev_grp)
+            self._iplist_href_cache.clear()
+            self._iplist_href_cache.update(prev_ip)
+            self._query_lookup_cache_refreshed_at = prev_ts
             if not silent:
                 logger.warning(f"Label cache update error: {e}")
+
+    def invalidate_labels(self) -> None:
+        """Force the next label lookup to hit the PCE. Useful when settings change."""
+        self.label_cache.clear()
+        self._label_href_cache.clear()
+        self._label_group_href_cache.clear()
+        logger.debug("Label caches cleared (invalidate_labels)")
 
     def resolve_actor_str(self, actors):
         """Resolve actor list to human-readable string using label_cache."""
