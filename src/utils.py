@@ -19,16 +19,35 @@ from questionary import Style as _QStyle
 from src.i18n import get_language, t
 
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-_LAST_INPUT_ACTION = "value"
+
+
+class _InputState:
+    """Thread-safe singleton wrapping the last input action string."""
+
+    def __init__(self, initial: str = "value") -> None:
+        self._lock = threading.Lock()
+        self._value = initial
+
+    def get(self) -> str:
+        with self._lock:
+            return self._value
+
+    def set(self, action: str) -> None:
+        with self._lock:
+            self._value = action
+
+
+_INPUT_STATE = _InputState("value")
 
 
 def get_last_input_action() -> str:
-    return _LAST_INPUT_ACTION
+    """Return the most recent input action (thread-safe)."""
+    return _INPUT_STATE.get()
 
 
-def _set_last_input_action(action: str):
-    global _LAST_INPUT_ACTION
-    _LAST_INPUT_ACTION = action
+def _set_last_input_action(action: str) -> None:
+    """Record the most recent input action (thread-safe)."""
+    _INPUT_STATE.set(action)
 
 
 def _stdout_is_tty() -> bool:

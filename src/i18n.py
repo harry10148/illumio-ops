@@ -2,20 +2,44 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from functools import lru_cache
 from pathlib import Path
 
-_current_lang = "en"
 _ROOT = Path(__file__).resolve().parent
 _EN_MESSAGES_PATH = _ROOT / "i18n_en.json"
 
-def set_language(lang: str):
-    global _current_lang
-    if lang in {"en", "zh_TW"}:
-        _current_lang = lang
+
+class _I18nState:
+    """Thread-safe singleton for the active language code."""
+
+    _VALID = frozenset({"en", "zh_TW"})
+
+    def __init__(self, initial: str = "en") -> None:
+        self._lock = threading.Lock()
+        self._lang = initial
+
+    def get_language(self) -> str:
+        with self._lock:
+            return self._lang
+
+    def set_language(self, lang: str) -> None:
+        if lang in self._VALID:
+            with self._lock:
+                self._lang = lang
+
+
+_I18N_STATE = _I18nState("en")
+
+
+def set_language(lang: str) -> None:
+    """Set the active UI language (thread-safe). Public API."""
+    _I18N_STATE.set_language(lang)
+
 
 def get_language() -> str:
-    return _current_lang
+    """Return the active UI language code (thread-safe). Public API."""
+    return _I18N_STATE.get_language()
 
 def _entry(en: str, zh_tw: str | None = None) -> tuple[str, str]:
     return en, zh_tw or en
@@ -2064,21 +2088,22 @@ def _build_messages(lang: str) -> dict[str, str]:
     return base
 
 def get_messages(lang: str | None = None) -> dict[str, str]:
-    lang = lang or _current_lang
+    lang = lang or get_language()
     if lang not in {"en", "zh_TW"}:
         lang = "en"
     return dict(_build_messages(lang))
 
 def t(key: str, **kwargs) -> str:
     default_val = kwargs.pop("default", None)
-    text = get_messages(_current_lang).get(key)
+    _lang = get_language()
+    text = get_messages(_lang).get(key)
     if text is None:
         text = _normalized_en_messages().get(key)
     if text is None:
         if default_val is not None:
             text = default_val
         else:
-            text = _humanize_key_zh(key) if _current_lang == "zh_TW" else _humanize_key_en(key)
+            text = _humanize_key_zh(key) if _lang == "zh_TW" else _humanize_key_en(key)
     if kwargs:
         try:
             return text.format(**kwargs)

@@ -165,7 +165,8 @@ _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 _ROOT_DIR = os.path.dirname(_PKG_DIR)
 
 # ?? Rule Scheduler log history (in-memory, thread-safe) ??????????????????????
-_rs_log_history: list = []
+import collections as _collections
+_rs_log_history: _collections.deque = _collections.deque(maxlen=200)
 _rs_log_lock = threading.Lock()
 _ALLOWED_REPORT_FORMATS = frozenset({'html', 'csv', 'pdf', 'xlsx', 'all'})
 
@@ -176,9 +177,7 @@ def _append_rs_logs(logs: list) -> None:
             "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "logs": [_ANSI_RE.sub('', l) for l in logs],
         }
-        _rs_log_history.append(entry)
-        if len(_rs_log_history) > 200:
-            del _rs_log_history[:-200]
+        _rs_log_history.append(entry)  # deque(maxlen=200) auto-evicts oldest
 
 def _rs_background_scheduler(cm: ConfigManager) -> None:
     """Background thread: run rule scheduler periodically in GUI-only mode."""
