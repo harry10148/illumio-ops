@@ -4,7 +4,6 @@ import pandas as pd
 
 LABEL_KEYS = ('env', 'app', 'role', 'loc')
 
-
 def traffic_distribution(df: pd.DataFrame, top_n: int = 20) -> dict:
     """
     Multi-dimensional traffic distribution:

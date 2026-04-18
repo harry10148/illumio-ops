@@ -1,6 +1,5 @@
 import click
 
-
 @click.command("gui")
 @click.option("-p", "--port", type=int, default=5001)
 def gui_cmd(port: int) -> None:

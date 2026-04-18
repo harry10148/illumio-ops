@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import datetime
 import os
-import logging
+from loguru import logger
 import pandas as pd
 
 from .report_i18n import STRINGS, make_i18n_js, lang_btn_html, COL_I18N as _COL_I18N
@@ -24,11 +24,8 @@ from .chart_renderer import render_plotly_html, render_matplotlib_png
 from .code_highlighter import get_highlight_css
 from src.humanize_ext import human_number
 
-logger = logging.getLogger(__name__)
-
 _CSS = build_css('traffic')
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
-
 
 def _render_chart_for_html(chart_spec: dict | None) -> str:
     """Emit plotly interactive div + matplotlib PNG fallback (for PDF)."""
@@ -39,7 +36,7 @@ def _render_chart_for_html(chart_spec: dict | None) -> str:
     try:
         plotly_div = render_plotly_html(chart_spec)
     except Exception as exc:
-        logger.warning('plotly render failed: %s', exc)
+        logger.warning('plotly render failed: {}', exc)
     fallback_img = ''
     try:
         png = render_matplotlib_png(chart_spec)
@@ -49,11 +46,10 @@ def _render_chart_for_html(chart_spec: dict | None) -> str:
             f'src="data:image/png;base64,{b64}" alt="chart" />'
         )
     except Exception as exc:
-        logger.warning('matplotlib fallback failed: %s', exc)
+        logger.warning('matplotlib fallback failed: {}', exc)
     if not plotly_div and not fallback_img:
         return ''
     return f'<div class="chart-container">{plotly_div}{fallback_img}</div>'
-
 
 def _fmt_bytes(b) -> str:
     """Convert raw byte count to human-readable string (B / KB / MB / GB / TB)."""
@@ -73,7 +69,6 @@ def _fmt_bytes(b) -> str:
         return f'{b / 1024:.1f} KB'
     return f'{int(b)} B'
 
-
 def _fmt_bw(mbps) -> str:
     """Convert Mbps value to auto-scaled human-readable string (Mbps / Gbps / Tbps), 2 decimal places."""
     try:
@@ -88,13 +83,11 @@ def _fmt_bw(mbps) -> str:
         return f'{mbps / 1_000:.2f} Gbps'
     return f'{mbps:.2f} Mbps'
 
-
 # Column name fragments that contain raw byte values and should be auto-formatted
 _BYTE_COL_KEYWORDS = {'byte', 'bytes', 'total bytes', 'bytes total', 'bytes/conn'}
 
 # Column name fragments that contain Mbps bandwidth values and should be auto-scaled
 _BW_COL_KEYWORDS = {'bandwidth (mbps)', 'bandwidth(mbps)', 'bw (mbps)'}
-
 
 def _cov_stat(label: str, value: str) -> str:
     return (
@@ -104,7 +97,6 @@ def _cov_stat(label: str, value: str) -> str:
         '</div>'
     )
 
-
 def _progress_bar(pct: float) -> str:
     pct = max(0.0, min(100.0, float(pct or 0)))
     color = 'var(--green-80)' if pct >= 80 else ('var(--gold-110)' if pct >= 50 else 'var(--red-80)')
@@ -113,7 +105,6 @@ def _progress_bar(pct: float) -> str:
         f'<div class="progress-fill" style="width:{pct}%;background:{color};"></div>'
         f'</div>'
     )
-
 
 def _format_evidence(evidence: dict) -> str:
     """Convert evidence dict to readable pills, parsing Python literal strings where possible."""
@@ -145,10 +136,8 @@ def _format_evidence(evidence: dict) -> str:
         )
     return '<div class="finding-evidence">' + ''.join(pills) + '</div>'
 
-
 # Metrics whose direction polarity is inverted (up = good).
 _GOOD_UP_KEYWORDS = ('coverage', 'readiness', 'maturity')
-
 
 def _trend_chip(direction: str, delta: float, delta_pct: float | None, metric: str) -> str:
     """Render a tabular trend chip with arrow + signed delta + percentage."""
@@ -169,7 +158,6 @@ def _trend_chip(direction: str, delta: float, delta_pct: float | None, metric: s
         f'<span class="trend-arrow">{arrow}</span>{delta:+,.1f}{pct_str}'
         f'</span>'
     )
-
 
 def _trend_deltas_section(deltas: list | None) -> str:
     """Heading + chip-bearing table; or a friendly first-run note when empty."""
@@ -215,7 +203,6 @@ def _trend_deltas_section(deltas: list | None) -> str:
         col_i18n=_COL_I18N,
         render_cell=_render_cell,
     )
-
 
 # Rule descriptions: human-readable explanation of what each built-in rule checks
 _RULE_DESCRIPTIONS = {
@@ -270,7 +257,6 @@ _RULE_DESCRIPTIONS = {
              'CRITICAL: Detects lateral movement ports (SMB 445, RDP 3389, WinRM 5985/5986, RPC 135) allowed between different environments. Environment segmentation is the macro-security boundary. If lateral ports cross it, an attacker who compromises Dev/Test can directly pivot into Production using exactly the same techniques, bypassing all environment-level controls.'),
 }
 
-
 _SEVERITY_TOKENS = {'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'}
 
 # Column-name fragments that should render as integers (strip trailing ".0"
@@ -278,11 +264,9 @@ _SEVERITY_TOKENS = {'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'}
 _INT_COL_KEYWORDS = ('port', '連接埠', 'flow count', 'connections', 'flows',
                      'allowed', 'blocked', 'count')
 
-
 def _norm_col(name) -> str:
     """Normalize a column name for tolerant matching (case-insensitive, trimmed)."""
     return str(name).strip().lower().replace(' ', '_')
-
 
 def _fmt_int_cell(val) -> str:
     """Format an integer-valued cell with thousands separators; bare floats like
@@ -298,7 +282,6 @@ def _fmt_int_cell(val) -> str:
     if f.is_integer():
         return f'{int(f):,}'
     return f'{f:,.1f}'
-
 
 def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
                 no_data_key: str = "rpt_no_data") -> str:
@@ -336,7 +319,6 @@ def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
         no_data_key=no_data_key,
         render_cell=_render_cell,
     )
-
 
 class HtmlExporter:
     """Export report results to a single self-contained HTML file."""

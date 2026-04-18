@@ -9,7 +9,6 @@ from src.cli.gui_cmd import gui_cmd
 from src.cli.report import report_group
 from src.cli.status import status_cmd
 
-
 @click.group(invoke_without_command=True,
              context_settings={"help_option_names": ["-h", "--help"]})
 @click.pass_context
@@ -21,7 +20,6 @@ def cli(ctx: click.Context) -> None:
         from src.main import main_menu
         main_menu()
 
-
 @cli.command()
 def version() -> None:
     """Print the illumio-ops version."""
@@ -30,7 +28,6 @@ def version() -> None:
     except ImportError:
         __version__ = "unknown"
     click.echo(f"illumio-ops {__version__}")
-
 
 cli.add_command(config_group)
 cli.add_command(monitor_cmd)

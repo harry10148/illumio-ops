@@ -4,7 +4,6 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
-
 _UNLABELED = "unlabeled"
 
 SEVERITY_ORDER = {
@@ -38,7 +37,6 @@ FINDING_KIND_ORDER = {
     "blind_spot": 3,
     "enforcement_gap": 4,
 }
-
 
 RECOMMENDATION_TEMPLATES: dict[str, dict[str, str]] = {
     "LOCK_BOUNDARY_PORTS": {
@@ -91,21 +89,17 @@ RECOMMENDATION_TEMPLATES: dict[str, dict[str, str]] = {
     },
 }
 
-
 def _normalize_label(value: Any) -> str:
     text = str(value or "").strip().lower()
     return text if text else _UNLABELED
-
 
 def build_app_env_key(app: Any, env: Any) -> str:
     """Return normalized app_env identity key."""
     return f"{_normalize_label(app)}|{_normalize_label(env)}"
 
-
 def build_app_display(app: Any, env: Any) -> str:
     """Return standardized display format for app/env identity."""
     return f"{_normalize_label(app)} ({_normalize_label(env)})"
-
 
 def make_posture_item(
     *,
@@ -134,7 +128,6 @@ def make_posture_item(
         "evidence": dict(evidence or {}),
     }
 
-
 def rank_posture_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Sort posture findings with fixed severity/risk precedence."""
     return sorted(
@@ -149,7 +142,6 @@ def rank_posture_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
         ),
     )
 
-
 def resolve_recommendation(code: str, lang: str = "en") -> str:
     """Resolve recommendation text from deterministic templates."""
     template = RECOMMENDATION_TEMPLATES.get(str(code or "").strip())
@@ -158,7 +150,6 @@ def resolve_recommendation(code: str, lang: str = "en") -> str:
     if lang in template:
         return template[lang]
     return template.get("en", "")
-
 
 def summarize_attack_posture(items: list[dict[str, Any]], top_n: int = 5) -> dict[str, list[dict[str, Any]]]:
     """Build attack-first summary blocks for report/email/snapshot."""

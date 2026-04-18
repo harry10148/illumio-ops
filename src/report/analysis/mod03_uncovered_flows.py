@@ -2,13 +2,11 @@
 from __future__ import annotations
 import pandas as pd
 
-
 _REC_MAP = {
     'intra_app': "Intra-app flow: add an intra-scope rule to allow traffic within the same application.",
     'unmanaged_source': "Unmanaged source host: onboard to PCE or apply explicit deny / allow rule.",
     'cross_app': "Cross-app flow: add a rule-set entry for this src_app → dst_app communication.",
 }
-
 
 def uncovered_flows(df: pd.DataFrame, top_n: int = 20) -> dict:
     """
@@ -126,7 +124,6 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20) -> dict:
         'uncovered_services': uncovered_services,
     }
 
-
 def _port_gap_ranking(df: pd.DataFrame, uncovered: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
     """Ranks (port, proto) by number of uncovered flows; shows total vs uncovered and gap %."""
     has_proto = 'proto' in df.columns
@@ -151,7 +148,6 @@ def _port_gap_ranking(df: pd.DataFrame, uncovered: pd.DataFrame, top_n: int = 20
     if 'Proto' in result.columns and result['Proto'].astype(str).str.strip().eq('').all():
         result = result.drop(columns=['Proto'])
     return result
-
 
 def _service_gap_ranking(uncovered: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
     """Top (dst_app, port, proto) combinations with uncovered flows — surfaces missing policy rules."""

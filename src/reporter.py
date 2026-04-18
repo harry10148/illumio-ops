@@ -1,7 +1,7 @@
 ﻿import datetime
 import json
 import html
-import logging
+from loguru import logger
 import os
 import re
 import smtplib
@@ -12,12 +12,9 @@ from src.events import normalize_event, persist_dispatch_results
 from src.utils import Colors
 from src.i18n import t
 
-logger = logging.getLogger(__name__)
-
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
 STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
-
 
 class Reporter:
     def __init__(self, config_manager):
@@ -67,7 +64,7 @@ class Reporter:
         try:
             return build_output_plugin(name, self.cm)
         except KeyError:
-            logger.warning("Unknown alert output plugin requested: %s", name)
+            logger.warning("Unknown alert output plugin requested: {}", name)
             return None
 
     def _active_pce_url(self) -> str:
@@ -555,7 +552,7 @@ class Reporter:
 
         for channel in ordered_channels:
             if channel not in registry:
-                logger.warning("Configured alert channel has no registered plugin: %s", channel)
+                logger.warning("Configured alert channel has no registered plugin: {}", channel)
                 results.append({
                     "channel": channel,
                     "status": "failed",
@@ -575,7 +572,7 @@ class Reporter:
             try:
                 results.append(plugin.send(self, subj))
             except Exception as exc:
-                logger.exception("Alert plugin %s failed during send", channel)
+                logger.exception("Alert plugin {} failed during send", channel)
                 results.append({
                     "channel": channel,
                     "status": "failed",
@@ -599,7 +596,7 @@ class Reporter:
                 force_test=force_test,
             )
         except Exception as exc:
-            logger.warning("Failed to persist dispatch history: %s", exc)
+            logger.warning("Failed to persist dispatch history: {}", exc)
         return results
 
     def _build_line_message(self, subj: str) -> str:

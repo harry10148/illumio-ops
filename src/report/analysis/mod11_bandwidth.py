@@ -2,7 +2,6 @@
 from __future__ import annotations
 import pandas as pd
 
-
 def bandwidth_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
     """
     Volume and bandwidth analysis:

@@ -6,12 +6,9 @@ import os
 import re
 import json
 import datetime
-import logging
+from loguru import logger
 from src.utils import Colors
 from src.i18n import t
-
-logger = logging.getLogger(__name__)
-
 
 def _now_in_tz(tz_str: str) -> datetime.datetime:
     """Return current naive datetime in the configured schedule timezone."""
@@ -27,7 +24,6 @@ def _now_in_tz(tz_str: str) -> datetime.datetime:
         return (now_utc + offset).replace(tzinfo=None)
     return _dt.datetime.now()
 
-
 def truncate(text, width):
     """Truncate text to width, stripping schedule tags."""
     if not text:
@@ -41,11 +37,9 @@ def truncate(text, width):
         return text[:width - 3] + "..."
     return text.ljust(width)
 
-
 def extract_id(href):
     """Extract the last segment from an Illumio HREF path."""
     return href.split('/')[-1] if href else ""
-
 
 # ==========================================
 # Schedule Database
@@ -115,7 +109,6 @@ class ScheduleDB:
         if rs['href'] in db_keys:
             return 1
         return 0
-
 
 # ==========================================
 # Schedule Engine (Core Logic)

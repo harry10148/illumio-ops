@@ -5,14 +5,12 @@ from __future__ import annotations
 import re
 from typing import Any
 
-
 def _looks_like_regex(pattern: str) -> bool:
     if pattern.startswith("^") or pattern.endswith("$"):
         return True
     if any(c in pattern for c in r"*+?[](){}$\\"):
         return True
     return any(token in pattern for token in (".*", ".+", ".?"))
-
 
 def _value_matches(pattern: str, value: str | None) -> bool:
     if pattern in ("*", "any", "all", ""):
@@ -34,7 +32,6 @@ def _value_matches(pattern: str, value: str | None) -> bool:
 
     return pattern == normalized
 
-
 def _extract_nested(event: dict[str, Any], field_path: str) -> str | None:
     current: Any = event
     for part in field_path.split("."):
@@ -45,7 +42,6 @@ def _extract_nested(event: dict[str, Any], field_path: str) -> str | None:
     if current is None:
         return None
     return current if isinstance(current, str) else str(current)
-
 
 def _event_type_matches(pattern: str, event_type: str) -> bool:
     if pattern in ("*", ".*", ""):
@@ -59,7 +55,6 @@ def _event_type_matches(pattern: str, event_type: str) -> bool:
         except re.error:
             return pattern == event_type
     return pattern == event_type
-
 
 def matches_event_rule(rule: dict[str, Any], event: dict[str, Any]) -> bool:
     event_type = str(event.get("event_type") or "")

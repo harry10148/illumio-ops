@@ -15,7 +15,6 @@ from src.utils import Colors
 
 from .base import AlertOutputPlugin
 
-
 class MailAlertPlugin(AlertOutputPlugin):
     name = "mail"
 
@@ -54,7 +53,6 @@ class MailAlertPlugin(AlertOutputPlugin):
         except Exception as exc:
             print(f"{Colors.FAIL}{t('mail_failed', error=exc)}{Colors.ENDC}")
             return {"channel": "mail", "status": "failed", "target": ",".join(cfg.get("recipients", [])), "error": str(exc)}
-
 
 class LineAlertPlugin(AlertOutputPlugin):
     name = "line"
@@ -97,7 +95,6 @@ class LineAlertPlugin(AlertOutputPlugin):
         except Exception as exc:
             print(f"{Colors.FAIL}{t('line_alert_failed', error=exc, status='')}{Colors.ENDC}")
             return {"channel": "line", "status": "failed", "target": target_id, "error": str(exc)}
-
 
 class WebhookAlertPlugin(AlertOutputPlugin):
     name = "webhook"

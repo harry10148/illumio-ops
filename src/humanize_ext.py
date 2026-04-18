@@ -10,13 +10,11 @@ import humanize as _humanize
 
 from src.i18n import get_language
 
-
 _LOCALE_MAP = {
     "en": None,        # default (no activate call)
     "zh_TW": "zh_HK",  # humanize has zh_HK with traditional characters ("2 小時")
     "zh_CN": "zh_CN",  # simplified characters ("2小时")
 }
-
 
 def _activate_locale() -> None:
     lang = get_language() or "en"
@@ -31,24 +29,20 @@ def _activate_locale() -> None:
         # locale files missing; silently fall back to english
         pass
 
-
 def human_size(n: int) -> str:
     """Format bytes as human-readable, e.g. '3.5 MB'."""
     if n == 0:
         return "0 Bytes"
     return _humanize.naturalsize(n)
 
-
 def human_time_delta(delta: _dt.timedelta) -> str:
     """Format a timedelta, e.g. '2 hours', '5 minutes', '3 days'."""
     _activate_locale()
     return _humanize.naturaldelta(delta)
 
-
 def human_number(n: int | float) -> str:
     """Format a number with thousands separator: 12345 -> '12,345'."""
     return _humanize.intcomma(n)
-
 
 def human_time_ago(past: _dt.datetime) -> str:
     """Format a past datetime as 'X time ago'."""

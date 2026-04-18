@@ -12,7 +12,7 @@ Enhanced field extraction from Illumio PCE event JSON:
 """
 import datetime
 import json
-import logging
+from loguru import logger
 import os
 import pandas as pd
 from dataclasses import dataclass, field
@@ -27,13 +27,10 @@ from src.report.report_metadata import (
     extract_attack_summary,
 )
 
-logger = logging.getLogger(__name__)
-
 # Event types that represent a policy commit (no field-level diffs, only macro stats)
 _PROVISION_EVENT_TYPES = frozenset({
     'sec_policy.create', 'sec_policy.delete', 'sec_policy.restore',
 })
-
 
 @dataclass
 class AuditReportResult:
@@ -42,7 +39,6 @@ class AuditReportResult:
     date_range: tuple = ('', '')
     module_results: dict = field(default_factory=dict)
     dataframe: object = None
-
 
 # ── Nested-field extraction helpers ──────────────────────────────────────────
 
@@ -77,7 +73,6 @@ def _extract_created_by(raw) -> str:
             return str(val)
     return str(raw)
 
-
 def _extract_agent_hostname(raw_created_by) -> str:
     """Extract agent hostname from created_by, if agent-originated."""
     if not isinstance(raw_created_by, dict):
@@ -87,20 +82,17 @@ def _extract_agent_hostname(raw_created_by) -> str:
         return agent.get('hostname', '')
     return ''
 
-
 def _extract_src_ip(raw_action) -> str:
     """Extract source IP from action.src_ip — where admin connected from."""
     if isinstance(raw_action, dict):
         return str(raw_action.get('src_ip', '') or '')
     return ''
 
-
 def _extract_api_method(raw_action) -> str:
     """Extract HTTP method from action.api_method."""
     if isinstance(raw_action, dict):
         return str(raw_action.get('api_method', '') or '')
     return ''
-
 
 def _extract_api_endpoint(raw_action) -> str:
     """Extract API endpoint from action.api_endpoint (shortened)."""
@@ -117,7 +109,6 @@ def _extract_api_endpoint(raw_action) -> str:
                     return '…/' + segments[1]
         return ep
     return ''
-
 
 def _extract_resource_name(entry: dict) -> str:
     """Extract a short human-readable identifier for the changed resource.
@@ -159,7 +150,6 @@ def _extract_resource_name(entry: dict) -> str:
         return _shorten_href(href)
     return ''
 
-
 def _shorten_href(href: str) -> str:
     """Shorten an Illumio href like /orgs/1/sec_policy/draft/rule_sets/471 to rule_sets/471."""
     if '/orgs/' in href:
@@ -171,7 +161,6 @@ def _shorten_href(href: str) -> str:
                 break
         return rest[:60]
     return href[-60:]
-
 
 def _summarize_resource_changes(raw_changes) -> str:
     """Build a concise human-readable summary of resource_changes.
@@ -230,7 +219,6 @@ def _summarize_resource_changes(raw_changes) -> str:
             summaries.append(f'{prefix}workloads_affected: {wa}')
 
     return '; '.join(summaries[:8])  # Cap at 8 fields for readability
-
 
 def _summarize_provision(row) -> str:
     """Build a concise summary for sec_policy.create/delete/restore events.
@@ -302,7 +290,6 @@ def _summarize_provision(row) -> str:
 
     return '; '.join(parts) if parts else ''
 
-
 def _truncate_val(val, max_len: int = 80) -> str:
     """Convert a value to a truncated string for display."""
     if val is None:
@@ -331,7 +318,6 @@ def _truncate_val(val, max_len: int = 80) -> str:
         return s[:max_len] + '…'
     return s
 
-
 def _extract_notifications_detail(raw_notifications) -> str:
     """Extract useful information from notifications array.
 
@@ -359,7 +345,6 @@ def _extract_notifications_detail(raw_notifications) -> str:
                 details.append(f'host={hostname}')
     return '; '.join(details[:4])
 
-
 def _extract_supplied_username(raw_notifications) -> str:
     """Extract the username supplied during failed auth flows."""
     if not isinstance(raw_notifications, (list, tuple)) or not raw_notifications:
@@ -376,13 +361,11 @@ def _extract_supplied_username(raw_notifications) -> str:
             return str(username).strip()
     return ''
 
-
 def _stringify_parser_notes(value) -> str:
     if not isinstance(value, (list, tuple)):
         return ''
     notes = [str(note).strip() for note in value if str(note).strip()]
     return '; '.join(notes)
-
 
 def _extract_workloads_affected_from_event(row) -> int:
     """Extract workloads_affected from resource_changes and notifications.
@@ -428,7 +411,6 @@ def _extract_workloads_affected_from_event(row) -> int:
                         except (TypeError, ValueError):
                             pass
     return total
-
 
 # ── Main generator class ─────────────────────────────────────────────────────
 

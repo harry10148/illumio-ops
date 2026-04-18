@@ -3,7 +3,6 @@ from __future__ import annotations
 import pandas as pd
 from src.i18n import t, get_language
 
-
 def policy_decision_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
     """
     Breakdown of traffic by policy_decision. Per decision: top app→app flows,
@@ -104,7 +103,6 @@ def policy_decision_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
 
     return results
 
-
 def _top_ports_table(sub: pd.DataFrame, top_n: int) -> pd.DataFrame:
     """Top N (port [, proto]) by connection count, as an int-typed DataFrame.
 
@@ -132,7 +130,6 @@ def _top_ports_table(sub: pd.DataFrame, top_n: int) -> pd.DataFrame:
     if 'Proto' in grouped.columns and grouped['Proto'].astype(str).str.strip().eq('').all():
         grouped = grouped.drop(columns=['Proto'])
     return grouped
-
 
 def _compute_port_coverage(df: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
     """For each high-traffic (port, proto): allowed / blocked / potentially_blocked

@@ -1,7 +1,7 @@
 """BackgroundScheduler factory for illumio_ops daemon."""
 from __future__ import annotations
 
-import logging
+from loguru import logger
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -12,9 +12,6 @@ from src.scheduler.jobs import (
     tick_report_schedules,
     tick_rule_schedules,
 )
-
-logger = logging.getLogger(__name__)
-
 
 def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     """Factory for a BackgroundScheduler wired with illumio_ops jobs.

@@ -7,10 +7,8 @@ columns and compatible dtypes before analysis modules consume them.
 """
 from __future__ import annotations
 
-import logging
+from loguru import logger
 import pandas as pd
-
-logger = logging.getLogger(__name__)
 
 # Required columns and their expected dtype categories
 REQUIRED_COLUMNS: dict[str, str] = {
@@ -38,7 +36,6 @@ REQUIRED_COLUMNS: dict[str, str] = {
     'bandwidth_mbps':   'numeric',
     'data_source':      'object',
 }
-
 
 def validate(df: pd.DataFrame, raise_on_error: bool = False) -> list[str]:
     """
@@ -92,7 +89,6 @@ def validate(df: pd.DataFrame, raise_on_error: bool = False) -> list[str]:
         logger.debug(f"[Validator] DataFrame OK: {len(df)} rows, {len(df.columns)} cols")
 
     return issues
-
 
 def coerce(df: pd.DataFrame) -> pd.DataFrame:
     """

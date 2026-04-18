@@ -10,14 +10,11 @@ All findings are returned as a list[Finding] for direct use by Module 12
 """
 from __future__ import annotations
 
-import logging
+from loguru import logger
 from dataclasses import dataclass, field
 from typing import Optional
 
 import pandas as pd
-
-logger = logging.getLogger(__name__)
-
 
 def _fmt_bytes(n: float) -> str:
     """Return human-readable byte string (B / KB / MB / GB / TB)."""
@@ -27,11 +24,9 @@ def _fmt_bytes(n: float) -> str:
         n /= 1024
     return f"{n:.1f} TB"
 
-
 # ─── Finding model ───────────────────────────────────────────────────────────
 
 SEVERITY_RANK = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'INFO': 4}
-
 
 @dataclass
 class Finding:
@@ -57,7 +52,6 @@ class Finding:
             'recommendation': self.recommendation,
             **{f'evidence_{k}': v for k, v in self.evidence.items()},
         }
-
 
 # ─── Rules Engine ────────────────────────────────────────────────────────────
 

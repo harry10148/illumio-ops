@@ -1,17 +1,14 @@
 import json
 import orjson
-import logging
+from loguru import logger
 import os
 import tempfile
 import time
 from contextlib import contextmanager
 
-logger = logging.getLogger(__name__)
-
 _LOCK_RETRY_SECONDS = 0.05
 _LOCK_TIMEOUT_SECONDS = 10.0
 _LOCK_STALE_SECONDS = 30.0
-
 
 @contextmanager
 def _state_lock(lock_path: str, timeout: float = _LOCK_TIMEOUT_SECONDS):
@@ -45,7 +42,6 @@ def _state_lock(lock_path: str, timeout: float = _LOCK_TIMEOUT_SECONDS):
                 raise TimeoutError(f"Timed out acquiring state lock: {lock_path}")
             time.sleep(_LOCK_RETRY_SECONDS)
 
-
 def load_state_file(state_file: str) -> dict:
     if not os.path.exists(state_file):
         return {}
@@ -54,9 +50,8 @@ def load_state_file(state_file: str) -> dict:
             data = orjson.loads(f.read())
         return data if isinstance(data, dict) else {}
     except Exception as exc:
-        logger.warning("Failed to load state file %s: %s", state_file, exc)
+        logger.warning("Failed to load state file {}: {}", state_file, exc)
         return {}
-
 
 def update_state_file(state_file: str, updater) -> dict:
     os.makedirs(os.path.dirname(state_file) or ".", exist_ok=True)

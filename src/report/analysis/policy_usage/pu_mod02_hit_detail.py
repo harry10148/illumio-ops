@@ -1,13 +1,10 @@
 """
 Detail tables for policy rules that were hit by traffic.
 """
-import logging
+from loguru import logger
 import pandas as pd
 
-logger = logging.getLogger(__name__)
-
 _MAX_ROWS = 500
-
 
 def pu_hit_detail(
     baseline_rules: list,
@@ -73,7 +70,6 @@ def pu_hit_detail(
         "top_ports_df": top_ports_df,
     }
 
-
 def _build_row(rule: dict, ruleset_map: dict, hit_count: int, port_detail: dict, api_client) -> dict:
     rs_href = rule.get("_ruleset_href", "")
     rs_name = ruleset_map.get(rs_href, rule.get("_ruleset_name", rs_href))
@@ -105,7 +101,6 @@ def _build_row(rule: dict, ruleset_map: dict, hit_count: int, port_detail: dict,
         "Enabled": rule.get("enabled", True),
     }
 
-
 def _resolve_actors(actors: list, api_client) -> str:
     if not actors:
         return "Any"
@@ -132,7 +127,6 @@ def _resolve_actors(actors: list, api_client) -> str:
         else:
             parts.append(str(actor))
     return ", ".join(parts) if parts else "Any"
-
 
 def _resolve_services(services: list, api_client) -> str:
     if not services:

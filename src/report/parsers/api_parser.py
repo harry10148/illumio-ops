@@ -11,10 +11,8 @@ bandwidth and volume logic matches the monitoring engine exactly.
 """
 from __future__ import annotations
 
-import logging
+from loguru import logger
 import pandas as pd
-
-logger = logging.getLogger(__name__)
 
 # ─── Protocol mapping ─────────────────────────────────────────────────────────
 
@@ -23,7 +21,6 @@ _PROTO_MAP = {6: 'TCP', 17: 'UDP', 1: 'ICMP', 58: 'ICMPv6'}
 # ─── Guaranteed label keys ───────────────────────────────────────────────────
 
 LABEL_KEYS = ('app', 'env', 'loc', 'role')
-
 
 # ─── API Parser ──────────────────────────────────────────────────────────────
 

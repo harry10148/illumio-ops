@@ -3,7 +3,6 @@ from __future__ import annotations
 import pandas as pd
 from src.i18n import t, get_language
 
-
 def host_to_host_protocol_analysis(df: pd.DataFrame, report_config: dict, top_n: int = 20) -> dict:
     """
     Analyse lateral movement ports (RDP/SSH/VNC/SMB/WinRM etc.)

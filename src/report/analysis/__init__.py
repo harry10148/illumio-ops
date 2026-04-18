@@ -12,13 +12,10 @@ analysis modules without hardcoding imports.  To add a new module:
 from __future__ import annotations
 
 import importlib
-import logging
+from loguru import logger
 from typing import Callable, Any
 
 import pandas as pd
-
-logger = logging.getLogger(__name__)
-
 
 # ── Module registry ──────────────────────────────────────────────────────────
 # Each tuple: (module_id, dotted_module_path, function_name, call_builder)
@@ -36,7 +33,6 @@ def _call_df_cfg_n(fn, df, cfg, n):
 
 def _call_readiness(fn, df, _cfg, n):
     return fn(df, workloads=None, top_n=n)
-
 
 TRAFFIC_MODULES: list[tuple[str, str, str, Callable]] = [
     ('mod01', 'src.report.analysis.mod01_traffic_overview',     'traffic_overview',              _call_df),
@@ -58,12 +54,10 @@ TRAFFIC_MODULES: list[tuple[str, str, str, Callable]] = [
 # Module 12 (executive_summary) runs last and depends on all other results.
 SUMMARY_MODULE = ('mod12', 'src.report.analysis.mod12_executive_summary', 'executive_summary')
 
-
 def load_module_fn(module_path: str, func_name: str) -> Callable:
     """Lazily import a module and return the named function."""
     mod = importlib.import_module(module_path)
     return getattr(mod, func_name)
-
 
 def get_traffic_modules() -> list[tuple[str, Callable, Callable]]:
     """Return list of (mod_id, function, call_adapter) for all registered traffic modules."""
@@ -75,7 +69,6 @@ def get_traffic_modules() -> list[tuple[str, Callable, Callable]]:
         except Exception as e:
             logger.error(f"Failed to load module {mod_id} ({mod_path}): {e}")
     return result
-
 
 def get_summary_module() -> tuple[str, Callable]:
     """Return (mod_id, function) for the summary module."""

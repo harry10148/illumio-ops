@@ -2,7 +2,6 @@
 from __future__ import annotations
 import pandas as pd
 
-
 def traffic_overview(df: pd.DataFrame) -> dict:
     """
     Returns top-level KPI metrics for the Executive Summary and Overview sheet.

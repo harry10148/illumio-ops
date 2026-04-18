@@ -4,7 +4,6 @@ Policy usage overview — hit vs unused rule counts and percentages.
 """
 import pandas as pd
 
-
 def pu_overview(baseline_rules: list, hit_rule_hrefs: set) -> dict:
     """Compute top-level policy usage statistics.
 

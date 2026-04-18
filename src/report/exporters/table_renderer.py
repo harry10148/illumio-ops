@@ -7,19 +7,16 @@ from typing import Callable
 # (sticky first column + right-edge scroll-affordance gradient).
 WIDE_COL_THRESHOLD = 10
 
-
 def _is_empty(value) -> bool:
     if value is None:
         return True
     text = str(value)
     return text in ("None", "nan", "NaT")
 
-
 def _default_cell(value) -> str:
     if _is_empty(value):
         return ""
     return html.escape(str(value))
-
 
 def _empty_panel(no_data_key: str, message: str = "No data") -> str:
     """Render the empty-state tombstone panel.
@@ -35,7 +32,6 @@ def _empty_panel(no_data_key: str, message: str = "No data") -> str:
         f'<span class="empty-text" data-i18n="{html.escape(no_data_key, quote=True)}">{safe_msg}</span>'
         '</div>'
     )
-
 
 def render_df_table(
     df,

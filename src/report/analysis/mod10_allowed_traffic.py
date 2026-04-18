@@ -3,7 +3,6 @@ from __future__ import annotations
 import pandas as pd
 from src.i18n import t, get_language
 
-
 def allowed_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
     """
     Analyse flows with policy_decision='allowed':

@@ -2,7 +2,6 @@
 from __future__ import annotations
 import pandas as pd
 
-
 def user_process_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
     """
     Analyse flows that have user_name or process_name data.

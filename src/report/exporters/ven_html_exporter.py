@@ -4,7 +4,7 @@ Self-contained HTML report for the VEN Status Inventory Report.
 from __future__ import annotations
 
 import datetime
-import logging
+from loguru import logger
 import os
 
 import pandas as pd
@@ -15,11 +15,8 @@ from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
 from .code_highlighter import get_highlight_css
 
-logger = logging.getLogger(__name__)
-
 _CSS = build_css("ven")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
-
 
 def _policy_sync_badge(val: str) -> str:
     v = str(val).lower().strip()
@@ -30,7 +27,6 @@ def _policy_sync_badge(val: str) -> str:
     if v and v not in ("none", "nan"):
         return f'<span class="badge-unsynced">{val}</span>'
     return ""
-
 
 def _df_to_html(df, no_data_key: str = "rpt_no_records") -> str:
     # Empty case is rendered by the shared renderer for consistent panel chrome.
@@ -48,7 +44,6 @@ def _df_to_html(df, no_data_key: str = "rpt_no_records") -> str:
         render_cell=_render_cell,
     )
 
-
 class VenHtmlExporter:
     def __init__(self, results: dict, df: pd.DataFrame = None):
         self._r = results
@@ -61,7 +56,7 @@ class VenHtmlExporter:
         filepath = os.path.join(output_dir, filename)
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(self._build())
-        logger.info("[VenHtmlExporter] Saved: %s", filepath)
+        logger.info("[VenHtmlExporter] Saved: {}", filepath)
         return filepath
 
     def _build(self) -> str:

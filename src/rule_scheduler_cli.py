@@ -10,7 +10,6 @@ from src.rule_scheduler import ScheduleDB, ScheduleEngine, truncate, extract_id
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
-
 def clean_input(text):
     """Process raw input, stripping control characters."""
     if not text:
@@ -24,7 +23,6 @@ def clean_input(text):
             chars.append(char)
     return "".join(chars).strip()
 
-
 def get_valid_time(prompt):
     """Prompt for HH:MM time, returns string or None on cancel."""
     while True:
@@ -36,7 +34,6 @@ def get_valid_time(prompt):
             return raw
         except ValueError:
             print(f"{Colors.FAIL}[-] {t('rs_sch_time_error')}{Colors.ENDC}")
-
 
 def paginate_and_select(items, format_func, title="", header_str=""):
     """Paginated list with selection. Returns selected item or None."""
@@ -89,9 +86,7 @@ def paginate_and_select(items, format_func, title="", header_str=""):
         else:
             print(f"{Colors.FAIL}[-] {t('rs_invalid_input')}{Colors.ENDC}")
 
-
 # ─── Main Entry Point ────────────────────────────────────────────────────────
-
 
 def rule_scheduler_menu(cm):
     """Main entry point for the Rule Scheduler CLI, called from main menu."""
@@ -112,7 +107,6 @@ def rule_scheduler_menu(cm):
 
     cli = _RuleSchedulerCLI(db, api, engine, cm)
     cli.run()
-
 
 class _RuleSchedulerCLI:
     """Internal CLI class for rule scheduler operations."""

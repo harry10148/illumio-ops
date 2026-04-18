@@ -1,10 +1,8 @@
 import click
 
-
 @click.group("report")
 def report_group() -> None:
     """Generate reports (traffic/audit/ven/policy-usage)."""
-
 
 @report_group.command("traffic")
 @click.option("--source", type=click.Choice(["api", "csv"]), default="api")

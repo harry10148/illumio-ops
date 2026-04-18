@@ -57,7 +57,6 @@ RISK_BG = {
     RISK_INFO:     '#F9FAFB',
 }
 
-
 def get_risk(event_type: str):
     """Return (risk_level, description, recommendation) for an event_type."""
     # Exact match first
@@ -68,7 +67,6 @@ def get_risk(event_type: str):
         if event_type.startswith(key.rstrip('*')):
             return val
     return (RISK_INFO, '', '')
-
 
 def classify_df(df):
     """Add 'risk_level' column to a DataFrame that has 'event_type' column.

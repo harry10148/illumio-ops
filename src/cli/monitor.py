@@ -1,6 +1,5 @@
 import click
 
-
 @click.command("monitor")
 @click.option("-i", "--interval", type=int, default=10, help="Minutes between cycles")
 def monitor_cmd(interval: int) -> None:

@@ -9,10 +9,8 @@ from __future__ import annotations
 
 import os
 import re
-import logging
+from loguru import logger
 import pandas as pd
-
-logger = logging.getLogger(__name__)
 
 # ─── PCE CSV column mapping ─────────────────────────────────────────────────
 
@@ -94,7 +92,6 @@ def _parse_bytes_string(s) -> int:
     factor = _UNIT_FACTORS.get(unit, 1)
     return int(num * factor)
 
-
 # ─── Boolean normaliser ───────────────────────────────────────────────────────
 
 def _parse_bool(val, default=None) -> bool | None:
@@ -106,7 +103,6 @@ def _parse_bool(val, default=None) -> bool | None:
     if s in ('false', 'no', '0', 'unmanaged'):
         return False
     return default
-
 
 # ─── CSV Parser ──────────────────────────────────────────────────────────────
 

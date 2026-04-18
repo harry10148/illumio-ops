@@ -2,7 +2,6 @@
 from __future__ import annotations
 import pandas as pd
 
-
 def unmanaged_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
     """
     Analyse traffic involving unmanaged (non-PCE-managed) hosts.
@@ -75,7 +74,6 @@ def unmanaged_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
         'src_port_detail': src_port_detail,
     }
 
-
 def _per_app_unmanaged(unmanaged_src: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
     """Which managed destination apps receive the most traffic from unmanaged sources."""
     if unmanaged_src.empty:
@@ -96,7 +94,6 @@ def _per_app_unmanaged(unmanaged_src: pd.DataFrame, top_n: int = 20) -> pd.DataF
                                'unique_ports': 'Unique Ports',
                                'unique_decisions': 'Decision Types'}))
     return result
-
 
 def _per_port_proto_unmanaged(unmanaged_src: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
     """Which port/protocol combinations see the most unmanaged source traffic."""
@@ -129,7 +126,6 @@ def _per_port_proto_unmanaged(unmanaged_src: pd.DataFrame, top_n: int = 20) -> p
 
     result = result.rename(columns=rename_map).reset_index(drop=True)
     return result
-
 
 def _src_port_detail(unmanaged_src: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
     """Top unmanaged source IP × port combinations — reveals targeted service access patterns."""

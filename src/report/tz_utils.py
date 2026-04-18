@@ -7,7 +7,6 @@ across report_generator.py and ven_status_generator.py.
 """
 import datetime
 
-
 def parse_tz(tz_str: str) -> datetime.timezone:
     """
     Parse a config timezone string into a datetime.timezone object.
@@ -26,12 +25,10 @@ def parse_tz(tz_str: str) -> datetime.timezone:
         return datetime.timezone(datetime.timedelta(minutes=total_minutes))
     return datetime.timezone.utc
 
-
 def fmt_tz_now(tz: datetime.timezone) -> str:
     """Return current time formatted as '2026-03-26 16:30:00 (UTC+08:00)'."""
     now = datetime.datetime.now(tz)
     return fmt_tz_str(now)
-
 
 def fmt_tz_str(dt: datetime.datetime) -> str:
     """Format a timezone-aware datetime as '2026-03-26 16:30:00 (UTC+08)'."""
@@ -41,7 +38,6 @@ def fmt_tz_str(dt: datetime.datetime) -> str:
     mm = int(offset_s[3:5])
     tz_label = f"UTC{sign}{hh}" if mm == 0 else f"UTC{sign}{hh}:{mm:02d}"
     return dt.strftime('%Y-%m-%d %H:%M:%S') + f' ({tz_label})'
-
 
 def fmt_ts_local(ts_str, tz: datetime.timezone) -> str:
     """Format an ISO timestamp string to 'YYYY-MM-DD HH:MM (UTC+N)' in local time."""

@@ -6,11 +6,8 @@ will raise OSError — tests skip accordingly.
 """
 from __future__ import annotations
 
-import logging
+from loguru import logger
 from typing import Optional
-
-logger = logging.getLogger(__name__)
-
 
 def export_pdf(html: str, output_path: str, base_url: Optional[str] = None) -> None:
     """Render HTML to a PDF file. base_url is used to resolve relative assets."""
@@ -32,4 +29,4 @@ def export_pdf(html: str, output_path: str, base_url: Optional[str] = None) -> N
         div.plotly-graph-div, script[type="application/json"] { display: none; }
     """)
     HTML(string=html, base_url=base_url).write_pdf(output_path, stylesheets=[cjk_css])
-    logger.info("pdf report written to %s", output_path)
+    logger.info("pdf report written to {}", output_path)

@@ -8,10 +8,8 @@ from src.state_store import update_state_file
 
 from .poller import event_identity, format_utc
 
-
 DEFAULT_TIMELINE_LIMIT = 100
 DEFAULT_DISPATCH_LIMIT = 50
-
 
 def ensure_monitoring_state(state: dict) -> dict:
     state.setdefault("dispatch_history", [])
@@ -33,7 +31,6 @@ def ensure_monitoring_state(state: dict) -> dict:
     pce_stats.setdefault("last_batch_notes", 0)
     pce_stats.setdefault("last_batch_overflow", False)
     return state
-
 
 class StatsTracker:
     def __init__(
@@ -155,7 +152,6 @@ class StatsTracker:
             error=entry["error"],
             force_test=bool(force_test),
         )
-
 
 def persist_dispatch_results(
     state_file: str,

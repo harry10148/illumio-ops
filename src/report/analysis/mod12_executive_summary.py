@@ -6,13 +6,11 @@ from typing import Any
 
 from .attack_posture import summarize_attack_posture
 
-
 def _fmt(n) -> str:
     try:
         return f"{int(n):,}"
     except (TypeError, ValueError):
         return str(n)
-
 
 def _collect_attack_items(results: dict[str, Any]) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
@@ -24,14 +22,12 @@ def _collect_attack_items(results: dict[str, Any]) -> list[dict[str, Any]]:
                 items.extend(module_items)
     return items
 
-
 def _enforcement_mode_distribution(results: dict[str, Any]) -> dict[str, int]:
     """Extract enforcement mode distribution from mod13 workload metadata."""
     mod13 = results.get("mod13", {})
     if isinstance(mod13, dict) and "enforcement_mode_distribution" in mod13:
         return mod13["enforcement_mode_distribution"]
     return {}
-
 
 def _maturity_grade(score: float) -> str:
     if score >= 85:
@@ -43,7 +39,6 @@ def _maturity_grade(score: float) -> str:
     if score >= 40:
         return "D"
     return "F"
-
 
 def _compute_maturity_score(results: dict[str, Any]) -> dict[str, Any]:
     """Compute a single 0-100 Microsegmentation Maturity Score.
@@ -113,7 +108,6 @@ def _compute_maturity_score(results: dict[str, Any]) -> dict[str, Any]:
             "risk_port_control": {"weight": 10, "score": scores["risk_port_control"], "ratio": round(risk_control, 4)},
         },
     }
-
 
 def executive_summary(results: dict[str, Any]) -> dict:
     mod01 = results.get("mod01", {})

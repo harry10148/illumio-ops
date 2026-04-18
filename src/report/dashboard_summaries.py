@@ -5,7 +5,6 @@ import datetime
 import json
 import os
 
-
 def _records_from_table(table, limit: int = 10) -> list[dict]:
     try:
         if table is None:
@@ -15,7 +14,6 @@ def _records_from_table(table, limit: int = 10) -> list[dict]:
     except Exception:
         return []
     return []
-
 
 def build_audit_dashboard_summary(result) -> dict:
     mod00 = result.module_results.get("mod00", {}) if result else {}
@@ -59,7 +57,6 @@ def build_audit_dashboard_summary(result) -> dict:
         },
     }
 
-
 def write_audit_dashboard_summary(output_dir: str, result) -> str:
     os.makedirs(output_dir, exist_ok=True)
     summary_path = os.path.join(output_dir, "latest_audit_summary.json")
@@ -67,7 +64,6 @@ def write_audit_dashboard_summary(output_dir: str, result) -> str:
     with open(summary_path, "w", encoding="utf-8") as fh:
         json.dump(summary, fh, ensure_ascii=False, indent=2)
     return summary_path
-
 
 def build_policy_usage_dashboard_summary(result) -> dict:
     mod00 = result.module_results.get("mod00", {}) if result else {}
@@ -106,7 +102,6 @@ def build_policy_usage_dashboard_summary(result) -> dict:
         "pending_rule_details": _detail_rows(execution.get("pending_rule_details"), limit=5),
         "failed_rule_details": _detail_rows(execution.get("failed_rule_details"), limit=5),
     }
-
 
 def write_policy_usage_dashboard_summary(output_dir: str, result) -> str:
     os.makedirs(output_dir, exist_ok=True)

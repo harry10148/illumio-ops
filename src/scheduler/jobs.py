@@ -1,12 +1,9 @@
 """Job callables dispatched by the BackgroundScheduler."""
 from __future__ import annotations
 
-import logging
+from loguru import logger
 import os
 import re
-
-logger = logging.getLogger(__name__)
-
 
 def run_monitor_cycle(cm) -> None:
     """Execute one monitoring analysis + alert dispatch."""
@@ -25,9 +22,8 @@ def run_monitor_cycle(cm) -> None:
         rep.send_alerts()
         mlog.info("Monitor cycle complete")
     except Exception as exc:
-        logger.error("Monitor cycle failed: %s", exc, exc_info=True)
+        logger.error("Monitor cycle failed: {}", exc, exc_info=True)
         mlog.error(f"Monitor cycle failed: {exc}")
-
 
 def tick_report_schedules(cm) -> None:
     """Check and fire any due report schedules."""
@@ -38,8 +34,7 @@ def tick_report_schedules(cm) -> None:
         scheduler = ReportScheduler(cm, Reporter(cm))
         scheduler.tick()
     except Exception as exc:
-        logger.error("Report schedule tick failed: %s", exc, exc_info=True)
-
+        logger.error("Report schedule tick failed: {}", exc, exc_info=True)
 
 def tick_rule_schedules(cm) -> None:
     """Check and fire any due rule schedules."""
@@ -60,7 +55,7 @@ def tick_rule_schedules(cm) -> None:
         logs = engine.check(silent=True, tz_str=tz)
         for msg in logs:
             clean = re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", msg)
-            logger.info("[RuleScheduler] %s", clean)
+            logger.info("[RuleScheduler] {}", clean)
             mlog.info(clean)
         try:
             from src.gui import _append_rs_logs
@@ -68,5 +63,5 @@ def tick_rule_schedules(cm) -> None:
         except Exception:
             pass
     except Exception as exc:
-        logger.error("Rule schedule tick failed: %s", exc, exc_info=True)
+        logger.error("Rule schedule tick failed: {}", exc, exc_info=True)
         mlog.error(f"Rule schedule tick failed: {exc}")

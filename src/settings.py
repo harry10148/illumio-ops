@@ -52,7 +52,6 @@ FULL_EVENT_CATALOG = {
     },
 }
 
-
 def _tz_offset_info(cm: 'ConfigManager') -> tuple:
     """Return (tz_label: str, offset_hours: float) from config's settings.timezone."""
     tz_str = cm.config.get('settings', {}).get('timezone', 'local')
@@ -72,14 +71,11 @@ def _tz_offset_info(cm: 'ConfigManager') -> tuple:
         return tz_str, hours
     return 'UTC', 0.0
 
-
 def _utc_to_local_hour(utc_hour: int, offset_hours: float) -> int:
     return int(((utc_hour + offset_hours) % 24 + 24) % 24)
 
-
 def _local_to_utc_hour(local_hour: int, offset_hours: float) -> int:
     return int(((local_hour - offset_hours) % 24 + 24) % 24)
-
 
 def _menu_hints(path):
     return [
@@ -87,11 +83,9 @@ def _menu_hints(path):
         f"{Colors.DARK_GRAY}{t('cli_shortcuts_compact')}{Colors.ENDC}",
     ]
 
-
 def _wizard_step(step, total, title):
     step_label = t("wiz_step")
     print(f"\n{Colors.BOLD}{Colors.CYAN}[{step_label} {step}/{total}] {title}{Colors.ENDC}")
-
 
 def _wizard_confirm(summary_lines):
     title = t("wiz_review_config")
@@ -105,7 +99,6 @@ def _wizard_confirm(summary_lines):
     if not answer:
         return True
     return answer in ["y", "yes", "是", "好"]
-
 
 # Events that support Status (Success/Failure) and Severity filtering
 ACTION_EVENTS = [
@@ -183,7 +176,6 @@ _STATUS_FILTER_EVENT_TYPES = {
 }
 _SEVERITY_FILTER_EVENT_TYPES = set(_STATUS_FILTER_EVENT_TYPES)
 
-
 def _humanize_event_id(event_id: str) -> str:
     if event_id == "*":
         return "All events"
@@ -191,7 +183,6 @@ def _humanize_event_id(event_id: str) -> str:
     if not text:
         return event_id
     return " ".join(part.capitalize() for part in text.split())
-
 
 def _event_category(event_id: str) -> str:
     if event_id == "*":
@@ -313,12 +304,10 @@ def _event_category(event_id: str) -> str:
         return "Inventory & Identity"
     return "General"
 
-
 def _event_translation_key(event_id: str) -> str:
     if event_id in _EVENT_DESCRIPTION_OVERRIDES:
         return _EVENT_DESCRIPTION_OVERRIDES[event_id]
     return "event_label_" + event_id.replace(".", "_")
-
 
 def _build_full_event_catalog() -> dict[str, dict[str, str]]:
     buckets: dict[str, dict[str, str]] = {category: {} for category in _CATEGORY_ORDER}
@@ -330,12 +319,10 @@ def _build_full_event_catalog() -> dict[str, dict[str, str]]:
         buckets[category][event_id] = _event_translation_key(event_id)
     return {category: events for category, events in buckets.items() if events}
 
-
 FULL_EVENT_CATALOG = _build_full_event_catalog()
 ACTION_EVENTS = sorted(event_id for event_id in KNOWN_EVENT_TYPES if event_id in _STATUS_FILTER_EVENT_TYPES)
 SEVERITY_FILTER_EVENTS = sorted(event_id for event_id in KNOWN_EVENT_TYPES if event_id in _SEVERITY_FILTER_EVENT_TYPES)
 DISCOVERY_EVENTS = sorted(set(KNOWN_EVENT_TYPES) - set(ACTION_EVENTS))
-
 
 def add_event_menu(cm: ConfigManager, edit_rule=None):
     from src.utils import Colors, safe_input, draw_panel, draw_table
@@ -556,7 +543,6 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
         )
         break
 
-
 def add_system_health_menu(cm: ConfigManager, edit_rule=None):
     from src.utils import Colors, safe_input, draw_panel
 
@@ -634,7 +620,6 @@ def add_system_health_menu(cm: ConfigManager, edit_rule=None):
     input(
         f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('rule_saved')} {Colors.GREEN}❯{Colors.ENDC} "
     )
-
 
 def add_traffic_menu(cm: ConfigManager, edit_rule=None):
     from src.utils import Colors, safe_input, draw_panel
@@ -900,7 +885,6 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None):
         f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('traffic_rule_saved')} {Colors.GREEN}❯{Colors.ENDC} "
     )
 
-
 def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None):
     from src.utils import Colors, safe_input, draw_panel
     os.system("cls" if os.name == "nt" else "clear")
@@ -1152,7 +1136,6 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None):
         f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('rule_saved')} {Colors.GREEN}❯{Colors.ENDC} "
     )
 
-
 def manage_rules_menu(cm: ConfigManager):
     from src.utils import draw_panel, draw_table, get_visible_width
 
@@ -1309,7 +1292,6 @@ def manage_rules_menu(cm: ConfigManager):
             f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} {Colors.GREEN}❯{Colors.ENDC} "
         )
 
-
 def alert_settings_menu(cm: ConfigManager):
     from src.utils import draw_panel
 
@@ -1401,7 +1383,6 @@ def alert_settings_menu(cm: ConfigManager):
             if new_url:
                 cm.config.setdefault("alerts", {})["webhook_url"] = new_url
                 cm.save()
-
 
 def web_gui_security_menu(cm: ConfigManager):
     import secrets
@@ -1501,11 +1482,9 @@ def web_gui_security_menu(cm: ConfigManager):
         elif sel == 3:
             _web_gui_tls_menu(cm)
 
-
 def _clear_screen() -> None:
     """Centralised screen-clear so callers don't each invoke os.system."""
     os.system("cls" if os.name == "nt" else "clear")
-
 
 def _web_gui_tls_menu(cm: ConfigManager):
     """Interactive TLS / HTTPS configuration for the Web GUI.
@@ -1675,7 +1654,6 @@ def _web_gui_tls_menu(cm: ConfigManager):
             except RuntimeError as exc:
                 print(f"\n{Colors.FAIL}{exc}{Colors.ENDC}")
             input(f"{t('press_enter_to_continue')} ")
-
 
 def settings_menu(cm: ConfigManager):
     from src.utils import draw_panel
@@ -1857,7 +1835,6 @@ def settings_menu(cm: ConfigManager):
         elif sel == 7:
             web_gui_security_menu(cm)
 
-
 # ─── Report Schedule Management ───────────────────────────────────────────────
 
 def manage_report_schedules_menu(cm: ConfigManager):
@@ -1966,7 +1943,6 @@ def manage_report_schedules_menu(cm: ConfigManager):
                 except Exception as e:
                     print(f"{Colors.FAIL}{t('sched_run_failed', error=e)}{Colors.ENDC}")
                 input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")
-
 
 def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None):
     """Wizard for adding or editing a report schedule."""

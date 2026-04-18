@@ -292,6 +292,5 @@ LOCAL_EXTENSION_EVENT_TYPES = {
 
 KNOWN_EVENT_TYPES |= LOCAL_EXTENSION_EVENT_TYPES
 
-
 def is_known_event_type(event_type: str) -> bool:
     return event_type in KNOWN_EVENT_TYPES

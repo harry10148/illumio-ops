@@ -16,16 +16,13 @@ from __future__ import annotations
 
 import datetime
 import json
-import logging
+from loguru import logger
 import os
 import re
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 _NUMERIC_RE = re.compile(r"^-?[\d,]+\.?\d*%?$")
-
 
 def _to_numeric(val: Any) -> float | None:
     """Best-effort conversion of a KPI value to a float."""
@@ -44,10 +41,8 @@ def _to_numeric(val: Any) -> float | None:
     except ValueError:
         return None
 
-
 def _history_dir(output_dir: str, report_type: str) -> Path:
     return Path(output_dir) / "history" / report_type
-
 
 def save_snapshot(
     output_dir: str,
@@ -65,9 +60,8 @@ def save_snapshot(
     path = hdir / f"{safe_ts}.json"
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, default=str)
-    logger.info("[TrendStore] Saved %s snapshot → %s", report_type, path)
+    logger.info("[TrendStore] Saved {} snapshot → {}", report_type, path)
     return str(path)
-
 
 def load_previous(output_dir: str, report_type: str) -> dict[str, Any] | None:
     """Load the most recent previous snapshot (excluding the newest)."""
@@ -82,9 +76,8 @@ def load_previous(output_dir: str, report_type: str) -> dict[str, Any] | None:
         with open(prev, encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        logger.warning("[TrendStore] Failed to load %s: %s", prev, e)
+        logger.warning("[TrendStore] Failed to load {}: {}", prev, e)
         return None
-
 
 def compute_deltas(
     current: dict[str, Any],
@@ -124,7 +117,6 @@ def compute_deltas(
             "direction": direction,
         })
     return deltas
-
 
 def build_kpi_dict_from_metadata(kpis: list[dict]) -> dict[str, Any]:
     """Convert the KPI list from metadata.json format to a flat dict.

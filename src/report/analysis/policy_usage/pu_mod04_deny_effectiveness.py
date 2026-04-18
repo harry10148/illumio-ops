@@ -9,16 +9,13 @@ Analyses:
   - Override Deny rules and their risk profile
   - Deny rules targeting high-risk ports
 """
-import logging
+from loguru import logger
 import pandas as pd
-
-logger = logging.getLogger(__name__)
 
 _HIGH_RISK_PORTS = frozenset({
     22, 23, 135, 139, 445, 1433, 1521, 3306, 3389,
     5432, 5900, 5985, 5986, 8080, 8443,
 })
-
 
 def pu_deny_effectiveness(
     baseline_rules: list,
@@ -105,7 +102,6 @@ def pu_deny_effectiveness(
         "deny_summary_df": summary_df,
     }
 
-
 def _classify_scope(providers: list, consumers: list, services: list) -> str:
     """Classify rule scope as Narrow, Medium, or Broad."""
     any_providers = _is_any(providers)
@@ -119,7 +115,6 @@ def _classify_scope(providers: list, consumers: list, services: list) -> str:
         return "Medium"
     return "Narrow"
 
-
 def _is_any(actors: list) -> bool:
     """Check if actor list effectively means 'Any'."""
     if not actors:
@@ -128,7 +123,6 @@ def _is_any(actors: list) -> bool:
         if isinstance(a, dict) and a.get("actors") == "ams":
             return True
     return False
-
 
 def _targets_high_risk_ports(services: list) -> bool:
     """Check if the rule's services include known high-risk ports."""
@@ -140,7 +134,6 @@ def _targets_high_risk_ports(services: list) -> bool:
             if port is not None and int(port) in _HIGH_RISK_PORTS:
                 return True
     return False
-
 
 def _summarize_actors(actors: list) -> str:
     if not actors:
@@ -156,7 +149,6 @@ def _summarize_actors(actors: list) -> str:
         else:
             parts.append(str(a))
     return ", ".join(parts[:5]) if parts else "Any"
-
 
 def _summarize_services(services: list) -> str:
     if not services:

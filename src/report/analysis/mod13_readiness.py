@@ -10,7 +10,6 @@ from .attack_posture import (
     resolve_recommendation,
 )
 
-
 _WEIGHTS = {
     "policy_coverage": 35,
     "ringfence_maturity": 20,
@@ -21,14 +20,12 @@ _WEIGHTS = {
 
 _REMOTE_PORTS = {22, 3389, 5900, 5901, 5938, 3283}
 
-
 def _normalize_key_series(df: pd.DataFrame, app_col: str, env_col: str) -> pd.Series:
     app = df.get(app_col, pd.Series(index=df.index, dtype=object)).fillna("").astype(str).str.strip().str.lower()
     env = df.get(env_col, pd.Series(index=df.index, dtype=object)).fillna("").astype(str).str.strip().str.lower()
     app = app.where(app != "", "unlabeled")
     env = env.where(env != "", "unlabeled")
     return app + "|" + env
-
 
 def _score_to_grade(score: float) -> str:
     if score >= 90:
@@ -41,14 +38,12 @@ def _score_to_grade(score: float) -> str:
         return "D"
     return "F"
 
-
 def _severity_from_ratio(ratio: float) -> str:
     if ratio >= 0.75:
         return "CRITICAL"
     if ratio >= 0.45:
         return "HIGH"
     return "MEDIUM"
-
 
 def _build_recommendations(attack_items: list[dict], top_n: int) -> pd.DataFrame:
     if not attack_items:
@@ -70,7 +65,6 @@ def _build_recommendations(attack_items: list[dict], top_n: int) -> pd.DataFrame
             }
         )
     return pd.DataFrame(rows)
-
 
 def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n: int = 20) -> dict:
     if df.empty:

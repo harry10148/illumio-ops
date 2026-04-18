@@ -11,9 +11,7 @@ from src.report.analysis.attack_posture import (
     summarize_attack_posture,
 )
 
-
 _HIGH_RISK_PORT_MARKERS = {"22/", "3389/", "445/", "5985/", "5986/", "135/"}
-
 
 def pu_executive_summary(results: dict, lookback_days: int) -> dict:
     """Aggregate KPIs, attention items, execution stats, and deterministic attack posture."""

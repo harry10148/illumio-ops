@@ -1,6 +1,6 @@
 import sys
 import os
-import logging
+from loguru import logger
 import argparse
 from src.utils import setup_logger, Colors, safe_input, draw_panel, get_terminal_width, Spinner
 from src.config import ConfigManager
@@ -18,7 +18,6 @@ from src.settings import (
 )
 from src.i18n import t, get_language
 
-logger = logging.getLogger(__name__)
 LOG_FILE = ""  # To be set in main() or main_menu()
 
 # ─── Daemon / Monitor Loop ───────────────────────────────────────────────────
@@ -27,11 +26,9 @@ import threading
 
 _shutdown_event = threading.Event()
 
-
 def _signal_handler(signum, _frame):
     logger.info(f"Received signal {signum}. Shutting down gracefully...")
     _shutdown_event.set()
-
 
 def run_daemon_loop(interval_minutes: int):
     """Headless monitoring loop — APScheduler-backed.
@@ -59,7 +56,7 @@ def run_daemon_loop(interval_minutes: int):
     cm = ConfigManager()
     print(t("daemon_start", interval=interval_minutes))
     print(t("daemon_stop_hint"))
-    logger.info("Starting scheduler-backed daemon (interval=%dm)", interval_minutes)
+    logger.info("Starting scheduler-backed daemon (interval={}m)", interval_minutes)
 
     sched = build_scheduler(cm, interval_minutes=interval_minutes)
 
@@ -82,7 +79,6 @@ def run_daemon_loop(interval_minutes: int):
         logger.info("Scheduler stopped")
         print(f"\n{t('daemon_stopped')}")
 
-
 def run_daemon_with_gui(interval_minutes: int, port: int):
     """Headless monitoring loop running in background thread + Flask GUI in main thread."""
     cm = ConfigManager()
@@ -100,7 +96,6 @@ def run_daemon_with_gui(interval_minutes: int, port: int):
         sys.exit(1)
         
     launch_gui(cm, port=port, persistent_mode=True)
-
 
 def view_logs(log_file):
     """Simple log viewer for the CLI."""
@@ -122,9 +117,7 @@ def view_logs(log_file):
         f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} {Colors.GREEN}❯{Colors.ENDC} "
     )
 
-
 # ─── Interactive CLI Menu ─────────────────────────────────────────────────────
-
 
 def rule_management_menu(cm):
     while True:
@@ -233,13 +226,17 @@ def main_menu():
     LOG_DIR = os.path.join(ROOT_DIR, "logs")
     LOG_FILE = os.path.join(LOG_DIR, "illumio_ops.log")
 
-    setup_logger("src", LOG_FILE)
+    _pre_cm = ConfigManager()
+    _log_cfg = _pre_cm.config.get("logging", {})
+    setup_logger("src", LOG_FILE,
+                 level=_log_cfg.get("level", "INFO"),
+                 json_sink=_log_cfg.get("json_sink", False))
     logger.info("Starting Illumio PCE Ops")
 
     from src.module_log import ModuleLog as _ML_menu
     _ML_menu.init(LOG_DIR)
 
-    cm = ConfigManager()
+    cm = _pre_cm
 
     while True:
         os.system("cls" if os.name == "nt" else "clear")
@@ -310,9 +307,7 @@ def main_menu():
         elif sel == 6:
             view_logs(LOG_FILE)
 
-
 # ─── Report Sub-Menu ─────────────────────────────────────────────────────────
-
 
 def _run_report_menu(cm):
     """Interactive sub-menu for Traffic Flow Report (item 12)."""
@@ -471,9 +466,7 @@ def _run_report_menu(cm):
             print(f"\n{t('report_edit_hint')}")
             input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")
 
-
 # ─── Entry Point ──────────────────────────────────────────────────────────────
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -556,7 +549,11 @@ def main():
     ROOT_DIR = os.path.dirname(PKG_DIR)
     LOG_DIR = os.path.join(ROOT_DIR, "logs")
     LOG_FILE = os.path.join(LOG_DIR, "illumio_ops.log")
-    setup_logger("src", LOG_FILE)
+    _early_cm = ConfigManager()
+    _log_cfg = _early_cm.config.get("logging", {})
+    setup_logger("src", LOG_FILE,
+                 level=_log_cfg.get("level", "INFO"),
+                 json_sink=_log_cfg.get("json_sink", False))
 
     from src.module_log import ModuleLog
     _logs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'logs')
@@ -620,7 +617,6 @@ def main():
             main_menu()
         except KeyboardInterrupt:
             print(f"\n{t('bye_msg')}")
-
 
 def _run_audit_report_menu(cm):
     """Interactive sub-menu for Audit & System Events Report (item 13)."""
@@ -689,7 +685,6 @@ def _run_audit_report_menu(cm):
 
     input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")
 
-
 def _run_ven_status_menu(cm):
     """Interactive sub-menu for VEN Status Inventory Report (item 14)."""
     try:
@@ -732,7 +727,6 @@ def _run_ven_status_menu(cm):
         logger.exception("VEN status report error")
 
     input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")
-
 
 def _run_policy_usage_menu(cm):
     """Interactive sub-menu for Policy Usage Report."""
@@ -838,7 +832,6 @@ def _run_policy_usage_menu(cm):
             logger.exception("Policy usage CSV import error")
 
     input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")
-
 
 if __name__ == "__main__":
     main()

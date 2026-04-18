@@ -47,10 +47,8 @@ _CONTEXT_COLS = (
     "parser_notes",
 )
 
-
 def _meaningful(df: pd.DataFrame, column: str) -> bool:
     return column in df.columns and df[column].astype(str).str.strip().ne("").any()
-
 
 def _select_cols(df: pd.DataFrame, base_cols: list[str]) -> list[str]:
     cols = list(base_cols)
@@ -66,7 +64,6 @@ def _select_cols(df: pd.DataFrame, base_cols: list[str]) -> list[str]:
         if column not in cols and _meaningful(df, column):
             cols.append(column)
     return cols
-
 
 def audit_system_health(df: pd.DataFrame) -> dict:
     if df.empty or "event_type" not in df.columns:

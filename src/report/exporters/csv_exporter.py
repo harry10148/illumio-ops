@@ -13,17 +13,14 @@ from __future__ import annotations
 import csv
 import datetime
 import io
-import logging
+from loguru import logger
 import os
 import zipfile
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
-
 # Module keys whose values should not be walked for DataFrames
 _SKIP_KEYS = {'findings', 'error', 'note'}
-
 
 def _iter_dataframes(data, prefix: str):
     """
@@ -48,7 +45,6 @@ def _iter_dataframes(data, prefix: str):
                     yield f'{prefix}.csv', df
             except Exception:
                 pass
-
 
 class CsvExporter:
     """

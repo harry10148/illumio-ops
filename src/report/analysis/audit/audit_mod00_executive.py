@@ -13,7 +13,6 @@ from src.report.analysis.attack_posture import (
 )
 from src.report.analysis.audit.audit_risk import AUDIT_RISK_MAP, RISK_ORDER
 
-
 def _non_empty_values(df: pd.DataFrame, column: str, limit: int = 3) -> list[str]:
     if column not in df.columns:
         return []
@@ -27,7 +26,6 @@ def _non_empty_values(df: pd.DataFrame, column: str, limit: int = 3) -> list[str
         .tolist()
     )
     return [str(value) for value in values[:limit]]
-
 
 def audit_executive_summary(results: dict, df: pd.DataFrame) -> dict:
     mod01 = results.get("mod01", {})

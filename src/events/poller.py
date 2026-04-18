@@ -8,7 +8,6 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-
 def parse_event_timestamp(value: str | None) -> dt.datetime | None:
     if not value:
         return None
@@ -23,10 +22,8 @@ def parse_event_timestamp(value: str | None) -> dt.datetime | None:
     except ValueError:
         return None
 
-
 def format_utc(value: dt.datetime) -> str:
     return value.astimezone(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
 
 def event_identity(event: dict[str, Any]) -> str:
     href = str(event.get("href") or "").strip()
@@ -45,7 +42,6 @@ def event_identity(event: dict[str, Any]) -> str:
     encoded = json.dumps(fingerprint, sort_keys=True, ensure_ascii=True, default=str)
     return "sha1:" + hashlib.sha1(encoded.encode("utf-8")).hexdigest()
 
-
 @dataclass
 class EventBatch:
     events: list[dict[str, Any]]
@@ -55,7 +51,6 @@ class EventBatch:
     raw_count: int
     overflow_risk: bool
     seen_events: dict[str, str]
-
 
 class EventPoller:
     def __init__(self, api_client, max_results: int = 5000, overlap_seconds: int = 60):

@@ -7,9 +7,7 @@ import re
 
 from .poller import format_utc, parse_event_timestamp
 
-
 _THROTTLE_RE = re.compile(r"^\s*(\d+)\s*/\s*(\d+)([smhd]?)\s*$", re.IGNORECASE)
-
 
 def parse_throttle(value):
     if not value:
@@ -51,7 +49,6 @@ def parse_throttle(value):
         "period_seconds": period * multiplier,
         "label": f"{count}/{period}{unit}",
     }
-
 
 class AlertThrottler:
     def __init__(self, state: dict):

@@ -13,7 +13,7 @@ Also supports importing workloader CSV output via generate_from_csv().
 """
 import datetime
 import json
-import logging
+from loguru import logger
 import os
 import re
 from dataclasses import dataclass, field
@@ -27,9 +27,6 @@ from src.report.report_metadata import (
     extract_attack_summary,
 )
 
-logger = logging.getLogger(__name__)
-
-
 @dataclass
 class PolicyUsageResult:
     generated_at: datetime.datetime = field(default_factory=datetime.datetime.now)
@@ -39,7 +36,6 @@ class PolicyUsageResult:
     module_results: dict = field(default_factory=dict)
     dataframe: object = None       # flat rules DataFrame for CSV export
     execution_stats: dict = field(default_factory=dict)
-
 
 class PolicyUsageGenerator:
     def __init__(self, config_manager, api_client=None, config_dir: str = 'config'):

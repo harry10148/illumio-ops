@@ -18,7 +18,7 @@ Then further buckets offline VENs by when they last sent a heartbeat:
   - Long-term offline (last heartbeat > 48 h ago or unknown)
 """
 import datetime
-import logging
+from loguru import logger
 import os
 import pandas as pd
 from dataclasses import dataclass, field
@@ -26,13 +26,10 @@ from dataclasses import dataclass, field
 from src.i18n import t
 from src.report.tz_utils import parse_tz, fmt_tz_str as _fmt_tz_str, fmt_ts_local as _fmt_ts_local
 
-logger = logging.getLogger(__name__)
-
 _ONLINE_STATUSES = {'active', 'online'}
 # VENs whose last heartbeat is older than this are considered offline,
 # even when PCE reports their administrative status as "active".
 _ONLINE_HEARTBEAT_THRESHOLD_HOURS = 1.0
-
 
 @dataclass
 class VenStatusResult:
@@ -40,7 +37,6 @@ class VenStatusResult:
     record_count: int = 0
     module_results: dict = field(default_factory=dict)
     dataframe: object = None
-
 
 class VenStatusGenerator:
     def __init__(self, config_manager, api_client=None):

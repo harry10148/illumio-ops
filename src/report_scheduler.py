@@ -9,16 +9,13 @@ Usage (called from daemon loop every 60 seconds):
 
 import datetime
 import json
-import logging
+from loguru import logger
 import os
 import re
 
 from src.i18n import t
 from src.report.report_metadata import extract_attack_summary
 from src.state_store import load_state_file, update_state_file
-
-logger = logging.getLogger(__name__)
-
 
 def _tz_offset_hours(tz_str: str) -> float:
     """Return UTC offset in hours for a timezone string like 'UTC+8' or 'UTC-5'.
@@ -29,7 +26,6 @@ def _tz_offset_hours(tz_str: str) -> float:
     if not m:
         return 0.0
     return float(m.group(1) + m.group(2))
-
 
 def _now_in_schedule_tz(tz_str: str) -> datetime.datetime:
     """Return current naive datetime adjusted to the configured schedule timezone."""
@@ -47,7 +43,6 @@ _STATE_KEY = "report_schedule_states"
 
 # Gap to prevent re-trigger within the same hour window (seconds)
 _MIN_RERUN_GAP = 3600
-
 
 class ReportScheduler:
     def __init__(self, config_manager, reporter):

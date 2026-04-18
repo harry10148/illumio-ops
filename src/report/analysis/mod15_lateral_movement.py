@@ -8,7 +8,6 @@ import pandas as pd
 from .attack_posture import build_app_display, make_posture_item, rank_posture_items
 from src.i18n import t, get_language
 
-
 _LATERAL_PORTS = {
     445: "SMB",
     135: "RPC",
@@ -28,14 +27,12 @@ _LATERAL_PORTS = {
     5432: "PostgreSQL",
 }
 
-
 def _normalize_key_series(df: pd.DataFrame, app_col: str, env_col: str) -> pd.Series:
     app = df.get(app_col, pd.Series(index=df.index, dtype=object)).fillna("").astype(str).str.strip().str.lower()
     env = df.get(env_col, pd.Series(index=df.index, dtype=object)).fillna("").astype(str).str.strip().str.lower()
     app = app.where(app != "", "unlabeled")
     env = env.where(env != "", "unlabeled")
     return app + "|" + env
-
 
 def _articulation_points(nodes: list[str], graph: dict[str, set[str]]) -> set[str]:
     # Tarjan articulation point algorithm on undirected graph.
@@ -75,7 +72,6 @@ def _articulation_points(nodes: list[str], graph: dict[str, set[str]]) -> set[st
                 points.add(node)
     return points
 
-
 def _bfs_reachability(source: str, adjacency: dict[str, set[str]], max_depth: int) -> dict[str, list[str]]:
     paths: dict[str, list[str]] = {}
     q: deque[tuple[str, list[str]]] = deque([(source, [source])])
@@ -92,13 +88,11 @@ def _bfs_reachability(source: str, adjacency: dict[str, set[str]], max_depth: in
             q.append((nxt, new_path))
     return paths
 
-
 def _path_weight(path: list[str], edge_weights: dict[tuple[str, str], int]) -> int:
     total = 0
     for i in range(len(path) - 1):
         total += int(edge_weights.get((path[i], path[i + 1]), 0))
     return total
-
 
 def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4) -> dict:
     if df.empty:

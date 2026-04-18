@@ -9,7 +9,6 @@ from __future__ import annotations
 from flask_login import UserMixin
 from pydantic import BaseModel, Field
 
-
 class AdminUser(UserMixin):
     """The single configured admin."""
     def __init__(self, username: str):
@@ -18,7 +17,6 @@ class AdminUser(UserMixin):
     @classmethod
     def from_config(cls, cm):
         return cls(cm.config.get("web_gui", {}).get("username", "illumio"))
-
 
 class LoginForm(BaseModel):
     """Server-side validation for /api/login payload (Phase 3 pydantic)."""

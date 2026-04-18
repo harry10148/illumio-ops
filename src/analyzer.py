@@ -3,7 +3,7 @@ import json
 import gc
 import os
 import sys
-import logging
+from loguru import logger
 from collections import Counter
 from src.events import (
     AlertThrottler,
@@ -21,16 +21,12 @@ from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
 from src.state_store import load_state_file, update_state_file
 
-logger = logging.getLogger(__name__)
-
 # Refine Root Dir for State File
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
 STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
 
-
 # ─── Standalone Calculators (shared by Analyzer and Report modules) ──────────
-
 
 def calculate_mbps(flow):
     """
@@ -63,7 +59,6 @@ def calculate_mbps(flow):
         return val, "(Avg)", total_bytes, tdms
     return 0.0, "", 0.0, 0.0
 
-
 def calculate_volume_mb(flow):
     """
     Compute data volume in MB from a PCE traffic flow record.
@@ -80,7 +75,6 @@ def calculate_volume_mb(flow):
     tbo = float(flow.get("dst_tbo") or flow.get("tbo") or flow.get("dst_bo") or 0)
     tbi = float(flow.get("dst_tbi") or flow.get("tbi") or flow.get("dst_bi") or 0)
     return (tbo + tbi) / 1024 / 1024, "(Total)"
-
 
 # ─── Analyzer Class ───────────────────────────────────────────────────────────
 

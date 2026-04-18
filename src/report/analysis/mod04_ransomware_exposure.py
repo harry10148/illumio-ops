@@ -2,10 +2,8 @@
 from __future__ import annotations
 import pandas as pd
 
-
 _RISK_COLORS = {'critical': 'CRITICAL', 'high': 'HIGH',
                 'medium': 'MEDIUM', 'low': 'LOW'}
-
 
 def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20) -> dict:
     """

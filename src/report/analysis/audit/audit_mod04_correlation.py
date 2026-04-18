@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import pandas as pd
 
-
 _AUTH_FAILURE_EVENTS = frozenset({
     "request.authentication_failed",
     "request.authorization_failed",
@@ -36,7 +35,6 @@ _AGENT_SECURITY_EVENTS = frozenset({
 
 _BUSINESS_HOURS = range(8, 19)  # 08:00–18:59 local time
 
-
 def _parse_ts(df: pd.DataFrame) -> pd.DataFrame:
     """Ensure timestamp column is datetime and sorted."""
     work = df.copy()
@@ -45,7 +43,6 @@ def _parse_ts(df: pd.DataFrame) -> pd.DataFrame:
     work["_ts"] = pd.to_datetime(work["timestamp"], errors="coerce", utc=True)
     return work.dropna(subset=["_ts"]).sort_values("_ts")
 
-
 def _actor_key(row) -> str:
     """Best-effort actor identifier from available columns."""
     for col in ("actor", "created_by", "target_name"):
@@ -53,7 +50,6 @@ def _actor_key(row) -> str:
         if val and val.lower() not in ("", "none", "nan"):
             return val
     return ""
-
 
 def audit_event_correlation(df: pd.DataFrame, window_minutes: int = 30) -> dict:
     """Find temporally correlated suspicious event sequences."""

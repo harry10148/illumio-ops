@@ -7,14 +7,12 @@ import pandas as pd
 
 from .attack_posture import build_app_display, make_posture_item, rank_posture_items
 
-
 def _normalize_key_series(df: pd.DataFrame, app_col: str, env_col: str) -> pd.Series:
     app = df.get(app_col, pd.Series(index=df.index, dtype=object)).fillna("").astype(str).str.strip().str.lower()
     env = df.get(env_col, pd.Series(index=df.index, dtype=object)).fillna("").astype(str).str.strip().str.lower()
     app = app.where(app != "", "unlabeled")
     env = env.where(env != "", "unlabeled")
     return app + "|" + env
-
 
 def _betweenness_centrality(nodes: list[str], adjacency: dict[str, set[str]]) -> dict[str, float]:
     # Brandes algorithm for unweighted directed graph.
@@ -53,11 +51,9 @@ def _betweenness_centrality(nodes: list[str], adjacency: dict[str, set[str]]) ->
         return {k: 0.0 for k in bc}
     return {k: v / max_v for k, v in bc.items()}
 
-
 # Critical asset port groups for automatic tier boosting
 _DB_PORTS = {1433, 3306, 5432, 1521, 27017, 6379, 9200, 5984, 50000}
 _IDENTITY_PORTS = {88, 389, 636, 3268, 3269, 464}
-
 
 def _tier(score: float) -> str:
     if score >= 80:
@@ -67,7 +63,6 @@ def _tier(score: float) -> str:
     if score >= 40:
         return "Tier-3 Shared"
     return "Tier-4 Peripheral"
-
 
 def _detect_critical_asset_keys(df: pd.DataFrame) -> dict[str, set[str]]:
     """Identify app(env) keys that serve as database or identity infrastructure.
@@ -96,7 +91,6 @@ def _detect_critical_asset_keys(df: pd.DataFrame) -> dict[str, set[str]]:
             result["identity"] = set(dst_key_col.dropna().unique())
 
     return result
-
 
 def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20) -> dict:
     if df.empty:

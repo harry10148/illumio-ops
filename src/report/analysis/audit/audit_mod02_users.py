@@ -27,10 +27,8 @@ _ALWAYS_FAILURE_EVENTS = {
     "request.authorization_failed",
 }
 
-
 def _meaningful(df: pd.DataFrame, column: str) -> bool:
     return column in df.columns and df[column].astype(str).str.strip().ne("").any()
-
 
 def _principal_series(df: pd.DataFrame) -> pd.Series:
     if _meaningful(df, "target_name"):
@@ -45,7 +43,6 @@ def _principal_series(df: pd.DataFrame) -> pd.Series:
     if fallback_column in df.columns:
         return df[fallback_column].fillna("").astype(str).str.strip()
     return pd.Series([""] * len(df), index=df.index, dtype="object")
-
 
 def audit_user_activity(df: pd.DataFrame) -> dict:
     if df.empty or "event_type" not in df.columns:

@@ -7,11 +7,9 @@ import os
 import click
 from rich.console import Console
 
-
 @click.group("config")
 def config_group() -> None:
     """Inspect and validate config.json."""
-
 
 @config_group.command("validate")
 @click.option("--file", "config_file", type=click.Path(), default=None,
@@ -49,7 +47,6 @@ def validate(config_file: str | None) -> None:
         raise click.Abort()
 
     console.print("[green]config.json is valid[/green]")
-
 
 @config_group.command("show")
 @click.option("--section", type=str, default=None,

@@ -1,6 +1,5 @@
 import click
 
-
 @click.command("status")
 def status_cmd() -> None:
     """Show daemon / scheduler / config status."""

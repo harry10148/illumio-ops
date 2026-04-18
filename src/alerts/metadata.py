@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-
 @dataclass
 class FieldMeta:
     label: str
@@ -16,14 +15,12 @@ class FieldMeta:
     value_type: str = "string"
     list_delimiter: str = ","
 
-
 @dataclass
 class PluginMeta:
     name: str
     display_name: str
     description: str
     fields: dict[str, FieldMeta] = field(default_factory=dict)
-
 
 def plugin_config_path(plugin_name: str, field_key: str) -> tuple[str, ...]:
     if plugin_name == "mail":
@@ -35,7 +32,6 @@ def plugin_config_path(plugin_name: str, field_key: str) -> tuple[str, ...]:
         return tuple(part for part in field_key.split(".") if part)
     return (plugin_name, field_key)
 
-
 def plugin_config_value(config: dict, plugin_name: str, field_key: str):
     cursor = config
     for part in plugin_config_path(plugin_name, field_key):
@@ -43,7 +39,6 @@ def plugin_config_value(config: dict, plugin_name: str, field_key: str):
             return None
         cursor = cursor.get(part)
     return cursor
-
 
 PLUGIN_METADATA: dict[str, PluginMeta] = {
     "mail": PluginMeta(

@@ -7,13 +7,11 @@ from typing import Any
 from .matcher import matches_event_rule
 from .poller import event_identity
 
-
 def _legacy_value_matches(expected: str, actual: Any) -> bool:
     normalized_expected = str(expected or "all")
     if normalized_expected in {"all", "*", ""}:
         return True
     return normalized_expected == str(actual or "")
-
 
 def matches_event_rule_legacy(rule: dict[str, Any], event: dict[str, Any]) -> bool:
     event_type = str(event.get("event_type") or "")
@@ -32,7 +30,6 @@ def matches_event_rule_legacy(rule: dict[str, Any], event: dict[str, Any]) -> bo
     if not _legacy_value_matches(rule.get("filter_severity", "all"), event.get("severity")):
         return False
     return True
-
 
 def compare_event_rules(rules: list[dict[str, Any]], events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     comparisons: list[dict[str, Any]] = []

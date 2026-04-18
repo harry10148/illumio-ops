@@ -7,7 +7,7 @@ rows. chart_spec (if present) rendered as matplotlib PNG and embedded.
 from __future__ import annotations
 
 import io
-import logging
+from loguru import logger
 from typing import Any
 
 from openpyxl import Workbook
@@ -17,13 +17,10 @@ from openpyxl.utils import get_column_letter
 
 from src.report.exporters.chart_renderer import render_matplotlib_png
 
-logger = logging.getLogger(__name__)
-
 _HEADER_FONT = Font(bold=True, color="FFFFFF")
 _HEADER_FILL = PatternFill("solid", fgColor="375379")
 _ALERT_FILL = PatternFill("solid", fgColor="FFC7CE")
 _ALERT_TOKENS = ("blocked", "deny", "violat", "critical", "red_flag")
-
 
 def _write_module_sheet(wb: Workbook, name: str, module_data: dict[str, Any]) -> None:
     # openpyxl sheet names capped at 31 chars and cannot contain :\/?*[]
@@ -78,8 +75,7 @@ def _write_module_sheet(wb: Workbook, name: str, module_data: dict[str, Any]) ->
             img.anchor = f"A{row + 2}"
             ws.add_image(img)
         except Exception as exc:
-            logger.warning("Failed to render chart for %s: %s", safe_name, exc)
-
+            logger.warning("Failed to render chart for {}: {}", safe_name, exc)
 
 def export_xlsx(report_result: dict[str, Any], output_path: str) -> None:
     """Export a ReportResult-shaped dict to an .xlsx file."""
@@ -100,4 +96,4 @@ def export_xlsx(report_result: dict[str, Any], output_path: str) -> None:
         _write_module_sheet(wb, mod_name, mod_data)
 
     wb.save(output_path)
-    logger.info("xlsx report written to %s", output_path)
+    logger.info("xlsx report written to {}", output_path)

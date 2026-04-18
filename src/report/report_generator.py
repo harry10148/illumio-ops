@@ -18,7 +18,7 @@ Usage:
 from __future__ import annotations
 
 import datetime
-import logging
+from loguru import logger
 import os
 from dataclasses import dataclass, field
 from typing import Optional
@@ -30,9 +30,6 @@ from src.report.report_metadata import (
     extract_attack_summary,
 )
 from src.report.tz_utils import parse_tz as _parse_tz, fmt_tz_now as _fmt_tz_now
-
-logger = logging.getLogger(__name__)
-
 
 # ─── Snapshot helper (module-level) ──────────────────────────────────────────
 
@@ -123,7 +120,6 @@ def _build_snapshot(module_results: dict) -> dict:
         'top_bandwidth':     _df_records(mod11.get('top_bandwidth'), limit=10),
     }
 
-
 # ─── Result container ─────────────────────────────────────────────────────────
 
 @dataclass
@@ -137,7 +133,6 @@ class ReportResult:
     findings: list = field(default_factory=list)
     dataframe: object = None       # pd.DataFrame, optional
     query_context: dict = field(default_factory=dict)
-
 
 # ─── Generator ───────────────────────────────────────────────────────────────
 
@@ -258,7 +253,7 @@ class ReportGenerator:
                 paths.append(pdf_path)
                 print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
             except Exception as exc:
-                logger.warning('PDF export failed (may need GTK3 on Linux): %s', exc)
+                logger.warning('PDF export failed (may need GTK3 on Linux): {}', exc)
 
         if fmt in ('xlsx', 'all'):
             try:
@@ -288,7 +283,7 @@ class ReportGenerator:
                 paths.append(xlsx_path)
                 print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}"))
             except Exception as exc:
-                logger.warning('XLSX export failed: %s', exc)
+                logger.warning('XLSX export failed: {}', exc)
 
         if fmt in ('csv', 'all', 'all_raw'):
             export_data = dict(result.module_results)

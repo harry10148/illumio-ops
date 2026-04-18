@@ -22,7 +22,7 @@ chart_spec shape:
 from __future__ import annotations
 
 import io
-import logging
+from loguru import logger
 import math
 from typing import Any
 
@@ -37,13 +37,10 @@ from matplotlib import rcParams
 import plotly.graph_objects as go
 import plotly.offline as plotly_offline
 
-logger = logging.getLogger(__name__)
-
 # CJK font fallback for matplotlib — ensures zh_TW titles/labels render
 rcParams["font.family"] = ["Noto Sans CJK TC", "Microsoft JhengHei",
                             "PingFang TC", "Heiti TC", "sans-serif"]
 rcParams["axes.unicode_minus"] = False  # minus sign glitch fix
-
 
 def render_plotly_html(spec: dict[str, Any]) -> str:
     """Render chart spec as a plotly HTML div (offline, self-contained)."""
@@ -121,7 +118,6 @@ def render_plotly_html(spec: dict[str, Any]) -> str:
     return plotly_offline.plot(
         fig, output_type="div", include_plotlyjs="inline", show_link=False
     )
-
 
 def render_matplotlib_png(spec: dict[str, Any]) -> bytes:
     """Render chart spec as a PNG byte string (for PDF/Excel embedding)."""

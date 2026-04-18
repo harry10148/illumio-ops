@@ -236,7 +236,6 @@ POLICY_USAGE_CSS = """\
   td { word-break: break-word; }
 """
 
-
 def build_css(exporter_type: str) -> str:
     extra = {
         "traffic": TRAFFIC_CSS,
@@ -245,7 +244,6 @@ def build_css(exporter_type: str) -> str:
         "policy_usage": POLICY_USAGE_CSS,
     }.get(exporter_type, "")
     return f"{FONT_LINK}\n<style>\n{BASE_CSS}\n{extra}\n</style>\n"
-
 
 TABLE_JS = r"""
 <script>

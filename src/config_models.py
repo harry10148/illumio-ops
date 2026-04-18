@@ -15,7 +15,6 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
 
-
 class _Base(BaseModel):
     """Base class that rejects unknown keys (catches typos in config.json)."""
     model_config = ConfigDict(
@@ -23,7 +22,6 @@ class _Base(BaseModel):
         str_strip_whitespace=True,
         validate_assignment=True,
     )
-
 
 class ApiSettings(_Base):
     # url is stored as plain str to avoid pydantic's trailing-slash normalization
@@ -50,18 +48,15 @@ class ApiSettings(_Base):
             ) from None
         return raw
 
-
 class AlertsSettings(_Base):
     active: list[str] = Field(default_factory=lambda: ["mail"])
     line_channel_access_token: str = ""
     line_target_id: str = ""
     webhook_url: str = ""
 
-
 class EmailSettings(_Base):
     sender: str = "monitor@localhost"
     recipients: list[str] = Field(default_factory=lambda: ["admin@example.com"])
-
 
 class SmtpSettings(_Base):
     host: str = "localhost"
@@ -71,7 +66,6 @@ class SmtpSettings(_Base):
     enable_auth: bool = False
     enable_tls: bool = False
 
-
 class GeneralSettings(_Base):
     language: Literal["en", "zh_TW"] = "en"
     theme: Literal["light", "dark"] = "light"
@@ -79,12 +73,10 @@ class GeneralSettings(_Base):
     enable_health_check: bool = True
     dashboard_queries: list[dict] = Field(default_factory=list)
 
-
 class ReportApiQuery(_Base):
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     max_results: int = Field(default=200000, ge=1, le=1_000_000)
-
 
 class ReportSettings(_Base):
     enabled: bool = False
@@ -101,18 +93,21 @@ class ReportSettings(_Base):
     max_top_n: int = Field(default=20, ge=1, le=100)
     api_query: ReportApiQuery = Field(default_factory=ReportApiQuery)
 
+class LoggingSettings(_Base):
+    level: str = "INFO"
+    json_sink: bool = False
+    rotation: str = "10 MB"
+    retention: int = 10
 
 class RuleSchedulerSettings(_Base):
     enabled: bool = True
     check_interval_seconds: int = Field(default=300, ge=60)   # min 1 minute
-
 
 class WebGuiTls(_Base):
     enabled: bool = False
     cert_file: str = ""
     key_file: str = ""
     self_signed: bool = False
-
 
 class WebGuiSettings(_Base):
     username: str = "illumio"
@@ -121,7 +116,6 @@ class WebGuiSettings(_Base):
     secret_key: str = ""
     allowed_ips: list[str] = Field(default_factory=list)
     tls: WebGuiTls = Field(default_factory=WebGuiTls)
-
 
 class PceProfile(_Base):
     """Extra=allow since PCE profile shape may evolve; only require id + url."""
@@ -133,7 +127,6 @@ class PceProfile(_Base):
     secret: str = ""
     name: str = ""
 
-
 class ReportSchedule(_Base):
     """Report schedule entries; extra=allow because schedule shape
     may evolve during Phase 6 APScheduler migration."""
@@ -141,13 +134,11 @@ class ReportSchedule(_Base):
     id: Optional[int] = None
     name: str = ""
 
-
 class Rule(_Base):
     """Runtime rule — shape varies by type. Keep flexible."""
     model_config = ConfigDict(extra="allow")
     type: str
     name: str = ""
-
 
 class ConfigSchema(_Base):
     api: ApiSettings = Field(default_factory=ApiSettings)
@@ -162,5 +153,6 @@ class ConfigSchema(_Base):
     active_pce_id: Optional[int] = None
     rule_scheduler: RuleSchedulerSettings = Field(default_factory=RuleSchedulerSettings)
     web_gui: WebGuiSettings = Field(default_factory=WebGuiSettings)
+    logging: LoggingSettings = Field(default_factory=LoggingSettings)
     # Written by apply_best_practices(); must survive pydantic round-trips.
     rule_backups: list = Field(default_factory=list)

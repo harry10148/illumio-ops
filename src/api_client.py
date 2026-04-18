@@ -7,7 +7,7 @@ import gzip
 import base64
 import datetime
 import ipaddress
-import logging
+from loguru import logger
 import threading
 import urllib.parse
 from dataclasses import dataclass, field
@@ -19,8 +19,6 @@ from cachetools import TTLCache
 from src.utils import Colors
 from src.i18n import t
 from src.state_store import load_state_file, update_state_file
-
-logger = logging.getLogger(__name__)
 
 MAX_TRAFFIC_RESULTS = 200000
 MAX_RETRIES = 3
@@ -86,7 +84,6 @@ _TRAFFIC_FILTER_CAPABILITIES = {
     "ex_dst_label_groups": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to label_group hrefs and pushed to destinations.exclude."},
 }
 
-
 class EventFetchError(RuntimeError):
     """Raised when the PCE events API cannot be fetched safely."""
 
@@ -95,11 +92,9 @@ class EventFetchError(RuntimeError):
         self.status = status
         self.message = message
 
-
 def _extract_id(href):
     """Extract the last segment from an Illumio HREF path."""
     return href.split('/')[-1] if href else ""
-
 
 @dataclass
 class TrafficQuerySpec:
@@ -108,7 +103,6 @@ class TrafficQuerySpec:
     fallback_filters: dict = field(default_factory=dict)
     report_only_filters: dict = field(default_factory=dict)
     diagnostics: dict = field(default_factory=dict)
-
 
 class ApiClient:
     def __init__(self, config_manager):
@@ -1161,7 +1155,7 @@ class ApiClient:
         try:
             update_state_file(self._state_file, _merge)
         except Exception as exc:
-            logger.debug("Failed to persist async job state for %s: %s", job_href, exc)
+            logger.debug("Failed to persist async job state for {}: {}", job_href, exc)
 
     @staticmethod
     def _make_query_signature(payload):
@@ -1192,7 +1186,7 @@ class ApiClient:
             jobs = data.get(_ASYNC_JOB_STATE_KEY, {})
             return jobs if isinstance(jobs, dict) else {}
         except Exception as exc:
-            logger.debug("Failed to load async job states: %s", exc)
+            logger.debug("Failed to load async job states: {}", exc)
             return {}
 
     def _job_age_seconds(self, job):
@@ -1214,7 +1208,7 @@ class ApiClient:
         try:
             self.prune_async_job_states(max_age_days=self._async_job_cache_max_age_days)
         except Exception as exc:
-            logger.debug("Async job state prune skipped: %s", exc)
+            logger.debug("Async job state prune skipped: {}", exc)
 
     def find_cached_async_summary(self, payload, query_type="rule_usage"):
         signature = self._make_query_signature(payload)
@@ -2322,7 +2316,7 @@ class ApiClient:
                     result_href=poll_result.get("result"),
                 )
             except Exception as exc:
-                logger.warning("Failed to parse async job poll response for %s: %s", job_href, exc)
+                logger.warning("Failed to parse async job poll response for {}: {}", job_href, exc)
                 state = "pending"
             return job_href, state
 
@@ -2567,7 +2561,7 @@ class ApiClient:
                 return 'active'
             return 'draft'
         except Exception as exc:
-            logger.debug("Could not determine provision state for %s: %s", href, exc)
+            logger.debug("Could not determine provision state for {}: {}", href, exc)
             return 'unknown'
 
     def is_provisioned(self, href):

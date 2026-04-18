@@ -9,27 +9,22 @@ _current_lang = "en"
 _ROOT = Path(__file__).resolve().parent
 _EN_MESSAGES_PATH = _ROOT / "i18n_en.json"
 
-
 def set_language(lang: str):
     global _current_lang
     if lang in {"en", "zh_TW"}:
         _current_lang = lang
 
-
 def get_language() -> str:
     return _current_lang
 
-
 def _entry(en: str, zh_tw: str | None = None) -> tuple[str, str]:
     return en, zh_tw or en
-
 
 def _load_en_messages() -> dict[str, str]:
     try:
         return json.loads(_EN_MESSAGES_PATH.read_text(encoding="utf-8"))
     except Exception:
         return {}
-
 
 EN_MESSAGES = _load_en_messages()
 _PLACEHOLDER_VALUE_RE = re.compile(r"^(?:Rpt|GUI|Gui|Sched)\b")
@@ -1885,7 +1880,6 @@ _ZH_EXPLICIT.update({
     "rpt_col_port": "Port",  # Port stays in English per glossary
 })
 
-
 def _humanize_key_en(key: str) -> str:
     if key.startswith("event_label_"):
         key = key[len("event_label_"):]
@@ -1898,7 +1892,6 @@ def _humanize_key_en(key: str) -> str:
     for part in parts:
         words.append(_TOKEN_MAP_EN.get(part.lower(), part.replace("-", " ").title()))
     return " ".join(words).strip()
-
 
 @lru_cache(maxsize=1)
 def _normalized_en_messages() -> dict[str, str]:
@@ -1917,13 +1910,11 @@ def _normalized_en_messages() -> dict[str, str]:
         normalized[key] = value
     return normalized
 
-
 def _needs_space(prev: str, curr: str) -> bool:
     return (
         (prev.isascii() and (prev.isalnum() or prev in "/+%")) and
         (curr.isascii() and (curr.isalnum() or curr in "/+%"))
     )
-
 
 def _smart_join_zh(parts: list[str]) -> str:
     result = ""
@@ -1938,7 +1929,6 @@ def _smart_join_zh(parts: list[str]) -> str:
         else:
             result += part
     return result
-
 
 def _humanize_key_zh(key: str) -> str:
     if key.startswith("event_label_"):
@@ -1955,7 +1945,6 @@ def _humanize_key_zh(key: str) -> str:
             continue
         words.append(word)
     return _smart_join_zh(words).strip() or key
-
 
 def _translate_text(text: str) -> str:
     if not text:
@@ -2031,7 +2020,6 @@ def _translate_text(text: str) -> str:
     result = re.sub(r"\s{2,}", " ", result).strip()
     return result
 
-
 @lru_cache(maxsize=1)
 def _discover_keys() -> set[str]:
     patterns = [
@@ -2050,7 +2038,6 @@ def _discover_keys() -> set[str]:
                 if re.fullmatch(r"[A-Za-z0-9_&]+", key):
                     keys.add(key)
     return keys
-
 
 @lru_cache(maxsize=2)
 def _build_messages(lang: str) -> dict[str, str]:
@@ -2076,13 +2063,11 @@ def _build_messages(lang: str) -> dict[str, str]:
         base[key] = _humanize_key_zh(key)
     return base
 
-
 def get_messages(lang: str | None = None) -> dict[str, str]:
     lang = lang or _current_lang
     if lang not in {"en", "zh_TW"}:
         lang = "en"
     return dict(_build_messages(lang))
-
 
 def t(key: str, **kwargs) -> str:
     default_val = kwargs.pop("default", None)

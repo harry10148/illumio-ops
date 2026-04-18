@@ -62,10 +62,8 @@ _HIGH_RISK_EVENTS = {
 _HIGH_IMPACT_THRESHOLD = 50
 _CONTEXT_COLS = ("actor", "target_name", "resource_name", "action", "src_ip", "change_detail", "api_method")
 
-
 def _meaningful(df: pd.DataFrame, column: str) -> bool:
     return column in df.columns and df[column].astype(str).str.strip().ne("").any()
-
 
 def _select_cols(df: pd.DataFrame, base_cols: list[str], extra_cols: tuple[str, ...] = _CONTEXT_COLS) -> list[str]:
     cols = list(base_cols)
@@ -79,7 +77,6 @@ def _select_cols(df: pd.DataFrame, base_cols: list[str], extra_cols: tuple[str, 
         if column not in cols and _meaningful(df, column):
             cols.append(column)
     return cols
-
 
 def audit_policy_changes(df: pd.DataFrame) -> dict:
     if df.empty or "event_type" not in df.columns:

@@ -5,15 +5,12 @@ from __future__ import annotations
 
 import json
 
-
 class _StringMap(dict):
     def __missing__(self, key: str) -> dict[str, str]:
         return {"en": key, "zh_TW": key}
 
-
 def _entry(en: str, zh_tw: str | None = None) -> dict[str, str]:
     return {"en": en, "zh_TW": zh_tw or en}
-
 
 STRINGS: _StringMap = _StringMap({
     "rpt_generated": _entry("Generated:", "產出時間："),
@@ -528,7 +525,6 @@ STRINGS: _StringMap = _StringMap({
     "rpt_email_pu_subject": _entry("Illumio Policy Usage Report", "Illumio Policy 使用報表"),
 })
 
-
 for key, pair in {
     "ransomware": (
         "Ransomware Exposure",
@@ -571,7 +567,6 @@ for key, pair in {
     STRINGS[f"rpt_cat_{key}_name"] = _entry(name_en, name_zh)
     STRINGS[f"rpt_cat_{key}_desc"] = _entry(desc_en, desc_zh)
 
-
 for key, zh_text in {
     "B001": "檢查 SMB、RPC、RDP、WinRM 等高風險管理 Port 是否暴露，並優先鎖定高風險目的端。",
     "B002": "檢查 TeamViewer、VNC、NetBIOS 等遠端控制或舊式管理協定的暴露情況。",
@@ -594,7 +589,6 @@ for key, zh_text in {
     "L010": "檢查已明確 Allow 的 lateral movement 風險 Port。",
 }.items():
     STRINGS[f"rpt_rule_{key}_how"] = _entry("Rule detail", zh_text)
-
 
 for suffix, pair in {
     "hostname": ("Hostname", "主機名稱"),
@@ -774,7 +768,6 @@ for key, pair in {
 }.items():
     STRINGS[key] = _entry(pair[0], pair[1])
 
-
 def make_i18n_js() -> str:
     strings_json = json.dumps(STRINGS, ensure_ascii=False, indent=2)
     return f"""<script>
@@ -802,13 +795,11 @@ def make_i18n_js() -> str:
 }})();
 </script>"""
 
-
 COL_I18N: dict[str, str] = {
     value.get("en", ""): key
     for key, value in STRINGS.items()
     if key.startswith("rpt_col_") and value.get("en")
 }
-
 
 def lang_btn_html() -> str:
     return (

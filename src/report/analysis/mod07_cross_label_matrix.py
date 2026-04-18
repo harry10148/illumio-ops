@@ -5,7 +5,6 @@ from src.i18n import t, get_language
 
 LABEL_KEYS = ('env', 'app', 'role', 'loc')
 
-
 def cross_label_flow_matrix(df: pd.DataFrame, top_n: int = 20) -> dict:
     """
     For each label key produce a value×value flow matrix showing same-value vs

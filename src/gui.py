@@ -12,7 +12,7 @@ import io
 import json
 import datetime
 import threading
-import logging
+from loguru import logger
 import ipaddress
 from contextlib import redirect_stdout
 import secrets
@@ -38,18 +38,13 @@ from src.report.dashboard_summaries import (
     write_policy_usage_dashboard_summary,
 )
 
-logger = logging.getLogger(__name__)
-
 _ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-
 
 def _strip_ansi(text: str) -> str:
     return _ANSI_RE.sub('', text)
 
-
 # ????????????????????????????????????????????????????????????????????????????????# Event Catalog (mirrors settings.py)
 # ????????????????????????????????????????????????????????????????????????????????# We now dynamically import FULL_EVENT_CATALOG from src.settings inside the API route.
-
 
 # ????????????????????????????????????????????????????????????????????????????????# Flask Application Factory
 # ????????????????????????????????????????????????????????????????????????????????
@@ -74,7 +69,6 @@ def _check_ip_allowed(allowed_ips: list, remote_addr: str) -> bool:
             continue
     return False
 
-
 def _validate_allowed_ips(values) -> tuple[list, list]:
     normalized = []
     invalid = []
@@ -92,7 +86,6 @@ def _validate_allowed_ips(values) -> tuple[list, list]:
             invalid.append(item)
     return normalized, invalid
 
-
 def _normalize_rule_throttle(raw_value):
     value = str(raw_value or "").strip()
     if not value:
@@ -104,7 +97,6 @@ def _normalize_rule_throttle(raw_value):
     if parse_throttle and not parse_throttle(value):
         raise ValueError("Invalid throttle format. Use values like 2/10m or 5/1h.")
     return value
-
 
 def _normalize_match_fields(raw_value):
     if not raw_value:
@@ -119,11 +111,9 @@ def _normalize_match_fields(raw_value):
         return normalized
     raise ValueError("match_fields must be an object of field-path to pattern.")
 
-
 def _is_workload_href(href: str) -> bool:
     normalized = str(href or "").strip()
     return bool(normalized) and "/workloads/" in normalized
-
 
 def _normalize_quarantine_hrefs(raw_hrefs) -> list[str]:
     normalized: list[str] = []
@@ -167,10 +157,8 @@ def _rst_drop():
     # Raise ??Flask will attempt to write the 500 but the socket is gone
     raise _RstDrop()
 
-
 class _RstDrop(Exception):
     """Sentinel: request was silently dropped via TCP RST."""
-
 
 _PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 _ROOT_DIR = os.path.dirname(_PKG_DIR)
@@ -179,7 +167,6 @@ _ROOT_DIR = os.path.dirname(_PKG_DIR)
 _rs_log_history: list = []
 _rs_log_lock = threading.Lock()
 _ALLOWED_REPORT_FORMATS = frozenset({'html', 'csv', 'pdf', 'xlsx', 'all'})
-
 
 def _append_rs_logs(logs: list) -> None:
     """Append one check-run's output to the in-memory log history."""
@@ -191,7 +178,6 @@ def _append_rs_logs(logs: list) -> None:
         _rs_log_history.append(entry)
         if len(_rs_log_history) > 200:
             del _rs_log_history[:-200]
-
 
 def _rs_background_scheduler(cm: ConfigManager) -> None:
     """Background thread: run rule scheduler periodically in GUI-only mode."""
@@ -215,24 +201,20 @@ def _rs_background_scheduler(cm: ConfigManager) -> None:
                 logs = engine.check(silent=True, tz_str=tz_str)
                 _append_rs_logs(logs)
                 last_check = now
-                logger.info("[RuleScheduler] Auto-check completed (%d entries).", len(logs))
+                logger.info("[RuleScheduler] Auto-check completed ({} entries).", len(logs))
         except Exception as exc:
-            logger.error("[RuleScheduler] Background error: %s", exc, exc_info=True)
-
+            logger.error("[RuleScheduler] Background error: {}", exc, exc_info=True)
 
 def _resolve_reports_dir(cm_ref: ConfigManager) -> str:
     """Return absolute path to the report output directory."""
     d = cm_ref.config.get('report', {}).get('output_dir', 'reports')
     return d if os.path.isabs(d) else os.path.join(_ROOT_DIR, d)
 
-
 def _resolve_config_dir() -> str:
     return os.path.join(_ROOT_DIR, 'config')
 
-
 def _resolve_state_file() -> str:
     return os.path.join(_ROOT_DIR, 'logs', 'state.json')
-
 
 def _plugin_config_roots() -> set[str]:
     roots: set[str] = set()
@@ -242,7 +224,6 @@ def _plugin_config_roots() -> set[str]:
             if path:
                 roots.add(path[0])
     return roots
-
 
 def _summarize_alert_channels(config: dict, dispatch_history: list) -> list[dict]:
     active = set(config.get("alerts", {}).get("active", []) or [])
@@ -277,7 +258,6 @@ def _summarize_alert_channels(config: dict, dispatch_history: list) -> list[dict
         })
     return summaries
 
-
 def _ok(data=None, **kw):
     """Standard success response: {"ok": true, ...}"""
     body = {"ok": True}
@@ -286,11 +266,9 @@ def _ok(data=None, **kw):
     body.update(kw)
     return jsonify(body)
 
-
 def _err(msg, status=400):
     """Standard error response: {"ok": false, "error": "..."}"""
     return jsonify({"ok": False, "error": msg}), status
-
 
 def _get_active_pce_url(cm: 'ConfigManager') -> str:
     """Return the active PCE profile URL, falling back to config['api']['url']."""
@@ -304,18 +282,14 @@ def _get_active_pce_url(cm: 'ConfigManager') -> str:
 def _build_audit_dashboard_summary(result) -> dict:
     return build_audit_dashboard_summary(result)
 
-
 def _write_audit_dashboard_summary(output_dir: str, result) -> str:
     return write_audit_dashboard_summary(output_dir, result)
-
 
 def _build_policy_usage_dashboard_summary(result) -> dict:
     return build_policy_usage_dashboard_summary(result)
 
-
 def _write_policy_usage_dashboard_summary(output_dir: str, result) -> str:
     return write_policy_usage_dashboard_summary(output_dir, result)
-
 
 def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     app = Flask(__name__, template_folder=os.path.join(_PKG_DIR, 'templates'), static_folder=os.path.join(_PKG_DIR, 'static'))
@@ -641,7 +615,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             from src.events import event_identity, format_utc, normalize_event, parse_event_timestamp
             from src.settings import _event_category
         except Exception as exc:
-            logger.error("Failed to load event viewer dependencies: %s", exc)
+            logger.error("Failed to load event viewer dependencies: {}", exc)
             return _err(str(exc), 500)
 
         try:
@@ -676,10 +650,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 max_results=fetch_limit,
             )
         except EventFetchError as exc:
-            logger.error("Event viewer fetch failed: %s - %s", exc.status, exc.message)
+            logger.error("Event viewer fetch failed: {} - {}", exc.status, exc.message)
             return _err(f"PCE event fetch failed ({exc.status}): {exc.message[:300]}", 502)
         except Exception as exc:
-            logger.error("Event viewer fetch failed: %s", exc, exc_info=True)
+            logger.error("Event viewer fetch failed: {}", exc, exc_info=True)
             return _err(f"PCE event fetch failed: {exc}", 502)
 
         items = []
@@ -753,7 +727,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             from src.api_client import ApiClient, EventFetchError
             from src.events import compare_event_rules, format_utc
         except Exception as exc:
-            logger.error("Failed to load shadow compare dependencies: %s", exc)
+            logger.error("Failed to load shadow compare dependencies: {}", exc)
             return _err(str(exc), 500)
 
         try:
@@ -812,7 +786,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 normalize_event,
             )
         except Exception as exc:
-            logger.error("Failed to load rule test dependencies: %s", exc)
+            logger.error("Failed to load rule test dependencies: {}", exc)
             return _err(str(exc), 500)
 
         try:
@@ -2803,14 +2777,12 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
     return app
 
-
 # ????????????????????????????????????????????????????????????????????????????????# Launch
 # ????????????????????????????????????????????????????????????????????????????????
 # Default validity period for self-signed certs. 5 years keeps the cert
 # effectively "set and forget" for internal deployments while still giving
 # the auto-renew path meaningful runway before expiry.
 _SELF_SIGNED_VALIDITY_DAYS = 1825  # 5 years
-
 
 def _generate_self_signed_cert(cert_dir: str, force: bool = False,
                                days: int = _SELF_SIGNED_VALIDITY_DAYS) -> tuple[str, str]:
@@ -2855,7 +2827,6 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Failed to generate self-signed certificate: {e.stderr.decode()}")
 
-
 def _cert_days_remaining(cert_path: str) -> int | None:
     """Return the number of days until the cert expires, or None if unknown.
 
@@ -2890,7 +2861,6 @@ def _cert_days_remaining(cert_path: str) -> int | None:
     delta = expiry - datetime.now(timezone.utc)
     return int(delta.total_seconds() // 86400)
 
-
 def _maybe_auto_renew_self_signed(cert_dir: str, threshold_days: int = 30) -> tuple[bool, int | None]:
     """Regenerate the self-signed cert if it expires within ``threshold_days``.
 
@@ -2910,7 +2880,6 @@ def _maybe_auto_renew_self_signed(cert_dir: str, threshold_days: int = 30) -> tu
     except RuntimeError:
         return False, days
     return True, _cert_days_remaining(cert_path)
-
 
 def _get_cert_info(cert_path: str) -> dict:
     """Read certificate expiry and subject via openssl."""
@@ -2947,14 +2916,12 @@ def _get_cert_info(cert_path: str) -> dict:
         info["error"] = "openssl not available"
     return info
 
-
 def build_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     """Public factory: build a configured Flask app bound to the given ConfigManager.
 
     Pure constructor — does NOT call app.run(). Used by launch_gui and tests.
     """
     return _create_app(cm, persistent_mode=persistent_mode)
-
 
 def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_mode=False):
     if not HAS_FLASK:

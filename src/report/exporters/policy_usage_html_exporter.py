@@ -4,7 +4,7 @@ Self-contained HTML report for the Policy Usage Report.
 from __future__ import annotations
 
 import datetime
-import logging
+from loguru import logger
 import os
 
 import pandas as pd
@@ -15,11 +15,8 @@ from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
 from .code_highlighter import get_highlight_css
 
-logger = logging.getLogger(__name__)
-
 _CSS = build_css("policy_usage")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
-
 
 def _df_to_html(df, no_data_key: str = "rpt_no_data") -> str:
     # Empty case is rendered by the shared renderer for consistent panel chrome.
@@ -38,7 +35,6 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data") -> str:
         no_data_key=no_data_key,
         render_cell=_render_cell,
     )
-
 
 class PolicyUsageHtmlExporter:
     def __init__(
@@ -60,7 +56,7 @@ class PolicyUsageHtmlExporter:
         filepath = os.path.join(output_dir, filename)
         with open(filepath, "w", encoding="utf-8") as fh:
             fh.write(self._build())
-        logger.info("[PolicyUsageHtmlExporter] Saved: %s", filepath)
+        logger.info("[PolicyUsageHtmlExporter] Saved: {}", filepath)
         return filepath
 
     def _build(self) -> str:

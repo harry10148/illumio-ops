@@ -3,14 +3,11 @@ import os
 import time
 import hmac
 import hashlib
-import logging
+from loguru import logger
 from src.utils import Colors
 from src.i18n import t, set_language
 
-logger = logging.getLogger(__name__)
-
 _SECRET_FIELD_TOKENS = {"key", "secret", "password", "secret_key", "token", "password_hash", "password_salt"}
-
 
 def _format_error_input(loc: tuple, raw_input):
     """Redact secret-looking fields from validation error log output."""
@@ -77,10 +74,8 @@ _DEFAULT_CONFIG = {
     }
 }
 
-
 _PBKDF2_PREFIX = "pbkdf2:"
 _PBKDF2_ITERATIONS = 260000
-
 
 def hash_password(salt: str, password: str) -> str:
     """Hash a password with PBKDF2-HMAC-SHA256 (stdlib, no external deps).
@@ -90,7 +85,6 @@ def hash_password(salt: str, password: str) -> str:
         'sha256', password.encode('utf-8'), salt.encode('utf-8'), _PBKDF2_ITERATIONS
     )
     return _PBKDF2_PREFIX + dk.hex()
-
 
 # ── argon2id helpers ──────────────────────────────────────────────────────────
 _ARGON2_PREFIX = "argon2:"
@@ -107,13 +101,11 @@ except ImportError:
     _argon2_hasher = None
     _ArgonMismatch = Exception
 
-
 def hash_password_argon2(password: str) -> str:
     """Hash password with argon2id. Salt is embedded in the hash string."""
     if not _ARGON2_AVAILABLE:
         raise RuntimeError("argon2-cffi is not installed; cannot hash with argon2id")
     return _ARGON2_PREFIX + _argon2_hasher.hash(password)
-
 
 def verify_password(stored_hash: str, salt: str, password: str) -> bool:
     """Verify a password against a stored hash.
@@ -137,7 +129,6 @@ def verify_password(stored_hash: str, salt: str, password: str) -> bool:
     legacy = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
     return hmac.compare_digest(stored_hash, legacy)
 
-
 def verify_and_upgrade_password(stored_hash: str, salt: str, password: str):
     """Verify; if verified AND stored hash is not argon2, return a fresh argon2 hash
     as the second tuple element so the caller can persist the upgrade.
@@ -154,7 +145,6 @@ def verify_and_upgrade_password(stored_hash: str, salt: str, password: str):
         return True, hash_password_argon2(password)
     return True, None  # argon2-cffi not available; skip upgrade
 
-
 def _deep_merge(base: dict, override: dict) -> dict:
     """Recursively merges override into base. Lists and non-dict values are replaced."""
     merged = base.copy()
@@ -164,7 +154,6 @@ def _deep_merge(base: dict, override: dict) -> dict:
         else:
             merged[key] = val
     return merged
-
 
 class ConfigManager:
     def __init__(self, config_file: str = CONFIG_FILE):

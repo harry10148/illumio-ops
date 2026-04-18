@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-import logging
+from loguru import logger
 import os
 
 import pandas as pd
@@ -16,16 +16,12 @@ from .table_renderer import render_df_table
 from .code_highlighter import get_highlight_css
 from src.report.analysis.audit.audit_risk import RISK_BG, RISK_COLOR, get_risk
 
-logger = logging.getLogger(__name__)
-
 _CSS = build_css("audit")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
-
 
 def _norm_col(name) -> str:
     """Tolerant column-name match: case-insensitive, whitespace/dash collapsed."""
     return str(name).strip().lower().replace(" ", "_").replace("-", "_")
-
 
 def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False) -> str:
     # Empty-state rendering is delegated to render_df_table for consistent panel chrome.
@@ -67,7 +63,6 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False) -
         render_cell=_render_cell,
         row_attrs=_row_attrs,
     )
-
 
 class AuditHtmlExporter:
     def __init__(self, results: dict, df: pd.DataFrame = None, date_range: tuple = ("", "")):
@@ -147,7 +142,7 @@ class AuditHtmlExporter:
         filepath = os.path.join(output_dir, filename)
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(self._build())
-        logger.info("[AuditHtmlExporter] Saved: %s", filepath)
+        logger.info("[AuditHtmlExporter] Saved: {}", filepath)
         return filepath
 
     def _build(self) -> str:

@@ -30,14 +30,12 @@ _RESOURCE_TYPE_PRIORITY = (
     "group",
 )
 
-
 def _string(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, str):
         return value.strip()
     return str(value).strip()
-
 
 def _pick_first(*values: Any) -> str:
     for value in values:
@@ -46,13 +44,11 @@ def _pick_first(*values: Any) -> str:
             return text
     return ""
 
-
 def _href_tail(value: Any) -> str:
     text = _string(value)
     if not text or "/" not in text:
         return text
     return text.rstrip("/").rsplit("/", 1)[-1]
-
 
 def _shorten_api_endpoint(endpoint: str) -> str:
     if not endpoint:
@@ -65,7 +61,6 @@ def _shorten_api_endpoint(endpoint: str) -> str:
         if suffix.startswith(prefix):
             return "/" + suffix[len(prefix):]
     return "/" + suffix if suffix else endpoint
-
 
 def _resource_name(resource: Any) -> str:
     if isinstance(resource, list):
@@ -102,7 +97,6 @@ def _resource_name(resource: Any) -> str:
 
     return ""
 
-
 def _extract_resource_entry(resource: Any) -> tuple[str, dict[str, Any]]:
     if not isinstance(resource, dict):
         return "", {}
@@ -118,7 +112,6 @@ def _extract_resource_entry(resource: Any) -> tuple[str, dict[str, Any]]:
 
     return "", {}
 
-
 def _resource_from_changes(resource_changes: Any) -> tuple[str, dict[str, Any]]:
     if not isinstance(resource_changes, list):
         return "", {}
@@ -130,7 +123,6 @@ def _resource_from_changes(resource_changes: Any) -> tuple[str, dict[str, Any]]:
         if resource_type:
             return resource_type, resource_obj
     return "", {}
-
 
 def _extract_actor(event: dict[str, Any]) -> tuple[str, str, str, str]:
     created_by = event.get("created_by") or {}
@@ -173,7 +165,6 @@ def _extract_actor(event: dict[str, Any]) -> tuple[str, str, str, str]:
 
     return "System", actor_user, actor_agent, "system"
 
-
 def _extract_source_ip(event: dict[str, Any]) -> str:
     action = event.get("action") or {}
     return _pick_first(
@@ -181,7 +172,6 @@ def _extract_source_ip(event: dict[str, Any]) -> str:
         action.get("src_ip"),
         action.get("source_ip"),
     )
-
 
 def _extract_action(event: dict[str, Any]) -> tuple[str, str, str]:
     action = event.get("action") or {}
@@ -193,7 +183,6 @@ def _extract_action(event: dict[str, Any]) -> tuple[str, str, str]:
     path = _shorten_api_endpoint(path)
     action_label = " ".join(part for part in (method, path) if part).strip()
     return method, path, action_label
-
 
 def _extract_workloads_affected(event: dict[str, Any]) -> int:
     workloads = event.get("workloads_affected")
@@ -229,7 +218,6 @@ def _extract_workloads_affected(event: dict[str, Any]) -> int:
 
     return 0
 
-
 def _extract_notification_user(event: dict[str, Any]) -> str:
     notifications = event.get("notifications")
     if not isinstance(notifications, list):
@@ -243,7 +231,6 @@ def _extract_notification_user(event: dict[str, Any]) -> str:
         if username:
             return username
     return ""
-
 
 def _build_parser_notes(event: dict[str, Any], normalized: dict[str, Any]) -> list[str]:
     notes: list[str] = []
@@ -266,7 +253,6 @@ def _build_parser_notes(event: dict[str, Any], normalized: dict[str, Any]) -> li
     if event_type.startswith(("agent.", "agents.")) and not normalized.get("target_name"):
         notes.append("workload_unresolved")
     return notes
-
 
 def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
     event_type = _string(event.get("event_type"))

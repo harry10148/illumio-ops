@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 ATTACK_SECTION_KEYS = (
     "boundary_breaches",
     "suspicious_pivot_behavior",
@@ -12,10 +11,8 @@ ATTACK_SECTION_KEYS = (
     "action_matrix",
 )
 
-
 def _empty_attack_summary() -> dict[str, list[dict[str, Any]]]:
     return {key: [] for key in ATTACK_SECTION_KEYS}
-
 
 def _normalize_items(items: Any, top_n: int) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
@@ -25,7 +22,6 @@ def _normalize_items(items: Any, top_n: int) -> list[dict[str, Any]]:
         if isinstance(item, dict):
             rows.append(dict(item))
     return rows
-
 
 def extract_attack_summary(module_results: dict[str, Any], top_n: int = 5) -> dict[str, list[dict[str, Any]]]:
     """Extract deterministic attack sections from mod12/mod00 summary outputs."""
@@ -51,14 +47,12 @@ def extract_attack_summary(module_results: dict[str, Any], top_n: int = 5) -> di
 
     return _empty_attack_summary()
 
-
 def attack_summary_counts(attack_summary: dict[str, Any]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for key in ATTACK_SECTION_KEYS:
         values = attack_summary.get(key) if isinstance(attack_summary, dict) else []
         counts[key] = len(values) if isinstance(values, list) else 0
     return counts
-
 
 def build_attack_summary_brief(counts: dict[str, int]) -> str:
     total = sum(int(counts.get(k, 0) or 0) for k in ATTACK_SECTION_KEYS)
