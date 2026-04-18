@@ -1,12 +1,53 @@
-# Core: Zero external dependencies (Python stdlib only)
-# CLI and daemon modes work without any pip install.
+# illumio_ops production runtime dependencies.
+# All packages bundled into the offline RPM via PyInstaller.
+# Pinned to major version ranges; minor/patch upgrades allowed within range.
+#
+# Categories follow the upgrade roadmap phases:
+#   Phase 1 — CLI UX:          rich, questionary, click, humanize
+#   Phase 2 — HTTP client:     requests, orjson, cachetools
+#   Phase 3 — Settings:        pydantic, pydantic-settings
+#   Phase 4 — Web GUI security: flask-wtf, flask-limiter, flask-talisman, flask-login, argon2-cffi
+#   Phase 5 — Reports:         openpyxl, weasyprint, matplotlib, plotly, pygments
+#   Phase 6 — Scheduler:       APScheduler
+#   Phase 7 — Logging:         loguru
+#   Existing (mandatory):      flask, pandas, pyyaml
 
-# Optional: Web GUI mode (--gui)
+# ── Existing core (Web GUI + reports) ────────────────────────────────────────
 flask>=3.0,<4.0
+pandas>=2.0,<3.0
+pyyaml>=6.0,<7.0
 
-# Optional: Report generation (--report, menu items 12-14)
-# pandas  — data analysis; available in RHEL AppStream / standard repos
-# pyyaml  — report_config.yaml; available in RHEL AppStream (python3-pyyaml)
-# (No openpyxl required — reports export to HTML and CSV ZIP, stdlib only)
-# pandas>=2.0,<3.0
-# pyyaml>=6.0,<7.0
+# ── Phase 1: CLI UX ──────────────────────────────────────────────────────────
+rich>=13.7,<14.0
+questionary>=2.0,<3.0
+click>=8.1,<9.0
+humanize>=4.9,<5.0
+
+# ── Phase 2: HTTP client ─────────────────────────────────────────────────────
+requests>=2.31,<3.0
+orjson>=3.9,<4.0
+cachetools>=5.3,<6.0
+
+# ── Phase 3: Settings validation ─────────────────────────────────────────────
+pydantic>=2.6,<3.0
+pydantic-settings>=2.2,<3.0
+
+# ── Phase 4: Web GUI security ────────────────────────────────────────────────
+flask-wtf>=1.2,<2.0
+flask-limiter>=3.5,<4.0
+flask-talisman>=1.1,<2.0
+flask-login>=0.6,<0.7
+argon2-cffi>=23.1,<25.0
+
+# ── Phase 5: Reports (Excel + PDF + interactive charts) ──────────────────────
+openpyxl>=3.1,<4.0
+weasyprint>=61.0,<62.0
+matplotlib>=3.8,<4.0
+plotly>=5.20,<6.0
+pygments>=2.17,<3.0
+
+# ── Phase 6: Scheduler ───────────────────────────────────────────────────────
+APScheduler>=3.10,<4.0
+
+# ── Phase 7: Logging ─────────────────────────────────────────────────────────
+loguru>=0.7,<0.8
