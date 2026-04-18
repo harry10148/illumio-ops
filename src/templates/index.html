@@ -764,6 +764,8 @@
           <select id="sched-format" style="width:100%;">
             <option value="html" data-i18n="gui_sched_fmt_html">HTML</option>
             <option value="csv" data-i18n="gui_sched_fmt_csv">CSV (Raw Data ZIP)</option>
+            <option value="pdf" data-i18n="gui_sched_fmt_pdf">PDF</option>
+            <option value="xlsx" data-i18n="gui_sched_fmt_xlsx">Excel (XLSX)</option>
             <option value="all" data-i18n="gui_sched_fmt_all">HTML + CSV</option>
           </select>
         </div>
@@ -1714,6 +1716,16 @@
             </div>
           </div>
         </details>
+      </div>
+      <div id="m-gen-format-row" style="margin-top:10px;">
+        <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--dim);" data-i18n="gui_sched_format">Output Format</label>
+        <select id="m-gen-format" style="width:100%; padding:6px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px;">
+          <option value="all" data-i18n="gui_sched_fmt_all">HTML + CSV</option>
+          <option value="html" data-i18n="gui_sched_fmt_html">HTML</option>
+          <option value="csv" data-i18n="gui_sched_fmt_csv">CSV (Raw Data ZIP)</option>
+          <option value="xlsx">Excel (XLSX)</option>
+          <option value="pdf">PDF</option>
+        </select>
       </div>
       <p id="m-gen-note" style="display:none;font-size:0.85rem;color:var(--dim);margin-top:8px;" data-i18n="gui_gen_snapshot_note">Gen Snapshot Note</p>
       <div class="modal-actions">

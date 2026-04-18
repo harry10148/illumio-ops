@@ -20,10 +20,39 @@ import pandas as pd
 from .report_i18n import STRINGS, make_i18n_js, lang_btn_html, COL_I18N as _COL_I18N
 from .report_css import build_css, TABLE_JS
 from .table_renderer import render_df_table
+from .chart_renderer import render_plotly_html, render_matplotlib_png
+from .code_highlighter import get_highlight_css
+from src.humanize_ext import human_number
 
 logger = logging.getLogger(__name__)
 
 _CSS = build_css('traffic')
+_HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
+
+
+def _render_chart_for_html(chart_spec: dict | None) -> str:
+    """Emit plotly interactive div + matplotlib PNG fallback (for PDF)."""
+    import base64 as _b64
+    if not chart_spec:
+        return ''
+    plotly_div = ''
+    try:
+        plotly_div = render_plotly_html(chart_spec)
+    except Exception as exc:
+        logger.warning('plotly render failed: %s', exc)
+    fallback_img = ''
+    try:
+        png = render_matplotlib_png(chart_spec)
+        b64 = _b64.b64encode(png).decode('ascii')
+        fallback_img = (
+            f'<img class="plotly-fallback-img" '
+            f'src="data:image/png;base64,{b64}" alt="chart" />'
+        )
+    except Exception as exc:
+        logger.warning('matplotlib fallback failed: %s', exc)
+    if not plotly_div and not fallback_img:
+        return ''
+    return f'<div class="chart-container">{plotly_div}{fallback_img}</div>'
 
 
 def _fmt_bytes(b) -> str:
@@ -374,8 +403,8 @@ class HtmlExporter:
         total_flows = self._r.get('mod01', {}).get('total_flows', 0)
         summary_pills = (
             '<div class="summary-pill-row">'
-            f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_flows"]["en"]}</span><span class="summary-pill-value">{total_flows}</span></div>'
-            f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_findings"]["en"]}</span><span class="summary-pill-value">{n_findings}</span></div>'
+            f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_flows"]["en"]}</span><span class="summary-pill-value">{human_number(total_flows)}</span></div>'
+            f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_findings"]["en"]}</span><span class="summary-pill-value">{human_number(int(n_findings))}</span></div>'
             f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_focus"]["en"]}</span><span class="summary-pill-value">{STRINGS["rpt_focus_traffic"]["en"]}</span></div>'
             '</div>'
         )
@@ -471,7 +500,7 @@ class HtmlExporter:
         return (
             '<!DOCTYPE html><html lang="en"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            '<title>Illumio Traffic Report</title>' + _CSS + '</head>\n'
+            '<title>Illumio Traffic Report</title>' + _CSS + _HIGHLIGHT_CSS + '</head>\n'
             '<body>' + lang_btn_html() + nav_html + '<main>' + body + '</main>'
             + TABLE_JS + make_i18n_js() + '</body></html>'
         )
@@ -594,7 +623,7 @@ class HtmlExporter:
 
     def _mod02_html(self):
         m = self._r.get('mod02', {})
-        out = self._subnote('rpt_tr_mod02_intro', 'Start with the decision breakdown to see how much traffic is Allowed vs Blocked vs Potentially Blocked.') + _df_to_html(m.get('summary'))
+        out = self._subnote('rpt_tr_mod02_intro', 'Start with the decision breakdown to see how much traffic is Allowed vs Blocked vs Potentially Blocked.') + _df_to_html(m.get('summary')) + _render_chart_for_html(m.get('chart_spec'))
         # Per-port coverage table
         pc = m.get('port_coverage')
         if pc is not None and hasattr(pc, 'empty') and not pc.empty:
@@ -743,6 +772,7 @@ class HtmlExporter:
                 kv = (f'<span data-i18n="rpt_tr_same_value">Same-value:</span> {data.get("same_value_flows",0)} · '
                       f'<span data-i18n="rpt_tr_cross_value">Cross-value:</span> {data.get("cross_value_flows",0)}')
                 out += f'<p>{kv}</p>{_df_to_html(data.get("top_cross_pairs"))}'
+        out += _render_chart_for_html(m.get('chart_spec'))
         return out or '<p class="note" data-i18n="rpt_no_matrix">No label matrix data.</p>'
 
     def _mod08_html(self):
@@ -788,6 +818,7 @@ class HtmlExporter:
         return (
             self._subnote('rpt_tr_allowed_flows_subnote', 'Focus on explicitly Allowed top flows and verify they are required business paths.')
             + _df_to_html(m.get('top_app_flows'))
+            + _render_chart_for_html(m.get('chart_spec'))
             + self._subnote('rpt_tr_audit_flags_subnote', 'Audit Flags lists traffic that is Allowed but still worth a human review.')
             + '<h3><span data-i18n="rpt_tr_audit_flags">Audit Flags</span> (' +
             str(m.get('audit_flag_count', 0)) + ')</h3>'
@@ -1009,7 +1040,7 @@ class HtmlExporter:
             return f'<p class="note">{m["error"]}</p>'
         total = m.get('total_lateral_flows', 0)
         pct = m.get('lateral_pct', 0)
-        html = (self._subnote('rpt_tr_lateral_intro', 'Covers all lateral-movement analysis including IP-level host connection patterns and App(Env)-level graph risk scoring.') + f'<p><span data-i18n="rpt_tr_lateral_flows">Lateral movement port flows:</span> '
+        html = (self._subnote('rpt_tr_lateral_intro', 'Covers all lateral-movement analysis including IP-level host connection patterns and App(Env)-level graph risk scoring.') + _render_chart_for_html(m.get('chart_spec')) + f'<p><span data-i18n="rpt_tr_lateral_flows">Lateral movement port flows:</span> '
                 f'<b>{total:,}</b> ({pct}% <span data-i18n="rpt_tr_lateral_pct">of all flows</span>)</p>')
         service_summary = m.get('service_summary')
         if service_summary is not None and not service_summary.empty:

@@ -178,6 +178,7 @@ _ROOT_DIR = os.path.dirname(_PKG_DIR)
 # ?? Rule Scheduler log history (in-memory, thread-safe) ??????????????????????
 _rs_log_history: list = []
 _rs_log_lock = threading.Lock()
+_ALLOWED_REPORT_FORMATS = frozenset({'html', 'csv', 'pdf', 'xlsx', 'all'})
 
 
 def _append_rs_logs(logs: list) -> None:
@@ -1716,6 +1717,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 return jsonify({"ok": False, "error": t("gui_no_traffic_data")})
 
             fmt = d.get('format', 'all')
+            fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'all'
             output_dir = _resolve_reports_dir(cm)
                 
             paths = gen.export(result, fmt=fmt, output_dir=output_dir, send_email=str(d.get('send_email', '')).lower() == 'true', reporter=reporter)

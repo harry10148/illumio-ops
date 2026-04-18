@@ -995,6 +995,8 @@
   "gui_rs_schedule_title": "Create schedule",
   "rpt_tr_score_breakdown": "Rpt Tr Score Breakdown",
   "gui_sched_fmt_all": "All formats (HTML + CSV)",
+  "gui_sched_fmt_pdf": "PDF",
+  "gui_sched_fmt_xlsx": "Excel (XLSX)",
   "gui_rs_active_days": "Active Days",
   "gui_rs_clear": "Clear",
   "rpt_tr_hub_apps": "Rpt Tr Hub Apps",
@@ -1119,6 +1121,8 @@
   "rpt_tr_top_users": "Rpt Tr Top Users",
   "rpt_au_lifecycle_title": "Rpt Au Lifecycle Title",
   "rpt_col_uncovered_flows": "Rpt Col Uncovered Flows",
+  "rpt_col_connections": "Connections",
+  "rpt_col_port": "Port",
   "gui_delete_failed": "Delete failed: {error}",
   "gui_ws_col_ip": "IP Address",
   "rpt_tr_cross_value": "Rpt Tr Cross Value",
@@ -1476,5 +1480,12 @@
   "wgs_tls_renew_not_self": "Renew only applies to self-signed mode.",
   "wgs_tls_renewed": "Certificate renewed. Restart the Web GUI to apply.",
   "gui_last_activity": "Last activity",
-  "gui_no_log_activity": "(no log activity)"
+  "gui_no_log_activity": "(no log activity)",
+  "rpt_pd_chart_title": "Policy Decision Breakdown",
+  "rpt_ra_chart_title": "Top Remote Access Ports",
+  "rpt_clm_chart_title": "Cross-Label Traffic Matrix",
+  "rpt_at_chart_title": "Allowed Traffic Timeline",
+  "rpt_lm_chart_title": "Lateral Movement Graph",
+  "rpt_pdf_saved": "PDF report saved: {path}",
+  "rpt_xlsx_saved": "XLSX report saved: {path}"
 }

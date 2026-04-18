@@ -6,6 +6,7 @@ from collections import defaultdict, deque
 import pandas as pd
 
 from .attack_posture import build_app_display, make_posture_item, rank_posture_items
+from src.i18n import t, get_language
 
 
 _LATERAL_PORTS = {
@@ -401,6 +402,36 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4)
                 )
             )
 
+    # Phase 5: network chart_spec from top reachable nodes + edges
+    _chart_nodes = []
+    _chart_edges = []
+    if nodes:
+        # Use top 10 reachable nodes as network graph vertices
+        top_node_keys = (
+            pd.DataFrame(reach_rows)
+            .sort_values("Reachable App Count", ascending=False)
+            .head(10)["app_env_key"]
+            .tolist()
+            if reach_rows else nodes[:10]
+        )
+        for nk in top_node_keys:
+            app, env = str(nk).split("|", 1)
+            _chart_nodes.append({"id": nk, "label": build_app_display(app, env)})
+        top_node_set = set(top_node_keys)
+        for (src, dst) in list(edge_weights.keys())[:30]:
+            if src in top_node_set and dst in top_node_set:
+                _chart_edges.append((src, dst))
+
+    _network_chart_spec = {
+        "type": "network",
+        "title": t("rpt_lm_chart_title", default="Lateral Movement Graph"),
+        "data": {
+            "nodes": _chart_nodes,
+            "edges": _chart_edges,
+        },
+        "i18n": {"lang": get_language()},
+    }
+
     return {
         "total_lateral_flows": int(len(lateral)),
         "unique_lateral_src": int(lateral["src_ip"].nunique()) if "src_ip" in lateral.columns else 0,
@@ -418,5 +449,6 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4)
         "source_risk_scores": source_risk_scores,
         "allowed_lateral_flows": allowed_lateral_flows,
         "attack_posture_items": rank_posture_items(attack_items)[: max(top_n, 10)],
+        "chart_spec": _network_chart_spec,
     }
 

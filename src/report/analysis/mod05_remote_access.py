@@ -1,6 +1,7 @@
 """Module 5: Remote Access Protocol Analysis (Lateral Movement)."""
 from __future__ import annotations
 import pandas as pd
+from src.i18n import t, get_language
 
 
 def host_to_host_protocol_analysis(df: pd.DataFrame, report_config: dict, top_n: int = 20) -> dict:
@@ -47,6 +48,10 @@ def host_to_host_protocol_analysis(df: pd.DataFrame, report_config: dict, top_n:
                  .rename(columns={'pair': 'Host Pair', 'service': 'Service',
                                   'num_connections': 'Connections'}))
 
+    # Top 5 services for chart_spec
+    top5_labels = list(by_svc['Service'].head(5)) if not by_svc.empty else []
+    top5_values = list(by_svc['Connections'].head(5)) if not by_svc.empty else []
+
     return {
         'total_lateral_flows': int(lateral['num_connections'].sum()),
         'unique_lateral_src': lateral['src_ip'].nunique(),
@@ -54,4 +59,16 @@ def host_to_host_protocol_analysis(df: pd.DataFrame, report_config: dict, top_n:
         'by_service': by_svc,
         'top_talkers': top_talkers,
         'top_pairs': top_pairs,
+        # Phase 5: chart_spec
+        'chart_spec': {
+            'type': 'bar',
+            'title': t('rpt_ra_chart_title', default='Top Remote Access Ports'),
+            'x_label': 'Service',
+            'y_label': t('rpt_col_connections', default='Connections'),
+            'data': {
+                'labels': top5_labels,
+                'values': top5_values,
+            },
+            'i18n': {'lang': get_language()},
+        },
     }

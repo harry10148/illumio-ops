@@ -9,7 +9,7 @@ def report_group() -> None:
 @report_group.command("traffic")
 @click.option("--source", type=click.Choice(["api", "csv"]), default="api")
 @click.option("--file", "file_path", type=click.Path(exists=True), default=None)
-@click.option("--format", "fmt", type=click.Choice(["html", "csv", "all"]), default="html")
+@click.option("--format", "fmt", type=click.Choice(["html", "csv", "pdf", "xlsx", "all"]), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
 @click.option("--email", is_flag=True)
 def report_traffic(source: str, file_path, fmt: str, output_dir, email: bool) -> None:

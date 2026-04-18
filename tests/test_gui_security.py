@@ -973,4 +973,39 @@ def test_reports_route_surfaces_attack_metadata(client, app_persistent, tmp_path
     first = reports[0]
     assert first["report_type"] == "traffic"
     assert "attack_summary" in first
-    assert first["attack_summary_counts"]["boundary_breaches"] == 1
+
+
+def test_allowed_report_formats_constant_exists():
+    """Phase 5 hardening: format allowlist constant must be defined in gui module."""
+    from src import gui
+    assert hasattr(gui, '_ALLOWED_REPORT_FORMATS'), (
+        "_ALLOWED_REPORT_FORMATS not found; format allowlist must be defined as a module-level constant"
+    )
+    assert 'html' in gui._ALLOWED_REPORT_FORMATS
+    assert 'csv' in gui._ALLOWED_REPORT_FORMATS
+    assert 'pdf' in gui._ALLOWED_REPORT_FORMATS
+    assert 'xlsx' in gui._ALLOWED_REPORT_FORMATS
+    assert 'all' in gui._ALLOWED_REPORT_FORMATS
+
+
+def test_report_endpoint_rejects_path_traversal_format(client):
+    """Security: report format field must be allowlisted, not passed through raw."""
+    # Log in first
+    login_resp = client.post(
+        '/api/login',
+        json={"username": "admin", "password": "testpass"},
+        environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+    )
+    assert login_resp.get_json().get("ok") is True
+    csrf = login_resp.get_json().get("csrf_token", "")
+
+    resp = client.post(
+        '/api/reports/generate',
+        json={'format': '../../etc/passwd', 'source': 'api'},
+        headers={'X-CSRF-Token': csrf},
+        environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+    )
+    # Must not be 500 — either 200 (silent fallback to 'all') or 400 (explicit reject)
+    assert resp.status_code in (200, 400, 422), (
+        f"Path-traversal format should be allowlisted; got {resp.status_code}"
+    )

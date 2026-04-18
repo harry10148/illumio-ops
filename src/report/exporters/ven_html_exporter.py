@@ -13,10 +13,12 @@ from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
+from .code_highlighter import get_highlight_css
 
 logger = logging.getLogger(__name__)
 
 _CSS = build_css("ven")
+_HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
 
 
 def _policy_sync_badge(val: str) -> str:
@@ -136,7 +138,7 @@ class VenHtmlExporter:
             '<!DOCTYPE html><html lang="en"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
             "<title>Illumio VEN Status Report</title>"
-            + _CSS
+            + _CSS + _HIGHLIGHT_CSS
             + "</head>\n<body>"
             + lang_btn_html()
             + nav_html

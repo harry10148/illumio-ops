@@ -1,6 +1,7 @@
 """Module 7: Cross-Label Flow Matrix."""
 from __future__ import annotations
 import pandas as pd
+from src.i18n import t, get_language
 
 LABEL_KEYS = ('env', 'app', 'role', 'loc')
 
@@ -57,4 +58,28 @@ def cross_label_flow_matrix(df: pd.DataFrame, top_n: int = 20) -> dict:
             'top_cross_pairs': top_cross,
         }
 
-    return {'matrices': matrices}
+    # Phase 5: chart_spec — use first available matrix (env preferred) as heatmap
+    chart_spec = None
+    for key in LABEL_KEYS:
+        mat_data = matrices.get(key, {})
+        if 'matrix' in mat_data:
+            mat_df = mat_data['matrix']
+            # matrix is reset_index'd DataFrame with src label as first column
+            if hasattr(mat_df, 'columns') and len(mat_df.columns) > 1:
+                row_labels = list(mat_df.iloc[:, 0].astype(str))
+                col_labels = list(mat_df.columns[1:].astype(str))
+                matrix_values = mat_df.iloc[:, 1:].values.tolist()
+                chart_spec = {
+                    'type': 'heatmap',
+                    'title': t('rpt_clm_chart_title', default='Cross-Label Traffic Matrix')
+                             + f' ({key})',
+                    'data': {
+                        'labels': col_labels,
+                        'ylabels': row_labels,
+                        'matrix': matrix_values,
+                    },
+                    'i18n': {'lang': get_language()},
+                }
+                break
+
+    return {'matrices': matrices, 'chart_spec': chart_spec}
