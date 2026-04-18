@@ -172,57 +172,38 @@ class ApiClient:
 
     def _request(self, url, method="GET", data=None, headers=None, timeout=15, stream=False):
         """
-        Core HTTP helper with retry logic.
-        Returns (status_code, response_body_bytes | None).
-        For stream=True, returns (status_code, raw_response_object) — caller must close it.
+        Core HTTP helper using requests.Session + urllib3 Retry.
+        Returns (status_code, response_body_bytes | response_object).
+        For stream=True, returns (status_code, raw requests.Response) — caller must close it.
         """
-        if headers is None:
-            headers = {}
-        headers.setdefault("Authorization", self._auth_header)
-        headers.setdefault("Accept", "application/json")
-
+        req_headers = {}
+        if headers:
+            req_headers.update(headers)
+        # Content-Type for JSON body only (bytes body is passed through)
         body = None
         if data is not None:
             body = json.dumps(data).encode('utf-8')
-            headers.setdefault("Content-Type", "application/json")
+            req_headers.setdefault("Content-Type", "application/json")
 
-        last_exc = None
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                req = urllib.request.Request(url, data=body, headers=headers, method=method)
-                resp = urllib.request.urlopen(req, timeout=timeout, context=self._ssl_ctx)
-                if stream:
-                    return resp.status, resp
-                resp_body = resp.read()
-                return resp.status, resp_body
-            except urllib.error.HTTPError as e:
-                status = e.code
-                resp_body = e.read()
-                if status == 429 and attempt < MAX_RETRIES:
-                    wait = RETRY_BACKOFF_BASE ** attempt
-                    logger.warning(f"Rate limited (429). Retrying in {wait}s... (attempt {attempt}/{MAX_RETRIES})")
-                    time.sleep(wait)
-                    last_exc = e
-                    continue
-                if status in (502, 503, 504) and attempt < MAX_RETRIES:
-                    wait = RETRY_BACKOFF_BASE ** attempt
-                    logger.warning(f"Server error ({status}). Retrying in {wait}s... (attempt {attempt}/{MAX_RETRIES})")
-                    time.sleep(wait)
-                    last_exc = e
-                    continue
-                return status, resp_body
-            except (urllib.error.URLError, OSError, TimeoutError) as e:
-                if attempt < MAX_RETRIES:
-                    wait = RETRY_BACKOFF_BASE ** attempt
-                    logger.warning(f"Connection error: {e}. Retrying in {wait}s... (attempt {attempt}/{MAX_RETRIES})")
-                    time.sleep(wait)
-                    last_exc = e
-                    continue
-                logger.error(f"Connection failed after {MAX_RETRIES} attempts: {e}")
-                return 0, str(e).encode('utf-8')
+        try:
+            resp = self._session.request(
+                method=method,
+                url=url,
+                data=body,
+                headers=req_headers,
+                timeout=timeout,
+                stream=stream,
+            )
+        except Exception as e:
+            # urllib3/requests has already retried up to MAX_RETRIES;
+            # any exception here is terminal. Match legacy shape: (0, error_bytes).
+            logger.error(f"Connection failed: {e}")
+            return 0, str(e).encode('utf-8')
 
-        # Should not reach here, but safety fallback
-        return 0, str(last_exc).encode('utf-8') if last_exc else b""
+        if stream:
+            return resp.status_code, resp
+        # .content buffers entire body; matches old resp.read() semantics.
+        return resp.status_code, resp.content
 
     def check_health(self):
         url = f"{self.api_cfg['url']}/api/v2/health"
