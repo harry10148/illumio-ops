@@ -1877,6 +1877,8 @@ _ZH_EXPLICIT.update({
     "rpt_clm_chart_title": "Cross-Label 傳輸矩陣",
     "rpt_at_chart_title": "Allowed 傳輸時間軸",
     "rpt_lm_chart_title": "橫向移動圖",
+    "rpt_pdf_saved": "PDF 報表已儲存：{path}",
+    "rpt_xlsx_saved": "XLSX 報表已儲存：{path}",
 })
 
 

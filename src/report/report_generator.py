@@ -247,6 +247,49 @@ class ReportGenerator:
             self._write_report_metadata(path, self._build_report_metadata(result, file_format="html"))
             print(t("rpt_html_saved", path=path))
 
+        if fmt in ('pdf', 'all'):
+            try:
+                from src.report.exporters.pdf_exporter import export_pdf
+                html_content = HtmlExporter(result.module_results)._build()
+                import datetime as _dt
+                ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
+                pdf_path = os.path.join(output_dir, f'Illumio_Traffic_Report_{ts_str}.pdf')
+                export_pdf(html_content, pdf_path)
+                paths.append(pdf_path)
+                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
+            except Exception as exc:
+                logger.warning('PDF export failed (may need GTK3 on Linux): %s', exc)
+
+        if fmt in ('xlsx', 'all'):
+            try:
+                from src.report.exporters.xlsx_exporter import export_xlsx
+                import datetime as _dt
+                ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
+                xlsx_path = os.path.join(output_dir, f'Illumio_Traffic_Report_{ts_str}.xlsx')
+                meta = self._build_report_metadata(result, file_format="xlsx")
+                xlsx_result = {
+                    'record_count': result.record_count,
+                    'metadata': {
+                        'title': 'Traffic Flow Report',
+                        'generated_at': meta.get('generated_at', ''),
+                        'start_date': result.date_range[0] if result.date_range else '',
+                        'end_date': result.date_range[1] if len(result.date_range) > 1 else '',
+                    },
+                    'module_results': {},
+                }
+                for mod_key, mod_data in (result.module_results or {}).items():
+                    if not isinstance(mod_data, dict):
+                        continue
+                    sheet_data = {'summary': '', 'table': []}
+                    if 'chart_spec' in mod_data:
+                        sheet_data['chart_spec'] = mod_data['chart_spec']
+                    xlsx_result['module_results'][mod_key] = sheet_data
+                export_xlsx(xlsx_result, xlsx_path)
+                paths.append(xlsx_path)
+                print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}"))
+            except Exception as exc:
+                logger.warning('XLSX export failed: %s', exc)
+
         if fmt in ('csv', 'all', 'all_raw'):
             export_data = dict(result.module_results)
             if result.dataframe is not None and not result.dataframe.empty:

@@ -875,7 +875,8 @@ async function _doGenerateTraffic() {
       _updateGenStep(_translations['gui_gen_step_parsing'] || 'Parsing CSV file…');
       const formData = new FormData();
       formData.append('source', 'csv');
-      formData.append('format', 'all');
+      const fmtEl = document.getElementById('m-gen-format');
+      formData.append('format', fmtEl ? fmtEl.value : 'all');
       formData.append('file', fileInput.files[0]);
 
       _updateGenStep(_translations['gui_gen_step_analysing'] || 'Running analysis modules…');
@@ -911,8 +912,9 @@ async function _doGenerateTraffic() {
       const _stepTimer = setTimeout(() => _updateGenStep(_translations['gui_gen_step_analysing'] || 'Running analysis modules…'), 5000);
 
       const reportFilters = _collectReportFilters();
+      const fmtEl2 = document.getElementById('m-gen-format');
       const r = await post('/api/reports/generate', {
-        source: 'api', format: 'all',
+        source: 'api', format: fmtEl2 ? fmtEl2.value : 'all',
         start_date: startDate, end_date: endDate,
         ...(reportFilters ? { filters: reportFilters } : {}),
       });

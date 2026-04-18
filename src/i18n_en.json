@@ -1481,5 +1481,7 @@
   "rpt_ra_chart_title": "Top Remote Access Ports",
   "rpt_clm_chart_title": "Cross-Label Traffic Matrix",
   "rpt_at_chart_title": "Allowed Traffic Timeline",
-  "rpt_lm_chart_title": "Lateral Movement Graph"
+  "rpt_lm_chart_title": "Lateral Movement Graph",
+  "rpt_pdf_saved": "PDF report saved: {path}",
+  "rpt_xlsx_saved": "XLSX report saved: {path}"
 }
