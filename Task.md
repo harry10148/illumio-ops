@@ -5,36 +5,28 @@
 
 ---
 
-## Phase 6: APScheduler 統一 ✅ DONE (2026-04-18, v3.5.2-scheduler merged)
+## Phase 6: APScheduler 統一 ✅ DONE (v3.5.2-scheduler merged)
 
-- [x] **P6**: Replace self-rolled daemon loop with APScheduler BackgroundScheduler
-  - `src/scheduler/__init__.py`: `build_scheduler(cm, interval_minutes)` factory
-    - ThreadPoolExecutor(max_workers=5), coalesce=True, max_instances=1, misfire_grace_time=60s
-  - `src/scheduler/jobs.py`: 3 job callables (monitor, tick_report, tick_rule)
-  - `src/main.py` `run_daemon_loop()`: scheduler.start inside try, SIGINT+SIGTERM handlers, shutdown guarded
-  - `src/api_client.py`: `_cache_lock = threading.RLock()` wraps all 5 TTLCache mutations
-  - JSON schedule file formats unchanged; business logic (ReportScheduler.tick / ScheduleEngine.check) intact
-  - **Status.md A3 + T1 resolved** (daemon blocking + Phase 2 TTLCache thread-safety)
-  - Test count: +21 (213 total), 0 regressions, i18n audit 0 findings
+BackgroundScheduler + 3 jobs. RLock on all 5 ApiClient TTLCaches. SIGINT+SIGTERM handlers. Resolves A3 + T1.
 
 ---
 
-## Phase 4: Web GUI Security ✅ DONE (2026-04-18)
+## Phase 4: Web GUI Security ✅ DONE (v3.5.0-websec merged)
 
-- [x] **P4**: flask-wtf + flask-limiter + flask-talisman + flask-login + argon2-cffi
-  - `build_app(cm)` factory 拆分，利測試；`launch_gui` 改薄包裝
-  - `src/auth_models.py`: `AdminUser` (flask-login UserMixin) + `LoginForm` (pydantic)
-  - CSRF：自製 synchronizer → flask-wtf CSRFProtect；`X-CSRF-Token` header 相容
-  - Rate limit：`_check_rate_limit` 自製 → flask-limiter `@limiter.limit("5 per minute")` + JSON 429
-  - Session auth：自製 `session['logged_in']` → flask-login `current_user.is_authenticated`
-  - Security headers：flask-talisman（CSP/HSTS/X-Frame-Options/nosniff/Permissions-Policy）
-  - Password hash：PBKDF2 → argon2id，silent upgrade 舊 hash on next login
-  - `verify_and_upgrade_password(hash, salt, pw) → (ok, new_hash_or_None)`
-  - Test count: 192 baseline → 210 (+18 new, 0 regressions)
-  - Resolves: Status.md S1 (argon2), S4 (flask-wtf), S5 (flask-limiter), T1 (_LOGIN_ATTEMPTS removed)
-  - i18n audit: 0 findings
-  - Branch: `upgrade/phase-4-web-security` → tag `v3.5.0-websec`
+flask-wtf CSRF + flask-limiter rate limit + flask-talisman headers + flask-login + argon2id. Resolves S1/S4/S5/T1.
 
+---
+
+## Phase 5: Reports Excel/PDF/Charts ✅ DONE (v3.5.1-reports about to merge)
+
+- [x] `chart_renderer.py` — plotly HTML (offline) + matplotlib PNG from same spec
+- [x] `code_highlighter.py` — pygments JSON/YAML/bash
+- [x] `xlsx_exporter.py` — openpyxl multi-sheet + embedded chart PNG
+- [x] `pdf_exporter.py` — weasyprint HTML→PDF + CJK CSS (skips Windows)
+- [x] chart_spec in mod02/05/07/10/15; pygments CSS in 4 HTML exporters
+- [x] CLI + GUI format: html/csv/pdf/xlsx/all; `/api/reports/generate` allowlist
+- [x] humanize in HTML summaries; scheduler format select expanded
+- [x] +21 new tests (3 skipped for PDF on Windows); i18n 0 findings
 ---
 
 ## Phase 3: 設定驗證 ✅ DONE (2026-04-18)

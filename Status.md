@@ -1,49 +1,37 @@
 # Project Status — illumio_ops
 
 **As of:** 2026-04-18  
-**Version:** v3.5.0-websec + v3.5.2-scheduler (merging in sequence)  
-**Branch:** upgrade/phase-4-web-security (about to merge)  
-**Phase:** 4 & 6 of 9 complete (Phase 5 next)  
+**Version:** Wave A + Wave B complete (v3.5.0-websec + v3.5.1-reports + v3.5.2-scheduler)  
+**Branch:** main  
+**Phase:** 4/5/6 of 9 complete (Phase 7 Logging + Phase 9 Refactor remain)  
 **Code Review Date:** 2026-04-13  
 **i18n Overhaul:** 2026-04-18 — see Task.md i18n-P1..P7 (all done)
 
 ---
 
-## Phase 6 Complete (2026-04-18)
+## Phase 6 Complete (v3.5.2-scheduler, merged)
 
-Phase 6 — APScheduler daemon unification — merged to main as `v3.5.2-scheduler`.
+APScheduler daemon unification. BackgroundScheduler + 3 jobs (monitor/report/rule). RLock on all 5 ApiClient TTLCaches. SIGINT+SIGTERM handlers for graceful shutdown. Resolves A3 + T1.
 
-| Task | Status |
-|---|---|
-| `src/scheduler/__init__.py` — `build_scheduler()` factory | ✅ |
-| `src/scheduler/jobs.py` — 3 job callables (monitor, report, rule) | ✅ |
-| `run_daemon_loop` migrated to BackgroundScheduler | ✅ |
-| ApiClient `_cache_lock` (RLock) wrapping all 5 TTLCache mutation sites | ✅ |
-| Signal handlers (SIGINT/SIGTERM) registered for graceful shutdown | ✅ |
-| Test count: +21 new tests (213 total), 0 regressions | ✅ |
-| A3 daemon blocking: resolved ✅ | ✅ |
-| Phase 2 TTLCache NOTE: resolved ✅ | ✅ |
-| Shutdown < 10s: verified ✅ | ✅ |
+## Phase 4 Complete (v3.5.0-websec, merged)
+
+Web GUI security: flask-wtf CSRF + flask-limiter rate limit + flask-talisman headers + flask-login + argon2id password. Permissions-Policy restored. 429 JSON errorhandler. Resolves S1/S4/S5/T1.
+
+## Phase 5 Complete (v3.5.1-reports, about to merge)
+
+Reports Excel/PDF/Charts:
+- `chart_renderer.py` dual-engine (plotly HTML offline + matplotlib PNG for PDF/Excel)
+- `xlsx_exporter.py` multi-sheet + embedded PNG
+- `pdf_exporter.py` weasyprint HTML→PDF + CJK CSS
+- `code_highlighter.py` pygments JSON/YAML/bash
+- 5 analysis modules produce chart_spec (mod02 pie / mod05 bar / mod07 heatmap / mod10 line / mod15 network)
+- CLI/GUI format options extended: html/csv/pdf/xlsx/all
+- humanize in HTML summaries
+- `/api/reports/generate` format allowlist (security hardening)
+- Test count: +21 (231 after Wave B integration), 0 regressions, i18n audit 0 findings
 
 ---
 
-## Phase 4 Complete (2026-04-18)
-
-Phase 4 — Web GUI security hardening — on branch `upgrade/phase-4-web-security`.
-
-| Task | Status |
-|---|---|
-| `build_app(cm)` factory extracted from `launch_gui` | ✅ |
-| flask-login: `AdminUser` + current_user-based session auth | ✅ |
-| flask-wtf: `CSRFProtect` replaces ~60 LOC self-rolled CSRF | ✅ |
-| flask-limiter: `5/minute` on `/api/login`, memory storage | ✅ |
-| flask-talisman: CSP + X-Frame-Options + Permissions-Policy + nosniff | ✅ |
-| argon2id: `hash_password_argon2` + `verify_and_upgrade_password` | ✅ |
-| Silent PBKDF2→argon2id upgrade on first successful login | ✅ |
-| `src/auth_models.py` — `AdminUser`, `LoginForm` | ✅ |
-| 429 JSON errorhandler (API contract consistency) | ✅ |
-| Test count: 192 baseline → 210 (+18 new, 0 regressions) | ✅ |
-| i18n audit: 0 findings | ✅ |
 
 ## Phase 3 Complete (2026-04-18)
 
