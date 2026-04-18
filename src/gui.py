@@ -15,7 +15,6 @@ import threading
 import logging
 import ipaddress
 from contextlib import redirect_stdout
-from collections import Counter
 import secrets
 import socket as _socket
 import struct
@@ -28,7 +27,7 @@ except ImportError:
     HAS_FLASK = False
     FLASK_IMPORT_ERROR = str(sys.exc_info()[1])
 
-from src.config import ConfigManager, hash_password, verify_password, verify_and_upgrade_password
+from src.config import ConfigManager, verify_password, verify_and_upgrade_password
 from src.i18n import t, get_messages
 from src import __version__
 from src.alerts import PLUGIN_METADATA, plugin_config_path, plugin_config_value
@@ -373,6 +372,15 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         strategy="fixed-window",
     )
 
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        # Keep the API contract consistent: JSON response
+        return jsonify({
+            "ok": False,
+            "error": "rate_limit_exceeded",
+            "description": str(e.description) if hasattr(e, 'description') else "too many requests",
+        }), 429
+
     # ── flask-talisman security headers ───────────────────────────────────────
     from flask_talisman import Talisman
 
@@ -396,11 +404,12 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         content_security_policy_nonce_in=[],   # inline not nonce-based (SPA compat)
         frame_options='DENY',
         referrer_policy='strict-origin-when-cross-origin',
+        permissions_policy={
+            "camera": "()",
+            "microphone": "()",
+            "geolocation": "()",
+        },
     )
-
-    @app.context_processor
-    def inject_csrf():
-        return dict(csrf_token=generate_csrf)
 
     # SPA endpoint to refresh tokens without full reload
     @app.route('/api/csrf-token')
@@ -441,7 +450,6 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         response.headers.setdefault('X-Frame-Options', 'DENY')
         response.headers.setdefault('X-Content-Type-Options', 'nosniff')
         response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
-        response.headers.setdefault('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
         _tls_cfg = cm.config.get("web_gui", {}).get("tls", {})
         if _tls_cfg.get("enabled"):
             response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')

@@ -43,3 +43,17 @@ def test_verify_and_upgrade_password_on_argon2_returns_none_upgrade():
     ok, new_hash = verify_and_upgrade_password(h, salt="", password="pw")
     assert ok is True
     assert new_hash is None    # no upgrade needed
+
+
+def test_sha256_legacy_hash_still_verifies():
+    """Pre-PBKDF2 SHA256 hashes (no prefix) must still verify."""
+    import hashlib
+    from src.config import verify_password
+    salt = "legacy_salt"
+    password = "legacy_pw"
+    legacy_hash = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
+    # No 'pbkdf2:' or 'argon2:' prefix — raw SHA256
+    assert not legacy_hash.startswith("pbkdf2:")
+    assert not legacy_hash.startswith("argon2:")
+    assert verify_password(legacy_hash, salt=salt, password=password)
+    assert not verify_password(legacy_hash, salt=salt, password="wrong")

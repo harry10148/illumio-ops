@@ -83,3 +83,15 @@ def test_ip_allowlist_blocks_non_matching_client(app_client):
     # Post-migration target: returns 403. Accept both.
     r = client.get("/")
     assert r.status_code in (200, 403), f"Blocked IP should be rejected; got {r.status_code}"
+
+
+def test_rate_limit_429_returns_json_not_html(app_client):
+    """Regression: 429 must return JSON error body so API clients can parse it."""
+    client, _cm = app_client
+    # Exhaust the limit
+    for _ in range(6):
+        r = client.post("/api/login", json={"username": "x", "password": "y"})
+    assert r.status_code == 429
+    body = r.get_json(silent=True)
+    assert body is not None, f"429 body must be JSON, got: {r.data[:200]!r}"
+    assert body.get("ok") is False

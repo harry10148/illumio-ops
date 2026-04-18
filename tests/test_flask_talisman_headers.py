@@ -44,3 +44,13 @@ def test_hsts_only_when_tls_enabled(client):
     # Either absent (TLS off) or present with max-age (TLS on) — both valid
     if hsts is not None:
         assert "max-age=" in hsts
+
+
+def test_permissions_policy_restricts_sensitive_apis(client):
+    """Regression: camera/microphone/geolocation must be restricted (not browsing-topics only)."""
+    r = client.get("/login")
+    pp = r.headers.get("Permissions-Policy", "")
+    # Must mention at least one of the intended restrictions
+    assert "camera" in pp, f"camera not restricted; got: {pp!r}"
+    assert "microphone" in pp, f"microphone not restricted; got: {pp!r}"
+    assert "geolocation" in pp, f"geolocation not restricted; got: {pp!r}"
