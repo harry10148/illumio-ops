@@ -10,6 +10,11 @@ import importlib
 import sys
 from typing import NamedTuple
 
+# Packages that load native libraries on import and may fail on Windows
+# dev machines without the runtime installed. On Linux (the production
+# target), RPM deps will be declared so these always succeed.
+WINDOWS_OPTIONAL_MODULES = {"weasyprint"}  # needs GTK3 runtime on Windows
+
 
 class Pkg(NamedTuple):
     """A package to verify: distribution name, import name, optional version attr path."""
@@ -83,15 +88,27 @@ def verify(pkgs: list[Pkg], category: str, fatal: bool) -> list[str]:
     """Try to import each package; print a status line; return failed dist names."""
     print(f"\n=== {category} ({len(pkgs)} packages) ===")
     failed: list[str] = []
+    is_windows = sys.platform.startswith("win")
     for pkg in pkgs:
+        # Suppress deprecation warnings raised by getattr(mod, '__version__')
+        # for packages (Flask/Click/argon2) that deprecate the attribute.
+        import warnings
         try:
-            mod = importlib.import_module(pkg.module)
-            version = _get_version(mod, pkg.version_attr)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", DeprecationWarning)
+                mod = importlib.import_module(pkg.module)
+                version = _get_version(mod, pkg.version_attr)
             print(f"  OK    {pkg.dist:<22} {version}")
-        except ImportError as exc:
-            mark = "FAIL" if fatal else "SKIP"
-            print(f"  {mark}  {pkg.dist:<22} -- {exc}")
-            if fatal:
+        except (ImportError, OSError) as exc:
+            # weasyprint on Windows needs GTK3 runtime (not part of pip wheel).
+            # Treat as non-fatal SKIP on Windows; still FAIL on Linux/macOS.
+            is_windows_optional = pkg.module in WINDOWS_OPTIONAL_MODULES and is_windows
+            mark = "SKIP" if (not fatal or is_windows_optional) else "FAIL"
+            hint = ""
+            if is_windows_optional:
+                hint = " (Windows: install GTK3 runtime; see docs)"
+            print(f"  {mark}  {pkg.dist:<22} -- {type(exc).__name__}: {exc}{hint}")
+            if fatal and not is_windows_optional:
                 failed.append(pkg.dist)
     return failed
 
