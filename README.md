@@ -55,6 +55,21 @@ python illumio_ops.py --monitor-gui --interval 5 --port 5001
 
 # Background Daemon Only:
 python illumio_ops.py --monitor --interval 5
+
+# New subcommand style (Phase 1+):
+python illumio_ops.py monitor -i 5
+python illumio_ops.py status
+python illumio_ops.py version
+```
+
+### Shell Tab Completion (bash)
+
+```bash
+# Source once (dev)
+source scripts/illumio-ops-completion.bash
+
+# Install globally (RPM will do this automatically):
+sudo cp scripts/illumio-ops-completion.bash /etc/bash_completion.d/illumio-ops
 ```
 
 ### 3. First Login
