@@ -1,11 +1,11 @@
 import itertools
-import logging
 import os
 import re
 import sys
 import threading
 import unicodedata
-from logging.handlers import RotatingFileHandler
+
+from loguru import logger
 
 from rich.style import Style as _RichStyle
 from rich.color import ColorSystem as _ColorSystem
@@ -275,22 +275,13 @@ def safe_input(
 def setup_logger(
     name: str,
     log_file: str,
-    level=logging.INFO,
-    max_bytes: int = 10 * 1024 * 1024,
-    backup_count: int = 5,
-) -> logging.Logger:
-    log_dir = os.path.dirname(log_file)
-    if log_dir and not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    handler = RotatingFileHandler(log_file, maxBytes=max_bytes, backupCount=backup_count)
-    handler.setFormatter(formatter)
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    if not logger.handlers:
-        logger.addHandler(handler)
-    return logger
+    level: str = "INFO",
+    json_sink: bool = False,
+    **_kwargs,
+) -> None:
+    """Configure logging — delegates to loguru. Signature kept for back-compat."""
+    from src.loguru_config import setup_loguru
+    setup_loguru(log_file, level=level, json_sink=json_sink)
 
 
 def get_terminal_width(default: int = 80) -> int:
