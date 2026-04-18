@@ -3,7 +3,18 @@ from __future__ import annotations
 
 import pytest
 
-pytest.importorskip("weasyprint", reason="weasyprint needs GTK3 on Windows; Linux RPM target OK")
+# weasyprint raises OSError at import on Windows (no GTK3/GObject libs).
+# Catch that here so pytest can collect the file and then skip all tests.
+try:
+    import weasyprint as _wp  # noqa: F401
+    _WEASYPRINT_AVAILABLE = True
+except (ImportError, OSError):
+    _WEASYPRINT_AVAILABLE = False
+
+pytestmark = pytest.mark.skipif(
+    not _WEASYPRINT_AVAILABLE,
+    reason="weasyprint needs GTK3/GObject libs; available on Linux RPM target"
+)
 
 
 def test_export_pdf_produces_pdf_magic_bytes(tmp_path):
