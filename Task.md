@@ -1,7 +1,21 @@
 # Active Tasks — illumio_ops
 
-**As of:** 2026-04-18  
+**As of:** 2026-04-19  
 **Source:** Code Review (full project analysis) + Upgrade Roadmap
+
+---
+
+## Phase 7: Logging → loguru ✅ DONE (v3.6.0-loguru merged)
+
+- [x] `src/loguru_config.py` — `setup_loguru()`: rotating file + TTY console + optional JSON SIEM sink
+- [x] `src/utils.py::setup_logger()` — delegates to loguru; signature preserved for 2 callers
+- [x] `scripts/migrate_to_loguru.py` — codemod: 86 src/ files migrated (import + %s→{})
+- [x] stdlib 3rd-party logs intercepted via `_StdLibInterceptHandler`
+- [x] `src/config_models.py` — `LoggingSettings` (level/json_sink/rotation/retention)
+- [x] `src/main.py` — reads `config.logging` at startup
+- [x] `tests/conftest.py` — loguru↔caplog bridge (autouse fixture)
+- [x] 15 new tests (9 loguru setup + contract + migration script); 266 passed, 3 pre-existing failures
+- [x] `module_log.py` untouched (GUI ring-buffer, not logging infra)
 
 ---
 

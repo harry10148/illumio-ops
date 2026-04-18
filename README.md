@@ -93,6 +93,21 @@ Default credentials: **username `illumio`** / **password `illumio`**.
 | **IP Allowlisting** | Supports individual IPs, CIDR ranges, and subnet masks |
 | **SMTP Credentials** | Set `ILLUMIO_SMTP_PASSWORD` env var to avoid storing passwords in config |
 
+### 5. Logging (loguru)
+
+Logs are written to `logs/illumio_ops.log` with 10 MB rotation and 10-file retention.
+
+**SIEM / JSON sink** — enable structured JSON logging by adding to `config/config.json`:
+```json
+{
+  "logging": {
+    "json_sink": true,
+    "level": "INFO"
+  }
+}
+```
+This writes one JSON object per line to `logs/illumio_ops.json.log`, compatible with tools like Splunk, Elasticsearch, and Datadog.
+
 ---
 
 ## Report Engine

@@ -1,11 +1,17 @@
 # Project Status — illumio_ops
 
-**As of:** 2026-04-18  
-**Version:** Wave A + Wave B complete (v3.5.0-websec + v3.5.1-reports + v3.5.2-scheduler)  
+**As of:** 2026-04-19  
+**Version:** Wave A + Wave B + Phase 7 complete (v3.5.0-websec + v3.5.1-reports + v3.5.2-scheduler + v3.6.0-loguru)  
 **Branch:** main  
-**Phase:** 4/5/6 of 9 complete (Phase 7 Logging + Phase 9 Refactor remain)  
+**Phase:** 4/5/6/7 of 9 complete (Phase 9 Architecture Refactor remains)  
 **Code Review Date:** 2026-04-13  
 **i18n Overhaul:** 2026-04-18 — see Task.md i18n-P1..P7 (all done)
+
+---
+
+## Phase 7 Complete (v3.6.0-loguru, merged)
+
+loguru replaces stdlib logging across 86 src/ files. `src/loguru_config.py` centralises setup (rotating file + TTY-coloured console + optional JSON SIEM sink). `src/utils.py::setup_logger()` signature preserved. stdlib 3rd-party libs intercepted via `_StdLibInterceptHandler`. JSON sink toggled via `config.json logging.json_sink`. +15 new tests; pytest `caplog` bridge added to conftest.py.
 
 ---
 
@@ -228,7 +234,7 @@ deploy/                     systemd (Ubuntu/RHEL) + NSSM (Windows) service confi
 | flask-wtf, flask-limiter, flask-talisman, flask-login, argon2-cffi | Phase 4 (Web security) | ✓ **used** |
 | openpyxl, weasyprint, matplotlib, plotly, pygments | Phase 5 (Reports) | ✓ |
 | APScheduler | Phase 6 (Scheduler) | ✓ **used** |
-| loguru | Phase 7 (Logging) | ✓ |
+| loguru | Phase 7 (Logging) | ✓ **used** |
 
 **Dev-only** (`requirements-dev.txt`, NOT bundled):
 pytest, pytest-cov, responses, freezegun, ruff, mypy, build, pyinstaller
