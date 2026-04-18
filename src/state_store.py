@@ -1,4 +1,5 @@
 import json
+import orjson
 import logging
 import os
 import tempfile
@@ -49,8 +50,8 @@ def load_state_file(state_file: str) -> dict:
     if not os.path.exists(state_file):
         return {}
     try:
-        with open(state_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        with open(state_file, "rb") as f:
+            data = orjson.loads(f.read())
         return data if isinstance(data, dict) else {}
     except Exception as exc:
         logger.warning("Failed to load state file %s: %s", state_file, exc)

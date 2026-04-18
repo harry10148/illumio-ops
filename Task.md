@@ -74,7 +74,21 @@
 
 ---
 
-## Phase 2: Architecture Improvements (Priority: MEDIUM)
+---
+
+## Phase 2: HTTP client 重構 ✅ DONE (2026-04-18)
+
+- [x] **P2**: requests + orjson + cachetools migration
+  - `_request()` 底層改 `requests.Session` + `urllib3.Retry`（429/502/503/504 自動退避）
+  - Hot path `json.loads` 改 `orjson.loads`（async traffic 大型回應提速 2-3×）
+  - label caches 全包 `TTLCache(ttl=900)` — **Status.md Q5 解決**
+  - 50+ ApiClient public method 簽章完全不變
+  - Test count: 130 → 145 (+15: contract/retry/ttl/orjson_compat tests)
+  - Branch: `upgrade/phase-2-http-requests` → squash merge + tag `v3.4.2-http`
+
+---
+
+## Phase 2b: Architecture Improvements (Priority: MEDIUM)
 
 - [x] **A4 (partial): Fix silent exception swallowing**
   - `src/api_client.py:2293` — async job poll parse failure now logs warning
@@ -141,10 +155,8 @@
   - `ConfigManager.load()` validates via pydantic; logs per-field errors on failure
   - `cm.models` exposes typed access; `cm.config` dict patterns unchanged
 
-- [ ] **D3: Add label cache TTL to api_client**
-  - File: `src/api_client.py:118-122`
-  - Labels cached without expiry; stale data risk in long-running daemon
-  - Add TTL (e.g., 15 minutes) or explicit invalidation
+- [x] **D3: Add label cache TTL to api_client** ✅ Done in Phase 2
+  - All 5 caches now use `TTLCache(ttl=900)` — Status.md Q5 resolved
 
 ---
 

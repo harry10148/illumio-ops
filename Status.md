@@ -1,9 +1,9 @@
 # Project Status — illumio_ops
 
 **As of:** 2026-04-18  
-**Version:** v3.4.1-cli + v3.4.3-settings (Wave A merged)  
-**Branch:** upgrade/phase-1-cli-rich (about to merge)  
-**Phase:** 3 of 9 (Phase 1 CLI + Phase 3 Settings merged; see [docs/superpowers/plans/2026-04-18-upgrade-roadmap.md](docs/superpowers/plans/2026-04-18-upgrade-roadmap.md))
+**Version:** v3.4.1-cli + v3.4.2-http + v3.4.3-settings (Wave A complete)  
+**Branch:** main  
+**Phase:** 3 of 9 — Wave A (CLI + HTTP + Settings) complete (see [docs/superpowers/plans/2026-04-18-upgrade-roadmap.md](docs/superpowers/plans/2026-04-18-upgrade-roadmap.md))
 **Code Review Date:** 2026-04-13  
 **i18n Overhaul:** 2026-04-18 — see Task.md i18n-P1..P7 (all done)
 
@@ -150,7 +150,7 @@ deploy/                     systemd (Ubuntu/RHEL) + NSSM (Windows) service confi
 | Q2 | **MEDIUM** | `api_client.py` is 2542 LOC with 50+ methods — god class | `api_client.py` |
 | Q3 | **LOW** | Duplicate `extract_id()` in analyzer and rule_scheduler | `analyzer.py`, `rule_scheduler.py` |
 | Q4 | **LOW** | Inconsistent naming (tz_str vs timezone_str vs _tz_str) | Across codebase |
-| Q5 | **LOW** | Label cache has no TTL — stale data in long-running daemon | `api_client.py:118-122` |
+| Q5 | ✅ **FIXED** | Label cache now uses TTLCache(ttl=900) — stale data resolved | `api_client.py` — Phase 2 |
 
 ### Test Coverage Assessment
 
@@ -199,7 +199,7 @@ deploy/                     systemd (Ubuntu/RHEL) + NSSM (Windows) service confi
 | pandas | existing (**mandatory** — 41 files, 338 DataFrame ops) | ✓ >=2.0,<3.0 |
 | pyyaml | existing (**mandatory** — report_config.yaml) | ✓ >=6.0,<7.0 |
 | rich, questionary, click, humanize | Phase 1 (CLI UX) | ✓ |
-| requests, orjson, cachetools | Phase 2 (HTTP + cache) | ✓ |
+| requests, orjson, cachetools | Phase 2 (HTTP + cache) | ✓ **used** |
 | pydantic, pydantic-settings | Phase 3 (Settings) | ✓ |
 | flask-wtf, flask-limiter, flask-talisman, flask-login, argon2-cffi | Phase 4 (Web security) | ✓ |
 | openpyxl, weasyprint, matplotlib, plotly, pygments | Phase 5 (Reports) | ✓ |

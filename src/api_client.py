@@ -1,18 +1,20 @@
 import json
+import orjson
 import os
 import re
 import time
 import gzip
-import ssl
 import base64
 import datetime
 import ipaddress
 import logging
-import urllib.request
-import urllib.error
 import urllib.parse
 from dataclasses import dataclass, field
 from io import BytesIO
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from cachetools import TTLCache
 from src.utils import Colors
 from src.i18n import t
 from src.state_store import load_state_file, update_state_file
@@ -21,9 +23,9 @@ logger = logging.getLogger(__name__)
 
 MAX_TRAFFIC_RESULTS = 200000
 MAX_RETRIES = 3
-RETRY_BACKOFF_BASE = 2  # seconds
 _ASYNC_JOB_STATE_KEY = "async_query_jobs"
 _QUERY_LOOKUP_CACHE_TTL_SECONDS = 300
+_LABEL_CACHE_TTL_SECONDS = 900  # 15 minutes — Phase 2 Q5 fix
 _ASYNC_JOB_CACHE_MAX_AGE_DAYS = 7
 _ASYNC_JOB_PRUNE_INTERVAL_SECONDS = 3600
 _TRAFFIC_FILTER_CAPABILITIES = {
@@ -113,14 +115,16 @@ class ApiClient:
         self.api_cfg = self.cm.config["api"]
         self.base_url = f"{self.api_cfg['url']}/api/v2/orgs/{self.api_cfg['org_id']}"
         self._auth_header = self._build_auth_header()
-        self._ssl_ctx = self._build_ssl_context()
-        # Caches for rule scheduler features (TTL controlled by _query_lookup_cache_ttl_seconds)
-        self.label_cache = {}
+        # Caches for rule scheduler features — TTLCache expires stale data after 15 min (Phase 2 Q5 fix)
+        # NOTE: TTLCache is not thread-safe. Acquire self._cache_lock (added in Phase 6
+        # when APScheduler introduces multi-threading) before any cache mutation.
+        # Use time.time (wall clock) so freezegun can control expiry in tests
+        self.label_cache = TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
         self.ruleset_cache = []
-        self.service_ports_cache = {}  # {service_href: [{"port":N,"proto":P}, ...]}
-        self._label_href_cache = {}    # {"key:value": href}
-        self._label_group_href_cache = {}  # {"name": href}
-        self._iplist_href_cache = {}   # {"name": href}
+        self.service_ports_cache = TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
+        self._label_href_cache = TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
+        self._label_group_href_cache = TTLCache(maxsize=1000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
+        self._iplist_href_cache = TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
         self.last_traffic_query_diagnostics = {}
         self.last_rule_usage_batch_stats = {}
         self._root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -131,72 +135,69 @@ class ApiClient:
         self._async_job_prune_interval_seconds = _ASYNC_JOB_PRUNE_INTERVAL_SECONDS
         self._last_async_job_prune_at = 0.0
 
+        # ── HTTP session with connection pool + automatic retry (Phase 2) ──
+        self._session = requests.Session()
+        # verify: bool OR path to CA bundle; matches old ssl_ctx behavior
+        _verify_cfg = self.api_cfg.get('verify_ssl', True)
+        # Preserve string values (CA bundle path) as-is; otherwise coerce to bool
+        self._session.verify = _verify_cfg if isinstance(_verify_cfg, str) else bool(_verify_cfg)
+        # Default headers on every request
+        self._session.headers.update({
+            "Authorization": self._auth_header,
+            "Accept": "application/json",
+        })
+        # Retry policy: 3 tries, exponential backoff, on 429/502/503/504
+        retry = Retry(
+            total=MAX_RETRIES,
+            backoff_factor=1.0,            # 0s, 1s, 2s (first retry always 0; urllib3: factor * 2^(n-1))
+            status_forcelist=[429, 502, 503, 504],
+            allowed_methods=frozenset(["GET", "POST", "PUT", "DELETE", "HEAD"]),
+            respect_retry_after_header=True,
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(pool_connections=10, pool_maxsize=20, max_retries=retry)
+        self._session.mount("http://", adapter)
+        self._session.mount("https://", adapter)
+
     def _build_auth_header(self):
         credentials = f"{self.api_cfg['key']}:{self.api_cfg['secret']}"
         encoded = base64.b64encode(credentials.encode('utf-8')).decode('ascii')
         return f"Basic {encoded}"
 
-    def _build_ssl_context(self):
-        ctx = ssl.create_default_context()
-        if not self.api_cfg.get('verify_ssl', True):
-            logger.debug("SSL verification disabled — API connections are not secure")
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-        return ctx
-
     def _request(self, url, method="GET", data=None, headers=None, timeout=15, stream=False):
         """
-        Core HTTP helper with retry logic.
-        Returns (status_code, response_body_bytes | None).
-        For stream=True, returns (status_code, raw_response_object) — caller must close it.
+        Core HTTP helper using requests.Session + urllib3 Retry.
+        Returns (status_code, response_body_bytes | response_object).
+        For stream=True, returns (status_code, raw requests.Response) — caller must close it.
         """
-        if headers is None:
-            headers = {}
-        headers.setdefault("Authorization", self._auth_header)
-        headers.setdefault("Accept", "application/json")
-
+        req_headers = {}
+        if headers:
+            req_headers.update(headers)
+        # Content-Type for JSON body only (bytes body is passed through)
         body = None
         if data is not None:
             body = json.dumps(data).encode('utf-8')
-            headers.setdefault("Content-Type", "application/json")
+            req_headers.setdefault("Content-Type", "application/json")
 
-        last_exc = None
-        for attempt in range(1, MAX_RETRIES + 1):
-            try:
-                req = urllib.request.Request(url, data=body, headers=headers, method=method)
-                resp = urllib.request.urlopen(req, timeout=timeout, context=self._ssl_ctx)
-                if stream:
-                    return resp.status, resp
-                resp_body = resp.read()
-                return resp.status, resp_body
-            except urllib.error.HTTPError as e:
-                status = e.code
-                resp_body = e.read()
-                if status == 429 and attempt < MAX_RETRIES:
-                    wait = RETRY_BACKOFF_BASE ** attempt
-                    logger.warning(f"Rate limited (429). Retrying in {wait}s... (attempt {attempt}/{MAX_RETRIES})")
-                    time.sleep(wait)
-                    last_exc = e
-                    continue
-                if status in (502, 503, 504) and attempt < MAX_RETRIES:
-                    wait = RETRY_BACKOFF_BASE ** attempt
-                    logger.warning(f"Server error ({status}). Retrying in {wait}s... (attempt {attempt}/{MAX_RETRIES})")
-                    time.sleep(wait)
-                    last_exc = e
-                    continue
-                return status, resp_body
-            except (urllib.error.URLError, OSError, TimeoutError) as e:
-                if attempt < MAX_RETRIES:
-                    wait = RETRY_BACKOFF_BASE ** attempt
-                    logger.warning(f"Connection error: {e}. Retrying in {wait}s... (attempt {attempt}/{MAX_RETRIES})")
-                    time.sleep(wait)
-                    last_exc = e
-                    continue
-                logger.error(f"Connection failed after {MAX_RETRIES} attempts: {e}")
-                return 0, str(e).encode('utf-8')
+        try:
+            resp = self._session.request(
+                method=method,
+                url=url,
+                data=body,
+                headers=req_headers,
+                timeout=timeout,
+                stream=stream,
+            )
+        except Exception as e:
+            # urllib3/requests has already retried up to MAX_RETRIES;
+            # any exception here is terminal. Match legacy shape: (0, error_bytes).
+            logger.error(f"Connection failed: {e}")
+            return 0, str(e).encode('utf-8')
 
-        # Should not reach here, but safety fallback
-        return 0, str(last_exc).encode('utf-8') if last_exc else b""
+        if stream:
+            return resp.status_code, resp
+        # .content buffers entire body; matches old resp.read() semantics.
+        return resp.status_code, resp.content
 
     def check_health(self):
         url = f"{self.api_cfg['url']}/api/v2/health"
@@ -226,7 +227,7 @@ class ApiClient:
             raise EventFetchError(status, err_msg[:1000])
 
         try:
-            data = json.loads(body)
+            data = orjson.loads(body)
         except Exception as exc:
             raise EventFetchError(status, f"Invalid events JSON: {exc}") from exc
 
@@ -279,11 +280,11 @@ class ApiClient:
 
     def invalidate_query_lookup_cache(self):
         """Clear cached label/service/IP-list/label-group lookups."""
-        self.label_cache = {}
-        self.service_ports_cache = {}
-        self._label_href_cache = {}
-        self._label_group_href_cache = {}
-        self._iplist_href_cache = {}
+        self.label_cache.clear()
+        self.service_ports_cache.clear()
+        self._label_href_cache.clear()
+        self._label_group_href_cache.clear()
+        self._iplist_href_cache.clear()
         self._query_lookup_cache_refreshed_at = 0.0
 
     def _query_lookup_cache_is_stale(self):
@@ -858,7 +859,7 @@ class ApiClient:
             print(t("api_error_status", status=status, text=text))
             return
 
-        result = json.loads(body)
+        result = orjson.loads(body)
         if result.get("status") in ("queued", "pending") and not result.get("href"):
             logger.error(f"Async query accepted but no href returned: {result}")
             return
@@ -872,7 +873,7 @@ class ApiClient:
             if poll_status != 200:
                 continue
 
-            state = json.loads(poll_body).get("status")
+            state = orjson.loads(poll_body).get("status")
             if state == "completed":
                 print(f" {t('done')}")
                 logger.info("Traffic query completed.")
@@ -902,7 +903,7 @@ class ApiClient:
                     if poll_status != 200:
                         time.sleep(2)
                         continue
-                    poll_result = json.loads(poll_body)
+                    poll_result = orjson.loads(poll_body)
                     state = poll_result.get("status")
                     rules_state = poll_result.get("rules")
                     logger.info(f"update_rules poll [{attempt}]: status={state}, rules={rules_state}")
@@ -937,7 +938,7 @@ class ApiClient:
                             continue
                         if line.endswith(b','):
                             line = line[:-1]
-                        data = json.loads(line)
+                        data = orjson.loads(line)
                         if isinstance(data, list):
                             for item in data:
                                 yield item
@@ -952,7 +953,7 @@ class ApiClient:
                 if not line.strip():
                     continue
                 try:
-                    data = json.loads(line)
+                    data = orjson.loads(line)
                     if isinstance(data, list):
                         for item in data:
                             yield item
@@ -1392,7 +1393,7 @@ class ApiClient:
             if status != 200:
                 logger.error(f"Get Labels Failed: {status}")
                 return []
-            return json.loads(body)
+            return orjson.loads(body)
         except Exception as e:
             logger.error(f"Fetch Labels Error: {e}")
             return []
@@ -1403,7 +1404,7 @@ class ApiClient:
             payload = {"key": key, "value": value}
             status, body = self._request(url, method="POST", data=payload, timeout=10)
             if status == 201:
-                return json.loads(body)
+                return orjson.loads(body)
             logger.error(f"Create Label Failed: {status} - {body.decode(errors='replace')}")
             return {}
         except Exception as e:
@@ -1434,7 +1435,7 @@ class ApiClient:
             url = f"{self.api_cfg['url']}/api/v2{href}"
             status, body = self._request(url, timeout=10)
             if status == 200:
-                return json.loads(body)
+                return orjson.loads(body)
             logger.error(f"Get Workload Failed: {status} for {href}")
             return {}
         except Exception as e:
@@ -1462,7 +1463,7 @@ class ApiClient:
             url = f"{self.base_url}/workloads?{params}"
             status, body = self._request(url, timeout=30)
             if status == 200:
-                return json.loads(body)
+                return orjson.loads(body)
             err_msg = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
             logger.error(f"Fetch Managed Workloads Failed: {status} - {err_msg}")
             return []
@@ -1477,7 +1478,7 @@ class ApiClient:
             url = f"{self.base_url}/workloads?{query_str}"
             status, body = self._request(url, timeout=15)
             if status == 200:
-                return json.loads(body)
+                return orjson.loads(body)
             logger.error(f"Search Workloads Failed: {status}")
             return []
         except Exception as e:
@@ -1494,7 +1495,7 @@ class ApiClient:
         try:
             status, body = self._request(url, timeout=timeout)
             if status == 200:
-                return status, json.loads(body)
+                return status, orjson.loads(body)
             if status == 204:
                 return status, {}
             return status, None
@@ -1518,7 +1519,7 @@ class ApiClient:
         try:
             status, body = self._request(url, method="POST", data=payload, timeout=timeout)
             if status in (200, 201):
-                return status, json.loads(body) if body else {}
+                return status, orjson.loads(body) if body else {}
             return status, None
         except Exception as e:
             logger.error(f"API POST {endpoint}: {e}")
@@ -1594,16 +1595,36 @@ class ApiClient:
                         self.service_ports_cache[i['href'].replace('/draft/', '/active/')] = port_defs
             self._query_lookup_cache_refreshed_at = time.time()
         except Exception as e:
-            (
-                self.label_cache,
-                self.service_ports_cache,
-                self._label_href_cache,
-                self._label_group_href_cache,
-                self._iplist_href_cache,
-                self._query_lookup_cache_refreshed_at,
-            ) = previous_state
+            # Restore previous state — update caches in-place to preserve TTLCache instances
+            prev_label, prev_svc, prev_href, prev_grp, prev_ip, prev_ts = previous_state
+            self.label_cache.clear()
+            self.label_cache.update(prev_label)
+            self.service_ports_cache.clear()
+            self.service_ports_cache.update(prev_svc)
+            self._label_href_cache.clear()
+            self._label_href_cache.update(prev_href)
+            self._label_group_href_cache.clear()
+            self._label_group_href_cache.update(prev_grp)
+            self._iplist_href_cache.clear()
+            self._iplist_href_cache.update(prev_ip)
+            self._query_lookup_cache_refreshed_at = prev_ts
             if not silent:
                 logger.warning(f"Label cache update error: {e}")
+
+    def invalidate_labels(self) -> None:
+        """Force the next label lookup to hit the PCE.
+
+        Clears 3 of the 5 TTLCaches: label_cache, _label_href_cache, _label_group_href_cache.
+        Deliberately DOES NOT clear service_ports_cache or _iplist_href_cache — those
+        are populated by update_label_cache() but their content is keyed by href/name
+        rather than label value, so they remain valid when only labels change.
+
+        For a full cache flush (all 5 caches), use invalidate_query_lookup_cache().
+        """
+        self.label_cache.clear()
+        self._label_href_cache.clear()
+        self._label_group_href_cache.clear()
+        logger.debug("Label caches cleared (invalidate_labels)")
 
     def resolve_actor_str(self, actors):
         """Resolve actor list to human-readable string using label_cache."""
@@ -1672,7 +1693,7 @@ class ApiClient:
             text = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
             logger.debug(f"submit_async_query failed: {status} {text[:200]}")
             return None
-        result = json.loads(body)
+        result = orjson.loads(body)
         job_href = result.get("href")
         self._save_async_job_state(
             job_href,
@@ -1695,7 +1716,7 @@ class ApiClient:
             poll_status, poll_body = self._request(poll_url, timeout=15)
             if poll_status != 200:
                 continue
-            poll_result = json.loads(poll_body)
+            poll_result = orjson.loads(poll_body)
             state = poll_result.get("status")
             self._save_async_job_state(
                 job_href,
@@ -1723,7 +1744,7 @@ class ApiClient:
                     if poll_status != 200:
                         time.sleep(2)
                         continue
-                    poll_result = json.loads(poll_body)
+                    poll_result = orjson.loads(poll_body)
                     state = poll_result.get("status")
                     rules_state = poll_result.get("rules")
                     self._save_async_job_state(
@@ -1769,7 +1790,7 @@ class ApiClient:
                 elif isinstance(line, str) and line.endswith(','):
                     line = line[:-1]
                 try:
-                    data = json.loads(line)
+                    data = orjson.loads(line)
                     if isinstance(data, list):
                         for item in data:
                             yield item
@@ -2282,7 +2303,7 @@ class ApiClient:
             if status != 200:
                 return job_href, "pending"
             try:
-                poll_result = json.loads(body)
+                poll_result = orjson.loads(body)
                 state = poll_result.get("status", "pending")
                 self._save_async_job_state(
                     job_href,
