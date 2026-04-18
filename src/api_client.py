@@ -8,6 +8,7 @@ import base64
 import datetime
 import ipaddress
 import logging
+import threading
 import urllib.parse
 from dataclasses import dataclass, field
 from io import BytesIO
@@ -116,9 +117,10 @@ class ApiClient:
         self.base_url = f"{self.api_cfg['url']}/api/v2/orgs/{self.api_cfg['org_id']}"
         self._auth_header = self._build_auth_header()
         # Caches for rule scheduler features — TTLCache expires stale data after 15 min (Phase 2 Q5 fix)
-        # NOTE: TTLCache is not thread-safe. Acquire self._cache_lock (added in Phase 6
-        # when APScheduler introduces multi-threading) before any cache mutation.
+        # Phase 6: _cache_lock serialises all TTLCache mutations so that APScheduler's
+        # ThreadPoolExecutor workers cannot corrupt cache state concurrently.
         # Use time.time (wall clock) so freezegun can control expiry in tests
+        self._cache_lock = threading.RLock()  # RLock: re-entrant (update_label_cache calls invalidate_*)
         self.label_cache = TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
         self.ruleset_cache = []
         self.service_ports_cache = TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
@@ -280,12 +282,13 @@ class ApiClient:
 
     def invalidate_query_lookup_cache(self):
         """Clear cached label/service/IP-list/label-group lookups."""
-        self.label_cache.clear()
-        self.service_ports_cache.clear()
-        self._label_href_cache.clear()
-        self._label_group_href_cache.clear()
-        self._iplist_href_cache.clear()
-        self._query_lookup_cache_refreshed_at = 0.0
+        with self._cache_lock:
+            self.label_cache.clear()
+            self.service_ports_cache.clear()
+            self._label_href_cache.clear()
+            self._label_group_href_cache.clear()
+            self._iplist_href_cache.clear()
+            self._query_lookup_cache_refreshed_at = 0.0
 
     def _query_lookup_cache_is_stale(self):
         if not self._query_lookup_cache_refreshed_at:
@@ -1528,6 +1531,7 @@ class ApiClient:
     def update_label_cache(self, silent=False, force_refresh=True):
         """Cache labels, IP lists, and services for display resolution."""
         org = self.api_cfg['org_id']
+        # Snapshot current state without holding the lock (reads are safe here)
         previous_state = (
             dict(self.label_cache),
             dict(self.service_ports_cache),
@@ -1537,77 +1541,82 @@ class ApiClient:
             self._query_lookup_cache_refreshed_at,
         )
         try:
+            # I/O phase: fetch data from API without holding lock (network latency)
             if force_refresh:
-                self.invalidate_query_lookup_cache()
-            status, data = self._api_get(f"/orgs/{org}/labels?max_results=10000")
-            if status == 200 and data:
-                for i in data:
-                    label_str = f"{i.get('key')}:{i.get('value')}"
-                    self.label_cache[i['href']] = label_str
-                    self._label_href_cache[label_str] = i['href']
+                self.invalidate_query_lookup_cache()  # acquires _cache_lock internally (RLock)
+            s_labels, d_labels = self._api_get(f"/orgs/{org}/labels?max_results=10000")
+            s_groups, d_groups = self._api_get(f"/orgs/{org}/sec_policy/draft/label_groups?max_results=10000")
+            s_iplists, d_iplists = self._api_get(f"/orgs/{org}/sec_policy/draft/ip_lists?max_results=10000")
+            s_services, d_services = self._api_get(f"/orgs/{org}/sec_policy/draft/services?max_results=10000")
 
-            status, data = self._api_get(f"/orgs/{org}/sec_policy/draft/label_groups?max_results=10000")
-            if status == 200 and data:
-                for i in data:
-                    name = i.get('name')
-                    if not name:
-                        continue
-                    val = f"[LabelGroup] {name}"
-                    self.label_cache[i['href']] = val
-                    self.label_cache[i['href'].replace('/draft/', '/active/')] = val
-                    self._label_group_href_cache[name] = i['href']
+            # Write phase: acquire lock once to write all fetched data atomically
+            with self._cache_lock:
+                if s_labels == 200 and d_labels:
+                    for i in d_labels:
+                        label_str = f"{i.get('key')}:{i.get('value')}"
+                        self.label_cache[i['href']] = label_str
+                        self._label_href_cache[label_str] = i['href']
 
-            status, data = self._api_get(f"/orgs/{org}/sec_policy/draft/ip_lists?max_results=10000")
-            if status == 200 and data:
-                for i in data:
-                    val = f"[IPList] {i.get('name')}"
-                    self.label_cache[i['href']] = val
-                    self.label_cache[i['href'].replace('/draft/', '/active/')] = val
-                    if i.get('name'):
-                        self._iplist_href_cache[i['name']] = i['href']
+                if s_groups == 200 and d_groups:
+                    for i in d_groups:
+                        name = i.get('name')
+                        if not name:
+                            continue
+                        val = f"[LabelGroup] {name}"
+                        self.label_cache[i['href']] = val
+                        self.label_cache[i['href'].replace('/draft/', '/active/')] = val
+                        self._label_group_href_cache[name] = i['href']
 
-            status, data = self._api_get(f"/orgs/{org}/sec_policy/draft/services?max_results=10000")
-            if status == 200 and data:
-                for i in data:
-                    name = i.get('name')
-                    ports = []
-                    port_defs = []  # raw port/proto dicts for query building
-                    for svc in i.get('service_ports', []):
-                        p = svc.get('port')
-                        if p:
-                            proto = "UDP" if svc.get('proto') == 17 else "TCP"
-                            top = f"-{svc['to_port']}" if svc.get('to_port') else ""
-                            ports.append(f"{proto}/{p}{top}")
-                            # Build raw port definition for async queries
-                            pd = {"port": p}
-                            if svc.get('proto') is not None:
-                                pd["proto"] = svc['proto']
-                            if svc.get('to_port'):
-                                pd["to_port"] = svc['to_port']
-                            port_defs.append(pd)
-                    port_str = f" ({','.join(ports)})" if ports else ""
-                    val = f"{name}{port_str}"
-                    self.label_cache[i['href']] = val
-                    self.label_cache[i['href'].replace('/draft/', '/active/')] = val
-                    # Cache resolved port definitions for per-rule queries
-                    if port_defs:
-                        self.service_ports_cache[i['href']] = port_defs
-                        self.service_ports_cache[i['href'].replace('/draft/', '/active/')] = port_defs
-            self._query_lookup_cache_refreshed_at = time.time()
+                if s_iplists == 200 and d_iplists:
+                    for i in d_iplists:
+                        val = f"[IPList] {i.get('name')}"
+                        self.label_cache[i['href']] = val
+                        self.label_cache[i['href'].replace('/draft/', '/active/')] = val
+                        if i.get('name'):
+                            self._iplist_href_cache[i['name']] = i['href']
+
+                if s_services == 200 and d_services:
+                    for i in d_services:
+                        name = i.get('name')
+                        ports = []
+                        port_defs = []  # raw port/proto dicts for query building
+                        for svc in i.get('service_ports', []):
+                            p = svc.get('port')
+                            if p:
+                                proto = "UDP" if svc.get('proto') == 17 else "TCP"
+                                top = f"-{svc['to_port']}" if svc.get('to_port') else ""
+                                ports.append(f"{proto}/{p}{top}")
+                                # Build raw port definition for async queries
+                                pd = {"port": p}
+                                if svc.get('proto') is not None:
+                                    pd["proto"] = svc['proto']
+                                if svc.get('to_port'):
+                                    pd["to_port"] = svc['to_port']
+                                port_defs.append(pd)
+                        port_str = f" ({','.join(ports)})" if ports else ""
+                        val = f"{name}{port_str}"
+                        self.label_cache[i['href']] = val
+                        self.label_cache[i['href'].replace('/draft/', '/active/')] = val
+                        # Cache resolved port definitions for per-rule queries
+                        if port_defs:
+                            self.service_ports_cache[i['href']] = port_defs
+                            self.service_ports_cache[i['href'].replace('/draft/', '/active/')] = port_defs
+                self._query_lookup_cache_refreshed_at = time.time()
         except Exception as e:
             # Restore previous state — update caches in-place to preserve TTLCache instances
             prev_label, prev_svc, prev_href, prev_grp, prev_ip, prev_ts = previous_state
-            self.label_cache.clear()
-            self.label_cache.update(prev_label)
-            self.service_ports_cache.clear()
-            self.service_ports_cache.update(prev_svc)
-            self._label_href_cache.clear()
-            self._label_href_cache.update(prev_href)
-            self._label_group_href_cache.clear()
-            self._label_group_href_cache.update(prev_grp)
-            self._iplist_href_cache.clear()
-            self._iplist_href_cache.update(prev_ip)
-            self._query_lookup_cache_refreshed_at = prev_ts
+            with self._cache_lock:
+                self.label_cache.clear()
+                self.label_cache.update(prev_label)
+                self.service_ports_cache.clear()
+                self.service_ports_cache.update(prev_svc)
+                self._label_href_cache.clear()
+                self._label_href_cache.update(prev_href)
+                self._label_group_href_cache.clear()
+                self._label_group_href_cache.update(prev_grp)
+                self._iplist_href_cache.clear()
+                self._iplist_href_cache.update(prev_ip)
+                self._query_lookup_cache_refreshed_at = prev_ts
             if not silent:
                 logger.warning(f"Label cache update error: {e}")
 
@@ -1621,9 +1630,10 @@ class ApiClient:
 
         For a full cache flush (all 5 caches), use invalidate_query_lookup_cache().
         """
-        self.label_cache.clear()
-        self._label_href_cache.clear()
-        self._label_group_href_cache.clear()
+        with self._cache_lock:
+            self.label_cache.clear()
+            self._label_href_cache.clear()
+            self._label_group_href_cache.clear()
         logger.debug("Label caches cleared (invalidate_labels)")
 
     def resolve_actor_str(self, actors):
