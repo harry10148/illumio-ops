@@ -11,6 +11,10 @@ import logging
 import urllib.parse
 from dataclasses import dataclass, field
 from io import BytesIO
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from cachetools import TTLCache
 from src.utils import Colors
 from src.i18n import t
 from src.state_store import load_state_file, update_state_file
@@ -21,6 +25,7 @@ MAX_TRAFFIC_RESULTS = 200000
 MAX_RETRIES = 3
 _ASYNC_JOB_STATE_KEY = "async_query_jobs"
 _QUERY_LOOKUP_CACHE_TTL_SECONDS = 300
+_LABEL_CACHE_TTL_SECONDS = 900  # 15 minutes — Phase 2 Q5 fix
 _ASYNC_JOB_CACHE_MAX_AGE_DAYS = 7
 _ASYNC_JOB_PRUNE_INTERVAL_SECONDS = 3600
 _TRAFFIC_FILTER_CAPABILITIES = {
@@ -111,16 +116,15 @@ class ApiClient:
         self.base_url = f"{self.api_cfg['url']}/api/v2/orgs/{self.api_cfg['org_id']}"
         self._auth_header = self._build_auth_header()
         # Caches for rule scheduler features — TTLCache expires stale data after 15 min (Phase 2 Q5 fix)
-        import time as _time
-        from cachetools import TTLCache as _TTLCache
-        _LABEL_CACHE_TTL_SECONDS = 900  # 15 minutes — Phase 2 Q5 fix
+        # NOTE: TTLCache is not thread-safe. Acquire self._cache_lock (added in Phase 6
+        # when APScheduler introduces multi-threading) before any cache mutation.
         # Use time.time (wall clock) so freezegun can control expiry in tests
-        self.label_cache = _TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=_time.time)
+        self.label_cache = TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
         self.ruleset_cache = []
-        self.service_ports_cache = _TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=_time.time)
-        self._label_href_cache = _TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=_time.time)
-        self._label_group_href_cache = _TTLCache(maxsize=1000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=_time.time)
-        self._iplist_href_cache = _TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=_time.time)
+        self.service_ports_cache = TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
+        self._label_href_cache = TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
+        self._label_group_href_cache = TTLCache(maxsize=1000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
+        self._iplist_href_cache = TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
         self.last_traffic_query_diagnostics = {}
         self.last_rule_usage_batch_stats = {}
         self._root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -132,28 +136,26 @@ class ApiClient:
         self._last_async_job_prune_at = 0.0
 
         # ── HTTP session with connection pool + automatic retry (Phase 2) ──
-        import requests as _requests
-        from requests.adapters import HTTPAdapter as _HTTPAdapter
-        from urllib3.util.retry import Retry as _Retry
-
-        self._session = _requests.Session()
+        self._session = requests.Session()
         # verify: bool OR path to CA bundle; matches old ssl_ctx behavior
-        self._session.verify = bool(self.api_cfg.get('verify_ssl', True))
+        _verify_cfg = self.api_cfg.get('verify_ssl', True)
+        # Preserve string values (CA bundle path) as-is; otherwise coerce to bool
+        self._session.verify = _verify_cfg if isinstance(_verify_cfg, str) else bool(_verify_cfg)
         # Default headers on every request
         self._session.headers.update({
             "Authorization": self._auth_header,
             "Accept": "application/json",
         })
         # Retry policy: 3 tries, exponential backoff, on 429/502/503/504
-        retry = _Retry(
+        retry = Retry(
             total=MAX_RETRIES,
-            backoff_factor=1.0,            # 1s, 2s, 4s (roughly; urllib3 uses base * 2^(n-1))
+            backoff_factor=1.0,            # 0s, 1s, 2s (first retry always 0; urllib3: factor * 2^(n-1))
             status_forcelist=[429, 502, 503, 504],
             allowed_methods=frozenset(["GET", "POST", "PUT", "DELETE", "HEAD"]),
             respect_retry_after_header=True,
             raise_on_status=False,
         )
-        adapter = _HTTPAdapter(pool_connections=10, pool_maxsize=20, max_retries=retry)
+        adapter = HTTPAdapter(pool_connections=10, pool_maxsize=20, max_retries=retry)
         self._session.mount("http://", adapter)
         self._session.mount("https://", adapter)
 
@@ -1610,7 +1612,15 @@ class ApiClient:
                 logger.warning(f"Label cache update error: {e}")
 
     def invalidate_labels(self) -> None:
-        """Force the next label lookup to hit the PCE. Useful when settings change."""
+        """Force the next label lookup to hit the PCE.
+
+        Clears 3 of the 5 TTLCaches: label_cache, _label_href_cache, _label_group_href_cache.
+        Deliberately DOES NOT clear service_ports_cache or _iplist_href_cache — those
+        are populated by update_label_cache() but their content is keyed by href/name
+        rather than label value, so they remain valid when only labels change.
+
+        For a full cache flush (all 5 caches), use invalidate_query_lookup_cache().
+        """
         self.label_cache.clear()
         self._label_href_cache.clear()
         self._label_group_href_cache.clear()

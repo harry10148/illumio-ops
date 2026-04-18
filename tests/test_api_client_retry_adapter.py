@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 
 import pytest
 import responses
-from responses import matchers
 
 
 @pytest.fixture
