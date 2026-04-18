@@ -20,6 +20,7 @@ from src.events import (
 from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
 from src.state_store import load_state_file, update_state_file
+from src.interfaces import IApiClient, IReporter
 
 # Refine Root Dir for State File
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -79,7 +80,7 @@ def calculate_volume_mb(flow):
 # ─── Analyzer Class ───────────────────────────────────────────────────────────
 
 class Analyzer:
-    def __init__(self, config_manager, api_client, reporter):
+    def __init__(self, config_manager, api_client: IApiClient, reporter: IReporter):
         self.cm = config_manager
         self.api = api_client
         self.reporter = reporter
