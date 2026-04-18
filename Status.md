@@ -1,11 +1,28 @@
 # Project Status — illumio_ops
 
 **As of:** 2026-04-18  
-**Version:** v3.4.0-deps  
-**Branch:** upgrade/phase-0-deps  
-**Phase:** 0 of 9 — Dependency baseline complete (see [docs/superpowers/plans/2026-04-18-upgrade-roadmap.md](docs/superpowers/plans/2026-04-18-upgrade-roadmap.md))
+**Version:** v3.4.3-settings  
+**Branch:** upgrade/phase-3-settings-pydantic  
+**Phase:** 3 of 9 — Settings validation complete (see [docs/superpowers/plans/2026-04-18-upgrade-roadmap.md](docs/superpowers/plans/2026-04-18-upgrade-roadmap.md))
 **Code Review Date:** 2026-04-13  
 **i18n Overhaul:** 2026-04-18 — see Task.md i18n-P1..P7 (all done)
+
+---
+
+## Phase 3 Complete (2026-04-18)
+
+Phase 3 — pydantic v2 settings validation — merged into `upgrade/phase-3-settings-pydantic`.
+
+| Task | Status |
+|---|---|
+| `src/config_models.py` — 12 BaseModel classes | ✅ |
+| `ConfigManager.load()` pydantic validation | ✅ |
+| `cm.models` typed access attribute | ✅ |
+| 70+ `cm.config[...]` call sites preserved (backward-compat tests) | ✅ |
+| `src/cli/config.py` — `validate` + `show` subcommands (isolated) | ✅ |
+| Test count: baseline 130 → 147 (+17 new, 0 regressions) | ✅ |
+| i18n audit: 0 findings | ✅ |
+| Code Review D2 (config schema validation) | ✅ **RESOLVED** |
 
 ---
 

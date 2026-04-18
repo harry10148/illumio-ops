@@ -22,8 +22,7 @@
         "active": ["mail"],
         "line_channel_access_token": "",
         "line_target_id": "",
-        "webhook_url": "",
-        "line_token": ""
+        "webhook_url": ""
     },
     "email": {
         "sender": "pce-monitor@example.com",

@@ -9,6 +9,16 @@ from src.i18n import t, set_language
 
 logger = logging.getLogger(__name__)
 
+_SECRET_FIELD_TOKENS = {"key", "secret", "password", "secret_key", "token", "password_hash", "password_salt"}
+
+
+def _format_error_input(loc: tuple, raw_input):
+    """Redact secret-looking fields from validation error log output."""
+    for part in loc:
+        if any(tok in str(part).lower() for tok in _SECRET_FIELD_TOKENS):
+            return "[REDACTED]"
+    return repr(raw_input)
+
 # Determine Root Directory (parent of the package)
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
@@ -113,18 +123,44 @@ class ConfigManager:
         self.load()
 
     def load(self):
+        """Load and validate config.json via pydantic ConfigSchema."""
+        from pydantic import ValidationError
+        from src.config_models import ConfigSchema
+
+        raw_data = {}
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    self.config = _deep_merge(self.config, data)
+                    raw_data = json.load(f)
             except (json.JSONDecodeError, IOError, OSError) as e:
-                logger.error(f"Error loading config: {e}")
+                logger.error(f"Error reading config file: {e}")
                 print(f"{Colors.FAIL}{t('error_loading_config', error=e)}{Colors.ENDC}")
-            finally:
-                lang = self.config.get("settings", {}).get("language", "en")
-                set_language(lang)
-                self._ensure_web_gui_secret()
+                # Fall through with raw_data={} to use defaults
+
+        # Merge defaults with raw data (deep merge preserves legacy behavior)
+        merged = _deep_merge(json.loads(json.dumps(_DEFAULT_CONFIG)), raw_data)
+
+        try:
+            self.models = ConfigSchema.model_validate(merged)
+            self.config = self.models.model_dump(mode="json")
+        except ValidationError as e:
+            # Format pydantic errors into readable log lines
+            logger.error(f"Config validation failed: {e.error_count()} error(s):")
+            for err in e.errors():
+                loc_parts = err["loc"]
+                loc = ".".join(str(p) for p in loc_parts)
+                redacted = _format_error_input(loc_parts, err.get('input'))
+                logger.error(f"  {loc}: {err['msg']} (input: {redacted})")
+            print(f"{Colors.FAIL}{t('error_loading_config', error=str(e)[:200])}{Colors.ENDC}")
+            # Fall back to the merged data (preserves valid sections, logs errors).
+            # This keeps the app functional even with partially invalid config.
+            self.models = ConfigSchema()  # typed access uses defaults
+            self.config = merged          # dict access uses the raw merged data
+
+        # Preserve post-load side effects
+        lang = self.config.get("settings", {}).get("language", "en")
+        set_language(lang)
+        self._ensure_web_gui_secret()
 
     def _ensure_web_gui_secret(self):
         import secrets as _secrets

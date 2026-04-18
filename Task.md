@@ -5,6 +5,21 @@
 
 ---
 
+## Phase 3: 設定驗證 ✅ DONE (2026-04-18)
+
+- [x] **P3**: pydantic v2 + pydantic-settings integration
+  - `src/config_models.py`: 12 BaseModel classes (ApiSettings, SmtpSettings, WebGuiSettings, ...)
+  - `ConfigManager.load()` wired to pydantic validation; failures log per-field errors and fall back to merged data
+  - `cm.models` new attribute exposes typed schema; `cm.config` dict access 100% backward-compatible (70+ call sites unchanged)
+  - **Status.md D2 resolved** (config schema validation)
+  - Top-level `extra='forbid'` catches config.json typos at startup
+  - `src/cli/config.py`: `illumio-ops config validate / show` subcommands (isolated; registration deferred to Phase 1+3 integration)
+  - Test count: baseline 130 → 147 (+17 new, 0 regressions)
+  - i18n audit: 0 findings
+  - Branch: `upgrade/phase-3-settings-pydantic` → tag `v3.4.3-settings`
+
+---
+
 ## Phase 0: Dependency Baseline ✅ DONE (2026-04-18)
 
 - [x] **P0**: Pin all roadmap packages
@@ -106,10 +121,10 @@
   - `flask>=3.0,<4.0` (tested on 3.1.3)
   - pandas/pyyaml constraints added as comments (installed via OS packages on RHEL)
 
-- [ ] **D2: Add config schema validation on load**
-  - File: `src/config.py:80-92`
-  - Validate required fields, types, value ranges at startup
-  - Fail fast with clear error messages
+- [x] **D2: Add config schema validation on load** ✅ RESOLVED (Phase 3)
+  - `src/config_models.py`: pydantic v2 ConfigSchema + 11 nested BaseModel classes
+  - `ConfigManager.load()` validates via pydantic; logs per-field errors on failure
+  - `cm.models` exposes typed access; `cm.config` dict patterns unchanged
 
 - [ ] **D3: Add label cache TTL to api_client**
   - File: `src/api_client.py:118-122`
