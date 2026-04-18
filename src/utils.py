@@ -7,6 +7,9 @@ import threading
 import unicodedata
 from logging.handlers import RotatingFileHandler
 
+from rich.style import Style as _RichStyle
+from rich.color import ColorSystem as _ColorSystem
+
 from src.i18n import get_language, t
 
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
@@ -82,21 +85,37 @@ def _spinner_frames() -> list[str]:
     return ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] if _stream_supports_text("⠋") else ["|", "/", "-", "\\"]
 
 
+def _ansi(style: _RichStyle) -> str:
+    """Render a rich Style to its ANSI escape sequence (keeps back-compat).
+
+    Auto-disabled when stdout is not a TTY (daemon/service mode).
+    """
+    if not _stdout_is_tty():
+        return ""
+    codes = style._make_ansi_codes(_ColorSystem.TRUECOLOR)
+    return f"\033[{codes}m" if codes else ""
+
+
 class Colors:
-    """ANSI color codes. Auto-disabled when stdout is not a TTY (daemon/service mode)."""
+    """ANSI color codes — now backed by rich.Style for consistency.
 
-    _enabled = _stdout_is_tty()
+    All 446 existing call sites (f'{Colors.FAIL}...{Colors.ENDC}') keep working
+    because these remain plain strings containing ANSI escape sequences.
+    New code should prefer rich directly (from rich.console import Console).
+    Auto-disabled when stdout is not a TTY (daemon/service mode).
+    """
 
-    HEADER = "\033[38;2;255;85;0m" if _enabled else ""
-    BLUE = "\033[94m" if _enabled else ""
-    CYAN = "\033[38;2;148;206;229m" if _enabled else ""
-    GREEN = "\033[38;2;41;155;101m" if _enabled else ""
-    WARNING = "\033[38;2;255;162;47m" if _enabled else ""
-    FAIL = "\033[38;2;244;63;81m" if _enabled else ""
-    DARK_GRAY = "\033[90m" if _enabled else ""
-    ENDC = "\033[0m" if _enabled else ""
-    BOLD = "\033[1m" if _enabled else ""
-    UNDERLINE = "\033[4m" if _enabled else ""
+    HEADER = _ansi(_RichStyle(color="magenta"))
+    BLUE = _ansi(_RichStyle(color="blue"))
+    CYAN = _ansi(_RichStyle(color="cyan"))
+    GREEN = _ansi(_RichStyle(color="green"))
+    WARNING = _ansi(_RichStyle(color="yellow"))
+    FAIL = _ansi(_RichStyle(color="red"))
+    RED = _ansi(_RichStyle(color="red"))
+    DARK_GRAY = _ansi(_RichStyle(color="bright_black"))
+    ENDC = "\033[0m"
+    BOLD = _ansi(_RichStyle(bold=True))
+    UNDERLINE = _ansi(_RichStyle(underline=True))
 
 
 def safe_input(
