@@ -1476,5 +1476,10 @@
   "wgs_tls_renew_not_self": "Renew only applies to self-signed mode.",
   "wgs_tls_renewed": "Certificate renewed. Restart the Web GUI to apply.",
   "gui_last_activity": "Last activity",
-  "gui_no_log_activity": "(no log activity)"
+  "gui_no_log_activity": "(no log activity)",
+  "rpt_pd_chart_title": "Policy Decision Breakdown",
+  "rpt_ra_chart_title": "Top Remote Access Ports",
+  "rpt_clm_chart_title": "Cross-Label Traffic Matrix",
+  "rpt_at_chart_title": "Allowed Traffic Timeline",
+  "rpt_lm_chart_title": "Lateral Movement Graph"
 }

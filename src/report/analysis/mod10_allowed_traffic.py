@@ -1,6 +1,7 @@
 """Module 10: Allowed Traffic Analysis."""
 from __future__ import annotations
 import pandas as pd
+from src.i18n import t, get_language
 
 
 def allowed_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
@@ -57,10 +58,28 @@ def allowed_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
     if 'Proto' in top_ports.columns and top_ports['Proto'].astype(str).str.strip().eq('').all():
         top_ports = top_ports.drop(columns=['Proto'])
 
+    # Phase 5: chart_spec — line chart of top allowed ports by connection count
+    if not top_ports.empty:
+        port_labels = list(top_ports['Port'].head(10).astype(str))
+        port_values = list(top_ports['Connections'].head(10))
+    else:
+        port_labels, port_values = [], []
+
     return {
         'total_allowed': len(allowed),
         'top_app_flows': top_app_flows,
         'audit_flags': audit_table,
         'audit_flag_count': len(audit_flags),
         'top_allowed_ports': top_ports,
+        'chart_spec': {
+            'type': 'line',
+            'title': t('rpt_at_chart_title', default='Allowed Traffic Timeline'),
+            'x_label': t('rpt_col_port', default='Port'),
+            'y_label': t('rpt_col_connections', default='Connections'),
+            'data': {
+                'x': port_labels,
+                'y': port_values,
+            },
+            'i18n': {'lang': get_language()},
+        },
     }

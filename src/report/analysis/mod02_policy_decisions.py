@@ -1,6 +1,7 @@
 """Module 2: Policy Decision Breakdown."""
 from __future__ import annotations
 import pandas as pd
+from src.i18n import t, get_language
 
 
 def policy_decision_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
@@ -81,6 +82,26 @@ def policy_decision_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
         for d in ('allowed', 'blocked', 'potentially_blocked', 'unknown')
     ])
     results['summary'] = summary
+
+    # Phase 5: chart_spec for HTML (plotly) + PDF/Excel (matplotlib)
+    results['chart_spec'] = {
+        'type': 'pie',
+        'title': t('rpt_pd_chart_title', default='Policy Decision Breakdown'),
+        'data': {
+            'labels': [
+                t('rpt_pd_allowed', default='Allowed'),
+                t('rpt_pd_blocked', default='Blocked'),
+                t('rpt_pd_potential', default='Potentially Blocked'),
+            ],
+            'values': [
+                results.get('allowed', {}).get('count', 0),
+                results.get('blocked', {}).get('count', 0),
+                results.get('potentially_blocked', {}).get('count', 0),
+            ],
+        },
+        'i18n': {'lang': get_language()},
+    }
+
     return results
 
 

@@ -1872,6 +1872,11 @@ _PHRASE_OVERRIDES = {
 _ZH_EXPLICIT.update({
     "gui_last_activity": "最後活動時間",
     "gui_no_log_activity": "(無日誌活動)",
+    "rpt_pd_chart_title": "Policy 決策分布",
+    "rpt_ra_chart_title": "Remote Access Port Top-N",
+    "rpt_clm_chart_title": "Cross-Label 傳輸矩陣",
+    "rpt_at_chart_title": "Allowed 傳輸時間軸",
+    "rpt_lm_chart_title": "橫向移動圖",
 })
 
 
