@@ -92,17 +92,67 @@ def hash_password(salt: str, password: str) -> str:
     return _PBKDF2_PREFIX + dk.hex()
 
 
+# ── argon2id helpers ──────────────────────────────────────────────────────────
+_ARGON2_PREFIX = "argon2:"
+
+try:
+    from argon2 import PasswordHasher as _Argon2Hasher
+    from argon2.exceptions import VerifyMismatchError as _ArgonMismatch
+    _argon2_hasher = _Argon2Hasher(
+        time_cost=3, memory_cost=65536, parallelism=4, hash_len=32, salt_len=16
+    )
+    _ARGON2_AVAILABLE = True
+except ImportError:
+    _ARGON2_AVAILABLE = False
+    _argon2_hasher = None
+    _ArgonMismatch = Exception
+
+
+def hash_password_argon2(password: str) -> str:
+    """Hash password with argon2id. Salt is embedded in the hash string."""
+    if not _ARGON2_AVAILABLE:
+        raise RuntimeError("argon2-cffi is not installed; cannot hash with argon2id")
+    return _ARGON2_PREFIX + _argon2_hasher.hash(password)
+
+
 def verify_password(stored_hash: str, salt: str, password: str) -> bool:
     """Verify a password against a stored hash.
-    Supports both new PBKDF2 format ('pbkdf2:...') and legacy SHA256 format.
+    Supports argon2id, PBKDF2 ('pbkdf2:...'), and legacy SHA256 formats.
     Uses constant-time comparison to prevent timing attacks.
     """
+    if stored_hash.startswith(_ARGON2_PREFIX):
+        if not _ARGON2_AVAILABLE:
+            return False
+        try:
+            _argon2_hasher.verify(stored_hash[len(_ARGON2_PREFIX):], password)
+            return True
+        except _ArgonMismatch:
+            return False
+        except Exception:
+            return False
     if stored_hash.startswith(_PBKDF2_PREFIX):
         expected = hash_password(salt, password)
         return hmac.compare_digest(stored_hash, expected)
     # Legacy SHA256 fallback (for hashes created before this update)
     legacy = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
     return hmac.compare_digest(stored_hash, legacy)
+
+
+def verify_and_upgrade_password(stored_hash: str, salt: str, password: str):
+    """Verify; if verified AND stored hash is not argon2, return a fresh argon2 hash
+    as the second tuple element so the caller can persist the upgrade.
+
+    Returns: (ok: bool, new_argon2_hash: str | None)
+    """
+    ok = verify_password(stored_hash, salt, password)
+    if not ok:
+        return False, None
+    if stored_hash.startswith(_ARGON2_PREFIX):
+        return True, None
+    # Upgrade to argon2id
+    if _ARGON2_AVAILABLE:
+        return True, hash_password_argon2(password)
+    return True, None  # argon2-cffi not available; skip upgrade
 
 
 def _deep_merge(base: dict, override: dict) -> dict:

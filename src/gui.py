@@ -28,7 +28,7 @@ except ImportError:
     HAS_FLASK = False
     FLASK_IMPORT_ERROR = str(sys.exc_info()[1])
 
-from src.config import ConfigManager, hash_password, verify_password
+from src.config import ConfigManager, hash_password, verify_password, verify_and_upgrade_password
 from src.i18n import t, get_messages
 from src import __version__
 from src.alerts import PLUGIN_METADATA, plugin_config_path, plugin_config_value
@@ -485,15 +485,15 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             logger.error("[GUI] Login attempted but no password hash configured.")
             return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
 
-        if username == saved_username and verify_password(saved_hash, saved_salt, password):
+        ok, new_hash = verify_and_upgrade_password(saved_hash, saved_salt, password)
+        if username == saved_username and ok:
             login_user(AdminUser(username))
-            # Upgrade legacy SHA256 hash to PBKDF2 on successful login
-            if not saved_hash.startswith("pbkdf2:"):
-                new_salt = secrets.token_hex(16)
-                gui_cfg["password_salt"] = new_salt
-                gui_cfg["password_hash"] = hash_password(new_salt, password)
+            if new_hash is not None:
+                # Silent upgrade: PBKDF2/SHA256 → argon2id
+                gui_cfg["password_hash"] = new_hash
+                gui_cfg["password_salt"] = ""   # argon2 embeds salt
                 cm.save()
-                logger.info("[GUI] Upgraded legacy SHA256 password hash to PBKDF2 for user '%s'.", saved_username)
+                logger.info("[GUI] Upgraded password hash to argon2id for user '%s'.", saved_username)
             # Clear legacy _initial_password if present
             if gui_cfg.get("_initial_password"):
                 del gui_cfg["_initial_password"]
@@ -545,9 +545,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 if not verify_password(stored, salt, old_pass):
                     return jsonify({"ok": False, "error": t("gui_err_invalid_old_pass")}), 401
 
-            salt = secrets.token_hex(16)
-            gui_cfg["password_salt"] = salt
-            gui_cfg["password_hash"] = hash_password(salt, d["new_password"])
+            from src.config import hash_password_argon2 as _hash_argon2
+            gui_cfg["password_salt"] = ""   # argon2 embeds salt
+            gui_cfg["password_hash"] = _hash_argon2(d["new_password"])
             gui_cfg.pop("_initial_password", None)
             
         cm.save()
