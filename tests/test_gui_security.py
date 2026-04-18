@@ -4,7 +4,7 @@ import json
 import tempfile
 from src.alerts.metadata import FieldMeta, PluginMeta
 from src.config import ConfigManager
-from src.gui import _create_app
+from src.gui import build_app as _create_app
 from src.config import hash_password as _hash_password
 from src.i18n import get_language, get_messages, set_language
 

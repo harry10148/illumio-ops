@@ -15,7 +15,6 @@ import threading
 import logging
 import ipaddress
 from contextlib import redirect_stdout
-from collections import Counter
 import secrets
 import socket as _socket
 import struct
@@ -28,7 +27,7 @@ except ImportError:
     HAS_FLASK = False
     FLASK_IMPORT_ERROR = str(sys.exc_info()[1])
 
-from src.config import ConfigManager, hash_password, verify_password
+from src.config import ConfigManager, verify_password, verify_and_upgrade_password
 from src.i18n import t, get_messages
 from src import __version__
 from src.alerts import PLUGIN_METADATA, plugin_config_path, plugin_config_value
@@ -54,33 +53,6 @@ def _strip_ansi(text: str) -> str:
 
 # ????????????????????????????????????????????????????????????????????????????????# Flask Application Factory
 # ????????????????????????????????????????????????????????????????????????????????
-# Login rate limiter: {ip_address: [unix_timestamp, ...]}
-_login_attempts: dict = {}
-_login_attempts_lock = threading.Lock()
-_LOGIN_MAX_ATTEMPTS = 5
-_LOGIN_WINDOW_SECONDS = 60
-
-
-def _check_rate_limit(remote_addr: str) -> bool:
-    """Return True if the IP is within the allowed rate limit, False if blocked."""
-    import time as _time
-    now = _time.time()
-    with _login_attempts_lock:
-        attempts = _login_attempts.get(remote_addr, [])
-        # Prune timestamps outside the window
-        attempts = [ts for ts in attempts if now - ts < _LOGIN_WINDOW_SECONDS]
-        _login_attempts[remote_addr] = attempts
-        return len(attempts) < _LOGIN_MAX_ATTEMPTS
-
-
-def _record_failed_login(remote_addr: str) -> None:
-    import time as _time
-    now = _time.time()
-    with _login_attempts_lock:
-        attempts = _login_attempts.get(remote_addr, [])
-        attempts.append(now)
-        _login_attempts[remote_addr] = attempts
-
 def _check_ip_allowed(allowed_ips: list, remote_addr: str) -> bool:
     if not allowed_ips:
         return True
@@ -364,6 +336,86 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         app.config['SESSION_COOKIE_SECURE'] = True
     app.jinja_env.globals.update(t=t)
 
+    # ── flask-login setup ──────────────────────────────────────────────────────
+    from flask_login import LoginManager, current_user, login_user, logout_user
+    from src.auth_models import AdminUser, LoginForm
+
+    login_manager = LoginManager(app)
+    login_manager.login_view = "login_page"
+    login_manager.session_protection = "strong"
+
+    @login_manager.user_loader
+    def _load_user(user_id: str):
+        admin_name = cm.config.get("web_gui", {}).get("username", "illumio")
+        return AdminUser(admin_name) if user_id == admin_name else None
+
+    # ── flask-wtf CSRF setup ───────────────────────────────────────────────────
+    from flask_wtf.csrf import CSRFProtect, generate_csrf
+
+    app.config["WTF_CSRF_ENABLED"] = True
+    app.config["WTF_CSRF_TIME_LIMIT"] = 3600  # 1 hour
+    app.config["WTF_CSRF_CHECK_DEFAULT"] = True
+    # Accept both X-CSRFToken (flask-wtf default) and X-CSRF-Token (legacy SPA header)
+    app.config["WTF_CSRF_HEADERS"] = ["X-CSRFToken", "X-CSRF-Token"]
+
+    csrf = CSRFProtect(app)
+
+    # ── flask-limiter rate limiting ────────────────────────────────────────────
+    from flask_limiter import Limiter
+    from flask_limiter.util import get_remote_address
+
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=[],          # no global limit; apply per-endpoint
+        storage_uri="memory://",    # single-node deployment
+        strategy="fixed-window",
+    )
+
+    @app.errorhandler(429)
+    def ratelimit_handler(e):
+        # Keep the API contract consistent: JSON response
+        return jsonify({
+            "ok": False,
+            "error": "rate_limit_exceeded",
+            "description": str(e.description) if hasattr(e, 'description') else "too many requests",
+        }), 429
+
+    # ── flask-talisman security headers ───────────────────────────────────────
+    from flask_talisman import Talisman
+
+    tls_enabled = cm.config.get("web_gui", {}).get("tls", {}).get("enabled", False)
+
+    # CSP: allow inline scripts/styles (SPA uses them); locked down otherwise
+    _csp = {
+        'default-src': "'self'",
+        'script-src': ["'self'", "'unsafe-inline'"],  # SPA inline JS
+        'style-src': ["'self'", "'unsafe-inline'"],   # SPA inline CSS
+        'img-src': ["'self'", "data:"],
+        'font-src': "'self'",
+        'connect-src': "'self'",
+    }
+
+    Talisman(
+        app,
+        force_https=tls_enabled,               # only when TLS is configured
+        strict_transport_security=tls_enabled,
+        content_security_policy=_csp,
+        content_security_policy_nonce_in=[],   # inline not nonce-based (SPA compat)
+        frame_options='DENY',
+        referrer_policy='strict-origin-when-cross-origin',
+        permissions_policy={
+            "camera": "()",
+            "microphone": "()",
+            "geolocation": "()",
+        },
+    )
+
+    # SPA endpoint to refresh tokens without full reload
+    @app.route('/api/csrf-token')
+    def api_csrf_token():
+        return jsonify({"csrf_token": generate_csrf()})
+
     @app.errorhandler(_RstDrop)
     def handle_rst_drop(e):
         # Socket is already closed with RST ??return an empty Response object
@@ -385,41 +437,22 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
         # Auth check (always enforced for all GUI modes)
         # Bypass login routes
-        if request.path in ['/login', '/api/login', '/logout']:
+        if request.path in ['/login', '/api/login', '/logout', '/api/csrf-token']:
             return
-        if not session.get('logged_in'):
+        if not current_user.is_authenticated:
             if request.path.startswith('/api/'):
                 return _err(t("gui_err_unauthorized"), 401)
             return redirect('/login')
 
-        # Ensure a CSRF token exists in the session for all authenticated requests
-        if 'csrf_token' not in session:
-            session['csrf_token'] = secrets.token_hex(32)
-
-        # CSRF protection for state-changing requests
-        if request.method in ('POST', 'PUT', 'DELETE'):
-            # Exempt login (session not yet established)
-            if request.path == '/api/login':
-                return
-            token = request.headers.get('X-CSRF-Token', '')
-            if not token or token != session.get('csrf_token'):
-                return _err("CSRF token missing or invalid", 403)
-
     @app.after_request
-    def inject_csrf_cookie(response):
-        if 'csrf_token' not in session:
-            session['csrf_token'] = secrets.token_hex(32)
-        # The CSRF token is injected into index.html via a <meta> tag (synchronizer token
-        # pattern). The cookie is no longer needed for CSRF; remove it if present.
-        response.delete_cookie('csrf_token')
-        # Security headers
-        response.headers['X-Frame-Options'] = 'DENY'
-        response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        response.headers['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
+    def add_security_headers(response):
+        # Security headers (talisman will add CSP/HSTS in Task 7; keep fallbacks here)
+        response.headers.setdefault('X-Frame-Options', 'DENY')
+        response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+        response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
         _tls_cfg = cm.config.get("web_gui", {}).get("tls", {})
         if _tls_cfg.get("enabled"):
-            response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+            response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
         return response
 
     # ??? Frontend SPA ?????????????????????????????????????????????????????
@@ -427,9 +460,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     def index():
         cm.load()
         pce_url = _get_active_pce_url(cm)
-        if 'csrf_token' not in session:
-            session['csrf_token'] = secrets.token_hex(32)
-        return render_template('index.html', pce_url=pce_url, csrf_token=session['csrf_token'])
+        # csrf_token() is a Jinja2 global injected by flask-wtf CSRFProtect
+        return render_template('index.html', pce_url=pce_url)
 
     # ??? Auth Routes ??????????????????????????????????????????????????????
     @app.route('/login', methods=['GET'])
@@ -437,15 +469,17 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         return render_template('login.html')
 
     @app.route('/api/login', methods=['POST'])
+    @csrf.exempt
+    @limiter.limit("5 per minute")
     def api_login():
-        remote = request.remote_addr or ""
-        if not _check_rate_limit(remote):
-            logger.warning("[GUI] Login rate limit exceeded for IP: %s", remote)
-            return jsonify({"ok": False, "error": t("gui_err_too_many_attempts")}), 429
+        from pydantic import ValidationError as _ValidationError
+        try:
+            form = LoginForm.model_validate(request.get_json(silent=True) or {})
+        except _ValidationError as e:
+            return jsonify({"ok": False, "error": "invalid_form", "detail": str(e)}), 400
 
-        d = request.json or {}
-        username = d.get('username', '')
-        password = d.get('password', '')
+        username = form.username
+        password = form.password
 
         cm.load()
         gui_cfg = cm.config.get("web_gui", {})
@@ -457,31 +491,28 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         if not saved_hash:
             # No password configured — reject all logins until config is repaired
             logger.error("[GUI] Login attempted but no password hash configured.")
-            _record_failed_login(remote)
             return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
 
-        if username == saved_username and verify_password(saved_hash, saved_salt, password):
-            session['logged_in'] = True
-            if 'csrf_token' not in session:
-                session['csrf_token'] = secrets.token_hex(32)
-            # Upgrade legacy SHA256 hash to PBKDF2 on successful login
-            if not saved_hash.startswith("pbkdf2:"):
-                new_salt = secrets.token_hex(16)
-                gui_cfg["password_salt"] = new_salt
-                gui_cfg["password_hash"] = hash_password(new_salt, password)
+        ok, new_hash = verify_and_upgrade_password(saved_hash, saved_salt, password)
+        if username == saved_username and ok:
+            login_user(AdminUser(username))
+            if new_hash is not None:
+                # Silent upgrade: PBKDF2/SHA256 → argon2id
+                gui_cfg["password_hash"] = new_hash
+                gui_cfg["password_salt"] = ""   # argon2 embeds salt
                 cm.save()
-                logger.info("[GUI] Upgraded legacy SHA256 password hash to PBKDF2 for user '%s'.", saved_username)
+                logger.info("[GUI] Upgraded password hash to argon2id for user '%s'.", saved_username)
             # Clear legacy _initial_password if present
             if gui_cfg.get("_initial_password"):
                 del gui_cfg["_initial_password"]
                 cm.save()
-            return jsonify({"ok": True, "csrf_token": session['csrf_token']})
+            return jsonify({"ok": True, "csrf_token": generate_csrf()})
 
-        _record_failed_login(remote)
         return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
 
     @app.route('/logout')
     def logout():
+        logout_user()
         session.clear()
         return redirect('/login')
 
@@ -522,9 +553,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 if not verify_password(stored, salt, old_pass):
                     return jsonify({"ok": False, "error": t("gui_err_invalid_old_pass")}), 401
 
-            salt = secrets.token_hex(16)
-            gui_cfg["password_salt"] = salt
-            gui_cfg["password_hash"] = hash_password(salt, d["new_password"])
+            from src.config import hash_password_argon2 as _hash_argon2
+            gui_cfg["password_salt"] = ""   # argon2 embeds salt
+            gui_cfg["password_hash"] = _hash_argon2(d["new_password"])
             gui_cfg.pop("_initial_password", None)
             
         cm.save()
@@ -2915,6 +2946,14 @@ def _get_cert_info(cert_path: str) -> dict:
     return info
 
 
+def build_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
+    """Public factory: build a configured Flask app bound to the given ConfigManager.
+
+    Pure constructor — does NOT call app.run(). Used by launch_gui and tests.
+    """
+    return _create_app(cm, persistent_mode=persistent_mode)
+
+
 def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_mode=False):
     if not HAS_FLASK:
         print("Flask is not installed. The Web GUI requires Flask.")
@@ -2930,7 +2969,7 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
     from src.module_log import ModuleLog as _ML
     _ML.init(os.path.join(_ROOT_DIR, 'logs'))
 
-    app = _create_app(cm, persistent_mode=persistent_mode)
+    app = build_app(cm, persistent_mode=persistent_mode)
 
     # TLS / HTTPS configuration
     cm.load()

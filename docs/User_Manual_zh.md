@@ -301,10 +301,11 @@ python illumio_ops.py --gui --port 8080
 
 ### 4.1 身份驗證
 
-- **密碼雜湊**：PBKDF2-HMAC-SHA256，260,000 次迭代（Python 標準函式庫，無需外部套件）
-- **登入速率限制**：每個 IP 每 60 秒最多 5 次嘗試（超過回傳 HTTP 429）
-- **CSRF 防護**：Synchronizer Token 模式，透過 `<meta>` 標籤注入（無可被 XSS 讀取的 Cookie）
-- **Session 管理**：使用安全簽章 Cookie（密鑰自動產生於 `config.json` 中）。
+- **密碼雜湊**：argon2id（argon2-cffi，記憶體困難演算法，符合 OWASP 建議）。舊版 PBKDF2 雜湊值在下次成功登入時自動升級為 argon2id，無需手動操作。
+- **登入速率限制**：每個 IP 每分鐘最多 5 次嘗試（超過回傳 HTTP 429），由 flask-limiter 管理。
+- **CSRF 防護**：flask-wtf CSRFProtect — token 透過 `X-CSRF-Token` 回應標頭及 `<meta>` 標籤傳遞；所有變更請求（POST/PUT/DELETE）均需驗證。
+- **安全標頭**：flask-talisman 自動設定 `Content-Security-Policy`、`X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`、`Referrer-Policy`；啟用 TLS 時自動開啟 HSTS。
+- **Session 管理**：flask-login session 保護（strong 模式）；安全簽章 Cookie（密鑰自動產生於 `config.json` 中）。
 - **設定方式**：透過 **CLI 選單 7. Web GUI Security** 或 Web GUI **Settings** 頁面變更帳密。
 - **SMTP 憑證**：可設定 `ILLUMIO_SMTP_PASSWORD` 環境變數，避免在設定檔中明文儲存密碼
 
