@@ -37,6 +37,7 @@ from src.report.dashboard_summaries import (
     write_audit_dashboard_summary,
     write_policy_usage_dashboard_summary,
 )
+from src.href_utils import extract_id as _extract_id_href
 
 _ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
@@ -2446,9 +2447,6 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
     # ??? Rule Scheduler API ????????????????????????????????????????????????
 
-    def extract_id(href):
-        return href.split('/')[-1] if href else ""
-
     def _get_rs_components():
         """Lazy-init Rule Scheduler components."""
         from src.rule_scheduler import ScheduleDB, ScheduleEngine
@@ -2507,7 +2505,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                                len(rs.get('deny_rules', [])))
             results.append({
                 "href": rs['href'],
-                "id": extract_id(rs['href']),
+                "id": _extract_id_href(rs['href']),
                 "name": rs.get('name', ''),
                 "enabled": rs.get('enabled', False),
                 "rules_count": all_rules_count,
@@ -2531,7 +2529,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         results = []
         q_lower = q.lower()
         for rs in all_rs:
-            rs_id = extract_id(rs['href'])
+            rs_id = _extract_id_href(rs['href'])
             rs_name = rs.get('name', '')
             typed_rules = []
             for r in rs.get('sec_rules', []) + rs.get('rules', []):
@@ -2543,7 +2541,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             no_counters = {'allow': 0, 'deny': 0, 'override_deny': 0}
             for r, rule_type in typed_rules:
                 no_counters[rule_type] += 1
-                rule_id = extract_id(r['href'])
+                rule_id = _extract_id_href(r['href'])
                 desc = r.get('description', '') or ''
                 matched = (scope == 'id' and q == rule_id) or \
                           (scope == 'desc' and q_lower in desc.lower())
@@ -2580,7 +2578,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         ut = rs.get('update_type')
         rs_row = {
             "href": rs['href'],
-            "id": extract_id(rs['href']),
+            "id": _extract_id_href(rs['href']),
             "name": rs.get('name', ''),
             "enabled": rs.get('enabled', False),
             "provision_state": "DRAFT" if ut else "ACTIVE",
@@ -2604,7 +2602,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             dest_field = r.get('destinations', r.get('consumers', []))
             rules.append({
                 "href": r['href'],
-                "id": extract_id(r['href']),
+                "id": _extract_id_href(r['href']),
                 "no": no_counters[rule_type],
                 "enabled": r.get('enabled', False),
                 "description": r.get('description', ''),
@@ -2626,7 +2624,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         for href, conf in db_data.items():
             entry = dict(conf)
             entry['href'] = href
-            entry['id'] = extract_id(href)
+            entry['id'] = _extract_id_href(href)
             # Live status check
             try:
                 status, data = api.get_live_item(href)
@@ -2708,7 +2706,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
         db.put(href, db_entry)
         api.update_rule_note(href, note)
-        return jsonify({"ok": True, "id": extract_id(href)})
+        return jsonify({"ok": True, "id": _extract_id_href(href)})
 
     @app.route('/api/rule_scheduler/schedules/<path:href>')
     def rs_schedule_detail(href):
@@ -2719,7 +2717,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             return _err("Not found", 404)
         entry = dict(conf)
         entry['href'] = href
-        entry['id'] = extract_id(href)
+        entry['id'] = _extract_id_href(href)
         return jsonify(entry)
 
     @app.route('/api/rule_scheduler/schedules/delete', methods=['POST'])
@@ -2734,7 +2732,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             except Exception:
                 pass
             if db.delete(href):
-                deleted.append(extract_id(href))
+                deleted.append(_extract_id_href(href))
         return jsonify({"ok": True, "deleted": deleted})
 
     @app.route('/api/rule_scheduler/check', methods=['POST'])

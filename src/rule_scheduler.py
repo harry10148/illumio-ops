@@ -9,6 +9,7 @@ import datetime
 from loguru import logger
 from src.utils import Colors
 from src.i18n import t
+from src.href_utils import extract_id  # canonical — also re-exported for rule_scheduler_cli.py
 
 def _now_in_tz(tz_str: str) -> datetime.datetime:
     """Return current naive datetime in the configured schedule timezone."""
@@ -36,10 +37,6 @@ def truncate(text, width):
     if len(text) > width:
         return text[:width - 3] + "..."
     return text.ljust(width)
-
-def extract_id(href):
-    """Extract the last segment from an Illumio HREF path."""
-    return href.split('/')[-1] if href else ""
 
 # ==========================================
 # Schedule Database
