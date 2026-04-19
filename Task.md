@@ -5,6 +5,19 @@
 
 ---
 
+## Phase 12: Polish & Advanced ✅ DONE (v3.10.0-polish, 2026-04-19)
+
+- [x] **T1**: Branch + baseline (406 passing)
+- [x] **T2**: humanize sweep — Jinja filters, dashboard.js helper, 3 HTML exporter updates, 3 tests
+- [x] **T3**: SIEM docs — `docs/SIEM_Integration.md` + 3 deploy configs + 4 tests
+- [x] **T4**: GUI rule highlight — `/api/rules/<idx>/highlight` + `pygments.css` + 4 tests
+- [x] **T5**: APScheduler persistence — `SchedulerSettings`, `SQLAlchemyJobStore`, `replace_existing=True` + 5 tests
+- [x] **T6**: Shell completions — bash/zsh/fish in `scripts/completions/`; entrypoint updated
+- [x] **T7**: 422 passed, 0 failed; i18n audit 0 findings; Status.md + Task.md updated
+- [x] 422 passed, 1 skipped; i18n audit clean
+
+---
+
 ## Phase 11: Charts + Dashboard ✅ DONE (v3.9.0-dashboard, 2026-04-19)
 
 - [x] **T1**: Branch + baseline + `tests/test_phase11_chart_coverage.py` (20 failing tests)

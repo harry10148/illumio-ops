@@ -1,11 +1,24 @@
 # Project Status — illumio_ops
 
 **As of:** 2026-04-19  
-**Version:** v3.9.0-dashboard (Phase 11 Charts + Dashboard complete)  
+**Version:** v3.10.0-polish (Phase 12 Polish complete)  
 **Branch:** main  
-**Phase:** All 11 phases complete  
+**Phase:** All 12 phases complete  
 **Code Review Date:** 2026-04-13  
 **i18n Overhaul:** 2026-04-18 — see Task.md i18n-P1..P7 (all done)
+
+---
+
+## Phase 12 Complete (v3.10.0-polish)
+
+Polish & advanced. 422 tests passed (baseline 406, +16 new).
+
+- **humanize sweep**: Jinja filters `human_time_ago`/`human_number`/`human_size` registered in `_create_app`. `index.html` header shows rules count, schedule count, config-loaded-ago via filters. `dashboard.js` adds `humanTimeAgo()` helper for schedule last-run (relative time + hover tooltip). audit/ven/policy_usage HTML exporters import `human_number` for summary pill counts.
+- **SIEM integration**: `docs/SIEM_Integration.md` with 4 forwarding options (Filebeat, Logstash, rsyslog, Splunk). Ready-to-use sample configs in `deploy/`.
+- **GUI rule highlight**: `/api/rules/<idx>/highlight` endpoint returns pygments-highlighted JSON. `pygments.css` generated at startup. `<link>` added to index.html.
+- **Persistent scheduler**: `SchedulerSettings.persist=true` switches to `SQLAlchemyJobStore(sqlite:///)`. `SQLAlchemy>=2.0` in requirements.txt. All `add_job()` calls use `replace_existing=True`.
+- **Shell completions**: bash/zsh/fish completion scripts in `scripts/completions/`. Entrypoint routes to click when `_ILLUMIO_OPS_COMPLETE` is set.
+- **+16 new tests**: humanize coverage (3), SIEM sanity (4), pygments endpoint (4), scheduler persistence (5).
 
 ---
 
