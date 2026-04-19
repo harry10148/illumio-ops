@@ -271,32 +271,52 @@ class AsyncJobManager:
 
     def _wait_for_async_query(self, job_href, timeout=120, compute_draft=False):
         """Poll an async query until completed/failed/timeout and return the last poll result."""
+        import sys
+        from contextlib import nullcontext
+
         c = self._client
         poll_url = f"{c.api_cfg['url']}/api/v2{job_href}"
         max_polls = timeout // 2
         poll_result = {"status": "pending"}
-        for _ in range(max_polls):
-            time.sleep(2)
-            poll_status, poll_body = c._request(poll_url, timeout=15)
-            if poll_status != 200:
-                continue
-            poll_result = orjson.loads(poll_body)
-            state = poll_result.get("status")
-            self._save_async_job_state(
-                job_href,
-                status=state,
-                rules_status=poll_result.get("rules"),
-                result_href=poll_result.get("result"),
+
+        show_progress = sys.stderr.isatty()
+        if show_progress:
+            from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+            progress_ctx = Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                TimeElapsedColumn(),
+                transient=True,
             )
-            if state == "completed":
-                break
-            if state == "failed":
-                logger.debug(f"Async query failed: {job_href}")
-                return poll_result
         else:
-            logger.debug(f"Async query timed out: {job_href}")
-            self._save_async_job_state(job_href, status="timeout")
-            return {"status": "timeout"}
+            progress_ctx = nullcontext()
+
+        with progress_ctx as prog:
+            task_id = prog.add_task(f"Polling async query...", total=None) if show_progress else None
+            for poll_num in range(max_polls):
+                time.sleep(2)
+                poll_status, poll_body = c._request(poll_url, timeout=15)
+                if poll_status != 200:
+                    continue
+                poll_result = orjson.loads(poll_body)
+                state = poll_result.get("status")
+                if show_progress and prog is not None:
+                    prog.update(task_id, description=f"Async query: {state} (poll {poll_num + 1}/{max_polls})")
+                self._save_async_job_state(
+                    job_href,
+                    status=state,
+                    rules_status=poll_result.get("rules"),
+                    result_href=poll_result.get("result"),
+                )
+                if state == "completed":
+                    break
+                if state == "failed":
+                    logger.debug(f"Async query failed: {job_href}")
+                    return poll_result
+            else:
+                logger.debug(f"Async query timed out: {job_href}")
+                self._save_async_job_state(job_href, status="timeout")
+                return {"status": "timeout"}
 
         if compute_draft:
             update_rules_url = f"{c.api_cfg['url']}/api/v2{job_href}/update_rules"
