@@ -638,6 +638,44 @@ class AuditGenerator:
             paths.append(path)
             self._write_report_metadata(path, result, file_format='html')
             print(t("rpt_audit_html_saved", path=path))
+        if fmt in ('pdf', 'all'):
+            try:
+                from src.report.exporters.pdf_exporter import export_pdf
+                from src.report.exporters.audit_html_exporter import AuditHtmlExporter
+                html_content = AuditHtmlExporter(
+                    result.module_results, df=result.dataframe,
+                    date_range=result.date_range
+                )._build()
+                import datetime as _dt
+                ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
+                pdf_path = os.path.join(output_dir, f'Illumio_Audit_Report_{ts_str}.pdf')
+                export_pdf(html_content, pdf_path)
+                paths.append(pdf_path)
+                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
+            except Exception as exc:
+                logger.warning('PDF export failed: {}', exc)
+
+        if fmt in ('xlsx', 'all'):
+            try:
+                from src.report.exporters.xlsx_exporter import export_xlsx
+                import datetime as _dt
+                ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
+                xlsx_path = os.path.join(output_dir, f'Illumio_Audit_Report_{ts_str}.xlsx')
+                xlsx_result = {
+                    'record_count': result.record_count,
+                    'metadata': {'title': 'Audit Report'},
+                    'module_results': {
+                        k: {'summary': '', 'table': []}
+                        for k, v in (result.module_results or {}).items()
+                        if isinstance(v, dict)
+                    },
+                }
+                export_xlsx(xlsx_result, xlsx_path)
+                paths.append(xlsx_path)
+                print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}"))
+            except Exception as exc:
+                logger.warning('XLSX export failed: {}', exc)
+
         if fmt in ('csv', 'all'):
             # Include full raw event data alongside module results
             export_data = dict(result.module_results)

@@ -76,6 +76,41 @@ class VenStatusGenerator:
             path = VenHtmlExporter(result.module_results, df=result.dataframe).export(output_dir)
             paths.append(path)
             print(t("rpt_ven_html_saved", path=path))
+        if fmt in ('pdf', 'all'):
+            try:
+                from src.report.exporters.pdf_exporter import export_pdf
+                from src.report.exporters.ven_html_exporter import VenHtmlExporter
+                html_content = VenHtmlExporter(result.module_results, df=result.dataframe)._build()
+                import datetime as _dt
+                ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
+                pdf_path = os.path.join(output_dir, f'Illumio_VEN_Report_{ts_str}.pdf')
+                export_pdf(html_content, pdf_path)
+                paths.append(pdf_path)
+                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
+            except Exception as exc:
+                logger.warning('PDF export failed: {}', exc)
+
+        if fmt in ('xlsx', 'all'):
+            try:
+                from src.report.exporters.xlsx_exporter import export_xlsx
+                import datetime as _dt
+                ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
+                xlsx_path = os.path.join(output_dir, f'Illumio_VEN_Report_{ts_str}.xlsx')
+                xlsx_result = {
+                    'record_count': result.record_count,
+                    'metadata': {'title': 'VEN Status Report'},
+                    'module_results': {
+                        k: {'summary': '', 'table': []}
+                        for k, v in (result.module_results or {}).items()
+                        if isinstance(v, dict)
+                    },
+                }
+                export_xlsx(xlsx_result, xlsx_path)
+                paths.append(xlsx_path)
+                print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}"))
+            except Exception as exc:
+                logger.warning('XLSX export failed: {}', exc)
+
         if fmt in ('csv', 'all'):
             path = CsvExporter(result.module_results, report_label='VEN_Status').export(output_dir)
             paths.append(path)
