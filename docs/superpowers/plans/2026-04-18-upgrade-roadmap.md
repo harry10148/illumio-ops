@@ -36,14 +36,18 @@
 | 6 | 排程器統一 | `2026-04-18-phase-6-scheduler-aps.md` | 中（既有 jobs 遷移） | L (~5 days) | APScheduler |
 | 7 | Logging 統一 | `2026-04-18-phase-7-logging-loguru.md` | 低-中（觸及全部檔案，但機械式） | M (~3 days) | loguru（**完整替換**） |
 | 9 | 架構重構（god-class 拆分） | `2026-04-18-phase-9-architecture.md` | 高（核心模組分割） | XL (~10 days) | （無新套件，純重構） |
+| 10 | **Wave D — UX Quick Wins + Report Parity** ✅ Done? | `2026-04-19-phase-10-ux-quickwins.md` | 低-中 | M (~3-4 days) | 既有套件活化（CSV 預設關、audit/ven/policy_usage 接 pdf/xlsx、7 新 chart、rule/workload CLI、progress bar） |
+| 11 | **Wave D — Chart & Dashboard Expansion** | `2026-04-19-phase-11-charts-dashboard.md` | 中 | L (~5-6 days) | 10 traffic module chart、GUI plotly 即時 dashboard、rule edit（questionary+pygments）、cron 排程 |
+| 12 | **Wave D — Polish & Advanced** | `2026-04-19-phase-12-polish.md` | 中 | M (~3-5 days) | humanize sweep、SIEM docs+configs、GUI pygments、SQLAlchemyJobStore 持久化、shell completions |
 | 8 | (後續獨立計畫) RPM 打包 | TBD | 高（部署面） | XL | PyInstaller + fpm/rpmbuild |
 
 **總工期估算**：~45 個工作天（單人、含 Phase 9、不含測試補強）。**已確認採平行執行**：
 - **Wave A (Phase 0 後並行)**：Phase 1 (CLI) ‖ Phase 2 (HTTP) ‖ Phase 3 (Settings) — 3 條 branch 同時推進
 - **Wave B (依賴 Wave A)**：Phase 4 (Web 安全，依賴 Phase 3) ‖ Phase 5 (報表) ‖ Phase 6 (排程，依賴 Phase 3)
 - **Wave C (序列)**：Phase 7 (Logging) → Phase 9 (架構重構) — 序列因 Phase 9 須在乾淨 logging 基礎上重構
+- **Wave D (序列, Phase 10 → 11 → 12)**：升級套件的價值實體化 — 讓使用者從「沒差」變成「感受到差」。每 Phase 為獨立 branch、依序 merge 以避免 rebase 衝突。
 
-**平行執行下總工期壓縮至 ~28 天**（Wave A ~5 天，Wave B ~7 天，Wave C ~13 天）。
+**平行執行下總工期壓縮至 ~28 天**（Wave A ~5 天，Wave B ~7 天，Wave C ~13 天，Wave D ~12 天）。
 
 ---
 
