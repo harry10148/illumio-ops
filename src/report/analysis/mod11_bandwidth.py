@@ -1,6 +1,7 @@
 """Module 11: Bandwidth & Data Volume Analysis."""
 from __future__ import annotations
 import pandas as pd
+from src.i18n import t, get_language
 
 def bandwidth_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
     """
@@ -97,5 +98,19 @@ def bandwidth_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
         )
     result['total_bytes'] = int(has_bytes['bytes_total'].sum())
     result['total_mb'] = round(result['total_bytes'] / 1024 / 1024, 2)
+
+    if not top_app_bytes.empty:
+        app_labels = top_app_bytes['Source App'].tolist()[:10]
+        app_values = [int(v) for v in top_app_bytes['Bytes Total'].tolist()[:10]]
+    else:
+        app_labels, app_values = [], []
+    result['chart_spec'] = {
+        'type': 'bar',
+        'title': t('rpt_mod11_chart_title', default='Top Apps by Data Volume'),
+        'x_label': t('rpt_app', default='Application'),
+        'y_label': t('rpt_bytes_total', default='Bytes'),
+        'data': {'labels': app_labels, 'values': app_values},
+        'i18n': {'lang': get_language()},
+    }
 
     return result

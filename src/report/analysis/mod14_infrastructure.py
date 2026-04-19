@@ -6,6 +6,7 @@ from collections import defaultdict, deque
 import pandas as pd
 
 from .attack_posture import build_app_display, make_posture_item, rank_posture_items
+from src.i18n import t, get_language
 
 def _normalize_key_series(df: pd.DataFrame, app_col: str, env_col: str) -> pd.Series:
     app = df.get(app_col, pd.Series(index=df.index, dtype=object)).fillna("").astype(str).str.strip().str.lower()
@@ -267,6 +268,12 @@ def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20) -> dict:
         ]
     ).sort_values(by=["Connections", "Source App Env Key", "Destination App Env Key"], ascending=[False, True, True]).head(top_n)
 
+    if not role_summary.empty:
+        tier_labels = role_summary['Tier'].tolist()
+        tier_values = [int(v) for v in role_summary['Count'].tolist()]
+    else:
+        tier_labels, tier_values = [], []
+
     return {
         "total_apps": int(len(all_nodes)),
         "total_edges": int(len(edge_weights)),
@@ -275,5 +282,13 @@ def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20) -> dict:
         "role_summary": role_summary.reset_index(drop=True),
         "hub_apps": hub_apps.reset_index(drop=True),
         "attack_posture_items": rank_posture_items(attack_items)[: max(top_n, 10)],
+        "chart_spec": {
+            "type": "bar",
+            "title": t("rpt_mod14_chart_title", default="Infrastructure Apps by Tier"),
+            "x_label": t("rpt_tier", default="Tier"),
+            "y_label": t("rpt_app_count", default="App Count"),
+            "data": {"labels": tier_labels, "values": tier_values},
+            "i18n": {"lang": get_language()},
+        },
     }
 

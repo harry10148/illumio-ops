@@ -5,6 +5,7 @@ import datetime
 from typing import Any
 
 from .attack_posture import summarize_attack_posture
+from src.i18n import t, get_language
 
 def _fmt(n) -> str:
     try:
@@ -227,6 +228,17 @@ def executive_summary(results: dict[str, Any]) -> dict:
     maturity = _compute_maturity_score(results)
     kpis.insert(0, {"label": "Maturity Score", "value": f"{maturity['maturity_score']}/100 ({maturity['maturity_grade']})"})
 
+    dim_labels = [
+        t('rpt_dim_enforcement', default='Enforcement Coverage'),
+        t('rpt_dim_policy', default='Policy Coverage'),
+        t('rpt_dim_lateral', default='Lateral Control'),
+        t('rpt_dim_managed', default='Managed Asset Ratio'),
+        t('rpt_dim_risk', default='Risk Port Control'),
+    ]
+    dim_keys = ['enforcement_coverage', 'policy_coverage', 'lateral_movement_control',
+                'managed_asset_ratio', 'risk_port_control']
+    dim_values = [maturity['maturity_dimensions'][k]['score'] for k in dim_keys]
+
     return {
         "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "kpis": kpis,
@@ -246,5 +258,13 @@ def executive_summary(results: dict[str, Any]) -> dict:
         "blast_radius": attack_sections["blast_radius"],
         "blind_spots": attack_sections["blind_spots"],
         "action_matrix": attack_sections["action_matrix"],
+        "chart_spec": {
+            "type": "bar",
+            "title": t("rpt_mod12_chart_title", default="Microsegmentation Maturity Dimensions"),
+            "x_label": t("rpt_dimension", default="Dimension"),
+            "y_label": t("rpt_score", default="Score"),
+            "data": {"labels": dim_labels, "values": dim_values},
+            "i18n": {"lang": get_language()},
+        },
     }
 

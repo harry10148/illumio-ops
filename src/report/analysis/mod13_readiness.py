@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pandas as pd
+from src.i18n import t, get_language
 
 from .attack_posture import (
     build_app_display,
@@ -262,6 +263,21 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
     ranked_items = rank_posture_items(attack_items)
     recommendations = _build_recommendations(ranked_items, top_n=top_n)
 
+    factor_chart_labels = [
+        t('rpt_r_policy', default='Policy Coverage'),
+        t('rpt_r_ringfence', default='Ringfence Maturity'),
+        t('rpt_r_enforcement', default='Enforcement Mode'),
+        t('rpt_r_staged', default='Staged Readiness'),
+        t('rpt_r_remote', default='Remote App Coverage'),
+    ]
+    factor_chart_values = [
+        factor_scores['policy_coverage'],
+        factor_scores['ringfence_maturity'],
+        factor_scores['enforcement_mode'],
+        factor_scores['staged_readiness'],
+        factor_scores['remote_app_coverage'],
+    ]
+
     return {
         "total_score": total_score,
         "grade": _score_to_grade(total_score),
@@ -271,5 +287,13 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
         "app_env_scores": app_env_scores.head(top_n),
         "enforcement_mode_distribution": enforcement_mode_distribution,
         "attack_posture_items": ranked_items[: max(top_n, 10)],
+        "chart_spec": {
+            "type": "bar",
+            "title": t("rpt_mod13_chart_title", default="Enforcement Readiness Factor Scores"),
+            "x_label": t("rpt_dimension", default="Factor"),
+            "y_label": t("rpt_score", default="Score"),
+            "data": {"labels": factor_chart_labels, "values": factor_chart_values},
+            "i18n": {"lang": get_language()},
+        },
     }
 
