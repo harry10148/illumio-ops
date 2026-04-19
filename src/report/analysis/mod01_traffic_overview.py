@@ -1,6 +1,7 @@
 """Module 1: Traffic Overview — KPI summary statistics."""
 from __future__ import annotations
 import pandas as pd
+from src.i18n import t, get_language
 
 def traffic_overview(df: pd.DataFrame) -> dict:
     """
@@ -56,6 +57,21 @@ def traffic_overview(df: pd.DataFrame) -> dict:
                   .reset_index()
                   .rename(columns={'proto': 'Protocol', 'count': 'Flow Count'}))
 
+    chart_spec = {
+        'type': 'pie',
+        'title': t('rpt_mod01_chart_title', default='Policy Decision Breakdown'),
+        'data': {
+            'labels': [
+                t('rpt_pd_allowed', default='Allowed'),
+                t('rpt_pd_blocked', default='Blocked'),
+                t('rpt_pd_potential', default='Potentially Blocked'),
+                t('rpt_pd_unknown', default='Unknown'),
+            ],
+            'values': [int(allowed), int(blocked), int(potential), int(unknown)],
+        },
+        'i18n': {'lang': get_language()},
+    }
+
     return {
         'total_flows': total_flows,
         'total_connections': total_connections,
@@ -73,4 +89,5 @@ def traffic_overview(df: pd.DataFrame) -> dict:
         'date_range': date_range,
         'top_ports': top_ports,
         'top_protocols': top_protos,
+        'chart_spec': chart_spec,
     }

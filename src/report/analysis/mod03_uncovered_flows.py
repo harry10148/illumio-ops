@@ -1,6 +1,7 @@
 """Module 3: Uncovered Flows — Policy Coverage Gaps."""
 from __future__ import annotations
 import pandas as pd
+from src.i18n import t, get_language
 
 _REC_MAP = {
     'intra_app': "Intra-app flow: add an intra-scope rule to allow traffic within the same application.",
@@ -55,6 +56,19 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20) -> dict:
             'by_recommendation': pd.DataFrame(),
             'uncovered_ports': pd.DataFrame(),
             'uncovered_services': pd.DataFrame(),
+            'chart_spec': {
+                'type': 'pie',
+                'title': t('rpt_mod03_chart_title', default='Policy Coverage Tiers'),
+                'data': {
+                    'labels': [
+                        t('rpt_enforced', default='Enforced'),
+                        t('rpt_staged', default='Staged'),
+                        t('rpt_gap', default='Gap'),
+                    ],
+                    'values': [n_allowed, 0, 0],
+                },
+                'i18n': {'lang': get_language()},
+            },
         }
 
     # Inbound/outbound coverage split
@@ -122,6 +136,19 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20) -> dict:
         'by_recommendation': by_rec,
         'uncovered_ports': uncovered_ports,
         'uncovered_services': uncovered_services,
+        'chart_spec': {
+            'type': 'pie',
+            'title': t('rpt_mod03_chart_title', default='Policy Coverage Tiers'),
+            'data': {
+                'labels': [
+                    t('rpt_enforced', default='Enforced'),
+                    t('rpt_staged', default='Staged'),
+                    t('rpt_gap', default='Gap'),
+                ],
+                'values': [n_allowed, n_pb, n_blocked + n_unknown],
+            },
+            'i18n': {'lang': get_language()},
+        },
     }
 
 def _port_gap_ranking(df: pd.DataFrame, uncovered: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
