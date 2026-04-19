@@ -9,6 +9,7 @@ from src.cli.gui_cmd import gui_cmd
 from src.cli.report import report_group
 from src.cli.rule import rule_group
 from src.cli.status import status_cmd
+from src.cli.workload import workload_group
 
 @click.group(invoke_without_command=True,
              context_settings={"help_option_names": ["-h", "--help"]})
@@ -36,3 +37,4 @@ cli.add_command(gui_cmd)
 cli.add_command(report_group)
 cli.add_command(rule_group)
 cli.add_command(status_cmd)
+cli.add_command(workload_group)
