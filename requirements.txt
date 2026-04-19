@@ -41,7 +41,7 @@ argon2-cffi>=23.1,<25.0
 
 # ── Phase 5: Reports (Excel + PDF + interactive charts) ──────────────────────
 openpyxl>=3.1,<4.0
-weasyprint>=61.0,<62.0
+weasyprint>=62.0,<69.0
 matplotlib>=3.8,<4.0
 plotly>=5.20,<6.0
 pygments>=2.17,<3.0
