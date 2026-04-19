@@ -212,7 +212,7 @@ def safe_input(
     if lang == "zh_TW" and not shortcuts:
         shortcuts = "Enter=default, 0=back, -1=cancel, h=help" if allow_cancel else "Enter=default, h=help"
 
-    print(_console_safe_text(f"{prefix}{Colors.DARK_GRAY}  {shortcuts.strip()}{Colors.ENDC}"), end="")
+    print(_console_safe_text(f"{prefix}{Colors.DARK_GRAY}  {shortcuts.strip()}{Colors.ENDC}"))
 
     full_prompt = f"\n{Colors.CYAN}[?]{Colors.ENDC} {prompt}{range_hint}"
     if hint:

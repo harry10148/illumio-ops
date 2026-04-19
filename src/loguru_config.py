@@ -76,3 +76,7 @@ def setup_loguru(
         )
 
     logging.basicConfig(handlers=[_StdLibInterceptHandler()], level=0, force=True)
+
+    # Suppress verbose INFO/DEBUG noise from PDF/font rendering libraries
+    for _lib in ("fontTools", "weasyprint", "pydyf", "cssselect2", "tinycss2", "brotli"):
+        logging.getLogger(_lib).setLevel(logging.WARNING)
