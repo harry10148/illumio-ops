@@ -98,6 +98,12 @@
       </svg>
       <span id="hdr-meta-url">{{ pce_url or '—' }}</span>
     </div>
+    <div id="hdr-stats" style="display:flex;gap:12px;align-items:center;font-size:0.75rem;color:var(--dim);"
+         title="Config loaded {{ config_loaded_at | human_time_ago }}">
+      <span><span data-i18n="gui_rules_count">Rules</span>: <strong>{{ rules_count | human_number }}</strong></span>
+      <span><span data-i18n="gui_schedules_count">Schedules</span>: <strong>{{ schedules_count | human_number }}</strong></span>
+      <span title="{{ config_loaded_at }}"><span data-i18n="gui_config_loaded">Loaded</span>: {{ config_loaded_at | human_time_ago }}</span>
+    </div>
     <div class="header-right">
       <div class="ui-pref" aria-label="Theme mode selector">
         <label for="ui-theme-mode" data-i18n="gui_theme">Theme</label>

@@ -14,6 +14,7 @@ from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
 from .code_highlighter import get_highlight_css
+from src.humanize_ext import human_number
 
 _CSS = build_css("ven")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -147,10 +148,10 @@ class VenHtmlExporter:
 
     def _summary_pills(self, online_count: int, offline_count: int, today_count: int, yest_count: int) -> str:
         pills = [
-            (STRINGS["rpt_pill_online"]["en"], str(online_count)),
-            (STRINGS["rpt_pill_offline"]["en"], str(offline_count)),
-            (STRINGS["rpt_pill_lost_24h"]["en"], str(today_count)),
-            (STRINGS["rpt_pill_lost_48h"]["en"], str(yest_count)),
+            (STRINGS["rpt_pill_online"]["en"], human_number(online_count)),
+            (STRINGS["rpt_pill_offline"]["en"], human_number(offline_count)),
+            (STRINGS["rpt_pill_lost_24h"]["en"], human_number(today_count)),
+            (STRINGS["rpt_pill_lost_48h"]["en"], human_number(yest_count)),
         ]
         html = '<div class="summary-pill-row">'
         for label, value in pills:

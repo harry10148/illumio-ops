@@ -1,3 +1,18 @@
+/* ─── Humanize helpers ─────────────────────────────────────────────── */
+function humanTimeAgo(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr), now = new Date();
+  const sec = Math.round((now - d) / 1000);
+  if (sec < 5) return 'just now';
+  if (sec < 60) return sec + 's ago';
+  const min = Math.round(sec / 60);
+  if (min < 60) return min + 'm ago';
+  const hr = Math.round(min / 60);
+  if (hr < 24) return hr + 'h ago';
+  const day = Math.round(hr / 24);
+  return day + 'd ago';
+}
+
 /* ─── Dashboard ───────────────────────────────────────────────────── */
 function _dashboardCardTone(el, tone = '') {
   if (!el) return;
@@ -347,7 +362,10 @@ function renderSchedules() {
     const tzLabel = s.timezone && s.timezone !== 'local' ? s.timezone : _tzDisplayLabel();
     freq += ` ${String(s.hour||0).padStart(2,'0')}:${String(s.minute||0).padStart(2,'0')} (${tzLabel})`;
 
-    const lastRun = s.last_run ? s.last_run.slice(0,16).replace('T',' ') : (_translations['gui_sched_status_never'] || 'Never run');
+    const lastRunRaw = s.last_run ? s.last_run.slice(0,16).replace('T',' ') : '';
+    const lastRun = s.last_run
+      ? `<span title="${escapeHtml(lastRunRaw)}">${escapeHtml(humanTimeAgo(s.last_run))}</span>`
+      : escapeHtml(_translations['gui_sched_status_never'] || 'Never run');
     let statusBadge = '';
     if (s.last_status === 'success') statusBadge = `<span style="color:var(--green);font-weight:700;">${_translations['gui_sched_status_success']||'Success'}</span>`;
     else if (s.last_status === 'failed') statusBadge = `<span style="color:var(--red);font-weight:700;" title="${escapeHtml(s.last_error||'')}">${_translations['gui_sched_status_failed']||'Failed'}</span>`;
@@ -362,7 +380,7 @@ function renderSchedules() {
       <td style="font-weight:600;">${escapeHtml(s.name||'')}</td>
       <td>${escapeHtml(typeLabel)}</td>
       <td style="font-size:0.85rem;">${escapeHtml(freq)}</td>
-      <td style="font-size:0.85rem;">${escapeHtml(lastRun)}</td>
+      <td style="font-size:0.85rem;">${lastRun}</td>
       <td>${statusBadge}</td>
       <td>${enabledBadge}</td>
       <td>

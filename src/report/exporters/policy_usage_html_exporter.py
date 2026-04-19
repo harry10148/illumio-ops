@@ -14,6 +14,7 @@ from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
 from .code_highlighter import get_highlight_css
+from src.humanize_ext import human_number
 
 _CSS = build_css("policy_usage")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -292,9 +293,9 @@ class PolicyUsageHtmlExporter:
 
         stats = (
             "<p>"
-            f'<span data-i18n="rpt_pu_total_rules">Total Active Rules</span>: <strong>{total}</strong> &nbsp;|&nbsp; '
-            f'<span class="badge-hit" data-i18n="rpt_pu_hit_rules">Hit Rules</span> {hit} &nbsp;|&nbsp; '
-            f'<span class="badge-unused" data-i18n="rpt_pu_unused_rules">Unused Rules</span> {unused} &nbsp;|&nbsp; '
+            f'<span data-i18n="rpt_pu_total_rules">Total Active Rules</span>: <strong>{human_number(total)}</strong> &nbsp;|&nbsp; '
+            f'<span class="badge-hit" data-i18n="rpt_pu_hit_rules">Hit Rules</span> {human_number(hit)} &nbsp;|&nbsp; '
+            f'<span class="badge-unused" data-i18n="rpt_pu_unused_rules">Unused Rules</span> {human_number(unused)} &nbsp;|&nbsp; '
             f'<span data-i18n="rpt_pu_hit_rate">Hit Rate</span>: <strong>{rate}%</strong>'
             "</p>"
         )

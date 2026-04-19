@@ -451,6 +451,23 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         app.config['SESSION_COOKIE_SECURE'] = True
     app.jinja_env.globals.update(t=t)
 
+    # ── humanize Jinja filters ─────────────────────────────────────────────────
+    from src.humanize_ext import human_time_ago as _hta, human_size as _hs, human_number as _hn
+
+    @app.template_filter("human_time_ago")
+    def _filter_hta(dt):
+        if dt is None:
+            return "-"
+        return _hta(dt)
+
+    @app.template_filter("human_size")
+    def _filter_hs(n):
+        return _hs(n) if n is not None else "-"
+
+    @app.template_filter("human_number")
+    def _filter_hn(n):
+        return _hn(n) if n is not None else "-"
+
     # ── flask-login setup ──────────────────────────────────────────────────────
     from flask_login import LoginManager, current_user, login_user, logout_user
     from src.auth_models import AdminUser, LoginForm
@@ -573,10 +590,20 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     # ??? Frontend SPA ?????????????????????????????????????????????????????
     @app.route('/')
     def index():
+        import datetime as _dt
         cm.load()
         pce_url = _get_active_pce_url(cm)
+        rules_count = len(cm.config.get("rules", []))
+        schedules_count = len(cm.config.get("report_schedules", []))
+        config_loaded_at = _dt.datetime.now()
         # csrf_token() is a Jinja2 global injected by flask-wtf CSRFProtect
-        return render_template('index.html', pce_url=pce_url)
+        return render_template(
+            'index.html',
+            pce_url=pce_url,
+            rules_count=rules_count,
+            schedules_count=schedules_count,
+            config_loaded_at=config_loaded_at,
+        )
 
     # ??? Auth Routes ??????????????????????????????????????????????????????
     @app.route('/login', methods=['GET'])

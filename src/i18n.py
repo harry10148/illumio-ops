@@ -1959,6 +1959,9 @@ _ZH_EXPLICIT.update({
     "rpt_r_remote": "遠端存取",
     "rpt_r_ringfence": "環形隔離",
     "rpt_r_staged": "分段覆蓋率",
+    "gui_rules_count": "規則數",
+    "gui_schedules_count": "排程數",
+    "gui_config_loaded": "載入時間",
 })
 
 def _humanize_key_en(key: str) -> str:

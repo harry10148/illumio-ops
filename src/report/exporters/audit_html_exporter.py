@@ -10,6 +10,7 @@ import pandas as pd
 
 from .html_exporter import _trend_deltas_section
 from .report_css import TABLE_JS, build_css
+from src.humanize_ext import human_number
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
@@ -170,7 +171,7 @@ class AuditHtmlExporter:
         summary_pills = (
             '<div class="summary-pill-row">'
             f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_period"]["en"]}</span><span class="summary-pill-value">{date_str or "N/A"}</span></div>'
-            f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_attention"]["en"]}</span><span class="summary-pill-value">{len(mod00.get("attention_items", []))}</span></div>'
+            f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_attention"]["en"]}</span><span class="summary-pill-value">{human_number(len(mod00.get("attention_items", [])))}</span></div>'
             f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_focus"]["en"]}</span><span class="summary-pill-value">{STRINGS["rpt_focus_audit"]["en"]}</span></div>'
             "</div>"
         )

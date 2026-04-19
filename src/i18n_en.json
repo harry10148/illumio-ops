@@ -1544,5 +1544,8 @@
   "rpt_r_policy": "Policy",
   "rpt_r_remote": "Remote Access",
   "rpt_r_ringfence": "Ringfence",
-  "rpt_r_staged": "Staged Coverage"
+  "rpt_r_staged": "Staged Coverage",
+  "gui_rules_count": "Rules",
+  "gui_schedules_count": "Schedules",
+  "gui_config_loaded": "Loaded"
 }
