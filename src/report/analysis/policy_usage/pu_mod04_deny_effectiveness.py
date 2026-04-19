@@ -90,6 +90,20 @@ def pu_deny_effectiveness(
     ]
     summary_df = pd.DataFrame(summary_rows)
 
+    # Chart: Deny effectiveness pie
+    chart_spec = None
+    total_for_chart = total_allow + len(deny_hit) + len(deny_unused)
+    if total_for_chart > 0:
+        chart_spec = {
+            "type": "pie",
+            "title": "Policy Decision Distribution",
+            "data": {
+                "labels": ["Allow Rules", "Deny Rules (Active)", "Deny Rules (Unused)"],
+                "values": [total_allow, len(deny_hit), len(deny_unused)],
+            },
+            "i18n": {"lang": "en"},
+        }
+
     return {
         "total_deny": total_deny,
         "total_allow": total_allow,
@@ -100,6 +114,7 @@ def pu_deny_effectiveness(
         "override_deny_count": len(override_deny),
         "deny_detail_df": deny_df,
         "deny_summary_df": summary_df,
+        "chart_spec": chart_spec,
     }
 
 def _classify_scope(providers: list, consumers: list, services: list) -> str:

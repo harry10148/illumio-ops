@@ -64,10 +64,27 @@ def pu_hit_detail(
     ]
     top_ports_df = pd.DataFrame(top_port_rows, columns=["Port / Proto", "Flow Count"])
 
+    # Chart: Top hit rules bar
+    chart_spec = None
+    if rows:
+        top_rows = sorted(rows, key=lambda r: r.get("Hit Count", 0), reverse=True)[:10]
+        labels = [(r.get("Description", "") or r.get("Rule ID", ""))[:40] for r in top_rows]
+        values = [r.get("Hit Count", 0) for r in top_rows]
+        if any(v > 0 for v in values):
+            chart_spec = {
+                "type": "bar",
+                "title": "Top 10 Hit Rules",
+                "x_label": "Rule",
+                "y_label": "Hit Count",
+                "data": {"labels": labels, "values": values},
+                "i18n": {"lang": "en"},
+            }
+
     return {
         "hit_df": hit_df,
         "record_count": len(rows),
         "top_ports_df": top_ports_df,
+        "chart_spec": chart_spec,
     }
 
 def _build_row(rule: dict, ruleset_map: dict, hit_count: int, port_detail: dict, api_client) -> dict:
