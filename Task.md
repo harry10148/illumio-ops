@@ -5,6 +5,22 @@
 
 ---
 
+## Phase 10: UX Quick Wins ✅ DONE (v3.8.0-ux, 2026-04-19)
+
+- [x] **T1**: Branch + baseline + format contract freeze test (317 baseline)
+- [x] **T2**: CSV demoted — `--format html` is new default; `gui_fmt_*` i18n keys added
+- [x] **T3**: pdf/xlsx/all parity for AuditGenerator, VenStatusGenerator, PolicyUsageGenerator (20 new parity tests)
+- [x] **T4**: Audit chart_specs — audit_mod00 (bar), audit_mod02 (bar), audit_mod03 (bar)
+- [x] **T5**: VEN chart_specs — status_chart_spec (pie), os_chart_spec (bar)
+- [x] **T6**: Policy Usage chart_specs — pu_mod02 (bar), pu_mod04 (pie)
+- [x] **T7**: chart_spec coverage regression test — 15 tests for 5 modules
+- [x] **T8**: CLI `illumio-ops rule list [--type X] [--enabled-only]` — 6 tests
+- [x] **T9**: CLI `illumio-ops workload list [--env X] [--limit N] [--enforcement X]` — 3 tests
+- [x] **T10**: rich.progress spinner on `_wait_for_async_query` — TTY-only, silent in daemon
+- [x] 366 passed, 1 skipped, 1 pre-existing flaky (subprocess timeout)
+
+---
+
 ## Phase 9: Architecture Refactor ✅ DONE (v3.7.0-refactor)
 
 - [x] **A5**: `events/shadow.py` evaluated — retained as active GUI endpoint; 17 tests added
