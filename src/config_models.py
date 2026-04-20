@@ -148,6 +148,59 @@ class Rule(_Base):
     type: str
     name: str = ""
 
+class TrafficFilterSettings(_Base):
+    model_config = ConfigDict(extra="ignore")
+    actions: list[str] = Field(default_factory=lambda: ["blocked", "potentially_blocked"])
+    workload_label_env: list[str] = Field(default_factory=list)
+    ports: list[int] = Field(default_factory=list)
+    protocols: list[str] = Field(default_factory=list)
+    exclude_src_ips: list[str] = Field(default_factory=list)
+
+
+class TrafficSamplingSettings(_Base):
+    model_config = ConfigDict(extra="ignore")
+    sample_ratio_allowed: int = Field(default=1, ge=1)
+    max_rows_per_batch: int = Field(default=200000, ge=1, le=200000)
+
+
+class PceCacheSettings(_Base):
+    model_config = ConfigDict(extra="ignore")
+    enabled: bool = False
+    db_path: str = "data/pce_cache.sqlite"
+    events_retention_days: int = Field(default=90, ge=1)
+    traffic_raw_retention_days: int = Field(default=7, ge=1)
+    traffic_agg_retention_days: int = Field(default=90, ge=1)
+    events_poll_interval_seconds: int = Field(default=300, ge=30)
+    traffic_poll_interval_seconds: int = Field(default=3600, ge=60)
+    rate_limit_per_minute: int = Field(default=400, ge=10, le=500)
+    async_threshold_events: int = Field(default=10000, ge=1, le=10000)
+    traffic_filter: TrafficFilterSettings = Field(default_factory=TrafficFilterSettings)
+    traffic_sampling: TrafficSamplingSettings = Field(default_factory=TrafficSamplingSettings)
+
+
+class SiemDestinationSettings(_Base):
+    model_config = ConfigDict(extra="ignore")
+    name: str = Field(min_length=1, max_length=64)
+    enabled: bool = True
+    transport: str = "udp"  # udp|tcp|tls|hec
+    format: str = "cef"    # cef|json|syslog_cef|syslog_json
+    endpoint: str = ""
+    tls_verify: bool = True
+    tls_ca_bundle: Optional[str] = None
+    hec_token: Optional[str] = None
+    batch_size: int = Field(default=100, ge=1, le=10000)
+    source_types: list[str] = Field(default_factory=lambda: ["audit", "traffic"])
+    max_retries: int = Field(default=10, ge=0)
+
+
+class SiemForwarderSettings(_Base):
+    model_config = ConfigDict(extra="ignore")
+    enabled: bool = False
+    destinations: list[SiemDestinationSettings] = Field(default_factory=list)
+    dlq_max_per_dest: int = Field(default=10000, ge=100)
+    dispatch_tick_seconds: int = Field(default=5, ge=1)
+
+
 class ConfigSchema(_Base):
     api: ApiSettings = Field(default_factory=ApiSettings)
     alerts: AlertsSettings = Field(default_factory=AlertsSettings)
@@ -165,3 +218,5 @@ class ConfigSchema(_Base):
     logging: LoggingSettings = Field(default_factory=LoggingSettings)
     # Written by apply_best_practices(); must survive pydantic round-trips.
     rule_backups: list = Field(default_factory=list)
+    pce_cache: PceCacheSettings = Field(default_factory=PceCacheSettings)
+    siem: SiemForwarderSettings = Field(default_factory=SiemForwarderSettings)

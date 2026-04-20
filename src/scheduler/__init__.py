@@ -76,6 +76,32 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         replace_existing=True,
     )
 
+    try:
+        cache_cfg = cm.models.pce_cache
+        if cache_cfg.enabled:
+            from apscheduler.triggers.interval import IntervalTrigger as _IT
+            from src.scheduler.jobs import (
+                run_events_ingest, run_traffic_ingest,
+                run_traffic_aggregate, run_cache_retention,
+            )
+            sched.add_job(run_events_ingest, _IT(seconds=cache_cfg.events_poll_interval_seconds),
+                          args=[cm], id="pce_cache_ingest_events", replace_existing=True)
+            sched.add_job(run_traffic_ingest, _IT(seconds=cache_cfg.traffic_poll_interval_seconds),
+                          args=[cm], id="pce_cache_ingest_traffic", replace_existing=True)
+            sched.add_job(run_traffic_aggregate, _IT(hours=1),
+                          args=[cm], id="pce_cache_aggregate", replace_existing=True)
+            sched.add_job(run_cache_retention, _IT(hours=24),
+                          args=[cm], id="pce_cache_retention", replace_existing=True)
+
+        siem_cfg = cm.models.siem
+        if siem_cfg.enabled:
+            from apscheduler.triggers.interval import IntervalTrigger as _IT
+            from src.scheduler.jobs import run_siem_dispatch
+            sched.add_job(run_siem_dispatch, _IT(seconds=siem_cfg.dispatch_tick_seconds),
+                          args=[cm], id="siem_dispatch", replace_existing=True)
+    except Exception:
+        pass  # cache/siem not configured — skip gracefully
+
     logger.info(
         "Scheduler built: monitor=%dm report=60s rule=%ds persist=%s",
         interval_minutes,

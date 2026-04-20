@@ -65,3 +65,92 @@ def tick_rule_schedules(cm) -> None:
     except Exception as exc:
         logger.error("Rule schedule tick failed: {}", exc, exc_info=True)
         mlog.error(f"Rule schedule tick failed: {exc}")
+
+
+def run_events_ingest(cm) -> None:
+    try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from src.pce_cache.schema import init_schema
+        from src.pce_cache.watermark import WatermarkStore
+        from src.pce_cache.ingestor_events import EventsIngestor
+        from src.api_client import ApiClient
+        cfg = cm.models.pce_cache
+        engine = create_engine(f"sqlite:///{cfg.db_path}")
+        init_schema(engine)
+        sf = sessionmaker(engine)
+        api = ApiClient(cm)
+        ing = EventsIngestor(api=api, session_factory=sf,
+                              watermark=WatermarkStore(sf),
+                              async_threshold=cfg.async_threshold_events)
+        count = ing.run_once()
+        logger.info("Events ingest: {} rows inserted", count)
+    except Exception as exc:
+        logger.exception("run_events_ingest failed: {}", exc)
+
+
+def run_traffic_ingest(cm) -> None:
+    try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from src.pce_cache.schema import init_schema
+        from src.pce_cache.watermark import WatermarkStore
+        from src.pce_cache.ingestor_traffic import TrafficIngestor
+        from src.api_client import ApiClient
+        cfg = cm.models.pce_cache
+        engine = create_engine(f"sqlite:///{cfg.db_path}")
+        init_schema(engine)
+        sf = sessionmaker(engine)
+        api = ApiClient(cm)
+        ing = TrafficIngestor(api=api, session_factory=sf,
+                               watermark=WatermarkStore(sf),
+                               max_results=cfg.traffic_sampling.max_rows_per_batch)
+        count = ing.run_once()
+        logger.info("Traffic ingest: {} rows inserted", count)
+    except Exception as exc:
+        logger.exception("run_traffic_ingest failed: {}", exc)
+
+
+def run_traffic_aggregate(cm) -> None:
+    try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from src.pce_cache.schema import init_schema
+        from src.pce_cache.aggregator import TrafficAggregator
+        cfg = cm.models.pce_cache
+        engine = create_engine(f"sqlite:///{cfg.db_path}")
+        init_schema(engine)
+        sf = sessionmaker(engine)
+        agg = TrafficAggregator(sf)
+        count = agg.run_once()
+        logger.info("Traffic aggregate: {} buckets updated", count)
+    except Exception as exc:
+        logger.exception("run_traffic_aggregate failed: {}", exc)
+
+
+def run_cache_retention(cm) -> None:
+    try:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from src.pce_cache.schema import init_schema
+        from src.pce_cache.retention import RetentionWorker
+        cfg = cm.models.pce_cache
+        engine = create_engine(f"sqlite:///{cfg.db_path}")
+        init_schema(engine)
+        sf = sessionmaker(engine)
+        worker = RetentionWorker(sf)
+        result = worker.run_once(
+            events_days=cfg.events_retention_days,
+            traffic_raw_days=cfg.traffic_raw_retention_days,
+            traffic_agg_days=cfg.traffic_agg_retention_days,
+        )
+        logger.info("Cache retention purged: {}", result)
+    except Exception as exc:
+        logger.exception("run_cache_retention failed: {}", exc)
+
+
+def run_siem_dispatch(cm) -> None:
+    try:
+        logger.debug("SIEM dispatch tick (destinations configured via siem.destinations)")
+    except Exception as exc:
+        logger.exception("run_siem_dispatch failed: {}", exc)

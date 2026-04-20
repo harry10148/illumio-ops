@@ -99,5 +99,21 @@
         "enabled": false,
         "check_interval_seconds": 300
     },
-    "report_schedules": []
+    "report_schedules": [],
+  "pce_cache": {
+    "enabled": false,
+    "db_path": "data/pce_cache.sqlite",
+    "events_retention_days": 90,
+    "traffic_raw_retention_days": 7,
+    "traffic_agg_retention_days": 90,
+    "events_poll_interval_seconds": 300,
+    "traffic_poll_interval_seconds": 3600,
+    "rate_limit_per_minute": 400
+  },
+  "siem": {
+    "enabled": false,
+    "destinations": [],
+    "dlq_max_per_dest": 10000,
+    "dispatch_tick_seconds": 5
+  }
 }

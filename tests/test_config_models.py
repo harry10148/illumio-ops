@@ -86,3 +86,26 @@ def test_dumped_model_has_all_legacy_dict_keys():
                       "report", "report_schedules", "pce_profiles",
                       "active_pce_id", "rule_scheduler", "web_gui"):
         assert top_level in dumped, f"missing {top_level} in model_dump()"
+
+
+def test_pce_cache_settings_defaults():
+    from src.config_models import PceCacheSettings
+    cfg = PceCacheSettings()
+    assert cfg.enabled is False
+    assert cfg.rate_limit_per_minute == 400
+    assert cfg.events_retention_days == 90
+
+
+def test_pce_cache_settings_validation():
+    from src.config_models import PceCacheSettings
+    import pytest
+    with pytest.raises(Exception):
+        PceCacheSettings(rate_limit_per_minute=600)  # > 500 should fail
+
+
+def test_siem_forwarder_settings_defaults():
+    from src.config_models import SiemForwarderSettings
+    cfg = SiemForwarderSettings()
+    assert cfg.enabled is False
+    assert cfg.destinations == []
+    assert cfg.dispatch_tick_seconds == 5
