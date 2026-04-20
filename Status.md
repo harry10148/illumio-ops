@@ -1,9 +1,9 @@
 # Project Status — illumio_ops
 
 **As of:** 2026-04-20  
-**Version:** v3.10.0-polish (Phase 12 Polish complete)  
-**Branch:** feature/phase-13-siem-cache (Phase 13 in progress)
-**Phase:** 12 phases shipped; Phase 13–15 in progress  
+**Version:** v3.11.0-siem-cache (Phase 13 Complete)  
+**Branch:** feature/phase-13-siem-cache (PR open, pending merge)
+**Phase:** 13 phases shipped; Phase 14–15 planned  
 **Code Review Date:** 2026-04-13  
 **i18n Overhaul:** 2026-04-18 — see Task.md i18n-P1..P7 (all done)
 **CLI Audit Note:** 2026-04-19 — legacy `Rules > Manage` menu command parser fixed: prompt now documents `m`/`d` syntax, `h/?` help now works, invalid formats return actionable guidance, rule edit no longer deletes the original rule before confirmation, and regression tests cover help/delete/modify/error paths.
@@ -16,29 +16,21 @@
 
 ---
 
-## Phase 13–15 — IN PROGRESS (2026-04-20)
+## Phase 13 Complete (v3.11.0-siem-cache, 2026-04-20)
 
-New feature: push PCE audit events + traffic flows to SIEM, with a shared local SQLite cache that also serves reports and alerts. Split into three phases for safer rollout.
+- PCE cache layer: SQLite 6-table schema (WAL), token-bucket rate limiter, per-source watermarks, events ingestor (sync≤10k/async>10k), traffic ingestor (async-first, 200k cap, filter+sample), daily aggregator, retention worker
+- SIEM forwarder layer: CEF 0.1 + JSON Lines formatters with RFC5424 wrapper, UDP/TCP/TLS/HEC transports, dispatcher with exponential backoff (cap 1h), DLQ with replay/purge
+- APScheduler: 4 cache jobs + 1 siem job behind `pce_cache.enabled`/`siem.enabled` flags (default OFF)
+- CLI: `illumio-ops siem test|status|replay|purge|dlq`
+- GUI: `/api/siem/` blueprint (destinations CRUD + DLQ admin)
+- Docs: `docs/PCE_Cache.md`, `docs/SIEM_Forwarder.md`, `docs/SIEM_Integration.md` updated
+- E2E test: 3 events + 10 flows ingested → 13 CEF lines dispatched via loopback transport
+- Tests: 523 passed (baseline 465, +58 new), 1 skipped, i18n audit 0 findings
 
-**Phase 13 T1 Complete (2026-04-20)**: Branch `feature/phase-13-siem-cache` created. Package skeleton scaffolded: `src/pce_cache/`, `src/siem/formatters/`, `src/siem/transports/`. All 465 tests passing, 1 skipped.
+---
 
-**Phase 13 T3 Complete (2026-04-20)**: Token-bucket rate limiter (`src/pce_cache/rate_limiter.py`) with `GlobalRateLimiter`, `get_rate_limiter()` singleton, and `reset_for_tests()`. `ApiClient._request()` gains opt-in `rate_limit=False` parameter; guard reads `pce_cache.rate_limit_per_minute` from config (default 400). 471 passed, 1 skipped.
+## Phase 14–15 — PLANNED
 
-**Phase 13 T5 Complete (2026-04-20)**: `EventsIngestor` (`src/pce_cache/ingestor_events.py`) — sync pull (≤async_threshold), auto-switch to async when cap hit, duplicate-skip via `IntegrityError` on unique `pce_href`, watermark advance after each batch. `ApiClient` gains `get_events()` wrapper and `get_events_async()` stub. 477 passed, 1 skipped (+3 new tests).
-
-**Phase 13 T6 Complete (2026-04-20)**: `TrafficFilter` + `TrafficSampler` (`src/pce_cache/traffic_filter.py`) — filter passes/rejects flow dicts by actions/ports/protocols/src-IP exclusion, sampler applies deterministic 1:N drop to allowed flows using stable hash(src_ip|dst_ip|port). 482 passed, 1 skipped (+5 new tests).
-
-**Phase 13 T7 Complete (2026-04-20)**: `TrafficIngestor` (`src/pce_cache/ingestor_traffic.py`) — async-only pull via `get_traffic_flows_async`, 200k cap, deduplicates on SHA1 `flow_hash`, filter+sampler applied per flow, watermark advance with 5-min grace window. Also fixed `BigInteger` PK autoincrement on SQLite (changed all id PKs to `Integer` in models.py). `ApiClient` gains `get_traffic_flows_async()` stub. 485 passed, 1 skipped (+3 new tests).
-
-**Phase 13 T9 Complete (2026-04-20)**: `RetentionWorker` (`src/pce_cache/retention.py`) — per-table TTL purge (events/traffic_raw/traffic_agg/dead_letter) with configurable days thresholds (default 90/7/90/30). Each purge runs in its own transaction; `run_once()` returns dict with rowcount per table. 490 passed, 1 skipped (+3 new tests).
-
-**Phase 13 T10 Complete (2026-04-20)**: SIEM formatters (`src/siem/formatters/`) — base ABC, CEF 0.1 (severity map, timestamp→epoch-ms), JSON Lines (orjson), RFC5424 syslog header wrapper. 499 passed, 1 skipped (+9 new tests).
-
-**Phase 13 T11 Complete (2026-04-20)**: SIEM transports (`src/siem/transports/`) — `Transport` ABC, `SyslogUDPTransport` (sendto, MTU warning), `SyslogTCPTransport` (lazy connect, auto-reconnect on broken pipe, thread-safe lock), `SyslogTLSTransport` (ssl.create_default_context, CERT_NONE opt-out, reconnect), `SplunkHECTransport` (requests session, urllib3 Retry 3×, 429/5xx forcelist). 505 passed, 1 skipped (+6 new tests).
-
-**Phase 13 T14 Complete (2026-04-20)**: `illumio-ops siem` CLI group (`src/cli/siem.py`) — 5 subcommands: `test` (synthetic event → destination), `status` (per-dest dispatch count table), `replay` (DLQ → pending requeue), `purge` (delete DLQ entries older than N days), `dlq` (list DLQ entries). Registered in `src/cli/root.py`; `"siem"` added to `_CLICK_SUBCOMMANDS` in `illumio_ops.py`. i18n keys added (EN + ZH). 518 passed, 1 skipped (+4 new tests).
-
-- **Phase 13** — PCE cache (SQLite, 6 tables) + SIEM forwarder (CEF/JSON over UDP/TCP/TLS/HEC) + DLQ. Infrastructure PR. Plan: [docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md](docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md). Target tag: `v3.11.0-siem-cache`.
 - **Phase 14** — `AuditGenerator` + `ReportGenerator` read from cache when range in retention, backfill CLI for out-of-range. Plan: [docs/superpowers/plans/2026-04-19-phase-14-reports-on-cache.md](docs/superpowers/plans/2026-04-19-phase-14-reports-on-cache.md). Target tag: `v3.12.0-reports-cache`.
 - **Phase 15** — `Analyzer` + `EventPoller` subscribe to cache via `ingested_at`-cursor; enables 30s monitor tick without breaching PCE 500/min. Plan: [docs/superpowers/plans/2026-04-19-phase-15-alerts-on-cache.md](docs/superpowers/plans/2026-04-19-phase-15-alerts-on-cache.md). Target tag: `v3.13.0-alerts-cache`.
 - **Roadmap** — [docs/superpowers/plans/2026-04-19-phase-13-14-15-roadmap.md](docs/superpowers/plans/2026-04-19-phase-13-14-15-roadmap.md) with 15 confirmed design decisions.

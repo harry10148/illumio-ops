@@ -1,6 +1,6 @@
 # Active Tasks — illumio_ops
 
-**As of:** 2026-04-19  
+**As of:** 2026-04-20  
 **Source:** Code Review (full project analysis) + Upgrade Roadmap
 
 ---
@@ -35,14 +35,14 @@
 
 ---
 
-## Phase 13: PCE Cache + SIEM Forwarder 📋 PLANNED (2026-04-19)
+## Phase 13: PCE Cache + SIEM Forwarder ✅ DONE (v3.11.0-siem-cache, 2026-04-20)
 
 Plan: [docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md](docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md) • Target tag: `v3.11.0-siem-cache` • Branch: `feature/phase-13-siem-cache`
 
 - [x] **T1**: Branch + baseline (465 passed, branch `feature/phase-13-siem-cache` created, package skeleton scaffolded)
-- [ ] **T2**: SQLAlchemy models + WAL schema (6 tables: events / traffic_raw / traffic_agg / watermarks / dispatch / dead_letter)
+- [x] **T2**: SQLAlchemy models + WAL schema (6 tables: events / traffic_raw / traffic_agg / watermarks / dispatch / dead_letter)
 - [x] **T3**: Global rate limiter (token bucket, 400/min default) + `ApiClient._request(rate_limit=...)` feature flag
-- [ ] **T4**: Watermark store (per-source cursor with error recording)
+- [x] **T4**: Watermark store (per-source cursor with error recording)
 - [x] **T5**: Events ingestor (sync ≤ 10k, async via `Prefer: respond-async` beyond)
 - [x] **T6**: Traffic filter + deterministic sampler (`hash(src,dst,port)` for idempotent drops)
 - [x] **T7**: Traffic ingestor (async `/traffic_flows/async_queries`, 200k cap, filter+sample applied)
@@ -53,9 +53,9 @@ Plan: [docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md](docs/su
 - [x] **T12**: Dispatcher + DLQ with exponential backoff (cap 1h) and quarantine after N retries
 - [x] **T13**: Config models (pydantic v2) + APScheduler job registration behind flags
 - [x] **T14**: CLI `illumio-ops siem test|status|replay|purge|dlq` — `src/cli/siem.py`, registered in root.py + illumio_ops.py, i18n EN+ZH, 4 tests, 518 total pass
-- [ ] **T15**: Flask blueprint `/api/siem/` — destinations CRUD + DLQ admin + UDP warning banner
-- [ ] **T16**: Docs — `docs/PCE_Cache.md`, `docs/SIEM_Forwarder.md`, update `docs/SIEM_Integration.md`
-- [ ] **T17**: E2E test + i18n audit + Status/Task updates + PR + tag
+- [x] **T15**: Flask blueprint `/api/siem/` — destinations CRUD + DLQ admin + UDP warning banner
+- [x] **T16**: Docs — `docs/PCE_Cache.md`, `docs/SIEM_Forwarder.md`, update `docs/SIEM_Integration.md`
+- [x] **T17**: E2E test (523 passed) + i18n audit (0 findings) + Status/Task updates + PR + tag
 
 ---
 
