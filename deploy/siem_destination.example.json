@@ -1,0 +1,44 @@
+[
+  {
+    "_comment": "Splunk HEC example — uncomment and fill in your values",
+    "name": "splunk-hec",
+    "enabled": false,
+    "transport": "hec",
+    "format": "json",
+    "endpoint": "https://splunk.example.com:8088",
+    "hec_token": "YOUR-HEC-TOKEN-HERE",
+    "source_types": ["audit", "traffic"],
+    "max_retries": 10
+  },
+  {
+    "_comment": "Syslog TCP+TLS example (QRadar, LogRhythm, etc.)",
+    "name": "syslog-tls",
+    "enabled": false,
+    "transport": "tls",
+    "format": "syslog_cef",
+    "endpoint": "siem.example.com:6514",
+    "tls_verify": true,
+    "source_types": ["audit"],
+    "max_retries": 10
+  },
+  {
+    "_comment": "Plain TCP syslog — internal/dev use only",
+    "name": "syslog-tcp",
+    "enabled": false,
+    "transport": "tcp",
+    "format": "cef",
+    "endpoint": "syslog.internal:514",
+    "source_types": ["audit", "traffic"],
+    "max_retries": 5
+  },
+  {
+    "_comment": "UDP syslog — WARNING: no delivery guarantee",
+    "name": "syslog-udp",
+    "enabled": false,
+    "transport": "udp",
+    "format": "cef",
+    "endpoint": "syslog.internal:514",
+    "source_types": ["audit"],
+    "max_retries": 0
+  }
+]

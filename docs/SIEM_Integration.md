@@ -3,6 +3,20 @@
 illumio_ops emits structured JSON logs when the loguru JSON sink is enabled.
 This document shows how to ship those logs to Splunk / Elastic / QRadar / Sentinel.
 
+## Option E — Built-in Forwarder (Recommended for On-Box Push)
+
+illumio_ops v3.11+ includes a native SIEM forwarder that pushes PCE audit events and traffic flows directly to your SIEM over UDP, TCP, TCP+TLS, or Splunk HEC — no sidecar required.
+
+**Advantages over file-based options (A–D):**
+- Pushes PCE API data (not just app logs): audit events, traffic flows, policy decisions
+- Built-in DLQ with replay — no events lost during SIEM downtime
+- CEF 0.1 and JSON Lines format with optional RFC5424 syslog envelope
+- Rate-limited ingestor respects the PCE 500 req/min budget
+
+**Quick start:** See [`docs/SIEM_Forwarder.md`](SIEM_Forwarder.md).
+
+---
+
 ## 1. Enable the JSON sink
 
 In `config/config.json`, set:
