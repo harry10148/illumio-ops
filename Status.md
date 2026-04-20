@@ -22,6 +22,14 @@ New feature: push PCE audit events + traffic flows to SIEM, with a shared local 
 
 **Phase 13 T1 Complete (2026-04-20)**: Branch `feature/phase-13-siem-cache` created. Package skeleton scaffolded: `src/pce_cache/`, `src/siem/formatters/`, `src/siem/transports/`. All 465 tests passing, 1 skipped.
 
+**Phase 13 T3 Complete (2026-04-20)**: Token-bucket rate limiter (`src/pce_cache/rate_limiter.py`) with `GlobalRateLimiter`, `get_rate_limiter()` singleton, and `reset_for_tests()`. `ApiClient._request()` gains opt-in `rate_limit=False` parameter; guard reads `pce_cache.rate_limit_per_minute` from config (default 400). 471 passed, 1 skipped.
+
+**Phase 13 T5 Complete (2026-04-20)**: `EventsIngestor` (`src/pce_cache/ingestor_events.py`) — sync pull (≤async_threshold), auto-switch to async when cap hit, duplicate-skip via `IntegrityError` on unique `pce_href`, watermark advance after each batch. `ApiClient` gains `get_events()` wrapper and `get_events_async()` stub. 477 passed, 1 skipped (+3 new tests).
+
+**Phase 13 T6 Complete (2026-04-20)**: `TrafficFilter` + `TrafficSampler` (`src/pce_cache/traffic_filter.py`) — filter passes/rejects flow dicts by actions/ports/protocols/src-IP exclusion, sampler applies deterministic 1:N drop to allowed flows using stable hash(src_ip|dst_ip|port). 482 passed, 1 skipped (+5 new tests).
+
+**Phase 13 T7 Complete (2026-04-20)**: `TrafficIngestor` (`src/pce_cache/ingestor_traffic.py`) — async-only pull via `get_traffic_flows_async`, 200k cap, deduplicates on SHA1 `flow_hash`, filter+sampler applied per flow, watermark advance with 5-min grace window. Also fixed `BigInteger` PK autoincrement on SQLite (changed all id PKs to `Integer` in models.py). `ApiClient` gains `get_traffic_flows_async()` stub. 485 passed, 1 skipped (+3 new tests).
+
 - **Phase 13** — PCE cache (SQLite, 6 tables) + SIEM forwarder (CEF/JSON over UDP/TCP/TLS/HEC) + DLQ. Infrastructure PR. Plan: [docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md](docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md). Target tag: `v3.11.0-siem-cache`.
 - **Phase 14** — `AuditGenerator` + `ReportGenerator` read from cache when range in retention, backfill CLI for out-of-range. Plan: [docs/superpowers/plans/2026-04-19-phase-14-reports-on-cache.md](docs/superpowers/plans/2026-04-19-phase-14-reports-on-cache.md). Target tag: `v3.12.0-reports-cache`.
 - **Phase 15** — `Analyzer` + `EventPoller` subscribe to cache via `ingested_at`-cursor; enables 30s monitor tick without breaching PCE 500/min. Plan: [docs/superpowers/plans/2026-04-19-phase-15-alerts-on-cache.md](docs/superpowers/plans/2026-04-19-phase-15-alerts-on-cache.md). Target tag: `v3.13.0-alerts-cache`.

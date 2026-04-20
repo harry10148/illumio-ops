@@ -41,11 +41,11 @@ Plan: [docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md](docs/su
 
 - [x] **T1**: Branch + baseline (465 passed, branch `feature/phase-13-siem-cache` created, package skeleton scaffolded)
 - [ ] **T2**: SQLAlchemy models + WAL schema (6 tables: events / traffic_raw / traffic_agg / watermarks / dispatch / dead_letter)
-- [ ] **T3**: Global rate limiter (token bucket, 400/min default) + `ApiClient._request(rate_limit=...)` feature flag
+- [x] **T3**: Global rate limiter (token bucket, 400/min default) + `ApiClient._request(rate_limit=...)` feature flag
 - [ ] **T4**: Watermark store (per-source cursor with error recording)
-- [ ] **T5**: Events ingestor (sync ≤ 10k, async via `Prefer: respond-async` beyond)
-- [ ] **T6**: Traffic filter + deterministic sampler (`hash(src,dst,port)` for idempotent drops)
-- [ ] **T7**: Traffic ingestor (async `/traffic_flows/async_queries`, 200k cap, filter+sample applied)
+- [x] **T5**: Events ingestor (sync ≤ 10k, async via `Prefer: respond-async` beyond)
+- [x] **T6**: Traffic filter + deterministic sampler (`hash(src,dst,port)` for idempotent drops)
+- [x] **T7**: Traffic ingestor (async `/traffic_flows/async_queries`, 200k cap, filter+sample applied)
 - [ ] **T8**: Traffic aggregator (daily rollup to `pce_traffic_flows_agg`, idempotent UPSERT)
 - [ ] **T9**: Retention worker (per-table TTL purge)
 - [ ] **T10**: Formatters — CEF + JSON Lines + RFC5424 syslog header wrapper
