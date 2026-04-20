@@ -27,13 +27,19 @@
 - [x] Fixed single-IP mismatch for IPv4-mapped IPv6 remotes and loopback equivalence in [src/gui.py](/mnt/d/OneDrive/RD/illumio_ops/src/gui.py).
 - [x] Added regression coverage for exact-IP allowlist, mapped IPv6 remotes, and allowlist normalization in [tests/test_gui_security.py](/mnt/d/OneDrive/RD/illumio_ops/tests/test_gui_security.py).
 
+## Repository Cleanup (2026-04-20)
+
+- [x] Removed all remaining `upgrade/*` local branches.
+- [x] Removed the remaining `upgrade/*` remote branch (`origin/upgrade/phase-11-charts-dashboard`).
+- [x] Removed all `upgrade/*` worktrees and pruned stale worktree metadata; only the main worktree remains.
+
 ---
 
 ## Phase 13: PCE Cache + SIEM Forwarder 📋 PLANNED (2026-04-19)
 
 Plan: [docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md](docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md) • Target tag: `v3.11.0-siem-cache` • Branch: `feature/phase-13-siem-cache`
 
-- [ ] **T1**: Branch + baseline (422 passed)
+- [x] **T1**: Branch + baseline (465 passed, branch `feature/phase-13-siem-cache` created, package skeleton scaffolded)
 - [ ] **T2**: SQLAlchemy models + WAL schema (6 tables: events / traffic_raw / traffic_agg / watermarks / dispatch / dead_letter)
 - [ ] **T3**: Global rate limiter (token bucket, 400/min default) + `ApiClient._request(rate_limit=...)` feature flag
 - [ ] **T4**: Watermark store (per-source cursor with error recording)

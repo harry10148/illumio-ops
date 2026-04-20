@@ -1,23 +1,26 @@
 # Project Status — illumio_ops
 
-**As of:** 2026-04-19  
+**As of:** 2026-04-20  
 **Version:** v3.10.0-polish (Phase 12 Polish complete)  
-**Branch:** main  
-**Phase:** 12 phases shipped; Phase 13–15 **planned 2026-04-19, not started**  
+**Branch:** feature/phase-13-siem-cache (Phase 13 in progress)
+**Phase:** 12 phases shipped; Phase 13–15 in progress  
 **Code Review Date:** 2026-04-13  
 **i18n Overhaul:** 2026-04-18 — see Task.md i18n-P1..P7 (all done)
 **CLI Audit Note:** 2026-04-19 — legacy `Rules > Manage` menu command parser fixed: prompt now documents `m`/`d` syntax, `h/?` help now works, invalid formats return actionable guidance, rule edit no longer deletes the original rule before confirmation, and regression tests cover help/delete/modify/error paths.
 **CLI Review Note:** 2026-04-19 — broader CLI audit completed. The three follow-up gaps are now fixed: click `report` supports `audit` / `ven-status` / `policy-usage`, legacy `--report-type` is restored for argparse compatibility, `workload list --limit` now rejects non-positive values at parse time, and rule-scheduler management no longer exits on blank Enter. Targeted CLI regression suite: `68 passed`. Additional CLI compatibility matrix verification (legacy flags + click dispatch): `41 passed`.
 **GUI IP Allowlist Note:** 2026-04-19 — reviewed the source-IP trust / allowlist path in Web GUI. Root cause for “single IP not effective” was address-format mismatch: exact IPv4 entries such as `192.168.1.1` did not match IPv4-mapped IPv6 remotes such as `::ffff:192.168.1.1`, and loopback variants `127.0.0.1` / `::1` were also treated as different. `src/gui.py` now normalizes addresses/networks before validation and matching. Targeted GUI allowlist verification: `5 passed`.
+**Branch Cleanup Note:** 2026-04-20 — all remaining `upgrade/*` branches and worktrees were intentionally removed per operator request. Removed local branches: `upgrade/phase-11-charts-dashboard`, `upgrade/phase-12-polish`, `upgrade/phase-4-web-security`, `upgrade/phase-5-reports-rich`, `upgrade/phase-6-scheduler-aps`. Removed remote branch: `origin/upgrade/phase-11-charts-dashboard`. `git worktree list` now shows only the main worktree.
 **Bug Fixes (2026-04-19):**
 - `illumio_ops.py`: Added `rule`, `workload`, `config` to `_CLICK_SUBCOMMANDS` — these subcommands were silently falling back to the interactive menu instead of routing to the click CLI.
 - `src/utils.py` + `src/settings.py`: Fixed wizard silent-exit bug — `safe_input()` now returns action=`"empty"` (not `"back"`) for empty Enter on int fields; traffic/bandwidth wizard callers distinguish "skip to default" vs "go back" and no longer exit mid-wizard when user presses Enter.
 
 ---
 
-## Phase 13–15 — PLANNED (2026-04-19, not started)
+## Phase 13–15 — IN PROGRESS (2026-04-20)
 
 New feature: push PCE audit events + traffic flows to SIEM, with a shared local SQLite cache that also serves reports and alerts. Split into three phases for safer rollout.
+
+**Phase 13 T1 Complete (2026-04-20)**: Branch `feature/phase-13-siem-cache` created. Package skeleton scaffolded: `src/pce_cache/`, `src/siem/formatters/`, `src/siem/transports/`. All 465 tests passing, 1 skipped.
 
 - **Phase 13** — PCE cache (SQLite, 6 tables) + SIEM forwarder (CEF/JSON over UDP/TCP/TLS/HEC) + DLQ. Infrastructure PR. Plan: [docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md](docs/superpowers/plans/2026-04-19-phase-13-pce-cache-and-siem.md). Target tag: `v3.11.0-siem-cache`.
 - **Phase 14** — `AuditGenerator` + `ReportGenerator` read from cache when range in retention, backfill CLI for out-of-range. Plan: [docs/superpowers/plans/2026-04-19-phase-14-reports-on-cache.md](docs/superpowers/plans/2026-04-19-phase-14-reports-on-cache.md). Target tag: `v3.12.0-reports-cache`.
