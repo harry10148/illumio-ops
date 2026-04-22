@@ -42,51 +42,111 @@ rcParams["font.family"] = ["Noto Sans CJK TC", "Microsoft JhengHei",
                             "PingFang TC", "Heiti TC", "sans-serif"]
 rcParams["axes.unicode_minus"] = False  # minus sign glitch fix
 
+_PALETTE = [
+    "#FF5500", "#FFA22F", "#299B65", "#375379", "#857ad6",
+    "#38BDF8", "#F43F51", "#10B981", "#F59E0B", "#6366F1",
+]
+
+_BASE_LAYOUT = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(family="Montserrat, -apple-system, sans-serif", size=13, color="#313638"),
+    title_font=dict(size=15, color="#1A2C32", family="Montserrat, sans-serif"),
+    margin=dict(l=48, r=24, t=52, b=48),
+    legend=dict(
+        bgcolor="rgba(247,244,238,0.88)",
+        bordercolor="#D6D7D7",
+        borderwidth=1,
+        font=dict(size=12),
+    ),
+    hoverlabel=dict(
+        bgcolor="#1A2C32",
+        font=dict(color="#fff", size=12),
+        bordercolor="#2D454C",
+    ),
+)
+
+
+def _apply_base_layout(fig, title: str, x_label: str = "", y_label: str = "") -> None:
+    updates = dict(**_BASE_LAYOUT, title=dict(text=title, x=0.04, xanchor="left"))
+    if x_label or y_label:
+        updates["xaxis"] = dict(
+            title=x_label,
+            gridcolor="rgba(50,81,88,0.10)",
+            linecolor="rgba(50,81,88,0.18)",
+            tickfont=dict(size=11),
+        )
+        updates["yaxis"] = dict(
+            title=y_label,
+            gridcolor="rgba(50,81,88,0.10)",
+            linecolor="rgba(50,81,88,0.18)",
+            tickfont=dict(size=11),
+        )
+    fig.update_layout(**updates)
+
+
 def render_plotly_html(spec: dict[str, Any]) -> str:
-    """Render chart spec as a plotly HTML div (offline, self-contained)."""
+    """Render chart spec as a styled plotly HTML div (offline, self-contained)."""
     chart_type = spec.get("type")
     data = spec.get("data", {})
     title = spec.get("title", "")
 
     if chart_type == "bar":
+        labels = data.get("labels", [])
+        values = data.get("values", [])
+        colors = [_PALETTE[i % len(_PALETTE)] for i in range(len(labels))]
         fig = go.Figure(go.Bar(
-            x=data.get("labels", []),
-            y=data.get("values", []),
-            marker_color="rgb(55, 83, 109)",
+            x=labels,
+            y=values,
+            marker=dict(color=colors, line=dict(color="rgba(0,0,0,0.08)", width=1)),
+            hovertemplate="%{x}<br><b>%{y:,}</b><extra></extra>",
         ))
-        fig.update_layout(
-            title=title,
-            xaxis_title=spec.get("x_label", ""),
-            yaxis_title=spec.get("y_label", ""),
-        )
+        _apply_base_layout(fig, title, spec.get("x_label", ""), spec.get("y_label", ""))
+        fig.update_layout(bargap=0.28)
     elif chart_type == "pie":
+        labels = data.get("labels", [])
+        values = data.get("values", [])
         fig = go.Figure(go.Pie(
-            labels=data.get("labels", []),
-            values=data.get("values", []),
-            hole=0.3,
+            labels=labels,
+            values=values,
+            hole=0.38,
+            marker=dict(
+                colors=_PALETTE[:len(labels)],
+                line=dict(color="#ffffff", width=2),
+            ),
+            textfont=dict(size=12, family="Montserrat, sans-serif"),
+            hovertemplate="<b>%{label}</b><br>%{value:,} (%{percent})<extra></extra>",
+            pull=[0.04] + [0] * max(0, len(labels) - 1),
         ))
-        fig.update_layout(title=title)
+        _apply_base_layout(fig, title)
+        fig.update_layout(
+            legend=dict(**_BASE_LAYOUT["legend"], orientation="v", x=1.02, y=0.5),
+            margin=dict(l=24, r=160, t=52, b=24),
+        )
     elif chart_type == "line":
         fig = go.Figure(go.Scatter(
             x=data.get("x", []),
             y=data.get("y", []),
             mode="lines+markers",
+            line=dict(color=_PALETTE[0], width=2.5),
+            marker=dict(size=7, color=_PALETTE[0], line=dict(color="#fff", width=1.5)),
+            hovertemplate="%{x}<br><b>%{y:,}</b><extra></extra>",
         ))
-        fig.update_layout(
-            title=title,
-            xaxis_title=spec.get("x_label", ""),
-            yaxis_title=spec.get("y_label", ""),
-        )
+        _apply_base_layout(fig, title, spec.get("x_label", ""), spec.get("y_label", ""))
     elif chart_type == "heatmap":
         fig = go.Figure(go.Heatmap(
             z=data.get("matrix", []),
             x=data.get("labels", []),
             y=data.get("ylabels", data.get("labels", [])),
-            colorscale="Viridis",
+            colorscale=[[0, "#F7F4EE"], [0.5, "#FFA22F"], [1, "#1A2C32"]],
+            hovertemplate="x: %{x}<br>y: %{y}<br><b>%{z:,}</b><extra></extra>",
         ))
-        fig.update_layout(title=title)
+        _apply_base_layout(fig, title)
+        fig.update_layout(
+            xaxis=dict(tickfont=dict(size=11), gridcolor="rgba(0,0,0,0)"),
+            yaxis=dict(tickfont=dict(size=11), gridcolor="rgba(0,0,0,0)"),
+        )
     elif chart_type == "network":
-        # Force-directed graph using circular layout
         nodes = data.get("nodes", [])
         edges = data.get("edges", [])
         n = len(nodes) or 1
@@ -101,20 +161,32 @@ def render_plotly_html(spec: dict[str, Any]) -> str:
             edge_x += [node_x[i], node_x[j], None]
             edge_y += [node_y[i], node_y[j], None]
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=edge_x, y=edge_y, mode="lines",
-                                 line=dict(color="gray"), hoverinfo="none"))
+        fig.add_trace(go.Scatter(
+            x=edge_x, y=edge_y, mode="lines",
+            line=dict(color="rgba(50,81,88,0.30)", width=1.5),
+            hoverinfo="none",
+        ))
         fig.add_trace(go.Scatter(
             x=node_x, y=node_y, mode="markers+text",
             text=[nd.get("label", nd.get("id", "")) for nd in nodes],
-            marker=dict(size=20), textposition="bottom center",
+            marker=dict(
+                size=24,
+                color=_PALETTE[3],
+                line=dict(color="#fff", width=2),
+            ),
+            textposition="bottom center",
+            textfont=dict(size=11),
+            hovertemplate="%{text}<extra></extra>",
         ))
-        fig.update_layout(title=title, showlegend=False,
-                          xaxis=dict(showgrid=False, zeroline=False, visible=False),
-                          yaxis=dict(showgrid=False, zeroline=False, visible=False))
+        _apply_base_layout(fig, title)
+        fig.update_layout(
+            showlegend=False,
+            xaxis=dict(showgrid=False, zeroline=False, visible=False),
+            yaxis=dict(showgrid=False, zeroline=False, visible=False),
+        )
     else:
         raise ValueError(f"unsupported chart type: {chart_type!r}")
 
-    # include_plotlyjs='inline' — embeds plotly.min.js directly (offline-safe)
     return plotly_offline.plot(
         fig, output_type="div", include_plotlyjs="inline", show_link=False
     )

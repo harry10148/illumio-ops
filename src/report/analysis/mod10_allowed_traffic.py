@@ -72,9 +72,9 @@ def allowed_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
         'top_allowed_ports': top_ports,
         'chart_spec': {
             'type': 'line',
-            'title': t('rpt_at_chart_title', default='Allowed Traffic Timeline'),
-            'x_label': t('rpt_col_port', default='Port'),
-            'y_label': t('rpt_col_connections', default='Connections'),
+            'title': 'Allowed Traffic Timeline',
+            'x_label': 'Port',
+            'y_label': 'Connections',
             'data': {
                 'x': port_labels,
                 'y': port_values,

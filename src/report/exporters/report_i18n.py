@@ -783,6 +783,10 @@ def make_i18n_js() -> str:
       var k = el.getAttribute('data-i18n-html');
       if (_T[k] && _T[k][_lang]) el.innerHTML = _T[k][_lang];
     }});
+    var zhVisible = _lang === 'zh_TW';
+    document.querySelectorAll('.zh-only').forEach(function(el) {{
+      el.style.display = zhVisible ? '' : 'none';
+    }});
     var btn = document.getElementById('_langBtn');
     if (btn) btn.textContent = _lang === 'zh_TW' ? 'EN' : '中文';
   }}

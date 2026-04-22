@@ -264,11 +264,11 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
     recommendations = _build_recommendations(ranked_items, top_n=top_n)
 
     factor_chart_labels = [
-        t('rpt_r_policy', default='Policy Coverage'),
-        t('rpt_r_ringfence', default='Ringfence Maturity'),
-        t('rpt_r_enforcement', default='Enforcement Mode'),
-        t('rpt_r_staged', default='Staged Readiness'),
-        t('rpt_r_remote', default='Remote App Coverage'),
+        'Policy Coverage',
+        'Ringfence Maturity',
+        'Enforcement Mode',
+        'Staged Readiness',
+        'Remote App Coverage',
     ]
     factor_chart_values = [
         factor_scores['policy_coverage'],
@@ -289,7 +289,7 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
         "attack_posture_items": ranked_items[: max(top_n, 10)],
         "chart_spec": {
             "type": "bar",
-            "title": t("rpt_mod13_chart_title", default="Enforcement Readiness Factor Scores"),
+            "title": "Enforcement Readiness Factor Scores",
             "x_label": t("rpt_dimension", default="Factor"),
             "y_label": t("rpt_score", default="Score"),
             "data": {"labels": factor_chart_labels, "values": factor_chart_values},

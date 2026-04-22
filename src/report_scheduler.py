@@ -13,7 +13,7 @@ from loguru import logger
 import os
 import re
 
-from src.i18n import t
+from src.i18n import t, get_language
 from src.report.report_metadata import extract_attack_summary
 from src.state_store import load_state_file, update_state_file
 
@@ -347,39 +347,42 @@ class ReportScheduler:
 
         attack_summary = extract_attack_summary(getattr(result, "module_results", {}) or {}, top_n=3)
         section_labels = {
-            "boundary_breaches": "Boundary Breaches / 邊界破口",
-            "suspicious_pivot_behavior": "Suspicious Pivot Behavior / 可疑橫向跳板",
-            "blast_radius": "Blast Radius / 爆炸半徑",
-            "blind_spots": "Blind Spots / 盲點",
-            "action_matrix": "Action Matrix / 行動矩陣",
+            "boundary_breaches": t("rpt_email_boundary_breaches"),
+            "suspicious_pivot_behavior": t("rpt_email_suspicious_pivot_behavior"),
+            "blast_radius": t("rpt_email_blast_radius"),
+            "blind_spots": t("rpt_email_blind_spots"),
+            "action_matrix": t("rpt_email_action_matrix"),
         }
         has_attack = any(attack_summary.get(k) for k in section_labels.keys())
         if has_attack:
             body += "<div style='margin-bottom:16px;'>"
-            body += "<div style='font-size:14px;font-weight:700;color:#1A2C32;margin-bottom:10px;border-bottom:2px solid #FF5500;padding-bottom:4px;'>Attack Summary / 攻擊摘要</div>"
+            body += f"<div style='font-size:14px;font-weight:700;color:#1A2C32;margin-bottom:10px;border-bottom:2px solid #FF5500;padding-bottom:4px;'>{t('rpt_email_attack_summary')}</div>"
             body += "<table style='width:100%;border-collapse:collapse;font-size:12px;'>"
             body += "<tr style='background:#24393F;color:#D6D7D7;'>"
-            body += "<th style='padding:8px;text-align:left;'>Section</th><th style='padding:8px;text-align:left;'>Finding / 發現</th><th style='padding:8px;text-align:left;'>Action / 建議</th>"
+            body += f"<th style='padding:8px;text-align:left;'>Section</th><th style='padding:8px;text-align:left;'>{t('rpt_email_finding')}</th><th style='padding:8px;text-align:left;'>{t('rpt_email_action')}</th>"
             body += "</tr>"
+            _zh = get_language() == "zh_TW"
             row_index = 0
             for key, label in section_labels.items():
                 for item in (attack_summary.get(key) or [])[:2]:
                     row_bg = "#fff" if row_index % 2 == 0 else "#F7F4EE"
                     finding_en = esc(item.get("finding", ""))
-                    finding_zh = esc(item.get("finding_zh", ""))
                     if key == "action_matrix" and not finding_en:
                         finding_en = esc(item.get("action", ""))
                         if item.get("count") is not None:
                             finding_en = f"{finding_en} (x{esc(item.get('count'))})"
                     finding_html = finding_en
-                    if finding_zh:
-                        finding_html += f"<br><small style='color:#989A9B;'>{finding_zh}</small>"
+                    if _zh:
+                        finding_zh = esc(item.get("finding_zh", ""))
+                        if finding_zh:
+                            finding_html += f"<br><small style='color:#989A9B;'>{finding_zh}</small>"
 
                     action_en = esc(item.get("action", ""))
-                    action_zh = esc(item.get("action_zh", ""))
                     action_html = action_en
-                    if action_zh:
-                        action_html += f"<br><small style='color:#989A9B;'>{action_zh}</small>"
+                    if _zh:
+                        action_zh = esc(item.get("action_zh", ""))
+                        if action_zh:
+                            action_html += f"<br><small style='color:#989A9B;'>{action_zh}</small>"
 
                     body += f"<tr style='background:{row_bg};'>"
                     body += f"<td style='padding:8px;border-bottom:1px solid #E3D8C5;font-weight:700;color:#1A2C32;'>{esc(label)}</td>"

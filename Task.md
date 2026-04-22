@@ -88,6 +88,24 @@ Plan: [docs/superpowers/plans/2026-04-19-phase-15-alerts-on-cache.md](docs/super
 
 ---
 
+## Phase 16: Offline Bundle 📋 PLANNED (2026-04-20) — FINAL PHASE
+
+Plan: [docs/superpowers/plans/2026-04-20-phase-16-offline-bundle.md](docs/superpowers/plans/2026-04-20-phase-16-offline-bundle.md) • Target tag: `v3.14.0-offline-bundle` • Branch: `feature/phase-16-offline-bundle`
+
+**Goal:** Any developer can `git clone` → run `bash scripts/build_offline_bundle.sh` → hand the tarball to an operator → operator installs on air-gapped RHEL 8 or 9 via `sudo ./install.sh`. No internet required on the target host.
+
+**Decisions locked:** single artifact (EL8 + EL9), drop PDF from offline build, PBS CPython 3.12, manylinux_2_17_x86_64 wheels, no RPM required.
+
+- [ ] **T1**: `requirements-offline.txt` + `PDF_AVAILABLE` flag in `pdf_exporter.py` + 2 new tests
+- [ ] **T2**: CLI guard — `_check_pdf_available()` in `src/cli/report.py` applied to all 4 report commands + 4 new tests
+- [ ] **T3**: `verify_deps.py --offline-bundle` mode + 1 new test (total tests: 523 → 530)
+- [ ] **T4**: `scripts/build_offline_bundle.sh` (Linux+Windows) + `scripts/preflight.sh` + `scripts/preflight.ps1` (pre-install host checks) + `scripts/setup.sh` (git-clone Linux) + `scripts/install.sh` (offline Linux) + `scripts/install.ps1` (offline Windows) + `deploy/illumio-ops.service` + `deploy/install_service.ps1` (PBS priority) — all scripts support install **and** uninstall
+- [ ] **T5**: `docs/User_Manual.md` — §1.2 Offline Bundle install steps + troubleshooting row
+- [ ] **T6**: Fix `requirements.txt` header comment + final `pytest` baseline (≥530) + i18n audit
+- [ ] **T7**: Manual E2E smoke test on Rocky 8 + Rocky 9 (same tarball), tag `v3.14.0-offline-bundle`
+
+---
+
 ## Phase 12: Polish & Advanced ✅ DONE (v3.10.0-polish, 2026-04-19)
 
 - [x] **T1**: Branch + baseline (406 passing)

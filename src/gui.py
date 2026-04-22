@@ -463,7 +463,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     app.config['CM'] = cm
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
-    app.config['PERMANENT_SESSION_LIFETIME'] = 3600
+    app.config['PERMANENT_SESSION_LIFETIME'] = 28800  # 8 hours
 
     # Initialize session secret
     cm.load()
@@ -616,24 +616,30 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         _tls_cfg = cm.config.get("web_gui", {}).get("tls", {})
         if _tls_cfg.get("enabled"):
             response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+        # Prevent browser from caching JS/CSS so code changes take effect immediately
+        if request.path.startswith('/static/'):
+            response.headers['Cache-Control'] = 'no-store'
         return response
 
     # ??? Frontend SPA ?????????????????????????????????????????????????????
     @app.route('/')
     def index():
         import datetime as _dt
+        import json as _json
         cm.load()
         pce_url = _get_active_pce_url(cm)
         rules_count = len(cm.config.get("rules", []))
         schedules_count = len(cm.config.get("report_schedules", []))
         config_loaded_at = _dt.datetime.now()
-        # csrf_token() is a Jinja2 global injected by flask-wtf CSRFProtect
+        lang = cm.config.get("settings", {}).get("language", "en")
+        ui_translations = {k: v for k, v in get_messages(lang).items() if k.startswith("gui_")}
         return render_template(
             'index.html',
             pce_url=pce_url,
             rules_count=rules_count,
             schedules_count=schedules_count,
             config_loaded_at=config_loaded_at,
+            ui_translations_json=_json.dumps(ui_translations, ensure_ascii=False),
         )
 
     # ??? Auth Routes ??????????????????????????????????????????????????????
@@ -668,6 +674,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
         ok, new_hash = verify_and_upgrade_password(saved_hash, saved_salt, password)
         if username == saved_username and ok:
+            session.permanent = True
             login_user(AdminUser(username))
             if new_hash is not None:
                 # Silent upgrade: PBKDF2/SHA256 → argon2id
@@ -1839,7 +1846,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         target = os.path.realpath(os.path.join(reports_dir, filename))
         if not target.startswith(os.path.realpath(reports_dir) + os.sep):
             return jsonify({"ok": False, "error": "Invalid path"}), 403
-        return send_from_directory(reports_dir, filename)
+        as_download = request.args.get('download') == '1'
+        return send_from_directory(reports_dir, filename, as_attachment=as_download)
 
     @app.route('/api/reports/generate', methods=['POST'])
     def api_generate_report():
@@ -1970,8 +1978,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 return jsonify({"ok": False, "error": t("gui_no_audit_data")})
 
             output_dir = _resolve_reports_dir(cm)
-                
-            paths = gen.export(result, fmt='all', output_dir=output_dir)
+            fmt = d.get('format', 'html')
+            fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir)
             _write_audit_dashboard_summary(output_dir, result)
             filenames = [os.path.basename(p) for p in paths]
             try:
@@ -1992,6 +2001,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     # ??? API: VEN Status Report ????????????????????????????????????????????
     @app.route('/api/ven_status_report/generate', methods=['POST'])
     def api_generate_ven_status_report():
+        d = request.json or {}
         _vrlog = None
         try:
             from src.report.ven_status_generator import VenStatusGenerator
@@ -2013,8 +2023,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 return jsonify({"ok": False, "error": t("gui_no_ven_data")})
 
             output_dir = _resolve_reports_dir(cm)
-
-            paths = gen.export(result, fmt='all', output_dir=output_dir)
+            fmt = d.get('format', 'html')
+            fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir)
             filenames = [os.path.basename(p) for p in paths]
             kpis = result.module_results.get('kpis', [])
             try:
@@ -2062,7 +2073,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 return jsonify({"ok": False, "error": t("gui_no_pu_data")})
 
             output_dir = _resolve_reports_dir(cm)
-            paths = gen.export(result, fmt='all', output_dir=output_dir)
+            fmt = d.get('format', 'html')
+            fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir)
             _write_policy_usage_dashboard_summary(output_dir, result)
             filenames = [os.path.basename(p) for p in paths]
             mod00 = result.module_results.get('mod00', {})
@@ -3148,6 +3161,63 @@ def _get_cert_info(cert_path: str) -> dict:
         info["error"] = "openssl not available"
     return info
 
+def _run_server(app, host: str, port: int, ssl_context) -> None:
+    """Dispatch to the appropriate server backend.
+
+    - HTTP  → waitress (production-grade, cross-platform, stable idle handling)
+    - HTTPS → Werkzeug make_server + select() timeout loop
+              waitress does NOT support SSL; using select() avoids setting
+              socket.settimeout() on an SSLSocket which breaks accept().
+    """
+    if ssl_context is None:
+        _run_http(app, host, port)
+    else:
+        _run_https(app, host, port, ssl_context)
+
+
+def _run_http(app, host: str, port: int) -> None:
+    try:
+        from waitress import create_server
+        logger.info("Starting HTTP server via waitress on {}:{}", host, port)
+        server = create_server(app, host=host, port=port)
+        try:
+            server.run()
+        except KeyboardInterrupt:
+            pass
+    except ImportError:
+        logger.warning("waitress not installed — falling back to Werkzeug dev server.")
+        try:
+            app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)
+        except KeyboardInterrupt:
+            pass
+
+
+def _run_https(app, host: str, port: int, ssl_context) -> None:
+    """HTTPS via Werkzeug make_server with a select() timeout loop.
+
+    Using select() with a timeout (instead of socket.settimeout) keeps the
+    accept loop alive on idle without corrupting the SSLSocket state.
+    """
+    import select as _select
+    from werkzeug.serving import make_server
+
+    logger.info("Starting HTTPS server via Werkzeug on {}:{}", host, port)
+    srv = make_server(host, port, app, threaded=True, ssl_context=ssl_context)
+    try:
+        while True:
+            # Wake every 60 s even when idle — prevents Windows/Linux select() freeze
+            readable, _, _ = _select.select([srv.socket], [], [], 60)
+            if readable:
+                srv.handle_request()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            srv.socket.close()
+        except OSError:
+            pass
+
+
 def build_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     """Public factory: build a configured Flask app bound to the given ConfigManager.
 
@@ -3236,4 +3306,4 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
         import webbrowser
         threading.Timer(1.5, lambda: webbrowser.open(f'{scheme}://127.0.0.1:{port}')).start()
 
-    app.run(host=host, port=port, debug=False, use_reloader=False, ssl_context=ssl_context)
+    _run_server(app, host, port, ssl_context)

@@ -229,11 +229,11 @@ def executive_summary(results: dict[str, Any]) -> dict:
     kpis.insert(0, {"label": "Maturity Score", "value": f"{maturity['maturity_score']}/100 ({maturity['maturity_grade']})"})
 
     dim_labels = [
-        t('rpt_dim_enforcement', default='Enforcement Coverage'),
-        t('rpt_dim_policy', default='Policy Coverage'),
-        t('rpt_dim_lateral', default='Lateral Control'),
-        t('rpt_dim_managed', default='Managed Asset Ratio'),
-        t('rpt_dim_risk', default='Risk Port Control'),
+        'Enforcement Coverage',
+        'Policy Coverage',
+        'Lateral Control',
+        'Managed Asset Ratio',
+        'Risk Port Control',
     ]
     dim_keys = ['enforcement_coverage', 'policy_coverage', 'lateral_movement_control',
                 'managed_asset_ratio', 'risk_port_control']
@@ -260,7 +260,7 @@ def executive_summary(results: dict[str, Any]) -> dict:
         "action_matrix": attack_sections["action_matrix"],
         "chart_spec": {
             "type": "bar",
-            "title": t("rpt_mod12_chart_title", default="Microsegmentation Maturity Dimensions"),
+            "title": "Microsegmentation Maturity Dimensions",
             "x_label": t("rpt_dimension", default="Dimension"),
             "y_label": t("rpt_score", default="Score"),
             "data": {"labels": dim_labels, "values": dim_values},

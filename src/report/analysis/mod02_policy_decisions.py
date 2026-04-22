@@ -85,12 +85,12 @@ def policy_decision_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
     # Phase 5: chart_spec for HTML (plotly) + PDF/Excel (matplotlib)
     results['chart_spec'] = {
         'type': 'pie',
-        'title': t('rpt_pd_chart_title', default='Policy Decision Breakdown'),
+        'title': 'Policy Decision Breakdown',
         'data': {
             'labels': [
-                t('rpt_pd_allowed', default='Allowed'),
-                t('rpt_pd_blocked', default='Blocked'),
-                t('rpt_pd_potential', default='Potentially Blocked'),
+                'Allowed',
+                'Blocked',
+                'Potentially Blocked',
             ],
             'values': [
                 results.get('allowed', {}).get('count', 0),

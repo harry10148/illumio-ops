@@ -284,7 +284,7 @@ def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20) -> dict:
         "attack_posture_items": rank_posture_items(attack_items)[: max(top_n, 10)],
         "chart_spec": {
             "type": "bar",
-            "title": t("rpt_mod14_chart_title", default="Infrastructure Apps by Tier"),
+            "title": "Infrastructure Apps by Tier",
             "x_label": t("rpt_tier", default="Tier"),
             "y_label": t("rpt_app_count", default="App Count"),
             "data": {"labels": tier_labels, "values": tier_values},

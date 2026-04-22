@@ -251,12 +251,14 @@ async function loadReports() {
     const downloadLabel = _translations['gui_btn_download'] || 'Download';
     const deleteLabel = _translations['gui_btn_delete'] || 'Delete';
     let actionBtn = '';
+    const fnAttr = `data-fn="${escapeHtml(rp.filename)}"`;
     if(rp.filename.endsWith('.html')) {
-      actionBtn = `<a href="/reports/${escapeHtml(rp.filename)}" target="_blank" class="btn btn-sm btn-secondary">${viewLabel}</a>`;
+      actionBtn = `<a href="/reports/${escapeHtml(rp.filename)}" target="_blank" class="btn btn-sm btn-secondary">${viewLabel}</a>` +
+                  `<button class="btn btn-sm btn-primary" ${fnAttr} onclick="blobDownloadReport(this.dataset.fn)">${downloadLabel}</button>`;
     } else {
-      actionBtn = `<a href="/reports/${escapeHtml(rp.filename)}" download class="btn btn-sm btn-primary">${downloadLabel}</a>`;
+      actionBtn = `<button class="btn btn-sm btn-primary" ${fnAttr} onclick="blobDownloadReport(this.dataset.fn)">${downloadLabel}</button>`;
     }
-    const delBtn = `<button class="btn btn-sm btn-danger" onclick="deleteReport('${escapeHtml(rp.filename)}')" title="${deleteLabel}" aria-label="${deleteLabel}" style="padding:4px 8px;line-height:1;">&times;</button>`;
+    const delBtn = `<button class="btn btn-sm btn-danger" data-fn="${escapeHtml(rp.filename)}" onclick="deleteReport(this.dataset.fn)" title="${deleteLabel}" aria-label="${deleteLabel}" style="padding:4px 8px;line-height:1;">&times;</button>`;
     tbody.innerHTML += `<tr>
       <td><input type="checkbox" class="rt-chk" value="${escapeHtml(rp.filename)}" onchange="onReportCheckChange()"></td>
       <td><div>${escapeHtml(rp.filename)}</div>${metaLine}</td>
@@ -310,6 +312,32 @@ async function deleteSelectedReports() {
     }
   } catch (err) {
     toast('Bulk delete error: ' + err.message, 'err');
+  }
+}
+
+async function blobDownloadReport(filename) {
+  try {
+    // Use fetch + blob to avoid HTTPS self-signed cert download block in Chrome/Edge.
+    // GET request — no CSRF token needed (only required for state-changing methods).
+    const resp = await fetch(`/reports/${encodeURIComponent(filename)}?download=1`, {
+      credentials: 'same-origin'
+    });
+    if (resp.redirected && resp.url.includes('/login')) {
+      toast((_translations['gui_err_unauthorized'] || 'Session expired — please log in again.'), true);
+      return;
+    }
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  } catch(e) {
+    toast((_translations['gui_download_failed'] || 'Download failed: {error}').replace('{error}', e.message), true);
   }
 }
 
@@ -966,10 +994,12 @@ async function _doGenerateAudit() {
   }
   const startDate = new Date(startVal + 'T00:00:00Z').toISOString();
   const endDate   = new Date(endVal   + 'T23:59:59Z').toISOString();
+  const fmtEl = document.getElementById('m-gen-format');
+  const fmt = fmtEl ? fmtEl.value : 'html';
   _updateGenStep(_translations['gui_gen_step_fetching'] || 'Fetching audit events from PCE…');
   try {
     const _stepTimer = setTimeout(() => _updateGenStep(_translations['gui_gen_step_analysing'] || 'Running analysis modules…'), 3000);
-    const r = await post('/api/audit_report/generate', {start_date:startDate, end_date:endDate});
+    const r = await post('/api/audit_report/generate', {start_date:startDate, end_date:endDate, format:fmt});
     clearTimeout(_stepTimer);
     if (r.ok) {
       const msg = `${r.record_count} events`;
@@ -988,9 +1018,11 @@ async function _doGenerateAudit() {
 }
 
 async function _doGenerateVen() {
+  const fmtEl = document.getElementById('m-gen-format');
+  const fmt = fmtEl ? fmtEl.value : 'html';
   _updateGenStep(_translations['gui_gen_step_fetching'] || 'Fetching VEN status from PCE…');
   try {
-    const r = await post('/api/ven_status_report/generate', {});
+    const r = await post('/api/ven_status_report/generate', {format:fmt});
     if (r.ok) {
       const kpiText = (r.kpis || []).map(k => `${k.label}: ${k.value}`).join(' | ');
       _hideGenProgress(true, kpiText || (_translations['gui_gen_done'] || 'Done'));
@@ -1033,11 +1065,13 @@ async function _doGeneratePolicyUsage() {
 }
 
 async function _doGeneratePolicyUsageClean() {
+  const fmtEl = document.getElementById('m-gen-format');
+  const fmt = fmtEl ? fmtEl.value : 'html';
   _updateGenStep(_translations['gui_gen_step_fetching'] || 'Fetching policy data from PCE…');
   try {
     const start = $('m-gen-start') ? $('m-gen-start').value : null;
     const end   = $('m-gen-end')   ? $('m-gen-end').value   : null;
-    const r = await post('/api/policy_usage_report/generate', { start_date: start, end_date: end });
+    const r = await post('/api/policy_usage_report/generate', { start_date: start, end_date: end, format: fmt });
     if (r.ok) {
       const kpiText = (r.kpis || []).map(k => `${k.label}: ${k.value}`).join(' | ');
       const execText = _formatPolicyUsageExecutionSummary(r.execution_stats, r.execution_notes);

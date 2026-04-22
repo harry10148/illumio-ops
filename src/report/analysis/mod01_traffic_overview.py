@@ -59,13 +59,13 @@ def traffic_overview(df: pd.DataFrame) -> dict:
 
     chart_spec = {
         'type': 'pie',
-        'title': t('rpt_mod01_chart_title', default='Policy Decision Breakdown'),
+        'title': 'Policy Decision Breakdown',
         'data': {
             'labels': [
-                t('rpt_pd_allowed', default='Allowed'),
-                t('rpt_pd_blocked', default='Blocked'),
-                t('rpt_pd_potential', default='Potentially Blocked'),
-                t('rpt_pd_unknown', default='Unknown'),
+                'Allowed',
+                'Blocked',
+                'Potentially Blocked',
+                'Unknown',
             ],
             'values': [int(allowed), int(blocked), int(potential), int(unknown)],
         },

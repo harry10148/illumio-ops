@@ -58,7 +58,7 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20) -> dict:
             'uncovered_services': pd.DataFrame(),
             'chart_spec': {
                 'type': 'pie',
-                'title': t('rpt_mod03_chart_title', default='Policy Coverage Tiers'),
+                'title': 'Policy Coverage Tiers',
                 'data': {
                     'labels': [
                         t('rpt_enforced', default='Enforced'),
@@ -138,7 +138,7 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20) -> dict:
         'uncovered_services': uncovered_services,
         'chart_spec': {
             'type': 'pie',
-            'title': t('rpt_mod03_chart_title', default='Policy Coverage Tiers'),
+            'title': 'Policy Coverage Tiers',
             'data': {
                 'labels': [
                     t('rpt_enforced', default='Enforced'),

@@ -14,10 +14,28 @@ from pathlib import Path
 from loguru import logger
 
 
+_NOISY_LIBS = frozenset({
+    "fontTools", "fonttools",
+    "weasyprint", "pydyf", "cssselect2", "tinycss2",
+    "brotli", "PIL", "matplotlib",
+})
+
+
 class _StdLibInterceptHandler(logging.Handler):
-    """Route stdlib logging calls (from 3rd-party libs) into loguru."""
+    """Route stdlib logging calls (from 3rd-party libs) into loguru.
+
+    Noisy font/PDF libs are hard-filtered below WARNING at the handler
+    level — setLevel() alone is unreliable because submodule loggers
+    (e.g. fontTools.subset) may be created before the parent level is set.
+    """
 
     def emit(self, record: logging.LogRecord) -> None:
+        # Hard-suppress verbose INFO/DEBUG from font & PDF rendering libs
+        if record.levelno < logging.WARNING:
+            top = record.name.split(".")[0]
+            if top in _NOISY_LIBS:
+                return
+
         try:
             level = logger.level(record.levelname).name
         except ValueError:

@@ -14,11 +14,25 @@ from src.humanize_ext import human_number
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
+from .chart_renderer import render_plotly_html
 from .code_highlighter import get_highlight_css
 from src.report.analysis.audit.audit_risk import RISK_BG, RISK_COLOR, get_risk
 
 _CSS = build_css("audit")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
+
+
+def _chart_html(spec: dict | None) -> str:
+    """Render a chart_spec as a styled chart-container div, or '' on failure."""
+    if not spec:
+        return ""
+    try:
+        div = render_plotly_html(spec)
+        return f'<div class="chart-container">{div}</div>' if div else ""
+    except Exception as exc:
+        logger.warning("audit chart render failed: {}", exc)
+        return ""
+
 
 def _norm_col(name) -> str:
     """Tolerant column-name match: case-insensitive, whitespace/dash collapsed."""
@@ -49,9 +63,7 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False) -
             color = RISK_COLOR.get(risk_level, "#989A9B")
             bg = RISK_BG.get(risk_level, "#F9FAFB")
             badge = (
-                f"<span style='display:inline-block; background:{bg}; color:{color}; "
-                f"border:1px solid {color}; padding:1px 5px; border-radius:3px; "
-                f"font-size:10px; font-weight:700; white-space:nowrap; margin-right:5px;'>"
+                f"<span class='risk-badge' style='background:{bg};color:{color};border-color:{color}'>"
                 f"{risk_level}</span>"
             )
             return f"{badge}{row[col]}"
@@ -76,65 +88,53 @@ class AuditHtmlExporter:
         color = RISK_COLOR.get(risk_level, "#989A9B")
         bg = RISK_BG.get(risk_level, "#F9FAFB")
         return (
-            f"<span style='display:inline-block; background:{bg}; color:{color}; "
-            f"border:1px solid {color}; padding:1px 6px; border-radius:4px; "
-            f"font-size:10px; font-weight:700; white-space:nowrap;'>{risk_level}</span>"
+            f"<span class='risk-badge' style='background:{bg};color:{color};border-color:{color}'>"
+            f"{risk_level}</span>"
         )
 
     def _attention_section(self, attention_items: list) -> str:
         if not attention_items:
             return ""
-        html = "<div style='margin-bottom:20px;'>"
-        html += (
-            "<h2 style='font-family:\"Montserrat\",Arial,sans-serif; font-size:15px; "
-            "font-weight:700; margin:0 0 10px 0; color:#BE122F;' "
-            "data-i18n='rpt_au_attention_title'>Attention Required</h2>"
-        )
+        items_html = ""
         for item in attention_items:
             risk = item.get("risk", "INFO")
-            color = RISK_COLOR.get(risk, "#989A9B")
-            bg = RISK_BG.get(risk, "#F9FAFB")
             badge = self._risk_badge(risk)
             event_type = item.get("event_type", "")
             count = item.get("count", 0)
             summary = item.get("summary", "")
             rec = item.get("recommendation", "")
-            actors = item.get("actors", [])
-            actors_str = ", ".join(str(a) for a in actors[:3]) if actors else "N/A"
-            targets = item.get("targets", [])
-            targets_str = ", ".join(str(a) for a in targets[:3]) if targets else ""
-            resources = item.get("resources", [])
-            resources_str = ", ".join(str(a) for a in resources[:3]) if resources else ""
-            src_ips = item.get("src_ips", [])
-            src_ips_str = ", ".join(str(ip) for ip in src_ips[:3]) if src_ips else ""
-
-            html += (
-                f"<div style='border-left:4px solid {color}; background:{bg}; "
-                f"padding:10px 14px; margin-bottom:8px; border-radius:0 6px 6px 0;'>"
-                f"<div style='display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap;'>"
-                f"{badge}"
-                f"<code style='font-size:11px; color:#8B407A;'>{event_type}</code>"
-                f"<span style='font-size:11px; font-weight:700; color:{color};'>x{count}</span>"
-                f"</div>"
-                f"<div style='font-size:12px; color:#313638; margin-bottom:3px;'>{summary}</div>"
-                f"<div style='font-size:11px; color:#989A9B;'>"
-                f"<strong style='color:#313638;' data-i18n='rpt_au_actor'>Actor:</strong> {actors_str}"
-                + (f" &nbsp;|&nbsp; <strong style='color:#313638;'>IP:</strong> {src_ips_str}" if src_ips_str else "")
-                + "</div>"
+            actors_str = ", ".join(str(a) for a in item.get("actors", [])[:3]) or "N/A"
+            targets_str = ", ".join(str(a) for a in item.get("targets", [])[:3])
+            resources_str = ", ".join(str(a) for a in item.get("resources", [])[:3])
+            src_ips_str = ", ".join(str(ip) for ip in item.get("src_ips", [])[:3])
+            items_html += (
+                f'<div class="audit-attn-item risk-{risk}">'
+                f'<div class="audit-attn-header">'
+                f'{badge}'
+                f'<code class="audit-attn-event-code">{event_type}</code>'
+                f'<span class="audit-attn-count">x{count}</span>'
+                f'</div>'
+                f'<div class="audit-attn-summary">{summary}</div>'
+                f'<div class="audit-attn-meta">'
+                f'<strong data-i18n="rpt_au_actor">Actor:</strong> {actors_str}'
+                + (f' &nbsp;|&nbsp; <strong>IP:</strong> {src_ips_str}' if src_ips_str else '')
+                + '</div>'
                 + (
-                    f"<div style='font-size:11px; color:#989A9B; margin-top:3px;'>"
-                    f"<strong style='color:#313638;'>Target:</strong> {targets_str}"
-                    + (f" &nbsp;|&nbsp; <strong style='color:#313638;'>Resource:</strong> {resources_str}" if resources_str else "")
-                    + "</div>"
-                    if targets_str or resources_str else ""
+                    f'<div class="audit-attn-meta">'
+                    f'<strong>Target:</strong> {targets_str}'
+                    + (f' &nbsp;|&nbsp; <strong>Resource:</strong> {resources_str}' if resources_str else '')
+                    + '</div>'
+                    if targets_str or resources_str else ''
                 )
-                + f"<div style='font-size:11px; color:#325158; margin-top:3px;'>"
-                f"<strong data-i18n='rpt_au_rec'>Recommendation:</strong> {rec}"
-                f"</div>"
-                f"</div>"
+                + f'<div class="audit-attn-rec"><strong data-i18n="rpt_au_rec">Recommendation:</strong> {rec}</div>'
+                f'</div>'
             )
-        html += "</div>"
-        return html
+        return (
+            '<div style="margin-bottom:20px">'
+            '<h2 data-i18n="rpt_au_attention_title" style="color:var(--red)">Attention Required</h2>'
+            + items_html
+            + '</div>'
+        )
 
     def export(self, output_dir: str = "reports") -> str:
         os.makedirs(output_dir, exist_ok=True)
@@ -190,6 +190,7 @@ class AuditHtmlExporter:
             + self._trend_deltas_html()
             + self._severity_dist_html(mod00)
             + '<h2 data-i18n="rpt_au_top_events">Top Event Types</h2>'
+            + _chart_html(mod00.get("chart_spec"))
             + _df_to_html(mod00.get("top_events_overall"))
             + "</section>\n"
             + self._section("health", "rpt_au_sec_health", "1 System Health &amp; Agent", self._mod01_html())
@@ -252,13 +253,13 @@ class AuditHtmlExporter:
                 + str(item.get("severity", "INFO"))
                 + "</span>&nbsp;"
                 + str(item.get("finding", ""))
-                + (("<br><span style='color:#718096;font-size:12px;'>"
+                + (("<br><span class='zh-only' style='color:#718096;font-size:12px;'>"
                     + str(item.get("finding_zh", ""))
                     + "</span>") if item.get("finding_zh") else "")
                 + " <em style='color:#718096'>&rarr; "
                 + str(item.get("action", ""))
                 + "</em>"
-                + (("<br><span style='color:#718096;font-size:12px;'><em>&rarr; "
+                + (("<br><span class='zh-only' style='color:#718096;font-size:12px;'><em>&rarr; "
                     + str(item.get("action_zh", ""))
                     + "</em></span>") if item.get("action_zh") else "")
                 + "</p>"
@@ -271,7 +272,7 @@ class AuditHtmlExporter:
             + str(item.get("action_code", ""))
             + "</b>: "
             + str(item.get("action", ""))
-            + (("<br><span style='color:#718096;font-size:12px;'>"
+            + (("<br><span class='zh-only' style='color:#718096;font-size:12px;'>"
                 + str(item.get("action_zh", ""))
                 + "</span>") if item.get("action_zh") else "")
             + "</p>"
@@ -291,7 +292,24 @@ class AuditHtmlExporter:
         sev_df = mod00.get("severity_distribution")
         if sev_df is None or (hasattr(sev_df, "empty") and sev_df.empty):
             return ""
-        return '<h2 data-i18n="rpt_au_severity_dist">Severity Distribution</h2>' + _df_to_html(sev_df)
+        chart_html = ""
+        try:
+            labels = sev_df["Severity"].tolist()
+            values = sev_df["Count"].tolist()
+            if labels and any(v > 0 for v in values):
+                spec = {
+                    "type": "pie",
+                    "title": "Event Severity Distribution",
+                    "data": {"labels": labels, "values": values},
+                }
+                chart_html = _chart_html(spec)
+        except Exception:
+            pass
+        return (
+            '<h2 data-i18n="rpt_au_severity_dist">Severity Distribution</h2>'
+            + chart_html
+            + _df_to_html(sev_df)
+        )
 
     def _mod01_html(self) -> str:
         m = self._r.get("mod01", {})
@@ -391,7 +409,11 @@ class AuditHtmlExporter:
 
         per_user = m.get("per_user")
         if per_user is not None and not (hasattr(per_user, "empty") and per_user.empty):
-            html += '<h3 data-i18n="rpt_au_per_user">Activity by User</h3>' + _df_to_html(per_user)
+            html += (
+                '<h3 data-i18n="rpt_au_per_user">Activity by User</h3>'
+                + _chart_html(m.get("chart_spec"))
+                + _df_to_html(per_user)
+            )
 
         html += '<h3 data-i18n="rpt_au_summary_type">Summary by Event Type</h3>' + _df_to_html(m.get("summary"))
         html += '<h3 data-i18n="rpt_au_recent">Recent Events (up to 50)</h3>' + _df_to_html(m.get("recent"), show_risk=True)
@@ -531,6 +553,7 @@ class AuditHtmlExporter:
             html += (
                 self._subnote("rpt_au_per_user_policy_subnote", "This table aggregates Policy activity by parsed actor, separating admin operations, system tasks, and actions initiated by the Agent itself.")
                 + '<h3 data-i18n="rpt_au_per_user_policy">Changes by User</h3>'
+                + _chart_html(m.get("chart_spec"))
                 + _df_to_html(per_user)
             )
 

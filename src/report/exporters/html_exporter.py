@@ -20,7 +20,7 @@ import pandas as pd
 from .report_i18n import STRINGS, make_i18n_js, lang_btn_html, COL_I18N as _COL_I18N
 from .report_css import build_css, TABLE_JS
 from .table_renderer import render_df_table
-from .chart_renderer import render_plotly_html, render_matplotlib_png
+from .chart_renderer import render_plotly_html
 from .code_highlighter import get_highlight_css
 from src.humanize_ext import human_number
 
@@ -28,28 +28,16 @@ _CSS = build_css('traffic')
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
 
 def _render_chart_for_html(chart_spec: dict | None) -> str:
-    """Emit plotly interactive div + matplotlib PNG fallback (for PDF)."""
-    import base64 as _b64
+    """Emit plotly interactive div. Matplotlib PNG is PDF-only; never shown in HTML."""
     if not chart_spec:
         return ''
-    plotly_div = ''
     try:
         plotly_div = render_plotly_html(chart_spec)
+        if plotly_div:
+            return f'<div class="chart-container">{plotly_div}</div>'
     except Exception as exc:
         logger.warning('plotly render failed: {}', exc)
-    fallback_img = ''
-    try:
-        png = render_matplotlib_png(chart_spec)
-        b64 = _b64.b64encode(png).decode('ascii')
-        fallback_img = (
-            f'<img class="plotly-fallback-img" '
-            f'src="data:image/png;base64,{b64}" alt="chart" />'
-        )
-    except Exception as exc:
-        logger.warning('matplotlib fallback failed: {}', exc)
-    if not plotly_div and not fallback_img:
-        return ''
-    return f'<div class="chart-container">{plotly_div}{fallback_img}</div>'
+    return ''
 
 def _fmt_bytes(b) -> str:
     """Convert raw byte count to human-readable string (B / KB / MB / GB / TB)."""
@@ -539,9 +527,9 @@ class HtmlExporter:
                 '<p style="margin-bottom:8px"><span class="badge badge-' +
                 str(item.get('severity', 'INFO')) + '">' + str(item.get('severity', 'INFO')) +
                 '</span>&nbsp;' + str(item.get('finding', '')) +
-                (('<br><span style="color:#718096;font-size:12px;">' + str(item.get('finding_zh', '')) + '</span>') if item.get('finding_zh') else '') +
+                (('<br><span class="zh-only" style="color:#718096;font-size:12px;">' + str(item.get('finding_zh', '')) + '</span>') if item.get('finding_zh') else '') +
                 ' <em style="color:#718096">&rarr; ' + str(item.get('action', '')) + '</em>' +
-                (('<br><span style="color:#718096;font-size:12px;"><em>&rarr; ' + str(item.get('action_zh', '')) + '</em></span>') if item.get('action_zh') else '') +
+                (('<br><span class="zh-only" style="color:#718096;font-size:12px;"><em>&rarr; ' + str(item.get('action_zh', '')) + '</em></span>') if item.get('action_zh') else '') +
                 '</p>'
                 for item in section_items[:3]
             )
@@ -550,7 +538,7 @@ class HtmlExporter:
         action_html = ''.join(
             '<p style="margin-bottom:8px"><b>' + str(item.get('action_code', '')) + '</b>: ' +
             str(item.get('action', '')) +
-            (('<br><span style="color:#718096;font-size:12px;">' + str(item.get('action_zh', '')) + '</span>') if item.get('action_zh') else '') +
+            (('<br><span class="zh-only" style="color:#718096;font-size:12px;">' + str(item.get('action_zh', '')) + '</span>') if item.get('action_zh') else '') +
             '</p>'
             for item in action_matrix[:3]
         ) or '<p class="note">No data</p>'
@@ -593,6 +581,21 @@ class HtmlExporter:
             '</div>'
         )
 
+    def _three_col_tables(
+        self,
+        main_title: str, main_html: str,
+        mid_title: str, mid_html: str,
+        right_title: str, right_html: str,
+    ) -> str:
+        """Wide-left + two narrow-right columns in a single tri-grid row."""
+        return (
+            '<div class="tri-grid">'
+            f'<div>{main_title}{main_html}</div>'
+            f'<div>{mid_title}{mid_html}</div>'
+            f'<div>{right_title}{right_html}</div>'
+            '</div>'
+        )
+
     def _mod01_html(self):
         m = self._r.get('mod01', {})
         return (
@@ -617,18 +620,18 @@ class HtmlExporter:
             inb = dm.get('inbound_count', 0)
             outb = dm.get('outbound_count', 0)
             pct = dm.get('pct_of_total', 0)
-            out += (
-                '<h3>' + d.replace('_', ' ').upper() + f' ({pct}% of total)'
-                f' &nbsp;·&nbsp; ↓ Inbound: {inb} &nbsp;·&nbsp; ↑ Outbound: {outb}</h3>'
-                '<h4 data-i18n="rpt_tr_top_app_flows">Top App Flows</h4>'
-                + _df_to_html(dm.get('top_app_flows'))
-            )
             status = {
                 'allowed': 'ALLOWED',
                 'blocked': 'BLOCKED',
                 'potentially_blocked': 'POTENTIAL',
             }.get(d, d.upper())
-            out += self._side_by_side_tables(
+            out += (
+                '<h3>' + d.replace('_', ' ').upper() + f' ({pct}% of total)'
+                f' &nbsp;·&nbsp; ↓ Inbound: {inb} &nbsp;·&nbsp; ↑ Outbound: {outb}</h3>'
+            )
+            out += self._three_col_tables(
+                '<h4 data-i18n="rpt_tr_top_app_flows">Top App Flows</h4>',
+                _df_to_html(dm.get('top_app_flows')),
                 f'<h4>Top Inbound Ports ({status})</h4>',
                 _df_to_html(dm.get('top_inbound_ports')),
                 f'<h4>Top Outbound Ports ({status})</h4>',

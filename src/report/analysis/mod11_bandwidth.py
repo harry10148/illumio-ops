@@ -106,7 +106,7 @@ def bandwidth_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
         app_labels, app_values = [], []
     result['chart_spec'] = {
         'type': 'bar',
-        'title': t('rpt_mod11_chart_title', default='Top Apps by Data Volume'),
+        'title': 'Top Apps by Data Volume',
         'x_label': t('rpt_app', default='Application'),
         'y_label': t('rpt_bytes_total', default='Bytes'),
         'data': {'labels': app_labels, 'values': app_values},

@@ -166,6 +166,15 @@ BASE_CSS = """\
   @media (max-width: 1100px) { .dual-grid { grid-template-columns: 1fr; } }
   @container main (max-width: 880px) { .dual-grid { grid-template-columns: 1fr; } }
 
+  /* 3-column layout: wide left (app flows) + two narrow right columns (ports) */
+  .tri-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 18px; align-items: start; margin: 12px 0 18px; }
+  .tri-grid > div { min-width: 0; }
+  .tri-grid > div > h4:first-child { margin-top: 0; }
+  .tri-grid .report-table-panel { margin: 8px 0 0; }
+  @media (max-width: 1200px) { .tri-grid { grid-template-columns: 1fr 1fr; } .tri-grid > div:first-child { grid-column: 1 / -1; } }
+  @container main (max-width: 960px) { .tri-grid { grid-template-columns: 1fr 1fr; } .tri-grid > div:first-child { grid-column: 1 / -1; } }
+  @container main (max-width: 600px) { .tri-grid { grid-template-columns: 1fr; } .tri-grid > div:first-child { grid-column: auto; } }
+
   .attention-box { position: relative; background: linear-gradient(180deg, #FFFFFF, var(--tan)); border: 1px solid var(--tan-120); border-radius: var(--radius-compact); padding: 16px 18px; margin: 12px 0 18px; box-shadow: var(--shadow-panel); }
   .attention-box h4 { margin: 0 0 10px; color: var(--cyan-120); }
   .attention-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgba(50,81,88,.06); font-size: 12px; }
@@ -190,6 +199,20 @@ BASE_CSS = """\
   .trend-empty-note .trend-empty-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); display: inline-block; }
 
   .mono, .report-table tbody td.mono { font-family: var(--font-mono); font-size: 11px; }
+
+  /* Chart container — constrains plotly divs to a readable width and adds a
+     subtle card treatment so charts don't float on bare white. */
+  .chart-container {
+    margin: 16px 0 20px;
+    border-radius: var(--radius-panel);
+    border: 1px solid rgba(50,81,88,.12);
+    background: linear-gradient(180deg, #fff, var(--tan));
+    box-shadow: var(--shadow-panel);
+    overflow: hidden;
+    max-width: 860px;
+  }
+  .chart-container > div { width: 100% !important; }
+  .chart-img { width: 100%; height: auto; display: block; }
 
   @media print {
     nav { display: none; }
@@ -226,6 +249,28 @@ AUDIT_CSS = """\
   .bp-box b { color: var(--cyan-120); }
   .report-hero + .card .report-table-panel,
   .card .report-table-panel { box-shadow: var(--shadow-panel); }
+
+  /* ── Audit attention items ──────────────────────────────────────────── */
+  .audit-attn-item { border-left: 4px solid var(--slate-20); padding: 10px 14px; margin-bottom: 8px; border-radius: 0 6px 6px 0; }
+  .audit-attn-item.risk-CRITICAL { border-left-color: var(--red); background: var(--red-10); }
+  .audit-attn-item.risk-HIGH { border-left-color: #F97316; background: #FFF7ED; }
+  .audit-attn-item.risk-MEDIUM { border-left-color: #EAB308; background: #FEFCE8; }
+  .audit-attn-item.risk-LOW { border-left-color: var(--green-80); background: var(--green-10); }
+  .audit-attn-item.risk-INFO { border-left-color: var(--slate-50); background: var(--tan); }
+  .audit-attn-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  .audit-attn-event-code { font-size: 11px; color: #8B407A; font-family: var(--font-mono); background: rgba(139,64,122,.08); padding: 1px 5px; border-radius: 3px; }
+  .audit-attn-count { font-size: 11px; font-weight: 700; }
+  .risk-CRITICAL .audit-attn-count { color: var(--red); }
+  .risk-HIGH .audit-attn-count { color: #F97316; }
+  .risk-MEDIUM .audit-attn-count { color: #EAB308; }
+  .risk-LOW .audit-attn-count { color: var(--green-80); }
+  .risk-INFO .audit-attn-count { color: var(--slate-50); }
+  .audit-attn-summary { font-size: 12px; color: var(--slate); margin-bottom: 3px; }
+  .audit-attn-meta { font-size: 11px; color: var(--slate-50); }
+  .audit-attn-rec { font-size: 11px; color: var(--cyan-100); margin-top: 3px; }
+
+  /* ── Risk badge (shared for event_type column) ───────────────────────── */
+  .risk-badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; white-space: nowrap; margin-right: 5px; border: 1px solid currentColor; }
 """
 
 VEN_CSS = """\
@@ -234,6 +279,38 @@ VEN_CSS = """\
 
 POLICY_USAGE_CSS = """\
   td { word-break: break-word; }
+
+  /* ── Policy Usage card layout ───────────────────────────────────────── */
+  .pu-cards { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+  .pu-card { display: grid; grid-template-columns: minmax(180px,22%) 1fr minmax(140px,18%); gap: 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #fff; font-size: 13px; }
+  .pu-card:nth-child(even) { background: #fafafa; }
+  .pu-col { padding: 10px 14px; border-right: 1px solid var(--border); }
+  .pu-col:last-child { border-right: none; }
+  .pu-ruleset { font-weight: 700; font-size: 13px; color: var(--cyan-120); line-height: 1.35; word-break: break-word; }
+  .pu-meta { color: var(--slate-50); font-size: 11px; margin-top: 3px; }
+  .pu-badges { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .pu-badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .pu-badge-allow { background: var(--green-10); color: var(--green); }
+  .pu-badge-deny { background: var(--red-10); color: var(--red); }
+  .pu-badge-enabled { background: rgba(59,130,246,.13); color: #1e40af; }
+  .pu-badge-disabled { background: var(--slate-10); color: var(--slate-50); }
+  .pu-flow-block { display: flex; flex-direction: column; gap: 5px; }
+  .pu-flow-row { display: flex; align-items: flex-start; gap: 6px; line-height: 1.4; }
+  .pu-flow-label { color: var(--slate-50); font-size: 11px; min-width: 50px; flex-shrink: 0; padding-top: 1px; }
+  .pu-flow-val { color: var(--slate); word-break: break-word; flex: 1; }
+  .pu-services { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+  .pu-desc { margin-top: 6px; color: var(--slate-50); font-size: 11px; font-style: italic; }
+  .pu-stat-block { display: flex; flex-direction: column; gap: 4px; }
+  .pu-stat-label { color: var(--slate-50); font-size: 11px; }
+  .pu-stat-val { font-weight: 700; color: var(--slate); font-size: 13px; }
+  .pu-stat-ports { margin-top: 4px; color: var(--slate-50); font-size: 11px; word-break: break-all; }
+  .pu-hit-count { font-size: 20px; font-weight: 800; color: var(--cyan-120); }
+  .pu-unused-label { font-size: 13px; font-weight: 700; color: var(--gold-110); }
+  @media (max-width: 700px) {
+    .pu-card { grid-template-columns: 1fr; }
+    .pu-col { border-right: none; border-bottom: 1px solid var(--border); }
+    .pu-col:last-child { border-bottom: none; }
+  }
 """
 
 def build_css(exporter_type: str) -> str:

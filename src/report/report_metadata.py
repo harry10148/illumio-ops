@@ -59,7 +59,7 @@ def build_attack_summary_brief(counts: dict[str, int]) -> str:
     if total <= 0:
         return ""
     return (
-        "Attack/攻擊 posture "
+        "Attack posture "
         f"boundary {counts.get('boundary_breaches', 0)} | "
         f"pivot {counts.get('suspicious_pivot_behavior', 0)} | "
         f"blast {counts.get('blast_radius', 0)} | "

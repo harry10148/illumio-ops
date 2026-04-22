@@ -9,9 +9,38 @@
   <title>Illumio PCE Ops</title>
   <link rel="stylesheet" href="/static/css/app.css">
   <link rel="stylesheet" href="/static/pygments.css">
+  <script>window._INIT_TRANSLATIONS = {{ ui_translations_json | safe }};</script>
 </head>
 
 <body>
+  <script>
+    (function(){
+      var t = window._INIT_TRANSLATIONS;
+      if (!t) return;
+      function apply() {
+        document.querySelectorAll('[data-i18n]').forEach(function(el) {
+          var v = t[el.getAttribute('data-i18n')];
+          if (!v) return;
+          var icon = el.querySelector('svg');
+          if (icon) {
+            var nodes = Array.from(el.childNodes).filter(function(n){ return n.nodeType === 3; });
+            if (nodes.length) nodes[nodes.length-1].textContent = ' ' + v;
+            else el.appendChild(document.createTextNode(' ' + v));
+          } else { el.textContent = v; }
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
+          var v = t[el.getAttribute('data-i18n-placeholder')];
+          if (v) el.placeholder = v;
+        });
+        document.querySelectorAll('[data-i18n-title]').forEach(function(el) {
+          var v = t[el.getAttribute('data-i18n-title')];
+          if (v) el.title = v;
+        });
+      }
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply);
+      else apply();
+    })();
+  </script>
   <a href="#main-content" class="skip-link">Skip to main content</a>
 
   <!-- SVG Icons definition for reuse -->

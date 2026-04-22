@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pandas as pd
 
+import src.i18n as _i18n
 from src.report.analysis.mod12_executive_summary import executive_summary
 from src.report.analysis.mod13_readiness import enforcement_readiness
 from src.report.analysis.mod14_infrastructure import infrastructure_scoring
@@ -169,23 +170,28 @@ def test_html_exporter_renders_attack_summary_sections():
 
 
 def test_report_email_body_renders_attack_summary():
-    cm = MagicMock()
-    cm.config = {"settings": {}}
-    gen = ReportGenerator(cm, api_client=MagicMock())
-    body = gen._build_email_body(
-        {
-            "generated_at": "2026-04-10 00:00:00",
-            "kpis": [{"label": "Total Flows", "value": "4"}],
-            "key_findings": [],
-            "boundary_breaches": [{"severity": "HIGH", "finding": "Cross-env lateral flows found.", "action": "Restrict boundary rules."}],
-            "suspicious_pivot_behavior": [],
-            "blast_radius": [],
-            "blind_spots": [],
-            "action_matrix": [],
-        }
-    )
-    assert "Attack Summary" in body
-    assert "Boundary Breaches" in body
+    prev_lang = _i18n.get_language()
+    _i18n.set_language("en")
+    try:
+        cm = MagicMock()
+        cm.config = {"settings": {}}
+        gen = ReportGenerator(cm, api_client=MagicMock())
+        body = gen._build_email_body(
+            {
+                "generated_at": "2026-04-10 00:00:00",
+                "kpis": [{"label": "Total Flows", "value": "4"}],
+                "key_findings": [],
+                "boundary_breaches": [{"severity": "HIGH", "finding": "Cross-env lateral flows found.", "action": "Restrict boundary rules."}],
+                "suspicious_pivot_behavior": [],
+                "blast_radius": [],
+                "blind_spots": [],
+                "action_matrix": [],
+            }
+        )
+        assert "Attack Summary" in body
+        assert "Boundary Breaches" in body
+    finally:
+        _i18n.set_language(prev_lang)
 
 
 def test_snapshot_contains_attack_summary_keys():

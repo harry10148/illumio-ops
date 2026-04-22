@@ -13,11 +13,86 @@ from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
+from .chart_renderer import render_plotly_html
 from .code_highlighter import get_highlight_css
 from src.humanize_ext import human_number
 
 _CSS = build_css("policy_usage")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
+
+def _e(val) -> str:
+    import html as _html
+    return _html.escape(str(val)) if val is not None else ""
+
+def _rule_cards_html(df, mode: str = "hit") -> str:
+    """Render hit/unused rules as compact card rows instead of a wide flat table."""
+    import html as _html
+    if df is None or (hasattr(df, "empty") and df.empty):
+        return '<p class="note" data-i18n="rpt_no_data">No data</p>'
+
+    rows_html = []
+    for _, row in df.iterrows():
+        ruleset   = _e(row.get("Ruleset", ""))
+        rule_no   = _e(row.get("No", ""))
+        rule_id   = _e(row.get("Rule ID", ""))
+        rtype     = str(row.get("Type", "Allow"))
+        desc      = _e(row.get("Description", ""))
+        src       = _e(row.get("Source", ""))
+        dst       = _e(row.get("Destination", ""))
+        services  = _e(row.get("Services", ""))
+        enabled   = row.get("Enabled", True)
+        created   = _e(row.get("Created At", ""))
+
+        type_cls  = "pu-badge-deny" if "deny" in rtype.lower() else "pu-badge-allow"
+        en_cls    = "pu-badge-enabled" if str(enabled).lower() in ("true","1","yes") else "pu-badge-disabled"
+        en_label  = "Enabled" if str(enabled).lower() in ("true","1","yes") else "Disabled"
+
+        meta_parts = []
+        if rule_no: meta_parts.append(f"#{_e(str(rule_no))}")
+        if rule_id: meta_parts.append(f"ID: {_e(str(rule_id))}")
+        meta_str = " &middot; ".join(meta_parts)
+
+        # stats column
+        if mode == "hit":
+            hit_count = row.get("Hit Count", 0)
+            top_ports = _e(row.get("Top Hit Ports", ""))
+            stat_html = (
+                f'<div class="pu-hit-count">{_html.escape(str(hit_count))}</div>'
+                '<div class="pu-stat-label">hits</div>'
+                + (f'<div class="pu-stat-ports">{top_ports}</div>' if top_ports else "")
+            )
+        else:
+            obs_ports = _e(row.get("Observed Hit Ports", ""))
+            stat_html = (
+                '<div class="pu-unused-label">Unused</div>'
+                + (f'<div class="pu-stat-ports">{obs_ports}</div>' if obs_ports else "")
+                + (f'<div class="pu-stat-label" style="margin-top:6px">Created: {created}</div>' if created else "")
+            )
+
+        rows_html.append(
+            '<div class="pu-card">'
+            # col 1: identity
+            f'<div class="pu-col">'
+            f'<div class="pu-ruleset">{ruleset}</div>'
+            + (f'<div class="pu-meta">{meta_str}</div>' if meta_str else "")
+            + f'<div class="pu-badges">'
+            f'<span class="pu-badge {type_cls}">{_e(rtype)}</span>'
+            f'<span class="pu-badge {en_cls}">{en_label}</span>'
+            f'</div></div>'
+            # col 2: flow
+            f'<div class="pu-col"><div class="pu-flow-block">'
+            f'<div class="pu-flow-row"><span class="pu-flow-label">Source</span><span class="pu-flow-val">{src}</span></div>'
+            f'<div class="pu-flow-row"><span class="pu-flow-label">Dest</span><span class="pu-flow-val">{dst}</span></div>'
+            + (f'<div class="pu-services"><span class="pu-flow-label">Service</span> {services}</div>' if services else "")
+            + (f'<div class="pu-desc">{desc}</div>' if desc and desc != "No description" else "")
+            + '</div></div>'
+            # col 3: stats
+            f'<div class="pu-col"><div class="pu-stat-block">{stat_html}</div></div>'
+            '</div>'
+        )
+
+    return '<div class="pu-cards">' + "".join(rows_html) + "</div>"
+
 
 def _df_to_html(df, no_data_key: str = "rpt_no_data") -> str:
     # Empty case is rendered by the shared renderer for consistent panel chrome.
@@ -248,13 +323,13 @@ class PolicyUsageHtmlExporter:
                 + str(item.get("severity", "INFO"))
                 + "</span>&nbsp;"
                 + str(item.get("finding", ""))
-                + (("<br><span style='color:#718096;font-size:12px;'>"
+                + (("<br><span class='zh-only' style='color:#718096;font-size:12px;'>"
                     + str(item.get("finding_zh", ""))
                     + "</span>") if item.get("finding_zh") else "")
                 + " <em style='color:#718096'>&rarr; "
                 + str(item.get("action", ""))
                 + "</em>"
-                + (("<br><span style='color:#718096;font-size:12px;'><em>&rarr; "
+                + (("<br><span class='zh-only' style='color:#718096;font-size:12px;'><em>&rarr; "
                     + str(item.get("action_zh", ""))
                     + "</em></span>") if item.get("action_zh") else "")
                 + "</p>"
@@ -267,7 +342,7 @@ class PolicyUsageHtmlExporter:
             + str(item.get("action_code", ""))
             + "</b>: "
             + str(item.get("action", ""))
-            + (("<br><span style='color:#718096;font-size:12px;'>"
+            + (("<br><span class='zh-only' style='color:#718096;font-size:12px;'>"
                 + str(item.get("action_zh", ""))
                 + "</span>") if item.get("action_zh") else "")
             + "</p>"
@@ -299,7 +374,23 @@ class PolicyUsageHtmlExporter:
             f'<span data-i18n="rpt_pu_hit_rate">Hit Rate</span>: <strong>{rate}%</strong>'
             "</p>"
         )
-        return stats + _df_to_html(summary_df)
+        chart_html = ""
+        if hit + unused > 0:
+            try:
+                spec = {
+                    "type": "pie",
+                    "title": "Rule Hit Rate",
+                    "data": {
+                        "labels": ["Hit Rules", "Unused Rules"],
+                        "values": [hit, unused],
+                    },
+                }
+                div = render_plotly_html(spec)
+                if div:
+                    chart_html = f'<div class="chart-container">{div}</div>'
+            except Exception:
+                pass
+        return stats + chart_html + _df_to_html(summary_df)
 
     def _mod02_html(self) -> str:
         mod02 = self._r.get("mod02", {})
@@ -317,7 +408,7 @@ class PolicyUsageHtmlExporter:
             )
         if hit_df is None or (hasattr(hit_df, "empty") and hit_df.empty):
             return top_ports_html + '<p class="note" data-i18n="rpt_pu_no_hit_rules">No rules were hit during this period.</p>'
-        return top_ports_html + note + _df_to_html(hit_df)
+        return top_ports_html + note + _rule_cards_html(hit_df, mode="hit")
 
     def _mod03_html(self) -> str:
         mod03 = self._r.get("mod03", {})
@@ -341,7 +432,7 @@ class PolicyUsageHtmlExporter:
             )
 
         note = f'<p style="color:#718096;font-size:12px;">{count} rows</p>' if count else ""
-        return caveat_html + note + _df_to_html(unused_df)
+        return caveat_html + note + _rule_cards_html(unused_df, mode="unused")
 
     def _mod04_html(self) -> str:
         mod04 = self._r.get("mod04", {})

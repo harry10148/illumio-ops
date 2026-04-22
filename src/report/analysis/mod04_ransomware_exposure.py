@@ -121,9 +121,9 @@ def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20) 
     level_counts = {row['Risk Level']: int(row['Flows']) for _, row in part_a.iterrows()}
     chart_spec = {
         'type': 'bar',
-        'title': t('rpt_mod04_chart_title', default='Ransomware Exposure by Risk Level'),
+        'title': 'Ransomware Exposure by Risk Level',
         'x_label': t('rpt_risk_level', default='Risk Level'),
-        'y_label': t('rpt_flow_count', default='Flows'),
+        'y_label': 'Flows',
         'data': {
             'labels': [lvl.capitalize() for lvl in risk_levels if lvl in level_counts],
             'values': [level_counts[lvl] for lvl in risk_levels if lvl in level_counts],

@@ -262,7 +262,11 @@ function hideAll() {
 }
 
 async function loadTranslations() {
-  _translations = await api('/api/ui_translations');
+  if (window._INIT_TRANSLATIONS && Object.keys(window._INIT_TRANSLATIONS).length) {
+    _translations = window._INIT_TRANSLATIONS;
+  } else {
+    _translations = await api('/api/ui_translations');
+  }
   applyI18n(document);
   initTableResizers();
 }

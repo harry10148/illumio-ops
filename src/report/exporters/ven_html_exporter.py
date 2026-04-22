@@ -13,6 +13,7 @@ from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
+from .chart_renderer import render_plotly_html
 from .code_highlighter import get_highlight_css
 from src.humanize_ext import human_number
 
@@ -106,6 +107,24 @@ class VenHtmlExporter:
         today_count = len(df_today) if df_today is not None and not df_today.empty else 0
         yest_count = len(df_yest) if df_yest is not None and not df_yest.empty else 0
 
+        status_chart_html = ""
+        total_vens = online_count + offline_count + today_count + yest_count
+        if total_vens > 0:
+            try:
+                spec = {
+                    "type": "pie",
+                    "title": "VEN Status Distribution",
+                    "data": {
+                        "labels": ["Online", "Offline", "Lost <24h", "Lost 24-48h"],
+                        "values": [online_count, offline_count, today_count, yest_count],
+                    },
+                }
+                div = render_plotly_html(spec)
+                if div:
+                    status_chart_html = f'<div class="chart-container">{div}</div>'
+            except Exception:
+                pass
+
         body = (
             '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
@@ -116,6 +135,7 @@ class VenHtmlExporter:
             + "</p></div>"
             + self._summary_pills(online_count, offline_count, today_count, yest_count)
             + f'<div class="kpi-grid">{kpi_cards}</div>'
+            + status_chart_html
             + "</section>\n"
             + self._section("online", "rpt_ven_sec_online_title", "Online VENs", online_count, _df_to_html(df_online), "rpt_ven_sec_online_intro", "online")
             + "\n"

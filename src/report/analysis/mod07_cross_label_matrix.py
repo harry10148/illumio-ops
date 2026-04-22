@@ -70,7 +70,7 @@ def cross_label_flow_matrix(df: pd.DataFrame, top_n: int = 20) -> dict:
                 matrix_values = mat_df.iloc[:, 1:].values.tolist()
                 chart_spec = {
                     'type': 'heatmap',
-                    'title': t('rpt_clm_chart_title', default='Cross-Label Traffic Matrix')
+                    'title': 'Cross-Label Traffic Matrix'
                              + f' ({key})',
                     'data': {
                         'labels': col_labels,

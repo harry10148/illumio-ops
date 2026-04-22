@@ -1572,5 +1572,15 @@
   "gui_siem_status": "SIEM Status",
   "gui_siem_pending": "Pending",
   "gui_siem_sent": "Sent",
-  "gui_siem_failed": "Failed"
+  "gui_siem_failed": "Failed",
+  "gui_download_failed": "Download failed: {error}",
+  "rpt_email_attack_summary": "Attack Summary",
+  "rpt_email_no_attack_findings": "No attack posture findings.",
+  "rpt_email_finding": "Finding",
+  "rpt_email_action": "Action",
+  "rpt_email_boundary_breaches": "Boundary Breaches",
+  "rpt_email_suspicious_pivot_behavior": "Suspicious Pivot Behavior",
+  "rpt_email_blast_radius": "Blast Radius",
+  "rpt_email_blind_spots": "Blind Spots",
+  "rpt_email_action_matrix": "Action Matrix"
 }

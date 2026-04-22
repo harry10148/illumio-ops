@@ -23,7 +23,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
-from src.i18n import t
+from src.i18n import t, get_language
 from src.report.report_metadata import (
     attack_summary_counts,
     build_attack_summary_brief,
@@ -531,30 +531,33 @@ class ReportGenerator:
             for f in findings
         )
         attack_rows = []
+        _zh = get_language() == "zh_TW"
         for title, items in [
-            ("Boundary Breaches", boundary_breaches),
-            ("Suspicious Pivot Behavior", suspicious_pivot),
-            ("Blast Radius", blast_radius),
-            ("Blind Spots", blind_spots),
+            (t("rpt_email_boundary_breaches"), boundary_breaches),
+            (t("rpt_email_suspicious_pivot_behavior"), suspicious_pivot),
+            (t("rpt_email_blast_radius"), blast_radius),
+            (t("rpt_email_blind_spots"), blind_spots),
         ]:
             if items:
                 sample = items[0]
+                zh_action = (f'<br><span style="font-size:11px">{sample.get("action_zh","")}</span>' if _zh and sample.get("action_zh") else '')
                 attack_rows.append(
                     f'<tr>'
                     f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">{title}</td>'
                     f'<td style="padding:4px 10px;color:#313638">{sample.get("finding","")}</td>'
                     f'<td style="padding:4px 10px;color:#989A9B"><em>{sample.get("action","")}</em>'
-                    + (f'<br><span style="font-size:11px">{sample.get("action_zh","")}</span>' if sample.get("action_zh") else '')
+                    + zh_action
                     + '</td>'
                     f'</tr>'
                 )
         if action_matrix:
             top_action = action_matrix[0]
+            zh_action_cell = (f'<em>{top_action.get("action_zh","")}</em>' if _zh and top_action.get("action_zh") else '')
             attack_rows.append(
                 f'<tr>'
-                f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">Action Matrix</td>'
+                f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">{t("rpt_email_action_matrix")}</td>'
                 f'<td style="padding:4px 10px;color:#313638">{top_action.get("action","")}</td>'
-                f'<td style="padding:4px 10px;color:#989A9B"><em>{top_action.get("action_zh","")}</em></td>'
+                f'<td style="padding:4px 10px;color:#989A9B">{zh_action_cell}</td>'
                 f'</tr>'
             )
         attack_rows_html = "".join(attack_rows)
@@ -576,9 +579,9 @@ class ReportGenerator:
       <table border="0" cellpadding="0" cellspacing="3" style="border-collapse:separate;border-spacing:0 3px;width:100%">
         {finding_rows or f'<tr><td colspan="3" style="padding:8px;color:#989A9B">{t("rpt_email_no_findings")}</td></tr>'}
       </table>
-      <h3 style="color:#1A2C32;font-size:13px;font-weight:600;margin:16px 0 8px;border-bottom:2px solid #FF5500;padding-bottom:5px">Attack Summary / 攻擊摘要</h3>
+      <h3 style="color:#1A2C32;font-size:13px;font-weight:600;margin:16px 0 8px;border-bottom:2px solid #FF5500;padding-bottom:5px">{t("rpt_email_attack_summary")}</h3>
       <table border="0" cellpadding="0" cellspacing="3" style="border-collapse:separate;border-spacing:0 3px;width:100%">
-        {attack_rows_html or '<tr><td colspan="3" style="padding:8px;color:#989A9B">No attack posture findings.</td></tr>'}
+        {attack_rows_html or f'<tr><td colspan="3" style="padding:8px;color:#989A9B">{t("rpt_email_no_attack_findings")}</td></tr>'}
       </table>
     </div>
     <div style="background:#F7F4EE;padding:12px 20px;border-top:1px solid #E3D8C5;text-align:center;color:#989A9B;font-size:11px">
