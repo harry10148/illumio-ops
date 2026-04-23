@@ -114,12 +114,13 @@ function openModal(id, isEdit) {
   _editIdx = isEdit ?? null; $(id).classList.add('show');
   if (id === 'm-event' && !Object.keys(_catalog).length) loadCatalog();
   if (id === 'm-event' && _editIdx === null) {
+    $('ev-cat').value = '';
+    populateEvents();
     $('ev-status').value = 'all';
     $('ev-severity').value = 'all';
     $('ev-match-fields').value = '';
     $('ev-throttle').value = '';
     $('ev-advanced').open = false;
-    updateEventFilters();
     onEvTtChange();
   }
   if (id === 'm-event' && _editIdx !== null) { onEvTtChange(); }
