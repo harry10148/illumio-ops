@@ -1094,7 +1094,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     @app.route('/api/event-catalog')
     def api_event_catalog():
         from src.events.catalog import LOCAL_EXTENSION_EVENT_TYPES
-        from src.settings import FULL_EVENT_CATALOG, ACTION_EVENTS, SEVERITY_FILTER_EVENTS
+        from src.settings import FULL_EVENT_CATALOG, ACTION_EVENTS, SEVERITY_FILTER_EVENTS, EVENT_DESCRIPTION_KEYS
         from src.i18n import set_language, t
 
         cm.load()
@@ -1112,13 +1112,15 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
             event_items = []
             for event_id, translation_key in events.items():
-                description = t(translation_key)
+                label = t(translation_key)
+                desc_key = EVENT_DESCRIPTION_KEYS.get(event_id)
+                description = t(desc_key) if desc_key else ''
                 supports_status = event_id in ACTION_EVENTS
                 supports_severity = event_id in SEVERITY_FILTER_EVENTS or event_id == "*"
-                translated_catalog[trans_cat][event_id] = description
+                translated_catalog[trans_cat][event_id] = label
                 event_items.append({
                     'id': event_id,
-                    'label': description,
+                    'label': label,
                     'description': description,
                     'source': 'local_extension' if event_id in LOCAL_EXTENSION_EVENT_TYPES else 'vendor_baseline',
                     'supports_status': supports_status,

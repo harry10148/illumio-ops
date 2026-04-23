@@ -349,6 +349,32 @@ ACTION_EVENTS = sorted(event_id for event_id in KNOWN_EVENT_TYPES if event_id in
 SEVERITY_FILTER_EVENTS = sorted(event_id for event_id in KNOWN_EVENT_TYPES if event_id in _SEVERITY_FILTER_EVENT_TYPES)
 DISCOVERY_EVENTS = sorted(set(KNOWN_EVENT_TYPES) - set(ACTION_EVENTS))
 
+EVENT_DESCRIPTION_KEYS = {
+    "agent.goodbye":                              "event_desc_agent_goodbye",
+    "agent.service_not_available":                "event_desc_agent_service_not_available",
+    "agent.suspend":                              "event_desc_agent_suspend",
+    "lost_agent.found":                           "event_desc_lost_agent_found",
+    "agent.tampering":                            "event_desc_agent_tampering",
+    "agent.clone_detected":                       "event_desc_agent_clone_detected",
+    "agent.activate_clone":                       "event_desc_agent_activate_clone",
+    "user.sign_in":                               "event_desc_user_sign_in",
+    "user.sign_out":                              "event_desc_user_sign_out",
+    "user.login_session_terminated":              "event_desc_user_login_session_terminated",
+    "user.use_expired_password":                  "event_desc_user_use_expired_password",
+    "user.pce_session_terminated":                "event_desc_user_pce_session_terminated",
+    "request.authentication_failed":              "event_desc_request_authentication_failed",
+    "request.authorization_failed":               "event_desc_request_authorization_failed",
+    "sec_policy.create":                          "event_desc_sec_policy_create",
+    "enforcement_boundary.create":                "event_desc_enforcement_boundary_create",
+    "enforcement_boundary.delete":                "event_desc_enforcement_boundary_delete",
+    "firewall_settings.update":                   "event_desc_firewall_settings_update",
+    "system_task.agent_missed_heartbeats_check":  "event_desc_system_task_agent_missed_heartbeats",
+    "system_task.agent_offline_check":            "event_desc_system_task_agent_offline_check",
+    "workloads.unpair":                           "event_desc_workloads_unpair",
+    "network_enforcement_node.missed_heartbeats": "event_desc_nen_missed_heartbeats",
+    "network_enforcement_node.degraded":          "event_desc_nen_degraded",
+}
+
 def add_event_menu(cm: ConfigManager, edit_rule=None):
     from src.utils import Colors, safe_input, draw_panel, draw_table
 

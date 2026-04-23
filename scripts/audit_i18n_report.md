@@ -2,15 +2,15 @@
 
 Run `python scripts/audit_i18n_usage.py` to regenerate.
 
-**Total findings:** 0
+**Total findings:** 3
 
 | Category | Description | Count |
 |---|---|---|
 | A | EN placeholder leaks (key resolved to humanize fallback at lang=en) | 0 |
 | B | ZH placeholder leaks (key resolved to humanize fallback at lang=zh_TW) | 0 |
 | C | Hardcoded CJK in non-i18n Python/JS/HTML source files | 0 |
-| D | Auto-translate residue (zh_TW values with suspicious English words) | 0 |
-| E | Glossary violations (whitelist terms translated to Chinese in zh_TW) | 0 |
+| D | Auto-translate residue (zh_TW values with suspicious English words) | 1 |
+| E | Glossary violations (whitelist terms translated to Chinese in zh_TW) | 2 |
 | F | Placeholder English values in i18n_en.json | 0 |
 | G | Keys referenced in code but missing from i18n_en.json | 0 |
 | H | JS/HTML fallback literals (`_translations[key] || 'English text'`) | 0 |
@@ -30,11 +30,20 @@ _No findings._
 
 ## [D] Auto-translate residue (zh_TW values with suspicious English words)
 
-_No findings._
+**1 finding(s).**
+
+| Location | Key | Detail |
+|---|---|---|
+| `src/i18n.py` | `rule_ruleset_change` | zh="Rule Set 變更" (untranslated: Rule) |
 
 ## [E] Glossary violations (whitelist terms translated to Chinese in zh_TW)
 
-_No findings._
+**2 finding(s).**
+
+| Location | Key | Detail |
+|---|---|---|
+| `src/i18n.py` | `rule_bulk_unpair` | [Workload] en="Bulk Workload Unpair" zh="批次取消配對" |
+| `src/i18n.py` | `rule_policy_provision` | [Policy] en="Security Policy Provisioned" zh="安全政策已佈署" |
 
 ## [F] Placeholder English values in i18n_en.json
 

@@ -1,16 +1,18 @@
-# illumio_ops production runtime dependencies.
-# All packages bundled into the offline RPM via PyInstaller.
-# Pinned to major version ranges; minor/patch upgrades allowed within range.
+# illumio_ops offline bundle dependencies.
+# Derived from requirements.txt with weasyprint removed.
+# PDF export is disabled in offline builds; HTML/XLSX/CSV/charts work on both platforms.
 #
-# Categories follow the upgrade roadmap phases:
-#   Phase 1 — CLI UX:          rich, questionary, click, humanize
-#   Phase 2 — HTTP client:     requests, orjson, cachetools
-#   Phase 3 — Settings:        pydantic
-#   Phase 4 — Web GUI security: flask-wtf, flask-limiter, flask-talisman, flask-login, argon2-cffi
-#   Phase 5 — Reports:         openpyxl, weasyprint, matplotlib, plotly, pygments
-#   Phase 6 — Scheduler:       APScheduler, SQLAlchemy
-#   Phase 7 — Logging:         loguru
-#   Existing (mandatory):      flask, pandas, pyyaml, waitress
+# Build command (Linux/WSL):
+#   pip download -r requirements-offline.txt \
+#       --platform manylinux_2_17_x86_64 --python-version 3.12 \
+#       --only-binary=:all: -d dist/wheels/linux/
+#
+#   pip download -r requirements-offline.txt \
+#       --platform win_amd64 --python-version 3.12 \
+#       --only-binary=:all: -d dist/wheels/windows/
+#
+# Note: transitive binary dependencies (numpy, pillow, cffi, argon2-cffi-bindings,
+# contourpy, etc.) are automatically included by pip download.
 
 # ── Existing core (Web GUI + reports) ────────────────────────────────────────
 flask>=3.0,<4.0
@@ -31,7 +33,6 @@ cachetools>=5.3,<8.0
 
 # ── Phase 3: Settings validation ─────────────────────────────────────────────
 pydantic>=2.6,<3.0
-# pydantic-settings removed: never imported anywhere in the codebase
 
 # ── Phase 4: Web GUI security ────────────────────────────────────────────────
 flask-wtf>=1.2,<2.0
@@ -40,16 +41,16 @@ flask-talisman>=1.1,<2.0
 flask-login>=0.6,<0.7
 argon2-cffi>=23.1,<26.0
 
-# ── Phase 5: Reports (Excel + PDF + interactive charts) ──────────────────────
+# ── Phase 5: Reports (Excel + interactive charts; PDF excluded) ───────────────
 openpyxl>=3.1,<4.0
-weasyprint>=62.0,<69.0
+# weasyprint excluded — PDF export gracefully degrades in offline builds
 matplotlib>=3.8,<4.0
 plotly>=5.20,<7.0
 pygments>=2.17,<3.0
 
 # ── Phase 6: Scheduler ───────────────────────────────────────────────────────
 APScheduler>=3.10,<4.0
-SQLAlchemy>=2.0,<3.0      # required when pce_cache.enabled or scheduler.persist=true
+SQLAlchemy>=2.0,<3.0
 
 # ── Phase 7: Logging ─────────────────────────────────────────────────────────
 loguru>=0.7,<0.8
