@@ -75,7 +75,7 @@ function _populateEventViewerGroupOptions() {
 }
 
 function _populateEventViewerTypeOptions() {
-  const select = $('ev-type');
+  const select = $('ev-viewer-type');
   if (!select || !_eventViewerCatalog) return;
   const previous = select.value || '';
   const filtered = _eventViewerFilteredCatalogItems().sort((a, b) => a.label.localeCompare(b.label));
@@ -241,7 +241,7 @@ function _eventViewerParams() {
     search: $('ev-search')?.value || '',
     category: $('ev-category')?.value || '',
     type_group: $('ev-group')?.value || '',
-    event_type: $('ev-type')?.value || '',
+    event_type: $('ev-viewer-type')?.value || '',
   });
 }
 
