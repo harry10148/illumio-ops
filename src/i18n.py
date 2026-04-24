@@ -2025,6 +2025,8 @@ _ZH_EXPLICIT.update({
     "gui_siem_pending": "待送",
     "gui_siem_sent": "已送出",
     "gui_siem_failed": "失敗",
+    "monitor_cache_enabled_hint": "監控週期：30 秒（從 PCE 快取讀取）",
+    "monitor_source_cache": "快取",
 })
 
 def _humanize_key_en(key: str) -> str:

@@ -13,6 +13,7 @@ from src.scheduler.jobs import (
     tick_rule_schedules,
 )
 from src.siem.preview import emit_preview_warning
+from src.i18n import t
 
 def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     """Factory for a BackgroundScheduler wired with illumio_ops jobs.
@@ -52,9 +53,20 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
 
     sched = BackgroundScheduler(**kwargs)
 
+    try:
+        _cache_enabled = cm.models.pce_cache.enabled
+    except Exception:
+        _cache_enabled = False
+
+    if _cache_enabled:
+        monitor_trigger = IntervalTrigger(seconds=30)
+        logger.info(t("monitor_cache_enabled_hint"))
+    else:
+        monitor_trigger = IntervalTrigger(minutes=interval_minutes)
+
     sched.add_job(
         run_monitor_cycle,
-        trigger=IntervalTrigger(minutes=interval_minutes),
+        trigger=monitor_trigger,
         args=[cm],
         id="monitor_cycle",
         name="Monitor analysis cycle",

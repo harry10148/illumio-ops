@@ -1782,5 +1782,7 @@
   "cache_backfill_failed": "Backfill failed",
   "cache_miss_notice": "Data outside cache retention. Use backfill to import historical data.",
   "cli_cache_status": "Cache status",
-  "cli_cache_retention": "Cache retention policy"
+  "cli_cache_retention": "Cache retention policy",
+  "monitor_cache_enabled_hint": "Monitor tick: 30s (reading from PCE cache)",
+  "monitor_source_cache": "Cache"
 }
