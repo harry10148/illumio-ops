@@ -1,5 +1,5 @@
 # illumio_ops production runtime dependencies.
-# All packages bundled into the offline RPM via PyInstaller.
+# For offline bundle packaging: use requirements-offline.txt (excludes weasyprint).
 # Pinned to major version ranges; minor/patch upgrades allowed within range.
 #
 # Categories follow the upgrade roadmap phases:
