@@ -69,8 +69,8 @@ These are the exact ports used in EternalBlue, NotPetya, WannaCry, and the major
 |:---|:---|
 | **CRITICAL** | Any flow crosses **environment boundaries** (e.g., Dev->Prod, Test->Prod) |
 | **HIGH** | Flow crosses a **/24 subnet boundary** and is explicitly `allowed` (not just test-mode) |
-| **MEDIUM** | Flows are **within the same /24 subnet** *or* exist only in test/visibility mode (not enforced) |
-| **INFO** | All flows are same-subnet **AND** all are test-mode — likely legitimate admin traffic |
+| **MEDIUM** | Flows are **within the same /24 subnet** *or* all are `potentially_blocked` (no allow rule; VEN in test mode) |
+| **INFO** | All flows are same-subnet **AND** all are `potentially_blocked` — no allow rule written yet; flows only because VEN is in test mode |
 
 **Trigger condition:**
 At least one flow on ports {135, 445, 3389, 5985, 5986} with `policy_decision != 'blocked'`.
@@ -118,12 +118,12 @@ At least one flow with `policy_decision = 'allowed'` on these ports.
 **Category:** Ransomware
 
 **What it checks:**
-Detects medium-risk ports with `policy_decision = 'potentially_blocked'` — meaning the segmentation rule exists but the workload is still in **visibility/test mode** and the block is **not yet enforced**.
+Detects medium-risk ports with `policy_decision = 'potentially_blocked'` — meaning **no allow rule covers this flow**. The VEN is in test/visibility mode so traffic passes through; once the workload moves to enforced mode, the default-deny whitelist will block it.
 
 Monitored ports include: SSH (22), NFS (2049), FTP (20/21), mDNS (5353), LLMNR (5355), HTTP (80), WSD (3702), SSDP (1900), Telnet (23).
 
 **Why it matters:**
-`potentially_blocked` is a deceptive state: the rule appears in the PCE, but traffic flows through unrestricted. This is the most common cause of "we had policies but still got breached" — the policies were real but the workloads were never moved to enforcement.
+`potentially_blocked` means there is **no allow or deny rule** for this flow — it is entirely uncovered by policy. The VEN is in test/visibility mode so traffic flows through unrestricted. This is a common cause of "we had micro-segmentation but still got breached" — workloads were never moved to enforced mode, so the default-deny whitelist never activated.
 
 **Trigger condition:**
 At least one flow with `policy_decision = 'potentially_blocked'` on medium-risk ports.
@@ -477,7 +477,7 @@ More than `unmanaged_critical_threshold` non-blocked flows from unmanaged source
 Identifies flows with `policy_decision = 'potentially_blocked'` on lateral movement ports, database ports, identity ports, and Windows management ports.
 
 **Why it matters:**
-`potentially_blocked` is the single most dangerous state in an Illumio deployment: the segmentation **rule exists in the PCE, but the workload is in visibility/test mode so the block is NOT active**. Traffic flows through unrestricted. This is statistically the most common cause of "we had micro-segmentation but still got breached" — the policies were correctly written but never enforced.
+`potentially_blocked` is the most critical policy gap in an Illumio deployment: **no allow rule covers these flows**, and the VEN is in test/visibility mode so traffic passes through unrestricted. Switching to enforced mode activates the default-deny whitelist — these flows would be blocked automatically. Until enforcement is active, these are live and unprotected attack paths.
 
 **Trigger condition:**
 More than `pb_lateral_threshold` potentially-blocked flows on critical ports (default: **10**).
@@ -485,8 +485,9 @@ More than `pb_lateral_threshold` potentially-blocked flows on critical ports (de
 **Threshold key:** `pb_lateral_threshold`
 
 **Recommended action:**
-- Move affected workloads from visibility/test mode to **selective** or **full** enforcement
-- This is the highest-ROI remediation available: rules already exist, only enforcement mode needs changing
+- Review each `potentially_blocked` lateral-port flow — these have **no allow rule**; identify which are legitimate before enforcing
+- Create allow rules for any legitimate lateral-port paths (e.g., jump host SSH, management VLAN)
+- Move workloads from visibility/test mode to **selective** or **full** enforcement — default-deny will then block all uncovered flows automatically
 - Review the destination apps listed in evidence — prioritise production workloads
 
 ---
@@ -548,10 +549,10 @@ Computes a 0-100 enforcement readiness score across five weighted factors:
 
 | Factor | Weight | Description |
 |:---|:---|:---|
-| Policy Coverage | 40 | Percentage of flows with `policy_decision = 'allowed'` |
-| Ringfence Ratio | 20 | Percentage of app-to-app flows where src and dst share the same app label |
+| Policy Coverage | 35 | Percentage of flows with `policy_decision = 'allowed'` |
+| Ringfence Maturity | 20 | Percentage of app-to-app flows where src and dst share the same app label |
 | Enforcement Mode | 20 | Percentage of managed workloads in `enforced` mode |
-| No Blocked Flows | 10 | Penalises blocked/PB flows proportionally |
+| Staged Readiness | 15 | Penalises `potentially_blocked` flows — uncovered traffic with no allow rule; blocked by default-deny once workload moves to enforced mode |
 | Remote App Coverage | 10 | Percentage of remote-access-port flows (SSH, RDP, VNC, TeamViewer) that are `allowed` |
 
 Outputs a letter grade (A-F) and prioritised remediation recommendations.

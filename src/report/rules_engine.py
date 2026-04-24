@@ -2,7 +2,7 @@
 src/report/rules_engine.py
 Rules Engine for Traffic Flow Security Analysis.
 
-Built-in structural rules (B001–B009, L001–L006) — always executed, no label
+Built-in structural rules (B001–B009, L001–L010) — always executed, no label
 semantics assumed.
 
 All findings are returned as a list[Finding] for direct use by Module 12
@@ -182,16 +182,27 @@ class RulesEngine:
         # ── Contextual severity determination ─────────────────────────────────
         if n_cross_env > 0:
             severity = 'CRITICAL'
+            cross_env_rows = matched[matched['_cross_env']]
+            n_cross_env_allowed = int((cross_env_rows['policy_decision'] == 'allowed').sum())
+            n_cross_env_pb = n_cross_env - n_cross_env_allowed
             risk_summary = (
-                f"{n_cross_env} flows cross environment boundaries — "
-                "this is an active lateral movement path between security domains."
+                f"{n_cross_env} flows cross environment boundaries "
+                f"({n_cross_env_allowed} explicitly allowed, {n_cross_env_pb} potentially_blocked) — "
+                "active lateral movement path between security domains."
             )
-            recommendation = (
-                "CRITICAL: No lateral movement port should ever cross environment boundaries. "
-                f"Immediately apply Illumio deny rules at environment boundaries for: "
-                f"{list(named_ports.keys())}. "
-                "Investigate source IPs in cross-env flows — treat as active incident until proven otherwise."
-            )
+            if n_cross_env_allowed > 0:
+                recommendation = (
+                    "CRITICAL: Explicit allow rules permit lateral movement ports across environment boundaries. "
+                    f"Immediately remove or tightly scope these allow rules for: {list(named_ports.keys())}. "
+                    "Investigate source IPs in cross-env flows — treat as active incident until proven otherwise."
+                )
+            else:
+                recommendation = (
+                    "CRITICAL: Cross-environment flows detected with no allow rule (potentially_blocked). "
+                    "No explicit policy permits this traffic — it flows only because workloads are in test mode. "
+                    f"Move workloads to enforced mode to activate default-deny and block these paths immediately. "
+                    f"Investigate why this cross-env traffic exists on: {list(named_ports.keys())}."
+                )
         elif n_cross_subnet > 0 and n_allowed > 0:
             severity = 'HIGH'
             risk_summary = (
@@ -210,13 +221,13 @@ class RulesEngine:
         elif n_cross_subnet > 0 and n_pb == n_cross_subnet:
             severity = 'MEDIUM'
             risk_summary = (
-                f"{n_cross_subnet} cross-subnet flows are in test-mode only (potentially_blocked). "
-                "Block not yet active — move workloads to enforced mode to activate."
+                f"{n_cross_subnet} cross-subnet flows have no allow rule (potentially_blocked) — "
+                "traffic flows because VEN is in test mode; enforce to activate default-deny."
             )
             recommendation = (
-                "Cross-subnet flows on critical ports exist but are only potentially_blocked — "
-                "the segmentation rule is written but the workload is in test mode. "
-                "Move destination workloads to selective or full enforcement to activate the block. "
+                "Cross-subnet flows on critical ports have no allow rule (potentially_blocked) — "
+                "no policy covers these paths; they flow only because VEN is in test mode. "
+                "Move destination workloads to selective or full enforcement to activate default-deny. "
                 f"Same-subnet flows ({n_same_subnet}) may be legitimate admin traffic."
             )
         elif n_same_subnet == n_total and n_pb == n_total:
@@ -421,36 +432,47 @@ class RulesEngine:
         lateral = df[df['port'].isin(self._lateral_ports) & (df['policy_decision'] != 'blocked')]
         if lateral.empty:
             return None
-        per_src = lateral.groupby('src_ip')['dst_ip'].nunique()
-        high_src = per_src[per_src > threshold]
-        if not high_src.empty:
-            top = high_src.nlargest(3).to_dict()
-            total_lateral = len(lateral)
-            top_ports = lateral['port'].value_counts().head(5).to_dict()
-            return Finding(
-                rule_id='B006', rule_name='High Lateral Movement',
-                severity='HIGH', category='LateralMovement',
-                description=(
-                    f"{len(high_src)} source IPs each connected to >{threshold} unique destinations "
-                    f"via lateral movement ports (SSH, RDP, SMB, WinRM), totalling {total_lateral:,} "
-                    f"flows on ports {list(top_ports.keys())}. "
-                    f"Top offenders: {list(top.keys())[:3]}. "
-                    f"This fan-out pattern is a strong indicator of host-hopping — attackers "
-                    f"pivoting through compromised workloads to reach higher-value targets."
-                ),
-                recommendation=(
-                    "1) Immediately investigate the top source IPs — check for running exploit tools, "
-                    "unexpected SSH sessions, or RDP brute-force attempts. "
-                    "2) Apply micro-segmentation to restrict lateral ports (22, 3389, 445, 5985) to "
-                    "only authorized admin workloads. "
-                    "3) Deploy ring-fencing rules around high-value assets (databases, domain controllers) "
-                    "to limit blast radius even if a workload is compromised. "
-                    "4) Enable Illumio enforcement on all workloads involved in this traffic."
-                ),
-                evidence={'high_src_count': len(high_src), 'top_sources': str(top),
-                          'total_lateral_flows': total_lateral, 'top_ports': str(top_ports)},
-            )
-        return None
+        per_src_all = lateral.groupby('src_ip')['dst_ip'].nunique()
+        high_src = per_src_all[per_src_all > threshold]
+        if high_src.empty:
+            return None
+
+        lateral_allowed = lateral[lateral['policy_decision'] == 'allowed']
+        per_src_allowed = lateral_allowed.groupby('src_ip')['dst_ip'].nunique() if not lateral_allowed.empty else {}
+        high_src_allowed = {ip: c for ip, c in per_src_allowed.items() if c > threshold} if per_src_allowed is not None and len(per_src_allowed) else {}
+
+        # Severity: HIGH if any source exceeds threshold via explicitly allowed flows;
+        # MEDIUM if fan-out is driven only by potentially_blocked (no allow rule — will be blocked when enforced)
+        severity = 'HIGH' if high_src_allowed else 'MEDIUM'
+
+        top = high_src.nlargest(3).to_dict()
+        total_lateral = len(lateral)
+        n_allowed_flows = len(lateral_allowed)
+        n_pb_flows = total_lateral - n_allowed_flows
+        top_ports = lateral['port'].value_counts().head(5).to_dict()
+
+        return Finding(
+            rule_id='B006', rule_name='High Lateral Movement',
+            severity=severity, category='LateralMovement',
+            description=(
+                f"{len(high_src)} source IPs each connected to >{threshold} unique destinations "
+                f"via lateral movement ports, totalling {total_lateral:,} flows "
+                f"({n_allowed_flows} explicitly allowed, {n_pb_flows} potentially_blocked). "
+                f"Top offenders: {list(top.keys())[:3]}. "
+                f"This fan-out pattern is a strong indicator of host-hopping."
+            ),
+            recommendation=(
+                "1) Investigate the top source IPs — check for exploit tools, unexpected SSH sessions, "
+                "or RDP brute-force. "
+                + ("2) Remove or tightly scope the allow rules driving the high-fan-out flows. " if high_src_allowed else
+                   "2) Move workloads to enforced mode — no allow rules exist for these paths; "
+                   "default-deny will block them upon enforcement. ")
+                + "3) Ring-fence high-value assets (databases, domain controllers) to limit blast radius."
+            ),
+            evidence={'high_src_count': len(high_src), 'top_sources': str(top),
+                      'total_lateral_flows': total_lateral, 'allowed_flows': n_allowed_flows,
+                      'pb_flows': n_pb_flows, 'top_ports': str(top_ports)},
+        )
 
     def _b007_user_high_destinations(self, df: pd.DataFrame) -> Optional[Finding]:
         threshold = self._thresholds.get('user_destination_threshold', 20)
@@ -609,13 +631,13 @@ class RulesEngine:
         matched = df[df['port'].isin(self._DISCOVERY_PORTS)].copy()
         if matched.empty:
             return None
-        allowed = matched[matched['policy_decision'] != 'blocked']
-        if len(allowed) == 0:
+        unblocked = matched[matched['policy_decision'] != 'blocked']
+        if len(unblocked) == 0:
             return None  # All blocked — fine
         threshold = self._thresholds.get('discovery_protocol_threshold', 10)
-        if len(allowed) < threshold:
+        if len(unblocked) < threshold:
             return None
-        top_ports = allowed['port'].value_counts().head(5).to_dict()
+        top_ports = unblocked['port'].value_counts().head(5).to_dict()
         _port_names = {137: 'NetBIOS-NS', 138: 'NetBIOS-DGM', 5353: 'mDNS',
                        5355: 'LLMNR', 1900: 'SSDP', 3702: 'WSD'}
         named = {_port_names.get(p, str(p)): c for p, c in top_ports.items()}
@@ -623,7 +645,7 @@ class RulesEngine:
             rule_id='L002', rule_name='Network Discovery Protocol Exposure',
             severity='MEDIUM', category='LateralMovement',
             description=(
-                f"{len(allowed)} flows on broadcast/discovery protocols are not blocked: "
+                f"{len(unblocked)} flows on broadcast/discovery protocols are not blocked: "
                 f"{named}. These protocols enable Responder-based NTLMv2 hash harvesting."
             ),
             recommendation=(
@@ -632,7 +654,7 @@ class RulesEngine:
                 "environments and are used almost exclusively for network reconnaissance and "
                 "credential poisoning attacks (e.g., Responder / Inveigh)."
             ),
-            evidence={'unblocked_flows': len(allowed), 'top_protocols': str(named)},
+            evidence={'unblocked_flows': len(unblocked), 'top_protocols': str(named)},
         )
 
     def _l003_database_port_wide_exposure(self, df: pd.DataFrame) -> Optional[Finding]:
@@ -729,27 +751,37 @@ class RulesEngine:
         unique_src_apps = id_flows['src_app'].fillna('').nunique()
         if unique_src_apps <= threshold:
             return None
+
+        id_allowed = id_flows[id_flows['policy_decision'] == 'allowed']
+        unique_src_apps_allowed = id_allowed['src_app'].fillna('').nunique()
+
+        # HIGH if explicit allow rules expose identity ports broadly;
+        # MEDIUM if only potentially_blocked (no allow rule — default-deny blocks when enforced)
+        severity = 'HIGH' if unique_src_apps_allowed > threshold else 'MEDIUM'
+
         top_ports = id_flows['port'].value_counts().head(5).to_dict()
         top_srcs = id_flows['src_app'].fillna('unknown').value_counts().head(5).to_dict()
         _port_names = {88: 'Kerberos', 389: 'LDAP', 636: 'LDAPS', 3268: 'GC', 3269: 'GC-SSL', 464: 'Kpasswd'}
         named = {_port_names.get(p, str(p)): c for p, c in top_ports.items()}
         return Finding(
             rule_id='L005', rule_name='Identity Infrastructure Wide Exposure',
-            severity='HIGH', category='LateralMovement',
+            severity=severity, category='LateralMovement',
             description=(
                 f"Identity infrastructure ports (Kerberos/LDAP) are reachable from "
-                f"{unique_src_apps} distinct source apps: {named}. "
+                f"{unique_src_apps} distinct source apps ({unique_src_apps_allowed} via explicit allow rules, "
+                f"{unique_src_apps - unique_src_apps_allowed} potentially_blocked): {named}. "
                 f"Excessive LDAP/Kerberos reach enables domain enumeration and ticket attacks."
             ),
             recommendation=(
-                "Restrict Kerberos (88) and LDAP (389/636) to domain-joined workloads only. "
-                "No application tier should query LDAP directly — use a service account on "
-                "the app tier that wraps LDAP calls. Block LDAP from any workload in "
-                "non-production or unmanaged environments. Monitor for LDAP enumeration "
-                "patterns (high query rates from single source)."
+                ("Restrict Kerberos (88) and LDAP (389/636) to domain-joined workloads only. "
+                 "Remove or tightly scope allow rules permitting broad identity-port access. "
+                 if unique_src_apps_allowed > threshold else
+                 "These flows have no allow rule — move workloads to enforced mode so default-deny blocks them. "
+                 "Before enforcing, create allow rules only for legitimate LDAP consumers (domain-joined workloads). ")
+                + "No application tier should query LDAP directly — use a service account wrapper."
             ),
-            evidence={'unblocked_flows': len(id_flows),
-                      'unique_src_apps': unique_src_apps,
+            evidence={'unblocked_flows': len(id_flows), 'allowed_flows': len(id_allowed),
+                      'unique_src_apps': unique_src_apps, 'unique_src_apps_allowed': unique_src_apps_allowed,
                       'top_ports': str(named), 'top_sources': str(top_srcs)},
         )
 
@@ -901,7 +933,7 @@ class RulesEngine:
             recommendation=(
                 "Move workloads from visibility/test mode to selective or full enforcement. "
                 "Until enforcement is active, 'potentially_blocked' flows are live attack "
-                "paths — the policy exists but provides ZERO protection. "
+                "paths — no allow rule covers them; only enforced mode's default-deny will block them. "
                 "Check enforcement mode in PCE for the destination apps: {top_apps}."
             ),
             evidence={'pb_lateral_flows': len(pb), 'unique_src': unique_src,
