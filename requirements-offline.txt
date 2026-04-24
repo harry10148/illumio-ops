@@ -1,6 +1,6 @@
 # illumio_ops offline bundle dependencies.
-# Derived from requirements.txt with weasyprint removed.
-# PDF export is disabled in offline builds; HTML/XLSX/CSV/charts work on both platforms.
+# Derived from requirements.txt — PDF export (requires system cairo/pango) excluded.
+# HTML/XLSX/CSV/charts work on both online and offline builds.
 #
 # Build command (Linux/WSL):
 #   pip download -r requirements-offline.txt \
@@ -43,7 +43,7 @@ argon2-cffi>=23.1,<26.0
 
 # ── Phase 5: Reports (Excel + interactive charts; PDF excluded) ───────────────
 openpyxl>=3.1,<4.0
-# weasyprint excluded — PDF export gracefully degrades in offline builds
+# PDF export excluded (requires system cairo/pango not bundled)
 matplotlib>=3.8,<4.0
 plotly>=5.20,<7.0
 pygments>=2.17,<3.0

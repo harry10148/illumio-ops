@@ -3,11 +3,19 @@
 On the RHEL RPM target (pango + cairo present) this works natively. On
 Windows dev machines lacking GTK3, this module imports cleanly but export
 will raise OSError — tests skip accordingly.
+On the offline bundle (weasyprint excluded), PDF_AVAILABLE=False.
 """
 from __future__ import annotations
 
 from loguru import logger
 from typing import Optional
+
+try:
+    import weasyprint as _wp  # noqa: F401 — probe only
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+
 
 def export_pdf(html: str, output_path: str, base_url: Optional[str] = None) -> None:
     """Render HTML to a PDF file. base_url is used to resolve relative assets."""

@@ -35,3 +35,8 @@ def test_export_pdf_handles_cjk(tmp_path):
     data = out.read_bytes()
     # PDF must be non-trivial size (CJK embedding failure often produces a tiny PDF)
     assert len(data) > 1500
+
+
+def test_pdf_available_is_bool():
+    from src.report.exporters.pdf_exporter import PDF_AVAILABLE
+    assert isinstance(PDF_AVAILABLE, bool)
