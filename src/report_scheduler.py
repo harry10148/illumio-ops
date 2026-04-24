@@ -44,6 +44,9 @@ _STATE_KEY = "report_schedule_states"
 # Gap to prevent re-trigger within the same hour window (seconds)
 _MIN_RERUN_GAP = 3600
 
+# Sentinel for "not provided" — distinguishes None (never run) from missing arg
+_UNSET = object()
+
 class ReportScheduler:
     def __init__(self, config_manager, reporter):
         self.cm = config_manager
@@ -80,15 +83,31 @@ class ReportScheduler:
 
     # ─── Scheduling logic ────────────────────────────────────────────────────
 
-    def should_run(self, schedule: dict, now: datetime.datetime) -> bool:
-        """Return True if this schedule should execute right now."""
+    def should_run(self, schedule: dict, now: datetime.datetime,
+                   last_run_str: str | None = _UNSET) -> bool:
+        """Return True if this schedule should execute right now.
+
+        Parameters
+        ----------
+        schedule:
+            Schedule dict (must contain at least ``id`` and ``enabled``).
+        now:
+            Current naive datetime expressed in the schedule's local timezone.
+        last_run_str:
+            ISO-format string of the last run time, or ``None`` if never run.
+            When omitted (sentinel), the value is loaded from the persisted
+            state file — the normal production path.  Pass ``None`` explicitly
+            in tests to skip state-file I/O.
+        """
         if not schedule.get("enabled", False):
             return False
 
-        # Check re-run gap using persisted last_run
-        states = self._load_states()
-        sid = str(schedule.get("id", ""))
-        last_run_str = states.get(sid, {}).get("last_run")
+        # Resolve last_run_str: use provided value or load from state file.
+        if last_run_str is _UNSET:
+            states = self._load_states()
+            sid = str(schedule.get("id", ""))
+            last_run_str = states.get(sid, {}).get("last_run")
+
         last_run_dt = None
         if last_run_str:
             try:
@@ -106,11 +125,20 @@ class ReportScheduler:
         cron_expr = schedule.get("cron_expr")
         if cron_expr:
             try:
+                import zoneinfo as _zi
                 from apscheduler.triggers.cron import CronTrigger
-                trigger = CronTrigger.from_crontab(cron_expr, timezone="UTC")
-                # Make now timezone-aware for APScheduler
-                now_aware = now.replace(tzinfo=datetime.timezone.utc)
-                prev = last_run_dt.replace(tzinfo=datetime.timezone.utc) if last_run_dt else None
+                sched_tz = schedule.get("timezone") or "UTC"
+                try:
+                    tz_obj = _zi.ZoneInfo(sched_tz)
+                except (KeyError, _zi.ZoneInfoNotFoundError):
+                    logger.warning("Unknown timezone {!r} for schedule {}, falling back to UTC",
+                                   sched_tz, schedule.get("id"))
+                    tz_obj = _zi.ZoneInfo("UTC")
+                    sched_tz = "UTC"
+                trigger = CronTrigger.from_crontab(cron_expr, timezone=sched_tz)
+                # Attach the schedule-local timezone so APScheduler can compare correctly.
+                now_aware = now.replace(tzinfo=tz_obj)
+                prev = last_run_dt.replace(tzinfo=tz_obj) if last_run_dt else None
                 next_fire = trigger.get_next_fire_time(prev, now_aware)
                 return next_fire is not None and next_fire <= now_aware
             except Exception:

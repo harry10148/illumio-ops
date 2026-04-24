@@ -143,6 +143,7 @@ class ReportSchedule(_Base):
     id: Optional[int] = None
     name: str = ""
     cron_expr: Optional[str] = None  # e.g. "0 8 * * MON-FRI"
+    timezone: Optional[str] = None   # e.g. "Asia/Taipei", "UTC", "UTC+8"
 
 class Rule(_Base):
     """Runtime rule — shape varies by type. Keep flexible."""
