@@ -375,6 +375,44 @@ EVENT_DESCRIPTION_KEYS = {
     "network_enforcement_node.degraded":          "event_desc_nen_degraded",
 }
 
+EVENT_TIPS_KEYS = {
+    "*":                                          "event_tips_all",
+    "agent.goodbye":                              "event_tips_agent_goodbye",
+    "agent.service_not_available":                "event_tips_agent_service_not_available",
+    "agent.suspend":                              "event_tips_agent_suspend",
+    "agent.refresh_policy":                       "event_tips_agent_refresh_policy",
+    "agent.activate":                             "event_tips_agent_activate",
+    "agent.deactivate":                           "event_tips_agent_deactivate",
+    "agent.tampering":                            "event_tips_agent_tampering",
+    "agent.clone_detected":                       "event_tips_agent_clone_detected",
+    "lost_agent.found":                           "event_tips_lost_agent_found",
+    "system_task.agent_missed_heartbeats_check":  "event_tips_system_task_agent_missed_heartbeats_check",
+    "system_task.agent_offline_check":            "event_tips_system_task_agent_offline_check",
+    "user.authenticate":                          "event_tips_user_authenticate",
+    "user.sign_in":                               "event_tips_user_sign_in",
+    "user.sign_out":                              "event_tips_user_sign_out",
+    "user.login_session_terminated":              "event_tips_user_login_session_terminated",
+    "user.pce_session_terminated":                "event_tips_user_pce_session_terminated",
+    "request.authentication_failed":              "event_tips_request_authentication_failed",
+    "request.authorization_failed":               "event_tips_request_authorization_failed",
+    "api_key.create":                             "event_tips_api_key_create",
+    "api_key.delete":                             "event_tips_api_key_delete",
+    "rule_set.create":                            "event_tips_rule_set_create",
+    "rule_set.update":                            "event_tips_rule_set_update",
+    "rule_set.delete":                            "event_tips_rule_set_delete",
+    "sec_rule.create":                            "event_tips_sec_rule_create",
+    "sec_rule.update":                            "event_tips_sec_rule_update",
+    "sec_rule.delete":                            "event_tips_sec_rule_delete",
+    "sec_policy.create":                          "event_tips_sec_policy_create",
+    "enforcement_boundary.create":                "event_tips_enforcement_boundary_create",
+    "enforcement_boundary.delete":                "event_tips_enforcement_boundary_delete",
+    "firewall_settings.update":                   "event_tips_firewall_settings_update",
+    "cluster.update":                             "event_tips_cluster_update",
+    "workloads.unpair":                           "event_tips_workloads_unpair",
+    "network_enforcement_node.missed_heartbeats": "event_tips_nen_missed_heartbeats",
+    "network_enforcement_node.degraded":          "event_tips_nen_degraded",
+}
+
 def add_event_menu(cm: ConfigManager, edit_rule=None):
     from src.utils import Colors, safe_input, draw_panel, draw_table
 

@@ -1094,11 +1094,20 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     @app.route('/api/event-catalog')
     def api_event_catalog():
         from src.events.catalog import LOCAL_EXTENSION_EVENT_TYPES
-        from src.settings import FULL_EVENT_CATALOG, ACTION_EVENTS, SEVERITY_FILTER_EVENTS, EVENT_DESCRIPTION_KEYS
+        from src.settings import FULL_EVENT_CATALOG, ACTION_EVENTS, SEVERITY_FILTER_EVENTS, EVENT_DESCRIPTION_KEYS, EVENT_TIPS_KEYS
         from src.i18n import set_language, t
 
         cm.load()
         set_language(cm.config.get("settings", {}).get("language", "en"))
+
+        # Build prefix → [event_id, ...] map for related_events computation
+        prefix_map: dict[str, list[str]] = {}
+        for events in FULL_EVENT_CATALOG.values():
+            for event_id in events:
+                if event_id == "*":
+                    continue
+                prefix = event_id.split(".")[0]
+                prefix_map.setdefault(prefix, []).append(event_id)
 
         translated_catalog = {}
         categories = []
@@ -1115,13 +1124,19 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 label = t(translation_key)
                 desc_key = EVENT_DESCRIPTION_KEYS.get(event_id)
                 description = t(desc_key) if desc_key else ''
+                tips_key = EVENT_TIPS_KEYS.get(event_id)
+                tips = t(tips_key) if tips_key else ''
                 supports_status = event_id in ACTION_EVENTS
                 supports_severity = event_id in SEVERITY_FILTER_EVENTS or event_id == "*"
+                prefix = event_id.split(".")[0] if event_id != "*" else None
+                related = [e for e in prefix_map.get(prefix, []) if e != event_id] if prefix else []
                 translated_catalog[trans_cat][event_id] = label
                 event_items.append({
                     'id': event_id,
                     'label': label,
                     'description': description,
+                    'tips': tips,
+                    'related_events': related,
                     'source': 'local_extension' if event_id in LOCAL_EXTENSION_EVENT_TYPES else 'vendor_baseline',
                     'supports_status': supports_status,
                     'supports_severity': supports_severity,

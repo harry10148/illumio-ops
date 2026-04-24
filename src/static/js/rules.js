@@ -284,6 +284,7 @@ function populateEvents() {
 function _renderEventInfo(eventId) {
   const box = $('ev-info');
   if (!box) return;
+  const relEl = $('ev-info-related');
   if (!eventId) {
     box.style.display = 'none';
     $('ev-info-id').textContent = '';
@@ -291,6 +292,7 @@ function _renderEventInfo(eventId) {
     $('ev-info-desc').textContent = '';
     $('ev-info-capabilities').textContent = '';
     $('ev-info-badges').innerHTML = '';
+    if (relEl) { while (relEl.firstChild) relEl.removeChild(relEl.firstChild); relEl.style.display = 'none'; }
     return;
   }
 
@@ -305,9 +307,33 @@ function _renderEventInfo(eventId) {
   $('ev-info-title').textContent = title;
   $('ev-info-desc').textContent = desc;
   $('ev-info-desc').style.display = desc ? '' : 'none';
-  $('ev-info-capabilities').textContent = meta.supports_status || meta.supports_severity
-    ? (_t('gui_ev_capability_filters'))
-    : (_t('gui_ev_capability_basic'));
+
+  const capEl = $('ev-info-capabilities');
+  capEl.textContent = (meta.tips) || (
+    meta.supports_status || meta.supports_severity
+      ? _t('gui_ev_capability_filters')
+      : _t('gui_ev_capability_basic')
+  );
+
+  if (relEl) {
+    while (relEl.firstChild) relEl.removeChild(relEl.firstChild);
+    const related = meta.related_events || [];
+    if (related.length) {
+      const label = document.createElement('span');
+      label.textContent = _t('gui_ev_see_also');
+      relEl.appendChild(label);
+      related.forEach(e => {
+        const chip = document.createElement('code');
+        chip.textContent = e;
+        chip.style.cssText = 'background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:1px 5px;';
+        relEl.appendChild(chip);
+      });
+      relEl.style.display = 'flex';
+    } else {
+      relEl.style.display = 'none';
+    }
+  }
+
   $('ev-info-badges').innerHTML = badges.join('');
   box.style.display = '';
 }
