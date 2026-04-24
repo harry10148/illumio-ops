@@ -431,7 +431,8 @@ class AuditGenerator:
                 logger.info("Audit report: events from cache ({} → {})", start, end)
                 return self._cache.read_events(start, end)
             # partial or miss: fall through to API
-        return self.api.get_events()
+        start_str = start.isoformat().replace("+00:00", "Z")
+        return self.api.get_events(since=start_str)
 
     def generate_from_api(self, start_date: Optional[str] = None,
                           end_date: Optional[str] = None) -> AuditReportResult:
@@ -448,15 +449,7 @@ class AuditGenerator:
         print(t("rpt_audit_querying", start=start_date, end=end_date))
         _start_dt = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
         _end_dt = datetime.datetime.fromisoformat(end_date.replace("Z", "+00:00"))
-        if self._cache is not None:
-            state = self._cache.cover_state("events", _start_dt, _end_dt)
-            if state == "full":
-                logger.info("Audit report: events from cache ({} → {})", start_date, end_date)
-                events = self._cache.read_events(_start_dt, _end_dt)
-            else:
-                events = self.api.fetch_events(start_time_str=start_date, end_time_str=end_date)
-        else:
-            events = self.api.fetch_events(start_time_str=start_date, end_time_str=end_date)
+        events = self._fetch_events(_start_dt, _end_dt)
 
         if not events:
             print(t("rpt_audit_no_events"))
