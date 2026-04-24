@@ -61,7 +61,7 @@ graph TB
     REP --> HOOK_SVC
 ```
 
-**Data Flow**: Entry Point → `ConfigManager` (loads rules/credentials) → `ApiClient` (queries PCE) → `Analyzer` (evaluates rules against returned data) → `Reporter` (dispatches alerts).
+**Data Flow**: Entry Point → `ConfigManager` (loads rules/credentials) → `ApiClient` (queries PCE) → `Analyzer` (evaluates rules against returned data) → `Reporter` (dispatches alerts). When cache is enabled, `CacheSubscriber` (`src/pce_cache/subscriber.py`) feeds pre-fetched data from the PCE cache layer into `Analyzer` instead of making live API calls.
 
 **Scheduler Flow**: `ReportScheduler.tick()` evaluates cron-like schedules → dispatches to report generators → emails results. `RuleScheduler.check()` evaluates recurring/one-time schedules → toggles PCE rules → provisions changes.
 
@@ -88,6 +88,11 @@ illumio_ops/
 │   │   ├── labels.py          # LabelResolver: label/IP-list/service TTL cache management
 │   │   ├── async_jobs.py      # AsyncJobManager: async query job lifecycle + state persistence
 │   │   └── traffic_query.py   # TrafficQueryBuilder: traffic payload construction + streaming
+│   ├── pce_cache/             # PCE cache layer (SQLite WAL) — populated by ingestors, read by Analyzer
+│   │   ├── subscriber.py      # CacheSubscriber: per-consumer cursor, feeds Analyzer when cache enabled
+│   │   ├── ingestor_traffic.py  # Writes traffic flows into cache
+│   │   ├── ingestor_events.py   # Writes PCE events into cache
+│   │   └── reader.py          # Read-side helpers for querying cached data
 │   ├── analyzer.py            # Rule engine: flow matching, metric calculation, state management
 │   ├── reporter.py            # Alert aggregation and multi-channel dispatch
 │   ├── config.py              # Configuration loading, saving, rule CRUD, atomic writes, PBKDF2 password hashing

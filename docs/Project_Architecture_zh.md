@@ -61,7 +61,7 @@ graph TB
     REP --> HOOK_SVC
 ```
 
-**資料流向**：進入點 → `ConfigManager`（載入規則/憑證）→ `ApiClient`（查詢 PCE）→ `Analyzer`（比對規則與回傳資料）→ `Reporter`（發送告警）。
+**資料流向**：進入點 → `ConfigManager`（載入規則/憑證）→ `ApiClient`（查詢 PCE）→ `Analyzer`（比對規則與回傳資料）→ `Reporter`（發送告警）。啟用快取時，`CacheSubscriber`（`src/pce_cache/subscriber.py`）從 PCE 快取層讀取預先擷取的資料，直接提供給 `Analyzer`，取代即時 API 呼叫。
 
 **排程流向**：`ReportScheduler.tick()` 評估排程 → 派送至報表產生器 → Email 寄送結果。`RuleScheduler.check()` 評估循環/一次性排程 → 切換 PCE 規則 → 部署變更。
 
@@ -88,6 +88,11 @@ illumio_ops/
 │   │   ├── labels.py          # LabelResolver：標籤/IP 列表/服務 TTL 快取管理
 │   │   ├── async_jobs.py      # AsyncJobManager：非同步查詢工作生命週期 + 狀態持久化
 │   │   └── traffic_query.py   # TrafficQueryBuilder：流量查詢負載建構 + 串流
+│   ├── pce_cache/             # PCE 快取層（SQLite WAL）— 由 ingestor 寫入，供 Analyzer 讀取
+│   │   ├── subscriber.py      # CacheSubscriber：每消費者游標，快取啟用時向 Analyzer 提供資料
+│   │   ├── ingestor_traffic.py  # 將流量記錄寫入快取
+│   │   ├── ingestor_events.py   # 將 PCE 事件寫入快取
+│   │   └── reader.py          # 快取資料查詢的讀取端輔助函式
 │   ├── analyzer.py            # 規則引擎：流量比對、指標計算、狀態管理
 │   ├── reporter.py            # 告警聚合與多通道發送
 │   ├── config.py              # 設定載入/儲存、規則 CRUD、原子寫入、PBKDF2 密碼雜湊
