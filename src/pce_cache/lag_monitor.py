@@ -59,8 +59,8 @@ def run_cache_lag_monitor(cm) -> None:
             cfg.events_poll_interval_seconds,
             cfg.traffic_poll_interval_seconds,
         ) * 3
-    except Exception:
-        pass
+    except AttributeError as e:
+        logger.debug("Cache poll intervals unavailable, using default lag threshold: {}", e)
 
     results = check_cache_lag(sf, max_lag_seconds=max_lag)
     for r in results:
