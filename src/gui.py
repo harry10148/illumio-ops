@@ -3031,9 +3031,26 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 # the auto-renew path meaningful runway before expiry.
 _SELF_SIGNED_VALIDITY_DAYS = 1825  # 5 years
 
+def _cert_has_san(cert_path: str) -> bool:
+    """Return True if the certificate contains a SubjectAlternativeName extension."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["openssl", "x509", "-in", cert_path, "-noout", "-ext", "subjectAltName"],
+            capture_output=True, text=True,
+        )
+        return "Subject Alternative Name" in result.stdout
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return False
+
+
 def _generate_self_signed_cert(cert_dir: str, force: bool = False,
                                days: int = _SELF_SIGNED_VALIDITY_DAYS) -> tuple[str, str]:
     """Generate a self-signed TLS certificate for local HTTPS.
+
+    Includes SubjectAlternativeName (SAN) for localhost and 127.0.0.1 so that
+    modern browsers accept the certificate for fetch() / XHR requests (Chrome 58+
+    ignores CN entirely and requires SAN for cert validation).
 
     Args:
         cert_dir: Directory to store cert and key files.
@@ -3044,25 +3061,61 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
         (cert_path, key_path) tuple.
     """
     import subprocess
+    import tempfile
 
     os.makedirs(cert_dir, exist_ok=True)
     cert_path = os.path.join(cert_dir, "self_signed.pem")
     key_path = os.path.join(cert_dir, "self_signed_key.pem")
 
     if not force and os.path.exists(cert_path) and os.path.exists(key_path):
-        return cert_path, key_path
+        # Regenerate if the existing cert lacks SAN — browsers reject SAN-less certs
+        # for fetch()/XHR even when the user has accepted the page-level warning.
+        if _cert_has_san(cert_path):
+            return cert_path, key_path
+        force = True
+
+    # Write a temporary OpenSSL config that adds the SAN extension.
+    # Using a config file works with all OpenSSL versions (1.0.2+), whereas
+    # -addext requires 1.1.1+.
+    san_config = (
+        "[req]\n"
+        "distinguished_name = req_dn\n"
+        "x509_extensions = v3_req\n"
+        "prompt = no\n"
+        "[req_dn]\n"
+        "CN = localhost\n"
+        "O = IllumioPCEOps\n"
+        "C = TW\n"
+        "[v3_req]\n"
+        "subjectAltName = @alt_names\n"
+        "[alt_names]\n"
+        "DNS.1 = localhost\n"
+        "IP.1 = 127.0.0.1\n"
+        "IP.2 = ::1\n"
+    )
 
     try:
-        subprocess.run(
-            [
-                "openssl", "req", "-x509", "-newkey", "rsa:2048",
-                "-keyout", key_path, "-out", cert_path,
-                "-days", str(days), "-nodes",
-                "-subj", "/CN=IllumioOps/O=IllumioPCEOps/C=TW",
-            ],
-            check=True,
-            capture_output=True,
-        )
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".cnf", delete=False) as f:
+            f.write(san_config)
+            cfg_path = f.name
+
+        try:
+            subprocess.run(
+                [
+                    "openssl", "req", "-x509", "-newkey", "rsa:2048",
+                    "-keyout", key_path, "-out", cert_path,
+                    "-days", str(days), "-nodes",
+                    "-config", cfg_path,
+                ],
+                check=True,
+                capture_output=True,
+            )
+        finally:
+            try:
+                os.unlink(cfg_path)
+            except OSError:
+                pass
+
         os.chmod(key_path, 0o600)
         print(f"  Self-signed certificate generated ({days} days): {cert_path}")
         return cert_path, key_path
@@ -3163,18 +3216,17 @@ def _get_cert_info(cert_path: str) -> dict:
         info["error"] = "openssl not available"
     return info
 
-def _run_server(app, host: str, port: int, ssl_context) -> None:
+def _run_server(app, host: str, port: int, ssl_context,
+                cert_file: str = "", key_file: str = "") -> None:
     """Dispatch to the appropriate server backend.
 
-    - HTTP  → waitress (production-grade, cross-platform, stable idle handling)
-    - HTTPS → Werkzeug make_server + select() timeout loop
-              waitress does NOT support SSL; using select() avoids setting
-              socket.settimeout() on an SSLSocket which breaks accept().
+    HTTP  → waitress
+    HTTPS → cheroot (native SSL, thread pool, no idle-hang)
     """
     if ssl_context is None:
         _run_http(app, host, port)
     else:
-        _run_https(app, host, port, ssl_context)
+        _run_https(app, host, port, cert_file, key_file)
 
 
 def _run_http(app, host: str, port: int) -> None:
@@ -3194,30 +3246,20 @@ def _run_http(app, host: str, port: int) -> None:
             pass
 
 
-def _run_https(app, host: str, port: int, ssl_context) -> None:
-    """HTTPS via Werkzeug make_server with a select() timeout loop.
+def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None:
+    """HTTPS via cheroot — production-grade WSGI server with native SSL support."""
+    from cheroot import wsgi as _cheroot_wsgi
+    from cheroot.ssl.builtin import BuiltinSSLAdapter as _SSLAdapter
 
-    Using select() with a timeout (instead of socket.settimeout) keeps the
-    accept loop alive on idle without corrupting the SSLSocket state.
-    """
-    import select as _select
-    from werkzeug.serving import make_server
-
-    logger.info("Starting HTTPS server via Werkzeug on {}:{}", host, port)
-    srv = make_server(host, port, app, threaded=True, ssl_context=ssl_context)
+    logger.info("Starting HTTPS server via cheroot on {}:{}", host, port)
+    server = _cheroot_wsgi.Server((host, port), app, numthreads=10)
+    server.ssl_adapter = _SSLAdapter(cert_file, key_file)
     try:
-        while True:
-            # Wake every 60 s even when idle — prevents Windows/Linux select() freeze
-            readable, _, _ = _select.select([srv.socket], [], [], 60)
-            if readable:
-                srv.handle_request()
+        server.start()
     except KeyboardInterrupt:
         pass
     finally:
-        try:
-            srv.socket.close()
-        except OSError:
-            pass
+        server.stop()
 
 
 def build_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
@@ -3253,6 +3295,8 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
         pass  # intentional fallback: preview warning must not block GUI startup
     tls_cfg = cm.config.get("web_gui", {}).get("tls", {})
     ssl_context = None
+    cert_file = ""
+    key_file = ""
 
     if tls_cfg.get("enabled"):
         import ssl
@@ -3313,4 +3357,4 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
         import webbrowser
         threading.Timer(1.5, lambda: webbrowser.open(f'{scheme}://127.0.0.1:{port}')).start()
 
-    _run_server(app, host, port, ssl_context)
+    _run_server(app, host, port, ssl_context, cert_file, key_file)
