@@ -3044,6 +3044,22 @@ def _cert_has_san(cert_path: str) -> bool:
         return False
 
 
+def _get_local_ips() -> list[str]:
+    """Return all non-link-local IP addresses on this machine (IPv4 + IPv6)."""
+    import socket
+    ips: set[str] = {"127.0.0.1", "::1"}
+    try:
+        hostname = socket.gethostname()
+        for info in socket.getaddrinfo(hostname, None):
+            ip = info[4][0]
+            # Skip link-local addresses
+            if not ip.startswith("fe80") and not ip.startswith("169.254"):
+                ips.add(ip)
+    except OSError:
+        pass
+    return sorted(ips)
+
+
 def _generate_self_signed_cert(cert_dir: str, force: bool = False,
                                days: int = _SELF_SIGNED_VALIDITY_DAYS) -> tuple[str, str]:
     """Generate a self-signed TLS certificate for local HTTPS.
@@ -3077,6 +3093,9 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
     # Write a temporary OpenSSL config that adds the SAN extension.
     # Using a config file works with all OpenSSL versions (1.0.2+), whereas
     # -addext requires 1.1.1+.
+    local_ips = _get_local_ips()
+    ip_lines = "".join(f"IP.{i + 1} = {ip}\n" for i, ip in enumerate(local_ips))
+    logger.info("Generating self-signed cert with SANs: DNS:localhost, {}", ", ".join(f"IP:{ip}" for ip in local_ips))
     san_config = (
         "[req]\n"
         "distinguished_name = req_dn\n"
@@ -3090,8 +3109,7 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
         "subjectAltName = @alt_names\n"
         "[alt_names]\n"
         "DNS.1 = localhost\n"
-        "IP.1 = 127.0.0.1\n"
-        "IP.2 = ::1\n"
+        + ip_lines
     )
 
     try:
@@ -3231,6 +3249,11 @@ def _run_http(app, host: str, port: int) -> None:
     server = _cheroot_wsgi.Server((host, port), app, numthreads=10)
     try:
         server.start()
+    except OSError as e:
+        if "Address already in use" in str(e):
+            logger.error("Port {} is already in use. Stop the existing process first (fuser -k {}/tcp) then retry.", port, port)
+        else:
+            raise
     except KeyboardInterrupt:
         pass
     finally:
@@ -3247,6 +3270,11 @@ def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None
     server.ssl_adapter = _SSLAdapter(cert_file, key_file)
     try:
         server.start()
+    except OSError as e:
+        if "Address already in use" in str(e):
+            logger.error("Port {} is already in use. Stop the existing process first (fuser -k {}/tcp) then retry.", port, port)
+        else:
+            raise
     except KeyboardInterrupt:
         pass
     finally:
