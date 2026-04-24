@@ -5,6 +5,8 @@ from loguru import logger
 import os
 import re
 
+from src.siem.dispatcher import DestinationDispatcher, enqueue_new_records
+
 def run_monitor_cycle(cm) -> None:
     """Execute one monitoring analysis + alert dispatch."""
     from src.api_client import ApiClient
@@ -154,6 +156,25 @@ def run_cache_retention(cm) -> None:
 
 def run_siem_dispatch(cm) -> None:
     try:
-        logger.debug("SIEM dispatch tick (destinations configured via siem.destinations)")
+        siem_cfg = cm.models.siem
+        if not siem_cfg.enabled:
+            return
+        destinations = list(siem_cfg.destinations or [])
+        if not destinations:
+            logger.debug("run_siem_dispatch: no destinations configured")
+            return
+        cache_cfg = cm.models.pce_cache
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker as _sm
+        engine = create_engine(
+            f"sqlite:///{cache_cfg.db_path}",
+            connect_args={"check_same_thread": False},
+        )
+        sf = _sm(engine)
+        new_count = enqueue_new_records(sf, destinations)
+        if new_count:
+            logger.info("run_siem_dispatch: enqueued {} new records", new_count)
+        dispatcher = DestinationDispatcher(sf, destinations)
+        dispatcher.tick()
     except Exception as exc:
         logger.exception("run_siem_dispatch failed: {}", exc)

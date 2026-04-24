@@ -155,3 +155,39 @@ def enqueue(
                 retries=0,
                 queued_at=now,
             ))
+
+
+def enqueue_new_records(
+    session_factory: sessionmaker,
+    destinations: list[str],
+) -> int:
+    """Enqueue cache rows not yet in siem_dispatch. Returns count of new rows created."""
+    if not destinations:
+        return 0
+
+    total = 0
+    pairs: list[tuple[str, type]] = [
+        ("pce_events", PceEvent),
+        ("pce_traffic_flows_raw", PceTrafficFlowRaw),
+    ]
+    for source_table, model in pairs:
+        with session_factory() as s:
+            already = set(
+                s.execute(
+                    select(SiemDispatch.source_id).where(
+                        SiemDispatch.source_table == source_table
+                    )
+                ).scalars().all()
+            )
+            if already:
+                new_ids = s.execute(
+                    select(model.id).where(model.id.not_in(already))
+                ).scalars().all()
+            else:
+                new_ids = s.execute(
+                    select(model.id)
+                ).scalars().all()
+        for source_id in new_ids:
+            enqueue(session_factory, source_table, source_id, destinations)
+            total += 1
+    return total
