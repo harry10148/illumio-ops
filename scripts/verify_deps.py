@@ -114,8 +114,35 @@ def verify(pkgs: list[Pkg], category: str, fatal: bool) -> list[str]:
 
 
 def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Verify illumio_ops dependencies can be imported."
+    )
+    parser.add_argument(
+        "--offline-bundle",
+        action="store_true",
+        help="Verify offline bundle: weasyprint must be absent; all others must import.",
+    )
+    args = parser.parse_args()
+
     print("illumio_ops dependency baseline verification")
     print(f"Python: {sys.version}")
+
+    if args.offline_bundle:
+        offline_production = [p for p in PRODUCTION if p.dist.lower() != "weasyprint"]
+        failed = verify(offline_production, "Production (offline bundle — weasyprint excluded)", fatal=True)
+        try:
+            importlib.import_module("weasyprint")
+            print("  FAIL  weasyprint must NOT be installed in offline bundle env")
+            return 1
+        except (ImportError, OSError):
+            print("  OK    weasyprint absent (expected for offline bundle)")
+        if failed:
+            print(f"\nFAILED: {len(failed)} package(s): {', '.join(failed)}")
+            return 1
+        print("\nOffline bundle dependency check passed.")
+        return 0
+
     failed = verify(PRODUCTION, "Production", fatal=True)
     verify(DEV, "Development (non-fatal)", fatal=False)
     if failed:

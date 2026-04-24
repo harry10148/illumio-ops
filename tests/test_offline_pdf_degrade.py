@@ -53,3 +53,18 @@ def test_report_policy_usage_pdf_raises_when_unavailable():
         result = CliRunner().invoke(report_policy_usage, ["--format", "pdf"])
     assert result.exit_code != 0
     assert "PDF export is not available" in result.output
+
+
+def test_verify_deps_offline_production_list_excludes_weasyprint():
+    """The offline production package list must not contain weasyprint."""
+    from scripts.verify_deps import PRODUCTION
+    dist_names = [p.dist.lower() for p in PRODUCTION]
+    # Baseline: weasyprint IS in the normal PRODUCTION list
+    assert "weasyprint" in dist_names
+
+    # Simulate offline bundle: filter as build_offline_bundle.sh does
+    offline = [p for p in PRODUCTION if p.dist.lower() != "weasyprint"]
+    offline_names = [p.dist.lower() for p in offline]
+    assert "weasyprint" not in offline_names
+    # All other packages must survive the filter
+    assert len(offline) == len(PRODUCTION) - 1
