@@ -128,7 +128,6 @@ TRACKED_PREFIXES = (
 # these are proper nouns inside the Illumio product surface and stay English
 # even inside Chinese UI text.
 AUTOTRANSLATE_RESIDUE_TOKENS = (
-    "Rule",
     "Detail",
     "Generate",
     "Loading",
