@@ -8,6 +8,17 @@ import click
 _REPORT_FORMATS = ["html", "csv", "pdf", "xlsx", "all"]
 
 
+def _check_pdf_available(fmt: str) -> None:
+    """Raise ClickException if PDF was requested but weasyprint is not installed."""
+    if fmt == "pdf":
+        from src.report.exporters.pdf_exporter import PDF_AVAILABLE
+        if not PDF_AVAILABLE:
+            raise click.ClickException(
+                "PDF export is not available in this build. "
+                "Use --format html or --format xlsx."
+            )
+
+
 def _resolve_paths(output_dir: str | None) -> tuple[str, str]:
     pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     root_dir = os.path.dirname(pkg_dir)
@@ -168,6 +179,7 @@ def report_group() -> None:
 @click.option("--email", is_flag=True)
 def report_traffic(source: str, file_path, fmt: str, output_dir, email: bool) -> None:
     """Generate Traffic Flow Report."""
+    _check_pdf_available(fmt)
     for path in generate_traffic_report(
         source=source,
         file_path=file_path,
@@ -185,6 +197,7 @@ def report_traffic(source: str, file_path, fmt: str, output_dir, email: bool) ->
 @click.option("--output-dir", type=click.Path(), default=None)
 def report_audit(start_date: str | None, end_date: str | None, fmt: str, output_dir) -> None:
     """Generate Audit Report."""
+    _check_pdf_available(fmt)
     for path in generate_audit_report(
         start_date=start_date,
         end_date=end_date,
@@ -199,6 +212,7 @@ def report_audit(start_date: str | None, end_date: str | None, fmt: str, output_
 @click.option("--output-dir", type=click.Path(), default=None)
 def report_ven_status(fmt: str, output_dir) -> None:
     """Generate VEN Status Report."""
+    _check_pdf_available(fmt)
     for path in generate_ven_status_report(fmt=fmt, output_dir=output_dir):
         click.echo(path)
 
@@ -219,6 +233,7 @@ def report_policy_usage(
     output_dir,
 ) -> None:
     """Generate Policy Usage Report."""
+    _check_pdf_available(fmt)
     for path in generate_policy_usage_report(
         source=source,
         file_path=file_path,
