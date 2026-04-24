@@ -31,6 +31,56 @@ All thresholds are configurable in **`config/report_config.yaml`** under the `th
 
 ---
 
+## Policy Decision Fields
+
+Understanding the two policy-decision fields is essential for correctly interpreting security rule findings.
+
+### `policy_decision` — Historical snapshot
+
+Recorded by the VEN at the time of each traffic flow. **Always exactly one of three values — no sub-types.**
+
+| Value | Meaning |
+|:---|:---|
+| `allowed` | A matching allow rule exists and the flow is permitted. |
+| `potentially_blocked` | **No allow or deny rule** covers this flow. The VEN is in visibility/test mode so traffic passes unrestricted. When the workload moves to enforced (whitelist) mode the default-deny will block it. |
+| `blocked` | The flow is actively blocked — either by a deny rule in selective/full-enforcement mode, or by default-deny with no matching allow rule. |
+
+> **Important:** `potentially_blocked` does **not** mean "a rule exists but isn't enforced." It means there is no matching rule at all. Rules engines that treat PB flows as already-regulated are wrong.
+
+### `draft_policy_decision` — Dynamically recalculated
+
+Returned by the async traffic query **after** a `PUT {job_href}/update_rules` call (available from Illumio Core 23.2.10+). The PCE re-evaluates **all** historical flow records against both active (provisioned) and draft rules, so `draft_policy_decision` is always current — even for flows recorded before a rule was created or provisioned.
+
+| Value | VEN mode | Condition | Meaning |
+|:---|:---|:---|:---|
+| `allowed` | Any | Draft allow rule exists (unprovisioned) | Flow would be permitted if the draft allow rule were provisioned. |
+| `potentially_blocked` | Any | No active or draft rule | Truly uncovered — no rule in any state. |
+| `potentially_blocked_by_boundary` | Visibility | Draft regular deny (unprovisioned) | A deny rule exists in draft; VEN not enforcing yet, so block is potential. |
+| `potentially_blocked_by_override_deny` | Visibility | Draft or active override deny | Override deny exists; VEN not enforcing yet, so block is potential. |
+| `blocked_by_boundary` | Selective / Full | Regular deny exists (draft or active) | VEN will immediately block upon provisioning; or is already blocking new flows. |
+| `blocked_by_override_deny` | Selective / Full | Override deny exists (draft or active) | Same as above but override deny — cannot be overridden by any allow rule. |
+| `allowed_across_boundary` | Any | Active regular deny + allow rule wins | A deny rule exists but an allow rule takes precedence. Never appears with override deny. |
+
+### Key behavioural rules
+
+- **`policy_decision` is a frozen historical snapshot.** Old flows keep their original value even after rules change.
+- **`draft_policy_decision` is always recalculated.** After calling `update_rules`, old flows get new values reflecting the current ruleset.
+- **The `potentially_` prefix signals VEN enforcement mode.** Present = visibility/test mode (block is potential). Absent = selective/full enforcement (block is definitive).
+- **`blocked_by_override_deny` vs `blocked_by_boundary`** — both indicate a deny rule will block, but override deny cannot be overridden by any allow rule.
+- **Transition state after provisioning:** Immediately after a deny rule is provisioned in selective mode, data shows a mix — old flows with `pd=potentially_blocked` and new flows with `pd=blocked` — but all share the same `draft_pd=blocked_by_boundary` because `update_rules` re-evaluates everything with the current ruleset.
+
+### Obtaining `draft_policy_decision`
+
+```
+1. POST /api/v2/orgs/{org}/traffic_flows/async_queries   → job_href
+2. Poll GET job_href until status == "completed"
+3. PUT  job_href/update_rules                             → 202
+4. Poll GET job_href until rules.status == "completed"
+5. GET  job_href/download                                 → JSON with draft_policy_decision column
+```
+
+---
+
 ## Ransomware Risk Port Tiers
 
 The `report_config.yaml` defines four tiers of ransomware risk ports. These tiers are used by rules B001, B002, and B003.

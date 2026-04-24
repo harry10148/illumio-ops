@@ -33,6 +33,56 @@
 
 ---
 
+## 政策決策欄位
+
+正確理解兩個政策決策欄位，是解讀安全規則結果的基礎。
+
+### `policy_decision` — 歷史快照
+
+由 VEN 在流量產生時當下記錄。**永遠只有三個值，無 sub-type。**
+
+| 值 | 意義 |
+|:---|:---|
+| `allowed` | 有對應的 allow rule，流量被允許。 |
+| `potentially_blocked` | **沒有任何 allow 或 deny rule** 覆蓋此流量。VEN 處於 visibility/test 模式，流量不受阻擋。當 workload 切換至 enforced（白名單）模式時，default-deny 才會阻擋。 |
+| `blocked` | 流量被主動阻擋 — 可能是 selective/full-enforcement 模式下的 deny rule，或是 enforced 模式下無 allow rule 的 default-deny。 |
+
+> **重要：** `potentially_blocked` **不代表「規則存在但未強制執行」**，而是代表根本**沒有任何對應規則**。將 PB 流量視為已受規則管轄是錯誤的。
+
+### `draft_policy_decision` — 動態重算
+
+在 async traffic query 完成後，透過 `PUT {job_href}/update_rules` 取得（Illumio Core 23.2.10+ 支援）。PCE 會對**所有**歷史流量紀錄重新套用目前 active（已 provision）和 draft 規則計算，因此此欄位永遠反映當前規則狀態，即使流量在規則建立前已存在。
+
+| 值 | VEN 模式 | 條件 | 意義 |
+|:---|:---|:---|:---|
+| `allowed` | 任何 | Draft allow rule（未 provision） | 若 provision 此 allow rule，流量將被允許。 |
+| `potentially_blocked` | 任何 | 無任何 active 或 draft rule | 完全未覆蓋，任何狀態的規則皆不存在。 |
+| `potentially_blocked_by_boundary` | Visibility | Draft regular deny（未 provision） | Deny rule 存在於草圖；VEN 未強制執行，阻擋僅為潛在。 |
+| `potentially_blocked_by_override_deny` | Visibility | Draft 或 active override deny | Override deny 存在；VEN 未強制執行，阻擋僅為潛在。 |
+| `blocked_by_boundary` | Selective / Full | Regular deny（draft 或 active） | VEN 一旦 provision 即立即阻擋；或已在阻擋新流量。 |
+| `blocked_by_override_deny` | Selective / Full | Override deny（draft 或 active） | 同上，但為 override deny，**不可被任何 allow rule 覆蓋**。 |
+| `allowed_across_boundary` | 任何 | Active regular deny + allow rule 勝出 | Deny rule 存在，但 allow rule 優先；**絕不與 override deny 共存**。 |
+
+### 核心行為規則
+
+- **`policy_decision` 是凍結的歷史快照。** 規則變更後，舊流量的值不會改變。
+- **`draft_policy_decision` 永遠動態重算。** 呼叫 `update_rules` 後，所有舊流量都套用當前規則重新評估。
+- **`potentially_` 前綴代表 VEN 的強制執行能力。** 有前綴 = visibility/test 模式（阻擋僅為潛在）；無前綴 = selective/full enforcement（阻擋確定生效）。
+- **`blocked_by_override_deny` vs `blocked_by_boundary`** — 兩者都表示 deny rule 將阻擋流量，但 override deny 無法被任何 allow rule 覆蓋。
+- **Provision 後的過渡狀態：** Selective 模式下剛 provision deny rule 時，資料會混有舊流量（`pd=potentially_blocked`）和新流量（`pd=blocked`），但全部的 `draft_pd` 都是 `blocked_by_boundary`，因為 `update_rules` 用當前規則重算所有紀錄。
+
+### 取得 `draft_policy_decision` 的步驟
+
+```
+1. POST /api/v2/orgs/{org}/traffic_flows/async_queries   → job_href
+2. 輪詢 GET job_href，直到 status == "completed"
+3. PUT  job_href/update_rules                             → 202
+4. 輪詢 GET job_href，直到 rules.status == "completed"
+5. GET  job_href/download                                 → JSON（含 draft_policy_decision 欄位）
+```
+
+---
+
 ## B 系列 — 基礎規則
 
 ### B001 · 勒索軟體高危連接埠 `CRITICAL / HIGH / MEDIUM / INFO`
