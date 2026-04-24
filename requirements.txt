@@ -10,13 +10,12 @@
 #   Phase 5 — Reports:         openpyxl, weasyprint, matplotlib, plotly, pygments
 #   Phase 6 — Scheduler:       APScheduler, SQLAlchemy
 #   Phase 7 — Logging:         loguru
-#   Existing (mandatory):      flask, pandas, pyyaml, waitress
+#   Existing (mandatory):      flask, pandas, pyyaml, cheroot
 
 # ── Existing core (Web GUI + reports) ────────────────────────────────────────
 flask>=3.0,<4.0
 pandas>=2.0,<4.0
 pyyaml>=6.0,<7.0
-waitress>=3.0,<4.0
 cheroot>=8.6,<12.0
 
 # ── Phase 1: CLI UX ──────────────────────────────────────────────────────────

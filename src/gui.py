@@ -3218,11 +3218,7 @@ def _get_cert_info(cert_path: str) -> dict:
 
 def _run_server(app, host: str, port: int, ssl_context,
                 cert_file: str = "", key_file: str = "") -> None:
-    """Dispatch to the appropriate server backend.
-
-    HTTP  → waitress
-    HTTPS → cheroot (native SSL, thread pool, no idle-hang)
-    """
+    """HTTP and HTTPS both served by cheroot (thread pool, native SSL)."""
     if ssl_context is None:
         _run_http(app, host, port)
     else:
@@ -3230,20 +3226,15 @@ def _run_server(app, host: str, port: int, ssl_context,
 
 
 def _run_http(app, host: str, port: int) -> None:
+    from cheroot import wsgi as _cheroot_wsgi
+    logger.info("Starting HTTP server via cheroot on {}:{}", host, port)
+    server = _cheroot_wsgi.Server((host, port), app, numthreads=10)
     try:
-        from waitress import create_server
-        logger.info("Starting HTTP server via waitress on {}:{}", host, port)
-        server = create_server(app, host=host, port=port)
-        try:
-            server.run()
-        except KeyboardInterrupt:
-            pass
-    except ImportError:
-        logger.warning("waitress not installed — falling back to Werkzeug dev server.")
-        try:
-            app.run(host=host, port=port, debug=False, use_reloader=False, threaded=True)
-        except KeyboardInterrupt:
-            pass
+        server.start()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.stop()
 
 
 def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None:
