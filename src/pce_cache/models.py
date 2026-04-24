@@ -73,6 +73,23 @@ class PceTrafficFlowAgg(Base):
     )
 
 
+class IngestionCursor(Base):
+    """Per-consumer cursor on `ingested_at` for cache subscribers.
+
+    Separate from IngestionWatermark (which tracks the ingestor's own
+    position relative to PCE) — this table tracks downstream consumers
+    of the cache itself. Multiple consumers (analyzer, future alert
+    engines, exporters) can hold independent cursors.
+    """
+    __tablename__ = "ingestion_cursors"
+
+    consumer:         Mapped[str]           = mapped_column(String(64), primary_key=True)
+    source_table:     Mapped[str]           = mapped_column(String(32), primary_key=True)  # "pce_events"|"pce_traffic_flows_raw"
+    last_ingested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_row_id:      Mapped[int | None]    = mapped_column(BigInteger, nullable=True)
+    updated_at:       Mapped[datetime]      = mapped_column(DateTime(timezone=True))
+
+
 class IngestionWatermark(Base):
     __tablename__ = "ingestion_watermarks"
 

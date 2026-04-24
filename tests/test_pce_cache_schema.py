@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import create_engine, inspect
 
 
-def test_schema_creates_all_six_tables():
+def test_schema_creates_all_seven_tables():
     from src.pce_cache.schema import init_schema
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -18,6 +18,7 @@ def test_schema_creates_all_six_tables():
             "pce_traffic_flows_raw",
             "pce_traffic_flows_agg",
             "ingestion_watermarks",
+            "ingestion_cursors",
             "siem_dispatch",
             "dead_letter",
         }
