@@ -137,6 +137,47 @@ class DestinationDispatcher:
             )
 
 
+def _formatter_for(dest_cfg):
+    """Build formatter from SiemDestinationSettings."""
+    from src.siem.formatters.cef import CEFFormatter
+    from src.siem.formatters.json_line import JSONLineFormatter
+    return CEFFormatter() if dest_cfg.format.startswith("cef") else JSONLineFormatter()
+
+
+def _transport_for(dest_cfg):
+    """Build transport from SiemDestinationSettings."""
+    transport_type = dest_cfg.transport.lower()
+    host, _, port_str = dest_cfg.endpoint.rpartition(":")
+    port = int(port_str) if port_str.isdigit() else 514
+    if not host:
+        host = dest_cfg.endpoint
+    if transport_type == "udp":
+        from src.siem.transports.syslog_udp import SyslogUDPTransport
+        return SyslogUDPTransport(host, port)
+    elif transport_type == "tcp":
+        from src.siem.transports.syslog_tcp import SyslogTCPTransport
+        return SyslogTCPTransport(host, port)
+    elif transport_type == "tls":
+        from src.siem.transports.syslog_tls import SyslogTLSTransport
+        return SyslogTLSTransport(host, port, tls_verify=dest_cfg.tls_verify)
+    elif transport_type == "hec":
+        from src.siem.transports.splunk_hec import SplunkHECTransport
+        return SplunkHECTransport(dest_cfg.endpoint, token=dest_cfg.hec_token or "")
+    raise ValueError(f"Unknown transport: {transport_type}")
+
+
+def build_dispatcher(dest_cfg, session_factory) -> "DestinationDispatcher":
+    """Build a DestinationDispatcher from a SiemDestinationSettings instance."""
+    return DestinationDispatcher(
+        name=dest_cfg.name,
+        session_factory=session_factory,
+        formatter=_formatter_for(dest_cfg),
+        transport=_transport_for(dest_cfg),
+        max_retries=dest_cfg.max_retries,
+        batch_size=dest_cfg.batch_size,
+    )
+
+
 def enqueue(
     session_factory: sessionmaker,
     source_table: str,

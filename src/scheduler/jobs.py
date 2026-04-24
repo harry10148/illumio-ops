@@ -5,7 +5,6 @@ from loguru import logger
 import os
 import re
 
-from src.siem.dispatcher import DestinationDispatcher, enqueue_new_records
 
 def run_monitor_cycle(cm) -> None:
     """Execute one monitoring analysis + alert dispatch."""
@@ -155,26 +154,30 @@ def run_cache_retention(cm) -> None:
 
 
 def run_siem_dispatch(cm) -> None:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.siem.dispatcher import enqueue_new_records, build_dispatcher
     try:
         siem_cfg = cm.models.siem
         if not siem_cfg.enabled:
             return
-        destinations = list(siem_cfg.destinations or [])
-        if not destinations:
-            logger.debug("run_siem_dispatch: no destinations configured")
+        enabled_dests = [d for d in (siem_cfg.destinations or []) if d.enabled]
+        if not enabled_dests:
+            logger.debug("run_siem_dispatch: no enabled destinations configured")
             return
         cache_cfg = cm.models.pce_cache
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker as _sm
-        engine = create_engine(
-            f"sqlite:///{cache_cfg.db_path}",
-            connect_args={"check_same_thread": False},
-        )
-        sf = _sm(engine)
-        new_count = enqueue_new_records(sf, destinations)
+        engine = create_engine(f"sqlite:///{cache_cfg.db_path}")
+        init_schema(engine)
+        sf = sessionmaker(engine)
+        dest_names = [d.name for d in enabled_dests]
+        new_count = enqueue_new_records(sf, dest_names)
         if new_count:
             logger.info("run_siem_dispatch: enqueued {} new records", new_count)
-        dispatcher = DestinationDispatcher(sf, destinations)
-        dispatcher.tick()
+        for dest_cfg in enabled_dests:
+            try:
+                build_dispatcher(dest_cfg, sf).tick()
+            except Exception as exc:
+                logger.exception("run_siem_dispatch destination {!r} failed: {}", dest_cfg.name, exc)
     except Exception as exc:
         logger.exception("run_siem_dispatch failed: {}", exc)

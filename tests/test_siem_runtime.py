@@ -92,19 +92,30 @@ def test_enqueue_new_records_noop_when_no_records(sf):
     assert len(count) == 0
 
 
-def test_run_siem_dispatch_calls_tick_and_enqueue(sf):
-    """run_siem_dispatch enqueues new records and calls dispatcher.tick()."""
+def test_run_siem_dispatch_calls_tick_and_enqueue():
+    """run_siem_dispatch enqueues new records and calls build_dispatcher().tick() per destination."""
     from src.scheduler.jobs import run_siem_dispatch
-    _add_event(sf)
+    from src.config_models import SiemDestinationSettings
+
+    dest = SiemDestinationSettings(
+        name="test-dest", enabled=True, transport="udp",
+        format="cef", endpoint="192.168.1.1:514",
+    )
     cm = MagicMock()
     cm.models.siem.enabled = True
-    cm.models.siem.destinations = ["syslog://host:514"]
+    cm.models.siem.destinations = [dest]
     cm.models.pce_cache.db_path = ":memory:"
-    # Patch the two helpers we care about
-    with patch("src.scheduler.jobs.enqueue_new_records") as mock_enqueue, \
-         patch("src.scheduler.jobs.DestinationDispatcher") as mock_disp_cls:
+
+    with patch("src.siem.dispatcher.enqueue_new_records") as mock_enqueue, \
+         patch("src.siem.dispatcher.build_dispatcher") as mock_build, \
+         patch("src.pce_cache.schema.init_schema"), \
+         patch("sqlalchemy.create_engine"), \
+         patch("sqlalchemy.orm.sessionmaker"):
+        mock_enqueue.return_value = 0
         mock_dispatcher = MagicMock()
-        mock_disp_cls.return_value = mock_dispatcher
+        mock_build.return_value = mock_dispatcher
         run_siem_dispatch(cm)
+
     mock_enqueue.assert_called_once()
+    assert mock_build.call_args[0][0] is dest
     mock_dispatcher.tick.assert_called_once()
