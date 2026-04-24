@@ -80,10 +80,13 @@ def calculate_volume_mb(flow):
 # ─── Analyzer Class ───────────────────────────────────────────────────────────
 
 class Analyzer:
-    def __init__(self, config_manager, api_client: IApiClient, reporter: IReporter):
+    def __init__(self, config_manager, api_client: IApiClient, reporter: IReporter,
+                 subscriber_events=None, subscriber_flows=None):
         self.cm = config_manager
         self.api = api_client
         self.reporter = reporter
+        self._sub_events = subscriber_events
+        self._sub_flows = subscriber_flows
         now_str = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         self.state = {
             "last_check": now_str,
@@ -485,6 +488,20 @@ class Analyzer:
         logger.info("Analysis cycle completed.")
         gc.collect()
 
+    def _legacy_event_pull(self):
+        """Fetch events from the PCE API (legacy path used when no cache subscriber)."""
+        event_batch = self._fetch_event_batch()
+        events = event_batch.events
+        self.stats.record_pce_success("events", status=200, message=f"fetched={len(events)}")
+        if event_batch.overflow_risk:
+            logger.warning(
+                "Event polling reached max_results=%s between %s and %s; additional events may exist.",
+                self.event_poller.max_results,
+                event_batch.query_since,
+                event_batch.query_until,
+            )
+        return events, event_batch
+
     def _run_event_analysis(self) -> list:
         """Poll events, normalise, run rule matching, and fire event alerts.
 
@@ -497,21 +514,20 @@ class Analyzer:
         event_triggers = []
         events = []
         event_batch = None
-        try:
-            event_batch = self._fetch_event_batch()
-            events = event_batch.events
-            self.stats.record_pce_success("events", status=200, message=f"fetched={len(events)}")
-            if event_batch.overflow_risk:
-                logger.warning(
-                    "Event polling reached max_results=%s between %s and %s; additional events may exist.",
-                    self.event_poller.max_results,
-                    event_batch.query_since,
-                    event_batch.query_until,
-                )
-        except Exception as e:
-            logger.error(f"Event polling failed; watermark preserved at {self.state.get('event_watermark')}: {e}")
-            print(f"{Colors.FAIL}{t('api_fetch_events_error', error=str(e))}{Colors.ENDC}")
-            self.stats.record_pce_error("events", str(e))
+        if self._sub_events is not None:
+            try:
+                events = self._sub_events.poll_new_rows(limit=5000)
+                logger.info("Analyzer event path: cache ({} rows)", len(events))
+            except Exception as e:
+                logger.error(f"Cache event poll failed: {e}")
+                print(f"{Colors.FAIL}{t('api_fetch_events_error', error=str(e))}{Colors.ENDC}")
+        else:
+            try:
+                events, event_batch = self._legacy_event_pull()
+            except Exception as e:
+                logger.error(f"Event polling failed; watermark preserved at {self.state.get('event_watermark')}: {e}")
+                print(f"{Colors.FAIL}{t('api_fetch_events_error', error=str(e))}{Colors.ENDC}")
+                self.stats.record_pce_error("events", str(e))
 
         if events:
             print(t('found_events', count=len(events)))
@@ -571,12 +587,25 @@ class Analyzer:
 
         return event_triggers
 
+    def _legacy_fetch_traffic(self):
+        """Fetch traffic from the PCE API (legacy path used when no cache subscriber)."""
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        max_win = max([r.get('threshold_window', 10) for r in self.cm.config["rules"]
+                       if r["type"] in ["traffic", "bandwidth", "volume"]])
+        start_dt = now_utc - datetime.timedelta(minutes=max_win + 2)
+        traffic_stream = self.api.execute_traffic_query_stream(
+            start_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            now_utc.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            ["blocked", "potentially_blocked", "allowed"]
+        )
+        return traffic_stream, now_utc
+
     def _fetch_traffic(self) -> tuple:
-        """Determine traffic rules, query the API, and return the raw stream.
+        """Determine traffic rules, query the API or cache, and return the raw stream.
 
         Returns:
             (traffic_stream, tr_rules, now_utc) where traffic_stream is the
-            generator/iterable from the API (or None if no rules or no data),
+            generator/iterable from the API or cache (or None if no rules or no data),
             tr_rules is the filtered list of traffic/bandwidth/volume rules, and
             now_utc is the datetime used as the query end boundary.
         """
@@ -585,14 +614,13 @@ class Analyzer:
             return None, tr_rules, datetime.datetime.now(datetime.timezone.utc)
 
         now_utc = datetime.datetime.now(datetime.timezone.utc)
-        max_win = max([r.get('threshold_window', 10) for r in tr_rules])
-        start_dt = now_utc - datetime.timedelta(minutes=max_win + 2)
 
-        traffic_stream = self.api.execute_traffic_query_stream(
-            start_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
-            now_utc.strftime('%Y-%m-%dT%H:%M:%SZ'),
-            ["blocked", "potentially_blocked", "allowed"]
-        )
+        if self._sub_flows is not None:
+            flows = self._sub_flows.poll_new_rows(limit=10000)
+            logger.info("Analyzer flow path: cache ({} rows)", len(flows))
+            return flows, tr_rules, now_utc
+
+        traffic_stream, now_utc = self._legacy_fetch_traffic()
         return traffic_stream, tr_rules, now_utc
 
     def _run_rule_engine(self, traffic_stream, tr_rules: list, now_utc) -> list:
