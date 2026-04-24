@@ -53,10 +53,23 @@ class EventBatch:
     seen_events: dict[str, str]
 
 class EventPoller:
-    def __init__(self, api_client, max_results: int = 5000, overlap_seconds: int = 60):
+    def __init__(self, api_client, max_results: int = 5000, overlap_seconds: int = 60,
+                 subscriber=None):
         self.api = api_client
         self.max_results = max_results
         self.overlap_seconds = overlap_seconds
+        self._subscriber = subscriber
+
+    def poll(self) -> list[dict[str, Any]]:
+        """Return new events from either the cache subscriber or the legacy API path."""
+        if self._subscriber is not None:
+            return self._subscriber.poll_new_rows(limit=self.max_results)
+        return self._legacy_poll()
+
+    def _legacy_poll(self) -> list[dict[str, Any]]:
+        """Thin wrapper kept for testability; real logic lives in fetch_batch."""
+        batch = self.fetch_batch(watermark=None)
+        return batch.events
 
     def fetch_batch(self, watermark: str | None, seen_events: dict[str, str] | None = None) -> EventBatch:
         poll_started_at = dt.datetime.now(dt.timezone.utc)

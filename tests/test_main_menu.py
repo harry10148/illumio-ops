@@ -63,7 +63,7 @@ def test_rule_management_menu_option_7_runs_analysis_and_sends_alerts(monkeypatc
             calls.append(("send_alerts", force_test))
 
     class FakeAnalyzer:
-        def __init__(self, _cm, _api, _rep):
+        def __init__(self, _cm, _api, _rep, **kwargs):
             calls.append("analyzer")
 
         def run_analysis(self):
@@ -101,7 +101,7 @@ def test_rule_management_menu_option_8_runs_debug_mode(monkeypatch):
             calls.append(("send_alerts", force_test))
 
     class FakeAnalyzer:
-        def __init__(self, _cm, _api, _rep):
+        def __init__(self, _cm, _api, _rep, **kwargs):
             calls.append("analyzer")
 
         def run_analysis(self):

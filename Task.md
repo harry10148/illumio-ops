@@ -103,18 +103,18 @@ Plan: [docs/superpowers/plans/2026-04-19-phase-14-reports-on-cache.md](docs/supe
 
 ---
 
-## Phase 15: Alerts on PCE Cache 📋 PLANNED (2026-04-19)
+## Phase 15: Alerts on PCE Cache ✅ DONE (v3.13.0-alerts-cache, 2026-04-24)
 
 Plan: [docs/superpowers/plans/2026-04-19-phase-15-alerts-on-cache.md](docs/superpowers/plans/2026-04-19-phase-15-alerts-on-cache.md) • Target tag: `v3.13.0-alerts-cache` • Branch: `feature/phase-15-alerts-cache` (independent of Phase 14)
 
-- [ ] **T1**: Branch + baseline
-- [ ] **T2**: `IngestionCursor` additive table (per-consumer cursor with `(ingested_at, id)` tuple)
-- [ ] **T3**: `CacheSubscriber` with persistent cursor
-- [ ] **T4**: `Analyzer` event/flow paths read from subscriber when cache enabled
-- [ ] **T5**: `EventPoller` adapter delegates to subscriber
-- [ ] **T6**: 30s monitor tick when `pce_cache.enabled` (drops from `interval_minutes`)
-- [ ] **T7**: Cache lag monitor — warns on stalled ingestor
-- [ ] **T8**: Docs (architecture diagram update) + E2E + PR + tag
+- [x] **T1**: Branch + baseline
+- [x] **T2**: `IngestionCursor` additive table (per-consumer cursor with `(ingested_at, id)` tuple)
+- [x] **T3**: `CacheSubscriber` with persistent cursor
+- [x] **T4**: `Analyzer` event/flow paths read from subscriber when cache enabled
+- [x] **T5**: `EventPoller` adapter delegates to subscriber
+- [x] **T6**: 30s monitor tick when `pce_cache.enabled` (drops from `interval_minutes`)
+- [x] **T7**: Cache lag monitor — warns on stalled ingestor
+- [x] **T8**: Docs (`PCE_Cache.md` Alerts on Cache section) + E2E test (4 tests) + full validation (≥582 passed) + Status/Task update
 
 ---
 

@@ -112,3 +112,43 @@ Generated HTML reports display a colored pill in the report header indicating th
 - **Green** — data served from local cache
 - **Blue** — data fetched from live PCE API
 - **Yellow** — mixed (partial cache + API)
+
+---
+
+## Alerts on Cache
+
+When `pce_cache.enabled = true`, the Analyzer subscribes to the PCE cache
+via `CacheSubscriber` instead of querying the PCE API directly. This enables:
+
+- **30-second alert latency** — the monitor tick drops from `interval_minutes`
+  (default 10 min) to 30 seconds when cache is enabled.
+- **No API budget impact** — each tick reads local SQLite only; PCE API calls
+  happen only via the ingestor on its own schedule.
+
+### How it works
+
+```
+PCE API  →  Ingestor  →  pce_cache.db
+                              ↓
+                        CacheSubscriber
+                              ↓
+                          Analyzer  →  Reporter  →  Alerts
+```
+
+Each consumer (analyzer) holds an independent cursor in the `ingestion_cursors`
+table. On each 30-second tick, the Analyzer reads only rows inserted since the
+last cursor position.
+
+### Cache lag monitoring
+
+A separate APScheduler job (`cache_lag_monitor`) runs every 60 seconds and
+checks `ingestion_watermarks.last_sync_at`. If the ingestor has not synced
+within `3 × max(events_poll_interval, traffic_poll_interval)` seconds, it
+emits a `WARNING` log. If lag exceeds twice that threshold, it emits `ERROR`.
+This catches ingestor stalls before alerts silently drift.
+
+### Fallback
+
+When `pce_cache.enabled = false` (default), every code path reverts to the
+original PCE API behaviour. No configuration change is needed for existing
+deployments.

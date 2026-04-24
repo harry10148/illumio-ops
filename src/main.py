@@ -20,6 +20,28 @@ from src.i18n import t, get_language
 
 LOG_FILE = ""  # To be set in main() or main_menu()
 
+
+def _make_subscribers(cm):
+    """Return (subscriber_events, subscriber_flows) when pce_cache is enabled, else (None, None)."""
+    try:
+        if not cm.models.pce_cache.enabled:
+            return None, None
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from src.pce_cache.schema import init_schema
+        from src.pce_cache.subscriber import CacheSubscriber
+        cfg = cm.models.pce_cache
+        engine = create_engine(f"sqlite:///{cfg.db_path}")
+        init_schema(engine)
+        sf = sessionmaker(engine)
+        sub_events = CacheSubscriber(sf, consumer="analyzer", source_table="pce_events")
+        sub_flows = CacheSubscriber(sf, consumer="analyzer", source_table="pce_traffic_flows_raw")
+        return sub_events, sub_flows
+    except Exception as exc:
+        logger.warning("Could not create cache subscribers: {}", exc)
+        return None, None
+
+
 # ─── Daemon / Monitor Loop ───────────────────────────────────────────────────
 
 import threading
@@ -182,7 +204,9 @@ def rule_management_menu(cm):
         elif sel == 7:
             api = ApiClient(cm)
             rep = Reporter(cm)
-            ana = Analyzer(cm, api, rep)
+            sub_events, sub_flows = _make_subscribers(cm)
+            ana = Analyzer(cm, api, rep,
+                           subscriber_events=sub_events, subscriber_flows=sub_flows)
             ana.run_analysis()
             rep.send_alerts()
             input(
@@ -191,7 +215,9 @@ def rule_management_menu(cm):
         elif sel == 8:
             api = ApiClient(cm)
             rep = Reporter(cm)
-            ana = Analyzer(cm, api, rep)
+            sub_events, sub_flows = _make_subscribers(cm)
+            ana = Analyzer(cm, api, rep,
+                           subscriber_events=sub_events, subscriber_flows=sub_flows)
             ana.run_debug_mode()
             input(
                 f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} {Colors.GREEN}❯{Colors.ENDC} "

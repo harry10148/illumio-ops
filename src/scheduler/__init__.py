@@ -13,6 +13,7 @@ from src.scheduler.jobs import (
     tick_rule_schedules,
 )
 from src.siem.preview import emit_preview_warning
+from src.i18n import t
 
 def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     """Factory for a BackgroundScheduler wired with illumio_ops jobs.
@@ -52,9 +53,21 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
 
     sched = BackgroundScheduler(**kwargs)
 
+    try:
+        _cache_enabled = cm.models.pce_cache.enabled
+    except Exception as e:
+        logger.warning("Cache config unavailable, defaulting to API interval: {}", e)
+        _cache_enabled = False
+
+    if _cache_enabled:
+        monitor_trigger = IntervalTrigger(seconds=30)
+        logger.info(t("monitor_cache_enabled_hint"))
+    else:
+        monitor_trigger = IntervalTrigger(minutes=interval_minutes)
+
     sched.add_job(
         run_monitor_cycle,
-        trigger=IntervalTrigger(minutes=interval_minutes),
+        trigger=monitor_trigger,
         args=[cm],
         id="monitor_cycle",
         name="Monitor analysis cycle",
@@ -85,6 +98,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
                 run_events_ingest, run_traffic_ingest,
                 run_traffic_aggregate, run_cache_retention,
             )
+            from src.pce_cache.lag_monitor import run_cache_lag_monitor
             sched.add_job(run_events_ingest, _IT(seconds=cache_cfg.events_poll_interval_seconds),
                           args=[cm], id="pce_cache_ingest_events", replace_existing=True)
             sched.add_job(run_traffic_ingest, _IT(seconds=cache_cfg.traffic_poll_interval_seconds),
@@ -93,6 +107,8 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
                           args=[cm], id="pce_cache_aggregate", replace_existing=True)
             sched.add_job(run_cache_retention, _IT(hours=24),
                           args=[cm], id="pce_cache_retention", replace_existing=True)
+            sched.add_job(run_cache_lag_monitor, _IT(seconds=60),
+                          args=[cm], id="cache_lag_monitor", replace_existing=True)
     except Exception as exc:
         logger.exception("Failed to register pce_cache scheduler jobs: {}", exc)
 

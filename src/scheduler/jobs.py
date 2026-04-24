@@ -11,13 +11,16 @@ def run_monitor_cycle(cm) -> None:
     from src.analyzer import Analyzer
     from src.reporter import Reporter
     from src.module_log import ModuleLog
+    from src.main import _make_subscribers
 
     mlog = ModuleLog.get("monitor")
     try:
         mlog.info("Starting monitor cycle")
         api = ApiClient(cm)
         rep = Reporter(cm)
-        ana = Analyzer(cm, api, rep)
+        sub_events, sub_flows = _make_subscribers(cm)
+        ana = Analyzer(cm, api, rep,
+                       subscriber_events=sub_events, subscriber_flows=sub_flows)
         ana.run_analysis()
         rep.send_alerts()
         mlog.info("Monitor cycle complete")

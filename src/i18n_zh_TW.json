@@ -1782,5 +1782,8 @@
   "cache_backfill_failed": "Cache 填補失敗",
   "cache_miss_notice": "資料超出 Cache 保留範圍，請使用 Backfill 匯入歷史資料。",
   "cli_cache_status": "Cache 狀態",
-  "cli_cache_retention": "Cache 保留政策"
+  "cli_cache_retention": "Cache 保留政策",
+  "monitor_cache_enabled_hint": "監控週期：30 秒（從 PCE 快取讀取）",
+  "alert_cache_lag_warning": "快取擷取器延遲警告：來源={source} 延遲={lag}秒",
+  "alert_cache_lag_error": "快取擷取器停止響應：來源={source} 延遲={lag}秒"
 }

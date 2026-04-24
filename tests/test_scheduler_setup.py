@@ -11,6 +11,8 @@ def _fake_cm(rule_check_interval=300):
         "rule_scheduler": {"check_interval_seconds": rule_check_interval},
         "settings": {"timezone": "UTC"},
     }
+    cm.models.pce_cache.enabled = False
+    cm.models.siem.enabled = False
     return cm
 
 
