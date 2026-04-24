@@ -119,3 +119,31 @@ def test_run_siem_dispatch_calls_tick_and_enqueue():
     mock_enqueue.assert_called_once()
     assert mock_build.call_args[0][0] is dest
     mock_dispatcher.tick.assert_called_once()
+
+
+def test_dispatcher_marks_failed_when_payload_none(sf):
+    """When _build_payload returns None, dispatch row must transition to 'failed'."""
+    from src.siem.dispatcher import DestinationDispatcher, enqueue
+    from src.siem.formatters.cef import CEFFormatter
+    from unittest.mock import MagicMock
+    import sqlalchemy
+
+    _add_event(sf)
+    enqueue(sf, "pce_events", 1, ["test-dest"])
+
+    mock_fmt = MagicMock(spec=CEFFormatter)
+    mock_transport = MagicMock()
+    dispatcher = DestinationDispatcher(
+        name="test-dest",
+        session_factory=sf,
+        formatter=mock_fmt,
+        transport=mock_transport,
+    )
+
+    with patch.object(dispatcher, "_build_payload", return_value=None):
+        dispatcher.tick()
+
+    with sf() as s:
+        row = s.execute(sqlalchemy.select(SiemDispatch)).scalars().first()
+    assert row.status == "failed"
+    assert row.last_error == "payload_build_failed"

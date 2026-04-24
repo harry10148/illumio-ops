@@ -69,6 +69,12 @@ class DestinationDispatcher:
         for dispatch_row in rows:
             payload = self._build_payload(dispatch_row)
             if payload is None:
+                with self._sf.begin() as s:
+                    s.execute(
+                        update(SiemDispatch)
+                        .where(SiemDispatch.id == dispatch_row.id)
+                        .values(status="failed", last_error="payload_build_failed")
+                    )
                 continue
             try:
                 self._transport.send(payload)
