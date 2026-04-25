@@ -11,6 +11,7 @@ sites working unchanged.
 """
 from __future__ import annotations
 
+import ipaddress
 from typing import Literal, Optional
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, HttpUrl, field_validator
@@ -158,6 +159,24 @@ class TrafficFilterSettings(_Base):
     ports: list[int] = Field(default_factory=list)
     protocols: list[str] = Field(default_factory=list)
     exclude_src_ips: list[str] = Field(default_factory=list)
+
+    @field_validator("exclude_src_ips")
+    @classmethod
+    def _validate_ips(cls, v: list[str]) -> list[str]:
+        for ip in v:
+            try:
+                ipaddress.ip_address(ip)
+            except ValueError as e:
+                raise ValueError(f"exclude_src_ips: {ip!r} is not a valid IP address") from e
+        return v
+
+    @field_validator("ports")
+    @classmethod
+    def _validate_ports(cls, v: list[int]) -> list[int]:
+        for p in v:
+            if not (1 <= p <= 65535):
+                raise ValueError(f"ports: {p} is out of range (1-65535)")
+        return v
 
 
 class TrafficSamplingSettings(_Base):

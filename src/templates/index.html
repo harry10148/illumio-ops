@@ -190,6 +190,11 @@
         <use href="#icon-clock"></use>
       </svg> <span data-i18n="gui_rs_tab">Rule Scheduler</span>
     </button>
+    <button class="tab" type="button" role="tab" aria-selected="false"
+            aria-controls="p-integrations" data-tab="integrations"
+            onclick="switchTab('integrations')" data-i18n="gui_tab_integrations">
+      <svg class="icon"><use href="#icon-settings"></use></svg> Integrations
+    </button>
     <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-settings" data-tab="settings" onclick="switchTab('settings')" data-i18n="gui_tab_settings">
       <svg class="icon">
         <use href="#icon-settings"></use>
@@ -953,6 +958,25 @@
     </div>
   </div>
 
+  <div class="panel" id="p-integrations">
+    <div class="sub-tab-bar" style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:10px;">
+      <button class="btn sub-tab active" onclick="integrationsSwitch('overview')"
+              data-i18n="gui_it_overview">Overview</button>
+      <button class="btn sub-tab" onclick="integrationsSwitch('cache')"
+              data-i18n="gui_it_cache">Cache</button>
+      <button class="btn sub-tab" onclick="integrationsSwitch('siem')"
+              data-i18n="gui_it_siem">SIEM</button>
+      <button class="btn sub-tab" onclick="integrationsSwitch('dlq')"
+              data-i18n="gui_it_dlq">DLQ</button>
+    </div>
+    <div id="it-pane-overview" class="it-pane"></div>
+    <div id="it-pane-cache" class="it-pane" style="display:none;"></div>
+    <div id="it-pane-siem" class="it-pane" style="display:none;"></div>
+    <div id="it-pane-dlq" class="it-pane" style="display:none;"></div>
+  </div>
+
+  <script src="{{ url_for('static', filename='js/integrations.js') }}"></script>
+
   <div class="panel" id="p-settings">
     <div class="cards" style="margin-bottom:14px;">
       <div class="card">
@@ -1043,6 +1067,20 @@
         #rs-left .table-container,
         #rs-right .table-container{border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);margin-top:0;box-shadow:0 2px 12px rgba(0,0,0,.04);}
         #rs-detail{padding-top:2px;}
+
+      /* Integration overview card status colors */
+      .card-ok      { border-left: 4px solid #299B65; }
+      .card-warn    { border-left: 4px solid var(--warn, #E6A700); }
+      .card-err     { border-left: 4px solid #F43F51; }
+      .card-neutral { border-left: 4px solid var(--border); }
+      .banner {
+        padding: 10px 14px;
+        background: var(--warn-bg, #3a2e00);
+        border: 1px solid var(--warn, #E6A700);
+        border-radius: var(--radius, 6px);
+        display: flex; align-items: center; gap: 12px;
+      }
+      .banner .btn:last-of-type { margin-left: auto; }
       </style>
 
     <!-- Sub-tabs -->

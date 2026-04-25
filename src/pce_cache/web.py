@@ -1,7 +1,7 @@
 """Flask Blueprint for PCE cache management endpoints."""
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required
 from loguru import logger
 
@@ -90,3 +90,25 @@ def api_cache_status():
     except Exception as e:
         logger.exception("cache status error: {}", e)
         return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/settings", methods=["GET"])
+@login_required
+def get_cache_settings():
+    cm = current_app.config['CM']
+    return jsonify(cm.models.pce_cache.model_dump(mode="json"))
+
+
+@bp.route("/settings", methods=["PUT"])
+@login_required
+def put_cache_settings():
+    from src.config_models import PceCacheSettings
+    from src.gui.settings_helpers import save_section
+    cm = current_app.config['CM']
+    incoming = request.get_json(silent=True) or {}
+    current = cm.models.pce_cache.model_dump(mode="json")
+    current.update(incoming)
+    result = save_section(cm, "pce_cache", current, PceCacheSettings)
+    if result["ok"]:
+        cm.load()
+    return jsonify(result), (200 if result["ok"] else 422)

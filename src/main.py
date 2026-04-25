@@ -127,7 +127,22 @@ def run_daemon_with_gui(interval_minutes: int, port: int):
         print(t("report_requires_flask"))
         print(t("cli_pip_install_hint", pkg="flask"))
         sys.exit(1)
-        
+
+    # Install restart hook so the GUI can restart the daemon scheduler.
+    import src.gui as _gui
+    from src.scheduler import build_scheduler
+
+    def _restart():
+        if _gui._DAEMON_SCHEDULER is not None and getattr(_gui._DAEMON_SCHEDULER, "running", False):
+            _gui._DAEMON_SCHEDULER.shutdown(wait=False)
+        cm.load()
+        new_sched = build_scheduler(cm, interval_minutes=interval_minutes)
+        new_sched.start()
+        return new_sched
+
+    _gui._GUI_OWNS_DAEMON = True
+    _gui._DAEMON_RESTART_FN = _restart
+
     launch_gui(cm, port=port, persistent_mode=True)
 
 def view_logs(log_file):
@@ -306,12 +321,14 @@ def main_menu():
             t("main_menu_root_4"),
             t("main_menu_root_5"),
             t("main_menu_root_6"),
+            t("main_menu_root_7"),
+            t("main_menu_root_8"),
             t("main_menu_0"),
         ]
 
         draw_panel("Illumio PCE Ops", lines)
 
-        sel = safe_input(f"\n{t('please_select')}", int, range(0, 7))
+        sel = safe_input(f"\n{t('please_select')}", int, range(0, 9))
 
         if sel is None or sel == 0:
             break
@@ -343,6 +360,12 @@ def main_menu():
                 launch_gui(cm, port=port)
         elif sel == 6:
             view_logs(LOG_FILE)
+        elif sel == 7:
+            from src.pce_cache_cli import manage_pce_cache_menu
+            manage_pce_cache_menu(cm)
+        elif sel == 8:
+            from src.siem_cli import manage_siem_menu
+            manage_siem_menu(cm)
 
 # ─── Report Sub-Menu ─────────────────────────────────────────────────────────
 
