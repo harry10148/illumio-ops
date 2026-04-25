@@ -79,7 +79,7 @@ def test_dlq_export_all(client):
 
 
 def test_dlq_export_filtered_by_destination(client):
-    resp = client.get("/api/siem/dlq/export?destination=demo",
+    resp = client.get("/api/siem/dlq/export?dest=demo",
                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert resp.status_code == 200
     rows = list(csv.reader(io.StringIO(resp.get_data(as_text=True))))
@@ -88,7 +88,7 @@ def test_dlq_export_filtered_by_destination(client):
 
 
 def test_dlq_export_filtered_no_match(client):
-    resp = client.get("/api/siem/dlq/export?destination=nosuch",
+    resp = client.get("/api/siem/dlq/export?dest=nosuch",
                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert resp.status_code == 200
     rows = list(csv.reader(io.StringIO(resp.get_data(as_text=True))))

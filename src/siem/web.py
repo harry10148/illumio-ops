@@ -44,34 +44,65 @@ def list_destinations():
 @login_required
 def add_destination():
     try:
-        from src.config_models import SiemDestinationSettings
+        from src.config_models import SiemDestinationSettings, SiemForwarderSettings
+        from src.gui.settings_helpers import save_section
+        cm = current_app.config['CM']
         data = request.get_json(force=True) or {}
-        dest = SiemDestinationSettings(**data)
-        warning = None
-        if dest.transport == "udp":
-            warning = "UDP transport does not guarantee delivery or ordering."
-        return jsonify({"status": "ok", "name": dest.name, "warning": warning})
+        SiemDestinationSettings(**data)  # validate first
+        current = cm.models.siem.model_dump(mode="json")
+        if any(d["name"] == data.get("name") for d in current.get("destinations", [])):
+            return jsonify({"ok": False, "error": "destination name already exists"}), 409
+        current.setdefault("destinations", []).append(data)
+        result = save_section(cm, "siem", current, SiemForwarderSettings)
+        if result["ok"]:
+            cm.load()
+        return jsonify(result), (200 if result["ok"] else 422)
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 400
+        return jsonify({"ok": False, "error": str(exc)}), 400
 
 
 @bp.route("/destinations/<name>", methods=["PUT"])
 @login_required
 def update_destination(name: str):
     try:
-        from src.config_models import SiemDestinationSettings
+        from src.config_models import SiemDestinationSettings, SiemForwarderSettings
+        from src.gui.settings_helpers import save_section
+        cm = current_app.config['CM']
         data = request.get_json(force=True) or {}
         data["name"] = name
-        SiemDestinationSettings(**data)
-        return jsonify({"status": "ok", "name": name})
+        SiemDestinationSettings(**data)  # validate
+        current = cm.models.siem.model_dump(mode="json")
+        dests = current.get("destinations", [])
+        idx = next((i for i, d in enumerate(dests) if d["name"] == name), None)
+        if idx is None:
+            return jsonify({"ok": False, "error": "destination not found"}), 404
+        dests[idx] = data
+        result = save_section(cm, "siem", current, SiemForwarderSettings)
+        if result["ok"]:
+            cm.load()
+        return jsonify(result), (200 if result["ok"] else 422)
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 400
+        return jsonify({"ok": False, "error": str(exc)}), 400
 
 
 @bp.route("/destinations/<name>", methods=["DELETE"])
 @login_required
 def delete_destination(name: str):
-    return jsonify({"status": "ok", "deleted": name})
+    try:
+        from src.config_models import SiemForwarderSettings
+        from src.gui.settings_helpers import save_section
+        cm = current_app.config['CM']
+        current = cm.models.siem.model_dump(mode="json")
+        before = len(current.get("destinations", []))
+        current["destinations"] = [d for d in current.get("destinations", []) if d["name"] != name]
+        if len(current["destinations"]) == before:
+            return jsonify({"ok": False, "error": "destination not found"}), 404
+        result = save_section(cm, "siem", current, SiemForwarderSettings)
+        if result["ok"]:
+            cm.load()
+        return jsonify(result), (200 if result["ok"] else 422)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
 
 
 @bp.route("/status", methods=["GET"])
@@ -176,7 +207,7 @@ def dlq_export():
     from src.pce_cache.models import DeadLetter
     from src.pce_cache.schema import init_schema
 
-    destination = request.args.get("destination", "").strip()
+    destination = request.args.get("dest", "").strip()
     reason = request.args.get("reason", "").strip()
     cm = current_app.config["CM"]
     cfg = cm.models.pce_cache

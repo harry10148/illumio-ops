@@ -506,7 +506,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         return _hn(n) if n is not None else "-"
 
     # ── flask-login setup ──────────────────────────────────────────────────────
-    from flask_login import LoginManager, current_user, login_user, logout_user
+    from flask_login import LoginManager, current_user, login_required, login_user, logout_user
     from src.auth_models import AdminUser, LoginForm
 
     login_manager = LoginManager(app)
@@ -3050,6 +3050,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         pass
 
     @app.route('/api/daemon/restart', methods=['POST'])
+    @login_required
     def api_daemon_restart():
         import src.gui as _self
         if not _self._GUI_OWNS_DAEMON:

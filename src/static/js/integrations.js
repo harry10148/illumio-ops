@@ -163,7 +163,7 @@ async function cacheSave() {
   });
   var resp = await fetch('/api/cache/settings', {
     method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
+    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
     body: JSON.stringify(payload),
   });
   var body = await resp.json();
@@ -213,7 +213,7 @@ async function doDaemonRestart(btn, msgSpan) {
   var original = btn.textContent;
   btn.textContent = '…';
   try {
-    var resp = await fetch('/api/daemon/restart', {method: 'POST'});
+    var resp = await fetch('/api/daemon/restart', {method: 'POST', headers: {'X-CSRF-Token': _csrfToken()}});
     var body = await resp.json();
     if (resp.status === 409) {
       msgSpan.textContent = _t('gui_daemon_external_restart_hint');
@@ -246,11 +246,16 @@ async function cacheBackfill() {
   var start = prompt('Start date (YYYY-MM-DD)');
   var end = prompt('End date (YYYY-MM-DD)');
   if (!start || !end) return;
-  await fetch('/api/cache/backfill', {
+  var r = await fetch('/api/cache/backfill', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({start: start, end: end}),
+    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
+    body: JSON.stringify({since: start, until: end}),
   });
+  if (!r.ok) {
+    var err = await r.json().catch(function() { return {}; });
+    alert('Backfill failed: ' + (err.error || r.status));
+    return;
+  }
   alert('Backfill submitted');
 }
 
@@ -450,7 +455,7 @@ async function siemSaveForwarder() {
   };
   var resp = await fetch('/api/siem/forwarder', {
     method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
+    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
     body: JSON.stringify(payload),
   });
   var body = await resp.json();
@@ -466,7 +471,7 @@ async function siemDeleteDest(nameEnc) {
   var name = decodeURIComponent(nameEnc);
   var confirmMsg = (typeof _t === 'function') ? _t('gui_confirm_delete') : 'Delete this destination?';
   if (!confirm(confirmMsg)) return;
-  await fetch('/api/siem/destinations/' + encodeURIComponent(name), {method: 'DELETE'});
+  await fetch('/api/siem/destinations/' + encodeURIComponent(name), {method: 'DELETE', headers: {'X-CSRF-Token': _csrfToken()}});
   window._integrations.renderSiem();
 }
 
@@ -587,12 +592,12 @@ async function siemSaveDest(editNameEnc) {
   try {
     if (editName) {
       resp = await fetch('/api/siem/destinations/' + encodeURIComponent(editName), {
-        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        method: 'PUT', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
         body: JSON.stringify(payload),
       });
     } else {
       resp = await fetch('/api/siem/destinations', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
+        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
         body: JSON.stringify(payload),
       });
     }
@@ -615,7 +620,7 @@ async function siemTestDest(nameEnc) {
   var name = decodeURIComponent(nameEnc);
   var resp, body;
   try {
-    resp = await fetch('/api/siem/destinations/' + encodeURIComponent(name) + '/test', {method: 'POST'});
+    resp = await fetch('/api/siem/destinations/' + encodeURIComponent(name) + '/test', {method: 'POST', headers: {'X-CSRF-Token': _csrfToken()}});
     body = await resp.json();
   } catch (err) {
     alert('Test error: ' + String(err));
@@ -640,7 +645,7 @@ async function siemTestDestInline() {
   }
   var resp, body;
   try {
-    resp = await fetch('/api/siem/destinations/' + encodeURIComponent(name) + '/test', {method: 'POST'});
+    resp = await fetch('/api/siem/destinations/' + encodeURIComponent(name) + '/test', {method: 'POST', headers: {'X-CSRF-Token': _csrfToken()}});
     body = await resp.json();
   } catch (err) {
     banner.textContent = 'Test error: ' + String(err);
@@ -821,7 +826,7 @@ async function dlqReplaySelected() {
   if (!dest) { alert('Select a destination filter first.'); return; }
   try {
     var r = await fetch('/api/siem/dlq/replay', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
       body: JSON.stringify({dest: dest, limit: ids.length}),
     });
     if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
@@ -834,7 +839,7 @@ async function dlqReplay(ids) {
   if (!dest) { alert('Select a destination filter first.'); return; }
   try {
     var r = await fetch('/api/siem/dlq/replay', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
       body: JSON.stringify({dest: dest, limit: ids.length || 1}),
     });
     if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
@@ -850,7 +855,7 @@ async function dlqPurgeSelected() {
   if (!confirm('Purge ' + ids.length + ' entries from ' + dest + '?')) return;
   try {
     var r = await fetch('/api/siem/dlq/purge', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
       body: JSON.stringify({dest: dest, older_than_days: 0}),
     });
     if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
@@ -866,7 +871,7 @@ async function dlqPurgeAll() {
   if (typed !== dest) return;
   try {
     var r = await fetch('/api/siem/dlq/purge', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
       body: JSON.stringify({dest: dest, older_than_days: 0}),
     });
     if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
