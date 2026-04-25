@@ -209,7 +209,7 @@ function renderTrafficFilter(s) {
   var actions = ['blocked', 'potentially_blocked', 'allowed'];
   var protocols = ['TCP', 'UDP', 'ICMP'];
   var envVals = (tf.workload_label_env || []).map(escapeAttr).join(',');
-  var portVals = (tf.ports || []).map(Number).join(',');
+  var portVals = escapeAttr((tf.ports || []).map(Number).join(','));
   var ipVals = (tf.exclude_src_ips || []).map(escapeAttr).join(',');
 
   var html = '<h3 data-i18n="gui_cache_sec_traffic_filter">Traffic Filter</h3>'
@@ -255,7 +255,10 @@ window.collectTrafficFilter = function () {
 };
 
 function validateIp(s) {
-  return /^((\d{1,3}\.){3}\d{1,3}|[\da-fA-F:]+)$/.test(s);
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(s)) {
+    return s.split('.').every(function(o) { return Number(o) <= 255; });
+  }
+  return /^[\da-fA-F:]+$/.test(s) && s.indexOf(':') >= 0;
 }
 
 function validateTrafficFilterHints() {
