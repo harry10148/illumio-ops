@@ -60,3 +60,145 @@
     },
   };
 })();
+
+// ── Cache sub-tab ────────────────────────────────────────────────────────────
+window._integrations.setRender('cache', async function renderCache() {
+  var el = document.getElementById('it-pane-cache');
+  if (!el) return;
+  el.innerHTML = '<p class="subtitle" data-i18n="gui_it_loading">Loading...</p>';
+
+  var stRes, cfgRes, status, s;
+  try {
+    var results = await Promise.all([
+      fetch('/api/cache/status'), fetch('/api/cache/settings')
+    ]);
+    stRes = results[0]; cfgRes = results[1];
+    status = await stRes.json();
+    s = await cfgRes.json();
+  } catch (err) {
+    el.innerHTML = '<p style="color:red">Failed to load cache data: ' + escapeAttr(String(err)) + '</p>';
+    return;
+  }
+
+  var header = buildCacheStatusCards(status, s);
+  var form = buildCacheForm(s);
+  el.innerHTML = header + form + '<div id="cache-banner" style="display:none;margin-top:12px;"></div>';
+  el.dataset.settings = JSON.stringify(s);
+  if (typeof window.i18nApply === 'function') window.i18nApply();
+});
+
+function buildCacheStatusCards(status, s) {
+  var evLag = (status.events_lag_sec == null) ? '—' : Number(status.events_lag_sec);
+  var trLag = (status.traffic_lag_sec == null) ? '—' : Number(status.traffic_lag_sec);
+  var lastEv = escapeAttr(status.last_event_ingested_at || '—');
+  var lastTr = escapeAttr(status.last_traffic_ingested_at || '—');
+  return '<div class="cards" style="margin-bottom:16px;">'
+    + '<div class="card"><div class="label" data-i18n="gui_cache_enabled">Enabled</div>'
+    + '<div class="value">' + (s.enabled ? '✓' : '—') + '</div></div>'
+    + '<div class="card"><div class="label" data-i18n="gui_cache_events_lag">Events lag (s)</div>'
+    + '<div class="value">' + evLag + '</div></div>'
+    + '<div class="card"><div class="label" data-i18n="gui_cache_traffic_lag">Traffic lag (s)</div>'
+    + '<div class="value">' + trLag + '</div></div>'
+    + '<div class="card"><div class="label" data-i18n="gui_cache_last_events">Last events ingest</div>'
+    + '<div class="value" style="font-size:.8rem;">' + lastEv + '</div></div>'
+    + '</div>'
+    + '<div style="display:flex;gap:8px;margin-bottom:16px;">'
+    + '<button class="btn" onclick="cacheBackfill()" data-i18n="gui_backfill">Backfill</button>'
+    + '<button class="btn" onclick="cacheRetentionNow()" data-i18n="gui_retention_now">Retention now</button>'
+    + '</div>';
+}
+
+function buildCacheForm(s) {
+  var dbPath = escapeAttr(s.db_path);
+  return '<form id="cache-form" class="rs-glass">'
+    + '<h3 data-i18n="gui_cache_sec_basic">Basic</h3>'
+    + '<label><input type="checkbox" name="enabled"' + (s.enabled ? ' checked' : '') + '>'
+    + ' <span data-i18n="gui_cache_enabled">Enabled</span></label>'
+    + '<div><label><span data-i18n="gui_cache_db_path">DB path</span>:'
+    + ' <input name="db_path" value="' + dbPath + '"></label></div>'
+    + '<h3 data-i18n="gui_cache_sec_retention">Retention (days)</h3>'
+    + '<div><label>events_retention_days:'
+    + ' <input type="number" name="events_retention_days" min="1" value="' + Number(s.events_retention_days) + '"></label></div>'
+    + '<div><label>traffic_raw_retention_days:'
+    + ' <input type="number" name="traffic_raw_retention_days" min="1" value="' + Number(s.traffic_raw_retention_days) + '"></label></div>'
+    + '<div><label>traffic_agg_retention_days:'
+    + ' <input type="number" name="traffic_agg_retention_days" min="1" value="' + Number(s.traffic_agg_retention_days) + '"></label></div>'
+    + '<h3 data-i18n="gui_cache_sec_polling">Polling (seconds)</h3>'
+    + '<div><label>events_poll_interval_seconds:'
+    + ' <input type="number" name="events_poll_interval_seconds" min="30" value="' + Number(s.events_poll_interval_seconds) + '"></label></div>'
+    + '<div><label>traffic_poll_interval_seconds:'
+    + ' <input type="number" name="traffic_poll_interval_seconds" min="60" value="' + Number(s.traffic_poll_interval_seconds) + '"></label></div>'
+    + '<h3 data-i18n="gui_cache_sec_throughput">Throughput</h3>'
+    + '<div><label>rate_limit_per_minute:'
+    + ' <input type="number" name="rate_limit_per_minute" min="10" max="500" value="' + Number(s.rate_limit_per_minute) + '"></label></div>'
+    + '<div><label>async_threshold_events:'
+    + ' <input type="number" name="async_threshold_events" min="1" max="10000" value="' + Number(s.async_threshold_events) + '"></label></div>'
+    + '<div id="cache-form-extra"></div>'
+    + '<div style="text-align:right;margin-top:12px;">'
+    + '<button type="button" class="btn btn-primary" onclick="cacheSave()" data-i18n="gui_save">Save</button>'
+    + '</div>'
+    + '</form>';
+}
+
+async function cacheSave() {
+  var form = document.getElementById('cache-form');
+  var data = Object.fromEntries(new FormData(form));
+  var pane = document.getElementById('it-pane-cache');
+  var existing = JSON.parse(pane.dataset.settings);
+  var payload = Object.assign({}, existing, {
+    enabled: form.elements['enabled'].checked,
+    db_path: data.db_path,
+    events_retention_days: Number(data.events_retention_days),
+    traffic_raw_retention_days: Number(data.traffic_raw_retention_days),
+    traffic_agg_retention_days: Number(data.traffic_agg_retention_days),
+    events_poll_interval_seconds: Number(data.events_poll_interval_seconds),
+    traffic_poll_interval_seconds: Number(data.traffic_poll_interval_seconds),
+    rate_limit_per_minute: Number(data.rate_limit_per_minute),
+    async_threshold_events: Number(data.async_threshold_events),
+    traffic_filter: (typeof window.collectTrafficFilter === 'function')
+      ? window.collectTrafficFilter() : existing.traffic_filter,
+    traffic_sampling: (typeof window.collectTrafficSampling === 'function')
+      ? window.collectTrafficSampling() : existing.traffic_sampling,
+  });
+  var resp = await fetch('/api/cache/settings', {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  });
+  var body = await resp.json();
+  var banner = document.getElementById('cache-banner');
+  if (body.ok) {
+    showRestartBanner(banner);
+  } else {
+    banner.style.display = 'block';
+    banner.textContent = 'Validation error:';
+    var ul = document.createElement('ul');
+    Object.entries(body.errors || {}).forEach(function(entry) {
+      var li = document.createElement('li');
+      li.textContent = entry[0] + ': ' + entry[1];
+      ul.appendChild(li);
+    });
+    banner.appendChild(ul);
+  }
+}
+
+function showRestartBanner(target) {
+  target.style.display = 'block';
+  target.textContent = 'Settings saved. Restart monitor to apply scheduling changes.';
+}
+
+async function cacheBackfill() {
+  var start = prompt('Start date (YYYY-MM-DD)');
+  var end = prompt('End date (YYYY-MM-DD)');
+  if (!start || !end) return;
+  await fetch('/api/cache/backfill', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({start: start, end: end}),
+  });
+  alert('Backfill submitted');
+}
+
+async function cacheRetentionNow() {
+  alert('Run "Retention now" via CLI; HTTP trigger not yet implemented.');
+}
