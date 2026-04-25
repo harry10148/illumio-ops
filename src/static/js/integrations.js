@@ -82,7 +82,7 @@ window._integrations.setRender('cache', async function renderCache() {
 
   var header = buildCacheStatusCards(status, s);
   var form = buildCacheForm(s);
-  el.innerHTML = header + form + '<div id="cache-banner" style="display:none;margin-top:12px;"></div>';
+  el.innerHTML = header + form;
   el.dataset.settings = JSON.stringify(s);
   renderTrafficFilter(s);
   renderTrafficSampling(s);
@@ -90,52 +90,83 @@ window._integrations.setRender('cache', async function renderCache() {
 });
 
 function buildCacheStatusCards(status, s) {
-  var evLag = (status.events_lag_sec == null) ? '—' : Number(status.events_lag_sec);
-  var trLag = (status.traffic_lag_sec == null) ? '—' : Number(status.traffic_lag_sec);
-  var lastEv = escapeAttr(status.last_event_ingested_at || '—');
+  var events     = Number(status.events      || 0);
+  var trafficRaw = Number(status.traffic_raw || 0);
+  var trafficAgg = Number(status.traffic_agg || 0);
+  var stateClass = s.enabled ? 'ok' : 'err';
+  var stateText  = s.enabled
+    ? '<span style="color:var(--success)">✓ ' + escapeAttr(_t('gui_cache_enabled')) + '</span>'
+    : '<span style="color:var(--danger)">✗ ' + escapeAttr(_t('gui_cache_enabled')) + '</span>';
   return '<div class="cards" style="margin-bottom:16px;">'
-    + '<div class="card"><div class="label" data-i18n="gui_cache_enabled">Enabled</div>'
-    + '<div class="value">' + (s.enabled ? '✓' : '—') + '</div></div>'
-    + '<div class="card"><div class="label" data-i18n="gui_cache_events_lag">Events lag (s)</div>'
-    + '<div class="value">' + evLag + '</div></div>'
-    + '<div class="card"><div class="label" data-i18n="gui_cache_traffic_lag">Traffic lag (s)</div>'
-    + '<div class="value">' + trLag + '</div></div>'
-    + '<div class="card"><div class="label" data-i18n="gui_cache_last_events">Last events ingest</div>'
-    + '<div class="value" style="font-size:.8rem;">' + lastEv + '</div></div>'
+    + '<div class="card card-' + stateClass + '">'
+    + '<div class="label" data-i18n="gui_cache_status">Cache Status</div>'
+    + '<div class="value" style="font-size:1.05rem;">' + stateText + '</div>'
     + '</div>'
-    + '<div style="display:flex;gap:8px;margin-bottom:16px;">'
-    + '<button class="btn" onclick="cacheBackfill()" data-i18n="gui_backfill">Backfill</button>'
-    + '<button class="btn" onclick="cacheRetentionNow()" data-i18n="gui_retention_now">Retention now</button>'
+    + '<div class="card card-ok">'
+    + '<div class="label" data-i18n="gui_ov_events">events</div>'
+    + '<div class="value">' + events.toLocaleString() + '</div>'
+    + '</div>'
+    + '<div class="card card-ok">'
+    + '<div class="label" data-i18n="gui_cache_card_traffic_raw">Traffic Raw</div>'
+    + '<div class="value">' + trafficRaw.toLocaleString() + '</div>'
+    + '</div>'
+    + '<div class="card card-ok">'
+    + '<div class="label" data-i18n="gui_cache_card_traffic_agg">Traffic Agg</div>'
+    + '<div class="value">' + trafficAgg.toLocaleString() + '</div>'
+    + '</div>'
+    + '</div>'
+    + '<div class="toolbar" style="margin-bottom:16px;">'
+    + '<button class="btn btn-sm" onclick="cacheBackfill()" data-i18n="gui_backfill">Backfill</button>'
+    + '<button class="btn btn-sm" onclick="cacheRetentionNow()" data-i18n="gui_retention_now">Retention now</button>'
     + '</div>';
 }
 
 function buildCacheForm(s) {
   var dbPath = escapeAttr(s.db_path);
-  return '<form id="cache-form" class="rs-glass">'
-    + '<h3 data-i18n="gui_cache_sec_basic">Basic</h3>'
+  return '<form id="cache-form">'
+    + '<fieldset>'
+    + '<legend data-i18n="gui_cache_sec_basic">Basic</legend>'
+    + '<div class="chk" style="margin-bottom:14px;">'
     + '<label><input type="checkbox" name="enabled"' + (s.enabled ? ' checked' : '') + '>'
     + ' <span data-i18n="gui_cache_enabled">Enabled</span></label>'
-    + '<div><label><span data-i18n="gui_cache_db_path">DB path</span>:'
-    + ' <input name="db_path" value="' + dbPath + '"></label></div>'
-    + '<h3 data-i18n="gui_cache_sec_retention">Retention (days)</h3>'
-    + '<div><label>events_retention_days:'
-    + ' <input type="number" name="events_retention_days" min="1" value="' + Number(s.events_retention_days) + '"></label></div>'
-    + '<div><label>traffic_raw_retention_days:'
-    + ' <input type="number" name="traffic_raw_retention_days" min="1" value="' + Number(s.traffic_raw_retention_days) + '"></label></div>'
-    + '<div><label>traffic_agg_retention_days:'
-    + ' <input type="number" name="traffic_agg_retention_days" min="1" value="' + Number(s.traffic_agg_retention_days) + '"></label></div>'
-    + '<h3 data-i18n="gui_cache_sec_polling">Polling (seconds)</h3>'
-    + '<div><label>events_poll_interval_seconds:'
-    + ' <input type="number" name="events_poll_interval_seconds" min="30" value="' + Number(s.events_poll_interval_seconds) + '"></label></div>'
-    + '<div><label>traffic_poll_interval_seconds:'
-    + ' <input type="number" name="traffic_poll_interval_seconds" min="60" value="' + Number(s.traffic_poll_interval_seconds) + '"></label></div>'
-    + '<h3 data-i18n="gui_cache_sec_throughput">Throughput</h3>'
-    + '<div><label>rate_limit_per_minute:'
-    + ' <input type="number" name="rate_limit_per_minute" min="10" max="500" value="' + Number(s.rate_limit_per_minute) + '"></label></div>'
-    + '<div><label>async_threshold_events:'
-    + ' <input type="number" name="async_threshold_events" min="1" max="10000" value="' + Number(s.async_threshold_events) + '"></label></div>'
+    + '</div>'
+    + '<div class="form-group">'
+    + '<label data-i18n="gui_cache_db_path">DB path</label>'
+    + '<input name="db_path" value="' + dbPath + '">'
+    + '</div>'
+    + '</fieldset>'
+    + '<fieldset>'
+    + '<legend data-i18n="gui_cache_sec_retention">Retention (days)</legend>'
+    + '<div class="form-row-3">'
+    + '<div class="form-group"><label data-i18n="gui_ov_events">events</label>'
+    + '<input type="number" name="events_retention_days" min="1" value="' + Number(s.events_retention_days) + '"></div>'
+    + '<div class="form-group"><label data-i18n="gui_cache_card_traffic_raw">Traffic Raw</label>'
+    + '<input type="number" name="traffic_raw_retention_days" min="1" value="' + Number(s.traffic_raw_retention_days) + '"></div>'
+    + '<div class="form-group"><label data-i18n="gui_cache_card_traffic_agg">Traffic Agg</label>'
+    + '<input type="number" name="traffic_agg_retention_days" min="1" value="' + Number(s.traffic_agg_retention_days) + '"></div>'
+    + '</div>'
+    + '</fieldset>'
+    + '<fieldset>'
+    + '<legend data-i18n="gui_cache_sec_polling">Polling (seconds)</legend>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label>events_poll_interval_seconds</label>'
+    + '<input type="number" name="events_poll_interval_seconds" min="30" value="' + Number(s.events_poll_interval_seconds) + '"></div>'
+    + '<div class="form-group"><label>traffic_poll_interval_seconds</label>'
+    + '<input type="number" name="traffic_poll_interval_seconds" min="60" value="' + Number(s.traffic_poll_interval_seconds) + '"></div>'
+    + '</div>'
+    + '</fieldset>'
+    + '<fieldset>'
+    + '<legend data-i18n="gui_cache_sec_throughput">Throughput</legend>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label>rate_limit_per_minute</label>'
+    + '<input type="number" name="rate_limit_per_minute" min="10" max="500" value="' + Number(s.rate_limit_per_minute) + '"></div>'
+    + '<div class="form-group"><label>async_threshold_events</label>'
+    + '<input type="number" name="async_threshold_events" min="1" max="10000" value="' + Number(s.async_threshold_events) + '"></div>'
+    + '</div>'
+    + '</fieldset>'
     + '<div id="cache-form-extra"></div>'
-    + '<div style="text-align:right;margin-top:12px;">'
+    + '<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px;">'
+    + '<div id="cache-banner" style="flex:1;display:none;"></div>'
     + '<button type="button" class="btn btn-primary" onclick="cacheSave()" data-i18n="gui_save">Save</button>'
     + '</div>'
     + '</form>';
@@ -266,32 +297,42 @@ async function cacheRetentionNow() {
 // ── Cache traffic_filter section ────────────────────────────────────────────
 function renderTrafficFilter(s) {
   var tf = s.traffic_filter || {};
-  var actions = ['blocked', 'potentially_blocked', 'allowed'];
+  var actions   = ['blocked', 'potentially_blocked', 'allowed'];
   var protocols = ['TCP', 'UDP', 'ICMP'];
-  var envVals = (tf.workload_label_env || []).map(escapeAttr).join(',');
+  var envVals  = (tf.workload_label_env || []).map(escapeAttr).join(',');
   var portVals = escapeAttr((tf.ports || []).map(Number).join(','));
-  var ipVals = (tf.exclude_src_ips || []).map(escapeAttr).join(',');
+  var ipVals   = (tf.exclude_src_ips || []).map(escapeAttr).join(',');
 
-  var html = '<h3 data-i18n="gui_cache_sec_traffic_filter">Traffic Filter</h3>'
-    + '<div><span data-i18n="gui_cache_tf_actions">Actions</span>: '
+  var html = '<fieldset>'
+    + '<legend data-i18n="gui_cache_sec_traffic_filter">Traffic Filter</legend>'
+    + '<div class="form-group"><label data-i18n="gui_cache_tf_actions">Actions</label>'
+    + '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:4px 0;">'
     + actions.map(function(a) {
-        return '<label><input type="checkbox" name="tf-action" value="' + escapeAttr(a) + '"'
-          + ((tf.actions || []).indexOf(a) >= 0 ? ' checked' : '') + '> ' + escapeAttr(a) + '</label>';
-      }).join(' ')
-    + '</div>'
-    + '<div><span data-i18n="gui_cache_tf_protocols">Protocols</span>: '
+        return '<label style="display:inline-flex;align-items:center;gap:6px;">'
+          + '<input type="checkbox" name="tf-action" value="' + escapeAttr(a) + '"'
+          + ((tf.actions || []).indexOf(a) >= 0 ? ' checked' : '') + '> '
+          + escapeAttr(a) + '</label>';
+      }).join('')
+    + '</div></div>'
+    + '<div class="form-group"><label data-i18n="gui_cache_tf_protocols">Protocols</label>'
+    + '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:4px 0;">'
     + protocols.map(function(p) {
-        return '<label><input type="checkbox" name="tf-protocol" value="' + escapeAttr(p) + '"'
-          + ((tf.protocols || []).indexOf(p) >= 0 ? ' checked' : '') + '> ' + escapeAttr(p) + '</label>';
-      }).join(' ')
+        return '<label style="display:inline-flex;align-items:center;gap:6px;">'
+          + '<input type="checkbox" name="tf-protocol" value="' + escapeAttr(p) + '"'
+          + ((tf.protocols || []).indexOf(p) >= 0 ? ' checked' : '') + '> '
+          + escapeAttr(p) + '</label>';
+      }).join('')
+    + '</div></div>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label data-i18n="gui_cache_tf_workload_env">Workload label env</label>'
+    + '<input id="tf-env" value="' + envVals + '" placeholder="prod,staging"></div>'
+    + '<div class="form-group"><label data-i18n="gui_cache_tf_ports">Ports</label>'
+    + '<input id="tf-ports" value="' + portVals + '" placeholder="22,443,..."></div>'
     + '</div>'
-    + '<div><label><span data-i18n="gui_cache_tf_workload_env">Workload label env</span>:'
-    + ' <input id="tf-env" value="' + envVals + '"></label></div>'
-    + '<div><label><span data-i18n="gui_cache_tf_ports">Ports</span>:'
-    + ' <input id="tf-ports" value="' + portVals + '" placeholder="22,443,..."></label></div>'
-    + '<div><label><span data-i18n="gui_cache_tf_exclude_ips">Exclude src IPs</span>:'
-    + ' <input id="tf-ips" value="' + ipVals + '" placeholder="10.0.0.1,..."></label></div>'
-    + '<div id="tf-validation-hints" style="color:var(--danger);font-size:.8rem;"></div>';
+    + '<div class="form-group"><label data-i18n="gui_cache_tf_exclude_ips">Exclude src IPs</label>'
+    + '<input id="tf-ips" value="' + ipVals + '" placeholder="10.0.0.1,..."></div>'
+    + '<div id="tf-validation-hints" style="color:var(--danger);font-size:.8rem;"></div>'
+    + '</fieldset>';
 
   var extra = document.getElementById('cache-form-extra');
   if (extra) extra.innerHTML = html;
@@ -344,14 +385,18 @@ document.addEventListener('input', function(e) {
 
 // ── Cache traffic_sampling section ───────────────────────────────────────────
 function renderTrafficSampling(s) {
-  var ts = s.traffic_sampling || {};
-  var ratio = Number(ts.sample_ratio_allowed || 1);
+  var ts      = s.traffic_sampling || {};
+  var ratio   = Number(ts.sample_ratio_allowed || 1);
   var maxRows = Number(ts.max_rows_per_batch || 200000);
-  var html = '<h3 data-i18n="gui_cache_sec_traffic_sampling">Traffic Sampling</h3>'
-    + '<div><label><span data-i18n="gui_cache_ts_ratio">sample_ratio_allowed</span> (&gt;=1):'
-    + ' <input type="number" id="ts-ratio" min="1" value="' + ratio + '"></label></div>'
-    + '<div><label><span data-i18n="gui_cache_ts_max_rows">max_rows_per_batch</span> (1-200000):'
-    + ' <input type="number" id="ts-max" min="1" max="200000" value="' + maxRows + '"></label></div>';
+  var html = '<fieldset>'
+    + '<legend data-i18n="gui_cache_sec_traffic_sampling">Traffic Sampling</legend>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label data-i18n="gui_cache_ts_ratio">sample_ratio_allowed</label>'
+    + '<input type="number" id="ts-ratio" min="1" value="' + ratio + '"></div>'
+    + '<div class="form-group"><label data-i18n="gui_cache_ts_max_rows">max_rows_per_batch</label>'
+    + '<input type="number" id="ts-max" min="1" max="200000" value="' + maxRows + '"></div>'
+    + '</div>'
+    + '</fieldset>';
   var extra = document.getElementById('cache-form-extra');
   if (extra) extra.insertAdjacentHTML('beforeend', html);
 }
