@@ -471,7 +471,8 @@ async function siemDeleteDest(nameEnc) {
   var name = decodeURIComponent(nameEnc);
   var confirmMsg = (typeof _t === 'function') ? _t('gui_confirm_delete') : 'Delete this destination?';
   if (!confirm(confirmMsg)) return;
-  await fetch('/api/siem/destinations/' + encodeURIComponent(name), {method: 'DELETE', headers: {'X-CSRF-Token': _csrfToken()}});
+  var r = await fetch('/api/siem/destinations/' + encodeURIComponent(name), {method: 'DELETE', headers: {'X-CSRF-Token': _csrfToken()}});
+  if (!r.ok) { alert('Delete failed: HTTP ' + r.status); return; }
   window._integrations.renderSiem();
 }
 
