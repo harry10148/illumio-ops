@@ -568,7 +568,7 @@ async function siemTestDest(nameEnc) {
     return;
   }
   var msg = body.ok
-    ? '✓ ' + _t('gui_siem_test_ok') + ' (' + Number(body.latency_ms) + ' ms)'
+    ? '✓ ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)'
     : '✗ ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
   alert(msg);
 }
@@ -596,7 +596,7 @@ async function siemTestDestInline() {
     banner.textContent = 'Destination not yet saved. Save first, then Test.';
   } else if (body.ok) {
     banner.style.color = 'var(--ok, green)';
-    banner.textContent = '✓ ' + _t('gui_siem_test_ok') + ' (' + Number(body.latency_ms) + ' ms)';
+    banner.textContent = '✓ ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)';
   } else {
     banner.style.color = 'var(--danger)';
     banner.textContent = '✗ ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
