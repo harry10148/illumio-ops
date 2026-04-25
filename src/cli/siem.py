@@ -22,36 +22,28 @@ def siem_group():
 @click.argument("destination")
 def siem_test(destination: str):
     """Send a synthetic test event to DESTINATION and report success/fail."""
+    from src.config import ConfigManager
+    from src.siem.tester import send_test_event
+
     try:
-        from src.config import ConfigManager
         cm = ConfigManager()
         siem_cfg = cm.models.siem
         dest_names = [d.name for d in siem_cfg.destinations if d.enabled]
         if destination not in dest_names:
             console.print(f"[red]Destination '{destination}' not found or disabled.[/red]")
             raise SystemExit(1)
-        # Build transport and formatter, send a synthetic event
-        from src.siem.formatters.cef import CEFFormatter
-        from src.siem.formatters.json_line import JSONLineFormatter
         dest_cfg = next(d for d in siem_cfg.destinations if d.name == destination)
-        formatter = CEFFormatter() if dest_cfg.format.startswith("cef") else JSONLineFormatter()
-        transport = _build_transport(dest_cfg)
-        test_event = {
-            "event_type": "siem.test",
-            "severity": "info",
-            "status": "success",
-            "pce_fqdn": "illumio-ops-test",
-            "pce_event_id": "test-0000",
-            "timestamp": _now_iso(),
-        }
-        payload = formatter.format_event(test_event)
-        transport.send(payload)
-        transport.close()
-        console.print(f"[green]✓ Test event sent to '{destination}'[/green]")
+        result = send_test_event(dest_cfg)
     except SystemExit:
         raise
     except Exception as exc:
         console.print(f"[red]✗ Test failed for '{destination}': {exc}[/red]")
+        raise SystemExit(1)
+
+    if result.ok:
+        console.print(f"[green]✓ Test event sent to '{destination}' ({result.latency_ms} ms)[/green]")
+    else:
+        console.print(f"[red]✗ Test failed for '{destination}': {result.error}[/red]")
         raise SystemExit(1)
 
 
@@ -184,29 +176,3 @@ def siem_dlq(dest: str, limit: int):
     except Exception as exc:
         console.print(f"[red]Error: {exc}[/red]")
         raise SystemExit(1)
-
-
-def _build_transport(dest_cfg):
-    transport_type = dest_cfg.transport.lower()
-    host, _, port_str = dest_cfg.endpoint.rpartition(":")
-    port = int(port_str) if port_str.isdigit() else 514
-    if not host:
-        host = dest_cfg.endpoint
-    if transport_type == "udp":
-        from src.siem.transports.syslog_udp import SyslogUDPTransport
-        return SyslogUDPTransport(host, port)
-    elif transport_type == "tcp":
-        from src.siem.transports.syslog_tcp import SyslogTCPTransport
-        return SyslogTCPTransport(host, port)
-    elif transport_type == "tls":
-        from src.siem.transports.syslog_tls import SyslogTLSTransport
-        return SyslogTLSTransport(host, port, tls_verify=dest_cfg.tls_verify)
-    elif transport_type == "hec":
-        from src.siem.transports.splunk_hec import SplunkHECTransport
-        return SplunkHECTransport(dest_cfg.endpoint, token=dest_cfg.hec_token or "")
-    raise ValueError(f"Unknown transport: {transport_type}")
-
-
-def _now_iso() -> str:
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).isoformat()
