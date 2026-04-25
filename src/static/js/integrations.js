@@ -940,15 +940,15 @@ window._integrations.setRender('overview', async function renderOverview() {
   el.innerHTML = '<div class="cards">'
     + '<div class="card card-neutral">'
     + '<div class="label" data-i18n="gui_ov_cache_lag">Cache Lag</div>'
-    + '<div class="value">events: ' + cacheEvents + ' rows<br>traffic: ' + cacheTraffic + ' rows</div>'
+    + '<div class="value">' + _t('gui_ov_events') + ': ' + cacheEvents + ' ' + _t('gui_ov_rows') + '<br>' + _t('gui_ov_traffic') + ': ' + cacheTraffic + ' ' + _t('gui_ov_rows') + '</div>'
     + '</div>'
     + '<div class="card card-neutral">'
-    + '<div class="label" data-i18n="gui_ov_ingest_recency">Ingest Recency</div>'
+    + '<div class="label" data-i18n="gui_ov_siem_destinations">SIEM Destinations</div>'
     + '<div class="value" style="font-size:.85rem;">' + siemStatus.length + ' destination(s)</div>'
     + '</div>'
     + '<div class="card ' + siemClass + '">'
     + '<div class="label" data-i18n="gui_ov_siem_queue">SIEM Queue</div>'
-    + '<div class="value">pending: ' + totalPending + '<br>sent: ' + totalSent + '<br>failed: ' + totalFailed + '</div>'
+    + '<div class="value">' + _t('gui_ov_pending') + ': ' + totalPending + '<br>' + _t('gui_ov_sent') + ': ' + totalSent + '<br>' + _t('gui_ov_failed') + ': ' + totalFailed + '</div>'
     + '</div>'
     + '<div class="card ' + dlqClass + '">'
     + '<div class="label" data-i18n="gui_ov_dlq_total">DLQ Total</div>'
@@ -972,10 +972,10 @@ window._integrations.setRender('overview', async function renderOverview() {
       code.textContent = d.destination || '';
       li.appendChild(code);
       li.appendChild(document.createTextNode(
-        ' — pending: ' + Number(d.pending || 0)
-        + ' sent: ' + Number(d.sent || 0)
-        + ' failed: ' + Number(d.failed || 0)
-        + ' dlq: ' + Number(d.dlq || 0)
+        ' — ' + _t('gui_ov_pending') + ': ' + Number(d.pending || 0)
+        + ' ' + _t('gui_ov_sent') + ': ' + Number(d.sent || 0)
+        + ' ' + _t('gui_ov_failed') + ': ' + Number(d.failed || 0)
+        + ' ' + _t('gui_ov_dlq') + ': ' + Number(d.dlq || 0)
       ));
       ul.appendChild(li);
     });

@@ -2032,8 +2032,10 @@ _ZH_EXPLICIT.update({
     "gui_it_dlq": "DLQ",     # DLQ stays in English per glossary
     "gui_siem_sec_tls": "TLS",   # TLS stays in English per glossary
     "gui_siem_sec_hec": "HEC",   # HEC stays in English per glossary
-    "gui_ov_siem_queue": "SIEM 佇列",   # SIEM stays in English per glossary
-    "gui_ov_dlq_total": "DLQ 總數",     # DLQ stays in English per glossary
+    "gui_ov_siem_queue": "SIEM 佇列",         # SIEM stays in English per glossary
+    "gui_ov_siem_destinations": "SIEM 目的地", # SIEM stays in English per glossary
+    "gui_ov_dlq_total": "DLQ 總數",           # DLQ stays in English per glossary
+    "gui_ov_dlq": "DLQ",                       # DLQ stays in English per glossary
 })
 
 def _humanize_key_en(key: str) -> str:
