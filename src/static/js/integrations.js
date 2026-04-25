@@ -424,10 +424,15 @@ async function siemOpenDestModal(nameEnc) {
     batch_size: 100, source_types: ['audit', 'traffic'], max_retries: 10
   };
   if (name) {
-    var body = await fetch('/api/siem/destinations').then(function(r) { return r.json(); });
-    var all = body.destinations || body || [];
-    var found = all.filter(function(d) { return d.name === name; })[0];
-    if (found) dest = Object.assign(dest, found);
+    try {
+      var body = await fetch('/api/siem/destinations').then(function(r) { return r.json(); });
+      var all = body.destinations || body || [];
+      var found = all.filter(function(d) { return d.name === name; })[0];
+      if (found) dest = Object.assign(dest, found);
+    } catch (err) {
+      // If fetch fails, proceed with default values
+      console.warn('Could not load destination data:', err);
+    }
   }
   document.getElementById('siem-modal-host').innerHTML = buildDestModal(dest, name);
   siemToggleCondFields();
@@ -502,11 +507,9 @@ function siemToggleCondFields() {
   if (hecEl) hecEl.style.display = (t === 'hec') ? '' : 'none';
 }
 
-function siemCloseModal(event) {
-  if (event && event.type === 'click') {
-    // If called from backdrop click, close; if from button, also close
-  }
-  document.getElementById('siem-modal-host').innerHTML = '';
+function siemCloseModal() {
+  var host = document.getElementById('siem-modal-host');
+  if (host) host.innerHTML = '';
 }
 
 async function siemSaveDest(editNameEnc) {
@@ -526,34 +529,38 @@ async function siemSaveDest(editNameEnc) {
     max_retries: Number(document.getElementById('md-retries').value),
     source_types: sourceTypes.length ? sourceTypes : ['audit', 'traffic'],
   };
-  var resp;
-  if (editName) {
-    resp = await fetch('/api/siem/destinations/' + encodeURIComponent(editName), {
-      method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-    });
-  } else {
-    resp = await fetch('/api/siem/destinations', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(payload),
-    });
+  var resp, body;
+  try {
+    if (editName) {
+      resp = await fetch('/api/siem/destinations/' + encodeURIComponent(editName), {
+        method: 'PUT', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      });
+    } else {
+      resp = await fetch('/api/siem/destinations', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+      });
+    }
+    body = await resp.json();
+  } catch (err) {
+    document.getElementById('md-banner').textContent = 'Save failed: ' + String(err);
+    return;
   }
-  var body = await resp.json();
   if (resp.ok && body.ok !== false) {
     siemCloseModal();
-    window._integrations.renderSiem();
+    await window._integrations.renderSiem();
     showRestartBanner(document.getElementById('siem-banner'));
   } else {
     var banner = document.getElementById('md-banner');
-    banner.textContent = 'Save failed: ' + (body.error || JSON.stringify(body.errors || body));
+    if (banner) banner.textContent = 'Save failed: ' + (body.error || JSON.stringify(body.errors || body));
   }
 }
 
 // Placeholder stub — real implementation in Task 20.
 function siemTestDest(nameEnc) {}
 function siemTestDestInline() {}
+window.siemTestDest = siemTestDest;
 window.siemTestDestInline = siemTestDestInline;
 
 window.siemSaveForwarder = siemSaveForwarder;
