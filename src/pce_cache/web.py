@@ -9,12 +9,14 @@ bp = Blueprint("pce_cache", __name__, url_prefix="/api/cache")
 
 
 def _get_sf():
+    import os
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from src.config import ConfigManager
     from src.pce_cache.schema import init_schema
     cm = ConfigManager()
     cfg = cm.models.pce_cache
+    os.makedirs(os.path.dirname(os.path.abspath(cfg.db_path)), exist_ok=True)
     engine = create_engine(f"sqlite:///{cfg.db_path}")
     init_schema(engine)
     return sessionmaker(engine)
