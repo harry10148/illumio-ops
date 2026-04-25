@@ -185,8 +185,9 @@ def _rst_drop():
 class _RstDrop(Exception):
     """Sentinel: request was silently dropped via TCP RST."""
 
-_PKG_DIR = os.path.dirname(os.path.abspath(__file__))
-_ROOT_DIR = os.path.dirname(_PKG_DIR)
+_GUI_DIR = os.path.dirname(os.path.abspath(__file__))
+_PKG_DIR = os.path.dirname(_GUI_DIR)   # src/  — static/ and templates/ live here
+_ROOT_DIR = os.path.dirname(_PKG_DIR)  # project root — config/ and logs/ live here
 
 # ?? Rule Scheduler log history (in-memory, thread-safe) ??????????????????????
 import collections as _collections
