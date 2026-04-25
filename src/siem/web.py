@@ -165,6 +165,43 @@ def purge_dlq():
         return jsonify({"error": str(exc)}), 500
 
 
+@bp.route("/dlq/export", methods=["GET"])
+@login_required
+def dlq_export():
+    from flask import Response
+    import csv, io
+    from sqlalchemy import create_engine, select
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.models import DeadLetter
+    from src.pce_cache.schema import init_schema
+
+    destination = request.args.get("destination", "").strip()
+    reason = request.args.get("reason", "").strip()
+    cm = current_app.config["CM"]
+    cfg = cm.models.pce_cache
+    engine = create_engine(f"sqlite:///{cfg.db_path}")
+    init_schema(engine)
+    Session = sessionmaker(engine)
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["id", "destination", "source_table", "source_id",
+                "retries", "last_error", "payload_preview", "quarantined_at"])
+    with Session() as s:
+        q = select(DeadLetter)
+        if destination:
+            q = q.where(DeadLetter.destination == destination)
+        if reason:
+            q = q.where(DeadLetter.last_error.like(f"%{reason}%"))
+        for row in s.scalars(q):
+            w.writerow([
+                row.id, row.destination, row.source_table, row.source_id,
+                row.retries, row.last_error, row.payload_preview,
+                row.quarantined_at.isoformat(),
+            ])
+    return Response(buf.getvalue(), mimetype="text/csv",
+                    headers={"Content-Disposition": "attachment; filename=dlq.csv"})
+
+
 @bp.route("/forwarder", methods=["GET"])
 @login_required
 def get_forwarder():
