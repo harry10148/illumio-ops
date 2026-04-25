@@ -424,6 +424,7 @@
   "gui_dlq_th_dest": "Dest",
   "gui_dlq_th_event_id": "Event ID",
   "gui_dlq_th_failed_at": "Failed At",
+  "gui_dlq_th_retries": "Retries",
   "gui_dlq_th_reason": "Reason",
   "gui_dlq_title": "Dead Letter Queue",
   "gui_dlq_view": "View",

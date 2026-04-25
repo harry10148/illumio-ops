@@ -795,7 +795,7 @@ function buildDlqSkeleton() {
     + '<th data-i18n="gui_dlq_th_event_id">Event ID</th>'
     + '<th data-i18n="gui_dlq_th_reason">Reason</th>'
     + '<th data-i18n="gui_dlq_th_failed_at">Failed At</th>'
-    + '<th>Retries</th>'
+    + '<th data-i18n="gui_dlq_th_retries">Retries</th>'
     + '<th></th>'
     + '</tr></thead>'
     + '<tbody id="dlq-tbody"></tbody>'
