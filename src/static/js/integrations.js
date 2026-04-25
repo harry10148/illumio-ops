@@ -972,12 +972,17 @@ window._integrations.setRender('overview', async function renderOverview() {
   var cache, siem;
   try {
     var results = await Promise.all([
-      fetch('/api/cache/status').then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),
-      fetch('/api/siem/status').then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }),
+      fetch('/api/cache/status').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
+      fetch('/api/siem/status').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
     ]);
-    cache = results[0]; siem = results[1];
+    cache = results[0] || {};
+    siem = results[1] || {status: []};
   } catch (err) {
-    el.innerHTML = '<p style="color:red">Failed to load overview: ' + escapeAttr(String(err)) + '</p>';
+    el.textContent = '';
+    var p = document.createElement('p');
+    p.style.color = 'var(--danger,red)';
+    p.textContent = 'Failed to load overview: ' + String(err);
+    el.appendChild(p);
     return;
   }
 
