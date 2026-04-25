@@ -553,6 +553,8 @@ async function siemSaveDest(editNameEnc) {
 
 // Placeholder stub — real implementation in Task 20.
 function siemTestDest(nameEnc) {}
+function siemTestDestInline() {}
+window.siemTestDestInline = siemTestDestInline;
 
 window.siemSaveForwarder = siemSaveForwarder;
 window.siemDeleteDest = siemDeleteDest;
