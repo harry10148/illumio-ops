@@ -556,7 +556,7 @@
   "gui_it_loading": "Loading...",
   "gui_it_overview": "Overview",
   "gui_it_siem": "SIEM",
-  "gui_ov_cache_lag": "Cache Lag",
+  "gui_ov_cache_lag": "Cache Rows",
   "gui_ov_dlq": "DLQ",
   "gui_ov_dlq_total": "DLQ Total",
   "gui_ov_events": "events",

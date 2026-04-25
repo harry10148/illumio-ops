@@ -964,10 +964,82 @@ window.dlqExport = dlqExport;
 window.dlqView = dlqView;
 
 // ── Overview sub-tab ─────────────────────────────────────────────────────────
+function _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq) {
+  var siemClass = totalFailed > 0 ? 'card-err' : 'card-ok';
+  var dlqClass  = totalDlq  > 0 ? 'card-warn' : 'card-ok';
+  var cacheEvents  = Number(cache.events      || 0);
+  var cacheTraffic = Number(cache.traffic_raw || 0) + Number(cache.traffic_agg || 0);
+  var failedColor  = totalFailed > 0 ? 'var(--danger)' : 'var(--dim)';
+  var queueInner = '<div style="display:flex;gap:16px;margin-top:6px;">'
+    + '<div><div style="font-size:.7rem;color:var(--dim);" data-i18n="gui_ov_pending">pending</div>'
+    + '<div style="font-size:1.3rem;color:var(--accent2);font-weight:700;">' + totalPending + '</div></div>'
+    + '<div><div style="font-size:.7rem;color:var(--success);" data-i18n="gui_ov_sent">sent</div>'
+    + '<div style="font-size:1.3rem;color:var(--success);font-weight:700;">' + totalSent + '</div></div>'
+    + '<div><div style="font-size:.7rem;color:' + failedColor + ';" data-i18n="gui_ov_failed">failed</div>'
+    + '<div style="font-size:1.3rem;color:' + failedColor + ';font-weight:700;">' + totalFailed + '</div></div>'
+    + '</div>';
+  return '<div class="cards" style="margin-bottom:16px;">'
+    + '<div class="card card-neutral">'
+    + '<div class="label" data-i18n="gui_ov_cache_lag">Cache Rows</div>'
+    + '<div class="value" style="font-size:.95rem;line-height:1.5;">'
+    + cacheEvents.toLocaleString() + ' <span style="font-size:.7rem;color:var(--dim);" data-i18n="gui_ov_events">events</span><br>'
+    + cacheTraffic.toLocaleString() + ' <span style="font-size:.7rem;color:var(--dim);" data-i18n="gui_ov_traffic">traffic</span>'
+    + '</div>'
+    + '</div>'
+    + '<div class="card card-neutral">'
+    + '<div class="label" data-i18n="gui_ov_siem_destinations">SIEM Destinations</div>'
+    + '<div class="value">' + siemStatus.length + '</div>'
+    + '<div style="font-size:.75rem;color:var(--dim);">' + escapeAttr(_t('gui_ov_destinations_fmt').replace('{n}', siemStatus.length)) + '</div>'
+    + '</div>'
+    + '<div class="card ' + siemClass + '">'
+    + '<div class="label" data-i18n="gui_ov_siem_queue">SIEM Queue</div>'
+    + queueInner
+    + '</div>'
+    + '<div class="card ' + dlqClass + '">'
+    + '<div class="label" data-i18n="gui_ov_dlq_total">DLQ Total</div>'
+    + '<div class="value">' + totalDlq + '</div>'
+    + '</div>'
+    + '</div>';
+}
+
+function _buildOvRecentTable(siemStatus) {
+  var rows = '';
+  if (siemStatus.length === 0) {
+    rows = '<tr><td colspan="5" style="color:var(--dim);padding:16px 10px;" data-i18n="gui_ov_no_events">(no recent events)</td></tr>';
+  } else {
+    siemStatus.forEach(function(d) {
+      var failStyle = Number(d.failed || 0) > 0 ? ' style="color:var(--danger)"' : '';
+      rows += '<tr>'
+        + '<td><code>' + escapeAttr(d.destination || '') + '</code></td>'
+        + '<td>' + Number(d.pending || 0) + '</td>'
+        + '<td style="color:var(--success)">' + Number(d.sent || 0) + '</td>'
+        + '<td' + failStyle + '>' + Number(d.failed || 0) + '</td>'
+        + '<td>' + Number(d.dlq || 0) + '</td>'
+        + '</tr>';
+    });
+  }
+  return '<h3 style="color:var(--accent2);font-size:.9rem;font-weight:700;margin:16px 0 8px;" data-i18n="gui_ov_recent_events">Recent dispatch events</h3>'
+    + '<div class="table-container">'
+    + '<table class="rule-table">'
+    + '<colgroup>'
+    + '<col style="width:30%"><col style="width:14%"><col style="width:18%"><col style="width:14%"><col style="width:14%">'
+    + '</colgroup>'
+    + '<thead><tr>'
+    + '<th data-i18n="gui_dlq_th_dest">Dest</th>'
+    + '<th data-i18n="gui_ov_pending">pending</th>'
+    + '<th data-i18n="gui_ov_sent">sent</th>'
+    + '<th data-i18n="gui_ov_failed">failed</th>'
+    + '<th data-i18n="gui_ov_dlq">DLQ</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table>'
+    + '</div>';
+}
+
 window._integrations.setRender('overview', async function renderOverview() {
   var el = document.getElementById('it-pane-overview');
   if (!el) return;
-  el.innerHTML = '<p class="subtitle" data-i18n="gui_it_loading">Loading...</p>';
+  el.innerHTML = '<p data-i18n="gui_it_loading" style="color:var(--dim)">Loading...</p>';
 
   var cache, siem;
   try {
@@ -976,7 +1048,7 @@ window._integrations.setRender('overview', async function renderOverview() {
       fetch('/api/siem/status').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
     ]);
     cache = results[0] || {};
-    siem = results[1] || {status: []};
+    siem  = results[1] || {status: []};
   } catch (err) {
     el.textContent = '';
     var p = document.createElement('p');
@@ -986,64 +1058,16 @@ window._integrations.setRender('overview', async function renderOverview() {
     return;
   }
 
-  // Aggregate SIEM totals from per-destination status array
   var siemStatus = siem.status || [];
   var totalPending = 0, totalSent = 0, totalFailed = 0, totalDlq = 0;
   siemStatus.forEach(function(d) {
     totalPending += Number(d.pending || 0);
-    totalSent += Number(d.sent || 0);
-    totalFailed += Number(d.failed || 0);
-    totalDlq += Number(d.dlq || 0);
+    totalSent    += Number(d.sent    || 0);
+    totalFailed  += Number(d.failed  || 0);
+    totalDlq     += Number(d.dlq     || 0);
   });
 
-  // Card colors
-  var siemClass = totalFailed > 0 ? 'card-warn' : 'card-ok';
-  var dlqClass = totalDlq > 0 ? 'card-warn' : 'card-ok';
-  var cacheEvents = Number(cache.events || 0);
-  var cacheTraffic = Number(cache.traffic_raw || 0) + Number(cache.traffic_agg || 0);
-
-  el.innerHTML = '<div class="cards">'
-    + '<div class="card card-neutral">'
-    + '<div class="label" data-i18n="gui_ov_cache_lag">Cache Lag</div>'
-    + '<div class="value">' + _t('gui_ov_events') + ': ' + cacheEvents + ' ' + _t('gui_ov_rows') + '<br>' + _t('gui_ov_traffic') + ': ' + cacheTraffic + ' ' + _t('gui_ov_rows') + '</div>'
-    + '</div>'
-    + '<div class="card card-neutral">'
-    + '<div class="label" data-i18n="gui_ov_siem_destinations">SIEM Destinations</div>'
-    + '<div class="value" style="font-size:.85rem;">' + _t('gui_ov_destinations_fmt').replace('{n}', siemStatus.length) + '</div>'
-    + '</div>'
-    + '<div class="card ' + siemClass + '">'
-    + '<div class="label" data-i18n="gui_ov_siem_queue">SIEM Queue</div>'
-    + '<div class="value">' + _t('gui_ov_pending') + ': ' + totalPending + '<br>' + _t('gui_ov_sent') + ': ' + totalSent + '<br>' + _t('gui_ov_failed') + ': ' + totalFailed + '</div>'
-    + '</div>'
-    + '<div class="card ' + dlqClass + '">'
-    + '<div class="label" data-i18n="gui_ov_dlq_total">DLQ Total</div>'
-    + '<div class="value">' + totalDlq + '</div>'
-    + '</div>'
-    + '</div>'
-    + '<h3 style="margin-top:16px;" data-i18n="gui_ov_recent_events">Recent dispatch events</h3>'
-    + '<ul id="ov-recent"></ul>';
-
-  var ul = document.getElementById('ov-recent');
-  if (siemStatus.length === 0) {
-    var li = document.createElement('li');
-    li.style.color = 'var(--dim)';
-    li.setAttribute('data-i18n', 'gui_ov_no_events');
-    li.textContent = '(no recent events)';
-    ul.appendChild(li);
-  } else {
-    siemStatus.forEach(function(d) {
-      var li = document.createElement('li');
-      var code = document.createElement('code');
-      code.textContent = d.destination || '';
-      li.appendChild(code);
-      li.appendChild(document.createTextNode(
-        ' — ' + _t('gui_ov_pending') + ': ' + Number(d.pending || 0)
-        + ' ' + _t('gui_ov_sent') + ': ' + Number(d.sent || 0)
-        + ' ' + _t('gui_ov_failed') + ': ' + Number(d.failed || 0)
-        + ' ' + _t('gui_ov_dlq') + ': ' + Number(d.dlq || 0)
-      ));
-      ul.appendChild(li);
-    });
-  }
+  el.innerHTML = _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq)
+               + _buildOvRecentTable(siemStatus);
   if (typeof window.i18nApply === 'function') window.i18nApply();
 });

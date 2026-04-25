@@ -556,7 +556,7 @@
   "gui_it_loading": "載入中...",
   "gui_it_overview": "總覽",
   "gui_it_siem": "SIEM",
-  "gui_ov_cache_lag": "快取延遲",
+  "gui_ov_cache_lag": "快取列數",
   "gui_ov_dlq": "DLQ",
   "gui_ov_dlq_total": "DLQ 總數",
   "gui_ov_events": "事件",
