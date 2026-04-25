@@ -751,7 +751,6 @@ function dlqPrevPage() { if (_dlqPage > 1) { _dlqPage--; _dlqLoadPage(); } }
 function dlqNextPage() { if (_dlqPage < DLQ_MAX_PAGE) { _dlqPage++; _dlqLoadPage(); } }
 
 // ── DLQ bulk actions ─────────────────────────────────────────────────────────
-var _dlqCurrentEntries = [];
 
 function dlqSelectAll() {
   document.querySelectorAll('.dlq-chk').forEach(function(c) { c.checked = true; });
@@ -767,10 +766,11 @@ async function dlqReplaySelected() {
   var dest = (document.getElementById('dlq-dest') || {}).value || '';
   if (!dest) { alert('Select a destination filter first.'); return; }
   try {
-    await fetch('/api/siem/dlq/replay', {
+    var r = await fetch('/api/siem/dlq/replay', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({dest: dest, limit: ids.length}),
     });
+    if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
   } catch (err) { alert('Replay error: ' + String(err)); return; }
   dlqSearch();
 }
@@ -779,10 +779,11 @@ async function dlqReplay(ids) {
   var dest = (document.getElementById('dlq-dest') || {}).value || '';
   if (!dest) { alert('Select a destination filter first.'); return; }
   try {
-    await fetch('/api/siem/dlq/replay', {
+    var r = await fetch('/api/siem/dlq/replay', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({dest: dest, limit: ids.length || 1}),
     });
+    if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
   } catch (err) { alert('Replay error: ' + String(err)); return; }
   dlqSearch();
 }
@@ -794,10 +795,11 @@ async function dlqPurgeSelected() {
   if (!dest) { alert('Select a destination filter first.'); return; }
   if (!confirm('Purge ' + ids.length + ' entries from ' + dest + '?')) return;
   try {
-    await fetch('/api/siem/dlq/purge', {
+    var r = await fetch('/api/siem/dlq/purge', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({dest: dest, older_than_days: 0}),
     });
+    if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
   } catch (err) { alert('Purge error: ' + String(err)); return; }
   dlqSearch();
 }
@@ -809,10 +811,11 @@ async function dlqPurgeAll() {
   var typed = prompt(confirmMsg, '');
   if (typed !== dest) return;
   try {
-    await fetch('/api/siem/dlq/purge', {
+    var r = await fetch('/api/siem/dlq/purge', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({dest: dest, older_than_days: 0}),
     });
+    if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
   } catch (err) { alert('Purge error: ' + String(err)); return; }
   dlqSearch();
 }
