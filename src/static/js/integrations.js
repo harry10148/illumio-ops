@@ -85,6 +85,7 @@ window._integrations.setRender('cache', async function renderCache() {
   el.innerHTML = header + form + '<div id="cache-banner" style="display:none;margin-top:12px;"></div>';
   el.dataset.settings = JSON.stringify(s);
   renderTrafficFilter(s);
+  renderTrafficSampling(s);
   if (typeof window.i18nApply === 'function') window.i18nApply();
 });
 
@@ -281,3 +282,26 @@ document.addEventListener('input', function(e) {
     validateTrafficFilterHints();
   }
 });
+
+// ── Cache traffic_sampling section ───────────────────────────────────────────
+function renderTrafficSampling(s) {
+  var ts = s.traffic_sampling || {};
+  var ratio = Number(ts.sample_ratio_allowed || 1);
+  var maxRows = Number(ts.max_rows_per_batch || 200000);
+  var html = '<h3 data-i18n="gui_cache_sec_traffic_sampling">Traffic Sampling</h3>'
+    + '<div><label>sample_ratio_allowed (&gt;=1):'
+    + ' <input type="number" id="ts-ratio" min="1" value="' + ratio + '"></label></div>'
+    + '<div><label>max_rows_per_batch (1-200000):'
+    + ' <input type="number" id="ts-max" min="1" max="200000" value="' + maxRows + '"></label></div>';
+  var extra = document.getElementById('cache-form-extra');
+  if (extra) extra.insertAdjacentHTML('beforeend', html);
+}
+
+window.collectTrafficSampling = function () {
+  var ratioEl = document.getElementById('ts-ratio');
+  var maxEl = document.getElementById('ts-max');
+  return {
+    sample_ratio_allowed: Number(ratioEl ? ratioEl.value : 1),
+    max_rows_per_batch: Number(maxEl ? maxEl.value : 200000),
+  };
+};
