@@ -439,26 +439,53 @@ window._integrations.setRender('siem', async function renderSiem() {
   if (typeof window.i18nApply === 'function') window.i18nApply();
 });
 
+function _siemStatusBadge(d, st) {
+  if (!d.enabled) {
+    return '<span class="status-badge warn"><span class="dot warn"></span>'
+      + escapeAttr(_t('gui_siem_status_disabled')) + '</span>';
+  }
+  if (Number(st.failed || 0) > 0) {
+    return '<span class="status-badge err"><span class="dot err"></span>'
+      + escapeAttr(_t('gui_siem_status_error')) + '</span>';
+  }
+  return '<span class="status-badge ok"><span class="dot ok"></span>'
+    + escapeAttr(_t('gui_siem_status_healthy')) + '</span>';
+}
+
 function buildSiemForwarderForm(fw) {
   return '<section class="rs-glass" style="margin-bottom:16px;">'
-    + '<h3 data-i18n="gui_siem_forwarder">Forwarder</h3>'
+    + '<h3 style="color:var(--accent2);margin:0 0 14px;" data-i18n="gui_siem_forwarder">Forwarder</h3>'
+    + '<div class="form-row">'
+    + '<div class="form-group">'
+    + '<label data-i18n="gui_siem_dispatch_tick">dispatch_tick_seconds</label>'
+    + '<input type="number" id="siem-tick" min="1" value="' + Number(fw.dispatch_tick_seconds || 10) + '">'
+    + '</div>'
+    + '<div class="form-group">'
+    + '<label data-i18n="gui_siem_dlq_max">dlq_max_per_dest</label>'
+    + '<input type="number" id="siem-dlq-max" min="100" value="' + Number(fw.dlq_max_per_dest || 500) + '">'
+    + '</div>'
+    + '</div>'
+    + '<div class="chk" style="margin-bottom:14px;">'
     + '<label><input type="checkbox" id="siem-enabled"' + (fw.enabled ? ' checked' : '') + '>'
     + ' <span data-i18n="gui_siem_enabled">Enabled</span></label>'
-    + '<div><label><span data-i18n="gui_siem_dispatch_tick">dispatch_tick_seconds</span>:'
-    + ' <input type="number" id="siem-tick" min="1" value="' + Number(fw.dispatch_tick_seconds) + '"></label></div>'
-    + '<div><label><span data-i18n="gui_siem_dlq_max">dlq_max_per_dest</span>:'
-    + ' <input type="number" id="siem-dlq-max" min="100" value="' + Number(fw.dlq_max_per_dest) + '"></label></div>'
-    + '<button class="btn btn-primary" onclick="siemSaveForwarder()" data-i18n="gui_save">Save</button>'
+    + '</div>'
+    + '<div style="display:flex;justify-content:flex-end;">'
+    + '<button class="btn btn-primary btn-sm" onclick="siemSaveForwarder()" data-i18n="gui_save">Save</button>'
+    + '</div>'
     + '</section>';
 }
 
 function buildSiemDestinationsSection() {
   return '<section class="rs-glass">'
-    + '<div style="display:flex;justify-content:space-between;align-items:center;">'
-    + '<h3 data-i18n="gui_siem_destinations">Destinations</h3>'
-    + '<button class="btn" onclick="siemOpenDestModal()" data-i18n="gui_siem_add">+ Add</button>'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
+    + '<h3 style="color:var(--accent2);margin:0;" data-i18n="gui_siem_destinations">Destinations</h3>'
+    + '<button class="btn btn-sm" onclick="siemOpenDestModal()" data-i18n="gui_siem_add">+ Add</button>'
     + '</div>'
-    + '<table style="width:100%;font-size:.85rem;">'
+    + '<div class="table-container">'
+    + '<table class="rule-table">'
+    + '<colgroup>'
+    + '<col style="width:18%"><col style="width:10%"><col style="width:13%"><col style="width:25%"><col style="width:16%"><col>'
+    + '</colgroup>'
     + '<thead><tr>'
     + '<th data-i18n="gui_siem_th_name">Name</th>'
     + '<th data-i18n="gui_siem_th_transport">Transport</th>'
@@ -469,25 +496,25 @@ function buildSiemDestinationsSection() {
     + '</tr></thead>'
     + '<tbody id="siem-dest-tbody"></tbody>'
     + '</table>'
+    + '</div>'
     + '</section>'
     + '<div id="siem-banner" style="margin-top:12px;"></div>'
     + '<div id="siem-modal-host"></div>';
 }
 
 function buildSiemRow(d, st) {
-  var dot = (st.failed > 0) ? '🔴' : (st.pending > 0 ? '🟡' : '🟢');
   var nameEnc = encodeURIComponent(d.name).replace(/'/g, '%27');
-  var dim = d.enabled ? '' : ' <span style="color:var(--dim);">(disabled)</span>';
+  var dim = d.enabled ? '' : ' <span style="color:var(--dim);font-size:.8rem;">(disabled)</span>';
   return '<tr>'
-    + '<td>' + escapeAttr(d.name) + dim + '</td>'
-    + '<td>' + escapeAttr(d.transport) + '</td>'
-    + '<td>' + escapeAttr(d.format) + '</td>'
-    + '<td>' + escapeAttr(d.endpoint) + '</td>'
-    + '<td>' + dot + '</td>'
-    + '<td>'
-    + '<button class="btn" onclick="siemTestDest(\'' + nameEnc + '\')" data-i18n="gui_siem_test">Test</button>'
-    + ' <button class="btn" onclick="siemOpenDestModal(\'' + nameEnc + '\')" data-i18n="gui_siem_edit">Edit</button>'
-    + ' <button class="btn btn-danger" onclick="siemDeleteDest(\'' + nameEnc + '\')" data-i18n="gui_siem_delete">Delete</button>'
+    + '<td><b>' + escapeAttr(d.name) + '</b>' + dim + '</td>'
+    + '<td><code>' + escapeAttr(d.transport) + '</code></td>'
+    + '<td><code>' + escapeAttr(d.format) + '</code></td>'
+    + '<td title="' + escapeAttr(d.endpoint) + '">' + escapeAttr(d.endpoint) + '</td>'
+    + '<td>' + _siemStatusBadge(d, st) + '</td>'
+    + '<td style="white-space:nowrap;">'
+    + '<button class="btn btn-sm" onclick="siemTestDest(\'' + nameEnc + '\')" data-i18n="gui_siem_test">Test</button> '
+    + '<button class="btn btn-sm" onclick="siemOpenDestModal(\'' + nameEnc + '\')" data-i18n="gui_siem_edit">Edit</button> '
+    + '<button class="btn btn-sm btn-danger" onclick="siemDeleteDest(\'' + nameEnc + '\')" data-i18n="gui_siem_delete">Delete</button>'
     + '</td>'
     + '</tr>';
 }
