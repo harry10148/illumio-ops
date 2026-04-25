@@ -10,7 +10,7 @@ from src.config import ConfigManager, hash_password
 
 
 @pytest.fixture
-def client(tmp_path):
+def client():
     fd, path = tempfile.mkstemp(suffix=".json")
     os.close(fd)
     try:
@@ -61,11 +61,17 @@ def test_save_then_restart_roundtrip(client, tmp_path):
     assert cfg["pce_cache"]["enabled"] is True
     assert cfg["pce_cache"]["events_retention_days"] == 42
 
-    gui_module._GUI_OWNS_DAEMON = True
     fn = MagicMock(return_value=MagicMock())
+    gui_module._GUI_OWNS_DAEMON = True
     gui_module._DAEMON_RESTART_FN = fn
-    resp = c.post("/api/daemon/restart",
-                  environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
-    assert resp.status_code == 200
-    assert resp.get_json()["ok"] is True
-    fn.assert_called_once()
+    try:
+        resp = c.post("/api/daemon/restart",
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+        b2 = resp.get_json()
+        assert resp.status_code == 200
+        assert b2 is not None
+        assert b2["ok"] is True
+        fn.assert_called_once()
+    finally:
+        gui_module._GUI_OWNS_DAEMON = False
+        gui_module._DAEMON_RESTART_FN = None
