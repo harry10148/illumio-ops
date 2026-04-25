@@ -763,7 +763,7 @@ function _fmtShortDt(iso) {
   var d = new Date(iso);
   if (isNaN(d.getTime())) return String(iso);
   var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return M[d.getMonth()] + ' ' + d.getDate()
+  return M[d.getMonth()] + ' ' + String(d.getDate()).padStart(2, '0')
     + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
 }
 
@@ -870,7 +870,7 @@ async function _dlqLoadPage() {
   if (pager) {
     var hasMore = allEntries.length >= DLQ_PAGE_SIZE * _dlqPage;
     var atMax = _dlqPage >= DLQ_MAX_PAGE;
-    pager.innerHTML = 'Page ' + _dlqPage + ' · '
+    pager.innerHTML = _t('gui_dlq_page') + ' ' + _dlqPage + ' · '
       + '<button class="btn" onclick="dlqPrevPage()"' + (_dlqPage <= 1 ? ' disabled' : '') + '>‹</button>'
       + ' <button class="btn" onclick="dlqNextPage()"' + (!hasMore || atMax ? ' disabled' : '') + '>›</button>';
   }

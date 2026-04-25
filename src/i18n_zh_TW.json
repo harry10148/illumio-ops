@@ -425,6 +425,7 @@
   "gui_dlq_th_event_id": "事件 ID",
   "gui_dlq_th_failed_at": "失敗時間",
   "gui_dlq_th_retries": "重試次數",
+  "gui_dlq_page": "第",
   "gui_dlq_th_reason": "原因",
   "gui_dlq_title": "失敗佇列",
   "gui_dlq_view": "檢視",
