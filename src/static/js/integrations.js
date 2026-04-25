@@ -91,7 +91,6 @@ function buildCacheStatusCards(status, s) {
   var evLag = (status.events_lag_sec == null) ? '—' : Number(status.events_lag_sec);
   var trLag = (status.traffic_lag_sec == null) ? '—' : Number(status.traffic_lag_sec);
   var lastEv = escapeAttr(status.last_event_ingested_at || '—');
-  var lastTr = escapeAttr(status.last_traffic_ingested_at || '—');
   return '<div class="cards" style="margin-bottom:16px;">'
     + '<div class="card"><div class="label" data-i18n="gui_cache_enabled">Enabled</div>'
     + '<div class="value">' + (s.enabled ? '✓' : '—') + '</div></div>'
