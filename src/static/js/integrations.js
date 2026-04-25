@@ -557,9 +557,51 @@ async function siemSaveDest(editNameEnc) {
   }
 }
 
-// Placeholder stub — real implementation in Task 20.
-function siemTestDest(nameEnc) {}
-function siemTestDestInline() {}
+async function siemTestDest(nameEnc) {
+  var name = decodeURIComponent(nameEnc);
+  var resp, body;
+  try {
+    resp = await fetch('/api/siem/destinations/' + encodeURIComponent(name) + '/test', {method: 'POST'});
+    body = await resp.json();
+  } catch (err) {
+    alert('Test error: ' + String(err));
+    return;
+  }
+  var msg = body.ok
+    ? '✓ ' + _t('gui_siem_test_ok') + ' (' + Number(body.latency_ms) + ' ms)'
+    : '✗ ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
+  alert(msg);
+}
+
+async function siemTestDestInline() {
+  var banner = document.getElementById('md-banner');
+  if (!banner) return;
+  banner.style.color = '';
+  banner.textContent = 'Testing…';
+  var name = (document.getElementById('md-name') || {}).value || '';
+  name = name.trim();
+  if (!name) {
+    banner.textContent = 'Enter name, then Save, then Test.';
+    return;
+  }
+  var resp, body;
+  try {
+    resp = await fetch('/api/siem/destinations/' + encodeURIComponent(name) + '/test', {method: 'POST'});
+    body = await resp.json();
+  } catch (err) {
+    banner.textContent = 'Test error: ' + String(err);
+    return;
+  }
+  if (resp.status === 404) {
+    banner.textContent = 'Destination not yet saved. Save first, then Test.';
+  } else if (body.ok) {
+    banner.style.color = 'var(--ok, green)';
+    banner.textContent = '✓ ' + _t('gui_siem_test_ok') + ' (' + Number(body.latency_ms) + ' ms)';
+  } else {
+    banner.style.color = 'var(--danger)';
+    banner.textContent = '✗ ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
+  }
+}
 window.siemTestDest = siemTestDest;
 window.siemTestDestInline = siemTestDestInline;
 
