@@ -262,12 +262,12 @@ function validateTrafficFilterHints() {
   var hints = [];
   var ipsEl = document.getElementById('tf-ips');
   var ips = (ipsEl ? ipsEl.value : '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
-  ips.forEach(function(ip) { if (!validateIp(ip)) hints.push('Invalid IP: ' + ip); });
+  ips.forEach(function(ip) { if (!validateIp(ip)) hints.push(_t('gui_err_invalid_ip') + ': ' + ip); });
   var portsEl = document.getElementById('tf-ports');
   var ports = (portsEl ? portsEl.value : '').split(',').map(function(s) { return s.trim(); }).filter(Boolean);
   ports.forEach(function(p) {
     var n = Number(p);
-    if (!Number.isInteger(n) || n < 1 || n > 65535) hints.push('Invalid port: ' + p);
+    if (!Number.isInteger(n) || n < 1 || n > 65535) hints.push(_t('gui_err_port_range') + ': ' + p);
   });
   var el = document.getElementById('tf-validation-hints');
   if (el) el.textContent = hints.join(' · ');
