@@ -615,6 +615,7 @@ window.siemSaveDest = siemSaveDest;
 // ── DLQ sub-tab ──────────────────────────────────────────────────────────────
 var _dlqPage = 1;
 var DLQ_PAGE_SIZE = 50;
+var DLQ_MAX_PAGE = Math.floor(500 / DLQ_PAGE_SIZE); // API cap is 500 entries
 
 window._integrations.setRender('dlq', async function renderDlq() {
   var el = document.getElementById('it-pane-dlq');
@@ -684,7 +685,10 @@ async function _dlqLoadPage() {
 
   var allEntries = [];
   try {
-    var body = await fetch('/api/siem/dlq?' + q.toString()).then(function(r) { return r.json(); });
+    var body = await fetch('/api/siem/dlq?' + q.toString()).then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
     allEntries = body.entries || body || [];
   } catch (err) {
     var tbody = document.getElementById('dlq-tbody');
@@ -709,9 +713,10 @@ async function _dlqLoadPage() {
   var pager = document.getElementById('dlq-pager');
   if (pager) {
     var hasMore = allEntries.length >= DLQ_PAGE_SIZE * _dlqPage;
+    var atMax = _dlqPage >= DLQ_MAX_PAGE;
     pager.innerHTML = 'Page ' + _dlqPage + ' · '
       + '<button class="btn" onclick="dlqPrevPage()"' + (_dlqPage <= 1 ? ' disabled' : '') + '>‹</button>'
-      + ' <button class="btn" onclick="dlqNextPage()"' + (!hasMore ? ' disabled' : '') + '>›</button>';
+      + ' <button class="btn" onclick="dlqNextPage()"' + (!hasMore || atMax ? ' disabled' : '') + '>›</button>';
   }
   if (typeof window.i18nApply === 'function') window.i18nApply();
 }
@@ -720,7 +725,7 @@ function buildDlqRow(e) {
   var id = Number(e.id);
   return '<tr>'
     + '<td><input type="checkbox" class="dlq-chk" value="' + id + '"></td>'
-    + '<td>' + escapeAttr(e.source_table || '') + '</td>'
+    + '<td>' + escapeAttr(e.destination || e.source_table || '') + '</td>'
     + '<td>' + escapeAttr(e.source_id || '') + '</td>'
     + '<td>' + escapeAttr(e.last_error || '') + '</td>'
     + '<td>' + escapeAttr(e.quarantined_at || '') + '</td>'
@@ -732,7 +737,7 @@ function buildDlqRow(e) {
 }
 
 function dlqPrevPage() { if (_dlqPage > 1) { _dlqPage--; _dlqLoadPage(); } }
-function dlqNextPage() { _dlqPage++; _dlqLoadPage(); }
+function dlqNextPage() { if (_dlqPage < DLQ_MAX_PAGE) { _dlqPage++; _dlqLoadPage(); } }
 
 // Stubs for Task 22
 function dlqView(id) {}

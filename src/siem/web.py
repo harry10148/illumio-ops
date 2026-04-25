@@ -119,6 +119,7 @@ def list_dlq():
             "entries": [
                 {
                     "id": e.id,
+                    "destination": e.destination,
                     "source_table": e.source_table,
                     "source_id": e.source_id,
                     "retries": e.retries,
