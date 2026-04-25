@@ -753,41 +753,54 @@ window._integrations.setRender('dlq', async function renderDlq() {
   var el = document.getElementById('it-pane-dlq');
   if (!el) return;
   el.innerHTML = buildDlqSkeleton();
-  var bulkBar = document.getElementById('dlq-bulk-bar');
-  if (bulkBar) {
-    bulkBar.innerHTML = '<div style="display:flex;gap:8px;margin-bottom:8px;">'
-      + '<button class="btn" onclick="dlqSelectAll()" data-i18n="gui_dlq_select_all">Select All</button>'
-      + '<button class="btn" onclick="dlqReplaySelected()" data-i18n="gui_dlq_replay_selected">Replay Selected</button>'
-      + '<button class="btn btn-warn" onclick="dlqPurgeSelected()" data-i18n="gui_dlq_purge_selected">Purge Selected</button>'
-      + '<button class="btn btn-danger" onclick="dlqPurgeAll()" data-i18n="gui_dlq_purge_all">Purge ALL</button>'
-      + '<button class="btn" onclick="dlqExport()" data-i18n="gui_dlq_export">Export CSV</button>'
-      + '</div>';
-  }
   await populateDlqDestinations();
   await dlqSearch();
   if (typeof window.i18nApply === 'function') window.i18nApply();
 });
 
+function _fmtShortDt(iso) {
+  if (!iso) return '—';
+  var d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso);
+  var M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return M[d.getMonth()] + ' ' + d.getDate()
+    + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
 function buildDlqSkeleton() {
-  return '<h3 data-i18n="gui_dlq_title">Dead Letter Queue</h3>'
-    + '<div style="display:flex;gap:10px;margin-bottom:10px;align-items:end;flex-wrap:wrap;">'
-    + '<label><span data-i18n="gui_dlq_filter_dest">Destination</span>:'
-    + ' <select id="dlq-dest"><option value="" data-i18n="gui_dlq_filter_all">All</option></select></label>'
-    + '<label><span data-i18n="gui_dlq_filter_reason">Reason contains</span>:'
-    + ' <input id="dlq-reason"></label>'
-    + '<button class="btn" onclick="dlqSearch()" data-i18n="gui_dlq_search">Search</button>'
+  return '<div class="toolbar" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;">'
+    + '<div class="form-group" style="margin:0;min-width:130px;">'
+    + '<label data-i18n="gui_dlq_filter_dest">Destination</label>'
+    + '<select id="dlq-dest" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;color:var(--fg);font-size:.83rem;">'
+    + '<option value="" data-i18n="gui_dlq_filter_all">All</option></select>'
     + '</div>'
-    + '<div id="dlq-bulk-bar"></div>'
-    + '<table style="width:100%;font-size:.85rem;">'
-    + '<thead><tr><th></th>'
+    + '<div class="form-group" style="margin:0;flex:1;min-width:140px;">'
+    + '<label data-i18n="gui_dlq_filter_reason">Reason contains</label>'
+    + '<input id="dlq-reason" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;color:var(--fg);font-size:.83rem;">'
+    + '</div>'
+    + '<button class="btn btn-sm" onclick="dlqSearch()" style="align-self:flex-end;" data-i18n="gui_dlq_search">Search</button>'
+    + '<span class="spacer"></span>'
+    + '<button class="btn btn-sm" onclick="dlqSelectAll()" style="align-self:flex-end;" data-i18n="gui_dlq_select_all">Select All</button>'
+    + '<button class="btn btn-sm" onclick="dlqReplaySelected()" style="align-self:flex-end;" data-i18n="gui_dlq_replay_selected">Replay</button>'
+    + '<button class="btn btn-sm btn-warn" onclick="dlqPurgeSelected()" style="align-self:flex-end;" data-i18n="gui_dlq_purge_selected">Purge</button>'
+    + '<button class="btn btn-sm btn-danger" onclick="dlqPurgeAll()" style="align-self:flex-end;" data-i18n="gui_dlq_purge_all">Purge ALL</button>'
+    + '<button class="btn btn-sm" onclick="dlqExport()" style="align-self:flex-end;" data-i18n="gui_dlq_export">Export CSV</button>'
+    + '</div>'
+    + '<div class="table-container">'
+    + '<table class="rule-table">'
+    + '<colgroup><col style="width:32px"><col style="width:15%"><col style="width:12%"><col><col style="width:110px"><col style="width:55px"><col style="width:130px"></colgroup>'
+    + '<thead><tr>'
+    + '<th></th>'
     + '<th data-i18n="gui_dlq_th_dest">Dest</th>'
     + '<th data-i18n="gui_dlq_th_event_id">Event ID</th>'
     + '<th data-i18n="gui_dlq_th_reason">Reason</th>'
     + '<th data-i18n="gui_dlq_th_failed_at">Failed At</th>'
+    + '<th>Retries</th>'
     + '<th></th>'
     + '</tr></thead>'
     + '<tbody id="dlq-tbody"></tbody>'
     + '</table>'
+    + '</div>'
     + '<div id="dlq-pager" style="margin-top:8px;"></div>'
     + '<div id="dlq-modal-host"></div>';
 }
@@ -834,7 +847,7 @@ async function _dlqLoadPage() {
     allEntries = body.entries || body || [];
   } catch (err) {
     var tbody = document.getElementById('dlq-tbody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="color:red">Failed to load: ' + escapeAttr(String(err)) + '</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="color:red">Failed to load: ' + escapeAttr(String(err)) + '</td></tr>';
     return;
   }
 
@@ -851,7 +864,7 @@ async function _dlqLoadPage() {
   var tbody = document.getElementById('dlq-tbody');
   if (!tbody) return;
   tbody.innerHTML = pageEntries.map(buildDlqRow).join('')
-    || '<tr><td colspan="6" style="color:var(--dim);" data-i18n="gui_dlq_empty">(no DLQ entries)</td></tr>';
+    || '<tr><td colspan="7" style="color:var(--dim);" data-i18n="gui_dlq_empty">(no DLQ entries)</td></tr>';
 
   var pager = document.getElementById('dlq-pager');
   if (pager) {
@@ -865,16 +878,18 @@ async function _dlqLoadPage() {
 }
 
 function buildDlqRow(e) {
-  var id = Number(e.id);
+  var id     = Number(e.id);
+  var reason = String(e.last_error || '');
   return '<tr>'
     + '<td><input type="checkbox" class="dlq-chk" value="' + id + '"></td>'
-    + '<td>' + escapeAttr(e.destination || e.source_table || '') + '</td>'
-    + '<td>' + escapeAttr(e.source_id || '') + '</td>'
-    + '<td>' + escapeAttr(e.last_error || '') + '</td>'
-    + '<td>' + escapeAttr(e.quarantined_at || '') + '</td>'
-    + '<td>'
-    + '<button class="btn" onclick="dlqView(' + id + ')" data-i18n="gui_dlq_view">View</button>'
-    + ' <button class="btn" onclick="dlqReplay([' + id + '])" data-i18n="gui_dlq_replay">Replay</button>'
+    + '<td><code>' + escapeAttr(e.destination || e.source_table || '') + '</code></td>'
+    + '<td style="font-size:.78rem;color:var(--dim);">' + escapeAttr(String(e.source_id || '')) + '</td>'
+    + '<td title="' + escapeAttr(reason) + '">' + escapeAttr(reason) + '</td>'
+    + '<td style="font-size:.78rem;color:var(--dim);">' + escapeAttr(_fmtShortDt(e.quarantined_at)) + '</td>'
+    + '<td style="text-align:center;">' + Number(e.retries || 0) + '</td>'
+    + '<td style="white-space:nowrap;">'
+    + '<button class="btn btn-sm" onclick="dlqView(' + id + ')" data-i18n="gui_dlq_view">View</button> '
+    + '<button class="btn btn-sm" onclick="dlqReplay([' + id + '])" data-i18n="gui_dlq_replay">Replay</button>'
     + '</td>'
     + '</tr>';
 }
