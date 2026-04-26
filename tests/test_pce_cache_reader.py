@@ -33,7 +33,7 @@ def _seed_event(sf, ts):
 
 def test_cover_state_full_when_range_in_retention(session_factory):
     now = datetime.now(timezone.utc)
-    _seed_event(session_factory, now - timedelta(days=1))
+    _seed_event(session_factory, now - timedelta(days=2))  # seed at range start
     rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
     assert rd.cover_state("events", now - timedelta(days=2), now) == "full"
 
@@ -98,3 +98,12 @@ def test_earliest_ingested_at_returns_min(session_factory):
 def test_earliest_ingested_at_returns_none_when_empty(session_factory):
     rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
     assert rd.earliest_ingested_at("traffic") is None
+
+
+def test_cover_state_partial_when_start_before_cache_data(session_factory):
+    """Fresh cache: data starts at now-1h, but range starts at now-3days → partial."""
+    now = datetime.now(timezone.utc)
+    _seed_event(session_factory, now - timedelta(hours=1))  # cache only has 1 hour
+    rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
+    # Range starts 3 days ago — entirely within retention window but before any cached data
+    assert rd.cover_state("events", now - timedelta(days=3), now) == "partial"

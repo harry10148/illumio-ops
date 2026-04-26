@@ -30,6 +30,9 @@ class CacheReader:
             return "miss"
         if start < cutoff:
             return "partial"
+        earliest = self.earliest_ingested_at(source)
+        if earliest is None or start < earliest:
+            return "partial"
         return "full"
 
     def earliest_ingested_at(self, source: str) -> datetime | None:
