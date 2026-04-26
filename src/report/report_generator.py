@@ -31,6 +31,10 @@ from src.report.report_metadata import (
 )
 from src.report.tz_utils import parse_tz as _parse_tz, fmt_tz_now as _fmt_tz_now
 
+def _fmt_iso(dt) -> str:
+    return dt.isoformat().replace("+00:00", "Z") if hasattr(dt, "isoformat") else str(dt)
+
+
 # ─── Snapshot helper (module-level) ──────────────────────────────────────────
 
 def _build_snapshot(module_results: dict) -> dict:
@@ -175,18 +179,17 @@ class ReportGenerator:
                         "Traffic report: hybrid fetch — API gap [{} → {}), cache [{} → {}]",
                         start, cache_start, cache_start, end,
                     )
-                    def _fmt(dt):
-                        return dt.isoformat().replace("+00:00", "Z") if hasattr(dt, "isoformat") else str(dt)
                     gap = self.api.fetch_traffic_for_report(
-                        start_time_str=_fmt(start),
-                        end_time_str=_fmt(cache_start),
+                        start_time_str=_fmt_iso(start),
+                        end_time_str=_fmt_iso(cache_start),
                         filters=filters,
                     ) or []
                     cached = self._cache.read_flows_raw(cache_start, end)
+                    # agg data not available for hybrid results
                     return {"raw": gap + cached, "agg": None, "source": "mixed"}
         flows = self.api.fetch_traffic_for_report(
-            start_time_str=start.isoformat().replace("+00:00", "Z") if hasattr(start, "isoformat") else str(start),
-            end_time_str=end.isoformat().replace("+00:00", "Z") if hasattr(end, "isoformat") else str(end),
+            start_time_str=_fmt_iso(start),
+            end_time_str=_fmt_iso(end),
             filters=filters,
         )
         return {"raw": flows or [], "agg": None, "source": "api"}

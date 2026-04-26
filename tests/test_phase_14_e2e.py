@@ -39,15 +39,17 @@ def test_audit_report_cache_hit_no_api_call(session_factory):
     """AuditGenerator reads from cache (full hit) and does NOT call API."""
     from src.report.audit_generator import AuditGenerator
     from src.pce_cache.reader import CacheReader
-    _seed_events(session_factory, 2)
+    _seed_events(session_factory, 2)  # events at now-1d, now-2d; earliest ≈ now-2d
     api = MagicMock()
     api.get_events.return_value = []
     rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
     gen = AuditGenerator(api=api, cache_reader=rd)
-    start = datetime.now(timezone.utc) - timedelta(days=3)
+    # start at now-36h: safely after earliest (now-2d=now-48h) so cover_state="full"
+    # only the now-1d event falls within [now-36h, now]
+    start = datetime.now(timezone.utc) - timedelta(hours=36)
     end = datetime.now(timezone.utc)
     events = gen._fetch_events(start, end)
-    assert len(events) == 2
+    assert len(events) == 1
     api.get_events.assert_not_called()
 
 

@@ -56,7 +56,7 @@ def test_report_generator_bypasses_cache_when_none(tmp_path):
 
 
 def test_report_generator_falls_back_on_partial(tmp_path):
-    """cover_state=partial: falls back to API."""
+    """cover_state=partial with earliest=None (no fixable gap): falls back to API."""
     from src.report.report_generator import ReportGenerator
     api = _make_mock_api()
     cache = _make_cache_reader(cover_state="partial")
