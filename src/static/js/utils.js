@@ -310,7 +310,7 @@ function hideAll() {
 
 async function loadTranslations() {
   const init = window._INIT_TRANSLATIONS;
-  if (init && 'sched_enabled_short' in init) {
+  if (init && 'sched_enabled_short' in init && 'status_ok' in init) {
     _translations = init;
   } else {
     _translations = await api('/api/ui_translations');

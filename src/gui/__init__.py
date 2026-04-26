@@ -246,11 +246,14 @@ def _resolve_config_dir() -> str:
 def _resolve_state_file() -> str:
     return os.path.join(_ROOT_DIR, 'logs', 'state.json')
 
+_UI_EXTRA_KEYS = frozenset({"rule_pce_health"})
+
 def _ui_translation_dict(lang: str) -> dict:
     return {
         k: v
         for k, v in get_messages(lang).items()
-        if k.startswith(("gui_", "sched_"))
+        if k.startswith(("gui_", "sched_", "status_", "error_"))
+        or k in _UI_EXTRA_KEYS
     }
 
 def _plugin_config_roots() -> set[str]:
