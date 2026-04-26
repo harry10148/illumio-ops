@@ -78,13 +78,19 @@ class VenStatusGenerator:
             print(t("rpt_ven_html_saved", path=path))
         if fmt in ('pdf', 'all'):
             try:
-                from src.report.exporters.pdf_exporter import export_pdf
-                from src.report.exporters.ven_html_exporter import VenHtmlExporter
-                html_content = VenHtmlExporter(result.module_results, df=result.dataframe)._build()
+                from src.report.exporters.pdf_exporter import export_report_pdf
                 import datetime as _dt
                 ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
                 pdf_path = os.path.join(output_dir, f'Illumio_VEN_Report_{ts_str}.pdf')
-                export_pdf(html_content, pdf_path)
+                export_report_pdf(
+                    title="VEN Status Report",
+                    output_path=pdf_path,
+                    module_results=result.module_results or {},
+                    metadata={
+                        "generated_at": result.generated_at.isoformat(),
+                        "record_count": result.record_count,
+                    },
+                )
                 paths.append(pdf_path)
                 print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
             except Exception as exc:

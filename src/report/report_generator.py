@@ -293,16 +293,25 @@ class ReportGenerator:
 
         if fmt in ('pdf', 'all'):
             try:
-                from src.report.exporters.pdf_exporter import export_pdf
-                html_content = HtmlExporter(result.module_results, data_source=result.data_source)._build()
+                from src.report.exporters.pdf_exporter import export_report_pdf
                 import datetime as _dt
                 ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
                 pdf_path = os.path.join(output_dir, f'Illumio_Traffic_Report_{ts_str}.pdf')
-                export_pdf(html_content, pdf_path)
+                export_report_pdf(
+                    title="Traffic Flow Report",
+                    output_path=pdf_path,
+                    module_results=result.module_results or {},
+                    metadata={
+                        "generated_at": result.generated_at.isoformat(),
+                        "record_count": result.record_count,
+                        "start_date": result.date_range[0] if result.date_range else "",
+                        "end_date": result.date_range[1] if len(result.date_range) > 1 else "",
+                    },
+                )
                 paths.append(pdf_path)
                 print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
             except Exception as exc:
-                logger.warning('PDF export failed (may need GTK3 on Linux): {}', exc)
+                logger.warning('PDF export failed: {}', exc)
 
         if fmt in ('xlsx', 'all'):
             try:

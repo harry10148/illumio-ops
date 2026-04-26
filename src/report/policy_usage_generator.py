@@ -243,18 +243,21 @@ class PolicyUsageGenerator:
 
         if fmt in ('pdf', 'all'):
             try:
-                from src.report.exporters.pdf_exporter import export_pdf
-                from src.report.exporters.policy_usage_html_exporter import PolicyUsageHtmlExporter
-                html_content = PolicyUsageHtmlExporter(
-                    result.module_results,
-                    df=result.dataframe,
-                    date_range=result.date_range,
-                    lookback_days=result.lookback_days,
-                )._build()
+                from src.report.exporters.pdf_exporter import export_report_pdf
                 import datetime as _dt
                 ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
                 pdf_path = os.path.join(output_dir, f'Illumio_PolicyUsage_Report_{ts_str}.pdf')
-                export_pdf(html_content, pdf_path)
+                export_report_pdf(
+                    title="Policy Usage Report",
+                    output_path=pdf_path,
+                    module_results=result.module_results or {},
+                    metadata={
+                        "generated_at": result.generated_at.isoformat(),
+                        "record_count": result.record_count,
+                        "start_date": result.date_range[0] if result.date_range else "",
+                        "end_date": result.date_range[1] if len(result.date_range) > 1 else "",
+                    },
+                )
                 paths.append(pdf_path)
                 print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
             except Exception as exc:
