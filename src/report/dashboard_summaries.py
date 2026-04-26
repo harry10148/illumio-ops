@@ -19,6 +19,27 @@ def build_audit_dashboard_summary(result) -> dict:
     mod00 = result.module_results.get("mod00", {}) if result else {}
     mod01 = result.module_results.get("mod01", {}) if result else {}
     mod03 = result.module_results.get("mod03", {}) if result else {}
+    mod12 = result.module_results.get("mod12", {}) if result else {}
+
+    # Pull KPIs from mod12 (executive summary) with backward-compatible alias
+    kpis = mod12.get("kpis", [])[:8]
+    # If mod12 is not available (audit/policy reports), fallback to mod00
+    if not kpis:
+        kpis = mod00.get("kpis", [])[:8]
+
+    # Ensure KPI aliases for backward compatibility
+    # Add deprecated staged_coverage alias pointing to pb_uncovered_exposure
+    kpis_with_aliases = []
+    for kpi in kpis:
+        kpi_copy = dict(kpi)
+        kpis_with_aliases.append(kpi_copy)
+        # If we have pb_uncovered_exposure, also add deprecated alias
+        if kpi.get("label") == "PB Uncovered Exposure":
+            kpis_with_aliases.append({
+                "label": "Staged Coverage (Deprecated)",  # DEPRECATED ALIAS: remove in v3.21
+                "value": kpi.get("value", "")
+            })
+
     attention_items = []
     for item in (mod00.get("attention_items") or [])[:5]:
         attention_items.append(
@@ -36,7 +57,7 @@ def build_audit_dashboard_summary(result) -> dict:
         or getattr(result, "generated_at", datetime.datetime.now()).strftime("%Y-%m-%d %H:%M:%S"),
         "record_count": int(getattr(result, "record_count", 0) or 0),
         "date_range": list(getattr(result, "date_range", ("", "")) or ("", "")),
-        "kpis": mod00.get("kpis", [])[:8],
+        "kpis": kpis_with_aliases,
         "attention_items": attention_items,
         "top_events": _records_from_table(mod00.get("top_events_overall"), limit=10),
         "boundary_breaches": list(mod00.get("boundary_breaches", [])[:5]),
@@ -67,7 +88,27 @@ def write_audit_dashboard_summary(output_dir: str, result) -> str:
 
 def build_policy_usage_dashboard_summary(result) -> dict:
     mod00 = result.module_results.get("mod00", {}) if result else {}
+    mod12 = result.module_results.get("mod12", {}) if result else {}
     execution = getattr(result, "execution_stats", {}) or mod00.get("execution_stats", {}) or {}
+
+    # Pull KPIs from mod12 (executive summary) with backward-compatible alias
+    kpis = mod12.get("kpis", [])[:8]
+    # If mod12 is not available (policy-specific reports), fallback to mod00
+    if not kpis:
+        kpis = mod00.get("kpis", [])[:8]
+
+    # Ensure KPI aliases for backward compatibility
+    # Add deprecated staged_coverage alias pointing to pb_uncovered_exposure
+    kpis_with_aliases = []
+    for kpi in kpis:
+        kpi_copy = dict(kpi)
+        kpis_with_aliases.append(kpi_copy)
+        # If we have pb_uncovered_exposure, also add deprecated alias
+        if kpi.get("label") == "PB Uncovered Exposure":
+            kpis_with_aliases.append({
+                "label": "Staged Coverage (Deprecated)",  # DEPRECATED ALIAS: remove in v3.21
+                "value": kpi.get("value", "")
+            })
 
     def _detail_rows(items, limit=5):
         rows = []
@@ -89,7 +130,7 @@ def build_policy_usage_dashboard_summary(result) -> dict:
         or getattr(result, "generated_at", datetime.datetime.now()).strftime("%Y-%m-%d %H:%M:%S"),
         "record_count": int(getattr(result, "record_count", 0) or 0),
         "date_range": list(getattr(result, "date_range", ("", "")) or ("", "")),
-        "kpis": mod00.get("kpis", [])[:8],
+        "kpis": kpis_with_aliases,
         "execution_stats": execution,
         "execution_notes": mod00.get("execution_notes", [])[:5],
         "boundary_breaches": list(mod00.get("boundary_breaches", [])[:5]),
