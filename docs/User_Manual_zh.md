@@ -10,6 +10,7 @@
 - **Python 3.8+**（已測試至 3.12）
 - 可透過 HTTPS 連線至 Illumio PCE（預設埠 `8443`）
 - **（選用）** `pip install flask` — 僅 Web GUI 模式需要
+- **（選用）PDF 匯出**：`pip install reportlab`（純 Python）。PDF 匯出使用 ReportLab，不需要 WeasyPrint、Pango、Cairo、GTK 或 GDK-PixBuf。PDF 輸出為英文靜態摘要版；完整在地化內容請使用 HTML 或 XLSX。
 
 ### 1.2 安裝步驟
 

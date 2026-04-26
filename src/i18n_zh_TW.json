@@ -517,6 +517,7 @@
   "gui_fmt_csv": "CSV（原始資料）",
   "gui_fmt_html": "HTML",
   "gui_fmt_pdf": "PDF",
+  "gui_pdf_static_english_note": "PDF 為英文靜態摘要版；完整在地化內容請使用 HTML 或 XLSX。",
   "gui_fmt_xlsx": "Excel",
   "gui_gen_audit_title": "產生稽核報表",
   "gui_gen_cancel": "取消",

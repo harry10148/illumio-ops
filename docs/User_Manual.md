@@ -30,6 +30,8 @@ all pre-built Python wheels — no `dnf`, no `python3`, no network required on t
 target host.
 
 > **Note:** PDF reports (`--format pdf`) are not available in the offline bundle.
+> PDF export uses ReportLab (pure Python) and does not require WeasyPrint, Pango, Cairo, GTK, or GDK-PixBuf,
+> but the ReportLab wheel is excluded from the air-gapped bundle to keep bundle size small.
 > All other formats (HTML, XLSX, CSV) work normally.
 
 ##### Build the bundle (on any internet-connected Linux or WSL machine)
@@ -100,7 +102,7 @@ sudo systemctl status illumio-ops
 ##### Verify offline build integrity
 
 ```bash
-# Confirm weasyprint is absent and all other packages imported successfully
+# Confirm reportlab is absent (offline bundle) and all other packages imported successfully
 /opt/illumio_ops/python/bin/python3 \
     /opt/illumio_ops/scripts/verify_deps.py --offline-bundle
 ```
@@ -111,6 +113,8 @@ sudo systemctl status illumio-ops
 and place `nssm.exe` in your system PATH or in the bundle's `deploy\` directory.
 
 > **Note:** PDF reports (`--format pdf`) are not available in the offline bundle.
+> PDF export uses ReportLab (pure Python) and does not require WeasyPrint, Pango, Cairo, GTK, or GDK-PixBuf,
+> but the ReportLab wheel is excluded from the air-gapped bundle to keep bundle size small.
 > All other formats (HTML, XLSX, CSV) work normally.
 
 ##### Build the bundle (on any internet-connected Linux or WSL machine)
@@ -948,6 +952,6 @@ Controls where reports are saved and how long they are kept.
 | Rule Scheduler shows `[SKIP]` log | Rule or parent Ruleset in Draft | Complete and Provision the policy edits in PCE Console; the schedule will resume automatically |
 | PCE profile switch has no effect | ApiClient not reinitialized | Use the GUI "Activate" button or CLI profile switch, which triggers reinitialization |
 | Policy Usage report shows 0 hits | Rules are draft-only | Only active (provisioned) rules are queried; provision draft rules first |
-| `PDF export is not available in this build` | Offline bundle excludes weasyprint | Use `--format html` or `--format xlsx` instead |
+| `PDF export is not available in this build` | Offline bundle excludes reportlab (pure Python; no WeasyPrint/Pango/Cairo/GTK required) | Use `--format html` or `--format xlsx` instead |
 | After upgrade: old config loaded | `config.json` preserved as-is | Compare with `config.json.example` and add any new fields |
 | Windows: `nssm.exe not found` | NSSM not in PATH or bundle deploy\ | Add `nssm.exe` to PATH or place it in the bundle `deploy\` folder |

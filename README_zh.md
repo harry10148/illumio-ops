@@ -42,6 +42,7 @@
 - **核心功能 (CLI/Daemon)**：無需安裝外部套件
 - **選用 — Web GUI**：`flask>=3.0`
 - **選用 — 報表**：`pandas`、`pyyaml`
+- **選用 — PDF 匯出**：`reportlab`（純 Python）。PDF 匯出使用 ReportLab，不需要 WeasyPrint、Pango、Cairo、GTK 或 GDK-PixBuf。PDF 輸出為英文靜態摘要版；完整在地化內容請使用 HTML 或 XLSX。
 
 ### 2. 安裝與啟動
 

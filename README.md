@@ -42,6 +42,7 @@ An advanced **agentless** monitoring and automation tool for **Illumio Core (PCE
 - **Core (no install needed):** CLI and daemon modes run with zero external dependencies.
 - **Optional — Web GUI:** `flask>=3.0`
 - **Optional — Reports:** `pandas`, `pyyaml`
+- **Optional — PDF export:** `reportlab` (pure Python). PDF export does not require WeasyPrint, Pango, Cairo, GTK, or GDK-PixBuf. PDF output is a static English summary; HTML and XLSX are the recommended formats for full localized content.
 
 ### 2. Installation & Launch
 
