@@ -90,6 +90,11 @@ STRINGS: _StringMap = _StringMap({
     "rpt_tr_outbound_coverage": _entry("Outbound Coverage", "Outbound 覆蓋率"),
     "rpt_tr_overall_coverage": _entry("Overall Coverage", "整體覆蓋率"),
     "rpt_tr_enforced_coverage": _entry("Enforced Coverage", "已強制執行覆蓋率"),
+    "rpt_pb_explainer": _entry(
+        "Traffic observed in visibility mode without a matching allow rule. Would be blocked once selective/full enforcement is enabled.",
+        "在視覺化模式下觀察到、但無對應 allow 規則的流量；切換到 selective/full enforcement 後將被預設拒絕。",
+    ),
+    "rpt_pb_label": _entry("PB Uncovered Exposure", "PB 未覆蓋暴露"),
     "rpt_tr_staged_coverage": _entry("Staged Coverage", "已就位待強制覆蓋率"),
     "rpt_tr_true_gap": _entry("True Gap", "真實缺口"),
     "rpt_tr_port_gaps": _entry("Port Gap Ranking", "Port 缺口排行"),

@@ -232,8 +232,8 @@ _RULE_DESCRIPTIONS = {
              'Checks for traffic on ransomware\'s primary attack ports (SMB 445, RPC 135, RDP 3389, WinRM 5985/5986) that is NOT blocked. These are the exact ports used in EternalBlue, NotPetya, and WannaCry-class attacks for network-wide lateral spread.'),
     'B002': ('Ransomware High-Risk Remote Access Allowed',
              'Detects allowed flows on secondary remote-access ports (TeamViewer 5938, VNC 5900, NetBIOS 137-139). Ransomware operators and APT groups use these for C2 persistence and remote control after initial compromise.'),
-    'B003': ('Ransomware Ports in Test Mode — Block Not Active',
-             'Detects medium-risk ports (SSH 22, NFS 2049, FTP 20/21, HTTP 80) showing as potentially_blocked. This means the segmentation rule exists but the workload is in visibility/test mode — the block is NOT enforced and traffic flows freely.'),
+    'B003': ('Ransomware Risk Port (Medium) — Uncovered',
+             t('rpt_rule_b003_desc')),
     # ── Policy & coverage gaps ─────────────────────────────────────────────────
     'B004': ('Unmanaged Source High Activity',
              'Counts flows from hosts not enrolled in the PCE. Unmanaged hosts have no VEN and therefore no micro-segmentation enforcement — they are outside the zero-trust boundary and represent uncontrolled attack surface.'),
@@ -268,8 +268,8 @@ _RULE_DESCRIPTIONS = {
     'L007': ('Unmanaged Host Accessing Critical Services',
              'Detects unmanaged (non-PCE) hosts communicating on database, identity (Kerberos/LDAP), or Windows management ports to managed workloads. Unmanaged hosts have no VEN enforcement — they are outside zero-trust. If they can reach critical services, they represent uncontrolled lateral movement entry points.'),
     # ── Lateral movement — enforcement gap ──────────────────────────────────────
-    'L008': ('Lateral Ports in Test Mode — Policy Not Enforced',
-             'Identifies \'potentially_blocked\' flows on lateral movement ports. This means the policy rule exists but the destination workload is in visibility/test mode — the block is not active. These are live, traversable attack paths right now. The most common cause of "we had policies but still got breached" incidents.'),
+    'L008': ('Lateral Ports in Test Mode (PB)',
+             t('rpt_rule_l008_desc')),
     # ── Lateral movement — exfiltration pattern ─────────────────────────────────
     'L009': ('Data Exfiltration Pattern — Outbound to Unmanaged',
              'Detects managed workloads transferring significant data volume to unmanaged (external/unknown) destinations. This is the post-lateral-movement exfiltration phase: attacker has pivoted to a high-value host and is now staging or exfiltrating data to an external C2 or drop server outside PCE visibility.'),
@@ -720,13 +720,14 @@ class HtmlExporter:
         stats = (
             '<div class="coverage-grid">'
             + _cov_stat('<span data-i18n="rpt_tr_enforced_coverage">Enforced Coverage</span>', str(enforced_cov) + '%')
-            + _cov_stat('<span data-i18n="rpt_tr_staged_coverage">Staged Coverage</span>', str(staged_cov) + '%')
+            + _cov_stat(f'<span data-i18n="rpt_pb_label">{t("rpt_pb_label")}</span>', str(staged_cov) + '%')
             + _cov_stat('<span data-i18n="rpt_tr_true_gap">True Gap</span>', str(true_gap) + '%')
             + (_cov_stat('<span data-i18n="rpt_tr_inbound_coverage">Inbound Coverage</span>', str(inb_cov) + '%') if inb_cov is not None else '')
             + (_cov_stat('<span data-i18n="rpt_tr_outbound_coverage">Outbound Coverage</span>', str(outb_cov) + '%') if outb_cov is not None else '')
             + _cov_stat('<span data-i18n="rpt_col_uncovered_flows">Uncovered Flows</span>', str(m.get('total_uncovered', 0)))
             + '</div>'
             + bar_html
+            + (f'<p class="note" data-i18n-html="rpt_pb_explainer">{t("rpt_pb_explainer")}</p>' if staged_cov > 0 else '')
         )
         out = (
             stats
