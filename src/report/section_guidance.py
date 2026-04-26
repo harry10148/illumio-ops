@@ -23,7 +23,28 @@ class SectionGuidance:
 
 # Registry — module_id → SectionGuidance.
 # Populated by Tasks 8-11; this skeleton starts empty.
-REGISTRY: dict[str, SectionGuidance] = {}
+REGISTRY: dict[str, SectionGuidance] = {
+    "mod02_policy_decisions": SectionGuidance(
+        module_id="mod02_policy_decisions",
+        purpose_key="rpt_guidance_mod02_purpose",
+        watch_signals_key="rpt_guidance_mod02_signals",
+        how_to_read_key="rpt_guidance_mod02_how",
+        recommended_actions_key="rpt_guidance_mod02_actions",
+        primary_audience="mixed",
+        profile_visibility=("security_risk", "network_inventory"),
+        min_detail_level="standard",
+    ),
+    "mod03_uncovered_flows": SectionGuidance(
+        module_id="mod03_uncovered_flows",
+        purpose_key="rpt_guidance_mod03_purpose",
+        watch_signals_key="rpt_guidance_mod03_signals",
+        how_to_read_key="rpt_guidance_mod03_how",
+        recommended_actions_key="rpt_guidance_mod03_actions",
+        primary_audience="security",
+        profile_visibility=("security_risk", "network_inventory"),
+        min_detail_level="standard",
+    ),
+}
 
 
 def get_guidance(module_id: str) -> Optional[SectionGuidance]:
