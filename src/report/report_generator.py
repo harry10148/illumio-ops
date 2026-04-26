@@ -31,6 +31,7 @@ from src.report.report_metadata import (
 )
 from src.report.tz_utils import parse_tz as _parse_tz, fmt_tz_now as _fmt_tz_now
 
+
 def _fmt_iso(dt) -> str:
     return dt.isoformat().replace("+00:00", "Z") if hasattr(dt, "isoformat") else str(dt)
 
