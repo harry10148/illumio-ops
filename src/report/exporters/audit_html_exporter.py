@@ -8,7 +8,7 @@ import os
 
 import pandas as pd
 
-from .html_exporter import _trend_deltas_section
+from .html_exporter import _trend_deltas_section, render_section_guidance
 from .report_css import TABLE_JS, build_css
 from src.humanize_ext import human_number
 from .report_i18n import COL_I18N as _COL_I18N
@@ -331,6 +331,8 @@ class AuditHtmlExporter:
         if "error" in m:
             return f'<p class="note">{m["error"]}</p>'
 
+        html_parts = [render_section_guidance("audit_mod01_health", profile="security_risk", detail_level="standard")]
+
         sec_count = m.get("security_concern_count", 0)
         conn_count = m.get("connectivity_event_count", 0)
         html = (
@@ -376,12 +378,14 @@ class AuditHtmlExporter:
         html += '<h3 data-i18n="rpt_au_severity_breakdown">Severity Breakdown</h3>' + _df_to_html(m.get("severity_breakdown"))
         html += '<h3 data-i18n="rpt_au_summary_type">Summary by Event Type</h3>' + _df_to_html(m.get("summary"))
         html += '<h3 data-i18n="rpt_au_recent">Recent Events (up to 50)</h3>' + _df_to_html(m.get("recent"), show_risk=True)
-        return html
+        return "".join(html_parts) + html
 
     def _mod02_html(self) -> str:
         m = self._r.get("mod02", {})
         if "error" in m:
             return f'<p class="note">{m["error"]}</p>'
+
+        html_parts = [render_section_guidance("audit_mod02_users", profile="security_risk", detail_level="standard")]
 
         failed = m.get("failed_logins", 0)
         unique_ips = m.get("unique_src_ips", 0)
@@ -432,7 +436,7 @@ class AuditHtmlExporter:
 
         html += '<h3 data-i18n="rpt_au_summary_type">Summary by Event Type</h3>' + _df_to_html(m.get("summary"))
         html += '<h3 data-i18n="rpt_au_recent">Recent Events (up to 50)</h3>' + _df_to_html(m.get("recent"), show_risk=True)
-        return html
+        return "".join(html_parts) + html
 
     @staticmethod
     def _lifecycle_concept_box() -> str:
@@ -497,6 +501,8 @@ class AuditHtmlExporter:
         m = self._r.get("mod03", {})
         if "error" in m:
             return f'<p class="note">{m["error"]}</p>'
+
+        html_parts = [render_section_guidance("audit_mod03_policy", profile="security_risk", detail_level="standard")]
 
         prov_count = m.get("provision_count", 0)
         rule_count = m.get("rule_change_count", 0)
@@ -574,12 +580,14 @@ class AuditHtmlExporter:
 
         html += '<h3 data-i18n="rpt_au_summary_type">Summary by Event Type</h3>' + _df_to_html(m.get("summary"))
         html += '<h3 data-i18n="rpt_au_recent">All Policy Events (up to 50)</h3>' + _df_to_html(m.get("recent"), show_risk=True)
-        return html
+        return "".join(html_parts) + html
 
     def _mod04_html(self) -> str:
         m = self._r.get("mod04", {})
         if "error" in m:
             return f'<p class="note">{m["error"]}</p>'
+
+        html_parts = [render_section_guidance("audit_mod04_correlation", profile="security_risk", detail_level="standard")]
 
         total_corr = m.get("total_correlations", 0)
         total_bf = m.get("total_brute_force", 0)
@@ -635,4 +643,4 @@ class AuditHtmlExporter:
         if total_corr == 0 and total_bf == 0 and total_oh == 0:
             html += '<p class="note" data-i18n="rpt_au_no_correlation">No suspicious temporal patterns detected.</p>'
 
-        return html
+        return "".join(html_parts) + html
