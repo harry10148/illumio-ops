@@ -1904,5 +1904,17 @@
   "cli_cache_retention": "Cache retention policy",
   "monitor_cache_enabled_hint": "Monitor tick: 30s (reading from PCE cache)",
   "alert_cache_lag_warning": "Cache ingestor lag warning: source={source} lag={lag}s",
-  "alert_cache_lag_error": "Cache ingestor stalled: source={source} lag={lag}s"
+  "alert_cache_lag_error": "Cache ingestor stalled: source={source} lag={lag}s",
+  "rpt_guidance_mod04_purpose": "Identify exposure to ransomware-relevant ports and protocols (SMB/RDP/SSH/etc).",
+  "rpt_guidance_mod04_signals": "Internet-facing or unmanaged sources reaching critical-port destinations.",
+  "rpt_guidance_mod04_how": "Each row is a workload pair using a high-risk port. Flag if not in your allowed admin-tooling baseline.",
+  "rpt_guidance_mod04_actions": "Quarantine or restrict; convert legitimate admin flows into named allow rules; investigate the rest.",
+  "rpt_guidance_mod07_purpose": "Map source-label → destination-label → service crossings to expose dependency structure.",
+  "rpt_guidance_mod07_signals": "Unexpected env crossings (prod ↔ dev), unknown labels, app pairs lacking justification.",
+  "rpt_guidance_mod07_how": "Read along rows = source group, columns = destination group. Cell intensity reflects flow volume.",
+  "rpt_guidance_mod07_actions": "Convert legitimate cells into label-based allow rules; investigate unexpected high-volume crossings.",
+  "rpt_guidance_mod08_purpose": "List unmanaged hosts (no VEN) participating in observed flows.",
+  "rpt_guidance_mod08_signals": "Unmanaged sources accessing crown-jewel apps; high-volume unmanaged egress; unmanaged peers in critical environments.",
+  "rpt_guidance_mod08_how": "Each row is an unmanaged IP and its observed peers, ports, and label hits.",
+  "rpt_guidance_mod08_actions": "Install VEN where feasible; document and accept exceptions; tighten boundary rules around unmanaged peers."
 }

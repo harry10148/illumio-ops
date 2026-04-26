@@ -1904,5 +1904,17 @@
   "cli_cache_retention": "Cache 保留政策",
   "monitor_cache_enabled_hint": "監控週期：30 秒（從 PCE 快取讀取）",
   "alert_cache_lag_warning": "快取擷取器延遲警告：來源={source} 延遲={lag}秒",
-  "alert_cache_lag_error": "快取擷取器停止響應：來源={source} 延遲={lag}秒"
+  "alert_cache_lag_error": "快取擷取器停止響應：來源={source} 延遲={lag}秒",
+  "rpt_guidance_mod04_purpose": "識別勒索軟體相關埠口與協議（SMB/RDP/SSH 等）的暴露風險。",
+  "rpt_guidance_mod04_signals": "來自網際網路或未納管來源、連向關鍵埠口目的地的流量。",
+  "rpt_guidance_mod04_how": "每一列代表使用高風險埠口的工作負載組合。若不在允許的管理工具基準中，應標記。",
+  "rpt_guidance_mod04_actions": "隔離或限制；將合法管理流量轉為具名 allow 規則；對其餘流量展開調查。",
+  "rpt_guidance_mod07_purpose": "將來源標籤 → 目的標籤 → 服務交叉點對應，揭示相依性結構。",
+  "rpt_guidance_mod07_signals": "非預期的環境交叉（prod ↔ dev）、未知標籤、缺乏理由的應用程式組合。",
+  "rpt_guidance_mod07_how": "橫向閱讀 = 來源群組，縱向 = 目的群組。格子深淺反映流量大小。",
+  "rpt_guidance_mod07_actions": "將合法格子轉換為標籤型 allow 規則；調查非預期的高流量交叉。",
+  "rpt_guidance_mod08_purpose": "列出參與觀察流量、但尚未安裝 VEN 的未納管主機。",
+  "rpt_guidance_mod08_signals": "未納管來源存取 crown-jewel 應用；高流量未納管外出流量；關鍵環境中的未納管對等主機。",
+  "rpt_guidance_mod08_how": "每一列代表一個未納管 IP 及其觀察到的對等主機、埠口和標籤。",
+  "rpt_guidance_mod08_actions": "可行時安裝 VEN；記錄並接受例外情況；針對未納管對等主機收緊邊界規則。"
 }

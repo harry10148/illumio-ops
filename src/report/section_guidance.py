@@ -44,6 +44,36 @@ REGISTRY: dict[str, SectionGuidance] = {
         profile_visibility=("security_risk", "network_inventory"),
         min_detail_level="standard",
     ),
+    "mod04_ransomware_exposure": SectionGuidance(
+        module_id="mod04_ransomware_exposure",
+        purpose_key="rpt_guidance_mod04_purpose",
+        watch_signals_key="rpt_guidance_mod04_signals",
+        how_to_read_key="rpt_guidance_mod04_how",
+        recommended_actions_key="rpt_guidance_mod04_actions",
+        primary_audience="security",
+        profile_visibility=("security_risk",),
+        min_detail_level="standard",
+    ),
+    "mod07_cross_label_matrix": SectionGuidance(
+        module_id="mod07_cross_label_matrix",
+        purpose_key="rpt_guidance_mod07_purpose",
+        watch_signals_key="rpt_guidance_mod07_signals",
+        how_to_read_key="rpt_guidance_mod07_how",
+        recommended_actions_key="rpt_guidance_mod07_actions",
+        primary_audience="network",
+        profile_visibility=("network_inventory",),
+        min_detail_level="standard",
+    ),
+    "mod08_unmanaged_hosts": SectionGuidance(
+        module_id="mod08_unmanaged_hosts",
+        purpose_key="rpt_guidance_mod08_purpose",
+        watch_signals_key="rpt_guidance_mod08_signals",
+        how_to_read_key="rpt_guidance_mod08_how",
+        recommended_actions_key="rpt_guidance_mod08_actions",
+        primary_audience="mixed",
+        profile_visibility=("security_risk", "network_inventory"),
+        min_detail_level="standard",
+    ),
 }
 
 
