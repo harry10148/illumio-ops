@@ -1,9 +1,10 @@
 from datetime import datetime, timedelta, timezone
 import json
+import hashlib
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from src.pce_cache.models import PceEvent
+from src.pce_cache.models import PceEvent, PceTrafficFlowRaw
 from src.pce_cache.reader import CacheReader
 
 
@@ -63,3 +64,38 @@ def test_read_events_returns_empty_for_miss_range(session_factory):
     rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
     rows = rd.read_events(now - timedelta(days=200), now - timedelta(days=150))
     assert rows == []
+
+
+def _seed_flow(sf, ingested_at):
+    ts = ingested_at
+    h = hashlib.sha1(ts.isoformat().encode()).hexdigest()
+    with sf.begin() as s:
+        s.add(PceTrafficFlowRaw(
+            flow_hash=h,
+            first_detected=ts,
+            last_detected=ts,
+            src_ip="1.2.3.4",
+            dst_ip="5.6.7.8",
+            port=443,
+            protocol="TCP",
+            action="allowed",
+            raw_json='{}',
+            ingested_at=ts,
+        ))
+
+
+def test_earliest_ingested_at_returns_min(session_factory):
+    now = datetime.now(timezone.utc)
+    older = now - timedelta(days=3)
+    newer = now - timedelta(days=1)
+    _seed_flow(session_factory, older)
+    _seed_flow(session_factory, newer)
+    rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
+    result = rd.earliest_ingested_at("traffic")
+    assert result is not None
+    assert abs((result - older).total_seconds()) < 1
+
+
+def test_earliest_ingested_at_returns_none_when_empty(session_factory):
+    rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
+    assert rd.earliest_ingested_at("traffic") is None

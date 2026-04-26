@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 import orjson
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import PceEvent, PceTrafficFlowAgg, PceTrafficFlowRaw
@@ -31,6 +31,17 @@ class CacheReader:
         if start < cutoff:
             return "partial"
         return "full"
+
+    def earliest_ingested_at(self, source: str) -> datetime | None:
+        table = PceEvent if source == "events" else PceTrafficFlowRaw
+        with self._sf() as s:
+            result = s.execute(select(func.min(table.ingested_at))).scalar()
+            if result is None:
+                return None
+            # SQLite aggregate functions return naive datetimes; restore UTC timezone
+            if result.tzinfo is None:
+                result = result.replace(tzinfo=timezone.utc)
+            return result
 
     def read_events(self, start: datetime, end: datetime) -> list[dict]:
         with self._sf() as s:
