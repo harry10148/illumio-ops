@@ -1,7 +1,43 @@
 """Module 1: Traffic Overview — KPI summary statistics."""
 from __future__ import annotations
+from typing import Optional
 import pandas as pd
 from src.i18n import t, get_language
+
+
+# ── Date-range helpers ────────────────────────────────────────────────────────
+
+def _safe_parse_min(series) -> Optional[str]:
+    """Return ISO string of earliest valid timestamp, or None."""
+    if series is None or len(series) == 0:
+        return None
+    valid = pd.to_datetime(series, errors="coerce").dropna()
+    return valid.min().isoformat() if not valid.empty else None
+
+
+def _safe_parse_max(series) -> Optional[str]:
+    """Return ISO string of latest valid timestamp, or None."""
+    if series is None or len(series) == 0:
+        return None
+    valid = pd.to_datetime(series, errors="coerce").dropna()
+    return valid.max().isoformat() if not valid.empty else None
+
+
+def analyze(flows_df: pd.DataFrame, query_context: Optional[dict] = None) -> dict:
+    """
+    Compute date_range from flows_df, falling back to query_context when
+    first/last_detected are missing or unparseable.
+
+    Returns a dict with at least::
+
+        {"date_range": {"start": <str>, "end": <str>}}
+    """
+    qc = query_context or {}
+    first_col = flows_df["first_detected"] if "first_detected" in flows_df.columns else None
+    last_col = flows_df["last_detected"] if "last_detected" in flows_df.columns else None
+    start = _safe_parse_min(first_col) or qc.get("start_date") or "N/A"
+    end = _safe_parse_max(last_col) or qc.get("end_date") or "N/A"
+    return {"date_range": {"start": start, "end": end}}
 
 def traffic_overview(df: pd.DataFrame) -> dict:
     """
