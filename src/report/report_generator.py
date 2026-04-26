@@ -200,13 +200,16 @@ class ReportGenerator:
     def generate_from_api(self, start_date: Optional[str] = None,
                           end_date: Optional[str] = None,
                           max_results: int = 200_000,
-                          filters: Optional[dict] = None) -> ReportResult:
+                          filters: Optional[dict] = None,
+                          traffic_report_profile: str = "security_risk") -> ReportResult:
         """Fetch traffic from PCE API and run the full analysis pipeline.
 
         filters: optional dict with traffic filter keys (src_labels, dst_labels,
                  src_ip, dst_ip, port, proto, ex_src_labels, ex_dst_labels,
                  ex_src_ip, ex_dst_ip, ex_port, policy_decisions).
         """
+        if traffic_report_profile not in ("security_risk", "network_inventory"):
+            raise ValueError(f"invalid traffic_report_profile: {traffic_report_profile!r}")
         if self.api is None:
             raise RuntimeError("api_client is required for generate_from_api()")
 
@@ -254,28 +257,34 @@ class ReportGenerator:
                 "policy_decisions": policy_decisions,
                 "query_diagnostics": self.api.get_last_traffic_query_diagnostics() if self.api else {},
             },
+            traffic_report_profile=traffic_report_profile,
         )
 
-    def generate_from_csv(self, csv_path: str) -> ReportResult:
+    def generate_from_csv(self, csv_path: str,
+                          traffic_report_profile: str = "security_risk") -> ReportResult:
         """Parse a CSV file from the PCE UI export and run the analysis pipeline."""
+        if traffic_report_profile not in ("security_risk", "network_inventory"):
+            raise ValueError(f"invalid traffic_report_profile: {traffic_report_profile!r}")
         logger.info(f"[ReportGenerator] Starting CSV-source report from: {csv_path}")
         print(t("rpt_parsing_csv", path=csv_path))
         df = self._parse_csv(csv_path)
-        return self._run_pipeline(df, source='csv')
+        return self._run_pipeline(df, source='csv', traffic_report_profile=traffic_report_profile)
 
     def export(self, result: ReportResult, fmt: str = 'html',
                output_dir: str = 'reports',
                send_email: bool = False,
-               reporter=None) -> list[str]:
+               reporter=None,
+               traffic_report_profile: str = "security_risk") -> list[str]:
         """
         Export a ReportResult to one or more files.
 
         Args:
-            result:     output of generate_from_*()
-            fmt:        'html' | 'csv' | 'all'
-            output_dir: directory to write files into
-            send_email: if True, send via reporter.send_report_email()
-            reporter:   Reporter instance (required if send_email=True)
+            result:                output of generate_from_*()
+            fmt:                   'html' | 'csv' | 'all'
+            output_dir:            directory to write files into
+            send_email:            if True, send via reporter.send_report_email()
+            reporter:              Reporter instance (required if send_email=True)
+            traffic_report_profile: 'security_risk' | 'network_inventory'
 
         Returns:
             list of file paths written
@@ -286,7 +295,11 @@ class ReportGenerator:
         paths = []
 
         if fmt in ('html', 'all', 'all_raw'):
-            path = HtmlExporter(result.module_results, data_source=result.data_source).export(output_dir)
+            path = HtmlExporter(
+                result.module_results,
+                data_source=result.data_source,
+                profile=traffic_report_profile,
+            ).export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, self._build_report_metadata(result, file_format="html"))
             print(t("rpt_html_saved", path=path))
@@ -421,7 +434,8 @@ class ReportGenerator:
 
     # ── private — pipeline ───────────────────────────────────────────────────
 
-    def _run_pipeline(self, df, source: str, query_context: Optional[dict] = None) -> ReportResult:
+    def _run_pipeline(self, df, source: str, query_context: Optional[dict] = None,
+                      traffic_report_profile: str = "security_risk") -> ReportResult:
         """Validate → Rules → 12 modules → wrap result."""
         import pandas as pd
         from src.report.parsers.validators import validate, coerce
@@ -445,7 +459,7 @@ class ReportGenerator:
         print(t("rpt_rules_findings", count=len(findings)))
 
         # 15 modules
-        results = self._run_modules(df, findings)
+        results = self._run_modules(df, findings, traffic_report_profile=traffic_report_profile)
 
         # Override generated_at with configured timezone
         tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
@@ -497,7 +511,8 @@ class ReportGenerator:
             "attack_summary_counts": counts,
         }
 
-    def _run_modules(self, df, findings: list) -> dict:
+    def _run_modules(self, df, findings: list,
+                     traffic_report_profile: str = "security_risk") -> dict:
         """Execute all registered analysis modules via the module registry."""
         from src.report.analysis import get_traffic_modules, get_summary_module
 
@@ -517,7 +532,7 @@ class ReportGenerator:
         # Summary module runs last (depends on all other results)
         try:
             summary_id, summary_fn = get_summary_module()
-            results[summary_id] = summary_fn(results)
+            results[summary_id] = summary_fn(results, profile=traffic_report_profile)
         except Exception as e:
             logger.error(f"[ReportGenerator] summary module failed: {e}")
             results['mod12'] = {'error': str(e)}

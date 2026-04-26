@@ -110,7 +110,7 @@ def _compute_maturity_score(results: dict[str, Any]) -> dict[str, Any]:
         },
     }
 
-def executive_summary(results: dict[str, Any]) -> dict:
+def executive_summary(results: dict[str, Any], profile: str = "security_risk") -> dict:
     mod01 = results.get("mod01", {})
     mod03 = results.get("mod03", {})
     mod04 = results.get("mod04", {})
