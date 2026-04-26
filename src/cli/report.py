@@ -36,6 +36,9 @@ def _iso_date(value: str | None, *, end_of_day: bool) -> str | None:
     return parsed.strftime(f"%Y-%m-%dT{suffix}")
 
 
+_TRAFFIC_PROFILES = ["security_risk", "network_inventory"]
+
+
 def generate_traffic_report(
     *,
     source: str = "api",
@@ -43,6 +46,7 @@ def generate_traffic_report(
     fmt: str = "html",
     output_dir: str | None = None,
     email: bool = False,
+    traffic_report_profile: str = "security_risk",
 ) -> list[str]:
     from src.api_client import ApiClient
     from src.config import ConfigManager
@@ -59,9 +63,9 @@ def generate_traffic_report(
     if source == "csv":
         if not file_path:
             raise click.ClickException("--file is required when --source csv is used")
-        result = gen.generate_from_csv(file_path)
+        result = gen.generate_from_csv(file_path, traffic_report_profile=traffic_report_profile)
     else:
-        result = gen.generate_from_api()
+        result = gen.generate_from_api(traffic_report_profile=traffic_report_profile)
 
     if result.record_count == 0:
         raise click.ClickException("No data for report")
@@ -166,7 +170,14 @@ def report_group() -> None:
 @click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
 @click.option("--email", is_flag=True)
-def report_traffic(source: str, file_path, fmt: str, output_dir, email: bool) -> None:
+@click.option(
+    "--profile",
+    "traffic_report_profile",
+    type=click.Choice(_TRAFFIC_PROFILES),
+    default="security_risk",
+    help="Traffic report profile (security_risk or network_inventory)",
+)
+def report_traffic(source: str, file_path, fmt: str, output_dir, email: bool, traffic_report_profile: str) -> None:
     """Generate Traffic Flow Report."""
     for path in generate_traffic_report(
         source=source,
@@ -174,6 +185,7 @@ def report_traffic(source: str, file_path, fmt: str, output_dir, email: bool) ->
         fmt=fmt,
         output_dir=output_dir,
         email=email,
+        traffic_report_profile=traffic_report_profile,
     ):
         click.echo(path)
 

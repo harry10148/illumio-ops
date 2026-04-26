@@ -60,6 +60,7 @@ def test_entrypoint_click_detection_matrix(argv, expected):
                 "fmt": "pdf",
                 "output_dir": "out",
                 "email": True,
+                "traffic_report_profile": "security_risk",
             },
         ),
         (
@@ -183,6 +184,7 @@ def test_legacy_gui_dispatches_launch_gui_with_port(monkeypatch):
                 "fmt": "all",
                 "output_dir": "out",
                 "email": True,
+                "traffic_report_profile": "security_risk",
             },
         ),
         (

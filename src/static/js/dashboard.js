@@ -715,6 +715,7 @@ function openReportGenModal(type) {
   if (type === 'traffic') {
     $('m-gen-source-row').style.display = '';
     $('m-gen-filters').style.display = '';
+    $('m-gen-profile-row').style.display = '';
     toggleTrafficSource();
     // Reset filter fields
     ['rpt-pd-blocked','rpt-pd-potential','rpt-pd-allowed'].forEach(id => {
@@ -729,6 +730,7 @@ function openReportGenModal(type) {
     $('m-gen-csv-upload').style.display = 'none';
     $('m-gen-dates').style.display = m.dates ? '' : 'none';
     $('m-gen-filters').style.display = 'none';
+    $('m-gen-profile-row').style.display = 'none';
   }
   
   $('m-gen-note').style.display  = m.dates ? 'none' : '';
@@ -935,6 +937,8 @@ async function _doGenerateTraffic() {
       formData.append('source', 'csv');
       const fmtEl = document.getElementById('m-gen-format');
       formData.append('format', fmtEl ? fmtEl.value : 'all');
+      const profileElCsv = document.getElementById('m-gen-profile');
+      formData.append('traffic_report_profile', profileElCsv ? profileElCsv.value : 'security_risk');
       formData.append('file', fileInput.files[0]);
 
       _updateGenStep(_t('gui_gen_step_analysing'));
@@ -971,9 +975,11 @@ async function _doGenerateTraffic() {
 
       const reportFilters = _collectReportFilters();
       const fmtEl2 = document.getElementById('m-gen-format');
+      const profileEl = document.getElementById('m-gen-profile');
       const r = await post('/api/reports/generate', {
         source: 'api', format: fmtEl2 ? fmtEl2.value : 'all',
         start_date: startDate, end_date: endDate,
+        traffic_report_profile: profileEl ? profileEl.value : 'security_risk',
         ...(reportFilters ? { filters: reportFilters } : {}),
       });
       clearTimeout(_stepTimer);

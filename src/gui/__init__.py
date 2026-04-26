@@ -1920,6 +1920,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             gen = ReportGenerator(cm, api_client=api, config_dir=config_dir)
 
             source = d.get('source', 'api')
+            _VALID_PROFILES = ("security_risk", "network_inventory")
+            traffic_report_profile = d.get('traffic_report_profile', 'security_risk')
+            if traffic_report_profile not in _VALID_PROFILES:
+                traffic_report_profile = 'security_risk'
             if source == 'csv':
                 if 'file' not in request.files:
                     return jsonify({"ok": False, "error": t("gui_err_no_csv")})
@@ -1932,7 +1936,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 temp_path = os.path.join(tempfile.gettempdir(), f"{_uuid.uuid4().hex}_{safe_filename}")
                 csv_file.save(temp_path)
                 try:
-                    result = gen.generate_from_csv(temp_path)
+                    result = gen.generate_from_csv(temp_path, traffic_report_profile=traffic_report_profile)
                 finally:
                     try:
                         os.remove(temp_path)
@@ -1964,7 +1968,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     if not any(v for v in report_filters.values() if v):
                         report_filters = None
 
-                result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=report_filters)
+                result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=report_filters, traffic_report_profile=traffic_report_profile)
 
             if result.record_count == 0:
                 return jsonify({"ok": False, "error": t("gui_no_traffic_data")})

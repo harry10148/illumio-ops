@@ -597,6 +597,12 @@ def main():
     )
 
     parser.add_argument(
+        "--profile",
+        choices=["security_risk", "network_inventory"],
+        default="security_risk",
+        help="Traffic report profile (default: security_risk)",
+    )
+    parser.add_argument(
         "--email",
         action="store_true",
         help="Send report by email after generation (uses SMTP config)",
@@ -656,6 +662,7 @@ def main():
                     fmt=args.format,
                     output_dir=args.output_dir,
                     email=args.email,
+                    traffic_report_profile=args.profile,
                 )
             elif args.report_type == "audit":
                 if args.email:
