@@ -430,12 +430,14 @@ class ReportScheduler:
 
         body += "</div></div></div></body></html>"
 
-        self.reporter.send_scheduled_report_email(
+        sent = self.reporter.send_scheduled_report_email(
             subject=subject,
             html_body=body,
             attachment_paths=paths,
             custom_recipients=custom_recipients,
         )
+        if sent is False:
+            raise RuntimeError(t("rpt_email_failed", error=""))
 
     # ─── Report retention ────────────────────────────────────────────────────
 
@@ -521,7 +523,7 @@ class ReportScheduler:
         global_tz = self.cm.config.get('settings', {}).get('timezone', 'local')
 
         for sched in schedules:
-            sched_tz = sched.get('timezone', global_tz)
+            sched_tz = sched.get('timezone') or global_tz
             now = _now_in_schedule_tz(sched_tz)
             if not self.should_run(sched, now):
                 continue
