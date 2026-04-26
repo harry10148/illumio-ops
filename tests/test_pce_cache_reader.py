@@ -67,20 +67,19 @@ def test_read_events_returns_empty_for_miss_range(session_factory):
 
 
 def _seed_flow(sf, ingested_at):
-    ts = ingested_at
-    h = hashlib.sha1(ts.isoformat().encode()).hexdigest()
+    h = hashlib.sha1(ingested_at.isoformat().encode()).hexdigest()
     with sf.begin() as s:
         s.add(PceTrafficFlowRaw(
             flow_hash=h,
-            first_detected=ts,
-            last_detected=ts,
+            first_detected=ingested_at,
+            last_detected=ingested_at,
             src_ip="1.2.3.4",
             dst_ip="5.6.7.8",
             port=443,
             protocol="TCP",
             action="allowed",
             raw_json='{}',
-            ingested_at=ts,
+            ingested_at=ingested_at,
         ))
 
 
