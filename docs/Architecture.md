@@ -8,10 +8,10 @@
 
 ```mermaid
 graph TB
-    subgraph Entry["Entry Points"]
-        CLI["CLI Menu<br/>(main.py)"]
-        DAEMON["Daemon Loop<br/>(main.py)"]
-        GUI["Web GUI<br/>(gui.py)"]
+    subgraph Entry["Entry Points (3 runtime modes)"]
+        CLI["CLI one-shot<br/>illumio-ops &lt;subcommand&gt;"]
+        DAEMON["Daemon / --monitor<br/>(main.py daemon loop)"]
+        GUI["Web GUI standalone<br/>illumio-ops gui (port 5001)"]
         PERSIST["Persistent Monitor+GUI<br/>(--monitor-gui)"]
     end
 
@@ -22,35 +22,64 @@ graph TB
         REP["Reporter<br/>(reporter.py)"]
     end
 
-    subgraph Scheduler["Scheduler Layer"]
+    subgraph ApiDomain["API Domain Layer (src/api/)"]
+        LBL["LabelResolver<br/>(labels.py)"]
+        JOBS["AsyncJobManager<br/>(async_jobs.py)"]
+        TQ["TrafficQueryBuilder<br/>(traffic_query.py)"]
+    end
+
+    subgraph CacheSub["PCE Cache (src/pce_cache/)"]
+        CACHE["SQLite WAL DB<br/>(pce_cache.db)"]
+        INGEST["Ingestors<br/>(ingestor_events/traffic)"]
+        SUB["CacheSubscriber<br/>(subscriber.py)"]
+    end
+
+    subgraph SchedulerLayer["Scheduler (src/scheduler/)"]
+        APSCHD["APScheduler<br/>(jobs.py)"]
         RSCHED["ReportScheduler<br/>(report_scheduler.py)"]
         RULSCHED["RuleScheduler<br/>(rule_scheduler.py)"]
     end
 
-    subgraph Report["Report Engine"]
+    subgraph Report["Report Engine (src/report/)"]
         RGEN["TrafficReport<br/>(report_generator.py)"]
         AGEN["AuditReport<br/>(audit_generator.py)"]
         VGEN["VENReport<br/>(ven_status_generator.py)"]
         PUGEN["PolicyUsageReport<br/>(policy_usage_generator.py)"]
     end
 
-    subgraph External["External"]
+    subgraph SiemLayer["SIEM Forwarder (src/siem/)"]
+        DISP["DestinationDispatcher<br/>(dispatcher.py)"]
+        FMT["Formatters: CEF / JSON / Syslog"]
+        TRANS["Transports: UDP / TCP / TLS / Splunk HEC"]
+    end
+
+    subgraph External["External Systems"]
         PCE["Illumio PCE<br/>REST API v2"]
         SMTP_SVC["SMTP Server"]
         LINE_SVC["LINE API"]
         HOOK_SVC["Webhook Endpoint"]
+        SIEM_SVC["SIEM Platform"]
     end
 
     CLI --> CFG
     DAEMON --> CFG
     GUI --> CFG
+    PERSIST --> CFG
     CFG --> API
-    API --> PCE
-    CFG --> ANA
+    API --> LBL
+    API --> JOBS
+    API --> TQ
+    TQ --> PCE
+    DAEMON --> APSCHD
+    APSCHD --> RSCHED
+    APSCHD --> RULSCHED
+    APSCHD --> INGEST
+    INGEST --> PCE
+    INGEST --> CACHE
+    CACHE --> SUB
+    SUB --> ANA
     ANA --> API
     ANA --> REP
-    DAEMON --> RSCHED
-    DAEMON --> RULSCHED
     RSCHED --> RGEN
     RSCHED --> AGEN
     RSCHED --> VGEN
@@ -59,11 +88,19 @@ graph TB
     REP --> SMTP_SVC
     REP --> LINE_SVC
     REP --> HOOK_SVC
+    CACHE --> DISP
+    DISP --> FMT
+    FMT --> TRANS
+    TRANS --> SIEM_SVC
 ```
 
-**Data Flow**: Entry Point → `ConfigManager` (loads rules/credentials) → `ApiClient` (queries PCE) → `Analyzer` (evaluates rules against returned data) → `Reporter` (dispatches alerts). When cache is enabled, `CacheSubscriber` (`src/pce_cache/subscriber.py`) feeds pre-fetched data from the PCE cache layer into `Analyzer` instead of making live API calls.
+**Runtime modes**: Three launch modes are supported: (1) **CLI one-shot** (`illumio-ops <subcommand>`) for interactive and scripted operations; (2) **Daemon** (`--monitor` or `--monitor-gui`) which starts the APScheduler loop in `src/scheduler/jobs.py` for continuous monitoring, scheduled reports, and rule automation; (3) **Web GUI standalone** (`illumio-ops gui`) which starts only the Flask application on port 5001.
 
-**Scheduler Flow**: `ReportScheduler.tick()` evaluates cron-like schedules → dispatches to report generators → emails results. `RuleScheduler.check()` evaluates recurring/one-time schedules → toggles PCE rules → provisions changes.
+**Data Flow**: Entry Point → `ConfigManager` (loads rules/credentials) → `ApiClient` (queries PCE via domain layer `src/api/`) → `Analyzer` (evaluates rules against returned data) → `Reporter` (dispatches alerts). When cache is enabled, `CacheSubscriber` (`src/pce_cache/subscriber.py`) feeds pre-fetched data from the SQLite WAL cache into `Analyzer` instead of making live API calls, reducing the monitor tick latency to 30 seconds.
+
+**Scheduler Flow**: `APScheduler` (`src/scheduler/jobs.py`) drives all timed jobs. `ReportScheduler.tick()` evaluates cron schedules → dispatches to report generators → emails results. `RuleScheduler.check()` evaluates recurring/one-time schedules → toggles PCE rules → provisions changes.
+
+**SIEM Forwarder**: `src/siem/dispatcher.py` reads from the PCE cache (`siem_dispatch` table) and forwards events/flows through pluggable formatters (CEF, JSON-line, RFC-5424 Syslog) and transports (UDP, TCP, TLS, Splunk HEC) to external SIEM platforms.
 
 ---
 
@@ -83,16 +120,59 @@ illumio_ops/
 │   ├── __init__.py            # Package init, exports __version__
 │   ├── main.py                # CLI argument parser, daemon/GUI orchestration, interactive menu
 │   ├── api_client.py          # ApiClient facade (~765 LOC): HTTP core + delegation wrappers for all public methods
-│   ├── api/                   # Phase 9 domain classes (composed by ApiClient facade)
-│   │   ├── __init__.py
+│   ├── api/                   # API domain classes (composed by ApiClient facade)
 │   │   ├── labels.py          # LabelResolver: label/IP-list/service TTL cache management
 │   │   ├── async_jobs.py      # AsyncJobManager: async query job lifecycle + state persistence
 │   │   └── traffic_query.py   # TrafficQueryBuilder: traffic payload construction + streaming
-│   ├── pce_cache/             # PCE cache layer (SQLite WAL) — populated by ingestors, read by Analyzer
+│   ├── cli/                   # Click subcommand groups registered to illumio-ops entry point
+│   │   ├── cache.py           # cache backfill / status / retention subcommands
+│   │   ├── config.py          # config show / set subcommands
+│   │   ├── monitor.py         # monitor daemon subcommand
+│   │   ├── report.py          # report generate subcommand
+│   │   ├── root.py            # root click group + version flag
+│   │   └── ...                # siem.py, workload.py, gui_cmd.py, rule.py, status.py
+│   ├── events/                # Event pipeline — polling, matching, normalization
+│   │   ├── poller.py          # EventPoller: watermark-based polling with dedup semantics
+│   │   ├── catalog.py         # KNOWN_EVENT_TYPES baseline (vendor + local extensions)
+│   │   ├── matcher.py         # matches_event_rule(): regex/pipe/negation matching
+│   │   ├── normalizer.py      # Normalized event field extraction
+│   │   ├── shadow.py          # Legacy vs current matcher diagnostic comparator
+│   │   ├── stats.py           # Dispatch history + event timeline tracking
+│   │   └── throttle.py        # Per-rule alert throttle state
+│   ├── pce_cache/             # PCE cache layer (SQLite WAL) — see §7 for full coverage
 │   │   ├── subscriber.py      # CacheSubscriber: per-consumer cursor, feeds Analyzer when cache enabled
-│   │   ├── ingestor_traffic.py  # Writes traffic flows into cache
-│   │   ├── ingestor_events.py   # Writes PCE events into cache
-│   │   └── reader.py          # Read-side helpers for querying cached data
+│   │   ├── ingestor_events.py # Writes PCE audit events into cache
+│   │   ├── ingestor_traffic.py# Writes traffic flows into cache
+│   │   ├── reader.py          # Read-side helpers for querying cached data
+│   │   ├── backfill.py        # BackfillRunner: historical range ingest
+│   │   ├── aggregator.py      # Daily traffic rollup (pce_traffic_flows_agg)
+│   │   ├── lag_monitor.py     # APScheduler job: warns when ingestor stalls
+│   │   ├── models.py          # SQLAlchemy ORM models for all cache tables
+│   │   ├── rate_limiter.py    # Token-bucket rate limiter (shared across ingestors)
+│   │   ├── retention.py       # Daily purge worker
+│   │   ├── schema.py          # init_schema() — creates tables / migrations
+│   │   ├── traffic_filter.py  # Post-ingest traffic sampling
+│   │   ├── watermark.py       # ingestion_watermarks CRUD
+│   │   └── web.py             # Flask Blueprint for /api/cache/* endpoints
+│   ├── scheduler/             # APScheduler integration
+│   │   └── jobs.py            # Job callables: run_monitor_cycle, report jobs, ingest jobs
+│   ├── siem/                  # SIEM forwarder — pluggable formatters and transports
+│   │   ├── dispatcher.py      # DestinationDispatcher: reads siem_dispatch queue, dispatches with retry + DLQ
+│   │   ├── dlq.py             # Dead-letter queue helpers
+│   │   ├── preview.py         # Preview formatter output for testing
+│   │   ├── tester.py          # send_test_event(): synthetic event round-trip test
+│   │   ├── web.py             # Flask Blueprint for /api/siem/* endpoints
+│   │   ├── formatters/        # Pluggable log formatters
+│   │   │   ├── base.py        # Formatter ABC
+│   │   │   ├── cef.py         # ArcSight CEF format
+│   │   │   ├── json_line.py   # JSON-line format
+│   │   │   └── syslog_header.py # RFC-5424 header helper
+│   │   └── transports/        # Pluggable output transports
+│   │       ├── base.py        # Transport ABC
+│   │       ├── syslog_udp.py  # UDP syslog
+│   │       ├── syslog_tcp.py  # TCP syslog
+│   │       ├── syslog_tls.py  # TLS syslog
+│   │       └── splunk_hec.py  # Splunk HTTP Event Collector
 │   ├── analyzer.py            # Rule engine: flow matching, metric calculation, state management
 │   ├── reporter.py            # Alert aggregation and multi-channel dispatch
 │   ├── config.py              # Configuration loading, saving, rule CRUD, atomic writes, PBKDF2 password hashing
@@ -115,10 +195,13 @@ illumio_ops/
 │       ├── ven_status_generator.py    # VEN status inventory report
 │       ├── policy_usage_generator.py  # Policy rule usage analysis report
 │       ├── rules_engine.py            # 19 automated Security Findings rules (B/L series)
+│       ├── snapshot_store.py          # KPI snapshot store for Change Impact (reports/snapshots/)
+│       ├── trend_store.py             # Trend KPI archive (per report type)
 │       ├── analysis/                  # Per-module analysis logic
 │       │   ├── mod01–mod15            # Traffic analysis modules
+│       │   ├── mod_change_impact.py   # Compare current KPIs to previous snapshot
 │       │   ├── audit/                 # Audit analysis modules (audit_mod00–03)
-│       │   └── policy_usage/          # Policy usage modules (pu_mod00–03)
+│       │   └── policy_usage/          # Policy usage modules (pu_mod00–05)
 │       ├── exporters/                 # HTML, CSV, and policy usage export formatters
 │       └── parsers/                   # API response and CSV data parsers
 │
@@ -370,6 +453,65 @@ The analyzer supports flexible filter conditions for traffic rules:
 - **CSV Import**: Accepts Workloader CSV export with pre-computed flow counts
 
 **Export Formats**: HTML (primary) and CSV ZIP (stdlib `zipfile`, zero external dependencies).
+
+### 3.10 `src/api/` — PCE API Domain Layer
+
+**Path**: `src/api/`
+**Entry points**: `labels.py`, `async_jobs.py`, `traffic_query.py` (all composed by `ApiClient` facade in `api_client.py`)
+
+These three domain classes were extracted from `ApiClient` in Phase 9 to keep the facade under a manageable size. The `ApiClient` continues to own the shared state (TTLCaches, `_cache_lock`, job tracking dict) so that existing callers and tests remain unaffected.
+
+- `LabelResolver` — label/IP-list/service lookup with TTL caching and filter normalization
+- `AsyncJobManager` — submit/poll/download lifecycle for PCE async traffic queries; persists job state to `state.json` so jobs survive daemon restarts
+- `TrafficQueryBuilder` — builds Illumio workloader-style async query payloads; handles up to 200,000 results with gzip streaming; powers `batch_get_rule_traffic_counts()` via `ThreadPoolExecutor` (max 10 concurrent)
+
+### 3.11 `src/events/` — Event Pipeline
+
+**Path**: `src/events/`
+**Dominant entry point**: `poller.py` (`EventPoller`)
+
+Provides safe, watermark-based PCE audit event polling with dedup semantics. Events are polled on an interval, normalized, matched against user-defined rules, and dispatched to alerts or the SIEM forwarder.
+
+- `poller.py` — watermark cursor, `event_identity()` dedup hashing, timestamp parsing
+- `catalog.py` — `KNOWN_EVENT_TYPES` baseline (vendor list + locally observed extensions)
+- `matcher.py` — `matches_event_rule()` supporting exact, pipe-OR, regex, negation (`!`), and wildcard patterns
+- `normalizer.py` — extracts canonical fields (resource type, actor, severity) from raw PCE event JSON
+- `shadow.py` — diagnostic comparator between legacy and current matcher (used by `/api/events/shadow_compare`)
+- `stats.py` — dispatch history and event timeline tracking written to `state.json`
+- `throttle.py` — per-rule alert throttle state management
+
+### 3.12 `src/siem/` — SIEM Forwarder
+
+**Path**: `src/siem/`
+**Dominant entry point**: `dispatcher.py` (`DestinationDispatcher`)
+
+Reads events and flows from the PCE cache (`siem_dispatch` table) and forwards them to external SIEM platforms. A Flask Blueprint in `web.py` exposes `/api/siem/*` configuration and test endpoints.
+
+Formatters (pluggable via config): CEF (ArcSight), JSON-line, RFC-5424 Syslog.
+Transports (pluggable): UDP, TCP, TLS (all syslog), Splunk HTTP Event Collector.
+
+The dispatcher implements retry with exponential backoff (capped at 1 hour) and routes failed records to the dead-letter queue (`dead_letter` table, auto-purged after 30 days). Use `tester.py` to send a synthetic test event to a destination without polluting real data.
+
+### 3.13 `src/scheduler/` — APScheduler Integration
+
+**Path**: `src/scheduler/`
+**Dominant entry point**: `jobs.py`
+
+Thin wrapper around APScheduler's `BackgroundScheduler`. Contains all job callables dispatched by the scheduler so that individual job functions can be tested in isolation without starting the full daemon.
+
+- `run_monitor_cycle()` — one analysis + alert dispatch tick (wraps `Analyzer.run_analysis()` + `Reporter.send_alerts()`)
+- Report jobs, ingestor jobs, cache lag monitor, and rule scheduler check are registered here
+
+The scheduler is initialized in `src/main.py` during daemon startup. Optional SQLAlchemy job store (`scheduler.persist = true` in config) enables job durability across daemon restarts.
+
+### 3.14 `src/pce_cache/` — PCE Cache Layer
+
+**Path**: `src/pce_cache/`
+**Dominant entry points**: `ingestor_events.py`, `ingestor_traffic.py`, `subscriber.py`
+
+Local SQLite (WAL mode) database acting as a shared buffer between the PCE API, the SIEM forwarder, and the monitoring/analysis subsystems. Full coverage in **§7 PCE Cache** — see that section for table schema, retention tuning, cache-miss semantics, backfill, and operator CLI commands.
+
+Key files: `models.py` (SQLAlchemy ORM), `schema.py` (`init_schema()`), `rate_limiter.py` (token-bucket shared across ingestors), `watermark.py` (ingestion cursor CRUD), `retention.py` (daily purge), `aggregator.py` (daily traffic rollup), `lag_monitor.py` (APScheduler stall detection).
 
 ---
 
