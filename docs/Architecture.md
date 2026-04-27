@@ -483,7 +483,7 @@ config.json
 
 ---
 
-# 5. PCE Cache
+# 7. PCE Cache
 
 # PCE Cache
 
@@ -642,7 +642,7 @@ deployments.
 
 ---
 
-# 6. PCE REST API Integration Cookbook
+# 8. PCE REST API Integration Cookbook
 
 # Illumio PCE Ops — API Cookbook & SIEM/SOAR Integration Guide
 ![Version](https://img.shields.io/badge/Version-v3.2.0-blue?style=flat-square)
