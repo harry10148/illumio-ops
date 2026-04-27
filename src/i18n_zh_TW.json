@@ -1804,7 +1804,7 @@
   "rule_r02_desc": "存在 Override Deny 規則；任何 allow 規則都無法覆蓋。",
   "rule_r03_name": "Visibility 模式 Boundary 突破",
   "rule_r03_desc": "VEN 處於 visibility/test 模式且此流量有 deny boundary draft。",
-  "rule_r04_name": "Allowed Across Boundary",
+  "rule_r04_name": "跨 Boundary 被允許",
   "rule_r04_desc": "Allow 規則覆蓋了 regular deny，請確認是否為預期行為。",
   "rule_r05_name": "Draft 與 Reported 不一致",
   "rule_r05_desc": "彙整 reported=allowed 但 draft 顯示會被封鎖的 workload pair 清單。",

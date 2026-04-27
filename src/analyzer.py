@@ -837,13 +837,14 @@ class Analyzer:
         }
         query_spec = self.api.build_traffic_query_spec(query_filters)
         draft_pd_filter = (query_spec.report_only_filters.get("draft_policy_decision") or "").strip().lower()
+        needs_draft = bool(draft_pd_filter) or getattr(query_spec, "requires_draft_pd", False)
 
         # When filtering by draft policy decision, always query all reported PDs
         # because the draft EB may affect flows whose reported PD is "allowed".
-        query_pds = pds if not draft_pd_filter else ["blocked", "potentially_blocked", "allowed"]
+        query_pds = pds if not needs_draft else ["blocked", "potentially_blocked", "allowed"]
 
         traffic_stream = self.api.execute_traffic_query_stream(
-            start_time, end_time, query_pds, filters=query_spec, compute_draft=bool(draft_pd_filter)
+            start_time, end_time, query_pds, filters=query_spec, compute_draft=needs_draft
         )
         if not traffic_stream:
             return []
