@@ -1226,10 +1226,12 @@ The `web_gui` block in `config.json` controls authentication and the web server 
 |---|---|---|---|
 | `web_gui.username` | string | `illumio` | Login username for the single-admin account |
 | `web_gui.password` | string | `illumio` | **Change on first login.** The GUI stores an Argon2 hash — the plain-text password in the example is only valid before first use. |
-| `web_gui.bind_host` | string | `127.0.0.1` | Bind address; set to `0.0.0.0` to expose on all interfaces (use with `allowed_ips`) |
-| `web_gui.port` | int | `5000` | Bind port; override with `--port N` on the command line |
 | `web_gui.allowed_ips` | list | `[]` | IP allowlist — empty list permits all sources |
 | `web_gui.tls.enabled` | bool | `false` | Enable HTTPS (requires `cert_file` + `key_file` or `self_signed: true`) |
+
+**Port:** the GUI port is set on the command line via `--port N` (default `5001`); it is not persisted in `config.json`.
+
+**Bind host:** the GUI bind address is set on the command line via `--host` (default `127.0.0.1`); it is not persisted in `config.json`.
 
 > **Security note:** The default credentials `illumio` / `illumio` are documented in `config.json.example`. Change them immediately after first login via Web GUI → **Settings → Web GUI Security**.
 
