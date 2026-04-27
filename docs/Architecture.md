@@ -10,7 +10,7 @@
 
 ### Background.1 PCE and VEN
 
-The **Policy Compute Engine (PCE)** is the centralized management and policy calculation component of the Illumio architecture. The PCE computes a unique security policy for each managed workload and transmits it to the Virtual Enforcement Node (VEN). The PCE is internally organized across four service tiers — Front End, Processing, Service/Caching, and Persistence — that together handle management interfaces, authentication, traffic flow aggregation, and database storage.
+At the core of the Illumio platform sits the **Policy Compute Engine (PCE)**: a server-side component that calculates and distributes security policy to every managed workload. For each workload, the PCE derives a tailored rule set and pushes it down to the resident enforcement agent — the **Virtual Enforcement Node** (**VEN**). Internally the PCE spans four service tiers — Front End, Processing, Service/Caching, and Persistence — which collectively provide management interfaces, authentication, traffic flow aggregation, and database storage.
 
 The **Virtual Enforcement Node (VEN)** is a lightweight, multiple-process application that runs directly on a workload (bare-metal server, virtual machine, or container). Once installed, the VEN interacts with the host's native networking interfaces and OS-level firewall to collect traffic flow data and enforce the security policies it receives from the PCE. The VEN programs native firewall mechanisms: `iptables`/`nftables` on Linux, `pf`/`ipfilter` on Solaris, and the Windows Filtering Platform on Windows. It is optimized to remain idle in the background, consuming CPU only when calculating or applying rules, while periodically summarizing and reporting flow telemetry to the PCE.
 
@@ -45,13 +45,13 @@ The PCE models three categories of workloads:
 
 ### Background.4 Policy lifecycle
 
-The PCE enforces a three-phase lifecycle for all provisionable objects (rulesets, rules, IP lists, services, label groups, virtual services, firewall settings, enforcement boundaries):
+Policy objects in the PCE — including rulesets, IP lists, enforcement boundaries, and associated service and label-group definitions — move through three distinct states before taking effect on any workload:
 
-1. **Draft**: When an administrator creates, modifies, or deletes a policy object, the change is saved in a Draft (not provisioned) state. Draft changes exist only in the PCE database; they do not alter the firewall rules on any managed workload. This allows security teams to build and review complex segmentation policies without impacting live traffic.
+1. **Draft**: Any write operation against a policy object (create, update, or delete) lands first in a Draft state that remains invisible to the enforcement plane. No firewall configuration on any managed workload changes until explicit provisioning occurs, giving security teams a safe environment to stage and validate complex segmentation changes.
 
-2. **Pending**: Saved draft modifications are classified as Pending — a staging area that accumulates all additions, updates, and deletions waiting for approval. While items are pending, administrators can review the full change list, revert individual items, check provisioning dependencies (some objects require co-provisioning of related items), and perform impact analysis.
+2. **Pending**: Accumulated draft edits transition to Pending status once saved, forming a change queue ready for review. From this staging area, administrators can inspect the full delta, selectively revert items, verify co-provisioning requirements, and run impact analysis before committing.
 
-3. **Active**: Provisioning is the explicit action that moves pending items to Active. On provisioning, the PCE recalculates the full security policy, then pushes the resulting firewall rules to all affected VENs over the secure channel. The PCE records a versioned provisioning history — timestamp, user, and count of affected workloads — enabling audit and rollback workflows.
+3. **Active**: An explicit provisioning action promotes pending changes to Active. The PCE then recomputes the full policy graph and distributes the updated firewall rules to every affected VEN through the encrypted control channel. Each provisioning event is stamped with a timestamp, the responsible user, and a count of impacted workloads, supporting audit and rollback workflows.
 
 The `compute_draft` logic in `illumio_ops` (see `Security_Rules_Reference.md` — R01–R05 rules) reads Draft-state rules from the PCE to evaluate policy intent before provisioning, surfacing gaps before they reach Active state.
 
@@ -965,10 +965,6 @@ deployments.
 
 # 8. PCE REST API Integration Cookbook
 
-# Illumio PCE Ops — API Cookbook & SIEM/SOAR Integration Guide
-![Version](https://img.shields.io/badge/Version-v3.2.0-blue?style=flat-square)
-
-
 > **[English](API_Cookbook.md)** | **[繁體中文](API_Cookbook_zh.md)**
 
 This guide provides scenario-based API tutorials specifically designed for **SIEM/SOAR engineers** writing Actions, Playbooks, or automation scripts. Each scenario lists the exact API calls, parameters, and Python code snippets needed.
@@ -1049,8 +1045,8 @@ for poll_num in range(max_polls):         # polls every 2 s, default 60 polls (1
 
 ## §8.4 Common Endpoints Used by illumio_ops
 
-| Endpoint | Method | `src/api/` method | Purpose |
-|----------|--------|-------------------|---------|
+| Endpoint | Method | `illumio_ops` implementation | Purpose |
+|----------|--------|------------------------------|---------|
 | `/api/v2/health` | GET | `ApiClient.check_health()` | PCE connectivity heartbeat |
 | `/orgs/{id}/events` | GET | `ApiClient.fetch_events()` | Security events (SIEM ingestion) |
 | `/orgs/{id}/labels` | GET | `LabelResolver.get_labels()` | Label dimension lookup |
