@@ -977,6 +977,127 @@ All examples use the `ApiClient` class from this project's `src/api_client.py`.
 
 ---
 
+## §8.1 Authentication
+
+The Illumio PCE REST API uses HTTP Basic Authentication with an **API key + secret** pair. Unlike session credentials, API keys do not expire unless explicitly deleted, making them the preferred mechanism for automated scripts.
+
+**Generating credentials:** In the PCE web console navigate to My Profile → API Keys. The system returns:
+- `auth_username` — the API key ID, formatted like `api_xxxxxxxx`
+- `secret` — a one-time-visible secret value
+
+**HTTP header format:** Concatenate `api_key:secret`, Base64-encode the result, and pass it as an `Authorization: Basic <b64>` header. `illumio_ops` builds this header in `_build_auth_header()`:
+
+```python
+# src/api_client.py — _build_auth_header()
+credentials = f"{self.api_cfg['key']}:{self.api_cfg['secret']}"
+encoded = base64.b64encode(credentials.encode('utf-8')).decode('ascii')
+return f"Basic {encoded}"
+```
+
+`illumio_ops` reads `api.key` and `api.secret` from `config/config.json`. The header is attached to the shared `requests.Session` at init time so all subsequent calls inherit it automatically.
+
+**Required headers by method:**
+
+| HTTP method | Required header |
+|-------------|----------------|
+| GET | `Accept: application/json` (recommended) |
+| PUT / POST | `Content-Type: application/json` |
+| Async request | `Prefer: respond-async` (see §8.3) |
+
+The PCE strictly requires **case-insensitive header name matching** per RFC 7230 §3.2. All responses include an `X-Request-Id` header useful for troubleshooting with Illumio Support.
+
+---
+
+## §8.2 Pagination
+
+By default, synchronous `GET` collection endpoints return at most **500 objects**. Two mechanisms control pagination:
+
+**`max_results` query parameter:** Pass `?max_results=N` to adjust the per-request ceiling (some endpoints allow up to 10,000, e.g., the Events API). To probe the total count cheaply, request `?max_results=1` and read the `X-Total-Count` response header.
+
+**Handling large collections:** When `X-Total-Count` exceeds the endpoint's ceiling, the PCE does not use a `Link` header for page-by-page traversal. Instead, use the **async bulk collection** pattern (§8.3): inject `Prefer: respond-async` and the PCE collects all matching records offline as a batch job, returning a single downloadable result file.
+
+`illumio_ops` uses `max_results=10000` for ruleset fetches (`/sec_policy/active/rule_sets`) and `max_results=5000` for event fetches. For traffic flows, it always uses the async path due to the 200,000-result ceiling.
+
+---
+
+## §8.3 Async Job Pattern
+
+Long-running or large-collection requests use the PCE async job pattern. The full lifecycle is:
+
+**1. Submit** — POST the query with `Prefer: respond-async`. The PCE responds `202 Accepted` and includes a `Location` header with the job HREF (e.g., `/orgs/1/traffic_flows/async_queries/<uuid>`).
+
+**2. Poll** — GET the job HREF repeatedly until `status` is `"completed"` or `"failed"`. Respect any `Retry-After` header. The `_wait_for_async_query()` method in `src/api/async_jobs.py` implements the polling loop:
+
+```python
+# src/api/async_jobs.py — _wait_for_async_query() (condensed)
+for poll_num in range(max_polls):         # polls every 2 s, default 60 polls (120 s)
+    time.sleep(2)
+    poll_status, poll_body = c._request(poll_url, timeout=15)
+    poll_result = orjson.loads(poll_body)
+    state = poll_result.get("status")
+    if state == "completed":
+        break
+    if state == "failed":
+        return poll_result
+```
+
+**3. Retrieve** — GET `<job_href>/download` to stream the gzip-compressed JSONL result file. `iter_async_query_results()` decompresses on the fly and yields flow dicts one at a time for memory efficiency.
+
+**Draft policy extension:** After `completed`, `illumio_ops` optionally PUTs `<job_href>/update_rules` (body `{}`) then re-polls until `rules` status also reaches `"completed"`. This unlocks `draft_policy_decision`, `rules`, `enforcement_boundaries`, and `override_deny_rules` fields in the download.
+
+---
+
+## §8.4 Common Endpoints Used by illumio_ops
+
+| Endpoint | Method | `src/api/` method | Purpose |
+|----------|--------|-------------------|---------|
+| `/api/v2/health` | GET | `ApiClient.check_health()` | PCE connectivity heartbeat |
+| `/orgs/{id}/events` | GET | `ApiClient.fetch_events()` | Security events (SIEM ingestion) |
+| `/orgs/{id}/labels` | GET | `LabelResolver.get_labels()` | Label dimension lookup |
+| `/orgs/{id}/workloads` | GET | `ApiClient.search_workloads()` | Workload inventory / search |
+| `/orgs/{id}/sec_policy/active/rule_sets` | GET | `ApiClient.get_active_rulesets()` | Active ruleset fetch |
+| `/orgs/{id}/traffic_flows/async_queries` | POST | `AsyncJobManager.submit_async_query()` | Submit traffic query |
+| `/orgs/{id}/traffic_flows/async_queries/{uuid}` | GET | `AsyncJobManager._wait_for_async_query()` | Poll job status |
+| `/orgs/{id}/traffic_flows/async_queries/{uuid}/download` | GET | `AsyncJobManager.iter_async_query_results()` | Stream results |
+| `/orgs/{id}/traffic_flows/async_queries/{uuid}/update_rules` | PUT | `AsyncJobManager._wait_for_async_query()` | Enable draft policy fields |
+
+---
+
+## §8.5 Error Handling and Retry Strategy
+
+`illumio_ops` mounts a `urllib3.Retry` adapter on the shared `requests.Session`:
+
+```python
+retry = Retry(
+    total=MAX_RETRIES,            # 3 attempts
+    backoff_factor=1.0,
+    status_forcelist=[429, 502, 503, 504],
+    allowed_methods=frozenset(["GET", "POST", "PUT", "DELETE", "HEAD"]),
+    respect_retry_after_header=True,
+    raise_on_status=False,
+)
+```
+
+HTTP 429 (rate limit) and 5xx transient errors are retried automatically with exponential backoff. `EventFetchError` is raised for non-retryable failures and caught by the caller, which logs the status code and returns an empty list to keep the daemon loop running.
+
+---
+
+## §8.6 Rate Limiting
+
+The PCE enforces an API rate budget (default 500 requests/minute in most deployments). `illumio_ops` exposes a token-bucket rate limiter in `src/pce_cache/rate_limiter.py`. Callers pass `rate_limit=True` to `_request()` to acquire a token before each call:
+
+```python
+# src/api_client.py — _request() with rate_limit=True
+if not get_rate_limiter(rate_per_minute=rpm).acquire(timeout=30.0):
+    raise APIError("Global rate limiter timeout — PCE 500/min budget exhausted")
+```
+
+The `rate_limit_per_minute` value is read from `config_models.pce_cache.rate_limit_per_minute` and defaults to 400 (leaving headroom for concurrent PCE web-console traffic).
+
+> **References:** Illumio REST API Guide 25.4 (`REST_APIs_25_4.pdf`).
+
+---
+
 ## Quick Setup
 
 ```python
