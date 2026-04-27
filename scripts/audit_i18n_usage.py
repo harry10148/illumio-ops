@@ -67,6 +67,9 @@ BILINGUAL_DATA_FILES = {
     # Bilingual recommendation templates keyed by action_code; consumers pick
     # the right lang via `resolve_recommendation(code, lang)`.
     SRC / "report" / "analysis" / "attack_posture.py",
+    # Bilingual key-finding templates keyed by template name; consumers pick
+    # the right lang via `_kf(key, lang, ...)`.
+    SRC / "report" / "analysis" / "mod12_executive_summary.py",
 }
 
 # (file_relpath, needle) pairs — specific intentional CJK spots that

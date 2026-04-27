@@ -13,7 +13,7 @@ from src.report.section_guidance import visible_in
 from .report_css import TABLE_JS, build_css
 from src.humanize_ext import human_number
 from .report_i18n import COL_I18N as _COL_I18N
-from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
+from .report_i18n import STRINGS
 from .table_renderer import render_df_table
 from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
@@ -21,6 +21,7 @@ from src.report.analysis.audit.audit_risk import RISK_BG, RISK_COLOR, get_risk
 
 _CSS = build_css("audit")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
+_REPORT_DETAIL_LEVEL = "full"
 
 
 def _chart_html(spec: dict | None, include_js: bool = True) -> str:
@@ -80,13 +81,14 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False) -
 
 class AuditHtmlExporter:
     def __init__(self, results: dict, df: pd.DataFrame = None, date_range: tuple = ("", ""), data_source: str = "",
-                 profile: str = "security_risk", detail_level: str = "standard"):
+                 profile: str = "security_risk", detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en"):
         self._r = results
         self._df = df
         self._date_range = date_range
         self._data_source = data_source
         self._profile = profile
-        self._detail_level = detail_level
+        self._detail_level = _REPORT_DETAIL_LEVEL
+        self._lang = lang
 
     @staticmethod
     def _risk_badge(risk_level: str) -> str:
@@ -153,17 +155,17 @@ class AuditHtmlExporter:
 
     def _build(self, profile: str = "", detail_level: str = "") -> str:
         profile = profile or self._profile
-        detail_level = detail_level or self._detail_level
+        detail_level = _REPORT_DETAIL_LEVEL
         self._chart_tracker = FirstChartTracker()
         mod00 = self._r.get("mod00", {})
         nav_html = (
             "<nav>"
             '<div class="nav-brand">Illumio PCE Ops</div>'
             '<a href="#summary"><span data-i18n="rpt_au_nav_summary">Executive Summary</span></a>'
-            '<a href="#health"><span data-i18n="rpt_au_nav_health">1 System Health</span></a>'
-            '<a href="#users"><span data-i18n="rpt_au_nav_users">2 User Activity</span></a>'
-            '<a href="#policy"><span data-i18n="rpt_au_nav_policy">3 Policy Changes</span></a>'
-            '<a href="#correlation"><span data-i18n="rpt_au_nav_correlation">4 Event Correlation</span></a>'
+            '<a href="#health"><span data-i18n="rpt_au_nav_health">System Health</span></a>'
+            '<a href="#users"><span data-i18n="rpt_au_nav_users">User Activity</span></a>'
+            '<a href="#policy"><span data-i18n="rpt_au_nav_policy">Policy Changes</span></a>'
+            '<a href="#correlation"><span data-i18n="rpt_au_nav_correlation">Event Correlation</span></a>'
             "</nav>"
         )
         kpi_cards = "".join(
@@ -199,7 +201,7 @@ class AuditHtmlExporter:
             summary_pills = summary_pills.replace("</div>", data_source_pill + "</div>", 1)
 
         body = (
-            render_section_guidance("audit_mod00_executive", profile="security_risk", detail_level="standard")
+            render_section_guidance("audit_mod00_executive", profile="security_risk", detail_level="full")
             + '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top"><div class="report-kicker" data-i18n="rpt_kicker_audit">Audit & Event Report</div>'
             '<h1 data-i18n="rpt_au_title">Illumio Audit &amp; System Events Report</h1>'
@@ -207,7 +209,6 @@ class AuditHtmlExporter:
             '<span data-i18n="rpt_generated">Generated:</span> ' + mod00.get("generated_at", "") + period_part + "</p></div>"
             + summary_pills
             + self._attention_section(mod00.get("attention_items", []))
-            + self._attack_summary_html(mod00)
             + '<h2 data-i18n="rpt_key_metrics">Key Metrics</h2>'
             + '<div class="kpi-grid">' + kpi_cards + "</div>"
             + self._trend_deltas_html()
@@ -232,19 +233,17 @@ class AuditHtmlExporter:
             + "</footer>"
         )
         return (
-            "<!DOCTYPE html><html lang=\"en\"><head>\n"
+            f'<!DOCTYPE html><html lang="{"zh-TW" if self._lang == "zh_TW" else "en"}"><head>\n'
             "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
             "<title>Illumio Audit Report</title>"
             + _CSS + _HIGHLIGHT_CSS
             + "</head>\n"
             + "<body>"
-            + lang_btn_html()
             + nav_html
             + "<main>"
             + body
             + "</main>"
             + TABLE_JS
-            + make_i18n_js()
             + "</body></html>"
         )
 
@@ -341,7 +340,7 @@ class AuditHtmlExporter:
         if "error" in m:
             return f'<p class="note">{m["error"]}</p>'
 
-        html_parts = [render_section_guidance("audit_mod01_health", profile="security_risk", detail_level="standard")]
+        html_parts = [render_section_guidance("audit_mod01_health", profile="security_risk", detail_level="full")]
 
         sec_count = m.get("security_concern_count", 0)
         conn_count = m.get("connectivity_event_count", 0)
@@ -395,7 +394,7 @@ class AuditHtmlExporter:
         if "error" in m:
             return f'<p class="note">{m["error"]}</p>'
 
-        html_parts = [render_section_guidance("audit_mod02_users", profile="security_risk", detail_level="standard")]
+        html_parts = [render_section_guidance("audit_mod02_users", profile="security_risk", detail_level="full")]
 
         failed = m.get("failed_logins", 0)
         unique_ips = m.get("unique_src_ips", 0)
@@ -451,10 +450,10 @@ class AuditHtmlExporter:
     @staticmethod
     def _lifecycle_concept_box() -> str:
         return (
-            "<details style='margin-bottom:16px; border:1px solid #CBD5E0; border-radius:8px; overflow:hidden;' open>"
-            "<summary style='padding:10px 14px; background:#EBF4FF; cursor:pointer; font-weight:700; "
-            "font-size:13px; color:#2B6CB0; list-style:none; display:flex; align-items:center; gap:6px;' "
-            "data-i18n='rpt_au_lifecycle_title'>Illumio Policy Lifecycle: Draft vs Provision</summary>"
+            "<div style='margin-bottom:16px; border:1px solid #CBD5E0; border-radius:8px; overflow:hidden;'>"
+            "<div style='padding:10px 14px; background:#EBF4FF; font-weight:700; "
+            "font-size:13px; color:#2B6CB0;' "
+            "data-i18n='rpt_au_lifecycle_title'>Illumio Policy Lifecycle: Draft vs Provision</div>"
             "<div style='display:grid; grid-template-columns:1fr 1fr; gap:0; border-top:1px solid #CBD5E0;'>"
             "<div style='padding:14px 16px; border-right:1px solid #CBD5E0; background:#FEFCE8;'>"
             "<div style='font-weight:700; font-size:12px; color:#92400E; margin-bottom:8px;' "
@@ -469,7 +468,7 @@ class AuditHtmlExporter:
             "<div style='font-size:12px; color:#374151; line-height:1.7;' data-i18n-html='rpt_au_lifecycle_prov_body'>"
             "A <code>sec_policy.create</code> event means draft changes were packaged into a new policy version and pushed to workloads. "
             "Use <code>workloads_affected</code> to verify rollout impact."
-            "</div></div></div></details>"
+            "</div></div></div></div>"
         )
 
     @staticmethod
@@ -512,7 +511,7 @@ class AuditHtmlExporter:
         if "error" in m:
             return f'<p class="note">{m["error"]}</p>'
 
-        html_parts = [render_section_guidance("audit_mod03_policy", profile="security_risk", detail_level="standard")]
+        html_parts = [render_section_guidance("audit_mod03_policy", profile="security_risk", detail_level="full")]
 
         prov_count = m.get("provision_count", 0)
         rule_count = m.get("rule_change_count", 0)
@@ -597,7 +596,7 @@ class AuditHtmlExporter:
         if "error" in m:
             return f'<p class="note">{m["error"]}</p>'
 
-        html_parts = [render_section_guidance("audit_mod04_correlation", profile="security_risk", detail_level="standard")]
+        html_parts = [render_section_guidance("audit_mod04_correlation", profile="security_risk", detail_level="full")]
 
         total_corr = m.get("total_correlations", 0)
         total_bf = m.get("total_brute_force", 0)

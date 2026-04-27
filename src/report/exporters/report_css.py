@@ -54,6 +54,9 @@ BASE_CSS = """\
   .summary-pill-label { display: block; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--slate-50); margin-bottom: 4px; }
   .summary-pill-value { display: block; font-size: 15px; font-weight: 700; color: var(--cyan-120); font-variant-numeric: tabular-nums; }
   .report-draft-pill { display: inline-block; background: #e8f4fd; color: #1a6fa8; border: 1px solid #1a6fa8; border-radius: 3px; font-size: 0.75em; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
+  .report-profile-badge { display: inline-block; padding: 4px 12px; margin-bottom: 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  .report-profile-badge--security { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+  .report-profile-badge--inventory { background: #DBEAFE; color: #1E40AF; border: 1px solid #93C5FD; }
   .section-intro { margin: 0 0 14px; color: var(--slate-50); font-size: 12px; line-height: 1.6; }
 
   .kpi-grid { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; }

@@ -27,7 +27,7 @@ from src.report.report_metadata import (
     extract_attack_summary,
 )
 
-_VALID_DETAIL_LEVELS = ("executive", "standard", "full")
+_REPORT_DETAIL_LEVEL = "full"
 
 # Event types that represent a policy commit (no field-level diffs, only macro stats)
 _PROVISION_EVENT_TYPES = frozenset({
@@ -438,9 +438,8 @@ class AuditGenerator:
 
     def generate_from_api(self, start_date: Optional[str] = None,
                           end_date: Optional[str] = None,
-                          detail_level: str = "standard") -> AuditReportResult:
-        if detail_level not in _VALID_DETAIL_LEVELS:
-            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
+                          detail_level: str = _REPORT_DETAIL_LEVEL,
+                          lang: str = "en") -> AuditReportResult:
         if not self.api:
             raise RuntimeError("api_client required for audit generation")
 
@@ -451,7 +450,8 @@ class AuditGenerator:
                 datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
             ).isoformat().replace("+00:00", "Z")
 
-        self._detail_level = detail_level
+        self._detail_level = _REPORT_DETAIL_LEVEL
+        self._lang = lang
         print(t("rpt_audit_querying", start=start_date, end=end_date))
         _start_dt = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
         _end_dt = datetime.datetime.fromisoformat(end_date.replace("Z", "+00:00"))
@@ -649,14 +649,15 @@ class AuditGenerator:
 
     def export(self, result: AuditReportResult, fmt: str = 'html',
                output_dir: str = 'reports',
-               detail_level: str = "standard") -> list[str]:
+               detail_level: str = _REPORT_DETAIL_LEVEL,
+               lang: str = "en") -> list[str]:
         from src.report.exporters.audit_html_exporter import AuditHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
         paths = []
         if fmt in ('html', 'all'):
             path = AuditHtmlExporter(
                 result.module_results, df=result.dataframe,
-                date_range=result.date_range
+                date_range=result.date_range, detail_level=_REPORT_DETAIL_LEVEL, lang=lang,
             ).export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, result, file_format='html')

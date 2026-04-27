@@ -7,6 +7,7 @@ CLAUDE.md
 # Runtime state
 logs/state.json
 state.json
+data/
 *.tmp
 *.temp
 
@@ -42,6 +43,9 @@ tests/.pytest_cache/
 
 # Reports output
 reports/
+build/
+dist/
+scripts/audit_i18n_report.md
 
 # Agent-specific directories
 .claude/

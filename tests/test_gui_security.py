@@ -4,9 +4,8 @@ import json
 import tempfile
 import threading
 from src.alerts.metadata import FieldMeta, PluginMeta
-from src.config import ConfigManager
+from src.config import ConfigManager, hash_password as _hash_password
 from src.gui import build_app as _create_app
-from src.config import hash_password as _hash_password
 from src.i18n import get_language, get_messages, set_language
 
 
@@ -32,10 +31,8 @@ def app_persistent(temp_config_file):
     cm = ConfigManager(config_file=temp_config_file)
     cm.load()
     
-    # Setup test credentials
     salt = "testsalt"
     pass_hash = _hash_password(salt, "testpass")
-    
     cm.config["web_gui"] = {
         "username": "admin",
         "password_salt": salt,

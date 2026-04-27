@@ -49,6 +49,28 @@ def test_report_policy_usage_subcommand_dispatches_helper():
     )
 
 
+def test_report_traffic_subcommand_has_no_detail_level_option():
+    from src.cli.root import cli
+
+    runner = CliRunner()
+    result = runner.invoke(cli, ["report", "traffic", "--help"])
+
+    assert result.exit_code == 0
+    assert "--detail-level" not in result.output
+
+
+def test_legacy_report_help_has_no_detail_level_option(monkeypatch, capsys):
+    import src.main as main_module
+
+    monkeypatch.setattr(sys, "argv", ["illumio_ops.py", "--help"])
+
+    with pytest.raises(SystemExit) as exc:
+        main_module.main()
+
+    assert exc.value.code == 0
+    assert "--detail-level" not in capsys.readouterr().out
+
+
 def test_legacy_report_type_audit_dispatches(monkeypatch):
     import src.main as main_module
 

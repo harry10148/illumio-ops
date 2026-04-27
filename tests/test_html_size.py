@@ -46,20 +46,20 @@ def results_with_charts():
     }
 
 
-def test_traffic_standard_under_5mb(results_with_charts):
-    """Standard Traffic report with charts must be under 5 MB."""
+def test_traffic_full_detail_under_5mb(results_with_charts):
+    """Traffic report with charts must be under 5 MB."""
     from src.report.exporters.html_exporter import HtmlExporter
-    exporter = HtmlExporter(results=results_with_charts, profile="security_risk", detail_level="standard")
-    html = exporter._build(profile="security_risk", detail_level="standard")
+    exporter = HtmlExporter(results=results_with_charts, profile="security_risk")
+    html = exporter._build(profile="security_risk")
     size_mb = len(html.encode("utf-8")) / (1024 * 1024)
-    assert size_mb < 5.0, f"Traffic standard report is {size_mb:.1f} MB (target <5 MB)"
+    assert size_mb < 5.0, f"Traffic report is {size_mb:.1f} MB (target <5 MB)"
 
 
 def test_plotly_bundle_inlined_only_once(results_with_charts):
     """Only one large Plotly script block should appear in the output."""
     from src.report.exporters.html_exporter import HtmlExporter
-    exporter = HtmlExporter(results=results_with_charts, profile="security_risk", detail_level="standard")
-    html = exporter._build(profile="security_risk", detail_level="standard")
+    exporter = HtmlExporter(results=results_with_charts, profile="security_risk")
+    html = exporter._build(profile="security_risk")
     script_blocks = html.split("<script")
     big_scripts = [s for s in script_blocks if len(s) > 100_000]
     assert len(big_scripts) <= 1, (

@@ -1,9 +1,10 @@
 import os
 import datetime
 import re
+import secrets
 from src.events.catalog import KNOWN_EVENT_TYPES
 from src.utils import Colors, safe_input, draw_panel, draw_table, get_last_input_action
-from src.config import ConfigManager
+from src.config import ConfigManager, hash_password as _hash_pass
 from src.i18n import t, set_language, get_language
 from src import __version__
 
@@ -1499,12 +1500,7 @@ def alert_settings_menu(cm: ConfigManager):
                 cm.save()
 
 def web_gui_security_menu(cm: ConfigManager):
-    import secrets
-    import hashlib
     from src.utils import draw_panel
-
-    def _hash_pass(salt, pw):
-        return hashlib.sha256((salt + pw).encode('utf-8')).hexdigest()
 
     while True:
         os.system("cls" if os.name == "nt" else "clear")

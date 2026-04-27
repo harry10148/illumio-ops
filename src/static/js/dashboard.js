@@ -716,7 +716,6 @@ function openReportGenModal(type) {
     $('m-gen-source-row').style.display = '';
     $('m-gen-filters').style.display = '';
     $('m-gen-profile-row').style.display = '';
-    if (document.getElementById('m-gen-detail-row')) document.getElementById('m-gen-detail-row').style.display = '';
     toggleTrafficSource();
     // Reset filter fields
     ['rpt-pd-blocked','rpt-pd-potential','rpt-pd-allowed'].forEach(id => {
@@ -732,7 +731,6 @@ function openReportGenModal(type) {
     $('m-gen-dates').style.display = m.dates ? '' : 'none';
     $('m-gen-filters').style.display = 'none';
     $('m-gen-profile-row').style.display = 'none';
-    if (document.getElementById('m-gen-detail-row')) document.getElementById('m-gen-detail-row').style.display = 'none';
   }
   
   $('m-gen-note').style.display  = m.dates ? 'none' : '';
@@ -941,8 +939,8 @@ async function _doGenerateTraffic() {
       formData.append('format', fmtEl ? fmtEl.value : 'all');
       const profileElCsv = document.getElementById('m-gen-profile');
       formData.append('traffic_report_profile', profileElCsv ? profileElCsv.value : 'security_risk');
-      const detailElCsv = document.getElementById('m-gen-detail');
-      formData.append('detail_level', detailElCsv ? detailElCsv.value : 'standard');
+      const langElCsv = document.getElementById('m-gen-lang');
+      formData.append('lang', langElCsv ? langElCsv.value : 'en');
       formData.append('file', fileInput.files[0]);
 
       _updateGenStep(_t('gui_gen_step_analysing'));
@@ -980,11 +978,12 @@ async function _doGenerateTraffic() {
       const reportFilters = _collectReportFilters();
       const fmtEl2 = document.getElementById('m-gen-format');
       const profileEl = document.getElementById('m-gen-profile');
+      const langEl = document.getElementById('m-gen-lang');
       const r = await post('/api/reports/generate', {
         source: 'api', format: fmtEl2 ? fmtEl2.value : 'all',
         start_date: startDate, end_date: endDate,
         traffic_report_profile: profileEl ? profileEl.value : 'security_risk',
-        detail_level: (() => { const el = document.getElementById('m-gen-detail'); return el ? el.value : 'standard'; })(),
+        lang: langEl ? langEl.value : 'en',
         ...(reportFilters ? { filters: reportFilters } : {}),
       });
       clearTimeout(_stepTimer);
@@ -1017,10 +1016,11 @@ async function _doGenerateAudit() {
   const endDate   = new Date(endVal   + 'T23:59:59Z').toISOString();
   const fmtEl = document.getElementById('m-gen-format');
   const fmt = fmtEl ? fmtEl.value : 'html';
+  const langElAudit = document.getElementById('m-gen-lang');
   _updateGenStep(_t('gui_gen_step_fetching'));
   try {
     const _stepTimer = setTimeout(() => _updateGenStep(_t('gui_gen_step_analysing')), 3000);
-    const r = await post('/api/audit_report/generate', {start_date:startDate, end_date:endDate, format:fmt});
+    const r = await post('/api/audit_report/generate', {start_date:startDate, end_date:endDate, format:fmt, lang: langElAudit ? langElAudit.value : 'en'});
     clearTimeout(_stepTimer);
     if (r.ok) {
       const msg = `${r.record_count} events`;
@@ -1041,9 +1041,10 @@ async function _doGenerateAudit() {
 async function _doGenerateVen() {
   const fmtEl = document.getElementById('m-gen-format');
   const fmt = fmtEl ? fmtEl.value : 'html';
+  const langElVen = document.getElementById('m-gen-lang');
   _updateGenStep(_t('gui_gen_step_fetching'));
   try {
-    const r = await post('/api/ven_status_report/generate', {format:fmt});
+    const r = await post('/api/ven_status_report/generate', {format:fmt, lang: langElVen ? langElVen.value : 'en'});
     if (r.ok) {
       const kpiText = (r.kpis || []).map(k => `${k.label}: ${k.value}`).join(' | ');
       _hideGenProgress(true, kpiText || (_t('gui_gen_done')));
@@ -1068,7 +1069,8 @@ async function _doGeneratePolicyUsage() {
   try {
     const start = $('m-gen-start') ? $('m-gen-start').value : null;
     const end   = $('m-gen-end')   ? $('m-gen-end').value   : null;
-    const r = await post('/api/policy_usage_report/generate', { start_date: start, end_date: end });
+    const langElPu = document.getElementById('m-gen-lang');
+    const r = await post('/api/policy_usage_report/generate', { start_date: start, end_date: end, lang: langElPu ? langElPu.value : 'en' });
     if (r.ok) {
       const kpiText = (r.kpis || []).map(k => `${k.label}: ${k.value}`).join(' | ');
       _hideGenProgress(true, kpiText || (_t('gui_gen_done')));
@@ -1092,7 +1094,8 @@ async function _doGeneratePolicyUsageClean() {
   try {
     const start = $('m-gen-start') ? $('m-gen-start').value : null;
     const end   = $('m-gen-end')   ? $('m-gen-end').value   : null;
-    const r = await post('/api/policy_usage_report/generate', { start_date: start, end_date: end, format: fmt });
+    const langElPuClean = document.getElementById('m-gen-lang');
+    const r = await post('/api/policy_usage_report/generate', { start_date: start, end_date: end, format: fmt, lang: langElPuClean ? langElPuClean.value : 'en' });
     if (r.ok) {
       const kpiText = (r.kpis || []).map(k => `${k.label}: ${k.value}`).join(' | ');
       const execText = _formatPolicyUsageExecutionSummary(r.execution_stats, r.execution_notes);
@@ -1181,7 +1184,6 @@ async function loadDashboard() {
     console.warn('[loadDashboard] status failed:', e);
   }
 
-  await loadTranslations();
   await loadDashboardQueries();
   await loadDashboardSnapshot();
   await loadDashboardPolicyUsageSummary();
@@ -1463,7 +1465,6 @@ function renderDashboardQueries() {
   initTableResizers();
 
   if (typeof applyLang === "function") applyLang();
-  else loadTranslations().catch(console.error);
 }
 
 function openQueryModal(idx = -1) {

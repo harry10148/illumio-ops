@@ -23,7 +23,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
-from src.i18n import t, get_language
+from src.i18n import t, set_language, get_language
 from src.report.rules_engine import ruleset_needs_draft_pd, DRAFT_PD_RULES
 from src.report.report_metadata import (
     attack_summary_counts,
@@ -37,7 +37,7 @@ def _fmt_iso(dt) -> str:
     return dt.isoformat().replace("+00:00", "Z") if hasattr(dt, "isoformat") else str(dt)
 
 
-_VALID_DETAIL_LEVELS = ("executive", "standard", "full")
+_REPORT_DETAIL_LEVEL = "full"
 
 
 # ─── Snapshot helper (module-level) ──────────────────────────────────────────
@@ -206,15 +206,14 @@ class ReportGenerator:
                           max_results: int = 200_000,
                           filters: Optional[dict] = None,
                           traffic_report_profile: str = "security_risk",
-                          detail_level: str = "standard") -> ReportResult:
+                          detail_level: str = _REPORT_DETAIL_LEVEL,
+                          lang: str = "en") -> ReportResult:
         """Fetch traffic from PCE API and run the full analysis pipeline.
 
         filters: optional dict with traffic filter keys (src_labels, dst_labels,
                  src_ip, dst_ip, port, proto, ex_src_labels, ex_dst_labels,
                  ex_src_ip, ex_dst_ip, ex_port, policy_decisions).
         """
-        if detail_level not in _VALID_DETAIL_LEVELS:
-            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
         if traffic_report_profile not in ("security_risk", "network_inventory"):
             raise ValueError(f"invalid traffic_report_profile: {traffic_report_profile!r}")
         if self.api is None:
@@ -257,7 +256,8 @@ class ReportGenerator:
 
         print(t("rpt_records_received", count=f"{len(records):,}"))
         df = self._parse_api(records)
-        self._detail_level = detail_level
+        self._detail_level = _REPORT_DETAIL_LEVEL
+        self._lang = lang
         return self._run_pipeline(
             df,
             source=traffic["source"],
@@ -273,13 +273,13 @@ class ReportGenerator:
 
     def generate_from_csv(self, csv_path: str,
                           traffic_report_profile: str = "security_risk",
-                          detail_level: str = "standard") -> ReportResult:
+                          detail_level: str = _REPORT_DETAIL_LEVEL,
+                          lang: str = "en") -> ReportResult:
         """Parse a CSV file from the PCE UI export and run the analysis pipeline."""
-        if detail_level not in _VALID_DETAIL_LEVELS:
-            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
         if traffic_report_profile not in ("security_risk", "network_inventory"):
             raise ValueError(f"invalid traffic_report_profile: {traffic_report_profile!r}")
-        self._detail_level = detail_level
+        self._detail_level = _REPORT_DETAIL_LEVEL
+        self._lang = lang
         logger.info(f"[ReportGenerator] Starting CSV-source report from: {csv_path}")
         print(t("rpt_parsing_csv", path=csv_path))
         df = self._parse_csv(csv_path)
@@ -290,7 +290,8 @@ class ReportGenerator:
                send_email: bool = False,
                reporter=None,
                traffic_report_profile: str = "security_risk",
-               detail_level: str = "standard") -> list[str]:
+               detail_level: str = _REPORT_DETAIL_LEVEL,
+               lang: str = "en") -> list[str]:
         """
         Export a ReportResult to one or more files.
 
@@ -315,7 +316,9 @@ class ReportGenerator:
                 result.module_results,
                 data_source=result.data_source,
                 profile=traffic_report_profile,
+                detail_level=_REPORT_DETAIL_LEVEL,
                 compute_draft=ruleset_needs_draft_pd(DRAFT_PD_RULES),
+                lang=lang,
             ).export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, self._build_report_metadata(result, file_format="html"))
@@ -486,45 +489,55 @@ class ReportGenerator:
             logger.warning("[ReportGenerator] Empty DataFrame, skipping analysis")
             return ReportResult(data_source=source, record_count=0)
 
-        issues = validate(df)
-        if issues:
-            print(t("rpt_schema_warnings", count=len(issues)))
-            df = coerce(df)
-
-        record_count = len(df)
-        print(t("rpt_running_analysis", count=f"{record_count:,}"))
-
-        # Rules engine
-        engine = RulesEngine(self._report_cfg, config_dir=self._config_dir)
-        findings = engine.evaluate(df)
-        print(t("rpt_rules_findings", count=len(findings)))
-
-        # 15 modules
-        results = self._run_modules(df, findings, traffic_report_profile=traffic_report_profile)
-
-        # Override generated_at with configured timezone
-        tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
+        # Apply per-report language so t() calls in the rules engine produce correct text
+        _prev_lang = get_language()
+        lang = getattr(self, '_lang', 'en')
+        if lang != _prev_lang:
+            set_language(lang)
         try:
-            tz = _parse_tz(tz_str)
-            results['mod12']['generated_at'] = _fmt_tz_now(tz)
-        except Exception:
-            pass  # intentional fallback: keep mod12's default generated_at if timezone parsing fails
+            issues = validate(df)
+            if issues:
+                print(t("rpt_schema_warnings", count=len(issues)))
+                df = coerce(df)
 
-        # Date range
-        first = df['first_detected'].min() if 'first_detected' in df.columns else pd.NaT
-        last = df['last_detected'].max() if 'last_detected' in df.columns else pd.NaT
-        date_range = (str(first.date()) if pd.notna(first) else '',
-                      str(last.date()) if pd.notna(last) else '')
+            record_count = len(df)
+            print(t("rpt_running_analysis", count=f"{record_count:,}"))
 
-        return ReportResult(
-            data_source=source,
-            record_count=record_count,
-            date_range=date_range,
-            module_results=results,
-            findings=findings,
-            dataframe=df,
-            query_context=dict(query_context or {}),
-        )
+            # Rules engine
+            engine = RulesEngine(self._report_cfg, config_dir=self._config_dir)
+            findings = engine.evaluate(df)
+            print(t("rpt_rules_findings", count=len(findings)))
+
+            # 15 modules
+            results = self._run_modules(df, findings, traffic_report_profile=traffic_report_profile,
+                                        lang=lang)
+
+            # Override generated_at with configured timezone
+            tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
+            try:
+                tz = _parse_tz(tz_str)
+                results['mod12']['generated_at'] = _fmt_tz_now(tz)
+            except Exception:
+                pass  # intentional fallback: keep mod12's default generated_at if timezone parsing fails
+
+            # Date range
+            first = df['first_detected'].min() if 'first_detected' in df.columns else pd.NaT
+            last = df['last_detected'].max() if 'last_detected' in df.columns else pd.NaT
+            date_range = (str(first.date()) if pd.notna(first) else '',
+                          str(last.date()) if pd.notna(last) else '')
+
+            return ReportResult(
+                data_source=source,
+                record_count=record_count,
+                date_range=date_range,
+                module_results=results,
+                findings=findings,
+                dataframe=df,
+                query_context=dict(query_context or {}),
+            )
+        finally:
+            if lang != _prev_lang:
+                set_language(_prev_lang)
 
     @staticmethod
     def _write_report_metadata(report_path: str, payload: dict):
@@ -553,7 +566,8 @@ class ReportGenerator:
         }
 
     def _run_modules(self, df, findings: list,
-                     traffic_report_profile: str = "security_risk") -> dict:
+                     traffic_report_profile: str = "security_risk",
+                     lang: str = "en") -> dict:
         """Execute all registered analysis modules via the module registry."""
         from src.report.analysis import get_traffic_modules, get_summary_module
 
@@ -573,7 +587,7 @@ class ReportGenerator:
         # Summary module runs last (depends on all other results)
         try:
             summary_id, summary_fn = get_summary_module()
-            results[summary_id] = summary_fn(results, profile=traffic_report_profile)
+            results[summary_id] = summary_fn(results, profile=traffic_report_profile, lang=lang)
         except Exception as e:
             logger.error(f"[ReportGenerator] summary module failed: {e}")
             results['mod12'] = {'error': str(e)}
@@ -645,7 +659,6 @@ class ReportGenerator:
             for f in findings
         )
         attack_rows = []
-        _zh = get_language() == "zh_TW"
         for title, items in [
             (t("rpt_email_boundary_breaches"), boundary_breaches),
             (t("rpt_email_suspicious_pivot_behavior"), suspicious_pivot),
@@ -654,24 +667,20 @@ class ReportGenerator:
         ]:
             if items:
                 sample = items[0]
-                zh_action = (f'<br><span style="font-size:11px">{sample.get("action_zh","")}</span>' if _zh and sample.get("action_zh") else '')
                 attack_rows.append(
                     f'<tr>'
                     f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">{title}</td>'
                     f'<td style="padding:4px 10px;color:#313638">{sample.get("finding","")}</td>'
-                    f'<td style="padding:4px 10px;color:#989A9B"><em>{sample.get("action","")}</em>'
-                    + zh_action
-                    + '</td>'
+                    f'<td style="padding:4px 10px;color:#989A9B"><em>{sample.get("action","")}</em></td>'
                     f'</tr>'
                 )
         if action_matrix:
             top_action = action_matrix[0]
-            zh_action_cell = (f'<em>{top_action.get("action_zh","")}</em>' if _zh and top_action.get("action_zh") else '')
             attack_rows.append(
                 f'<tr>'
                 f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">{t("rpt_email_action_matrix")}</td>'
                 f'<td style="padding:4px 10px;color:#313638">{top_action.get("action","")}</td>'
-                f'<td style="padding:4px 10px;color:#989A9B">{zh_action_cell}</td>'
+                f'<td style="padding:4px 10px;color:#989A9B"></td>'
                 f'</tr>'
             )
         attack_rows_html = "".join(attack_rows)

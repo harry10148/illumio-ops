@@ -35,7 +35,7 @@ def test_profile_visibility_values_are_valid():
 
 
 def test_min_detail_level_is_valid():
-    valid = {"executive", "standard", "full"}
+    valid = {"full"}
     for module_id, entry in REGISTRY.items():
         assert entry.min_detail_level in valid
 

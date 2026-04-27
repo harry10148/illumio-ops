@@ -3,6 +3,8 @@ from __future__ import annotations
 import html
 from typing import Callable
 
+from .report_i18n import STRINGS as _STRINGS
+
 # Tables with this many columns or more get the wide-panel treatment
 # (sticky first column + right-edge scroll-affordance gradient).
 WIDE_COL_THRESHOLD = 10
@@ -18,18 +20,13 @@ def _default_cell(value) -> str:
         return ""
     return html.escape(str(value))
 
-def _empty_panel(no_data_key: str, message: str = "No data") -> str:
-    """Render the empty-state tombstone panel.
-
-    Visually consistent with data tables: same panel chrome, but with a dashed
-    border and muted typography so the section reads as 'intentionally empty',
-    not 'rendering broken'.
-    """
-    safe_msg = html.escape(message)
+def _empty_panel(no_data_key: str, lang: str = "en") -> str:
+    """Render the empty-state tombstone panel."""
+    msg = html.escape(_STRINGS[no_data_key].get(lang) or _STRINGS[no_data_key]["en"])
     return (
         '<div class="report-table-panel report-table-panel--empty" data-empty="true">'
         '<span class="empty-marker" aria-hidden="true"></span>'
-        f'<span class="empty-text" data-i18n="{html.escape(no_data_key, quote=True)}">{safe_msg}</span>'
+        f'<span class="empty-text">{msg}</span>'
         '</div>'
     )
 
@@ -40,9 +37,10 @@ def render_df_table(
     no_data_key: str = "rpt_no_data",
     render_cell: Callable | None = None,
     row_attrs: Callable | None = None,
+    lang: str = "en",
 ) -> str:
     if df is None or (hasattr(df, "empty") and df.empty):
-        return _empty_panel(no_data_key)
+        return _empty_panel(no_data_key, lang)
 
     columns = list(df.columns)
     n_cols = len(columns)
@@ -84,12 +82,9 @@ def render_df_table(
         i18n_key = col_i18n.get(col)
         title = html.escape(str(col), quote=True)
         label_text = html.escape(str(col))
-        # IMPORTANT: put data-i18n on the INNER .th-label span, not on the <th>.
-        # The applyI18n script does `el.textContent = translated`, which wipes
-        # all children. Keeping data-i18n on the span means the .sort-indicator
-        # and .col-resizer siblings (added by TABLE_JS) survive language toggles.
         if i18n_key:
-            label_html = f'<span class="th-label" data-i18n="{i18n_key}">{label_text}</span>'
+            translated = html.escape(_STRINGS[i18n_key].get(lang) or _STRINGS[i18n_key]["en"])
+            label_html = f'<span class="th-label">{translated}</span>'
         else:
             label_html = f'<span class="th-label">{label_text}</span>'
         html_parts.append(f'<th title="{title}">{label_html}</th>')

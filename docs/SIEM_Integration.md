@@ -1,134 +1,176 @@
 # SIEM Integration Guide
 
-illumio_ops emits structured JSON logs when the loguru JSON sink is enabled.
-This document shows how to ship those logs to Splunk / Elastic / QRadar / Sentinel.
+This file is intentionally kept in English because existing tests and external links reference `docs/SIEM_Integration.md`. The main operations manual is now `docs/User_Manual_zh.md`.
+
+The built-in SIEM forwarder is currently **Preview**. Existing deployments can keep using it for compatibility. New production deployments should validate throughput, TLS, retry, and DLQ behavior before relying on it as a primary pipeline.
 
 ## Option E — Built-in Forwarder (Recommended for On-Box Push)
 
-illumio_ops v3.11+ includes a native SIEM forwarder that pushes PCE audit events and traffic flows directly to your SIEM over UDP, TCP, TCP+TLS, or Splunk HEC — no sidecar required.
+The built-in forwarder reads cached audit/traffic records, formats them as CEF/JSON/syslog, and sends them to configured destinations.
 
-**Advantages over file-based options (A–D):**
-- Pushes PCE API data (not just app logs): audit events, traffic flows, policy decisions
-- Built-in DLQ with replay — no events lost during SIEM downtime
-- CEF 0.1 and JSON Lines format with optional RFC5424 syslog envelope
-- Rate-limited ingestor respects the PCE 500 req/min budget
+Supported transports:
 
-**Quick start:** See [`docs/SIEM_Forwarder.md`](SIEM_Forwarder.md).
+- UDP
+- TCP
+- TLS
+- Splunk HEC
 
----
+Supported formats:
 
-## 1. Enable the JSON sink
+- CEF
+- JSON line
+- syslog CEF
+- syslog JSON
 
-In `config/config.json`, set:
+Example destination:
+
+```json
+{
+  "name": "soc",
+  "enabled": true,
+  "transport": "tls",
+  "format": "cef",
+  "endpoint": "siem.example.com:6514",
+  "tls_verify": true,
+  "batch_size": 100,
+  "source_types": ["audit", "traffic"],
+  "max_retries": 10
+}
+```
+
+CLI:
+
+```bash
+python illumio_ops.py siem status
+python illumio_ops.py siem test soc
+python illumio_ops.py siem dlq --dest soc
+python illumio_ops.py siem replay --dest soc --limit 100
+python illumio_ops.py siem purge --dest soc --older-than 30
+```
+
+Web API:
+
+- `GET /api/siem/destinations`
+- `POST /api/siem/destinations`
+- `PUT /api/siem/destinations/<name>`
+- `DELETE /api/siem/destinations/<name>`
+- `POST /api/siem/destinations/<name>/test`
+- `GET /api/siem/status`
+- `GET /api/siem/dlq`
+- `POST /api/siem/dlq/replay`
+- `POST /api/siem/dlq/purge`
+- `GET /api/siem/dlq/export`
+
+## 1. Enable the JSON Sink
+
+For file-based collection, enable structured JSON logs:
 
 ```json
 {
   "logging": {
-    "level": "INFO",
     "json_sink": true,
-    "rotation": "50 MB",
-    "retention": 30
+    "level": "INFO"
   }
 }
 ```
 
-Restart the daemon. The JSON log file appears at `logs/illumio_ops.json.log`.
-Each line is a valid JSON object:
+This writes JSON lines to `logs/illumio_ops.json.log`.
 
-```json
-{"text": "...", "record": {"time": {"timestamp": 1700000000.0}, "level": {"name": "INFO"}, "name": "monitor", "message": "Monitor cycle complete", "extra": {}}}
-```
-
-## 2. Forwarding options
+## 2. Forwarding Options
 
 ### Option A — Filebeat (Elastic Stack)
 
-See `deploy/filebeat.illumio_ops.yml` for a ready-to-use input configuration.
+Use `deploy/filebeat.illumio_ops.yml`.
 
 ```bash
-# Copy and edit the sample
 cp deploy/filebeat.illumio_ops.yml /etc/filebeat/conf.d/illumio_ops.yml
 # Update output.elasticsearch.hosts to your cluster
-filebeat test config && systemctl restart filebeat
+systemctl restart filebeat
 ```
 
-### Option B — Logstash pipeline
+### Option B — Logstash Pipeline
 
-See `deploy/logstash.illumio_ops.conf` for a complete input-filter-output pipeline.
+Use `deploy/logstash.illumio_ops.conf`.
 
 ```bash
-cp deploy/logstash.illumio_ops.conf /etc/logstash/conf.d/
+cp deploy/logstash.illumio_ops.conf /etc/logstash/conf.d/illumio_ops.conf
 # Update output.elasticsearch.hosts to your cluster
 systemctl restart logstash
 ```
 
-### Option C — rsyslog (syslog-based SIEMs, e.g. QRadar, ArcSight)
+### Option C — rsyslog
 
-See `deploy/rsyslog.illumio_ops.conf` for a `imfile`-based forwarding configuration.
+Use `deploy/rsyslog.illumio_ops.conf`.
 
 ```bash
-cp deploy/rsyslog.illumio_ops.conf /etc/rsyslog.d/90-illumio_ops.conf
-# Update Target and Port to your SIEM's syslog receiver
+cp deploy/rsyslog.illumio_ops.conf /etc/rsyslog.d/50-illumio-ops.conf
+# Update Target and Port to your SIEM syslog receiver
 systemctl restart rsyslog
 ```
 
 ### Option D — Splunk Universal Forwarder
 
-Add a monitor stanza to `$SPLUNK_HOME/etc/system/local/inputs.conf`:
+Monitor either:
 
-```ini
-[monitor:///opt/illumio-ops/logs/illumio_ops.json.log]
-sourcetype = _json
-index = illumio_ops
-```
+- `logs/illumio_ops.log`
+- `logs/illumio_ops.json.log`
+- built-in HEC destination from Option E
 
-Then restart the forwarder:
-
-```bash
-$SPLUNK_HOME/bin/splunk restart
-```
-
-## 3. Useful search queries
+## 3. Useful Search Queries
 
 ### Elastic / Kibana
 
-```
-record.level.name: "ERROR"
-record.message: *RateLimit*
-record.message: *MonitorCycle*
+```text
+event.module:"illumio_ops" AND severity:("HIGH" OR "CRITICAL")
 ```
 
 ### Splunk
 
-```spl
-source="/opt/illumio-ops/logs/illumio_ops.json.log" record.level.name="ERROR"
-| spath record.message | search record.message="*RateLimit*"
+```text
+index=illumio_ops (severity=HIGH OR severity=CRITICAL)
 ```
 
-### QRadar (AQL)
+### QRadar AQL
 
 ```sql
-SELECT "record.message", "record.time.timestamp"
-FROM events
-WHERE devicetype=<illumio_ops_device_id>
-  AND "record.level.name" = 'ERROR'
+SELECT * FROM events
+WHERE UTF8(payload) ILIKE '%illumio_ops%'
 LAST 24 HOURS
 ```
 
-## 4. Key log event types
+## 4. Key Event Types
 
-| record.message prefix | Meaning |
-|---|---|
-| `Monitor cycle complete` | Periodic analysis run finished normally |
-| `Monitor cycle failed` | Analysis error — check `record.exception` |
-| `[Scheduler] Triggering schedule` | Report schedule fired |
-| `[Scheduler] Running schedule` | Report generation started |
-| `RateLimit` | PCE API throttling detected |
-| `AsyncJob` | Long-running API query in progress |
-| `[RuleScheduler]` | Rule schedule evaluation result |
+Common event categories:
 
-## 5. Alerting recommendations
+- PCE health and connectivity.
+- Agent missed heartbeat / offline / tampering.
+- Login and API authentication failures.
+- Ruleset and security policy changes.
+- Traffic findings from reports.
+- SIEM dispatcher / DLQ events.
 
-- Alert on `record.level.name = "ERROR"` within any 5-minute window
-- Alert on repeated `RateLimit` messages (>10 in 1 hour indicates credential or concurrency issue)
-- Alert on absence of `Monitor cycle complete` for >2× the configured interval
+## 5. Alerting Recommendations
+
+- Alert immediately on `CRITICAL` and `HIGH` findings.
+- Treat cross-environment lateral ports and unmanaged-to-critical-services as priority incidents.
+- Monitor DLQ growth per destination.
+- Alert when SIEM pending rows grow continuously while sent rows do not increase.
+- Keep cache lag monitoring enabled when using SIEM Preview, because the forwarder depends on cached records.
+
+## 6. DLQ Operator Guide
+
+Use DLQ when destination delivery fails after retry or when payload preparation fails.
+
+Recommended flow:
+
+1. Check destination status.
+2. Fix network, TLS, token, or receiver-side issue.
+3. Replay DLQ for the destination.
+4. Purge old DLQ entries only after confirming replay is unnecessary.
+
+```bash
+python illumio_ops.py siem status
+python illumio_ops.py siem dlq --dest soc --limit 50
+python illumio_ops.py siem replay --dest soc --limit 100
+python illumio_ops.py siem purge --dest soc --older-than 30
+```

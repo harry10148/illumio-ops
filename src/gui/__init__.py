@@ -27,7 +27,7 @@ except ImportError:
     HAS_FLASK = False
     FLASK_IMPORT_ERROR = str(sys.exc_info()[1])
 
-from src.config import ConfigManager, verify_password, verify_and_upgrade_password
+from src.config import ConfigManager, hash_password_argon2, verify_and_upgrade_password, verify_password
 from src.i18n import t, get_messages
 from src import __version__
 from src.alerts import PLUGIN_METADATA, plugin_config_path, plugin_config_value
@@ -588,8 +588,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
     Talisman(
         app,
-        force_https=tls_enabled,               # only when TLS is configured
+        force_https=tls_enabled,
         strict_transport_security=tls_enabled,
+        session_cookie_secure=tls_enabled,
         content_security_policy=_csp,
         content_security_policy_nonce_in=[],   # inline not nonce-based (SPA compat)
         frame_options='DENY',
@@ -695,7 +696,6 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         saved_salt = gui_cfg.get("password_salt", "")
 
         if not saved_hash:
-            # No password configured — reject all logins until config is repaired
             logger.error("[GUI] Login attempted but no password hash configured.")
             return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
 
@@ -704,12 +704,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             session.permanent = True
             login_user(AdminUser(username))
             if new_hash is not None:
-                # Silent upgrade: PBKDF2/SHA256 → argon2id
                 gui_cfg["password_hash"] = new_hash
-                gui_cfg["password_salt"] = ""   # argon2 embeds salt
+                gui_cfg["password_salt"] = ""
                 cm.save()
                 logger.info("[GUI] Upgraded password hash to argon2id for user '%s'.", saved_username)
-            # Clear legacy _initial_password if present
             if gui_cfg.get("_initial_password"):
                 del gui_cfg["_initial_password"]
                 cm.save()
@@ -752,17 +750,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             gui_cfg["allowed_ips"] = allowed_ips
             
         if "new_password" in d and d["new_password"]:
-            # Check old password if there's already one set
             if gui_cfg.get("password_hash"):
                 old_pass = d.get("old_password", "")
                 stored = gui_cfg.get("password_hash", "")
                 salt = gui_cfg.get("password_salt", "")
                 if not verify_password(stored, salt, old_pass):
                     return jsonify({"ok": False, "error": t("gui_err_invalid_old_pass")}), 401
-
-            from src.config import hash_password_argon2 as _hash_argon2
-            gui_cfg["password_salt"] = ""   # argon2 embeds salt
-            gui_cfg["password_hash"] = _hash_argon2(d["new_password"])
+            gui_cfg["password_salt"] = ""
+            gui_cfg["password_hash"] = hash_password_argon2(d["new_password"])
             gui_cfg.pop("_initial_password", None)
             
         cm.save()
@@ -1925,10 +1920,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             if traffic_report_profile not in _VALID_PROFILES:
                 traffic_report_profile = 'security_risk'
 
-            _VALID_DETAIL_LEVELS_GUI = ('executive', 'standard', 'full')
-            detail_level = d.get('detail_level', 'standard')
-            if detail_level not in _VALID_DETAIL_LEVELS_GUI:
-                detail_level = 'standard'
+            lang = d.get('lang', 'en')
+            if lang not in ('en', 'zh_TW'):
+                lang = 'en'
 
             if source == 'csv':
                 if 'file' not in request.files:
@@ -1942,7 +1936,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 temp_path = os.path.join(tempfile.gettempdir(), f"{_uuid.uuid4().hex}_{safe_filename}")
                 csv_file.save(temp_path)
                 try:
-                    result = gen.generate_from_csv(temp_path, traffic_report_profile=traffic_report_profile, detail_level=detail_level)
+                    result = gen.generate_from_csv(temp_path, traffic_report_profile=traffic_report_profile, lang=lang)
                 finally:
                     try:
                         os.remove(temp_path)
@@ -1974,7 +1968,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     if not any(v for v in report_filters.values() if v):
                         report_filters = None
 
-                result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=report_filters, traffic_report_profile=traffic_report_profile, detail_level=detail_level)
+                result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=report_filters, traffic_report_profile=traffic_report_profile, lang=lang)
 
             if result.record_count == 0:
                 return jsonify({"ok": False, "error": t("gui_no_traffic_data")})
@@ -1982,8 +1976,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             fmt = d.get('format', 'all')
             fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'all'
             output_dir = _resolve_reports_dir(cm)
-                
-            paths = gen.export(result, fmt=fmt, output_dir=output_dir, send_email=str(d.get('send_email', '')).lower() == 'true', reporter=reporter)
+
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir, send_email=str(d.get('send_email', '')).lower() == 'true', reporter=reporter, traffic_report_profile=traffic_report_profile, lang=lang)
             
             filenames = [os.path.basename(p) for p in paths]
             try:
@@ -2023,8 +2017,11 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
             start_date = d.get('start_date')
             end_date = d.get('end_date')
+            lang = d.get('lang', 'en')
+            if lang not in ('en', 'zh_TW'):
+                lang = 'en'
 
-            result = gen.generate_from_api(start_date, end_date)
+            result = gen.generate_from_api(start_date, end_date, lang=lang)
 
             if result.record_count == 0:
                 return jsonify({"ok": False, "error": t("gui_no_audit_data")})
@@ -2032,7 +2029,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             output_dir = _resolve_reports_dir(cm)
             fmt = d.get('format', 'html')
             fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
-            paths = gen.export(result, fmt=fmt, output_dir=output_dir)
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
             _write_audit_dashboard_summary(output_dir, result)
             filenames = [os.path.basename(p) for p in paths]
             try:
@@ -2069,7 +2066,11 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             api = ApiClient(cm)
             gen = VenStatusGenerator(cm, api_client=api)
 
-            result = gen.generate()
+            lang = d.get('lang', 'en')
+            if lang not in ('en', 'zh_TW'):
+                lang = 'en'
+
+            result = gen.generate(lang=lang)
 
             if result.record_count == 0:
                 return jsonify({"ok": False, "error": t("gui_no_ven_data")})
@@ -2077,7 +2078,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             output_dir = _resolve_reports_dir(cm)
             fmt = d.get('format', 'html')
             fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
-            paths = gen.export(result, fmt=fmt, output_dir=output_dir)
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
             filenames = [os.path.basename(p) for p in paths]
             kpis = result.module_results.get('kpis', [])
             try:
@@ -2118,8 +2119,11 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
             start_date = d.get('start_date')
             end_date   = d.get('end_date')
+            lang = d.get('lang', 'en')
+            if lang not in ('en', 'zh_TW'):
+                lang = 'en'
 
-            result = gen.generate_from_api(start_date=start_date, end_date=end_date)
+            result = gen.generate_from_api(start_date=start_date, end_date=end_date, lang=lang)
 
             if result.record_count == 0:
                 return jsonify({"ok": False, "error": t("gui_no_pu_data")})
@@ -2127,7 +2131,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             output_dir = _resolve_reports_dir(cm)
             fmt = d.get('format', 'html')
             fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
-            paths = gen.export(result, fmt=fmt, output_dir=output_dir)
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
             _write_policy_usage_dashboard_summary(output_dir, result)
             filenames = [os.path.basename(p) for p in paths]
             mod00 = result.module_results.get('mod00', {})

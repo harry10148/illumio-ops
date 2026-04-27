@@ -1816,14 +1816,6 @@
           <option value="network_inventory" data-i18n="gui_report_profile_network_inventory">Network Inventory</option>
         </select>
       </div>
-      <div id="m-gen-detail-row" style="margin-top:10px; display:none;">
-        <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--dim);" data-i18n="gui_report_detail_label">Detail Level</label>
-        <select id="m-gen-detail" style="width:100%; padding:6px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px;">
-          <option value="executive" data-i18n="gui_report_detail_executive">Executive</option>
-          <option value="standard" data-i18n="gui_report_detail_standard" selected>Standard</option>
-          <option value="full" data-i18n="gui_report_detail_full">Full</option>
-        </select>
-      </div>
       <div id="m-gen-format-row" style="margin-top:10px;">
         <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--dim);" data-i18n="gui_sched_format">Output Format</label>
         <select id="m-gen-format" style="width:100%; padding:6px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px;">
@@ -1832,6 +1824,13 @@
           <option value="pdf"  data-i18n="gui_fmt_pdf">PDF</option>
           <option value="xlsx" data-i18n="gui_fmt_xlsx">Excel</option>
           <option value="all"  data-i18n="gui_fmt_all">All formats</option>
+        </select>
+      </div>
+      <div id="m-gen-lang-row" style="margin-top:10px;">
+        <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--dim);" data-i18n="gui_report_lang_label">Report Language</label>
+        <select id="m-gen-lang" style="width:100%; padding:6px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px;">
+          <option value="en" data-i18n="gui_report_lang_en" selected>English</option>
+          <option value="zh_TW" data-i18n="gui_report_lang_zh_tw">Traditional Chinese</option>
         </select>
       </div>
       <p id="m-gen-note" style="display:none;font-size:0.85rem;color:var(--dim);margin-top:8px;" data-i18n="gui_gen_snapshot_note">Gen Snapshot Note</p>

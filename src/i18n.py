@@ -1388,6 +1388,7 @@ _ZH_EXPLICIT: dict[str, str] = {
 
 _ZH_EXPLICIT["gui_top10_widgets"] = "排行總覽"
 _ZH_EXPLICIT["gui_top10_title"] = "排行統計"
+_ZH_EXPLICIT["gui_report_lang_en"] = "English"
 
 _ZH_EXPLICIT.update({
     # --- Summary field labels (sum_*) ---

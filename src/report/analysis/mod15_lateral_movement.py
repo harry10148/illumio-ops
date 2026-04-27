@@ -5,7 +5,7 @@ from collections import defaultdict, deque
 
 import pandas as pd
 
-from .attack_posture import build_app_display, make_posture_item, rank_posture_items
+from .attack_posture import build_app_display, make_posture_item, rank_posture_items, _enrich_app_display
 from src.i18n import t, get_language
 
 _LATERAL_PORTS = {
@@ -200,6 +200,17 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4)
     nodes = sorted(set(undirected.keys()) | {n for neigh in undirected.values() for n in neigh})
     articulation = _articulation_points(nodes, undirected)
 
+    # Build node_key → unique IPs for fallback display when labels are absent
+    node_ips: dict[str, list[str]] = {}
+    for _, _row in traversable.iterrows():
+        for key_col, ip_col in (("src_key", "src_ip"), ("dst_key", "dst_ip")):
+            k = str(_row.get(key_col, ""))
+            ip = str(_row.get(ip_col, ""))
+            if k and ip:
+                bucket = node_ips.setdefault(k, [])
+                if ip not in bucket:
+                    bucket.append(ip)
+
     reach_rows: list[dict] = []
     path_rows: list[dict] = []
     bridge_rows: list[dict] = []
@@ -211,6 +222,10 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4)
         reached = _bfs_reachability(node, adjacency, max_depth=max_depth)
         reach_cache[node] = reached
         max_reach = max(max_reach, len(reached))
+
+    def _ip_fallback_display(item: dict, key: str) -> dict:
+        new_display = _enrich_app_display(item.get("app_display", ""), key, node_ips)
+        return {**item, "app_display": new_display}
 
     for node in nodes:
         app, env = node.split("|", 1)
@@ -239,7 +254,7 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4)
         )
 
         if node in articulation and reach_count >= 2:
-            attack_items.append(
+            attack_items.append(_ip_fallback_display(
                 make_posture_item(
                     scope="traffic_report",
                     framework="microseg_attack",
@@ -251,10 +266,10 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4)
                     recommended_action_code="RESTRICT_TRANSIT_NODE_ACCESS",
                     severity="CRITICAL" if reach_count >= 6 else "HIGH",
                     evidence={"reachability_count": reach_count, "bridge_score": bridge_score},
-                )
-            )
+                ), node
+            ))
         if reach_count >= 4:
-            attack_items.append(
+            attack_items.append(_ip_fallback_display(
                 make_posture_item(
                     scope="traffic_report",
                     framework="microseg_attack",
@@ -266,8 +281,8 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4)
                     recommended_action_code="TIGHTEN_LATERAL_POLICY",
                     severity="HIGH",
                     evidence={"reachability_count": reach_count, "max_depth": max_depth},
-                )
-            )
+                ), node
+            ))
 
         for target, path in reached.items():
             if len(path) <= 2:
@@ -364,10 +379,11 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4)
             lambda v: build_app_display(*str(v).split("|", 1))
         )
 
+    _bridge_cols = ["App (Env)", "app_env_key", "Bridge Score", "Reachable App Count"]
     source_risk_scores = (
-        bridge_nodes[["App (Env)", "app_env_key", "Bridge Score", "Reachable App Count"]]
-        .rename(columns={"Bridge Score": "Risk Score"})
-        .copy()
+        bridge_nodes[_bridge_cols].rename(columns={"Bridge Score": "Risk Score"}).copy()
+        if not bridge_nodes.empty and all(c in bridge_nodes.columns for c in _bridge_cols)
+        else pd.DataFrame(columns=["App (Env)", "app_env_key", "Risk Score", "Reachable App Count"])
     )
     if not source_risk_scores.empty:
         source_risk_scores["Risk Level"] = source_risk_scores["Risk Score"].apply(
@@ -427,6 +443,7 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4)
     }
 
     return {
+        "node_ips": node_ips,
         "total_lateral_flows": int(len(lateral)),
         "unique_lateral_src": int(lateral["src_ip"].nunique()) if "src_ip" in lateral.columns else 0,
         "unique_lateral_dst": int(lateral["dst_ip"].nunique()) if "dst_ip" in lateral.columns else 0,

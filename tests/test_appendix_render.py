@@ -1,14 +1,13 @@
-"""Appendix wrapper renders content inside collapsible <details> by default,
-and expanded in 'full' mode."""
+"""Appendix wrapper always renders full detail."""
 from src.report.exporters.html_exporter import render_appendix
 
 
-def test_appendix_uses_details_in_standard():
+def test_appendix_uses_open_details_for_legacy_standard():
     out = render_appendix("Test", "<p>body</p>", detail_level="standard")
     assert "<details" in out
     assert "<summary" in out
     assert "<p>body</p>" in out
-    assert "<details open" not in out  # collapsed by default
+    assert "<details open" in out
 
 
 def test_appendix_open_in_full():
@@ -16,7 +15,7 @@ def test_appendix_open_in_full():
     assert "<details open" in out
 
 
-def test_appendix_omitted_in_executive():
-    """Executive mode hides appendix entirely."""
+def test_appendix_open_for_legacy_executive():
     out = render_appendix("Test", "<p>body</p>", detail_level="executive")
-    assert out == ""
+    assert "<details open" in out
+    assert "<p>body</p>" in out

@@ -1,70 +1,44 @@
-"""detail_level parameter must be accepted by all four generators and validated."""
+"""Report detail level is a legacy no-op; reports render full detail."""
+import inspect
+
 import pytest
-import pandas as pd
 
 
-def test_traffic_generator_rejects_invalid_detail():
+def test_traffic_generator_default_detail_level_is_full():
     from src.report.report_generator import ReportGenerator
-    gen = ReportGenerator.__new__(ReportGenerator)
-    with pytest.raises(ValueError, match="detail_level"):
-        gen.generate_from_api(detail_level="bogus")
 
-
-def test_audit_generator_rejects_invalid_detail():
-    from src.report.audit_generator import AuditGenerator
-    gen = AuditGenerator.__new__(AuditGenerator)
-    with pytest.raises(ValueError, match="detail_level"):
-        gen.generate_from_api(detail_level="bogus")
-
-
-def test_policy_usage_generator_rejects_invalid_detail():
-    from src.report.policy_usage_generator import PolicyUsageGenerator
-    gen = PolicyUsageGenerator.__new__(PolicyUsageGenerator)
-    with pytest.raises(ValueError, match="detail_level"):
-        gen.generate_from_api(detail_level="bogus")
-
-
-def test_ven_generator_rejects_invalid_detail():
-    from src.report.ven_status_generator import VenStatusGenerator
-    gen = VenStatusGenerator.__new__(VenStatusGenerator)
-    with pytest.raises(ValueError, match="detail_level"):
-        gen.generate(detail_level="bogus")
-
-
-def test_default_detail_level_is_standard():
-    """The default must be standard so legacy callers see no behavior change."""
-    import inspect
-    from src.report.report_generator import ReportGenerator
     sig = inspect.signature(ReportGenerator.generate_from_api)
-    assert sig.parameters.get("detail_level") is not None, "detail_level param missing"
-    assert sig.parameters["detail_level"].default == "standard"
+    assert sig.parameters.get("detail_level") is not None
+    assert sig.parameters["detail_level"].default == "full"
 
 
-@pytest.fixture
-def sample_flows_fixture():
-    return pd.DataFrame([
-        {"src": "a", "dst": "b", "port": 443, "policy_decision": "allowed"},
-        {"src": "a", "dst": "c", "port": 445, "policy_decision": "potentially_blocked"},
-        {"src": "x", "dst": "y", "port": 22,  "policy_decision": "blocked"},
-    ])
+@pytest.mark.parametrize(
+    ("factory", "method_name", "error_pattern"),
+    [
+        ("src.report.report_generator.ReportGenerator", "generate_from_api", "api_client"),
+        ("src.report.audit_generator.AuditGenerator", "generate_from_api", "api_client"),
+        ("src.report.policy_usage_generator.PolicyUsageGenerator", "generate_from_api", "api_client"),
+        ("src.report.ven_status_generator.VenStatusGenerator", "generate", "api_client"),
+    ],
+)
+def test_report_generators_do_not_validate_legacy_detail_level(factory, method_name, error_pattern):
+    module_name, class_name = factory.rsplit(".", 1)
+    module = __import__(module_name, fromlist=[class_name])
+    cls = getattr(module, class_name)
+    gen = cls.__new__(cls)
+    gen.api = None
+
+    with pytest.raises(RuntimeError, match=error_pattern):
+        getattr(gen, method_name)(detail_level="bogus")
 
 
-def test_executive_renders_fewer_sections_than_standard(sample_flows_fixture):
-    """executive detail_level shows fewer sections than standard."""
+def test_html_exporter_treats_all_detail_values_as_full():
     from src.report.exporters.html_exporter import HtmlExporter
-    exporter = HtmlExporter(results={}, profile="security_risk", detail_level="standard")
-    html_exec = exporter._build(profile="security_risk", detail_level="executive")
-    html_std  = exporter._build(profile="security_risk", detail_level="standard")
-    h2_exec = html_exec.count("<h2")
-    h2_std  = html_std.count("<h2")
-    assert h2_exec < h2_std, (
-        f"executive should have fewer sections than standard; exec={h2_exec}, std={h2_std}")
 
+    exporter = HtmlExporter(results={}, profile="security_risk", detail_level="executive")
 
-def test_full_renders_at_least_as_many_sections_as_standard(sample_flows_fixture):
-    """full detail_level shows at least as many sections as standard."""
-    from src.report.exporters.html_exporter import HtmlExporter
-    exporter = HtmlExporter(results={}, profile="security_risk", detail_level="standard")
-    html_std  = exporter._build(profile="security_risk", detail_level="standard")
-    html_full = exporter._build(profile="security_risk", detail_level="full")
-    assert html_full.count("<h2") >= html_std.count("<h2")
+    html_from_legacy_exec = exporter._build(profile="security_risk", detail_level="executive")
+    html_from_full = exporter._build(profile="security_risk", detail_level="full")
+
+    assert exporter._detail_level == "full"
+    assert html_from_legacy_exec == html_from_full

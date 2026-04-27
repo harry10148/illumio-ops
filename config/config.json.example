@@ -121,10 +121,7 @@
     "password_hash": "argon2:$argon2id$v=19$m=65536,t=3,p=4$aQ+N6jDiLEHLRpm78VgOmA$H6UiJKMTN4dT9Ho3bNU3mm8RYuj4RH0k0g+9XcqAmfE",
     "password_salt": "",
     "secret_key": "change-me-in-production",
-    "allowed_ips": [
-      "10.0.0.0/8",
-      "127.0.0.1"
-    ],
+    "allowed_ips": [],
     "tls": {
       "enabled": false,
       "cert_file": "",

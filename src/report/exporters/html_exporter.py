@@ -17,7 +17,7 @@ import os
 from loguru import logger
 import pandas as pd
 
-from .report_i18n import STRINGS, make_i18n_js, lang_btn_html, COL_I18N as _COL_I18N
+from .report_i18n import STRINGS, lang_btn_html, COL_I18N as _COL_I18N
 from .report_css import build_css, TABLE_JS
 from .table_renderer import render_df_table
 from .chart_renderer import render_plotly_html, FirstChartTracker
@@ -28,6 +28,9 @@ from src.i18n import t
 
 _CSS = build_css('traffic')
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
+
+
+_REPORT_DETAIL_LEVEL = "full"
 
 
 def render_section_guidance(module_id: str, profile: str, detail_level: str) -> str:
@@ -41,13 +44,6 @@ def render_section_guidance(module_id: str, profile: str, detail_level: str) -> 
         return ""
     purpose = t(g.purpose_key)
     actions = t(g.recommended_actions_key)
-    if detail_level == "executive":
-        return (
-            '<div class="section-guidance executive">'
-            f'<div><b>{t("rpt_guidance_purpose_label")}</b>: {purpose}</div>'
-            f'<div><b>{t("rpt_guidance_recommended_actions_label")}</b>: {actions}</div>'
-            "</div>"
-        )
     signals = t(g.watch_signals_key)
     how = t(g.how_to_read_key)
     return (
@@ -61,16 +57,9 @@ def render_section_guidance(module_id: str, profile: str, detail_level: str) -> 
 
 
 def render_appendix(title: str, body_html: str, *, detail_level: str) -> str:
-    """Wrap body_html in a collapsible <details> block.
-    - executive: returns "" (appendix entirely hidden).
-    - standard:  collapsed by default.
-    - full:      <details open>.
-    """
-    if detail_level == "executive":
-        return ""
-    open_attr = " open" if detail_level == "full" else ""
+    """Wrap body_html in an expanded appendix block."""
     return (
-        f'<details{open_attr} class="report-appendix">'
+        f'<details open class="report-appendix">'
         f'<summary><b>{t("rpt_appendix_label")}: {title}</b></summary>'
         f'{body_html}'
         f'</details>'
@@ -362,19 +351,21 @@ class HtmlExporter:
     """Export report results to a single self-contained HTML file."""
 
     def __init__(self, results: dict, data_source: str = "",
-                 profile: str = "security_risk", detail_level: str = "standard",
-                 compute_draft: bool = False):
+                 profile: str = "security_risk", detail_level: str = _REPORT_DETAIL_LEVEL,
+                 compute_draft: bool = False, lang: str = "en"):
         self._r = results
         self._data_source = data_source
         self._profile = profile
-        self._detail_level = detail_level
+        self._detail_level = _REPORT_DETAIL_LEVEL
         self._compute_draft = compute_draft
+        self._lang = lang
 
     def export(self, output_dir: str = 'reports') -> str:
         """Write HTML file and return full path."""
         os.makedirs(output_dir, exist_ok=True)
         ts = datetime.datetime.now().strftime('%Y-%m-%d_%H%M')
-        filename = f'Illumio_Traffic_Report_{ts}.html'
+        profile_label = "NetworkInventory" if self._profile == "network_inventory" else "SecurityRisk"
+        filename = f'Illumio_Traffic_Report_{profile_label}_{ts}.html'
         filepath = os.path.join(output_dir, filename)
 
         with open(filepath, 'w', encoding='utf-8') as f:
@@ -384,32 +375,13 @@ class HtmlExporter:
 
     def _build(self, profile: str = "", detail_level: str = "") -> str:
         profile = profile or self._profile
-        detail_level = detail_level or self._detail_level
+        detail_level = _REPORT_DETAIL_LEVEL
         self._chart_tracker = FirstChartTracker()
         mod12 = self._r.get('mod12', {})
         findings = self._r.get('findings', [])
         n_findings = str(len(findings))
 
-        nav_html = (
-            '<nav>'
-            '<a href="#summary"><span data-i18n="rpt_tr_nav_summary">📊 Executive Summary</span></a>'
-            '<a href="#overview"><span data-i18n="rpt_tr_nav_overview">1 Traffic Overview</span></a>'
-            '<a href="#policy"><span data-i18n="rpt_tr_nav_policy">2 Policy Decisions</span></a>'
-            '<a href="#uncovered"><span data-i18n="rpt_tr_nav_uncovered">3 Uncovered Flows</span></a>'
-            '<a href="#ransomware"><span data-i18n="rpt_tr_nav_ransomware">4 Ransomware Exposure</span></a>'
-            ''  # mod05 consolidated into mod15
-            '<a href="#user"><span data-i18n="rpt_tr_nav_user">6 User &amp; Process</span></a>'
-            '<a href="#matrix"><span data-i18n="rpt_tr_nav_matrix">7 Cross-Label Matrix</span></a>'
-            '<a href="#unmanaged"><span data-i18n="rpt_tr_nav_unmanaged">8 Unmanaged Hosts</span></a>'
-            '<a href="#distribution"><span data-i18n="rpt_tr_nav_distribution">9 Traffic Distribution</span></a>'
-            '<a href="#allowed"><span data-i18n="rpt_tr_nav_allowed">10 Allowed Traffic</span></a>'
-            '<a href="#bandwidth"><span data-i18n="rpt_tr_nav_bandwidth">11 Bandwidth &amp; Volume</span></a>'
-            '<a href="#readiness"><span data-i18n="rpt_tr_nav_readiness">13 Enforcement Readiness</span></a>'
-            '<a href="#infrastructure"><span data-i18n="rpt_tr_nav_infrastructure">14 Infrastructure Scoring</span></a>'
-            '<a href="#lateral"><span data-i18n="rpt_tr_nav_lateral">15 Lateral Movement</span></a>'
-            '<a href="#findings"><span data-i18n="rpt_tr_nav_findings">Findings</span> (' + n_findings + ')</a>'
-            '</nav>'
-        )
+        # nav_html is built after block flags are known (see below)
 
         # Pre-compute nested blocks to avoid f-string quote conflicts
         _raw_kpis = mod12.get('kpis', [])
@@ -432,16 +404,18 @@ class HtmlExporter:
             kf.get('action', '') + '</em></p>'
             for kf in mod12.get('key_findings', [])
         ) or '<p class="note" data-i18n="rpt_no_findings">No key findings.</p>'
-        attack_summary_html = self._attack_summary_html(mod12)
+        attack_summary_html = self._attack_summary_html(mod12) if profile == 'security_risk' else ''
 
         generated_at = mod12.get('generated_at', '')
         today_str = str(datetime.date.today())
         total_flows = self._r.get('mod01', {}).get('total_flows', 0)
+        _sl = self._lang
+        _s = lambda k: STRINGS[k].get(_sl) or STRINGS[k]["en"]
         summary_pills = (
             '<div class="summary-pill-row">'
-            f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_flows"]["en"]}</span><span class="summary-pill-value">{human_number(total_flows)}</span></div>'
-            f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_findings"]["en"]}</span><span class="summary-pill-value">{human_number(int(n_findings))}</span></div>'
-            f'<div class="summary-pill"><span class="summary-pill-label">{STRINGS["rpt_pill_focus"]["en"]}</span><span class="summary-pill-value">{STRINGS["rpt_focus_traffic"]["en"]}</span></div>'
+            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_flows")}</span><span class="summary-pill-value">{human_number(total_flows)}</span></div>'
+            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_findings")}</span><span class="summary-pill-value">{human_number(int(n_findings))}</span></div>'
+            f'<div class="summary-pill"><span class="summary-pill-label">{_s("rpt_pill_focus")}</span><span class="summary-pill-value">{_s("rpt_focus_traffic")}</span></div>'
             '</div>'
         )
 
@@ -504,15 +478,13 @@ class HtmlExporter:
             f'<div style="flex:1">{maturity_bars}</div></div>'
         )
 
-        # T6: mod06 user/process — appendix only when data available
+        # T6: mod06 user/process — security_risk only, and only when data available
         _mod06 = self._r.get('mod06', {})
         _mod06_has_data = _mod06.get('user_data_available') or _mod06.get('process_data_available')
-        _mod06_block = (render_appendix(
-            title=t('rpt_tr_sec_user'),
-            body_html=(render_section_guidance('mod06', profile=profile, detail_level=detail_level) +
-                       self._mod06_html()),
-            detail_level=detail_level,
-        ) if _mod06_has_data else '') + '\n'
+        _mod06_block = (self._section(
+            'user', 'rpt_tr_sec_user', 'User & Process',
+            render_section_guidance('mod06', profile=profile, detail_level=detail_level) + self._mod06_html(),
+        ) if (_mod06_has_data and profile == 'security_risk') else '') + '\n'
 
         # T7: mod07 — profile-aware rendering
         if visible_in('mod07_cross_label_matrix', profile, detail_level):
@@ -520,27 +492,74 @@ class HtmlExporter:
                            self._mod07_html())
             if profile == 'security_risk':
                 _mod07_block = (
-                    self._section('matrix', 'rpt_tr_sec_matrix', '7 · Cross-Label Matrix',
+                    self._section('matrix', 'rpt_tr_sec_matrix', 'Cross-Label Matrix',
                                   _mod07_body,
-                                  'rpt_tr_sec_matrix_intro', 'Observe cross-group communication by Label dimension, useful for surfacing segments that should not interact frequently.') + '\n' +
-                    render_appendix(
-                        title=t('rpt_mod07_full_matrix'),
-                        body_html=_mod07_body,
-                        detail_level=detail_level,
-                    )
+                                  'rpt_tr_sec_matrix_intro', 'Observe cross-group communication by Label dimension, useful for surfacing segments that should not interact frequently.') + '\n'
                 )
             else:  # network_inventory — full matrix in main
                 _mod07_block = (
-                    self._section('matrix', 'rpt_tr_sec_matrix', '7 · Cross-Label Matrix',
+                    self._section('matrix', 'rpt_tr_sec_matrix', 'Cross-Label Matrix',
                                   _mod07_body,
                                   'rpt_tr_sec_matrix_intro', 'Observe cross-group communication by Label dimension, useful for surfacing segments that should not interact frequently.') + '\n'
                 )
         else:
             _mod07_block = ''
 
+        # Build profile-aware nav after all block flags are known
+        def _nav_link(anchor: str, i18n_key: str, fallback: str, badge: str = '') -> str:
+            return (f'<a href="#{anchor}"><span data-i18n="{i18n_key}">{fallback}</span>'
+                    + (f'<span class="nav-badge">{badge}</span>' if badge else '') + '</a>')
+
+        if profile == 'security_risk':
+            _nav_links = [
+                _nav_link('summary', 'rpt_tr_nav_summary', 'Executive Summary'),
+                _nav_link('overview', 'rpt_tr_nav_overview', '1 Traffic Overview'),
+                _nav_link('policy', 'rpt_tr_nav_policy', '2 Policy Decisions'),
+                _nav_link('uncovered', 'rpt_tr_nav_uncovered', '3 Uncovered Flows'),
+                _nav_link('ransomware', 'rpt_tr_nav_ransomware', '4 Ransomware Exposure'),
+                (_nav_link('user', 'rpt_tr_nav_user', '6 User & Process') if _mod06_has_data else ''),
+                _nav_link('allowed', 'rpt_tr_nav_allowed', '10 Allowed Traffic'),
+                _nav_link('readiness', 'rpt_tr_nav_readiness', '13 Enforcement Readiness'),
+                _nav_link('infrastructure', 'rpt_tr_nav_infrastructure', '14 Infrastructure Scoring'),
+                _nav_link('lateral', 'rpt_tr_nav_lateral', '15 Lateral Movement'),
+                (_nav_link('draft_actions', 'rpt_tr_nav_draft_actions', 'Draft Actions')
+                 if visible_in('mod_draft_actions', profile, detail_level) else ''),
+                (_nav_link('enforcement_rollout', 'rpt_tr_nav_enf_rollout', 'Enforcement Rollout')
+                 if visible_in('mod_enforcement_rollout', profile, detail_level) else ''),
+                (_nav_link('exfiltration', 'rpt_tr_nav_exfiltration', 'Exfiltration Intel')
+                 if visible_in('mod_exfiltration_intel', profile, detail_level) else ''),
+                _nav_link('findings', 'rpt_tr_nav_findings', 'Findings', badge=n_findings),
+            ]
+        else:  # network_inventory
+            _nav_links = [
+                _nav_link('summary', 'rpt_tr_nav_summary', 'Executive Summary'),
+                _nav_link('overview', 'rpt_tr_nav_overview', '1 Traffic Overview'),
+                _nav_link('policy', 'rpt_tr_nav_policy', '2 Policy Decisions'),
+                (_nav_link('matrix', 'rpt_tr_nav_matrix', '7 Cross-Label Matrix')
+                 if _mod07_block else ''),
+                _nav_link('unmanaged', 'rpt_tr_nav_unmanaged', '8 Unmanaged Hosts'),
+                _nav_link('distribution', 'rpt_tr_nav_distribution', '9 Traffic Distribution'),
+                _nav_link('bandwidth', 'rpt_tr_nav_bandwidth', '11 Bandwidth & Volume'),
+                _nav_link('readiness', 'rpt_tr_nav_readiness', '13 Enforcement Readiness'),
+                (_nav_link('draft_actions', 'rpt_tr_nav_draft_actions', 'Draft Actions')
+                 if visible_in('mod_draft_actions', profile, detail_level) else ''),
+                (_nav_link('ringfence', 'rpt_tr_nav_ringfence', 'Application Ringfence')
+                 if visible_in('mod_ringfence', profile, detail_level) else ''),
+                (_nav_link('change_impact', 'rpt_tr_nav_change_impact', 'Change Impact')
+                 if visible_in('mod_change_impact', profile, detail_level) else ''),
+            ]
+        nav_html = '<nav>' + ''.join(_nav_links) + '</nav>'
+
         body = (
             '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top"><div class="report-kicker" data-i18n="rpt_kicker_traffic">Traffic Analytics Report</div>'
+            + (
+                f'<div class="report-profile-badge report-profile-badge--security" '
+                f'data-i18n="rpt_kicker_security_risk">{_s("rpt_kicker_security_risk")}</div>'
+                if profile == 'security_risk' else
+                f'<div class="report-profile-badge report-profile-badge--inventory" '
+                f'data-i18n="rpt_kicker_network_inventory">{_s("rpt_kicker_network_inventory")}</div>'
+            ) +
             '<h1 data-i18n="rpt_tr_title">Illumio Traffic Flow Report</h1>'
             '<p class="report-subtitle">'
             '<span data-i18n="rpt_generated">Generated:</span> ' + generated_at + '</p></div>'
@@ -553,18 +572,18 @@ class HtmlExporter:
             '<h2 data-i18n="rpt_key_findings">Key Findings</h2>' + key_findings_html +
             attack_summary_html +
             '</section>\n' +
-            self._section('overview', 'rpt_tr_sec_overview', '1 \u00b7 Traffic Overview',
+            self._section('overview', 'rpt_tr_sec_overview', 'Traffic Overview',
                           render_section_guidance('mod01', profile=profile, detail_level=detail_level) + self._mod01_html(),
                           'rpt_tr_sec_overview_intro', 'Start from overall traffic scale, Policy coverage, and top Ports to set a baseline for reading the rest of the report.') + '\n' +
-            (self._section('policy', 'rpt_tr_sec_policy', '2 \u00b7 Policy Decisions',
+            (self._section('policy', 'rpt_tr_sec_policy', 'Policy Decisions',
                            render_section_guidance('mod02', profile=profile, detail_level=detail_level) + self._mod02_html(),
                            'rpt_tr_sec_policy_intro', 'Break down the ratios and details of Allowed, Blocked, and Potentially Blocked to gauge how Policy is actually landing.') + '\n'
              if visible_in('mod02_policy_decisions', profile, detail_level) else '') +
-            (self._section('uncovered', 'rpt_tr_sec_uncovered', '3 \u00b7 Uncovered Flows',
+            (self._section('uncovered', 'rpt_tr_sec_uncovered', 'Uncovered Flows',
                            render_section_guidance('mod03', profile=profile, detail_level=detail_level) + self._mod03_html(),
                            'rpt_tr_sec_uncovered_intro', 'Focus on traffic not yet covered by effective Policy, helping prioritise which Services and directions to tighten first.') + '\n'
              if visible_in('mod03_uncovered_flows', profile, detail_level) else '') +
-            (self._section('ransomware', 'rpt_tr_sec_ransomware', '4 \u00b7 Ransomware Exposure',
+            (self._section('ransomware', 'rpt_tr_sec_ransomware', 'Ransomware Exposure',
                            render_section_guidance('mod04', profile=profile, detail_level=detail_level) + self._mod04_html(),
                            'rpt_tr_sec_ransomware_intro', 'Check high-risk Ports, Allowed flows, and host exposure commonly tied to ransomware attack chains.') + '\n'
              if visible_in('mod04_ransomware_exposure', profile, detail_level) else '') +
@@ -572,30 +591,31 @@ class HtmlExporter:
 
             _mod06_block +
             _mod07_block +
-            (self._section('unmanaged', 'rpt_tr_sec_unmanaged', '8 \u00b7 Unmanaged Hosts',
+            (self._section('unmanaged', 'rpt_tr_sec_unmanaged', 'Unmanaged Hosts',
                            render_section_guidance('mod08', profile=profile, detail_level=detail_level) + self._mod08_html(),
                            'rpt_tr_sec_unmanaged_intro', 'Inventory traffic involving hosts not managed by VEN; these typically sit outside the visibility and control boundary.') + '\n'
              if visible_in('mod08_unmanaged_hosts', profile, detail_level) else '') +
-            render_appendix(
-                title=t('rpt_tr_sec_distribution'),
-                body_html=(render_section_guidance('mod09', profile=profile, detail_level=detail_level) +
-                           self._mod09_html()),
-                detail_level=detail_level,
-            ) + '\n' +
-            self._section('allowed', 'rpt_tr_sec_allowed', '10 \u00b7 Allowed Traffic',
-                          render_section_guidance('mod10', profile=profile, detail_level=detail_level) + self._mod10_html(),
-                          'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.') + '\n' +
-            self._section('bandwidth', 'rpt_tr_sec_bandwidth', '11 \u00b7 Bandwidth &amp; Volume',
-                          render_section_guidance('mod11', profile=profile, detail_level=detail_level) + self._mod11_html(),
-                          'rpt_tr_sec_bandwidth_intro', 'Review high-volume flows by bandwidth and data volume to identify large backups, batch jobs, or suspected exfiltration.') + '\n' +
-            (self._section('readiness', 'rpt_tr_sec_readiness', '13 \u00b7 Enforcement Readiness',
+            (self._section('distribution', 'rpt_tr_sec_distribution', 'Traffic Distribution',
+                           render_section_guidance('mod09', profile=profile, detail_level=detail_level) +
+                           self._mod09_html()) + '\n'
+             if profile == 'network_inventory' else '') +
+            (self._section('allowed', 'rpt_tr_sec_allowed', 'Allowed Traffic',
+                           render_section_guidance('mod10', profile=profile, detail_level=detail_level) + self._mod10_html(),
+                           'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.') + '\n'
+             if profile == 'security_risk' else '') +
+            (self._section('bandwidth', 'rpt_tr_sec_bandwidth', 'Bandwidth &amp; Volume',
+                           render_section_guidance('mod11', profile=profile, detail_level=detail_level) + self._mod11_html(),
+                           'rpt_tr_sec_bandwidth_intro', 'Review high-volume flows by bandwidth and data volume to identify large backups, batch jobs, or suspected exfiltration.') + '\n'
+             if profile == 'network_inventory' else '') +
+            (self._section('readiness', 'rpt_tr_sec_readiness', 'Enforcement Readiness',
                            render_section_guidance('mod13', profile=profile, detail_level=detail_level) + self._mod13_html(),
                            'rpt_tr_sec_readiness_intro', 'Aggregate multiple signals into a readiness score to help assess whether it is safe to tighten Enforcement.') + '\n'
              if visible_in('mod13_readiness', profile, detail_level) else '') +
-            self._section('infrastructure', 'rpt_tr_sec_infrastructure', '14 \u00b7 Infrastructure Scoring',
-                          render_section_guidance('mod14', profile=profile, detail_level=detail_level) + self._mod14_html(),
-                          'rpt_tr_sec_infrastructure_intro', 'Identify critical nodes and infrastructure roles with large blast radius from application communication patterns.') + '\n' +
-            (self._section('lateral', 'rpt_tr_sec_lateral', '15 \u00b7 Lateral Movement',
+            (self._section('infrastructure', 'rpt_tr_sec_infrastructure', 'Infrastructure Scoring',
+                           render_section_guidance('mod14', profile=profile, detail_level=detail_level) + self._mod14_html(),
+                           'rpt_tr_sec_infrastructure_intro', 'Identify critical nodes and infrastructure roles with large blast radius from application communication patterns.') + '\n'
+             if profile == 'security_risk' else '') +
+            (self._section('lateral', 'rpt_tr_sec_lateral', 'Lateral Movement',
                            render_section_guidance('mod15', profile=profile, detail_level=detail_level) + self._mod15_html(),
                            'rpt_tr_sec_lateral_intro', 'Focus on paths, Services, and sources tied to lateral movement to surface spread risk.') + '\n'
              if visible_in('mod15_lateral_movement', profile, detail_level) else '') +
@@ -619,19 +639,22 @@ class HtmlExporter:
                            render_section_guidance('mod_exfiltration_intel', profile, detail_level) + self._mod_exfil_html(),
                            '', '') + '\n'
              if visible_in('mod_exfiltration_intel', profile, detail_level) else '') +
+            ((
             '<section id="findings" class="card">'
             '<h2><span data-i18n="rpt_tr_sec_findings">Security Findings</span> (' + n_findings + ')</h2>'
             + self._findings_html() +
-            '</section>\n' +
+            '</section>\n'
+            ) if profile == 'security_risk' else '') +
             '<footer><span data-i18n="rpt_tr_footer">Illumio PCE Ops — Traffic Flow Report</span>'
             ' &middot; ' + today_str + '</footer>'
         )
+        html_lang = "zh-TW" if self._lang == "zh_TW" else "en"
         return (
-            '<!DOCTYPE html><html lang="en"><head>\n'
+            f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
             '<title>Illumio Traffic Report</title>' + _CSS + _HIGHLIGHT_CSS + '</head>\n'
-            '<body>' + lang_btn_html() + nav_html + '<main>' + body + '</main>'
-            + TABLE_JS + make_i18n_js() + '</body></html>'
+            '<body>' + nav_html + '<main>' + body + '</main>'
+            + TABLE_JS + '</body></html>'
         )
 
     def _section(
@@ -686,9 +709,7 @@ class HtmlExporter:
                 '<p style="margin-bottom:8px"><span class="badge badge-' +
                 str(item.get('severity', 'INFO')) + '">' + str(item.get('severity', 'INFO')) +
                 '</span>&nbsp;' + str(item.get('finding', '')) +
-                (('<br><span class="zh-only" style="color:#718096;font-size:12px;">' + str(item.get('finding_zh', '')) + '</span>') if item.get('finding_zh') else '') +
                 ' <em style="color:#718096">&rarr; ' + str(item.get('action', '')) + '</em>' +
-                (('<br><span class="zh-only" style="color:#718096;font-size:12px;"><em>&rarr; ' + str(item.get('action_zh', '')) + '</em></span>') if item.get('action_zh') else '') +
                 '</p>'
                 for item in section_items[:3]
             )
@@ -697,7 +718,6 @@ class HtmlExporter:
         action_html = ''.join(
             '<p style="margin-bottom:8px"><b>' + str(item.get('action_code', '')) + '</b>: ' +
             str(item.get('action', '')) +
-            (('<br><span class="zh-only" style="color:#718096;font-size:12px;">' + str(item.get('action_zh', '')) + '</span>') if item.get('action_zh') else '') +
             '</p>'
             for item in action_matrix[:3]
         ) or '<p class="note">No data</p>'
@@ -1139,6 +1159,34 @@ class HtmlExporter:
                 + '</div>'
             )
 
+        _factor_legend = (
+            '<div style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;'
+            'padding:12px 16px;margin-bottom:12px;font-size:13px;line-height:1.6">'
+            '<b data-i18n="rpt_tr_col_legend">Column guide</b>'
+            '<ul style="margin:6px 0 0 0;padding-left:18px">'
+            '<li><b data-i18n="rpt_tr_col_factor">Factor</b> — <span data-i18n="rpt_tr_col_factor_desc">the aspect of enforcement readiness being measured</span></li>'
+            '<li><b data-i18n="rpt_tr_col_weight">Weight</b> — <span data-i18n="rpt_tr_col_weight_desc">how much this factor contributes to the 100-point total score (e.g. 35 = 35%)</span></li>'
+            '<li><b data-i18n="rpt_tr_col_ratio">Ratio %</b> — <span data-i18n="rpt_tr_col_ratio_desc">the underlying measurement (e.g. 60% of flows are policy-covered)</span></li>'
+            '<li><b data-i18n="rpt_tr_col_score">Score</b> — <span data-i18n="rpt_tr_col_score_desc">points earned for this factor (= Weight × Ratio ÷ 100); all factors sum to the total</span></li>'
+            '</ul>'
+            '<table style="margin-top:10px;font-size:12px;border-collapse:collapse;width:100%">'
+            '<tr style="border-bottom:1px solid var(--border)">'
+            '<th style="text-align:left;padding:4px 8px" data-i18n="rpt_tr_col_factor">Factor</th>'
+            '<th style="text-align:left;padding:4px 8px" data-i18n="rpt_tr_col_factor_meaning">What it measures</th>'
+            '</tr>'
+            '<tr><td style="padding:4px 8px">Policy Coverage</td>'
+            '<td style="padding:4px 8px" data-i18n="rpt_tr_mod13_factor_policy">% of flows matched by an allow policy (higher = fewer unprotected paths)</td></tr>'
+            '<tr style="background:var(--row-alt)"><td style="padding:4px 8px">Ringfence Maturity</td>'
+            '<td style="padding:4px 8px" data-i18n="rpt_tr_mod13_factor_ringfence">% of apps with app-boundary ringfence policies in place</td></tr>'
+            '<tr><td style="padding:4px 8px">Enforcement Mode</td>'
+            '<td style="padding:4px 8px" data-i18n="rpt_tr_mod13_factor_enforcement">% of workloads in selective or full enforcement (not visibility-only or idle)</td></tr>'
+            '<tr style="background:var(--row-alt)"><td style="padding:4px 8px">Staged Readiness</td>'
+            '<td style="padding:4px 8px" data-i18n="rpt_tr_mod13_factor_staged">% of staged flows (rules written, not yet enforced) that are already covered; shows how much of the backlog is resolved</td></tr>'
+            '<tr><td style="padding:4px 8px">Remote-App Coverage</td>'
+            '<td style="padding:4px 8px" data-i18n="rpt_tr_mod13_factor_remote">% of remote-access flows (RDP/SSH/VNC) that have a matching allow policy</td></tr>'
+            '</table>'
+            '</div>'
+        )
         html = (
             self._subnote('rpt_tr_readiness_subnote', 'The readiness score estimates how ready the environment is to tighten Enforcement; a higher score usually means tighter convergence.') +
             f'<div style="display:flex;align-items:center;gap:24px;margin-bottom:16px;">'
@@ -1149,6 +1197,7 @@ class HtmlExporter:
             f'</div></div>'
             + dist_html
             + '<h4 data-i18n="rpt_tr_score_breakdown">Score Breakdown by Factor</h4>'
+            + _factor_legend
             + _df_to_html(factor_table)
         )
         if app_env_scores is not None and not app_env_scores.empty:

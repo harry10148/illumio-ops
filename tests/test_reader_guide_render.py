@@ -27,7 +27,7 @@ def test_returns_card_when_registered(monkeypatch):
         how_to_read_key="rpt_guidance_demo_how",
         recommended_actions_key="rpt_guidance_demo_actions",
         profile_visibility=("security_risk", "network_inventory"),
-        min_detail_level="standard",
+        min_detail_level="full",
     )
     monkeypatch.setitem(sg.REGISTRY, "demo", fake)
     _patch_en_keys(monkeypatch, {
@@ -46,7 +46,7 @@ def test_returns_card_when_registered(monkeypatch):
         i18n_mod._normalized_en_messages.cache_clear()
 
 
-def test_executive_mode_renders_only_purpose_and_actions(monkeypatch):
+def test_legacy_executive_mode_still_renders_full_guidance(monkeypatch):
     from src.report import section_guidance as sg
     fake = sg.SectionGuidance(
         module_id="demo2",
@@ -55,7 +55,7 @@ def test_executive_mode_renders_only_purpose_and_actions(monkeypatch):
         how_to_read_key="rpt_guidance_demo_how",
         recommended_actions_key="rpt_guidance_demo_actions",
         profile_visibility=("security_risk",),
-        min_detail_level="executive",
+        min_detail_level="full",
     )
     monkeypatch.setitem(sg.REGISTRY, "demo2", fake)
     _patch_en_keys(monkeypatch, {
@@ -67,9 +67,8 @@ def test_executive_mode_renders_only_purpose_and_actions(monkeypatch):
     try:
         html = render_section_guidance("demo2", profile="security_risk",
                                         detail_level="executive")
-        # how_to_read and watch_signals are suppressed in executive mode
-        assert "Demo signals" not in html
-        assert "Demo how" not in html
+        assert "Demo signals" in html
+        assert "Demo how" in html
     finally:
         i18n_mod._build_messages.cache_clear()
         i18n_mod._normalized_en_messages.cache_clear()
@@ -84,7 +83,7 @@ def test_returns_empty_when_profile_excluded(monkeypatch):
         how_to_read_key="rpt_guidance_demo_how",
         recommended_actions_key="rpt_guidance_demo_actions",
         profile_visibility=("network_inventory",),  # only network, not security
-        min_detail_level="standard",
+        min_detail_level="full",
     )
     monkeypatch.setitem(sg.REGISTRY, "demo3", fake)
     html = render_section_guidance("demo3", profile="security_risk",

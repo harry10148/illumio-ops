@@ -60,8 +60,8 @@ RECOMMENDATION_TEMPLATES: dict[str, dict[str, str]] = {
         "zh_TW": "降低可橫向移動路徑，並優先分段高可達性的節點。",
     },
     "RESTRICT_TRANSIT_NODE_ACCESS": {
-        "en": "Constrain transit/bridge nodes with stricter east-west policy boundaries.",
-        "zh_TW": "對 transit/bridge 節點套用更嚴格的東西向政策邊界。",
+        "en": "This workload acts as a network hub (high reachability or articulation point). Apply stricter east-west policy boundaries to limit lateral movement.",
+        "zh_TW": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
     },
     "ONBOARD_UNMANAGED": {
         "en": "Onboard unmanaged assets or explicitly isolate their access paths.",
@@ -151,7 +151,19 @@ def resolve_recommendation(code: str, lang: str = "en") -> str:
         return template[lang]
     return template.get("en", "")
 
-def summarize_attack_posture(items: list[dict[str, Any]], top_n: int = 5) -> dict[str, list[dict[str, Any]]]:
+def _enrich_app_display(app_display: str, app_env_key: str, node_ips: dict[str, list[str]]) -> str:
+    """Append IPs to display label. Unlabeled: IPs only. Labeled: label · IPs."""
+    ips = node_ips.get(app_env_key, [])
+    if not ips:
+        return app_display
+    shown = ips[:4]
+    suffix = f" +{len(ips) - 4}" if len(ips) > 4 else ""
+    ip_str = ", ".join(shown) + suffix
+    if app_display == "unlabeled (unlabeled)":
+        return ip_str
+    return f"{app_display} · {ip_str}"
+
+def summarize_attack_posture(items: list[dict[str, Any]], top_n: int = 5, lang: str = "en", node_ips: dict[str, list[str]] | None = None) -> dict[str, list[dict[str, Any]]]:
     """Build attack-first summary blocks for report/email/snapshot."""
     ranked = rank_posture_items(items)
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
@@ -176,13 +188,15 @@ def summarize_attack_posture(items: list[dict[str, Any]], top_n: int = 5) -> dic
         if section:
             kind = str(item.get("finding_kind", "")).lower()
             label_en, label_zh = finding_labels.get(kind, (kind.replace("_", " "), kind.replace("_", " ")))
+            label = label_zh if lang == "zh_TW" else label_en
+            app_display = item.get("app_display", "unlabeled (unlabeled)")
+            if node_ips:
+                app_display = _enrich_app_display(app_display, item.get("app_env_key", ""), node_ips)
             grouped[section].append(
                 {
                     "severity": item.get("severity", "INFO"),
-                    "finding": f"{item.get('app_display', 'unlabeled (unlabeled)')}: {label_en}",
-                    "finding_zh": f"{item.get('app_display', 'unlabeled (unlabeled)')}: {label_zh}",
-                    "action": resolve_recommendation(str(item.get("recommended_action_code", "")), "en"),
-                    "action_zh": resolve_recommendation(str(item.get("recommended_action_code", "")), "zh_TW"),
+                    "finding": f"{app_display}: {label}",
+                    "action": resolve_recommendation(str(item.get("recommended_action_code", "")), lang),
                     "app_env_key": item.get("app_env_key", ""),
                     "action_code": item.get("recommended_action_code", ""),
                     "evidence": item.get("evidence", {}),
@@ -199,8 +213,7 @@ def summarize_attack_posture(items: list[dict[str, Any]], top_n: int = 5) -> dic
         {
             "action_code": code,
             "count": count,
-            "action": resolve_recommendation(code, "en"),
-            "action_zh": resolve_recommendation(code, "zh_TW"),
+            "action": resolve_recommendation(code, lang),
         }
         for code, count in sorted(action_counter.items(), key=lambda pair: (-pair[1], pair[0]))
     ][:top_n]

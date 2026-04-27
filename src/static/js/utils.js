@@ -288,6 +288,7 @@ document.addEventListener('click', function (e) {
 });
 
 async function init() {
+  await loadTranslations();
   const params = new URLSearchParams(window.location.search);
   const tab = params.get('tab');
   const validTabs = ['dashboard', 'traffic-workload', 'events', 'rules', 'reports', 'settings', 'rule-scheduler'];

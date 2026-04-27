@@ -11,7 +11,7 @@ import pandas as pd
 
 from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
-from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
+from .report_i18n import STRINGS
 from .table_renderer import render_df_table
 from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
@@ -21,6 +21,7 @@ from src.humanize_ext import human_number
 
 _CSS = build_css("ven")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
+_REPORT_DETAIL_LEVEL = "full"
 
 def _policy_sync_badge(val: str) -> str:
     v = str(val).lower().strip()
@@ -32,29 +33,14 @@ def _policy_sync_badge(val: str) -> str:
         return f'<span class="badge-unsynced">{val}</span>'
     return ""
 
-def _df_to_html(df, no_data_key: str = "rpt_no_records") -> str:
-    # Empty case is rendered by the shared renderer for consistent panel chrome.
-
-    def _render_cell(col, val, _row):
-        val_str = "" if val is None or str(val) in ("None", "nan") else str(val)
-        if str(col).strip().lower().replace(" ", "_") == "policy_sync":
-            return _policy_sync_badge(val_str)
-        return val_str
-
-    return render_df_table(
-        df,
-        col_i18n=_COL_I18N,
-        no_data_key=no_data_key,
-        render_cell=_render_cell,
-    )
-
 class VenHtmlExporter:
     def __init__(self, results: dict, df: pd.DataFrame = None,
-                 profile: str = "security_risk", detail_level: str = "standard"):
+                 profile: str = "security_risk", detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en"):
         self._r = results
         self._df = df
         self._profile = profile
-        self._detail_level = detail_level
+        self._detail_level = _REPORT_DETAIL_LEVEL
+        self._lang = lang
 
     def export(self, output_dir: str = "reports") -> str:
         os.makedirs(output_dir, exist_ok=True)
@@ -68,8 +54,12 @@ class VenHtmlExporter:
 
     def _build(self, profile: str = "", detail_level: str = "") -> str:
         profile = profile or self._profile
-        detail_level = detail_level or self._detail_level
+        detail_level = _REPORT_DETAIL_LEVEL
         self._chart_tracker = FirstChartTracker()
+        _sl = self._lang
+        _s = lambda k: STRINGS[k].get(_sl) or STRINGS[k]["en"]
+        self._s = _s
+
         kpis = self._r.get("kpis", [])
         gen_at = self._r.get("generated_at", "")
         today_str = str(datetime.date.today())
@@ -77,30 +67,21 @@ class VenHtmlExporter:
         nav_html = (
             "<nav>"
             '<div class="nav-brand">Illumio PCE Ops</div>'
-            '<a href="#summary"><span data-i18n="rpt_ven_nav_summary">Executive Summary</span></a>'
-            '<a href="#online"><span data-i18n="rpt_ven_nav_online">Online VENs</span></a>'
-            '<a href="#offline"><span data-i18n="rpt_ven_nav_offline">Offline VENs</span></a>'
-            '<a href="#lost-today"><span data-i18n="rpt_ven_nav_lost_today">Lost Today (&lt;24h)</span></a>'
-            '<a href="#lost-yest"><span data-i18n="rpt_ven_nav_lost_yest">Lost Yesterday</span></a>'
+            f'<a href="#summary">{_s("rpt_ven_nav_summary")}</a>'
+            f'<a href="#online">{_s("rpt_ven_nav_online")}</a>'
+            f'<a href="#offline">{_s("rpt_ven_nav_offline")}</a>'
+            f'<a href="#lost-today">{_s("rpt_ven_nav_lost_today")}</a>'
+            f'<a href="#lost-yest">{_s("rpt_ven_nav_lost_yest")}</a>'
             "</nav>"
         )
 
-        # KPI labels are i18n keys resolved against STRINGS; applyI18n() swaps
-        # textContent on lang toggle. Render EN initially so the pre-JS view
-        # reads correctly.
-        def _kpi_label(k: dict) -> tuple[str, str]:
-            key = k.get("i18n_key") or ""
-            entry = STRINGS.get(key, {}) if key else {}
-            en = entry.get("en", key) if isinstance(entry, dict) else key
-            return key, en
-
         kpi_cards_parts = []
         for k in kpis:
-            key, label_en = _kpi_label(k)
-            i18n_attr = f' data-i18n="{key}"' if key else ""
+            key = k.get("i18n_key") or ""
+            label = _s(key) if key and key in STRINGS else k.get("label", key)
             kpi_cards_parts.append(
                 '<div class="kpi-card">'
-                f'<div class="kpi-label"{i18n_attr}>{label_en}</div>'
+                f'<div class="kpi-label">{label}</div>'
                 f'<div class="kpi-value">{k["value"]}</div>'
                 "</div>"
             )
@@ -133,56 +114,65 @@ class VenHtmlExporter:
             except Exception:
                 pass
 
+        def _df_to_html(df, no_data_key: str = "rpt_no_records") -> str:
+            def _render_cell(col, val, _row):
+                val_str = "" if val is None or str(val) in ("None", "nan") else str(val)
+                if str(col).strip().lower().replace(" ", "_") == "policy_sync":
+                    return _policy_sync_badge(val_str)
+                return val_str
+            return render_df_table(df, col_i18n=_COL_I18N, no_data_key=no_data_key,
+                                   render_cell=_render_cell, lang=_sl)
+
         body = (
             '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
-            '<div class="report-kicker" data-i18n="rpt_kicker_ven">VEN Inventory Report</div>'
-            '<h1 data-i18n="rpt_ven_title">Illumio VEN Status Inventory Report</h1>'
-            '<p class="report-subtitle"><span data-i18n="rpt_generated">Generated:</span> '
+            f'<div class="report-kicker">{_s("rpt_kicker_ven")}</div>'
+            f'<h1>{_s("rpt_ven_title")}</h1>'
+            f'<p class="report-subtitle">{_s("rpt_generated")} '
             + gen_at
             + "</p></div>"
             + self._summary_pills(online_count, offline_count, today_count, yest_count)
             + f'<div class="kpi-grid">{kpi_cards}</div>'
             + status_chart_html
             + "</section>\n"
-            + self._section("online", "rpt_ven_sec_online_title", "Online VENs", online_count, _df_to_html(df_online), "rpt_ven_sec_online_intro", "online", "ven_online_inventory")
+            + self._section("online", "rpt_ven_sec_online_title", online_count, _df_to_html(df_online), "rpt_ven_sec_online_intro", "online", "ven_online_inventory")
             + "\n"
-            + (self._section("offline", "rpt_ven_sec_offline_title", "Offline VENs", offline_count, _df_to_html(df_offline), "rpt_ven_sec_offline_intro", "offline", "ven_offline")
+            + (self._section("offline", "rpt_ven_sec_offline_title", offline_count, _df_to_html(df_offline), "rpt_ven_sec_offline_intro", "offline", "ven_offline")
                + "\n"
                if visible_in('ven_offline', profile, detail_level) else '')
-            + (self._section("lost-today", "rpt_ven_sec_lost_today_title", "Lost Connection in Last 24h", today_count, _df_to_html(df_today), "rpt_ven_sec_lost_today_intro", "offline", "ven_lost_heartbeat_24h")
+            + (self._section("lost-today", "rpt_ven_sec_lost_today_title", today_count, _df_to_html(df_today), "rpt_ven_sec_lost_today_intro", "offline", "ven_lost_heartbeat_24h")
                + "\n"
                if visible_in('ven_lost_heartbeat_24h', profile, detail_level) else '')
-            + (self._section("lost-yest", "rpt_ven_sec_lost_yest_title", "Lost Connection 24-48h Ago", yest_count, _df_to_html(df_yest), "rpt_ven_sec_lost_yest_intro", "warn", "ven_lost_heartbeat_48h")
+            + (self._section("lost-yest", "rpt_ven_sec_lost_yest_title", yest_count, _df_to_html(df_yest), "rpt_ven_sec_lost_yest_intro", "warn", "ven_lost_heartbeat_48h")
                + "\n"
                if visible_in('ven_lost_heartbeat_48h', profile, detail_level) else '')
-            + '<footer><span data-i18n="rpt_ven_footer">Illumio PCE Ops — VEN Status Report</span> &middot; '
+            + f'<footer>{_s("rpt_ven_footer")} &middot; '
             + today_str
             + "</footer>"
         )
 
+        html_lang = "zh-TW" if self._lang == "zh_TW" else "en"
         return (
-            '<!DOCTYPE html><html lang="en"><head>\n'
+            f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
             "<title>Illumio VEN Status Report</title>"
             + _CSS + _HIGHLIGHT_CSS
             + "</head>\n<body>"
-            + lang_btn_html()
             + nav_html
             + "<main>"
             + body
             + "</main>"
             + TABLE_JS
-            + make_i18n_js()
             + "</body></html>"
         )
 
     def _summary_pills(self, online_count: int, offline_count: int, today_count: int, yest_count: int) -> str:
+        _s = self._s
         pills = [
-            (STRINGS["rpt_pill_online"]["en"], human_number(online_count)),
-            (STRINGS["rpt_pill_offline"]["en"], human_number(offline_count)),
-            (STRINGS["rpt_pill_lost_24h"]["en"], human_number(today_count)),
-            (STRINGS["rpt_pill_lost_48h"]["en"], human_number(yest_count)),
+            (_s("rpt_pill_online"), human_number(online_count)),
+            (_s("rpt_pill_offline"), human_number(offline_count)),
+            (_s("rpt_pill_lost_24h"), human_number(today_count)),
+            (_s("rpt_pill_lost_48h"), human_number(yest_count)),
         ]
         html = '<div class="summary-pill-row">'
         for label, value in pills:
@@ -199,28 +189,21 @@ class VenHtmlExporter:
         self,
         id_: str,
         title_key: str,
-        title_en: str,
         count: int,
         content: str,
         intro_key: str = "",
         extra_class: str = "",
         guidance_module_id: str = "",
     ) -> str:
-        # Section heading renders "Title (count)"; applyI18n swaps the title
-        # text on lang toggle, count is appended as a static span alongside.
-        intro_html = ""
-        if intro_key:
-            entry = STRINGS.get(intro_key, {})
-            intro_en = entry.get("en", "") if isinstance(entry, dict) else ""
-            intro_html = (
-                f'<p class="section-intro" data-i18n="{intro_key}">{intro_en}</p>'
-            )
+        _s = self._s
+        title = _s(title_key)
+        intro_html = f'<p class="section-intro">{_s(intro_key)}</p>' if intro_key else ""
         guidance_html = ""
         if guidance_module_id:
-            guidance_html = render_section_guidance(guidance_module_id, profile="security_risk", detail_level="standard")
+            guidance_html = render_section_guidance(guidance_module_id, profile="security_risk", detail_level=_REPORT_DETAIL_LEVEL)
         cls = f"card {extra_class}".strip()
         return (
             f'<section id="{id_}" class="{cls}">'
-            f'<h2><span data-i18n="{title_key}">{title_en}</span> ({count})</h2>'
+            f'<h2>{title} ({count})</h2>'
             f"{intro_html}{guidance_html}{content}</section>"
         )

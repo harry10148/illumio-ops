@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from src.i18n import t
 from src.report.tz_utils import parse_tz, fmt_tz_str as _fmt_tz_str, fmt_ts_local as _fmt_ts_local
 
-_VALID_DETAIL_LEVELS = ("executive", "standard", "full")
+_REPORT_DETAIL_LEVEL = "full"
 
 _ONLINE_STATUSES = {'active', 'online'}
 # VENs whose last heartbeat is older than this are considered offline,
@@ -47,13 +47,12 @@ class VenStatusGenerator:
 
     # ── public ───────────────────────────────────────────────────────────────
 
-    def generate(self, detail_level: str = "standard") -> VenStatusResult:
-        if detail_level not in _VALID_DETAIL_LEVELS:
-            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
+    def generate(self, detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en") -> VenStatusResult:
         if not self.api:
             raise RuntimeError("api_client required for VEN status report")
 
-        self._detail_level = detail_level
+        self._detail_level = _REPORT_DETAIL_LEVEL
+        self._lang = lang
         print(t("rpt_ven_fetching"))
         workloads = self.api.fetch_managed_workloads()
 
@@ -73,13 +72,13 @@ class VenStatusGenerator:
         )
 
     def export(self, result: VenStatusResult, fmt: str = 'html', output_dir: str = 'reports',
-               detail_level: str = "standard") -> list:
+               detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en") -> list:
         from src.report.exporters.ven_html_exporter import VenHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
         os.makedirs(output_dir, exist_ok=True)
         paths = []
         if fmt in ('html', 'all'):
-            path = VenHtmlExporter(result.module_results, df=result.dataframe).export(output_dir)
+            path = VenHtmlExporter(result.module_results, df=result.dataframe, lang=lang).export(output_dir)
             paths.append(path)
             print(t("rpt_ven_html_saved", path=path))
         if fmt in ('pdf', 'all'):

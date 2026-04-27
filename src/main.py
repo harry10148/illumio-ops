@@ -603,13 +603,6 @@ def main():
         help="Traffic report profile (default: security_risk)",
     )
     parser.add_argument(
-        "--detail-level",
-        choices=["executive", "standard", "full"],
-        default="standard",
-        dest="detail_level",
-        help=t("cli_report_detail_option", default="Detail level"),
-    )
-    parser.add_argument(
         "--email",
         action="store_true",
         help="Send report by email after generation (uses SMTP config)",
@@ -670,7 +663,6 @@ def main():
                     output_dir=args.output_dir,
                     email=args.email,
                     traffic_report_profile=args.profile,
-                    detail_level=args.detail_level,
                 )
             elif args.report_type == "audit":
                 if args.email:

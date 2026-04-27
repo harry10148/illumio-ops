@@ -3,8 +3,6 @@ Shared i18n helpers for HTML report exporters.
 """
 from __future__ import annotations
 
-import json
-
 class _StringMap(dict):
     def __missing__(self, key: str) -> dict[str, str]:
         return {"en": key, "zh_TW": key}
@@ -41,9 +39,10 @@ STRINGS: _StringMap = _StringMap({
     "rpt_kicker_audit": _entry("Audit & Event Report", "稽核與事件報表"),
     "rpt_kicker_policy": _entry("Policy Usage Report", "Policy 使用報表"),
     "rpt_kicker_ven": _entry("VEN Inventory Report", "VEN 資產狀態報表"),
-    "rpt_pill_flows": _entry("Flows", "Flows"),
+    "rpt_pill_flows": _entry("Flows", "流量數"),
     "rpt_pill_findings": _entry("Findings", "發現數"),
     "rpt_pill_focus": _entry("Focus", "焦點"),
+    "rpt_pill_hit_rate": _entry("Hit Rate", "命中率"),
     "rpt_pill_period": _entry("Period", "期間"),
     "rpt_pill_attention": _entry("Attention", "重點關注"),
     "rpt_pill_lookback": _entry("Lookback", "回看區間"),
@@ -51,10 +50,12 @@ STRINGS: _StringMap = _StringMap({
     "rpt_pill_offline": _entry("Offline", "Offline"),
     "rpt_pill_lost_24h": _entry("Lost <24h", "失聯 <24h"),
     "rpt_pill_lost_48h": _entry("Lost 24-48h", "失聯 24-48h"),
-    "rpt_focus_traffic": _entry("Traffic Analytics", "Traffic Analytics"),
-    "rpt_focus_audit": _entry("Audit & Events", "Audit & Events"),
-    "rpt_focus_usage": _entry("Usage Posture", "Usage Posture"),
-    "rpt_focus_inventory": _entry("VEN Connectivity", "VEN Connectivity"),
+    "rpt_focus_traffic": _entry("Traffic Analytics", "流量分析"),
+    "rpt_focus_audit": _entry("Audit & Events", "稽核與事件"),
+    "rpt_focus_usage": _entry("Usage Posture", "使用狀態"),
+    "rpt_focus_inventory": _entry("VEN Connectivity", "VEN 連線狀態"),
+    "rpt_kicker_security_risk": _entry("Security Risk Analysis", "安全風險分析"),
+    "rpt_kicker_network_inventory": _entry("Network Inventory", "網路盤點"),
     "rpt_data_source_cache": _entry("Data source: local cache", "資料來源：本地 Cache"),
     "rpt_data_source_api": _entry("Data source: live PCE API", "資料來源：即時 PCE API"),
     "rpt_data_source_mixed": _entry("Data source: mixed (cache + API)", "資料來源：混合（Cache + API）"),
@@ -63,21 +64,26 @@ STRINGS: _StringMap = _StringMap({
     "rpt_col_uncovered_flows": _entry("Uncovered Flows", "未覆蓋流量"),
     "rpt_tr_title": _entry("Illumio Traffic Flow Report", "Illumio 流量分析報表"),
     "rpt_tr_nav_summary": _entry("Executive Summary", "摘要"),
-    "rpt_tr_nav_overview": _entry("1 Traffic Overview", "1 流量總覽"),
-    "rpt_tr_nav_policy": _entry("2 Policy Decisions", "2 Policy 判定"),
-    "rpt_tr_nav_uncovered": _entry("3 Uncovered Flows", "3 未覆蓋流量"),
-    "rpt_tr_nav_ransomware": _entry("4 Ransomware Exposure", "4 勒索軟體風險"),
-    "rpt_tr_nav_remote": _entry("5 Remote Access", "5 遠端存取"),
-    "rpt_tr_nav_user": _entry("6 User & Process", "6 使用者與程序"),
-    "rpt_tr_nav_matrix": _entry("7 Cross-Label Matrix", "7 跨 Label 矩陣"),
-    "rpt_tr_nav_unmanaged": _entry("8 Unmanaged Hosts", "8 unmanaged 主機"),
-    "rpt_tr_nav_distribution": _entry("9 Traffic Distribution", "9 流量分布"),
-    "rpt_tr_nav_allowed": _entry("10 Allowed Traffic", "10 Allowed 流量"),
-    "rpt_tr_nav_bandwidth": _entry("11 Bandwidth & Volume", "11 頻寬與流量"),
-    "rpt_tr_nav_readiness": _entry("13 Enforcement Readiness", "13 Enforcement 就緒度"),
-    "rpt_tr_nav_infrastructure": _entry("14 Infrastructure Scoring", "14 基礎架構評分"),
-    "rpt_tr_nav_lateral": _entry("15 Lateral Movement", "15 lateral movement"),
+    "rpt_tr_nav_overview": _entry("Traffic Overview", "流量總覽"),
+    "rpt_tr_nav_policy": _entry("Policy Decisions", "Policy 判定"),
+    "rpt_tr_nav_uncovered": _entry("Uncovered Flows", "未覆蓋流量"),
+    "rpt_tr_nav_ransomware": _entry("Ransomware Exposure", "勒索軟體風險"),
+    "rpt_tr_nav_remote": _entry("Remote Access", "遠端存取"),
+    "rpt_tr_nav_user": _entry("User & Process", "使用者與程序"),
+    "rpt_tr_nav_matrix": _entry("Cross-Label Matrix", "跨 Label 矩陣"),
+    "rpt_tr_nav_unmanaged": _entry("Unmanaged Hosts", "Unmanaged 主機"),
+    "rpt_tr_nav_distribution": _entry("Traffic Distribution", "流量分布"),
+    "rpt_tr_nav_allowed": _entry("Allowed Traffic", "Allowed 流量"),
+    "rpt_tr_nav_bandwidth": _entry("Bandwidth & Volume", "頻寬與流量"),
+    "rpt_tr_nav_readiness": _entry("Enforcement Readiness", "Enforcement 就緒度"),
+    "rpt_tr_nav_infrastructure": _entry("Infrastructure Scoring", "基礎架構評分"),
+    "rpt_tr_nav_lateral": _entry("Lateral Movement", "橫向移動"),
     "rpt_tr_nav_findings": _entry("Findings", "發現總覽"),
+    "rpt_tr_nav_change_impact": _entry("Change Impact", "變更影響分析"),
+    "rpt_tr_nav_draft_actions": _entry("Draft Actions", "草稿動作"),
+    "rpt_tr_nav_enf_rollout": _entry("Enforcement Rollout", "Enforcement 推行計畫"),
+    "rpt_tr_nav_exfiltration": _entry("Exfiltration Intel", "外洩情資"),
+    "rpt_tr_nav_ringfence": _entry("Application Ringfence", "應用程式 Ringfence"),
     "rpt_tr_sec_findings": _entry("Security Findings", "安全發現"),
     "rpt_tr_policy_coverage": _entry("Policy Coverage", "Policy 覆蓋率"),
     "rpt_tr_flow_breakdown": _entry("Allowed / Blocked / Potentially Blocked", "Allowed / Blocked / Potentially Blocked"),
@@ -501,11 +507,16 @@ STRINGS: _StringMap = _StringMap({
     "rpt_ven_sec_lost_yest_title": _entry("Lost Connection 24-48h Ago", "24-48 小時前失聯"),
     "rpt_pu_title": _entry("Illumio Policy Usage Report", "Illumio Policy 使用報表"),
     "rpt_pu_nav_summary": _entry("Executive Summary", "摘要"),
-    "rpt_pu_nav_overview": _entry("1 Usage Overview", "1 使用總覽"),
-    "rpt_pu_nav_hit": _entry("2 Hit Rules", "2 Hit Rules"),
-    "rpt_pu_nav_unused": _entry("3 Unused Rules", "3 未使用 Rules"),
-    "rpt_pu_nav_deny": _entry("4 Deny Effectiveness", "4 Deny 有效性"),
-    "rpt_pu_sec_deny": _entry("4 Deny Rule Effectiveness", "4 Deny 規則有效性分析"),
+    "rpt_pu_nav_overview": _entry("Usage Overview", "使用總覽"),
+    "rpt_pu_nav_hit": _entry("Hit Rules", "已命中 Rules"),
+    "rpt_pu_nav_unused": _entry("Unused Rules", "未使用 Rules"),
+    "rpt_pu_nav_deny": _entry("Deny Effectiveness", "Deny 有效性"),
+    "rpt_pu_sec_overview": _entry("Policy Usage Overview", "Policy 使用總覽"),
+    "rpt_pu_sec_hit": _entry("Hit Rules Detail", "已命中 Rules 明細"),
+    "rpt_pu_sec_unused": _entry("Unused Rules Detail", "未使用 Rules 明細"),
+    "rpt_pu_sec_deny": _entry("Deny Rule Effectiveness", "Deny 規則有效性分析"),
+    "rpt_pu_query_execution": _entry("Query Execution", "查詢執行狀態"),
+    "rpt_pu_top_hit_ports": _entry("Top Hit Ports", "命中最多的 Ports"),
     "rpt_pu_deny_total": _entry("Total Deny Rules", "Deny 規則總數"),
     "rpt_pu_deny_hit": _entry("Hit", "已命中"),
     "rpt_pu_deny_unused": _entry("Unused", "未使用"),
@@ -515,7 +526,7 @@ STRINGS: _StringMap = _StringMap({
     "rpt_pu_no_deny": _entry("No deny rules found in the active policy.", "目前 Active Policy 中沒有 Deny 規則。"),
     "rpt_pu_footer": _entry("Illumio PCE Ops Policy Usage Report", "Illumio PCE Ops Policy 使用報表"),
     "rpt_pu_total_rules": _entry("Total Active Rules", "啟用中的規則總數"),
-    "rpt_pu_hit_rules": _entry("Hit Rules", "Hit Rules"),
+    "rpt_pu_hit_rules": _entry("Hit Rules", "已命中 Rules"),
     "rpt_pu_unused_rules": _entry("Unused Rules", "未使用 Rules"),
     "rpt_pu_hit_rate": _entry("Hit Rate", "命中率"),
     "rpt_pu_attention": _entry("Top Rulesets by Unused Rules", "未使用 Rules 最多的 Rulesets"),
@@ -776,37 +787,6 @@ for key, pair in {
 }.items():
     STRINGS[key] = _entry(pair[0], pair[1])
 
-def make_i18n_js() -> str:
-    strings_json = json.dumps(STRINGS, ensure_ascii=False, indent=2)
-    return f"""<script>
-(function(){{
-  var _T = {strings_json};
-  var _lang = localStorage.getItem('illumioReportLang') || 'zh_TW';
-  function applyI18n() {{
-    document.querySelectorAll('[data-i18n]').forEach(function(el) {{
-      var k = el.getAttribute('data-i18n');
-      if (_T[k] && _T[k][_lang]) el.textContent = _T[k][_lang];
-    }});
-    document.querySelectorAll('[data-i18n-html]').forEach(function(el) {{
-      var k = el.getAttribute('data-i18n-html');
-      if (_T[k] && _T[k][_lang]) el.innerHTML = _T[k][_lang];
-    }});
-    var zhVisible = _lang === 'zh_TW';
-    document.querySelectorAll('.zh-only').forEach(function(el) {{
-      el.style.display = zhVisible ? '' : 'none';
-    }});
-    var btn = document.getElementById('_langBtn');
-    if (btn) btn.textContent = _lang === 'zh_TW' ? 'EN' : '中文';
-  }}
-  window._toggleReportLang = function() {{
-    _lang = _lang === 'zh_TW' ? 'en' : 'zh_TW';
-    localStorage.setItem('illumioReportLang', _lang);
-    applyI18n();
-  }};
-  document.addEventListener('DOMContentLoaded', applyI18n);
-}})();
-</script>"""
-
 COL_I18N: dict[str, str] = {
     value.get("en", ""): key
     for key, value in STRINGS.items()
@@ -814,9 +794,4 @@ COL_I18N: dict[str, str] = {
 }
 
 def lang_btn_html() -> str:
-    return (
-        '<button id="_langBtn" onclick="_toggleReportLang()" '
-        'style="position:fixed;top:10px;right:12px;z-index:999;padding:4px 10px;'
-        'background:#2b6cb0;color:white;border:none;border-radius:4px;'
-        'cursor:pointer;font-size:12px;">中文</button>'
-    )
+    return ''

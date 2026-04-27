@@ -48,7 +48,6 @@ def test_change_impact_absent_on_first_run(patched_snapshot_dir):
     exporter = HtmlExporter(
         _make_module_results(),
         profile="security_risk",
-        detail_level="standard",
     )
     html = exporter._build()
     # The section title key resolves to 'Change Impact' in EN
@@ -75,8 +74,7 @@ def test_change_impact_appears_when_previous_snapshot_exists(patched_snapshot_di
     current_kpis = _make_kpis(pb_uncovered_exposure=1234, high_risk_lateral_paths=14)
     exporter = HtmlExporter(
         _make_module_results(kpis=current_kpis),
-        profile="security_risk",
-        detail_level="standard",
+        profile="network_inventory",
     )
     html = exporter._build()
 
@@ -106,8 +104,7 @@ def test_change_impact_shows_regression(patched_snapshot_dir):
     current_kpis = _make_kpis(pb_uncovered_exposure=2000)  # worse
     exporter = HtmlExporter(
         _make_module_results(kpis=current_kpis),
-        profile="security_risk",
-        detail_level="standard",
+        profile="network_inventory",
     )
     html = exporter._build()
     assert "REGRESSED" in html.upper(), "Expected REGRESSED verdict for worsening KPIs"
