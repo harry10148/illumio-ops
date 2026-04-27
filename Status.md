@@ -33,6 +33,13 @@ R4 or other roadmap items TBD.
 
 ---
 
-## 2026-04-28 — Documentation rebuild in progress
+## 2026-04-28 — Documentation rebuild complete (branch `docs-rebuild`)
 
-The documentation set is being rebuilt under `docs/superpowers/plans/2026-04-28-documentation-rebuild.md`. Status will be updated when Phase F acceptance passes.
+- Rebuilt 10 user-facing files (README × 2, User_Manual × 2, Architecture × 2, Security_Rules_Reference × 2, Status, Task) to v3.20.0.
+- 9,499 total lines across the 10 files (EN floor met for User_Manual ≥ 1700, Architecture ≥ 800, Security_Rules ≥ 700).
+- EN/ZH heading-structure parity verified for all 4 doc pairs (`diff` returns empty); ZH/EN line ratio 0.99–1.00.
+- Coverage gates passed: `scripts/check_doc_coverage.sh` (every report module + subcommand + bundle script), `scripts/check_doc_links.py` (zero broken local links), i18n audit (0 findings), `tests/test_i18n_audit.py` + `tests/test_i18n_quality.py` (10/10 pass).
+- NotebookLM-distilled Illumio platform background added to `docs/Architecture.md` Background.1–5; raw excerpts in gitignored `docs/_notebooklm_excerpts/`.
+- Latest rebuild commit: `0ee2eef` (37 commits since `ed20df0`).
+- Plan: `docs/superpowers/plans/2026-04-28-documentation-rebuild.md`
+- Spec: `docs/superpowers/specs/2026-04-28-documentation-rebuild-design.md`

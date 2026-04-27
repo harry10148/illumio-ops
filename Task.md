@@ -14,7 +14,9 @@
 
 ---
 
-## Active task — Documentation rebuild
+## Closed task — Documentation rebuild (2026-04-28)
 
+Branch: `docs-rebuild` (37 commits since `ed20df0`, latest `0ee2eef`).
 Plan: `docs/superpowers/plans/2026-04-28-documentation-rebuild.md`
 Spec: `docs/superpowers/specs/2026-04-28-documentation-rebuild-design.md`
+Acceptance gates G1–G9 all passed. Worktree at `.worktrees/docs-rebuild`; ready to merge to `main` per user direction.
