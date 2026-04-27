@@ -842,8 +842,12 @@ The Policy Usage Report analyzes how actively each PCE security rule is being us
 |:---|:---|
 | Executive Summary | Total rules, rules with traffic hits, coverage percentage |
 | Overview | Enabled/disabled breakdown, active/draft status |
-| Hit Detail | Rules with matching traffic; top flows per rule |
-| Unused Detail | Rules with zero traffic hits; candidates for cleanup |
+| Executive Summary (`pu_mod00_executive`) | Total rules, rules with traffic hits, coverage percentage |
+| Overview (`pu_mod01_overview`) | Enabled/disabled breakdown, active/draft status |
+| Hit Detail (`pu_mod02_hit_detail`) | Rules with matching traffic; top flows per rule |
+| Unused Detail (`pu_mod03_unused_detail`) | Rules with zero traffic hits; candidates for cleanup |
+| Deny Effectiveness (`pu_mod04_deny_effectiveness`) | Confirms deny/override-deny rules are actively blocking unwanted traffic |
+| Draft Policy Decision (`pu_mod05_draft_pd`) | Per-rule draft policy decision risk — visibility risk, draft conflicts, and draft coverage gap across three lenses |
 
 **Data Sources:**
 - **API mode**: Fetches active rulesets from the PCE, then runs parallel async traffic queries for each rule to count matching flows
@@ -885,6 +889,39 @@ Configure automated recurring reports via CLI **2. Report Generation → 5. Repo
 The daemon loop checks schedules every 60 seconds and runs any schedule whose configured time has been reached.
 
 After each successful run, old report files are automatically cleaned up according to the **retention policy** — see Section 11.3.
+
+### 9.10 R3 Intelligence Modules
+
+These modules run automatically as part of the Traffic Report pipeline and appear as dedicated sections in the HTML output.
+
+| Module | Purpose | Input | Output | Related config |
+|---|---|---|---|---|
+| `mod_change_impact` | Compare current report KPIs to the previous snapshot; emit `improved` / `regressed` / `neutral` verdict per KPI | Current KPIs dict + previous JSON snapshot | Delta table + overall verdict + previous snapshot timestamp | `report.snapshot_retention_days` |
+| `mod_draft_actions` | Actionable remediation suggestions for draft policy decision sub-categories that need human review: Override Deny, Allowed Across Boundary, what-if | Flows DataFrame with `draft_policy_decision` column | `override_deny` block, `allowed_across_boundary` block, `what_if_summary` | `report.draft_actions_enabled` |
+| `mod_draft_summary` | Count all 7 draft policy decision subtypes and list top workload pairs per subtype | Flows DataFrame with `draft_policy_decision` column | `counts` dict (7 subtypes) + `top_pairs` per subtype | — |
+| `mod_enforcement_rollout` | Rank applications by readiness score for moving to full enforcement | Flows DataFrame with app labels (`src_app` / `dst_app`) + optional draft / readiness summaries | Prioritized app list with score, `why_now` rationale, required allow rules, risk reduction | — |
+| `mod_exfiltration_intel` | Flag managed-to-unmanaged flows with high byte volume; optionally join against a CSV of known-bad IPs for threat-match enrichment | Flows DataFrame with `src_managed` / `dst_managed` + optional `bytes` column | `high_volume_exfil` list, `managed_to_unmanaged_count`, `threat_intel_matches` | `report.threat_intel_csv_path` |
+| `mod_ringfence` | Per-application dependency profile + candidate allow rules for micro-segmentation; top-app summary when no specific app is targeted | Flows DataFrame with `src_app` / `dst_app` labels | Per-app: intra-app flows, cross-app flows, cross-env flows, candidate allow rules; or top-20 apps list | — |
+
+### 9.11 Draft Policy Decision Behaviour
+
+**Auto-enable of `compute_draft`:** When a ruleset contains rules that use `requires_draft_pd` logic (i.e., the ruleset has pending draft changes), the reporting pipeline automatically enables draft policy decision computation for that ruleset's traffic flows.
+
+**HTML report header pill:** When draft computation is active, the Traffic Report HTML header displays a "Draft Policy Active" indicator pill to make the draft scope visible at a glance.
+
+**`draft_breakdown` cross-tab (from `mod_draft_summary`):** A 7-column cross-tabulation showing the count of flows for each draft policy decision subtype:
+
+| Subtype | Meaning |
+|---|---|
+| `allowed` | Flow would be allowed by the draft ruleset |
+| `potentially_blocked` | Flow has no matching draft rule; default-deny would block it |
+| `blocked_by_boundary` | Blocked by a boundary rule in the draft |
+| `blocked_by_override_deny` | Blocked by an Override Deny rule in the draft |
+| `potentially_blocked_by_boundary` | On a visibility workload; draft boundary would block on enforcement |
+| `potentially_blocked_by_override_deny` | On a visibility workload; draft override deny would block on enforcement |
+| `allowed_across_boundary` | Allowed despite crossing an application boundary — review required |
+
+**`draft_enforcement_gap` (from `mod_draft_summary` / `mod_draft_actions`):** The set of flows where `policy_decision = potentially_blocked` but the draft resolves to `allowed` or `blocked_by_boundary` — i.e., flows that currently have no rule but would be covered (or explicitly blocked) once the draft is provisioned. This gap quantifies the enforcement delta that will take effect at the next Provision.
 
 ---
 
