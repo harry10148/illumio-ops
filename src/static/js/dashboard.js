@@ -1603,8 +1603,24 @@ function _renderTop10Body(idx, data, total, ts) {
     const pBadge = m.pd === 2 ? `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${pd_blocked}</span>` :
       m.pd === 1 ? `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">${pd_potential}</span>` :
         m.pd === 0 ? `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${pd_allowed}</span>` : m.pd;
-    const draftPdMap = { 'blocked': `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;opacity:0.8;">${draftPrefix} ${pd_blocked}</span>`, 'potentially_blocked': `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;opacity:0.8;">${draftPrefix} ${pd_potential}</span>`, 'allowed': `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;opacity:0.8;">${draftPrefix} ${pd_allowed}</span>` };
-    const draftBadge = m.draft_pd && draftPdMap[m.draft_pd] ? `<div style="margin-top:3px;">${draftPdMap[m.draft_pd]}</div>` : '';
+    const draftPdMap = {
+      allowed: _t('gui_pd_allowed'),
+      potentially_blocked: _t('gui_pd_potential'),
+      blocked_by_boundary: _t('pd_blocked_by_boundary'),
+      blocked_by_override_deny: _t('pd_blocked_by_override_deny'),
+      potentially_blocked_by_boundary: _t('pd_potentially_blocked_by_boundary'),
+      potentially_blocked_by_override_deny: _t('pd_potentially_blocked_by_override_deny'),
+      allowed_across_boundary: _t('pd_allowed_across_boundary'),
+    };
+    const draftPdColor = {
+      allowed: 'var(--success)', allowed_across_boundary: 'var(--success)',
+      potentially_blocked: 'var(--warn)', potentially_blocked_by_boundary: 'var(--warn)', potentially_blocked_by_override_deny: 'var(--warn)',
+      blocked_by_boundary: 'var(--danger)', blocked_by_override_deny: 'var(--danger)',
+    };
+    const draftPdTextColor = {
+      potentially_blocked: '#000', potentially_blocked_by_boundary: '#000', potentially_blocked_by_override_deny: '#000',
+    };
+    const draftBadge = m.draft_pd && draftPdMap[m.draft_pd] ? `<div style="margin-top:3px;"><span style="background:${draftPdColor[m.draft_pd] || 'var(--secondary)'};color:${draftPdTextColor[m.draft_pd] || '#fff'};padding:2px 6px;border-radius:4px;font-size:10px;opacity:0.8;">${draftPrefix} ${draftPdMap[m.draft_pd]}</span></div>` : '';
 
     const sLabels = renderLabelsHtml(m.s_labels);
     const dLabels = renderLabelsHtml(m.d_labels);
