@@ -541,3 +541,82 @@ class PolicyUsageGenerator:
             dataframe=df,
             execution_stats=execution_stats or {},
         )
+
+
+def generate_policy_usage_xlsx(rules_df, out_path: str, top_n: int = 500) -> str:
+    """Generate a Policy Usage XLSX with real per-sheet DataFrames.
+
+    Uses direct DataFrame operations on rules_df columns:
+      hit_count, is_deny, name, rule_id, ruleset_name, enabled.
+    """
+    import pandas as pd
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    def _write_df(ws, df):
+        if df is None or not hasattr(df, "empty") or df.empty:
+            ws.append(["Note", "No data"])
+            return
+        ws.append(list(df.columns))
+        for _, row in df.head(top_n).iterrows():
+            ws.append([str(v) for v in row])
+
+    hit_col = "hit_count" if "hit_count" in rules_df.columns else None
+    deny_col = "is_deny" if "is_deny" in rules_df.columns else None
+
+    # --- Hit Rules ---
+    ws = wb.create_sheet("Hit Rules")
+    try:
+        if hit_col:
+            hit_df = rules_df[rules_df[hit_col] > 0].copy()
+            _write_df(ws, hit_df)
+        else:
+            ws.append(list(rules_df.columns))
+            for _, row in rules_df.head(top_n).iterrows():
+                ws.append([str(v) for v in row])
+    except Exception:
+        ws.append(["Note", "Hit rules data unavailable"])
+
+    # --- Unused Rules ---
+    ws = wb.create_sheet("Unused Rules")
+    try:
+        if hit_col:
+            unused_df = rules_df[rules_df[hit_col] == 0].copy()
+            _write_df(ws, unused_df)
+        else:
+            ws.append(["Note", "hit_count column not present"])
+    except Exception:
+        ws.append(["Note", "Unused rules data unavailable"])
+
+    # --- Deny Effectiveness ---
+    ws = wb.create_sheet("Deny Effectiveness")
+    try:
+        if deny_col:
+            deny_df = rules_df[rules_df[deny_col] == True].copy()
+            _write_df(ws, deny_df)
+        else:
+            ws.append(["Note", "is_deny column not present"])
+    except Exception:
+        ws.append(["Note", "Deny effectiveness data unavailable"])
+
+    # --- Execution Stats ---
+    ws = wb.create_sheet("Execution Stats")
+    try:
+        total = len(rules_df)
+        hit_count = int(rules_df[hit_col].gt(0).sum()) if hit_col else 0
+        unused_count = int(rules_df[hit_col].eq(0).sum()) if hit_col else 0
+        deny_count = int(rules_df[deny_col].sum()) if deny_col else 0
+        ws.append(["Metric", "Value"])
+        ws.append(["Total Rules", total])
+        ws.append(["Hit Rules", hit_count])
+        ws.append(["Unused Rules", unused_count])
+        ws.append(["Deny Rules", deny_count])
+        if total > 0 and hit_col:
+            ws.append(["Hit Rate %", round(hit_count / total * 100, 1)])
+    except Exception:
+        ws.append(["Note", "Stats unavailable"])
+
+    wb.save(out_path)
+    return out_path
