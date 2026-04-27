@@ -9,6 +9,7 @@ import os
 import pandas as pd
 
 from .html_exporter import _trend_deltas_section, render_section_guidance
+from src.report.section_guidance import visible_in
 from .report_css import TABLE_JS, build_css
 from src.humanize_ext import human_number
 from .report_i18n import COL_I18N as _COL_I18N
@@ -78,11 +79,14 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False) -
     )
 
 class AuditHtmlExporter:
-    def __init__(self, results: dict, df: pd.DataFrame = None, date_range: tuple = ("", ""), data_source: str = ""):
+    def __init__(self, results: dict, df: pd.DataFrame = None, date_range: tuple = ("", ""), data_source: str = "",
+                 profile: str = "security_risk", detail_level: str = "standard"):
         self._r = results
         self._df = df
         self._date_range = date_range
         self._data_source = data_source
+        self._profile = profile
+        self._detail_level = detail_level
 
     @staticmethod
     def _risk_badge(risk_level: str) -> str:
@@ -147,7 +151,9 @@ class AuditHtmlExporter:
         logger.info("[AuditHtmlExporter] Saved: {}", filepath)
         return filepath
 
-    def _build(self) -> str:
+    def _build(self, profile: str = "", detail_level: str = "") -> str:
+        profile = profile or self._profile
+        detail_level = detail_level or self._detail_level
         mod00 = self._r.get("mod00", {})
         nav_html = (
             "<nav>"
@@ -213,10 +219,12 @@ class AuditHtmlExporter:
             + "\n"
             + self._section("users", "rpt_au_sec_users", "2 User Activity &amp; Authentication", self._mod02_html())
             + "\n"
-            + self._section("policy", "rpt_au_sec_policy", "3 Policy Modifications", self._mod03_html())
-            + "\n"
-            + self._section("correlation", "rpt_au_sec_correlation", "4 Event Correlation", self._mod04_html())
-            + "\n"
+            + (self._section("policy", "rpt_au_sec_policy", "3 Policy Modifications", self._mod03_html())
+               + "\n"
+               if visible_in('audit_mod03_policy', profile, detail_level) else '')
+            + (self._section("correlation", "rpt_au_sec_correlation", "4 Event Correlation", self._mod04_html())
+               + "\n"
+               if visible_in('audit_mod04_correlation', profile, detail_level) else '')
             + '<footer><span data-i18n="rpt_au_footer">Illumio PCE Ops Audit Report</span>'
             + " &middot; "
             + today_str
