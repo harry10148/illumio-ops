@@ -530,9 +530,12 @@ class HtmlExporter:
                            render_section_guidance('mod08', profile=profile, detail_level=detail_level) + self._mod08_html(),
                            'rpt_tr_sec_unmanaged_intro', 'Inventory traffic involving hosts not managed by VEN; these typically sit outside the visibility and control boundary.') + '\n'
              if visible_in('mod08_unmanaged_hosts', profile, detail_level) else '') +
-            self._section('distribution', 'rpt_tr_sec_distribution', '9 \u00b7 Traffic Distribution',
-                          render_section_guidance('mod09', profile=profile, detail_level=detail_level) + self._mod09_html(),
-                          'rpt_tr_sec_distribution_intro', 'Observe how overall traffic is distributed across Ports and protocols to quickly spot concentration or unexpected highs.') + '\n' +
+            render_appendix(
+                title=t('rpt_tr_sec_distribution'),
+                body_html=(render_section_guidance('mod09', profile=profile, detail_level=detail_level) +
+                           self._mod09_html()),
+                detail_level=detail_level,
+            ) + '\n' +
             self._section('allowed', 'rpt_tr_sec_allowed', '10 \u00b7 Allowed Traffic',
                           render_section_guidance('mod10', profile=profile, detail_level=detail_level) + self._mod10_html(),
                           'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.') + '\n' +
