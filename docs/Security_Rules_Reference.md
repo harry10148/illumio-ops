@@ -8,14 +8,15 @@ This document describes all built-in security detection rules included in Illumi
 
 ## Overview
 
-Rules are split into two series:
+Rules are split into three series:
 
 | Series | Rules | Focus |
 |:---|:---|:---|
 | **B-series** (Baseline) | B001–B009 | Ransomware exposure, policy coverage gaps, behavioural anomalies |
 | **L-series** (Lateral Movement) | L001–L010 | Attacker pivoting, credential theft, blast-radius paths, exfiltration |
+| **R-series** (Draft Policy Decision) | R01–R05 | Conflicts between live policy state and draft (unprovisioned) rules |
 
-All thresholds are configurable in **`config/report_config.yaml`** under the `thresholds:` key. No code changes are required to tune sensitivity.
+All B-series and L-series thresholds are configurable in **`config/report_config.yaml`** under the `thresholds:` key. R-series rules require `draft_policy_decision` data and auto-enable `compute_draft` when present in the active ruleset (see [§ Configuration](#configuration)).
 
 ---
 
@@ -589,6 +590,177 @@ More than `cross_env_lateral_threshold` allowed flows using lateral/management p
 
 ---
 
+## R-Series — Draft Policy Decision Rules
+
+These rules evaluate the relationship between the **live** (provisioned) policy state and the **draft** (unprovisioned) policy state. They require the `draft_policy_decision` column in the traffic dataset, which is populated only when the async traffic query is submitted with `compute_draft=True` (see [§ Configuration — compute_draft auto-enable](#compute_draft-auto-enable)).
+
+R-series rules are executed by the same rules engine as B-series and L-series rules. All findings appear in the **Security Findings** section of the HTML report under the category `DraftPolicy`.
+
+> **PCE version requirement:** `draft_policy_decision` is available from **Illumio Core 23.2.10+**. On older PCEs the column is absent and all R-series rules return zero findings (no error is raised).
+
+---
+
+### R01 · Draft Deny Detected `HIGH`
+
+Flows that are currently **allowed** by live policy but would be **blocked** once the draft rules are provisioned.
+
+**Trigger condition:** One or more flows where `policy_decision == "allowed"` AND `draft_policy_decision` is either `"blocked_by_boundary"` or `"blocked_by_override_deny"`. The rule fires as a single aggregated finding covering all matched flows.
+
+**Requires draft PD:** Yes
+
+**Severity:** HIGH
+
+**Finding row schema:**
+- `rule_id`: `R01`
+- `rule_name`: localised via i18n key `rule_r01_name`
+- `severity`: `HIGH`
+- `category`: `DraftPolicy`
+- `description`: localised via i18n key `rule_r01_desc`
+- `recommendation`: "Review and provision the draft deny rules, or add explicit allow rules before provisioning to avoid unexpected traffic disruption."
+- `evidence_matching_flows`: integer — number of flows matched
+- `evidence_draft_decisions`: string — `value_counts()` dict of `draft_policy_decision` values seen
+
+**Sample finding:**
+
+```
+rule_id: R01
+severity: HIGH
+evidence_matching_flows: 47
+evidence_draft_decisions: "{'blocked_by_boundary': 40, 'blocked_by_override_deny': 7}"
+```
+
+**Recommended remediation:** Before provisioning any new deny rules, use `docs/User_Manual.md §9.11` (Draft Policy Decision behaviour) to run a pre-provisioning impact assessment. Add explicit allow rules for any legitimate flows that appear in this finding, then re-query to verify they are no longer matched.
+
+---
+
+### R02 · Override Deny Detected `HIGH`
+
+Flows with a **draft override deny** rule. Override deny rules take absolute precedence — they cannot be overridden by any allow rule, regardless of rule order or scope.
+
+**Trigger condition:** One or more flows where `draft_policy_decision` ends with `"_override_deny"` (i.e., either `"blocked_by_override_deny"` or `"potentially_blocked_by_override_deny"`). Fires as a single aggregated finding.
+
+**Requires draft PD:** Yes
+
+**Severity:** HIGH
+
+**Finding row schema:**
+- `rule_id`: `R02`
+- `rule_name`: localised via i18n key `rule_r02_name`
+- `severity`: `HIGH`
+- `category`: `DraftPolicy`
+- `description`: localised via i18n key `rule_r02_desc`
+- `recommendation`: "Override deny rules take precedence over all allow rules. Verify each override deny is intentional before provisioning."
+- `evidence_matching_flows`: integer — number of flows matched
+- `evidence_draft_decisions`: string — `value_counts()` dict of `draft_policy_decision` values seen
+
+**Sample finding:**
+
+```
+rule_id: R02
+severity: HIGH
+evidence_matching_flows: 3
+evidence_draft_decisions: "{'blocked_by_override_deny': 3}"
+```
+
+**Recommended remediation:** Locate each draft override deny ruleset in the PCE console. Confirm each is intentional and correctly scoped. Override deny rules should be rare and tightly targeted — they are operationally irreversible once provisioned (no allow rule can restore the flow). See `docs/User_Manual.md §9.10` for override deny rule management.
+
+---
+
+### R03 · Visibility Boundary Breach `MEDIUM`
+
+Flows where the VEN is in **visibility/test mode** (so traffic passes unrestricted today) but a **draft deny boundary** rule exists for this flow. Once the workloads move to enforced mode the boundary deny will activate and block this traffic.
+
+**Trigger condition:** One or more flows where `policy_decision == "potentially_blocked"` AND `draft_policy_decision == "potentially_blocked_by_boundary"`. The `potentially_` prefix on both values confirms the VEN is not yet enforcing.
+
+**Requires draft PD:** Yes
+
+**Severity:** MEDIUM
+
+**Finding row schema:**
+- `rule_id`: `R03`
+- `rule_name`: localised via i18n key `rule_r03_name`
+- `severity`: `MEDIUM`
+- `category`: `DraftPolicy`
+- `description`: localised via i18n key `rule_r03_desc`
+- `recommendation`: "Move workloads to enforced mode to activate the boundary deny. Flows are currently traversable only because VENs are in test/visibility mode."
+- `evidence_matching_flows`: integer — number of flows matched
+
+**Sample finding:**
+
+```
+rule_id: R03
+severity: MEDIUM
+evidence_matching_flows: 12
+```
+
+**Recommended remediation:** This is a pre-enforcement gap. Before switching workloads to enforced mode, verify that all legitimate traffic on these paths has an explicit allow rule. See `docs/User_Manual.md §9.11` for the recommended enforcement readiness checklist.
+
+---
+
+### R04 · Allowed Across Boundary `LOW`
+
+Flows where an **allow rule explicitly overrides a draft regular deny boundary**. The draft deny exists but an allow rule takes precedence — the flow is permitted across the boundary.
+
+**Trigger condition:** One or more flows where `draft_policy_decision == "allowed_across_boundary"`. Note that this value never appears when an override deny is present — it is specific to regular (non-override) deny boundaries.
+
+**Requires draft PD:** Yes
+
+**Severity:** LOW
+
+**Finding row schema:**
+- `rule_id`: `R04`
+- `rule_name`: localised via i18n key `rule_r04_name`
+- `severity`: `LOW`
+- `category`: `DraftPolicy`
+- `description`: localised via i18n key `rule_r04_desc`
+- `recommendation`: "Confirm that cross-boundary allow rules are intentional and tightly scoped. Consider whether a more restrictive rule can meet the business requirement."
+- `evidence_matching_flows`: integer — number of flows matched
+
+**Sample finding:**
+
+```
+rule_id: R04
+severity: LOW
+evidence_matching_flows: 8
+```
+
+**Recommended remediation:** Review each cross-boundary allow rule in the PCE console. Verify the source and destination scopes are as narrow as possible. If the business requirement no longer applies, remove the allow rule. LOW severity indicates this is intentional by design but warrants periodic review.
+
+---
+
+### R05 · Draft-Reported Mismatch `INFO`
+
+An aggregated list of workload pairs where the **reported decision** (`policy_decision`) is `"allowed"` but the **draft decision** (`draft_policy_decision`) indicates a block. This is a superset view — it captures all allowed-but-draft-blocked pairs regardless of which specific block type applies, complementing the focused findings of R01.
+
+**Trigger condition:** One or more flows where `policy_decision == "allowed"` AND `draft_policy_decision` starts with `"blocked_"`. The top 20 source-destination pairs are captured in evidence (using `src`/`src_ip` and `dst`/`dst_ip` columns as available).
+
+**Requires draft PD:** Yes
+
+**Severity:** INFO
+
+**Finding row schema:**
+- `rule_id`: `R05`
+- `rule_name`: localised via i18n key `rule_r05_name`
+- `severity`: `INFO`
+- `category`: `DraftPolicy`
+- `description`: localised via i18n key `rule_r05_desc`
+- `recommendation`: "Review these workload pairs before provisioning draft rules. Currently-allowed traffic will be blocked once the draft is provisioned."
+- `evidence_mismatch_count`: integer — total number of mismatched flows
+- `evidence_top_pairs`: string — JSON-serialised list of up to 20 `{src, dst}` dicts
+
+**Sample finding:**
+
+```
+rule_id: R05
+severity: INFO
+evidence_mismatch_count: 23
+evidence_top_pairs: "[{'src': '10.0.1.5', 'dst': '10.0.2.8'}, ...]"
+```
+
+**Recommended remediation:** Use this as a pre-provisioning checklist. Cross-reference each pair with your approved change request before provisioning draft rules. INFO severity means no immediate action is required but the list should be reviewed and acknowledged. See `docs/User_Manual.md §9.11`.
+
+---
+
 ## Analysis Modules (Non-Rule)
 
 In addition to the B-series and L-series security rules, the traffic report includes three analysis modules that provide scoring and risk assessment. These modules do **not** generate `Finding` objects in the rules engine but appear as dedicated sections in the HTML report.
@@ -709,3 +881,42 @@ All port numbers referenced by the security rules and analysis modules:
 | 27017 | MongoDB | L003, L004, L007, L008 |
 | 47001 | WinRM alternate | L007, L008, L010 |
 | 50000 | IBM DB2 | L003, L004, L007, L008 |
+
+---
+
+## Configuration
+
+### compute_draft auto-enable {#compute_draft-auto-enable}
+
+The `draft_policy_decision` column in a traffic flow dataset is expensive to populate: it requires the analyzer to issue a `PUT {job_href}/update_rules` call after the async query completes, which re-evaluates all historical flow records against both active and draft rules (see [§ Obtaining `draft_policy_decision`](#obtaining-draft_policy_decision)).
+
+By default, `compute_draft` is **off** — the analyzer does not request draft policy data unless the operator explicitly opts in. However, when the active ruleset contains **any rule** whose `needs_draft_pd()` method returns `True` (all R01–R05 rules qualify), the analyzer automatically forces `compute_draft=True`, even if the operator did not pass the flag.
+
+**Automatic escalation logic (from `src/analyzer.py`):**
+
+```python
+needs_draft = (
+    bool(draft_pd_filter)                              # operator passed a draft PD filter
+    or getattr(query_spec, "requires_draft_pd", False) # ruleset annotation
+    or bool(params.get("requires_draft_pd", False))    # explicit query param
+)
+```
+
+The function `ruleset_needs_draft_pd()` in `src/report/rules_engine.py` iterates the active ruleset and calls `needs_draft_pd()` on each rule instance. If any returns `True`, the result propagates to the analyzer.
+
+**Practical effect:**
+
+| Ruleset contains R-series rules? | `compute_draft` parameter | Actual behaviour |
+|:---|:---|:---|
+| No | False (default) | Draft data not requested; R-series rules return 0 findings |
+| No | True (operator opt-in) | Draft data requested; R-series rules evaluate normally |
+| Yes | False (default) | **Auto-escalated to True** — draft data requested automatically |
+| Yes | True | Draft data requested (no change) |
+
+**When `compute_draft` is forced on, a log entry is emitted** at INFO level using i18n key `rs_engine_needs_draft_pd` ("Rule requires draft_policy_decision; compute_draft forced on."). Operators can observe this in the application log to confirm the escalation occurred.
+
+**Test coverage:** `tests/test_phase34_attack_summaries.py` — the `test_policy_usage_html_renders_draft_pd_section` test verifies that the Draft Policy section renders in the HTML report when `mod05` draft conflict data is present.
+
+**Cross-references:**
+- `docs/User_Manual.md §9.11` — Draft Policy Decision behaviour (end-user operator guide)
+- `docs/Architecture.md §1.4` — Policy lifecycle: provisioned vs. draft state (added in Phase C)
