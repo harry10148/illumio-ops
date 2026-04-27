@@ -205,6 +205,42 @@ cd illumio_ops
 pip install -r requirements.txt
 ```
 
+#### Custom install root
+
+`install.sh` accepts `--install-root` to deploy to a non-default path:
+
+```bash
+sudo ./install.sh --install-root /opt/custom_path
+```
+
+The systemd unit file is updated automatically to reference the chosen path.
+
+#### Config preservation on upgrade
+
+On upgrade, `install.sh` detects `config/config.json` and skips the entire `config/` tree (comment in source: *"Preserve all of config/ on upgrade — never overwrite operator-owned files"*). Only `*.example` templates are updated so operators can diff for new keys:
+
+```bash
+diff /opt/illumio_ops/config/config.json.example \
+     /opt/illumio_ops/config/config.json
+```
+
+#### Uninstall
+
+The installer places `uninstall.sh` inside the install root so removal is self-contained.
+
+```bash
+# Preserve config/ (default — safe for re-install)
+sudo /opt/illumio_ops/uninstall.sh
+
+# Remove everything, including config/ (--purge)
+sudo /opt/illumio_ops/uninstall.sh --purge
+
+# When running from a bundle directory, or with a custom install root
+sudo ./uninstall.sh --install-root /opt/custom_path
+```
+
+Both variants stop and disable the `illumio-ops` systemd unit, remove the service file, and delete the `illumio_ops` system user. The default (no `--purge`) preserves `config/` in place — run `sudo rm -rf /opt/illumio_ops` afterwards to complete a full removal.
+
 ### 1.3 Configuration (`config.json`)
 
 Copy the example config and fill in your PCE API credentials:
@@ -592,6 +628,8 @@ nssm start IllumioOps
 
 ### 8.2 Linux systemd
 
+> **Preferred daemon flag:** Use `--monitor-gui` to run the scheduler and Web GUI together in a single process (Persistent Mode). Use `--monitor` only when you want a headless daemon with no GUI.
+
 #### RHEL / CentOS (system Python)
 
 ```ini
@@ -604,7 +642,7 @@ After=network.target
 Type=simple
 User=illumio
 WorkingDirectory=/opt/illumio_ops
-ExecStart=/usr/bin/python3 illumio_ops.py --monitor --interval 5
+ExecStart=/usr/bin/python3 illumio_ops.py --monitor-gui --interval 5
 Restart=on-failure
 
 [Install]
@@ -631,7 +669,7 @@ After=network.target
 Type=simple
 User=illumio
 WorkingDirectory=/opt/illumio_ops
-ExecStart=/opt/illumio_ops/venv/bin/python illumio_ops.py --monitor --interval 5
+ExecStart=/opt/illumio_ops/venv/bin/python illumio_ops.py --monitor-gui --interval 5
 Restart=on-failure
 
 [Install]
