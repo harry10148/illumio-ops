@@ -27,6 +27,8 @@ from src.report.report_metadata import (
     extract_attack_summary,
 )
 
+_VALID_DETAIL_LEVELS = ("executive", "standard", "full")
+
 # Event types that represent a policy commit (no field-level diffs, only macro stats)
 _PROVISION_EVENT_TYPES = frozenset({
     'sec_policy.create', 'sec_policy.delete', 'sec_policy.restore',
@@ -435,7 +437,10 @@ class AuditGenerator:
         return self.api.get_events(since=start_str)
 
     def generate_from_api(self, start_date: Optional[str] = None,
-                          end_date: Optional[str] = None) -> AuditReportResult:
+                          end_date: Optional[str] = None,
+                          detail_level: str = "standard") -> AuditReportResult:
+        if detail_level not in _VALID_DETAIL_LEVELS:
+            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
         if not self.api:
             raise RuntimeError("api_client required for audit generation")
 
@@ -446,6 +451,7 @@ class AuditGenerator:
                 datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
             ).isoformat().replace("+00:00", "Z")
 
+        self._detail_level = detail_level
         print(t("rpt_audit_querying", start=start_date, end=end_date))
         _start_dt = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
         _end_dt = datetime.datetime.fromisoformat(end_date.replace("Z", "+00:00"))
@@ -642,7 +648,8 @@ class AuditGenerator:
         )
 
     def export(self, result: AuditReportResult, fmt: str = 'html',
-               output_dir: str = 'reports') -> list[str]:
+               output_dir: str = 'reports',
+               detail_level: str = "standard") -> list[str]:
         from src.report.exporters.audit_html_exporter import AuditHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
         paths = []
@@ -750,3 +757,85 @@ class AuditGenerator:
         payload = self._build_report_metadata(result, file_format=file_format)
         with open(metadata_path, "w", encoding="utf-8") as fh:
             json.dump(payload, fh, indent=2, ensure_ascii=False)
+
+
+def generate_audit_xlsx(events_df, out_path: str, top_n: int = 100) -> str:
+    """Generate an Audit report XLSX with real per-sheet DataFrames."""
+    from openpyxl import Workbook
+    from src.report.analysis.audit.audit_mod00_executive import audit_executive_summary
+    from src.report.analysis.audit.audit_mod01_health import audit_system_health
+    from src.report.analysis.audit.audit_mod02_users import audit_user_activity
+    from src.report.analysis.audit.audit_mod03_policy import audit_policy_changes
+    from src.report.analysis.audit.audit_mod04_correlation import audit_event_correlation
+
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    def _df_to_sheet(ws, df):
+        if df is None or not hasattr(df, "empty") or df.empty:
+            ws.append(["Note", "No data"])
+            return
+        ws.append(list(df.columns))
+        for _, row in df.head(top_n).iterrows():
+            ws.append([str(v) for v in row])
+
+    # --- Attention Required (executive summary KPIs) ---
+    ws = wb.create_sheet("Attention Required")
+    try:
+        # audit_executive_summary expects results dict + df; build minimal results first
+        mod01 = audit_system_health(events_df)
+        mod02 = audit_user_activity(events_df)
+        mod03 = audit_policy_changes(events_df)
+        results = {"mod01": mod01, "mod02": mod02, "mod03": mod03}
+        exec_data = audit_executive_summary(results, events_df)
+        kpis = exec_data.get("kpis", [])
+        ws.append(["KPI", "Value"])
+        for item in kpis:
+            ws.append([str(item.get("label", "")), str(item.get("value", ""))])
+    except Exception:
+        ws.append(["Note", "Executive summary unavailable"])
+
+    # --- Health ---
+    ws = wb.create_sheet("Health")
+    try:
+        health_data = audit_system_health(events_df)
+        summary_df = health_data.get("summary")
+        _df_to_sheet(ws, summary_df)
+    except Exception:
+        ws.append(["Note", "Health data unavailable"])
+
+    # --- Users ---
+    ws = wb.create_sheet("Users")
+    try:
+        users_data = audit_user_activity(events_df)
+        per_user_df = users_data.get("per_user")
+        _df_to_sheet(ws, per_user_df)
+    except Exception:
+        ws.append(["Note", "User data unavailable"])
+
+    # --- Policy Changes ---
+    ws = wb.create_sheet("Policy Changes")
+    try:
+        policy_data = audit_policy_changes(events_df)
+        summary_df = policy_data.get("summary")
+        _df_to_sheet(ws, summary_df)
+    except Exception:
+        ws.append(["Note", "Policy changes unavailable"])
+
+    # --- Correlations ---
+    ws = wb.create_sheet("Correlations")
+    try:
+        corr_data = audit_event_correlation(events_df)
+        if isinstance(corr_data, dict) and "error" not in corr_data:
+            # Flatten scalar KPIs
+            ws.append(["Metric", "Value"])
+            for k, v in corr_data.items():
+                if not hasattr(v, "empty"):
+                    ws.append([str(k), str(v)])
+        else:
+            ws.append(["Note", str(corr_data.get("error", "No correlation data"))])
+    except Exception:
+        ws.append(["Note", "Correlation data unavailable"])
+
+    wb.save(out_path)
+    return out_path

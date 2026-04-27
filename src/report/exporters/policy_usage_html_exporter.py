@@ -13,9 +13,10 @@ from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
-from .chart_renderer import render_plotly_html
+from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from .html_exporter import render_section_guidance
+from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 
 _CSS = build_css("policy_usage")
@@ -120,11 +121,15 @@ class PolicyUsageHtmlExporter:
         df: pd.DataFrame = None,
         date_range: tuple = ("", ""),
         lookback_days: int = 30,
+        profile: str = "security_risk",
+        detail_level: str = "standard",
     ):
         self._r = results
         self._df = df
         self._date_range = date_range
         self._lookback_days = lookback_days
+        self._profile = profile
+        self._detail_level = detail_level
 
     def export(self, output_dir: str = "reports") -> str:
         os.makedirs(output_dir, exist_ok=True)
@@ -136,7 +141,10 @@ class PolicyUsageHtmlExporter:
         logger.info("[PolicyUsageHtmlExporter] Saved: {}", filepath)
         return filepath
 
-    def _build(self) -> str:
+    def _build(self, profile: str = "", detail_level: str = "") -> str:
+        profile = profile or self._profile
+        detail_level = detail_level or self._detail_level
+        self._chart_tracker = FirstChartTracker()
         mod00 = self._r.get("mod00", {})
         date_str = " ~ ".join(self._date_range) if any(self._date_range) else ""
         period_part = (
@@ -191,7 +199,7 @@ class PolicyUsageHtmlExporter:
                 "Rules that observed traffic during the lookback window, including their dominant hit ports.",
             )
             + "\n"
-            + self._section(
+            + (self._section(
                 "unused-rules",
                 "rpt_pu_sec_unused",
                 "3. Unused Rules Detail",
@@ -199,7 +207,8 @@ class PolicyUsageHtmlExporter:
                 "Rules without observed hits in the selected window, shown with expected services for review.",
             )
             + "\n"
-            + self._section(
+            if visible_in('pu_mod03_unused_detail', profile, detail_level) else '')
+            + (self._section(
                 "deny-rules",
                 "rpt_pu_sec_deny",
                 "4. Deny Rule Effectiveness",
@@ -207,6 +216,7 @@ class PolicyUsageHtmlExporter:
                 "Deny rule coverage and hit analysis — are deny rules actively blocking unwanted traffic?",
             )
             + "\n"
+            if visible_in('pu_mod04_deny_effectiveness', profile, detail_level) else '')
             + '<footer><span data-i18n="rpt_pu_footer">Illumio PCE Ops - Policy Usage Report</span>'
             + " &middot; "
             + today_str
@@ -394,7 +404,7 @@ class PolicyUsageHtmlExporter:
                         "values": [hit, unused],
                     },
                 }
-                div = render_plotly_html(spec)
+                div = render_plotly_html(spec, include_js=self._chart_tracker.consume())
                 if div:
                     chart_html = f'<div class="chart-container">{div}</div>'
             except Exception:

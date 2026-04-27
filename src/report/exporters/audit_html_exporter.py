@@ -9,12 +9,13 @@ import os
 import pandas as pd
 
 from .html_exporter import _trend_deltas_section, render_section_guidance
+from src.report.section_guidance import visible_in
 from .report_css import TABLE_JS, build_css
 from src.humanize_ext import human_number
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
-from .chart_renderer import render_plotly_html
+from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from src.report.analysis.audit.audit_risk import RISK_BG, RISK_COLOR, get_risk
 
@@ -22,12 +23,12 @@ _CSS = build_css("audit")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
 
 
-def _chart_html(spec: dict | None) -> str:
+def _chart_html(spec: dict | None, include_js: bool = True) -> str:
     """Render a chart_spec as a styled chart-container div, or '' on failure."""
     if not spec:
         return ""
     try:
-        div = render_plotly_html(spec)
+        div = render_plotly_html(spec, include_js=include_js)
         return f'<div class="chart-container">{div}</div>' if div else ""
     except Exception as exc:
         logger.warning("audit chart render failed: {}", exc)
@@ -78,11 +79,14 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False) -
     )
 
 class AuditHtmlExporter:
-    def __init__(self, results: dict, df: pd.DataFrame = None, date_range: tuple = ("", ""), data_source: str = ""):
+    def __init__(self, results: dict, df: pd.DataFrame = None, date_range: tuple = ("", ""), data_source: str = "",
+                 profile: str = "security_risk", detail_level: str = "standard"):
         self._r = results
         self._df = df
         self._date_range = date_range
         self._data_source = data_source
+        self._profile = profile
+        self._detail_level = detail_level
 
     @staticmethod
     def _risk_badge(risk_level: str) -> str:
@@ -147,7 +151,10 @@ class AuditHtmlExporter:
         logger.info("[AuditHtmlExporter] Saved: {}", filepath)
         return filepath
 
-    def _build(self) -> str:
+    def _build(self, profile: str = "", detail_level: str = "") -> str:
+        profile = profile or self._profile
+        detail_level = detail_level or self._detail_level
+        self._chart_tracker = FirstChartTracker()
         mod00 = self._r.get("mod00", {})
         nav_html = (
             "<nav>"
@@ -206,17 +213,19 @@ class AuditHtmlExporter:
             + self._trend_deltas_html()
             + self._severity_dist_html(mod00)
             + '<h2 data-i18n="rpt_au_top_events">Top Event Types</h2>'
-            + _chart_html(mod00.get("chart_spec"))
+            + _chart_html(mod00.get("chart_spec"), include_js=self._chart_tracker.consume())
             + _df_to_html(mod00.get("top_events_overall"))
             + "</section>\n"
             + self._section("health", "rpt_au_sec_health", "1 System Health &amp; Agent", self._mod01_html())
             + "\n"
             + self._section("users", "rpt_au_sec_users", "2 User Activity &amp; Authentication", self._mod02_html())
             + "\n"
-            + self._section("policy", "rpt_au_sec_policy", "3 Policy Modifications", self._mod03_html())
-            + "\n"
-            + self._section("correlation", "rpt_au_sec_correlation", "4 Event Correlation", self._mod04_html())
-            + "\n"
+            + (self._section("policy", "rpt_au_sec_policy", "3 Policy Modifications", self._mod03_html())
+               + "\n"
+               if visible_in('audit_mod03_policy', profile, detail_level) else '')
+            + (self._section("correlation", "rpt_au_sec_correlation", "4 Event Correlation", self._mod04_html())
+               + "\n"
+               if visible_in('audit_mod04_correlation', profile, detail_level) else '')
             + '<footer><span data-i18n="rpt_au_footer">Illumio PCE Ops Audit Report</span>'
             + " &middot; "
             + today_str
@@ -318,7 +327,7 @@ class AuditHtmlExporter:
                     "title": "Event Severity Distribution",
                     "data": {"labels": labels, "values": values},
                 }
-                chart_html = _chart_html(spec)
+                chart_html = _chart_html(spec, include_js=self._chart_tracker.consume())
         except Exception:
             pass
         return (
@@ -431,7 +440,7 @@ class AuditHtmlExporter:
         if per_user is not None and not (hasattr(per_user, "empty") and per_user.empty):
             html += (
                 '<h3 data-i18n="rpt_au_per_user">Activity by User</h3>'
-                + _chart_html(m.get("chart_spec"))
+                + _chart_html(m.get("chart_spec"), include_js=self._chart_tracker.consume())
                 + _df_to_html(per_user)
             )
 
@@ -575,7 +584,7 @@ class AuditHtmlExporter:
             html += (
                 self._subnote("rpt_au_per_user_policy_subnote", "This table aggregates Policy activity by parsed actor, separating admin operations, system tasks, and actions initiated by the Agent itself.")
                 + '<h3 data-i18n="rpt_au_per_user_policy">Changes by User</h3>'
-                + _chart_html(m.get("chart_spec"))
+                + _chart_html(m.get("chart_spec"), include_js=self._chart_tracker.consume())
                 + _df_to_html(per_user)
             )
 

@@ -1924,6 +1924,12 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             traffic_report_profile = d.get('traffic_report_profile', 'security_risk')
             if traffic_report_profile not in _VALID_PROFILES:
                 traffic_report_profile = 'security_risk'
+
+            _VALID_DETAIL_LEVELS_GUI = ('executive', 'standard', 'full')
+            detail_level = d.get('detail_level', 'standard')
+            if detail_level not in _VALID_DETAIL_LEVELS_GUI:
+                detail_level = 'standard'
+
             if source == 'csv':
                 if 'file' not in request.files:
                     return jsonify({"ok": False, "error": t("gui_err_no_csv")})
@@ -1936,7 +1942,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 temp_path = os.path.join(tempfile.gettempdir(), f"{_uuid.uuid4().hex}_{safe_filename}")
                 csv_file.save(temp_path)
                 try:
-                    result = gen.generate_from_csv(temp_path, traffic_report_profile=traffic_report_profile)
+                    result = gen.generate_from_csv(temp_path, traffic_report_profile=traffic_report_profile, detail_level=detail_level)
                 finally:
                     try:
                         os.remove(temp_path)
@@ -1968,7 +1974,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     if not any(v for v in report_filters.values() if v):
                         report_filters = None
 
-                result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=report_filters, traffic_report_profile=traffic_report_profile)
+                result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=report_filters, traffic_report_profile=traffic_report_profile, detail_level=detail_level)
 
             if result.record_count == 0:
                 return jsonify({"ok": False, "error": t("gui_no_traffic_data")})

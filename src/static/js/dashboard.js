@@ -716,6 +716,7 @@ function openReportGenModal(type) {
     $('m-gen-source-row').style.display = '';
     $('m-gen-filters').style.display = '';
     $('m-gen-profile-row').style.display = '';
+    if (document.getElementById('m-gen-detail-row')) document.getElementById('m-gen-detail-row').style.display = '';
     toggleTrafficSource();
     // Reset filter fields
     ['rpt-pd-blocked','rpt-pd-potential','rpt-pd-allowed'].forEach(id => {
@@ -731,6 +732,7 @@ function openReportGenModal(type) {
     $('m-gen-dates').style.display = m.dates ? '' : 'none';
     $('m-gen-filters').style.display = 'none';
     $('m-gen-profile-row').style.display = 'none';
+    if (document.getElementById('m-gen-detail-row')) document.getElementById('m-gen-detail-row').style.display = 'none';
   }
   
   $('m-gen-note').style.display  = m.dates ? 'none' : '';
@@ -939,6 +941,8 @@ async function _doGenerateTraffic() {
       formData.append('format', fmtEl ? fmtEl.value : 'all');
       const profileElCsv = document.getElementById('m-gen-profile');
       formData.append('traffic_report_profile', profileElCsv ? profileElCsv.value : 'security_risk');
+      const detailElCsv = document.getElementById('m-gen-detail');
+      formData.append('detail_level', detailElCsv ? detailElCsv.value : 'standard');
       formData.append('file', fileInput.files[0]);
 
       _updateGenStep(_t('gui_gen_step_analysing'));
@@ -980,6 +984,7 @@ async function _doGenerateTraffic() {
         source: 'api', format: fmtEl2 ? fmtEl2.value : 'all',
         start_date: startDate, end_date: endDate,
         traffic_report_profile: profileEl ? profileEl.value : 'security_risk',
+        detail_level: (() => { const el = document.getElementById('m-gen-detail'); return el ? el.value : 'standard'; })(),
         ...(reportFilters ? { filters: reportFilters } : {}),
       });
       clearTimeout(_stepTimer);

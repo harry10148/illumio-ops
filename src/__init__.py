@@ -1,1 +1,1 @@
-__version__ = "3.18.0-report-semantics"
+__version__ = "3.19.0-report-compact"

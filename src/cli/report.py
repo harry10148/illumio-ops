@@ -47,6 +47,7 @@ def generate_traffic_report(
     output_dir: str | None = None,
     email: bool = False,
     traffic_report_profile: str = "security_risk",
+    detail_level: str = "standard",
 ) -> list[str]:
     from src.api_client import ApiClient
     from src.config import ConfigManager
@@ -63,9 +64,9 @@ def generate_traffic_report(
     if source == "csv":
         if not file_path:
             raise click.ClickException("--file is required when --source csv is used")
-        result = gen.generate_from_csv(file_path, traffic_report_profile=traffic_report_profile)
+        result = gen.generate_from_csv(file_path, traffic_report_profile=traffic_report_profile, detail_level=detail_level)
     else:
-        result = gen.generate_from_api(traffic_report_profile=traffic_report_profile)
+        result = gen.generate_from_api(traffic_report_profile=traffic_report_profile, detail_level=detail_level)
 
     if result.record_count == 0:
         raise click.ClickException("No data for report")
@@ -177,7 +178,15 @@ def report_group() -> None:
     default="security_risk",
     help="Traffic report profile (security_risk or network_inventory)",
 )
-def report_traffic(source: str, file_path, fmt: str, output_dir, email: bool, traffic_report_profile: str) -> None:
+@click.option(
+    "--detail-level",
+    "detail_level",
+    type=click.Choice(["executive", "standard", "full"]),
+    default="standard",
+    show_default=True,
+    help="Detail level for report output",
+)
+def report_traffic(source: str, file_path, fmt: str, output_dir, email: bool, traffic_report_profile: str, detail_level: str) -> None:
     """Generate Traffic Flow Report."""
     for path in generate_traffic_report(
         source=source,
@@ -186,6 +195,7 @@ def report_traffic(source: str, file_path, fmt: str, output_dir, email: bool, tr
         output_dir=output_dir,
         email=email,
         traffic_report_profile=traffic_report_profile,
+        detail_level=detail_level,
     ):
         click.echo(path)
 

@@ -13,9 +13,10 @@ from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS, lang_btn_html, make_i18n_js
 from .table_renderer import render_df_table
-from .chart_renderer import render_plotly_html
+from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from .html_exporter import render_section_guidance
+from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 
 _CSS = build_css("ven")
@@ -48,9 +49,12 @@ def _df_to_html(df, no_data_key: str = "rpt_no_records") -> str:
     )
 
 class VenHtmlExporter:
-    def __init__(self, results: dict, df: pd.DataFrame = None):
+    def __init__(self, results: dict, df: pd.DataFrame = None,
+                 profile: str = "security_risk", detail_level: str = "standard"):
         self._r = results
         self._df = df
+        self._profile = profile
+        self._detail_level = detail_level
 
     def export(self, output_dir: str = "reports") -> str:
         os.makedirs(output_dir, exist_ok=True)
@@ -62,7 +66,10 @@ class VenHtmlExporter:
         logger.info("[VenHtmlExporter] Saved: {}", filepath)
         return filepath
 
-    def _build(self) -> str:
+    def _build(self, profile: str = "", detail_level: str = "") -> str:
+        profile = profile or self._profile
+        detail_level = detail_level or self._detail_level
+        self._chart_tracker = FirstChartTracker()
         kpis = self._r.get("kpis", [])
         gen_at = self._r.get("generated_at", "")
         today_str = str(datetime.date.today())
@@ -120,7 +127,7 @@ class VenHtmlExporter:
                         "values": [online_count, offline_count, today_count, yest_count],
                     },
                 }
-                div = render_plotly_html(spec)
+                div = render_plotly_html(spec, include_js=self._chart_tracker.consume())
                 if div:
                     status_chart_html = f'<div class="chart-container">{div}</div>'
             except Exception:
@@ -140,12 +147,15 @@ class VenHtmlExporter:
             + "</section>\n"
             + self._section("online", "rpt_ven_sec_online_title", "Online VENs", online_count, _df_to_html(df_online), "rpt_ven_sec_online_intro", "online", "ven_online_inventory")
             + "\n"
-            + self._section("offline", "rpt_ven_sec_offline_title", "Offline VENs", offline_count, _df_to_html(df_offline), "rpt_ven_sec_offline_intro", "offline", "ven_offline")
-            + "\n"
-            + self._section("lost-today", "rpt_ven_sec_lost_today_title", "Lost Connection in Last 24h", today_count, _df_to_html(df_today), "rpt_ven_sec_lost_today_intro", "offline", "ven_lost_heartbeat_24h")
-            + "\n"
-            + self._section("lost-yest", "rpt_ven_sec_lost_yest_title", "Lost Connection 24-48h Ago", yest_count, _df_to_html(df_yest), "rpt_ven_sec_lost_yest_intro", "warn", "ven_lost_heartbeat_48h")
-            + "\n"
+            + (self._section("offline", "rpt_ven_sec_offline_title", "Offline VENs", offline_count, _df_to_html(df_offline), "rpt_ven_sec_offline_intro", "offline", "ven_offline")
+               + "\n"
+               if visible_in('ven_offline', profile, detail_level) else '')
+            + (self._section("lost-today", "rpt_ven_sec_lost_today_title", "Lost Connection in Last 24h", today_count, _df_to_html(df_today), "rpt_ven_sec_lost_today_intro", "offline", "ven_lost_heartbeat_24h")
+               + "\n"
+               if visible_in('ven_lost_heartbeat_24h', profile, detail_level) else '')
+            + (self._section("lost-yest", "rpt_ven_sec_lost_yest_title", "Lost Connection 24-48h Ago", yest_count, _df_to_html(df_yest), "rpt_ven_sec_lost_yest_intro", "warn", "ven_lost_heartbeat_48h")
+               + "\n"
+               if visible_in('ven_lost_heartbeat_48h', profile, detail_level) else '')
             + '<footer><span data-i18n="rpt_ven_footer">Illumio PCE Ops — VEN Status Report</span> &middot; '
             + today_str
             + "</footer>"

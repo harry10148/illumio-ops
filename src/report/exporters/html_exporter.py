@@ -20,7 +20,7 @@ import pandas as pd
 from .report_i18n import STRINGS, make_i18n_js, lang_btn_html, COL_I18N as _COL_I18N
 from .report_css import build_css, TABLE_JS
 from .table_renderer import render_df_table
-from .chart_renderer import render_plotly_html
+from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from src.humanize_ext import human_number
 from src.report.section_guidance import get_guidance, visible_in
@@ -60,12 +60,29 @@ def render_section_guidance(module_id: str, profile: str, detail_level: str) -> 
     )
 
 
-def _render_chart_for_html(chart_spec: dict | None) -> str:
+def render_appendix(title: str, body_html: str, *, detail_level: str) -> str:
+    """Wrap body_html in a collapsible <details> block.
+    - executive: returns "" (appendix entirely hidden).
+    - standard:  collapsed by default.
+    - full:      <details open>.
+    """
+    if detail_level == "executive":
+        return ""
+    open_attr = " open" if detail_level == "full" else ""
+    return (
+        f'<details{open_attr} class="report-appendix">'
+        f'<summary><b>{t("rpt_appendix_label")}: {title}</b></summary>'
+        f'{body_html}'
+        f'</details>'
+    )
+
+
+def _render_chart_for_html(chart_spec: dict | None, include_js: bool = True) -> str:
     """Emit plotly interactive div. Matplotlib PNG is PDF-only; never shown in HTML."""
     if not chart_spec:
         return ''
     try:
-        plotly_div = render_plotly_html(chart_spec)
+        plotly_div = render_plotly_html(chart_spec, include_js=include_js)
         if plotly_div:
             return f'<div class="chart-container">{plotly_div}</div>'
     except Exception as exc:
@@ -366,6 +383,7 @@ class HtmlExporter:
     def _build(self, profile: str = "", detail_level: str = "") -> str:
         profile = profile or self._profile
         detail_level = detail_level or self._detail_level
+        self._chart_tracker = FirstChartTracker()
         mod12 = self._r.get('mod12', {})
         findings = self._r.get('findings', [])
         n_findings = str(len(findings))
@@ -470,6 +488,40 @@ class HtmlExporter:
             f'<div style="flex:1">{maturity_bars}</div></div>'
         )
 
+        # T6: mod06 user/process — appendix only when data available
+        _mod06 = self._r.get('mod06', {})
+        _mod06_has_data = _mod06.get('user_data_available') or _mod06.get('process_data_available')
+        _mod06_block = (render_appendix(
+            title=t('rpt_tr_sec_user'),
+            body_html=(render_section_guidance('mod06', profile=profile, detail_level=detail_level) +
+                       self._mod06_html()),
+            detail_level=detail_level,
+        ) if _mod06_has_data else '') + '\n'
+
+        # T7: mod07 — profile-aware rendering
+        if visible_in('mod07_cross_label_matrix', profile, detail_level):
+            _mod07_body = (render_section_guidance('mod07', profile=profile, detail_level=detail_level) +
+                           self._mod07_html())
+            if profile == 'security_risk':
+                _mod07_block = (
+                    self._section('matrix', 'rpt_tr_sec_matrix', '7 · Cross-Label Matrix',
+                                  _mod07_body,
+                                  'rpt_tr_sec_matrix_intro', 'Observe cross-group communication by Label dimension, useful for surfacing segments that should not interact frequently.') + '\n' +
+                    render_appendix(
+                        title=t('rpt_mod07_full_matrix'),
+                        body_html=_mod07_body,
+                        detail_level=detail_level,
+                    )
+                )
+            else:  # network_inventory — full matrix in main
+                _mod07_block = (
+                    self._section('matrix', 'rpt_tr_sec_matrix', '7 · Cross-Label Matrix',
+                                  _mod07_body,
+                                  'rpt_tr_sec_matrix_intro', 'Observe cross-group communication by Label dimension, useful for surfacing segments that should not interact frequently.') + '\n'
+                )
+        else:
+            _mod07_block = ''
+
         body = (
             '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top"><div class="report-kicker" data-i18n="rpt_kicker_traffic">Traffic Analytics Report</div>'
@@ -502,20 +554,18 @@ class HtmlExporter:
              if visible_in('mod04_ransomware_exposure', profile, detail_level) else '') +
             # mod05 (Remote Access) consolidated into mod15 (Lateral Movement)
 
-            self._section('user', 'rpt_tr_sec_user', '6 \u00b7 User &amp; Process',
-                          render_section_guidance('mod06', profile=profile, detail_level=detail_level) + self._mod06_html(),
-                          'rpt_tr_sec_user_intro', 'Add user and process context to traffic to judge whether these connections match existing operational patterns.') + '\n' +
-            (self._section('matrix', 'rpt_tr_sec_matrix', '7 \u00b7 Cross-Label Matrix',
-                           render_section_guidance('mod07', profile=profile, detail_level=detail_level) + self._mod07_html(),
-                           'rpt_tr_sec_matrix_intro', 'Observe cross-group communication by Label dimension, useful for surfacing segments that should not interact frequently.') + '\n'
-             if visible_in('mod07_cross_label_matrix', profile, detail_level) else '') +
+            _mod06_block +
+            _mod07_block +
             (self._section('unmanaged', 'rpt_tr_sec_unmanaged', '8 \u00b7 Unmanaged Hosts',
                            render_section_guidance('mod08', profile=profile, detail_level=detail_level) + self._mod08_html(),
                            'rpt_tr_sec_unmanaged_intro', 'Inventory traffic involving hosts not managed by VEN; these typically sit outside the visibility and control boundary.') + '\n'
              if visible_in('mod08_unmanaged_hosts', profile, detail_level) else '') +
-            self._section('distribution', 'rpt_tr_sec_distribution', '9 \u00b7 Traffic Distribution',
-                          render_section_guidance('mod09', profile=profile, detail_level=detail_level) + self._mod09_html(),
-                          'rpt_tr_sec_distribution_intro', 'Observe how overall traffic is distributed across Ports and protocols to quickly spot concentration or unexpected highs.') + '\n' +
+            render_appendix(
+                title=t('rpt_tr_sec_distribution'),
+                body_html=(render_section_guidance('mod09', profile=profile, detail_level=detail_level) +
+                           self._mod09_html()),
+                detail_level=detail_level,
+            ) + '\n' +
             self._section('allowed', 'rpt_tr_sec_allowed', '10 \u00b7 Allowed Traffic',
                           render_section_guidance('mod10', profile=profile, detail_level=detail_level) + self._mod10_html(),
                           'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.') + '\n' +
@@ -681,7 +731,7 @@ class HtmlExporter:
 
     def _mod02_html(self):
         m = self._r.get('mod02', {})
-        out = self._subnote('rpt_tr_mod02_intro', 'Start with the decision breakdown to see how much traffic is Allowed vs Blocked vs Potentially Blocked.') + _df_to_html(m.get('summary')) + _render_chart_for_html(m.get('chart_spec'))
+        out = self._subnote('rpt_tr_mod02_intro', 'Start with the decision breakdown to see how much traffic is Allowed vs Blocked vs Potentially Blocked.') + _df_to_html(m.get('summary')) + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
         # Per-port coverage table
         pc = m.get('port_coverage')
         if pc is not None and hasattr(pc, 'empty') and not pc.empty:
@@ -831,7 +881,7 @@ class HtmlExporter:
                 kv = (f'<span data-i18n="rpt_tr_same_value">Same-value:</span> {data.get("same_value_flows",0)} · '
                       f'<span data-i18n="rpt_tr_cross_value">Cross-value:</span> {data.get("cross_value_flows",0)}')
                 out += f'<p>{kv}</p>{_df_to_html(data.get("top_cross_pairs"))}'
-        out += _render_chart_for_html(m.get('chart_spec'))
+        out += _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
         return out or '<p class="note" data-i18n="rpt_no_matrix">No label matrix data.</p>'
 
     def _mod08_html(self):
@@ -877,7 +927,7 @@ class HtmlExporter:
         return (
             self._subnote('rpt_tr_allowed_flows_subnote', 'Focus on explicitly Allowed top flows and verify they are required business paths.')
             + _df_to_html(m.get('top_app_flows'))
-            + _render_chart_for_html(m.get('chart_spec'))
+            + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
             + self._subnote('rpt_tr_audit_flags_subnote', 'Audit Flags lists traffic that is Allowed but still worth a human review.')
             + '<h3><span data-i18n="rpt_tr_audit_flags">Audit Flags</span> (' +
             str(m.get('audit_flag_count', 0)) + ')</h3>'
@@ -1099,7 +1149,7 @@ class HtmlExporter:
             return f'<p class="note">{m["error"]}</p>'
         total = m.get('total_lateral_flows', 0)
         pct = m.get('lateral_pct', 0)
-        html = (self._subnote('rpt_tr_lateral_intro', 'Covers all lateral-movement analysis including IP-level host connection patterns and App(Env)-level graph risk scoring.') + _render_chart_for_html(m.get('chart_spec')) + f'<p><span data-i18n="rpt_tr_lateral_flows">Lateral movement port flows:</span> '
+        html = (self._subnote('rpt_tr_lateral_intro', 'Covers all lateral-movement analysis including IP-level host connection patterns and App(Env)-level graph risk scoring.') + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume()) + f'<p><span data-i18n="rpt_tr_lateral_flows">Lateral movement port flows:</span> '
                 f'<b>{total:,}</b> ({pct}% <span data-i18n="rpt_tr_lateral_pct">of all flows</span>)</p>')
         service_summary = m.get('service_summary')
         if service_summary is not None and not service_summary.empty:

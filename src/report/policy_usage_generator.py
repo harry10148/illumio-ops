@@ -27,6 +27,8 @@ from src.report.report_metadata import (
     extract_attack_summary,
 )
 
+_VALID_DETAIL_LEVELS = ("executive", "standard", "full")
+
 @dataclass
 class PolicyUsageResult:
     generated_at: datetime.datetime = field(default_factory=datetime.datetime.now)
@@ -49,8 +51,11 @@ class PolicyUsageGenerator:
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        detail_level: str = "standard",
     ) -> PolicyUsageResult:
         """Fetch draft policies and run per-rule async traffic queries."""
+        if detail_level not in _VALID_DETAIL_LEVELS:
+            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
         if not self.api:
             raise RuntimeError("api_client required for policy usage generation")
 
@@ -69,6 +74,7 @@ class PolicyUsageGenerator:
         except Exception:
             lookback_days = 30  # intentional fallback: use default if date range cannot be parsed
 
+        self._detail_level = detail_level
         # Step 1 — load label/service cache for actor resolution
         print(t("rpt_pu_fetching_rulesets"))
         try:
@@ -107,13 +113,16 @@ class PolicyUsageGenerator:
         print(t("rpt_pu_complete"))
         return result
 
-    def generate_from_csv(self, csv_path: str) -> PolicyUsageResult:
+    def generate_from_csv(self, csv_path: str, detail_level: str = "standard") -> PolicyUsageResult:
         """Import workloader rule-usage CSV and generate the same report.
 
         Expected CSV columns: ruleset_name, rule_description, rule_href,
         ruleset_href, flows, flows_by_port, src_labels, dst_labels, services,
         rule_enabled, ruleset_enabled, ...
         """
+        if detail_level not in _VALID_DETAIL_LEVELS:
+            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
+        self._detail_level = detail_level
         import pandas as pd
 
         if not os.path.isfile(csv_path):
@@ -223,6 +232,7 @@ class PolicyUsageGenerator:
         result: PolicyUsageResult,
         fmt: str = 'html',
         output_dir: str = 'reports',
+        detail_level: str = "standard",
     ) -> list[str]:
         from src.report.exporters.policy_usage_html_exporter import PolicyUsageHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
@@ -531,3 +541,82 @@ class PolicyUsageGenerator:
             dataframe=df,
             execution_stats=execution_stats or {},
         )
+
+
+def generate_policy_usage_xlsx(rules_df, out_path: str, top_n: int = 500) -> str:
+    """Generate a Policy Usage XLSX with real per-sheet DataFrames.
+
+    Uses direct DataFrame operations on rules_df columns:
+      hit_count, is_deny, name, rule_id, ruleset_name, enabled.
+    """
+    import pandas as pd
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    def _write_df(ws, df):
+        if df is None or not hasattr(df, "empty") or df.empty:
+            ws.append(["Note", "No data"])
+            return
+        ws.append(list(df.columns))
+        for _, row in df.head(top_n).iterrows():
+            ws.append([str(v) for v in row])
+
+    hit_col = "hit_count" if "hit_count" in rules_df.columns else None
+    deny_col = "is_deny" if "is_deny" in rules_df.columns else None
+
+    # --- Hit Rules ---
+    ws = wb.create_sheet("Hit Rules")
+    try:
+        if hit_col:
+            hit_df = rules_df[rules_df[hit_col] > 0].copy()
+            _write_df(ws, hit_df)
+        else:
+            ws.append(list(rules_df.columns))
+            for _, row in rules_df.head(top_n).iterrows():
+                ws.append([str(v) for v in row])
+    except Exception:
+        ws.append(["Note", "Hit rules data unavailable"])
+
+    # --- Unused Rules ---
+    ws = wb.create_sheet("Unused Rules")
+    try:
+        if hit_col:
+            unused_df = rules_df[rules_df[hit_col] == 0].copy()
+            _write_df(ws, unused_df)
+        else:
+            ws.append(["Note", "hit_count column not present"])
+    except Exception:
+        ws.append(["Note", "Unused rules data unavailable"])
+
+    # --- Deny Effectiveness ---
+    ws = wb.create_sheet("Deny Effectiveness")
+    try:
+        if deny_col:
+            deny_df = rules_df[rules_df[deny_col] == True].copy()
+            _write_df(ws, deny_df)
+        else:
+            ws.append(["Note", "is_deny column not present"])
+    except Exception:
+        ws.append(["Note", "Deny effectiveness data unavailable"])
+
+    # --- Execution Stats ---
+    ws = wb.create_sheet("Execution Stats")
+    try:
+        total = len(rules_df)
+        hit_count = int(rules_df[hit_col].gt(0).sum()) if hit_col else 0
+        unused_count = int(rules_df[hit_col].eq(0).sum()) if hit_col else 0
+        deny_count = int(rules_df[deny_col].sum()) if deny_col else 0
+        ws.append(["Metric", "Value"])
+        ws.append(["Total Rules", total])
+        ws.append(["Hit Rules", hit_count])
+        ws.append(["Unused Rules", unused_count])
+        ws.append(["Deny Rules", deny_count])
+        if total > 0 and hit_col:
+            ws.append(["Hit Rate %", round(hit_count / total * 100, 1)])
+    except Exception:
+        ws.append(["Note", "Stats unavailable"])
+
+    wb.save(out_path)
+    return out_path

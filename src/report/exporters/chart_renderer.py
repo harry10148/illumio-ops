@@ -85,8 +85,27 @@ def _apply_base_layout(fig, title: str, x_label: str = "", y_label: str = "") ->
     fig.update_layout(**updates)
 
 
-def render_plotly_html(spec: dict[str, Any]) -> str:
-    """Render chart spec as a styled plotly HTML div (offline, self-contained)."""
+class FirstChartTracker:
+    """One instance per document. First call to consume() returns True; subsequent False."""
+
+    def __init__(self):
+        self._first = True
+
+    def consume(self) -> bool:
+        v = self._first
+        self._first = False
+        return v
+
+
+def render_plotly_html(spec: dict[str, Any], *, include_js: bool = True) -> str:
+    """Render chart spec as a styled plotly HTML div (offline, self-contained).
+
+    Args:
+        spec: Chart specification dict.
+        include_js: If True (default), embeds the full Plotly JS bundle (~3 MB) inline.
+            Set to False for subsequent charts in the same document to avoid repeating
+            the bundle — Plotly reuses the already-loaded runtime from the first chart.
+    """
     chart_type = spec.get("type")
     data = spec.get("data", {})
     title = spec.get("title", "")
@@ -188,7 +207,10 @@ def render_plotly_html(spec: dict[str, Any]) -> str:
         raise ValueError(f"unsupported chart type: {chart_type!r}")
 
     return plotly_offline.plot(
-        fig, output_type="div", include_plotlyjs="inline", show_link=False
+        fig,
+        output_type="div",
+        include_plotlyjs="inline" if include_js else False,
+        show_link=False,
     )
 
 def render_matplotlib_png(spec: dict[str, Any]) -> bytes:
