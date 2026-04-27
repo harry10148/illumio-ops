@@ -837,7 +837,9 @@ class Analyzer:
         }
         query_spec = self.api.build_traffic_query_spec(query_filters)
         draft_pd_filter = (query_spec.report_only_filters.get("draft_policy_decision") or "").strip().lower()
-        needs_draft = bool(draft_pd_filter) or getattr(query_spec, "requires_draft_pd", False)
+        needs_draft = (bool(draft_pd_filter)
+                       or getattr(query_spec, "requires_draft_pd", False)
+                       or bool(params.get("requires_draft_pd", False)))
 
         # When filtering by draft policy decision, always query all reported PDs
         # because the draft EB may affect flows whose reported PD is "allowed".
