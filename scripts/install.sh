@@ -66,6 +66,8 @@ fi
 if ! id illumio_ops &>/dev/null; then
     useradd --system --no-create-home --shell /sbin/nologin illumio_ops
 fi
+cp "$SRC/uninstall.sh" "$INSTALL_ROOT/uninstall.sh"
+chmod +x "$INSTALL_ROOT/uninstall.sh"
 chown -R illumio_ops:illumio_ops "$INSTALL_ROOT"
 
 sed "s|/opt/illumio_ops|$INSTALL_ROOT|g" "$SRC/deploy/illumio-ops.service" > "$SERVICE_FILE"
@@ -78,4 +80,5 @@ else
     echo "==> Installation complete."
     echo "    Edit config : nano $INSTALL_ROOT/config/config.json"
     echo "    Start service: sudo systemctl enable --now $SERVICE_NAME"
+    echo "    Uninstall    : sudo $INSTALL_ROOT/uninstall.sh"
 fi

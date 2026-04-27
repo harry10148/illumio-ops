@@ -67,6 +67,8 @@ build_linux() {
     chmod +x "$BUILD/preflight.sh"
     cp "$REPO_ROOT/scripts/install.sh" "$BUILD/"
     chmod +x "$BUILD/install.sh"
+    cp "$REPO_ROOT/scripts/uninstall.sh" "$BUILD/"
+    chmod +x "$BUILD/uninstall.sh"
 
     echo "==> [Linux] Creating $ARCHIVE"
     tar czf "$DIST_DIR/$ARCHIVE" -C "$(dirname "$BUILD")" "$(basename "$BUILD")"
