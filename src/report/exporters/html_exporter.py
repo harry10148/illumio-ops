@@ -412,10 +412,17 @@ class HtmlExporter:
         )
 
         # Pre-compute nested blocks to avoid f-string quote conflicts
+        _raw_kpis = mod12.get('kpis', [])
+        if isinstance(_raw_kpis, dict):
+            # New-style: dict of kpi_name -> numeric value (from _security_risk_kpis)
+            _kpi_items = [{"label": k.replace("_", " ").title(), "value": v}
+                          for k, v in _raw_kpis.items() if not isinstance(v, dict)]
+        else:
+            _kpi_items = list(_raw_kpis)
         kpi_cards = ''.join(
             '<div class="kpi-card"><div class="kpi-label">' + str(k['label']) + '</div>'
             '<div class="kpi-value">' + str(k['value']) + '</div></div>'
-            for k in mod12.get('kpis', [])
+            for k in _kpi_items
         )
         trend_html = self._trend_deltas_html()
         key_findings_html = ''.join(
