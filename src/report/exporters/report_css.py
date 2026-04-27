@@ -53,6 +53,7 @@ BASE_CSS = """\
   .summary-pill { min-width: 140px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.92); border: 1px solid rgba(50,81,88,.10); box-shadow: 0 6px 14px rgba(26,44,50,.06); }
   .summary-pill-label { display: block; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--slate-50); margin-bottom: 4px; }
   .summary-pill-value { display: block; font-size: 15px; font-weight: 700; color: var(--cyan-120); font-variant-numeric: tabular-nums; }
+  .report-draft-pill { display: inline-block; background: #e8f4fd; color: #1a6fa8; border: 1px solid #1a6fa8; border-radius: 3px; font-size: 0.75em; padding: 1px 6px; margin-left: 6px; vertical-align: middle; }
   .section-intro { margin: 0 0 14px; color: var(--slate-50); font-size: 12px; line-height: 1.6; }
 
   .kpi-grid { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; }

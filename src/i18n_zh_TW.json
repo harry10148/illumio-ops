@@ -1409,6 +1409,7 @@
   "rpt_data_source_api": "資料來源：即時 PCE API",
   "rpt_data_source_cache": "資料來源：本地 Cache",
   "rpt_data_source_mixed": "資料來源：混合（Cache + API）",
+  "rpt_hdr_draft_enabled": "Draft Policy Decision：已啟用",
   "rpt_dim_enforcement": "Enforcement",
   "rpt_dim_lateral": "橫向移動",
   "rpt_dim_managed": "託管覆蓋率",

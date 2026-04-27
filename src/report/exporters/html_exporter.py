@@ -362,11 +362,13 @@ class HtmlExporter:
     """Export report results to a single self-contained HTML file."""
 
     def __init__(self, results: dict, data_source: str = "",
-                 profile: str = "security_risk", detail_level: str = "standard"):
+                 profile: str = "security_risk", detail_level: str = "standard",
+                 compute_draft: bool = False):
         self._r = results
         self._data_source = data_source
         self._profile = profile
         self._detail_level = detail_level
+        self._compute_draft = compute_draft
 
     def export(self, output_dir: str = 'reports') -> str:
         """Write HTML file and return full path."""
@@ -449,6 +451,13 @@ class HtmlExporter:
                 f'</div>'
             )
             summary_pills = summary_pills.replace('</div>', data_source_pill + '</div>', 1)
+
+        if self._compute_draft:
+            draft_pill = (
+                f'<span class="report-draft-pill" data-i18n="rpt_hdr_draft_enabled">'
+                f'{t("rpt_hdr_draft_enabled")}</span>'
+            )
+            summary_pills = summary_pills.replace('</div>', draft_pill + '</div>', 1)
 
         # Maturity score gauge
         m_score = mod12.get('maturity_score', 0)

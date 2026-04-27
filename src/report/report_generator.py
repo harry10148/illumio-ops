@@ -315,6 +315,7 @@ class ReportGenerator:
                 result.module_results,
                 data_source=result.data_source,
                 profile=traffic_report_profile,
+                compute_draft=ruleset_needs_draft_pd(DRAFT_PD_RULES),
             ).export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, self._build_report_metadata(result, file_format="html"))

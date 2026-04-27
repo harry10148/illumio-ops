@@ -1409,6 +1409,7 @@
   "rpt_data_source_api": "Data source: live PCE API",
   "rpt_data_source_cache": "Data source: local cache",
   "rpt_data_source_mixed": "Data source: mixed (cache + API)",
+  "rpt_hdr_draft_enabled": "Draft Policy Decision: Enabled",
   "rpt_dim_enforcement": "Enforcement",
   "rpt_dim_lateral": "Lateral Movement",
   "rpt_dim_managed": "Managed Coverage",
