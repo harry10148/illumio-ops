@@ -4,6 +4,76 @@
 
 ---
 
+## Background — Illumio Platform
+
+> Distilled from the official Illumio documentation 25.4 (Admin Guide and REST API Guide). This background section grounds the implementation-specific sections that follow.
+
+### Background.1 PCE and VEN
+
+The **Policy Compute Engine (PCE)** is the centralized management and policy calculation component of the Illumio architecture. The PCE computes a unique security policy for each managed workload and transmits it to the Virtual Enforcement Node (VEN). The PCE is internally organized across four service tiers — Front End, Processing, Service/Caching, and Persistence — that together handle management interfaces, authentication, traffic flow aggregation, and database storage.
+
+The **Virtual Enforcement Node (VEN)** is a lightweight, multiple-process application that runs directly on a workload (bare-metal server, virtual machine, or container). Once installed, the VEN interacts with the host's native networking interfaces and OS-level firewall to collect traffic flow data and enforce the security policies it receives from the PCE. The VEN programs native firewall mechanisms: `iptables`/`nftables` on Linux, `pf`/`ipfilter` on Solaris, and the Windows Filtering Platform on Windows. It is optimized to remain idle in the background, consuming CPU only when calculating or applying rules, while periodically summarizing and reporting flow telemetry to the PCE.
+
+**Supported VEN platforms** (25.4): Linux (RHEL 5/7/8, CentOS 8, Debian 11, SLES 11 SP2, IBM Z mainframe with RHEL 7/8), Windows (Server 2012/2016, Windows 10 64-bit), AIX, Solaris (up to 11.4 / Oracle Exadata), macOS (Illumio Edge only), and containerized VEN (C-VEN) for Kubernetes, OpenShift, Docker, ContainerD, and CRI-O.
+
+**VEN–PCE communication** uses TLS throughout. On-premises: the VEN connects to PCE on TCP 8443 (HTTPS) and TCP 8444 (long-lived TLS-over-TCP lightning-bolt channel). SaaS: both channels use TCP 443. The VEN sends a heartbeat every 5 minutes and summarized flow logs every 10 minutes. The PCE pushes new firewall rules and real-time policy-update signals down the lightning-bolt channel; if that channel is unavailable, updates fall back to the next heartbeat response.
+
+### Background.2 Label dimensions
+
+Illumio abstracts workload identity from IP addresses using a four-dimension label system. Labels are key-value metadata attached to workloads and used by the PCE to compute policy scopes.
+
+| Dimension | Key | Purpose | Example values |
+|-----------|-----|---------|----------------|
+| Role | `role` | Function of the workload within its application | `web`, `database`, `cache` |
+| Application | `app` | Business application or service | `HRM`, `SAP`, `Storefront` |
+| Environment | `env` | SDLC stage | `production`, `staging`, `development`, `QA` |
+| Location | `loc` | Physical or logical geography | `aws-east1`, `dc-frankfurt`, `rack-3` |
+
+Labels are applied to workloads via pairing profiles (at VEN install time), manual assignment in the PCE web console, REST API updates, bulk CSV import, or Container Workload Profiles (for Kubernetes/OpenShift pods). Once assigned, labels flow through to ruleset scopes and security rules: a rule that specifies `role=web, env=production` applies exactly to all workloads carrying those two label values, regardless of their IP address.
+
+In `illumio_ops`, labels surface in the `Workload` model, report tables (policy usage, traffic analysis), and the SIEM event enrichment pipeline. The `src/api/` domain classes fetch label definitions from the PCE and cache them in SQLite for offline resolution.
+
+### Background.3 Workload types
+
+The PCE models three categories of workloads:
+
+**Managed workloads** have a VEN installed and paired with the PCE. In the PCE REST API they appear as `workload` objects with `managed: true`, and include a `ven` property block tracking VEN version, operational status, heartbeat timestamp, and policy sync state. Managed workloads can be placed in any of the four enforcement modes and report live traffic telemetry to the PCE.
+
+**Unmanaged workloads** are network entities without a VEN (laptops, appliances, systems with frequently changing IPs, PKI/Kerberos endpoints). They are represented in the PCE as `workload` objects with `managed: false`. Administrators create them manually via the web console, REST API, or bulk CSV import. Unmanaged workloads can be labelled and used as providers/consumers in security rules, but they do not report traffic or process data to the PCE.
+
+**Container workloads** represent Kubernetes or OpenShift pods monitored through Illumio Kubelink. A single VEN is installed on the container host node rather than inside individual containers. The PCE creates `container_workload` objects for running pods and `container_workload_profile` objects that govern how new pods are labelled and paired as they start. This means policy for containerized applications is expressed in the same label-based ruleset model as for VMs and bare-metal.
+
+### Background.4 Policy lifecycle
+
+The PCE enforces a three-phase lifecycle for all provisionable objects (rulesets, rules, IP lists, services, label groups, virtual services, firewall settings, enforcement boundaries):
+
+1. **Draft**: When an administrator creates, modifies, or deletes a policy object, the change is saved in a Draft (not provisioned) state. Draft changes exist only in the PCE database; they do not alter the firewall rules on any managed workload. This allows security teams to build and review complex segmentation policies without impacting live traffic.
+
+2. **Pending**: Saved draft modifications are classified as Pending — a staging area that accumulates all additions, updates, and deletions waiting for approval. While items are pending, administrators can review the full change list, revert individual items, check provisioning dependencies (some objects require co-provisioning of related items), and perform impact analysis.
+
+3. **Active**: Provisioning is the explicit action that moves pending items to Active. On provisioning, the PCE recalculates the full security policy, then pushes the resulting firewall rules to all affected VENs over the secure channel. The PCE records a versioned provisioning history — timestamp, user, and count of affected workloads — enabling audit and rollback workflows.
+
+The `compute_draft` logic in `illumio_ops` (see `Security_Rules_Reference.md` — R01–R05 rules) reads Draft-state rules from the PCE to evaluate policy intent before provisioning, surfacing gaps before they reach Active state.
+
+### Background.5 Enforcement modes
+
+The VEN's policy state governs how PCE-computed rules are applied to a workload's OS firewall. Four modes exist:
+
+| Mode | Traffic blocked? | Logging behaviour |
+|------|-----------------|-------------------|
+| **Idle** | None — enforcement is off; VEN is dormant | Snapshot-only (state "S"); not exported to syslog/Fluentd |
+| **Visibility Only** | None — passive monitoring only | Configurable: Off / Blocked (low) / Blocked+Allowed (high) / Enhanced Data Collection (with byte counts) |
+| **Selective** | Only traffic violating configured Enforcement Boundaries | Same four logging tiers as Visibility Only |
+| **Full** | Any traffic not explicitly allowed by an allow-list rule | Same four logging tiers; Illumio operates default-deny / zero-trust |
+
+Selective mode lets administrators enforce specific network segments while merely observing the rest — a common transitional state when hardening an application incrementally. Full mode is the target state for production microsegmentation.
+
+`illumio_ops` surfaces per-workload enforcement mode in the policy usage report and the R-Series rules (see `Security_Rules_Reference.md` §R02–R04) flag workloads that remain in Idle or Visibility Only in production environments.
+
+> **References:** Illumio Admin Guide 25.4 (`Admin_25_4.pdf`).
+
+---
+
 ## 1. System Architecture Overview
 
 ```mermaid
