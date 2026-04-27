@@ -561,6 +561,80 @@ sequenceDiagram
     R-->>D: Send via Email/LINE/Webhook
 ```
 
+### 4.1 Event Pipeline (`src/events/`) → Alerts / SIEM
+
+PCE audit events follow a separate pipeline from traffic flows:
+
+```
+PCE REST API
+    ↓  EventPoller (src/events/poller.py)
+    │  — watermark cursor in state.json
+    │  — dedup via event_identity() SHA-256 hash
+    ↓
+EventNormalizer (src/events/normalizer.py)
+    — extracts resource_type, actor, severity from raw JSON
+    ↓
+EventMatcher (src/events/matcher.py)
+    — matches_event_rule(): regex/pipe-OR/negation/wildcard
+    — shadow.py comparator available for diagnostics
+    ↓
+Reporter.send_alerts()               pce_cache (siem_dispatch table)
+    — Email / LINE / Webhook              ↓
+                                   DestinationDispatcher (src/siem/dispatcher.py)
+                                      — Formatter: CEF / JSON / Syslog
+                                      — Transport: UDP / TCP / TLS / Splunk HEC
+                                      → External SIEM platform
+```
+
+When `pce_cache.enabled = true`, the monitor runs on a 30-second tick by reading only rows inserted since the last `CacheSubscriber` cursor position, avoiding direct PCE API calls on every tick.
+
+### 4.2 JSON Snapshot Store
+
+After each Traffic Report run, `ReportGenerator` writes two JSON artifacts:
+
+| Artifact | Path | Purpose |
+|---|---|---|
+| Latest dashboard snapshot | `reports/latest_snapshot.json` | Web GUI `/api/dashboard/snapshot` endpoint |
+| KPI change-impact snapshot | `reports/snapshots/<type>/<YYYY-MM-DD>_<profile>.json` | `mod_change_impact.py` delta calculation |
+
+**Naming convention**: `<YYYY-MM-DD>_<profile>.json` — e.g. `2026-04-28_security_risk.json`. Same date + profile overwrites atomically (`.tmp` → `os.replace()`).
+
+**Retention**: controlled by `report.snapshot_retention_days` in `config.json` (default **90**, range 1–3650). `cleanup_old()` in `src/report/snapshot_store.py` deletes snapshots older than this threshold; it is called at the end of every report run.
+
+**Change Impact calculation** (`src/report/analysis/mod_change_impact.py`): `compare()` loads the most recent previous snapshot via `snapshot_store.read_latest()`, then computes per-KPI deltas (direction: improved / regressed / unchanged / neutral) based on whether lower or higher values are desirable. If `previous_snapshot` is `None` (first ever run or all snapshots expired), the module returns `{"skipped": True, "reason": "no_previous_snapshot"}` — this guard prevents a `KeyError` on `previous_snapshot_at` and was hardened in commit `354ac0d`.
+
+Trend KPIs (for chart sparklines) are stored in a separate `src/report/trend_store.py` — one JSON file per report type, appended on each run, independent of the snapshot store.
+
+### 4.3 Report Generation Pipeline
+
+```
+generate_from_api() / generate_from_csv()
+    ↓
+Parsers (src/report/parsers/)
+    — api_parser.py: PCE response → DataFrame
+    — csv_parser.py: Workloader CSV → DataFrame
+    ↓
+Analysis modules (src/report/analysis/)
+    — mod01–mod15: traffic analysis (policy decisions, ransomware, remote access, …)
+    — mod_change_impact.py: KPI delta vs previous snapshot
+    — audit_mod00–03: health events, logins, policy changes
+    — pu_mod00–05: policy usage executive, overview, hit detail, unused detail
+    ↓
+RulesEngine (src/report/rules_engine.py)
+    — 19 detection rules: B001–B009 (baseline), L001–L010 (lateral)
+    ↓
+Exporters (src/report/exporters/)
+    — html_exporter.py: Jinja2 → standalone HTML (inline CSS/JS)
+    — policy_usage_html_exporter.py: policy usage HTML
+    — CSV ZIP (stdlib zipfile)
+    ↓
+Output: reports/<timestamp>_<type>.<ext>
+    + reports/snapshots/<type>/<date>_<profile>.json  (KPI snapshot)
+    + reports/latest_snapshot.json                    (dashboard cache)
+```
+
+Report HTML files embed a colored data-source pill: **green** = served from local SQLite cache; **blue** = live PCE API; **yellow** = mixed (partial cache + API).
+
 ---
 
 ## 5. Multi-PCE Profile Architecture
