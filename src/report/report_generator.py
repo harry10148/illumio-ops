@@ -36,6 +36,9 @@ def _fmt_iso(dt) -> str:
     return dt.isoformat().replace("+00:00", "Z") if hasattr(dt, "isoformat") else str(dt)
 
 
+_VALID_DETAIL_LEVELS = ("executive", "standard", "full")
+
+
 # ─── Snapshot helper (module-level) ──────────────────────────────────────────
 
 def _build_snapshot(module_results: dict) -> dict:
@@ -201,13 +204,16 @@ class ReportGenerator:
                           end_date: Optional[str] = None,
                           max_results: int = 200_000,
                           filters: Optional[dict] = None,
-                          traffic_report_profile: str = "security_risk") -> ReportResult:
+                          traffic_report_profile: str = "security_risk",
+                          detail_level: str = "standard") -> ReportResult:
         """Fetch traffic from PCE API and run the full analysis pipeline.
 
         filters: optional dict with traffic filter keys (src_labels, dst_labels,
                  src_ip, dst_ip, port, proto, ex_src_labels, ex_dst_labels,
                  ex_src_ip, ex_dst_ip, ex_port, policy_decisions).
         """
+        if detail_level not in _VALID_DETAIL_LEVELS:
+            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
         if traffic_report_profile not in ("security_risk", "network_inventory"):
             raise ValueError(f"invalid traffic_report_profile: {traffic_report_profile!r}")
         if self.api is None:
@@ -247,6 +253,7 @@ class ReportGenerator:
 
         print(t("rpt_records_received", count=f"{len(records):,}"))
         df = self._parse_api(records)
+        self._detail_level = detail_level
         return self._run_pipeline(
             df,
             source=traffic["source"],
@@ -261,10 +268,14 @@ class ReportGenerator:
         )
 
     def generate_from_csv(self, csv_path: str,
-                          traffic_report_profile: str = "security_risk") -> ReportResult:
+                          traffic_report_profile: str = "security_risk",
+                          detail_level: str = "standard") -> ReportResult:
         """Parse a CSV file from the PCE UI export and run the analysis pipeline."""
+        if detail_level not in _VALID_DETAIL_LEVELS:
+            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
         if traffic_report_profile not in ("security_risk", "network_inventory"):
             raise ValueError(f"invalid traffic_report_profile: {traffic_report_profile!r}")
+        self._detail_level = detail_level
         logger.info(f"[ReportGenerator] Starting CSV-source report from: {csv_path}")
         print(t("rpt_parsing_csv", path=csv_path))
         df = self._parse_csv(csv_path)
@@ -274,7 +285,8 @@ class ReportGenerator:
                output_dir: str = 'reports',
                send_email: bool = False,
                reporter=None,
-               traffic_report_profile: str = "security_risk") -> list[str]:
+               traffic_report_profile: str = "security_risk",
+               detail_level: str = "standard") -> list[str]:
         """
         Export a ReportResult to one or more files.
 

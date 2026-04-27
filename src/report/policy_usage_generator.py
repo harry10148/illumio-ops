@@ -27,6 +27,8 @@ from src.report.report_metadata import (
     extract_attack_summary,
 )
 
+_VALID_DETAIL_LEVELS = ("executive", "standard", "full")
+
 @dataclass
 class PolicyUsageResult:
     generated_at: datetime.datetime = field(default_factory=datetime.datetime.now)
@@ -49,8 +51,11 @@ class PolicyUsageGenerator:
         self,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        detail_level: str = "standard",
     ) -> PolicyUsageResult:
         """Fetch draft policies and run per-rule async traffic queries."""
+        if detail_level not in _VALID_DETAIL_LEVELS:
+            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
         if not self.api:
             raise RuntimeError("api_client required for policy usage generation")
 
@@ -69,6 +74,7 @@ class PolicyUsageGenerator:
         except Exception:
             lookback_days = 30  # intentional fallback: use default if date range cannot be parsed
 
+        self._detail_level = detail_level
         # Step 1 — load label/service cache for actor resolution
         print(t("rpt_pu_fetching_rulesets"))
         try:
@@ -107,13 +113,16 @@ class PolicyUsageGenerator:
         print(t("rpt_pu_complete"))
         return result
 
-    def generate_from_csv(self, csv_path: str) -> PolicyUsageResult:
+    def generate_from_csv(self, csv_path: str, detail_level: str = "standard") -> PolicyUsageResult:
         """Import workloader rule-usage CSV and generate the same report.
 
         Expected CSV columns: ruleset_name, rule_description, rule_href,
         ruleset_href, flows, flows_by_port, src_labels, dst_labels, services,
         rule_enabled, ruleset_enabled, ...
         """
+        if detail_level not in _VALID_DETAIL_LEVELS:
+            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
+        self._detail_level = detail_level
         import pandas as pd
 
         if not os.path.isfile(csv_path):
@@ -223,6 +232,7 @@ class PolicyUsageGenerator:
         result: PolicyUsageResult,
         fmt: str = 'html',
         output_dir: str = 'reports',
+        detail_level: str = "standard",
     ) -> list[str]:
         from src.report.exporters.policy_usage_html_exporter import PolicyUsageHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter

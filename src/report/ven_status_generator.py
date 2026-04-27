@@ -26,6 +26,8 @@ from dataclasses import dataclass, field
 from src.i18n import t
 from src.report.tz_utils import parse_tz, fmt_tz_str as _fmt_tz_str, fmt_ts_local as _fmt_ts_local
 
+_VALID_DETAIL_LEVELS = ("executive", "standard", "full")
+
 _ONLINE_STATUSES = {'active', 'online'}
 # VENs whose last heartbeat is older than this are considered offline,
 # even when PCE reports their administrative status as "active".
@@ -45,10 +47,13 @@ class VenStatusGenerator:
 
     # ── public ───────────────────────────────────────────────────────────────
 
-    def generate(self) -> VenStatusResult:
+    def generate(self, detail_level: str = "standard") -> VenStatusResult:
+        if detail_level not in _VALID_DETAIL_LEVELS:
+            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
         if not self.api:
             raise RuntimeError("api_client required for VEN status report")
 
+        self._detail_level = detail_level
         print(t("rpt_ven_fetching"))
         workloads = self.api.fetch_managed_workloads()
 
@@ -67,7 +72,8 @@ class VenStatusGenerator:
             dataframe=df,
         )
 
-    def export(self, result: VenStatusResult, fmt: str = 'html', output_dir: str = 'reports') -> list:
+    def export(self, result: VenStatusResult, fmt: str = 'html', output_dir: str = 'reports',
+               detail_level: str = "standard") -> list:
         from src.report.exporters.ven_html_exporter import VenHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
         os.makedirs(output_dir, exist_ok=True)

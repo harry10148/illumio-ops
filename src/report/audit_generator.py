@@ -27,6 +27,8 @@ from src.report.report_metadata import (
     extract_attack_summary,
 )
 
+_VALID_DETAIL_LEVELS = ("executive", "standard", "full")
+
 # Event types that represent a policy commit (no field-level diffs, only macro stats)
 _PROVISION_EVENT_TYPES = frozenset({
     'sec_policy.create', 'sec_policy.delete', 'sec_policy.restore',
@@ -435,7 +437,10 @@ class AuditGenerator:
         return self.api.get_events(since=start_str)
 
     def generate_from_api(self, start_date: Optional[str] = None,
-                          end_date: Optional[str] = None) -> AuditReportResult:
+                          end_date: Optional[str] = None,
+                          detail_level: str = "standard") -> AuditReportResult:
+        if detail_level not in _VALID_DETAIL_LEVELS:
+            raise ValueError(f"invalid detail_level: {detail_level!r}; must be one of {_VALID_DETAIL_LEVELS}")
         if not self.api:
             raise RuntimeError("api_client required for audit generation")
 
@@ -446,6 +451,7 @@ class AuditGenerator:
                 datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
             ).isoformat().replace("+00:00", "Z")
 
+        self._detail_level = detail_level
         print(t("rpt_audit_querying", start=start_date, end=end_date))
         _start_dt = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
         _end_dt = datetime.datetime.fromisoformat(end_date.replace("Z", "+00:00"))
@@ -642,7 +648,8 @@ class AuditGenerator:
         )
 
     def export(self, result: AuditReportResult, fmt: str = 'html',
-               output_dir: str = 'reports') -> list[str]:
+               output_dir: str = 'reports',
+               detail_level: str = "standard") -> list[str]:
         from src.report.exporters.audit_html_exporter import AuditHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
         paths = []
