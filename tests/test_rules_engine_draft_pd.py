@@ -157,5 +157,14 @@ def test_r05_silent_when_column_missing():
 
 def test_r05_severity_info():
     from src.report.rules_engine import R05DraftReportedMismatch
-    # R05 is informational
-    assert R05DraftReportedMismatch().severity in ("INFO", "INFORMATIONAL", "LOW")
+    assert R05DraftReportedMismatch().severity == "INFO"
+
+
+def test_all_rules_need_draft_pd():
+    from src.report.rules_engine import (
+        R01DraftDenyDetected, R02OverrideDenyDetected, R03VisibilityBoundaryBreach,
+        R04AllowedAcrossBoundary, R05DraftReportedMismatch,
+    )
+    for cls in (R01DraftDenyDetected, R02OverrideDenyDetected, R03VisibilityBoundaryBreach,
+                R04AllowedAcrossBoundary, R05DraftReportedMismatch):
+        assert cls().needs_draft_pd() is True, f"{cls.__name__}.needs_draft_pd() should be True"
