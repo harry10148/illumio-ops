@@ -72,3 +72,6 @@ grep_out.txt
 .tmp_preview/
 
 .superpowers/
+
+# Raw NotebookLM material (not checked in)
+docs/_notebooklm_excerpts/
