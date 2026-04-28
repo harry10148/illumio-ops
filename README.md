@@ -4,9 +4,14 @@
 | Document | EN | 中文 |
 |---|---|---|
 | README | [README.md](README.md) | [README_zh.md](README_zh.md) |
+| Installation | [Installation.md](docs/Installation.md) | [Installation_zh.md](docs/Installation_zh.md) |
 | User Manual | [User_Manual.md](docs/User_Manual.md) | [User_Manual_zh.md](docs/User_Manual_zh.md) |
-| Architecture | [Architecture.md](docs/Architecture.md) | [Architecture_zh.md](docs/Architecture_zh.md) |
+| Report Modules | [Report_Modules.md](docs/Report_Modules.md) | [Report_Modules_zh.md](docs/Report_Modules_zh.md) |
 | Security Rules | [Security_Rules_Reference.md](docs/Security_Rules_Reference.md) | [Security_Rules_Reference_zh.md](docs/Security_Rules_Reference_zh.md) |
+| SIEM Integration | [SIEM_Integration.md](docs/SIEM_Integration.md) | [SIEM_Integration_zh.md](docs/SIEM_Integration_zh.md) |
+| Architecture | [Architecture.md](docs/Architecture.md) | [Architecture_zh.md](docs/Architecture_zh.md) |
+| PCE Cache | [PCE_Cache.md](docs/PCE_Cache.md) | [PCE_Cache_zh.md](docs/PCE_Cache_zh.md) |
+| API Cookbook | [API_Cookbook.md](docs/API_Cookbook.md) | [API_Cookbook_zh.md](docs/API_Cookbook_zh.md) |
 <!-- END:doc-map -->
 
 ![Version](https://img.shields.io/badge/Version-v3.20.0--report--intelligence-blue?style=flat-square)
@@ -144,9 +149,14 @@ Reports can be generated from the Web GUI, CLI menu, or run automatically on a s
 
 ## Documentation
 
-- [User Manual](docs/User_Manual.md) ([中文](docs/User_Manual_zh.md)) — installation, configuration, CLI, GUI, daemon, reports, SIEM
-- [Architecture](docs/Architecture.md) ([中文](docs/Architecture_zh.md)) — Illumio platform background, system overview, module map, data flow, PCE cache, REST API cookbook
-- [Security Rules Reference](docs/Security_Rules_Reference.md) ([中文](docs/Security_Rules_Reference_zh.md)) — B-Series, L-Series, R-Series rule catalogues
+- [Installation](docs/Installation.md) ([中文](docs/Installation_zh.md)) — RHEL/Ubuntu/Windows/dev install, offline bundle build/install/upgrade/uninstall, systemd
+- [User Manual](docs/User_Manual.md) ([中文](docs/User_Manual_zh.md)) — CLI subcommands, GUI walkthrough, daemon mode, alerts, quarantine, multi-PCE, settings, troubleshooting
+- [Report Modules](docs/Report_Modules.md) ([中文](docs/Report_Modules_zh.md)) — All 22+ analysis modules (mod01-mod15, R3 intelligence, Policy Usage), output formats, scheduling, draft_pd behaviour
+- [Security Rules Reference](docs/Security_Rules_Reference.md) ([中文](docs/Security_Rules_Reference_zh.md)) — B-Series, L-Series, R-Series rule catalogues; severity model; compute_draft auto-enable
+- [SIEM Integration](docs/SIEM_Integration.md) ([中文](docs/SIEM_Integration_zh.md)) — CEF/JSON formats, UDP/TCP/TLS/HEC transports, forwarder config, field mapping
+- [Architecture](docs/Architecture.md) ([中文](docs/Architecture_zh.md)) — Illumio platform background; system overview; module map; data flow
+- [PCE Cache](docs/PCE_Cache.md) ([中文](docs/PCE_Cache_zh.md)) — SQLite WAL cache layer; refresh policy; operator commands
+- [API Cookbook](docs/API_Cookbook.md) ([中文](docs/API_Cookbook_zh.md)) — PCE REST API integration patterns; auth/pagination/async-job; common endpoints
 
 ---
 

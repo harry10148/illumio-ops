@@ -4,9 +4,14 @@
 | Document | EN | 中文 |
 |---|---|---|
 | README | [README.md](README.md) | [README_zh.md](README_zh.md) |
+| Installation | [Installation.md](docs/Installation.md) | [Installation_zh.md](docs/Installation_zh.md) |
 | User Manual | [User_Manual.md](docs/User_Manual.md) | [User_Manual_zh.md](docs/User_Manual_zh.md) |
-| Architecture | [Architecture.md](docs/Architecture.md) | [Architecture_zh.md](docs/Architecture_zh.md) |
+| Report Modules | [Report_Modules.md](docs/Report_Modules.md) | [Report_Modules_zh.md](docs/Report_Modules_zh.md) |
 | Security Rules | [Security_Rules_Reference.md](docs/Security_Rules_Reference.md) | [Security_Rules_Reference_zh.md](docs/Security_Rules_Reference_zh.md) |
+| SIEM Integration | [SIEM_Integration.md](docs/SIEM_Integration.md) | [SIEM_Integration_zh.md](docs/SIEM_Integration_zh.md) |
+| Architecture | [Architecture.md](docs/Architecture.md) | [Architecture_zh.md](docs/Architecture_zh.md) |
+| PCE Cache | [PCE_Cache.md](docs/PCE_Cache.md) | [PCE_Cache_zh.md](docs/PCE_Cache_zh.md) |
+| API Cookbook | [API_Cookbook.md](docs/API_Cookbook.md) | [API_Cookbook_zh.md](docs/API_Cookbook_zh.md) |
 <!-- END:doc-map -->
 
 ![Version](https://img.shields.io/badge/Version-v3.20.0--report--intelligence-blue?style=flat-square)
@@ -144,9 +149,14 @@ sudo cp scripts/illumio-ops-completion.bash /etc/bash_completion.d/illumio-ops
 
 ## 文件
 
-- [使用手冊](docs/User_Manual_zh.md) ([English](docs/User_Manual.md)) — 安裝、設定、CLI、GUI、daemon、報表、SIEM
-- [架構文件](docs/Architecture_zh.md) ([English](docs/Architecture.md)) — Illumio 平台背景、系統概觀、模組地圖、資料流、PCE 快取、REST API 手冊
-- [安全規則參考](docs/Security_Rules_Reference_zh.md) ([English](docs/Security_Rules_Reference.md)) — B 系列、L 系列、R 系列規則目錄
+- [安裝指南](docs/Installation_zh.md) ([English](docs/Installation.md)) — RHEL/Ubuntu/Windows/開發環境安裝、離線 bundle 建置/安裝/升級/移除、systemd
+- [使用手冊](docs/User_Manual_zh.md) ([English](docs/User_Manual.md)) — CLI 子命令、GUI 導覽、daemon 模式、警示、隔離、多 PCE、設定、疑難排解
+- [報表模組](docs/Report_Modules_zh.md) ([English](docs/Report_Modules.md)) — 全部 22+ 分析模組（mod01-mod15、R3 智慧分析、Policy Usage）、輸出格式、排程、draft_pd 行為
+- [安全規則參考](docs/Security_Rules_Reference_zh.md) ([English](docs/Security_Rules_Reference.md)) — B 系列、L 系列、R 系列規則目錄；嚴重性模型；compute_draft 自動啟用
+- [SIEM 整合](docs/SIEM_Integration_zh.md) ([English](docs/SIEM_Integration.md)) — CEF/JSON 格式、UDP/TCP/TLS/HEC 傳輸、forwarder 設定、欄位對應
+- [架構文件](docs/Architecture_zh.md) ([English](docs/Architecture.md)) — Illumio 平台背景；系統概觀；模組地圖；資料流
+- [PCE 快取](docs/PCE_Cache_zh.md) ([English](docs/PCE_Cache.md)) — SQLite WAL 快取層；更新策略；操作員命令
+- [API Cookbook](docs/API_Cookbook_zh.md) ([English](docs/API_Cookbook.md)) — PCE REST API 整合模式；認證/分頁/非同步任務；常用端點
 
 ---
 
