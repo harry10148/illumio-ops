@@ -1,39 +1,47 @@
 #!/usr/bin/env bash
-# Verify docs/User_Manual.md mentions every report module, subcommand, and bundle script.
+# Verify each doc covers its expected terms after the Option 1 split.
 # Exits non-zero with a list of missing terms.
 set -euo pipefail
 
-DOC=docs/User_Manual.md
-[ -f "$DOC" ] || { echo "FATAL: $DOC not found"; exit 2; }
+declare -A DOC_FOR_FAMILY=(
+  ["module"]="docs/Report_Modules.md"
+  ["pu_module"]="docs/Report_Modules.md"
+  ["subcommand"]="docs/User_Manual.md"
+  ["script"]="docs/Installation.md"
+)
+
+for d in "${DOC_FOR_FAMILY[@]}"; do
+  [ -f "$d" ] || { echo "FATAL: $d not found"; exit 2; }
+done
 
 missing=()
 
-# Report analysis modules (file basename without .py)
 while IFS= read -r path; do
   mod=$(basename "$path" .py)
-  grep -q -- "$mod" "$DOC" || missing+=("module:$mod")
+  doc=${DOC_FOR_FAMILY[module]}
+  grep -q -- "$mod" "$doc" || missing+=("module:$mod (in $doc)")
 done < <(find src/report/analysis -maxdepth 1 -name 'mod*.py' -not -name '__init__.py')
 
-# Policy Usage modules
 while IFS= read -r path; do
   mod=$(basename "$path" .py)
-  grep -q -- "$mod" "$DOC" || missing+=("pu_module:$mod")
+  doc=${DOC_FOR_FAMILY[pu_module]}
+  grep -q -- "$mod" "$doc" || missing+=("pu_module:$mod (in $doc)")
 done < <(find src/report/analysis/policy_usage -maxdepth 1 -name 'pu_*.py')
 
-# CLI subcommands (excluding -h/--help meta entries)
+doc=${DOC_FOR_FAMILY[subcommand]}
 for sub in cache monitor gui report rule siem workload config status version; do
-  grep -qE "(\`|\b)${sub}(\`|\b)" "$DOC" || missing+=("subcommand:$sub")
+  grep -qE "(\`|\b)${sub}(\`|\b)" "$doc" || missing+=("subcommand:$sub (in $doc)")
 done
 
-# Offline bundle scripts
+doc=${DOC_FOR_FAMILY[script]}
 for s in build_offline_bundle.sh install.sh uninstall.sh; do
-  grep -q -- "$s" "$DOC" || missing+=("script:$s")
+  grep -q -- "$s" "$doc" || missing+=("script:$s (in $doc)")
 done
 
 if [ ${#missing[@]} -ne 0 ]; then
-  printf 'MISSING in %s:\n' "$DOC"
+  printf 'MISSING:\n'
   printf '  %s\n' "${missing[@]}"
   exit 1
 fi
 
-echo "OK — all required terms present in $DOC"
+echo "OK — all required terms present in their target docs"
