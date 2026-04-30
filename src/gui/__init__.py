@@ -486,10 +486,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     cm.load()
     gui_cfg = cm.config.get("web_gui", {})
     app.secret_key = gui_cfg.get("secret_key", secrets.token_hex(32))
-    # Enable Secure cookie flag when HTTPS is configured
+    # Always set Secure cookie flag (TLS is the default)
     tls_cfg = gui_cfg.get("tls", {})
-    if tls_cfg.get("enabled"):
-        app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_SECURE'] = True
     app.jinja_env.globals.update(t=t)
 
     # ── pygments CSS — generated once at startup ───────────────────────────────
@@ -575,8 +574,6 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     # ── flask-talisman security headers ───────────────────────────────────────
     from flask_talisman import Talisman
 
-    tls_enabled = cm.config.get("web_gui", {}).get("tls", {}).get("enabled", False)
-
     # CSP: allow inline scripts/styles (SPA uses them); locked down otherwise
     _csp = {
         'default-src': "'self'",
@@ -587,11 +584,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         'connect-src': "'self'",
     }
 
-    Talisman(
+    _talisman = Talisman(
         app,
-        force_https=tls_enabled,
-        strict_transport_security=tls_enabled,
-        session_cookie_secure=tls_enabled,
+        force_https=True,
+        strict_transport_security=True,
+        strict_transport_security_max_age=31536000,
+        strict_transport_security_include_subdomains=True,
+        strict_transport_security_preload=True,
+        session_cookie_secure=True,
         content_security_policy=_csp,
         content_security_policy_nonce_in=[],   # inline not nonce-based (SPA compat)
         frame_options='DENY',
@@ -602,6 +602,24 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             "geolocation": "()",
         },
     )
+
+    # Disable HTTPS redirect during testing so test clients (plain HTTP) work.
+    # This is set after Talisman init because tests set app.testing=True after
+    # _create_app() returns.
+    _orig_force_https = _talisman._force_https
+
+    def _force_https_unless_testing():
+        if app.testing:
+            return None
+        return _orig_force_https()
+
+    # Replace the registered before_request handler in-place so existing
+    # registrations remain intact (position in the list is preserved).
+    try:
+        idx = app.before_request_funcs[None].index(_orig_force_https)
+        app.before_request_funcs[None][idx] = _force_https_unless_testing
+    except (ValueError, KeyError):
+        pass  # Talisman internals changed; fall back to always-on (production safe)
 
     # SPA endpoint to refresh tokens without full reload
     @app.route('/api/csrf-token')
@@ -3113,7 +3131,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 # Default validity period for self-signed certs. 5 years keeps the cert
 # effectively "set and forget" for internal deployments while still giving
 # the auto-renew path meaningful runway before expiry.
-_SELF_SIGNED_VALIDITY_DAYS = 1825  # 5 years
+_SELF_SIGNED_VALIDITY_DAYS = 397  # ~13 months (browser-accepted maximum)
 
 def _cert_has_san(cert_path: str) -> bool:
     """Return True if the certificate contains a SubjectAlternativeName extension."""
@@ -3145,24 +3163,26 @@ def _get_local_ips() -> list[str]:
 
 
 def _generate_self_signed_cert(cert_dir: str, force: bool = False,
-                               days: int = _SELF_SIGNED_VALIDITY_DAYS) -> tuple[str, str]:
+                               days: int = _SELF_SIGNED_VALIDITY_DAYS,
+                               key_algorithm: str = "ecdsa-p256") -> tuple[str, str]:
     """Generate a self-signed TLS certificate for local HTTPS.
 
     Includes SubjectAlternativeName (SAN) for localhost and 127.0.0.1 so that
     modern browsers accept the certificate for fetch() / XHR requests (Chrome 58+
     ignores CN entirely and requires SAN for cert validation).
 
+    Uses the `cryptography` library when available (ECDSA P-256 or RSA-2048).
+    Falls back to subprocess openssl (RSA-2048) if `cryptography` is not installed.
+
     Args:
         cert_dir: Directory to store cert and key files.
         force: If True, regenerate even if existing cert is still valid.
-        days: Validity period in days (default: 5 years).
+        days: Validity period in days.
+        key_algorithm: "ecdsa-p256" (default) or "rsa-2048".
 
     Returns:
         (cert_path, key_path) tuple.
     """
-    import subprocess
-    import tempfile
-
     os.makedirs(cert_dir, exist_ok=True)
     cert_path = os.path.join(cert_dir, "self_signed.pem")
     key_path = os.path.join(cert_dir, "self_signed_key.pem")
@@ -3174,60 +3194,125 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
             return cert_path, key_path
         force = True
 
-    # Write a temporary OpenSSL config that adds the SAN extension.
-    # Using a config file works with all OpenSSL versions (1.0.2+), whereas
-    # -addext requires 1.1.1+.
     local_ips = _get_local_ips()
-    ip_lines = "".join(f"IP.{i + 1} = {ip}\n" for i, ip in enumerate(local_ips))
-    logger.info("Generating self-signed cert with SANs: DNS:localhost, {}", ", ".join(f"IP:{ip}" for ip in local_ips))
-    san_config = (
-        "[req]\n"
-        "distinguished_name = req_dn\n"
-        "x509_extensions = v3_req\n"
-        "prompt = no\n"
-        "[req_dn]\n"
-        "CN = localhost\n"
-        "O = IllumioPCEOps\n"
-        "C = TW\n"
-        "[v3_req]\n"
-        "subjectAltName = @alt_names\n"
-        "[alt_names]\n"
-        "DNS.1 = localhost\n"
-        + ip_lines
+    logger.info(
+        "Generating self-signed cert with SANs: DNS:localhost, {}",
+        ", ".join(f"IP:{ip}" for ip in local_ips),
     )
 
     try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".cnf", delete=False) as f:
-            f.write(san_config)
-            cfg_path = f.name
+        from cryptography import x509 as _x509
+        from cryptography.x509.oid import NameOID as _NameOID
+        from cryptography.hazmat.primitives import hashes as _hashes, serialization as _serial
+        from cryptography.hazmat.primitives.asymmetric import ec as _ec, rsa as _rsa
+        import ipaddress as _ipaddress
+        import datetime as _datetime
 
-        try:
-            subprocess.run(
-                [
-                    "openssl", "req", "-x509", "-newkey", "rsa:2048",
-                    "-keyout", key_path, "-out", cert_path,
-                    "-days", str(days), "-nodes",
-                    "-config", cfg_path,
-                ],
-                check=True,
-                capture_output=True,
-            )
-        finally:
+        # Generate private key
+        if key_algorithm == "rsa-2048":
+            private_key = _rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        else:
+            # Default: ECDSA P-256
+            private_key = _ec.generate_private_key(_ec.SECP256R1())
+
+        # Build subject / issuer
+        name = _x509.Name([
+            _x509.NameAttribute(_NameOID.COUNTRY_NAME, "TW"),
+            _x509.NameAttribute(_NameOID.ORGANIZATION_NAME, "IllumioPCEOps"),
+            _x509.NameAttribute(_NameOID.COMMON_NAME, "localhost"),
+        ])
+
+        # Build SAN extension
+        san_entries = [_x509.DNSName("localhost")]
+        for ip_str in local_ips:
             try:
-                os.unlink(cfg_path)
-            except OSError:
+                san_entries.append(_x509.IPAddress(_ipaddress.ip_address(ip_str)))
+            except ValueError:
                 pass
 
-        os.chmod(key_path, 0o600)
-        print(f"  Self-signed certificate generated ({days} days): {cert_path}")
-        return cert_path, key_path
-    except FileNotFoundError:
-        raise RuntimeError(
-            "openssl command not found. Install OpenSSL to use self-signed certificates, "
-            "or provide your own cert_file and key_file in config."
+        now = _datetime.datetime.now(_datetime.timezone.utc)
+        cert = (
+            _x509.CertificateBuilder()
+            .subject_name(name)
+            .issuer_name(name)
+            .public_key(private_key.public_key())
+            .serial_number(_x509.random_serial_number())
+            .not_valid_before(now)
+            .not_valid_after(now + _datetime.timedelta(days=days))
+            .add_extension(_x509.SubjectAlternativeName(san_entries), critical=False)
+            .add_extension(_x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .sign(private_key, _hashes.SHA256())
         )
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Failed to generate self-signed certificate: {e.stderr.decode()}")
+
+        # Write key (restricted permissions) and certificate
+        with open(key_path, "wb") as fk:
+            fk.write(private_key.private_bytes(
+                encoding=_serial.Encoding.PEM,
+                format=_serial.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=_serial.NoEncryption(),
+            ))
+        os.chmod(key_path, 0o600)
+        with open(cert_path, "wb") as fc:
+            fc.write(cert.public_bytes(_serial.Encoding.PEM))
+
+        algo_label = "ECDSA P-256" if key_algorithm != "rsa-2048" else "RSA-2048"
+        print(f"  Self-signed certificate generated ({days} days, {algo_label}): {cert_path}")
+        return cert_path, key_path
+
+    except ImportError:
+        # Fallback: use openssl subprocess (RSA-2048)
+        import subprocess
+        import tempfile
+
+        ip_lines = "".join(f"IP.{i + 1} = {ip}\n" for i, ip in enumerate(local_ips))
+        san_config = (
+            "[req]\n"
+            "distinguished_name = req_dn\n"
+            "x509_extensions = v3_req\n"
+            "prompt = no\n"
+            "[req_dn]\n"
+            "CN = localhost\n"
+            "O = IllumioPCEOps\n"
+            "C = TW\n"
+            "[v3_req]\n"
+            "subjectAltName = @alt_names\n"
+            "[alt_names]\n"
+            "DNS.1 = localhost\n"
+            + ip_lines
+        )
+
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".cnf", delete=False) as f:
+                f.write(san_config)
+                cfg_path = f.name
+
+            try:
+                subprocess.run(
+                    [
+                        "openssl", "req", "-x509", "-newkey", "rsa:2048",
+                        "-keyout", key_path, "-out", cert_path,
+                        "-days", str(days), "-nodes",
+                        "-config", cfg_path,
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+            finally:
+                try:
+                    os.unlink(cfg_path)
+                except OSError:
+                    pass
+
+            os.chmod(key_path, 0o600)
+            print(f"  Self-signed certificate generated ({days} days, RSA-2048 fallback): {cert_path}")
+            return cert_path, key_path
+        except FileNotFoundError:
+            raise RuntimeError(
+                "openssl command not found. Install OpenSSL to use self-signed certificates, "
+                "or provide your own cert_file and key_file in config."
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Failed to generate self-signed certificate: {e.stderr.decode()}")
 
 def _cert_days_remaining(cert_path: str) -> int | None:
     """Return the number of days until the cert expires, or None if unknown.
@@ -3345,9 +3430,46 @@ def _run_http(app, host: str, port: int) -> None:
 
 
 def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None:
-    """HTTPS via cheroot — production-grade WSGI server with native SSL support."""
+    """HTTPS via cheroot — production-grade WSGI server with hardened TLS."""
+    import ssl as _ssl
+    import threading as _threading
     from cheroot import wsgi as _cheroot_wsgi
     from cheroot.ssl.builtin import BuiltinSSLAdapter as _SSLAdapter
+
+    # Read TLS hardening config
+    try:
+        from src.config import ConfigManager as _CM
+        _tls_cfg = _CM().config.get("web_gui", {}).get("tls", {})
+    except Exception:
+        _tls_cfg = {}
+
+    _min_ver_str = _tls_cfg.get("min_version", "TLSv1.2")
+    _min_ver_map = {
+        "TLSv1.2": _ssl.TLSVersion.TLSv1_2,
+        "TLSv1.3": _ssl.TLSVersion.TLSv1_3,
+    }
+    _min_ver = _min_ver_map.get(_min_ver_str, _ssl.TLSVersion.TLSv1_2)
+
+    _cipher_cfg = _tls_cfg.get("ciphers")
+    _safe_ciphers = (
+        "ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM"
+        ":!aNULL:!MD5:!DSS:!RC4:!3DES:!EXPORT"
+    )
+    _ciphers = _cipher_cfg if _cipher_cfg else _safe_ciphers
+
+    # Build hardened SSL context and inject into cheroot adapter
+    ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
+    ctx.load_cert_chain(cert_file, key_file)
+    ctx.minimum_version = _min_ver
+    ctx.set_ciphers(_ciphers)
+    ctx.options |= (
+        _ssl.OP_NO_COMPRESSION
+        | _ssl.OP_SINGLE_DH_USE
+        | _ssl.OP_SINGLE_ECDH_USE
+    )
+
+    adapter = _SSLAdapter(cert_file, key_file)
+    adapter.context = ctx
 
     logger.info("Starting HTTPS server via cheroot on {}:{}", host, port)
     server = _cheroot_wsgi.Server((host, port), app, numthreads=10)
@@ -3361,7 +3483,44 @@ def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None
             _orig_error_log(msg, level, traceback)
 
     server.error_log = _filtered_error_log
-    server.ssl_adapter = _SSLAdapter(cert_file, key_file)
+    server.ssl_adapter = adapter
+
+    # HTTP → HTTPS redirect server (daemon thread, best-effort)
+    _redirect_port = int(_tls_cfg.get("http_redirect_port", 80))
+    _https_port = port
+
+    def _redirect_app(environ, start_response):
+        _host_hdr = environ.get("HTTP_HOST", f"localhost:{_https_port}").split(":")[0]
+        _path = environ.get("PATH_INFO", "/")
+        _qs = environ.get("QUERY_STRING", "")
+        _location = f"https://{_host_hdr}:{_https_port}{_path}"
+        if _qs:
+            _location += f"?{_qs}"
+        start_response("308 Permanent Redirect", [
+            ("Location", _location),
+            ("Content-Length", "0"),
+        ])
+        return [b""]
+
+    def _start_redirect_server():
+        _rserver = _cheroot_wsgi.Server((host, _redirect_port), _redirect_app, numthreads=2)
+        try:
+            _rserver.start()
+        except OSError as _e:
+            logger.warning(
+                "HTTP redirect server could not bind port {} ({}). "
+                "Skipping redirect — HTTPS is still available.",
+                _redirect_port, _e,
+            )
+        finally:
+            try:
+                _rserver.stop()
+            except Exception:
+                pass
+
+    _t = _threading.Thread(target=_start_redirect_server, daemon=True, name="http-redirect")
+    _t.start()
+
     try:
         server.start()
     except OSError as e:
@@ -3441,7 +3600,11 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
                     )
                     if renewed:
                         print(f"  TLS: Self-signed cert auto-renewed ({days_after} days remaining).")
-                cert_file, key_file = _generate_self_signed_cert(cert_dir)
+                cert_file, key_file = _generate_self_signed_cert(
+                    cert_dir,
+                    days=int(tls_cfg.get("validity_days", _SELF_SIGNED_VALIDITY_DAYS)),
+                    key_algorithm=tls_cfg.get("key_algorithm", "ecdsa-p256"),
+                )
                 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
                 ssl_context.load_cert_chain(cert_file, key_file)
                 days_left = _cert_days_remaining(cert_file)

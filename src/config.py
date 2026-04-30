@@ -80,10 +80,15 @@ _DEFAULT_CONFIG = {
         "secret_key": "",
         "allowed_ips": [],
         "tls": {
-            "enabled": False,
+            "enabled": True,
             "cert_file": "",
             "key_file": "",
-            "self_signed": False
+            "self_signed": False,
+            "min_version": "TLSv1.2",
+            "ciphers": None,
+            "key_algorithm": "ecdsa-p256",
+            "validity_days": 397,
+            "http_redirect_port": 80,
         }
     }
 }
