@@ -1628,9 +1628,9 @@ function _renderTop10Body(idx, data, total, ts) {
 
     let isoBtn = '';
     if (m.s_href && m.d_href) {
-      isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${m.s_href}', false, '${m.d_href}')"><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
+      isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${escapeHtml(m.s_href)}', false, '${escapeHtml(m.d_href)}')"><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
     } else if (m.s_href || m.d_href) {
-      isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${m.s_href || m.d_href}')"><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
+      isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${escapeHtml(m.s_href || m.d_href)}')"><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
     }
 
     const formatActor = (name, ip, href, labelsHtml, process, user) => {

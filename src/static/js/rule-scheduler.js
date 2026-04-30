@@ -139,7 +139,7 @@ async function rsFetchRulesBySearch(q, scope) {
       const rsName = item.rs_name.length > 20 ? escapeHtml(item.rs_name.substring(0, 20)) + '…' : escapeHtml(item.rs_name);
       tr.innerHTML =
         '<td></td>' +
-        '<td style="color:var(--accent2);font-weight:600;">' + item.rule_id + '</td>' +
+        '<td style="color:var(--accent2);font-weight:600;">' + escapeHtml(String(item.rule_id)) + '</td>' +
         '<td></td>' +
         '<td>' + stBadge + '</td>' +
         '<td>' + rsName + '</td>' +
@@ -187,10 +187,10 @@ async function rsFetchRulesets() {
       if (rs.id === rsSelectedRsId) tr.style.background = 'rgba(255,85,0,.1)';
       tr.innerHTML =
         '<td>' + schMark + '</td>' +
-        '<td>' + rs.id + '</td>' +
+        '<td>' + escapeHtml(String(rs.id)) + '</td>' +
         '<td>' + provBadge + '</td>' +
         '<td>' + statusBadge + '</td>' +
-        '<td>' + rs.rules_count + '</td>' +
+        '<td>' + escapeHtml(String(rs.rules_count)) + '</td>' +
         '<td>' + escapeHtml(rs.name) + '</td>';
       tbody.appendChild(tr);
     });

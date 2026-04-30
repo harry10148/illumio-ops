@@ -6,7 +6,7 @@
   <title>{{ t('login_title') }}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
+  <style nonce="{{ csp_nonce() }}">
     *, *::before, *::after { box-sizing: border-box; }
 
     :root {
@@ -198,7 +198,7 @@
     </div>
   </div>
 
-  <script>
+  <script nonce="{{ csp_nonce() }}">
     const form = document.getElementById('login-form');
     const errBox = document.getElementById('error-msg');
     const btn = document.getElementById('login-btn');

@@ -114,12 +114,17 @@ class SchedulerSettings(_Base):
     db_path: str = "config/scheduler.db"
 
 class WebGuiTls(_Base):
-    enabled: bool = False
+    enabled: bool = True
     cert_file: str = ""
     key_file: str = ""
     self_signed: bool = False
     auto_renew: bool = True
     auto_renew_days: int = Field(default=30, ge=1)
+    min_version: str = "TLSv1.2"
+    ciphers: Optional[str] = None
+    key_algorithm: str = "ecdsa-p256"
+    validity_days: int = Field(default=397, ge=1)
+    http_redirect_port: int = Field(default=80, ge=1, le=65535)
 
 class WebGuiSettings(_Base):
     # extra="ignore" for forward-compat: new keys added in future config

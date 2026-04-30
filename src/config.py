@@ -4,8 +4,25 @@ import time
 from loguru import logger
 from src.utils import Colors
 from src.i18n import t, set_language
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 
 _SECRET_FIELD_TOKENS = {"key", "secret", "password", "secret_key", "token"}
+
+_PH = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
+
+
+def hash_password(plain: str) -> str:
+    return _PH.hash(plain)
+
+
+def verify_password(plain: str, stored: str) -> bool:
+    if not stored:
+        return False
+    try:
+        return _PH.verify(stored, plain)
+    except (VerifyMismatchError, VerificationError, InvalidHashError):
+        return False
 
 def _format_error_input(loc: tuple, raw_input):
     """Redact secret-looking fields from validation error log output."""
@@ -59,14 +76,19 @@ _DEFAULT_CONFIG = {
     },
     "web_gui": {
         "username": "illumio",
-        "password": "illumio",
+        "password": "",
         "secret_key": "",
         "allowed_ips": [],
         "tls": {
-            "enabled": False,
+            "enabled": True,
             "cert_file": "",
             "key_file": "",
-            "self_signed": False
+            "self_signed": False,
+            "min_version": "TLSv1.2",
+            "ciphers": None,
+            "key_algorithm": "ecdsa-p256",
+            "validity_days": 397,
+            "http_redirect_port": 80,
         }
     }
 }
@@ -140,9 +162,14 @@ class ConfigManager:
             gui["secret_key"] = _secrets.token_hex(32)
             changed = True
 
-        if not gui.get("password"):
-            gui["username"] = "illumio"
-            gui["password"] = "illumio"
+        if not gui.get("password") and not gui.get("_initial_password"):
+            initial = _secrets.token_urlsafe(12)
+            gui["password"] = hash_password(initial)
+            gui["_initial_password"] = initial
+            gui["must_change_password"] = True
+            changed = True
+        elif gui.get("password") and not gui["password"].startswith("$argon2"):
+            gui["password"] = hash_password(gui["password"])
             changed = True
 
         if changed:
@@ -156,6 +183,10 @@ class ConfigManager:
                 json.dump(self.config, f, indent=4, ensure_ascii=False)
             # On Windows, os.replace handles atomic rename
             os.replace(tmp_file, self.config_file)
+            try:
+                os.chmod(self.config_file, 0o600)
+            except OSError:
+                pass
             lang = self.config.get("settings", {}).get("language", "en")
             set_language(lang)
             print(f"{Colors.GREEN}{t('config_saved')}{Colors.ENDC}")

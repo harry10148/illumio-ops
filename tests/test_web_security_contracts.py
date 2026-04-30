@@ -67,7 +67,7 @@ def test_csrf_required_on_post_after_login(app_client):
 def test_logout_clears_session(app_client):
     client, _cm = app_client
     client.post("/api/login", json={"username": "illumio", "password": "illumio"})
-    client.get("/logout")
+    client.post("/logout")
     # After logout, protected endpoint should be unauthorized
     r = client.get("/api/dashboard")
     assert r.status_code in (302, 401), f"Logout must unauth; got {r.status_code}"

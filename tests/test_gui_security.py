@@ -31,9 +31,10 @@ def app_persistent(temp_config_file):
     cm = ConfigManager(config_file=temp_config_file)
     cm.load()
     
+    from src.config import hash_password as _hash_password
     cm.config["web_gui"] = {
         "username": "admin",
-        "password": "testpass",
+        "password": _hash_password("testpass"),
         "allowed_ips": ["127.0.0.1", "192.168.1.0/24"],
         "secret_key": "test-secret"
     }
@@ -222,15 +223,15 @@ def test_api_security_endpoints(app_persistent):
     res = client.post('/api/security', json={
         "username": "admin2",
         "old_password": "testpass",
-        "new_password": "newpass",
+        "new_password": "newpassword123",
         "allowed_ips": ["10.0.0.0/8", "127.0.0.1", "192.168.1.0/24"]
     }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
     assert res.status_code == 200
     assert res.json['ok'] is True
-    
+
     # Re-login with new password
-    client.get('/logout')
-    res = client.post('/api/login', json={"username": "admin2", "password": "newpass"}, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    client.post('/logout', environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    res = client.post('/api/login', json={"username": "admin2", "password": "newpassword123"}, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
     assert res.status_code == 200
     assert res.json['ok'] is True
 
@@ -846,7 +847,9 @@ def test_settings_support_dynamic_plugin_roots(monkeypatch):
 
         get_response = client.get('/api/settings', environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
         assert get_response.status_code == 200
-        assert get_response.json["dummy_plugin"]["token"] == "abc123"
+        # "token" is a secret field — GET response redacts it; verify via __set sentinel
+        assert get_response.json["dummy_plugin"]["token__set"] is True
+        assert get_response.json["dummy_plugin"]["token"] != "abc123"
         assert get_response.json["dummy_plugin"]["retries"] == 0
         assert get_response.json["dummy_plugin"]["targets"] == ["ops", "soc"]
 

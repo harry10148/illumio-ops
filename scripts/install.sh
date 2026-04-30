@@ -47,6 +47,7 @@ fi
 cp "$SRC/uninstall.sh" "$INSTALL_ROOT/uninstall.sh"
 chmod +x "$INSTALL_ROOT/uninstall.sh"
 chown -R illumio_ops:illumio_ops "$INSTALL_ROOT"
+chmod 600 "$INSTALL_ROOT/config/config.json" 2>/dev/null || true
 
 sed "s|/opt/illumio_ops|$INSTALL_ROOT|g" "$SRC/deploy/illumio-ops.service" > "$SERVICE_FILE"
 chmod 0644 "$SERVICE_FILE"

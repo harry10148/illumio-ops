@@ -12,6 +12,11 @@ import io
 import json
 import datetime
 import threading
+import ssl as _ssl
+import hmac as _hmac
+import urllib.parse
+import uuid as _uuid
+import traceback as _traceback
 from loguru import logger
 import ipaddress
 from contextlib import redirect_stdout
@@ -21,13 +26,15 @@ import struct
 
 try:
     from flask import Flask, request, jsonify, render_template, send_from_directory, session, redirect
+    from werkzeug.utils import secure_filename
+    from werkzeug.exceptions import HTTPException
     HAS_FLASK = True
     FLASK_IMPORT_ERROR = ""
 except ImportError:
     HAS_FLASK = False
     FLASK_IMPORT_ERROR = str(sys.exc_info()[1])
 
-from src.config import ConfigManager
+from src.config import ConfigManager, hash_password, verify_password
 from src.i18n import t, get_messages
 from src import __version__
 from src.alerts import PLUGIN_METADATA, plugin_config_path, plugin_config_value
@@ -115,6 +122,37 @@ def _validate_allowed_ips(values) -> tuple[list, list]:
         except ValueError:
             invalid.append(item)
     return normalized, invalid
+
+_SECRET_PATTERN = re.compile(
+    r'(?:^|_)(?:password|secret|key|token|webhook_url|line_channel_access_token|smtp_password)$'
+)
+
+def _redact_secrets(obj):
+    """Recursively redact secret fields for API responses."""
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            if _SECRET_PATTERN.search(k.lower()):
+                out[k] = "*" * min(len(str(v)), 8) if v else ""
+                out[f"{k}__set"] = bool(v)
+                out[f"{k}__length"] = len(str(v)) if v else 0
+            else:
+                out[k] = _redact_secrets(v)
+        return out
+    elif isinstance(obj, list):
+        return [_redact_secrets(item) for item in obj]
+    return obj
+
+_SETTINGS_ALLOWLISTS = {
+    "smtp": {"host", "port", "user", "password", "enable_auth", "enable_tls"},
+    "alerts": {"active", "line_channel_access_token", "line_target_id", "webhook_url"},
+    "settings": {
+        "language", "theme", "timezone", "enable_health_check", "dashboard_queries",
+    },
+    "api": {"url", "org_id", "key", "secret", "verify_ssl"},
+    "email": {"sender", "recipients"},
+    "report": {"output_dir", "retention_days"},
+}
 
 def _normalize_rule_throttle(raw_value):
     value = str(raw_value or "").strip()
@@ -310,6 +348,10 @@ def _err(msg, status=400):
     """Standard error response: {"ok": false, "error": "..."}"""
     return jsonify({"ok": False, "error": msg}), status
 
+def _safe_log(s: str, max_len: int = 200) -> str:
+    """Strip CRLF and truncate for safe log output."""
+    return str(s).replace('\r', '').replace('\n', '').replace('\t', ' ')[:max_len]
+
 def _get_active_pce_url(cm: 'ConfigManager') -> str:
     """Return the active PCE profile URL, falling back to config['api']['url']."""
     active_id = cm.config.get('active_pce_id')
@@ -476,6 +518,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     app.config['JSON_AS_ASCII'] = False
     app.config['TEMPLATES_AUTO_RELOAD'] = False
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+    app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # 25 MB
     app.config['CM'] = cm
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
@@ -485,10 +528,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     cm.load()
     gui_cfg = cm.config.get("web_gui", {})
     app.secret_key = gui_cfg.get("secret_key", secrets.token_hex(32))
-    # Enable Secure cookie flag when HTTPS is configured
+    # Always set Secure cookie flag (TLS is the default)
     tls_cfg = gui_cfg.get("tls", {})
-    if tls_cfg.get("enabled"):
-        app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_SECURE'] = True
     app.jinja_env.globals.update(t=t)
 
     # ── pygments CSS — generated once at startup ───────────────────────────────
@@ -517,7 +559,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
     # ── flask-login setup ──────────────────────────────────────────────────────
     from flask_login import LoginManager, current_user, login_required, login_user, logout_user
-    from src.auth_models import AdminUser, LoginForm
+    from src.auth_models import AdminUser, LoginForm, PasswordChangeForm
 
     login_manager = LoginManager(app)
     login_manager.login_view = "login_page"
@@ -557,7 +599,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     limiter = Limiter(
         app=app,
         key_func=get_remote_address,
-        default_limits=[],          # no global limit; apply per-endpoint
+        default_limits=["300 per minute"],
         storage_uri="memory://",    # single-node deployment
         strategy="fixed-window",
     )
@@ -574,33 +616,56 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     # ── flask-talisman security headers ───────────────────────────────────────
     from flask_talisman import Talisman
 
-    tls_enabled = cm.config.get("web_gui", {}).get("tls", {}).get("enabled", False)
-
-    # CSP: allow inline scripts/styles (SPA uses them); locked down otherwise
+    # CSP: nonce-based inline scripts/styles; no unsafe-inline
     _csp = {
         'default-src': "'self'",
-        'script-src': ["'self'", "'unsafe-inline'"],  # SPA inline JS
-        'style-src': ["'self'", "'unsafe-inline'"],   # SPA inline CSS
+        'script-src': "'self'",   # nonce added by Talisman per-request
+        'style-src': "'self'",    # nonce added by Talisman per-request
         'img-src': ["'self'", "data:"],
-        'font-src': "'self'",
+        'font-src': ["'self'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
         'connect-src': "'self'",
     }
 
-    Talisman(
+    _talisman = Talisman(
         app,
-        force_https=tls_enabled,
-        strict_transport_security=tls_enabled,
-        session_cookie_secure=tls_enabled,
+        force_https=True,
+        strict_transport_security=True,
+        strict_transport_security_max_age=31536000,
+        strict_transport_security_include_subdomains=True,
+        strict_transport_security_preload=True,
+        session_cookie_secure=True,
         content_security_policy=_csp,
-        content_security_policy_nonce_in=[],   # inline not nonce-based (SPA compat)
+        content_security_policy_nonce_in=['script-src', 'style-src'],
         frame_options='DENY',
         referrer_policy='strict-origin-when-cross-origin',
         permissions_policy={
             "camera": "()",
             "microphone": "()",
             "geolocation": "()",
+            "interest-cohort": "()",
+            "browsing-topics": "()",
+            "payment": "()",
+            "usb": "()",
         },
     )
+
+    # Disable HTTPS redirect during testing so test clients (plain HTTP) work.
+    # This is set after Talisman init because tests set app.testing=True after
+    # _create_app() returns.
+    _orig_force_https = _talisman._force_https
+
+    def _force_https_unless_testing():
+        if app.testing:
+            return None
+        return _orig_force_https()
+
+    # Replace the registered before_request handler in-place so existing
+    # registrations remain intact (position in the list is preserved).
+    try:
+        idx = app.before_request_funcs[None].index(_orig_force_https)
+        app.before_request_funcs[None][idx] = _force_https_unless_testing
+    except (ValueError, KeyError):
+        pass  # Talisman internals changed; fall back to always-on (production safe)
 
     # SPA endpoint to refresh tokens without full reload
     @app.route('/api/csrf-token')
@@ -614,6 +679,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         from flask import Response as _Resp
         return _Resp('', status=200)
 
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(exc):
+        if isinstance(exc, HTTPException):
+            return exc
+        req_id = str(_uuid.uuid4())[:8]
+        logger.error(f"[GUI] Unhandled exception req={req_id}: {_traceback.format_exc()}")
+        return jsonify({"ok": False, "error": "Internal server error", "request_id": req_id}), 500
+
     @app.before_request
     def security_check():
         if request.endpoint == 'static' or request.path.startswith('/static/'):
@@ -623,7 +696,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         # so port scanners cannot detect an HTTP service on this port
         allowed_ips = cm.config.get("web_gui", {}).get("allowed_ips", [])
         if not _check_ip_allowed(allowed_ips, request.remote_addr):
-            logger.warning(f"[GUI] Blocked untrusted IP: {request.remote_addr}")
+            logger.warning(f"[GUI] Blocked untrusted IP: {_safe_log(request.remote_addr)}")
             _rst_drop()  # closes socket with RST, raises _RstDrop
 
         # Auth check (always enforced for all GUI modes)
@@ -635,6 +708,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 return _err(t("gui_err_unauthorized"), 401)
             return redirect('/login')
 
+        # Force password change if flagged
+        if current_user.is_authenticated:
+            gui_cfg = cm.config.get("web_gui", {})
+            if gui_cfg.get("must_change_password") and request.endpoint not in (
+                'api_security_get', 'api_security_post', 'logout', 'api_csrf_token'
+            ):
+                return jsonify({"ok": False, "error": "must_change_password", "code": 423}), 423
+
     @app.after_request
     def add_security_headers(response):
         # Security headers (talisman will add CSP/HSTS in Task 7; keep fallbacks here)
@@ -644,6 +725,12 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         _tls_cfg = cm.config.get("web_gui", {}).get("tls", {})
         if _tls_cfg.get("enabled"):
             response.headers.setdefault('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+        # Isolation headers — safe for same-origin SPA; omit COEP to avoid breaking
+        # embedded third-party resources that may not send CORP headers.
+        response.headers['Cross-Origin-Opener-Policy'] = 'same-origin'
+        response.headers['Cross-Origin-Resource-Policy'] = 'same-site'
+        # Remove server fingerprint header
+        response.headers.pop('Server', None)
         # Prevent browser from caching JS/CSS so code changes take effect immediately
         if request.path.startswith('/static/'):
             response.headers['Cache-Control'] = 'no-store'
@@ -667,7 +754,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             rules_count=rules_count,
             schedules_count=schedules_count,
             config_loaded_at=config_loaded_at,
-            ui_translations_json=_json.dumps(ui_translations, ensure_ascii=False),
+            ui_translations_json=_json.dumps(ui_translations, ensure_ascii=False).replace('</', '<\\/'),
         )
 
     # ??? Auth Routes ??????????????????????????????????????????????????????
@@ -694,17 +781,18 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         saved_username = gui_cfg.get("username", "illumio")
         saved_password = gui_cfg.get("password", "")
 
-        if username == saved_username and password == saved_password:
+        if _hmac.compare_digest(username.strip(), saved_username.strip()) and verify_password(password, saved_password):
             session.permanent = True
             login_user(AdminUser(username))
             if gui_cfg.get("_initial_password"):
-                del gui_cfg["_initial_password"]
+                gui_cfg.pop("_initial_password", None)
                 cm.save()
             return jsonify({"ok": True, "csrf_token": generate_csrf()})
 
         return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
 
-    @app.route('/logout')
+    @app.route('/logout', methods=['POST'])
+    @csrf.exempt
     def logout():
         logout_user()
         session.clear()
@@ -721,6 +809,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         })
 
     @app.route('/api/security', methods=['POST'])
+    @limiter.limit("10 per hour")
     def api_security_post():
         d = request.json or {}
         cm.load()
@@ -739,12 +828,22 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             gui_cfg["allowed_ips"] = allowed_ips
             
         if "new_password" in d and d["new_password"]:
+            # Use a placeholder old_password when no password is set yet (initial setup)
+            old_pw_for_form = d.get("old_password") or "placeholder"
+            try:
+                change_form = PasswordChangeForm.model_validate({
+                    "old_password": old_pw_for_form,
+                    "new_password": d["new_password"],
+                    "confirm_password": d.get("confirm_password", d["new_password"]),
+                })
+            except Exception as e:
+                return jsonify({"ok": False, "error": str(e)}), 400
             if gui_cfg.get("password"):
-                old_pass = d.get("old_password", "")
-                if old_pass != gui_cfg.get("password", ""):
+                if not verify_password(d.get("old_password", ""), gui_cfg.get("password", "")):
                     return jsonify({"ok": False, "error": t("gui_err_invalid_old_pass")}), 401
-            gui_cfg["password"] = d["new_password"]
+            gui_cfg["password"] = hash_password(change_form.new_password)
             gui_cfg.pop("_initial_password", None)
+            gui_cfg.pop("must_change_password", None)
             
         cm.save()
         return jsonify({"ok": True})
@@ -827,7 +926,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             from src.settings import _event_category
         except Exception as exc:
             logger.error("Failed to load event viewer dependencies: {}", exc)
-            return _err(str(exc), 500)
+            return _err("Service unavailable", 500)
 
         try:
             mins = max(5, min(int(request.args.get('mins', 60)), 10080))
@@ -939,7 +1038,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             from src.events import compare_event_rules, format_utc
         except Exception as exc:
             logger.error("Failed to load shadow compare dependencies: {}", exc)
-            return _err(str(exc), 500)
+            return _err("Service unavailable", 500)
 
         try:
             mins = max(5, min(int(request.args.get('mins', 60)), 10080))
@@ -998,7 +1097,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             )
         except Exception as exc:
             logger.error("Failed to load rule test dependencies: {}", exc)
-            return _err(str(exc), 500)
+            return _err("Service unavailable", 500)
 
         try:
             idx = int(request.args.get('idx', '-1'))
@@ -1438,7 +1537,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         }
         for root in _plugin_config_roots():
             payload.setdefault(root, cm.config.get(root, {}))
-        return jsonify(payload)
+        return jsonify(_redact_secrets(payload))
 
     @app.route('/api/alert-plugins')
     def api_alert_plugins():
@@ -1469,23 +1568,41 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         })
 
     @app.route('/api/settings', methods=['POST'])
+    @limiter.limit("30 per hour")
     def api_save_settings():
         d = request.json
         if 'api' in d:
-            for k in ('url', 'org_id', 'key', 'secret', 'verify_ssl'):
-                if k in d['api']:
-                    cm.config['api'][k] = d['api'][k]
+            api_in = d['api']
+            api_allowlist = _SETTINGS_ALLOWLISTS["api"]
+            # Validate url scheme before accepting it
+            if 'url' in api_in:
+                _url_val = str(api_in['url']).strip()
+                _scheme = urllib.parse.urlparse(_url_val).scheme.lower()
+                if _scheme not in ('http', 'https'):
+                    return jsonify({"ok": False, "error": "api.url must use http or https scheme"}), 400
+                if _scheme == 'http':
+                    logger.warning("api.url uses plain HTTP — TLS verification cannot be performed")
+            for k in api_allowlist:
+                if k in api_in:
+                    cm.config['api'][k] = api_in[k]
         if 'email' in d:
-            if 'sender' in d['email']:
-                cm.config['email']['sender'] = d['email']['sender']
-            if 'recipients' in d['email']:
-                cm.config['email']['recipients'] = d['email']['recipients']
+            email_in = d['email']
+            if 'sender' in email_in:
+                cm.config['email']['sender'] = email_in['sender']
+            if 'recipients' in email_in:
+                cm.config['email']['recipients'] = email_in['recipients']
         if 'smtp' in d:
-            cm.config.setdefault('smtp', {}).update(d['smtp'])
+            allowlist = _SETTINGS_ALLOWLISTS["smtp"]
+            filtered = {k: v for k, v in d['smtp'].items() if k in allowlist}
+            cm.config.setdefault('smtp', {}).update(filtered)
         if 'alerts' in d:
-            cm.config.setdefault('alerts', {}).update(d['alerts'])
+            allowlist = _SETTINGS_ALLOWLISTS["alerts"]
+            filtered = {k: v for k, v in d['alerts'].items() if k in allowlist}
+            cm.config.setdefault('alerts', {}).update(filtered)
         if 'settings' in d:
-            cm.config.setdefault('settings', {}).update(d['settings'])
+            allowlist = _SETTINGS_ALLOWLISTS["settings"]
+            filtered = {k: v for k, v in d['settings'].items() if k in allowlist}
+            cm.config.setdefault('settings', {}).update(filtered)
         if 'report' in d:
             rpt_in = d['report']
             rpt_cfg = cm.config.setdefault('report', {})
@@ -1538,6 +1655,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         return jsonify(result)
 
     @app.route('/api/tls/config', methods=['POST'])
+    @limiter.limit("10 per hour")
     def api_tls_config():
         d = request.json or {}
         cm.load()
@@ -1559,6 +1677,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         return jsonify({"ok": True, "message": "TLS settings saved. Restart the server to apply."})
 
     @app.route('/api/tls/renew', methods=['POST'])
+    @limiter.limit("10 per hour")
     def api_tls_renew():
         cm.load()
         tls_cfg = cm.config.get("web_gui", {}).get("tls", {})
@@ -1579,10 +1698,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     @app.route('/api/pce-profiles', methods=['GET'])
     def api_list_pce_profiles():
         cm.load()
-        return jsonify({
+        return jsonify(_redact_secrets({
             "profiles": cm.get_pce_profiles(),
             "active_pce_id": cm.get_active_pce_id(),
-        })
+        }))
 
     @app.route('/api/pce-profiles', methods=['POST'])
     def api_pce_profiles_action():
@@ -1765,7 +1884,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             return jsonify(fig.to_plotly_json())
         except Exception as exc:
             logger.warning("Dashboard chart {} error: {}", chart_id, exc)
-            return _err(str(exc), 500)
+            return _err("Chart unavailable", 500)
 
     @app.route('/api/reports', methods=['GET'])
     def api_list_reports():
@@ -1863,6 +1982,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
     @app.route('/reports/<path:filename>', methods=['GET'])
     def api_serve_report(filename):
+        if '..' in filename or filename.startswith('/'):
+            return jsonify({"ok": False, "error": "Invalid path"}), 403
         cm.load()
         reports_dir = _resolve_reports_dir(cm)
         # Path traversal protection: ensure resolved path stays within reports_dir
@@ -1873,6 +1994,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         return send_from_directory(reports_dir, filename, as_attachment=as_download)
 
     @app.route('/api/reports/generate', methods=['POST'])
+    @limiter.limit("30 per hour")
     def api_generate_report():
         if request.is_json:
             d = request.json or {}
@@ -1916,9 +2038,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 csv_file = request.files['file']
                 if csv_file.filename == '':
                     return jsonify({"ok": False, "error": t("gui_err_empty_csv")})
+                if csv_file.mimetype not in {
+                    'text/csv', 'application/vnd.ms-excel',
+                    'text/plain', 'application/octet-stream',
+                }:
+                    return jsonify({"ok": False, "error": "Invalid file type"}), 415
 
                 import uuid as _uuid
-                safe_filename = os.path.basename(csv_file.filename)
+                safe_filename = secure_filename(csv_file.filename) or 'upload.csv'
                 temp_path = os.path.join(tempfile.gettempdir(), f"{_uuid.uuid4().hex}_{safe_filename}")
                 csv_file.save(temp_path)
                 try:
@@ -2720,6 +2847,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             return jsonify({"ok": False, "error": str(e)})
 
     @app.route('/api/shutdown', methods=['POST'])
+    @limiter.limit("5 per hour")
     def api_shutdown():
         if persistent_mode:
             return jsonify({"ok": False, "error": "Shutdown not allowed in persistent mode"}), 403
@@ -3072,6 +3200,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         pass
 
     @app.route('/api/daemon/restart', methods=['POST'])
+    @limiter.limit("5 per hour")
     @login_required
     def api_daemon_restart():
         import src.gui as _self
@@ -3093,7 +3222,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 # Default validity period for self-signed certs. 5 years keeps the cert
 # effectively "set and forget" for internal deployments while still giving
 # the auto-renew path meaningful runway before expiry.
-_SELF_SIGNED_VALIDITY_DAYS = 1825  # 5 years
+_SELF_SIGNED_VALIDITY_DAYS = 397  # ~13 months (browser-accepted maximum)
 
 def _cert_has_san(cert_path: str) -> bool:
     """Return True if the certificate contains a SubjectAlternativeName extension."""
@@ -3125,24 +3254,26 @@ def _get_local_ips() -> list[str]:
 
 
 def _generate_self_signed_cert(cert_dir: str, force: bool = False,
-                               days: int = _SELF_SIGNED_VALIDITY_DAYS) -> tuple[str, str]:
+                               days: int = _SELF_SIGNED_VALIDITY_DAYS,
+                               key_algorithm: str = "ecdsa-p256") -> tuple[str, str]:
     """Generate a self-signed TLS certificate for local HTTPS.
 
     Includes SubjectAlternativeName (SAN) for localhost and 127.0.0.1 so that
     modern browsers accept the certificate for fetch() / XHR requests (Chrome 58+
     ignores CN entirely and requires SAN for cert validation).
 
+    Uses the `cryptography` library when available (ECDSA P-256 or RSA-2048).
+    Falls back to subprocess openssl (RSA-2048) if `cryptography` is not installed.
+
     Args:
         cert_dir: Directory to store cert and key files.
         force: If True, regenerate even if existing cert is still valid.
-        days: Validity period in days (default: 5 years).
+        days: Validity period in days.
+        key_algorithm: "ecdsa-p256" (default) or "rsa-2048".
 
     Returns:
         (cert_path, key_path) tuple.
     """
-    import subprocess
-    import tempfile
-
     os.makedirs(cert_dir, exist_ok=True)
     cert_path = os.path.join(cert_dir, "self_signed.pem")
     key_path = os.path.join(cert_dir, "self_signed_key.pem")
@@ -3154,60 +3285,125 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
             return cert_path, key_path
         force = True
 
-    # Write a temporary OpenSSL config that adds the SAN extension.
-    # Using a config file works with all OpenSSL versions (1.0.2+), whereas
-    # -addext requires 1.1.1+.
     local_ips = _get_local_ips()
-    ip_lines = "".join(f"IP.{i + 1} = {ip}\n" for i, ip in enumerate(local_ips))
-    logger.info("Generating self-signed cert with SANs: DNS:localhost, {}", ", ".join(f"IP:{ip}" for ip in local_ips))
-    san_config = (
-        "[req]\n"
-        "distinguished_name = req_dn\n"
-        "x509_extensions = v3_req\n"
-        "prompt = no\n"
-        "[req_dn]\n"
-        "CN = localhost\n"
-        "O = IllumioPCEOps\n"
-        "C = TW\n"
-        "[v3_req]\n"
-        "subjectAltName = @alt_names\n"
-        "[alt_names]\n"
-        "DNS.1 = localhost\n"
-        + ip_lines
+    logger.info(
+        "Generating self-signed cert with SANs: DNS:localhost, {}",
+        ", ".join(f"IP:{ip}" for ip in local_ips),
     )
 
     try:
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".cnf", delete=False) as f:
-            f.write(san_config)
-            cfg_path = f.name
+        from cryptography import x509 as _x509
+        from cryptography.x509.oid import NameOID as _NameOID
+        from cryptography.hazmat.primitives import hashes as _hashes, serialization as _serial
+        from cryptography.hazmat.primitives.asymmetric import ec as _ec, rsa as _rsa
+        import ipaddress as _ipaddress
+        import datetime as _datetime
 
-        try:
-            subprocess.run(
-                [
-                    "openssl", "req", "-x509", "-newkey", "rsa:2048",
-                    "-keyout", key_path, "-out", cert_path,
-                    "-days", str(days), "-nodes",
-                    "-config", cfg_path,
-                ],
-                check=True,
-                capture_output=True,
-            )
-        finally:
+        # Generate private key
+        if key_algorithm == "rsa-2048":
+            private_key = _rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        else:
+            # Default: ECDSA P-256
+            private_key = _ec.generate_private_key(_ec.SECP256R1())
+
+        # Build subject / issuer
+        name = _x509.Name([
+            _x509.NameAttribute(_NameOID.COUNTRY_NAME, "TW"),
+            _x509.NameAttribute(_NameOID.ORGANIZATION_NAME, "IllumioPCEOps"),
+            _x509.NameAttribute(_NameOID.COMMON_NAME, "localhost"),
+        ])
+
+        # Build SAN extension
+        san_entries = [_x509.DNSName("localhost")]
+        for ip_str in local_ips:
             try:
-                os.unlink(cfg_path)
-            except OSError:
+                san_entries.append(_x509.IPAddress(_ipaddress.ip_address(ip_str)))
+            except ValueError:
                 pass
 
-        os.chmod(key_path, 0o600)
-        print(f"  Self-signed certificate generated ({days} days): {cert_path}")
-        return cert_path, key_path
-    except FileNotFoundError:
-        raise RuntimeError(
-            "openssl command not found. Install OpenSSL to use self-signed certificates, "
-            "or provide your own cert_file and key_file in config."
+        now = _datetime.datetime.now(_datetime.timezone.utc)
+        cert = (
+            _x509.CertificateBuilder()
+            .subject_name(name)
+            .issuer_name(name)
+            .public_key(private_key.public_key())
+            .serial_number(_x509.random_serial_number())
+            .not_valid_before(now)
+            .not_valid_after(now + _datetime.timedelta(days=days))
+            .add_extension(_x509.SubjectAlternativeName(san_entries), critical=False)
+            .add_extension(_x509.BasicConstraints(ca=False, path_length=None), critical=True)
+            .sign(private_key, _hashes.SHA256())
         )
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Failed to generate self-signed certificate: {e.stderr.decode()}")
+
+        # Write key (restricted permissions) and certificate
+        with open(key_path, "wb") as fk:
+            fk.write(private_key.private_bytes(
+                encoding=_serial.Encoding.PEM,
+                format=_serial.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=_serial.NoEncryption(),
+            ))
+        os.chmod(key_path, 0o600)
+        with open(cert_path, "wb") as fc:
+            fc.write(cert.public_bytes(_serial.Encoding.PEM))
+
+        algo_label = "ECDSA P-256" if key_algorithm != "rsa-2048" else "RSA-2048"
+        print(f"  Self-signed certificate generated ({days} days, {algo_label}): {cert_path}")
+        return cert_path, key_path
+
+    except ImportError:
+        # Fallback: use openssl subprocess (RSA-2048)
+        import subprocess
+        import tempfile
+
+        ip_lines = "".join(f"IP.{i + 1} = {ip}\n" for i, ip in enumerate(local_ips))
+        san_config = (
+            "[req]\n"
+            "distinguished_name = req_dn\n"
+            "x509_extensions = v3_req\n"
+            "prompt = no\n"
+            "[req_dn]\n"
+            "CN = localhost\n"
+            "O = IllumioPCEOps\n"
+            "C = TW\n"
+            "[v3_req]\n"
+            "subjectAltName = @alt_names\n"
+            "[alt_names]\n"
+            "DNS.1 = localhost\n"
+            + ip_lines
+        )
+
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".cnf", delete=False) as f:
+                f.write(san_config)
+                cfg_path = f.name
+
+            try:
+                subprocess.run(
+                    [
+                        "openssl", "req", "-x509", "-newkey", "rsa:2048",
+                        "-keyout", key_path, "-out", cert_path,
+                        "-days", str(days), "-nodes",
+                        "-config", cfg_path,
+                    ],
+                    check=True,
+                    capture_output=True,
+                )
+            finally:
+                try:
+                    os.unlink(cfg_path)
+                except OSError:
+                    pass
+
+            os.chmod(key_path, 0o600)
+            print(f"  Self-signed certificate generated ({days} days, RSA-2048 fallback): {cert_path}")
+            return cert_path, key_path
+        except FileNotFoundError:
+            raise RuntimeError(
+                "openssl command not found. Install OpenSSL to use self-signed certificates, "
+                "or provide your own cert_file and key_file in config."
+            )
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Failed to generate self-signed certificate: {e.stderr.decode()}")
 
 def _cert_days_remaining(cert_path: str) -> int | None:
     """Return the number of days until the cert expires, or None if unknown.
@@ -3324,10 +3520,58 @@ def _run_http(app, host: str, port: int) -> None:
         server.stop()
 
 
+def _build_ssl_context(tls_cfg: dict) -> "_ssl.SSLContext":
+    """Build and return a hardened ssl.SSLContext from a tls config dict.
+
+    Args:
+        tls_cfg: dict with optional keys ``min_version`` (str) and ``ciphers`` (str|None).
+
+    Returns:
+        Configured :class:`ssl.SSLContext` (PROTOCOL_TLS_SERVER).
+    """
+    _min_ver_str = tls_cfg.get("min_version", "TLSv1.2")
+    _min_ver_map = {
+        "TLSv1.2": _ssl.TLSVersion.TLSv1_2,
+        "TLSv1.3": _ssl.TLSVersion.TLSv1_3,
+    }
+    _min_ver = _min_ver_map.get(_min_ver_str, _ssl.TLSVersion.TLSv1_2)
+
+    _cipher_cfg = tls_cfg.get("ciphers")
+    _safe_ciphers = (
+        "ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM"
+        ":!aNULL:!MD5:!DSS:!RC4:!3DES:!EXPORT"
+    )
+    _ciphers = _cipher_cfg if _cipher_cfg else _safe_ciphers
+
+    ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
+    ctx.minimum_version = _min_ver
+    ctx.set_ciphers(_ciphers)
+    ctx.options |= (
+        _ssl.OP_NO_COMPRESSION
+        | _ssl.OP_SINGLE_DH_USE
+        | _ssl.OP_SINGLE_ECDH_USE
+    )
+    return ctx
+
+
 def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None:
-    """HTTPS via cheroot — production-grade WSGI server with native SSL support."""
+    """HTTPS via cheroot — production-grade WSGI server with hardened TLS."""
+    import threading as _threading
     from cheroot import wsgi as _cheroot_wsgi
     from cheroot.ssl.builtin import BuiltinSSLAdapter as _SSLAdapter
+
+    # Read TLS hardening config
+    try:
+        from src.config import ConfigManager as _CM
+        _tls_cfg = _CM().config.get("web_gui", {}).get("tls", {})
+    except Exception:
+        _tls_cfg = {}
+
+    ctx = _build_ssl_context(_tls_cfg)
+    ctx.load_cert_chain(cert_file, key_file)
+
+    adapter = _SSLAdapter(cert_file, key_file)
+    adapter.context = ctx
 
     logger.info("Starting HTTPS server via cheroot on {}:{}", host, port)
     server = _cheroot_wsgi.Server((host, port), app, numthreads=10)
@@ -3341,7 +3585,44 @@ def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None
             _orig_error_log(msg, level, traceback)
 
     server.error_log = _filtered_error_log
-    server.ssl_adapter = _SSLAdapter(cert_file, key_file)
+    server.ssl_adapter = adapter
+
+    # HTTP → HTTPS redirect server (daemon thread, best-effort)
+    _redirect_port = int(_tls_cfg.get("http_redirect_port", 80))
+    _https_port = port
+
+    def _redirect_app(environ, start_response):
+        _host_hdr = environ.get("HTTP_HOST", f"localhost:{_https_port}").split(":")[0]
+        _path = environ.get("PATH_INFO", "/")
+        _qs = environ.get("QUERY_STRING", "")
+        _location = f"https://{_host_hdr}:{_https_port}{_path}"
+        if _qs:
+            _location += f"?{_qs}"
+        start_response("308 Permanent Redirect", [
+            ("Location", _location),
+            ("Content-Length", "0"),
+        ])
+        return [b""]
+
+    def _start_redirect_server():
+        _rserver = _cheroot_wsgi.Server((host, _redirect_port), _redirect_app, numthreads=2)
+        try:
+            _rserver.start()
+        except OSError as _e:
+            logger.warning(
+                "HTTP redirect server could not bind port {} ({}). "
+                "Skipping redirect — HTTPS is still available.",
+                _redirect_port, _e,
+            )
+        finally:
+            try:
+                _rserver.stop()
+            except Exception:
+                pass
+
+    _t = _threading.Thread(target=_start_redirect_server, daemon=True, name="http-redirect")
+    _t.start()
+
     try:
         server.start()
     except OSError as e:
@@ -3421,7 +3702,11 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
                     )
                     if renewed:
                         print(f"  TLS: Self-signed cert auto-renewed ({days_after} days remaining).")
-                cert_file, key_file = _generate_self_signed_cert(cert_dir)
+                cert_file, key_file = _generate_self_signed_cert(
+                    cert_dir,
+                    days=int(tls_cfg.get("validity_days", _SELF_SIGNED_VALIDITY_DAYS)),
+                    key_algorithm=tls_cfg.get("key_algorithm", "ecdsa-p256"),
+                )
                 ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
                 ssl_context.load_cert_chain(cert_file, key_file)
                 days_left = _cert_days_remaining(cert_file)

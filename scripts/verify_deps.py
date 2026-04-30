@@ -36,6 +36,8 @@ PRODUCTION = [
     Pkg("cachetools", "cachetools"),
     # Phase 3
     Pkg("pydantic", "pydantic", "VERSION"),
+    # Phase 2 TLS
+    Pkg("cryptography", "cryptography"),
     # Phase 4
     Pkg("flask-wtf", "flask_wtf"),
     Pkg("flask-limiter", "flask_limiter"),
@@ -101,6 +103,30 @@ def verify(pkgs: list[Pkg], category: str, fatal: bool) -> list[str]:
     return failed
 
 
+def check_pip_audit() -> bool:
+    """Run pip-audit to check for known vulnerabilities (non-blocking)."""
+    import subprocess
+    requirements_path = (
+        __import__("pathlib").Path(__file__).parent.parent / "requirements.txt"
+    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip_audit", "-r", str(requirements_path)],
+            capture_output=True, text=True, timeout=120,
+        )
+        if result.returncode != 0:
+            print(f"WARNING: pip-audit found vulnerabilities:\n{result.stdout}")
+            return False
+        print("pip-audit: no known vulnerabilities found")
+        return True
+    except FileNotFoundError:
+        print("WARNING: pip-audit not installed (pip install pip-audit to enable)")
+        return True  # non-blocking
+    except subprocess.TimeoutExpired:
+        print("WARNING: pip-audit timed out")
+        return True  # non-blocking
+
+
 def main() -> int:
     import argparse
     parser = argparse.ArgumentParser(
@@ -126,6 +152,7 @@ def main() -> int:
 
     failed = verify(PRODUCTION, "Production", fatal=True)
     verify(DEV, "Development (non-fatal)", fatal=False)
+    check_pip_audit()
     if failed:
         print(f"\nFAILED: {len(failed)} production package(s) missing: {', '.join(failed)}")
         print("Run: pip install -r requirements.txt")

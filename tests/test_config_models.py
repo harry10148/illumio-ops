@@ -50,7 +50,7 @@ def test_config_schema_fills_defaults_for_missing_sections():
     cfg = ConfigSchema.model_validate(minimal)
     # settings defaults must be present
     assert cfg.settings.language == "en"
-    assert cfg.web_gui.tls.enabled is False
+    assert cfg.web_gui.tls.enabled is True  # TLS enabled by default (Phase 2)
 
 
 def test_config_schema_rejects_unknown_top_level_keys():

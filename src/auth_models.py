@@ -7,7 +7,7 @@ if the session's user_id matches the configured username.
 from __future__ import annotations
 
 from flask_login import UserMixin
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 class AdminUser(UserMixin):
     """The single configured admin."""
@@ -22,3 +22,16 @@ class LoginForm(BaseModel):
     """Server-side validation for /api/login payload (Phase 3 pydantic)."""
     username: str = Field(min_length=1, max_length=128)
     password: str = Field(min_length=1, max_length=512)
+
+
+class PasswordChangeForm(BaseModel):
+    """Server-side validation for password change requests."""
+    old_password: str = Field(min_length=1, max_length=512)
+    new_password: str = Field(min_length=12, max_length=512)
+    confirm_password: str = Field(min_length=12, max_length=512)
+
+    @model_validator(mode='after')
+    def passwords_match(self) -> 'PasswordChangeForm':
+        if self.new_password != self.confirm_password:
+            raise ValueError('Passwords do not match')
+        return self
