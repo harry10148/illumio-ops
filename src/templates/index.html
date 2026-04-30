@@ -210,31 +210,31 @@
     <!-- Top level stats -->
     <div class="cards">
       <div class="card">
-        <div class="label">Rules</div>
+        <div class="label" data-i18n="gui_dashboard_rules">Rules</div>
         <div class="value" id="d-rules">-</div>
       </div>
       <div class="card">
-        <div class="label">Health Rule</div>
+        <div class="label" data-i18n="gui_card_health_rule">Health Rule</div>
         <div class="value" id="d-health">-</div>
       </div>
       <div class="card">
-        <div class="label">Event Poll</div>
+        <div class="label" data-i18n="gui_card_event_poll">Event Poll</div>
         <div class="value" id="d-event-poll">-</div>
       </div>
       <div class="card">
-        <div class="label">Last Dispatch</div>
+        <div class="label" data-i18n="gui_card_last_dispatch">Last Dispatch</div>
         <div class="value" id="d-dispatch">-</div>
       </div>
       <div class="card">
-        <div class="label">Unknown Types</div>
+        <div class="label" data-i18n="gui_card_unknown_types">Unknown Types</div>
         <div class="value" id="d-unknown">-</div>
       </div>
       <div class="card">
-        <div class="label">Suppressed</div>
+        <div class="label" data-i18n="gui_card_suppressed">Suppressed</div>
         <div class="value" id="d-suppressed">-</div>
       </div>
       <div class="card" id="card-ransom" style="display:none">
-        <div class="label">Ransomware Exp</div>
+        <div class="label" data-i18n="gui_card_ransomware_exp">Ransomware Exp</div>
         <div class="value" id="d-ransom">—</div>
       </div>
     </div>
@@ -287,7 +287,7 @@
           <div class="form-group" style="margin-bottom:0;">
             <label data-i18n="gui_filter_details">Filter Details</label>
             <input id="qt-search" name="traffic-search" autocomplete="off" spellcheck="false"
-              placeholder="Quick Search String?? style="width: 150px;" data-i18n="gui_quick_search_placeholder">
+              placeholder="Quick Search String" style="width: 150px;" data-i18n-placeholder="gui_quick_search_placeholder">
           </div>
           <div class="form-group" style="margin-bottom:0;">
             <label data-i18n="gui_sort_by">Sort By</label>
@@ -300,13 +300,13 @@
 
           <div class="spacer"></div>
           <button class="btn btn-secondary" onclick="openQtFiltersModal()" style="height: 42px; align-self:flex-end;"
-            title="Advanced Filters">
+            title="Advanced Filters" data-i18n-title="gui_adv_filters_tooltip">
             <svg class="icon">
               <use href="#icon-settings"></use>
             </svg> <span data-i18n="gui_filter_settings">Filter Settings</span>
           </button>
           <button class="btn btn-secondary" onclick="openQtGuideModal()" style="height: 42px; align-self:flex-end;"
-            title="Parameter Guide">
+            title="Parameter Guide" data-i18n-title="gui_param_guide">
             <svg class="icon">
               <use href="#icon-help-circle"></use>
             </svg> <span data-i18n="gui_param_guide">Guide</span>
@@ -367,17 +367,17 @@
           <div class="form-group" style="margin-bottom:0; flex:1;">
             <label data-i18n="gui_workload_name">Workload Name</label>
             <input id="qw-name" name="workload-name" autocomplete="workload-name" spellcheck="false"
-              placeholder="Exact or partial name">
+              placeholder="Exact or partial name" data-i18n-placeholder="gui_ws_name_placeholder">
           </div>
           <div class="form-group" style="margin-bottom:0; flex:1;">
             <label data-i18n="gui_ip_address">IP Address</label>
             <input id="qw-ip" name="workload-ip" autocomplete="workload-ip" spellcheck="false"
-              placeholder="e.g. 10.0.0.5">
+              placeholder="e.g. 10.0.0.5" data-i18n-placeholder="gui_ws_ip_placeholder">
           </div>
           <div class="form-group" style="margin-bottom:0; flex:1;">
             <label data-i18n="gui_hostname">Hostname</label>
             <input id="qw-host" name="workload-hostname" autocomplete="workload-hostname" spellcheck="false"
-              placeholder="Hostname match">
+              placeholder="Hostname match" data-i18n-placeholder="gui_ws_hostname_placeholder">
           </div>
           <button id="btn-run-workload-search" class="btn btn-primary" onclick="runWorkloadSearch()" style="height: 42px; align-self:flex-end;">
             <svg class="icon">
@@ -698,7 +698,7 @@
           <div id="a-test-alert-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 8px;">
             <button class="btn btn-primary" onclick="runAction('test-alert')" data-i18n="gui_send">Send</button>
           </div>
-          <div id="a-test-alert-status" style="color:var(--dim);font-size:0.82rem;line-height:1.6;">Loading alert channel status...</div>
+          <div id="a-test-alert-status" style="color:var(--dim);font-size:0.82rem;line-height:1.6;" data-i18n="gui_loading_alert_status">Loading alert channel status...</div>
         </div>
         <div class="action-card">
           <h3 data-i18n="gui_best_practices"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg> Load Best Practices</h3>
@@ -1305,7 +1305,7 @@
       <input type="hidden" id="dq-idx" value="-1">
       <div class="form-row">
         <div class="form-group"><label data-i18n="gui_query_widget_name">Widget Name</label><input id="dq-name"
-            placeholder="E.g. Core Services Top Clients"></div>
+            placeholder="E.g. Core Services Top Clients" data-i18n-placeholder="gui_ph_query_name"></div>
         <div class="form-group"><label data-i18n="gui_rank_by">Rank By</label><select id="dq-rank">
             <option value="count" data-i18n="gui_rank_count">Connection Count</option>
             <option value="volume" data-i18n="gui_rank_volume">Total Volume</option>
@@ -1325,7 +1325,7 @@
         <legend data-i18n="gui_col_filters">Filters</legend>
         <div class="form-row">
           <div class="form-group"><label data-i18n="gui_port">Port</label><input id="dq-port"
-              placeholder="e.g. 80, 443"></div>
+              placeholder="e.g. 80, 443" data-i18n-placeholder="gui_ph_port"></div>
           <div class="form-group"><label data-i18n="gui_protocol">Protocol</label><select id="dq-proto">
               <option value="" data-i18n="gui_both">Both</option>
               <option value="6" data-i18n="gui_tcp">TCP</option>
@@ -1334,32 +1334,32 @@
         </div>
         <div class="form-row">
           <div class="form-group"><label data-i18n="gui_source">Source (Label/IP)</label><input id="dq-src"
-              placeholder="e.g. role=Web, 10.0.0.0/8, 192.168.1.1"></div>
+              placeholder="e.g. role=Web, 10.0.0.0/8, 192.168.1.1" data-i18n-placeholder="gui_ph_src"></div>
           <div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="dq-dst"
-              placeholder="e.g. app=DB, 10.1.1.5"></div>
+              placeholder="e.g. app=DB, 10.1.1.5" data-i18n-placeholder="gui_ph_dst"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label data-i18n="gui_any_label">Either Side Label (src OR dst)</label><input id="dq-any-label"
-              placeholder="e.g. env=Production, role:Web"></div>
+              placeholder="e.g. env=Production, role:Web" data-i18n-placeholder="gui_ph_any_label"></div>
           <div class="form-group"><label data-i18n="gui_any_ip">Either Side IP (src OR dst)</label><input id="dq-any-ip"
-              placeholder="e.g. 10.0.1.5, IPList name"></div>
+              placeholder="e.g. 10.0.1.5, IPList name" data-i18n-placeholder="gui_ph_any_ip"></div>
         </div>
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_excludes">Excludes (Optional)</legend>
         <div class="form-row-3">
           <div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="dq-expt"
-              placeholder="e.g. 22"></div>
+              placeholder="e.g. 22" data-i18n-placeholder="gui_ph_ex_port"></div>
           <div class="form-group"><label data-i18n="gui_ex_src">Exclude Source</label><input id="dq-exsrc"
-              placeholder="e.g. env=Kube, 10.9.9.9"></div>
+              placeholder="e.g. env=Kube, 10.9.9.9" data-i18n-placeholder="gui_ph_ex_src"></div>
           <div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="dq-exdst"
-              placeholder="e.g. 8.8.8.8"></div>
+              placeholder="e.g. 8.8.8.8" data-i18n-placeholder="gui_ph_ex_dst"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label data-i18n="gui_ex_any_label">Exclude Either Side Label</label><input id="dq-ex-any-label"
-              placeholder="e.g. env=Dev"></div>
+              placeholder="e.g. env=Dev" data-i18n-placeholder="gui_ph_ex_any_label"></div>
           <div class="form-group"><label data-i18n="gui_ex_any_ip">Exclude Either Side IP</label><input id="dq-ex-any-ip"
-              placeholder="e.g. 192.168.0.0/16"></div>
+              placeholder="e.g. 192.168.0.0/16" data-i18n-placeholder="gui_ph_ex_any_ip"></div>
         </div>
       </fieldset>
       <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-query')"
@@ -1371,14 +1371,14 @@
   <!-- Traffic Analyzer Advanced Filters Modal -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="modal-qt-filters">
     <div class="modal">
-      <h2><svg class="icon">
+      <h2 data-i18n="gui_qt_filters_title"><svg class="icon">
           <use href="#icon-settings"></use>
         </svg> Traffic Analyzer Filters</h2>
       <fieldset>
         <legend data-i18n="gui_col_filters">Filters</legend>
         <div class="form-row">
           <div class="form-group"><label data-i18n="gui_port">Port</label><input id="qt-port"
-              placeholder="e.g. 80, 443"></div>
+              placeholder="e.g. 80, 443" data-i18n-placeholder="gui_ph_port"></div>
           <div class="form-group"><label data-i18n="gui_protocol">Protocol</label><select id="qt-proto">
               <option value="" data-i18n="gui_both">Both</option>
               <option value="6" data-i18n="gui_tcp">TCP</option>
@@ -1387,15 +1387,15 @@
         </div>
         <div class="form-row">
           <div class="form-group"><label data-i18n="gui_source">Source (Label/IP)</label><input id="qt-src"
-              placeholder="e.g. role=Web, 10.0.0.0/8"></div>
+              placeholder="e.g. role=Web, 10.0.0.0/8" data-i18n-placeholder="gui_ph_src"></div>
           <div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="qt-dst"
-              placeholder="e.g. app=DB, 10.1.1.5"></div>
+              placeholder="e.g. app=DB, 10.1.1.5" data-i18n-placeholder="gui_ph_dst"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label data-i18n="gui_any_label">Either Side Label (src OR dst)</label><input id="qt-any-label"
-              placeholder="e.g. env=Production, role:Web"></div>
+              placeholder="e.g. env=Production, role:Web" data-i18n-placeholder="gui_ph_any_label"></div>
           <div class="form-group"><label data-i18n="gui_any_ip">Either Side IP (src OR dst)</label><input id="qt-any-ip"
-              placeholder="e.g. 10.0.1.5, IPList name"></div>
+              placeholder="e.g. 10.0.1.5, IPList name" data-i18n-placeholder="gui_ph_any_ip"></div>
         </div>
       </fieldset>
       <fieldset>
@@ -1423,17 +1423,17 @@
         <legend data-i18n="gui_excludes">Excludes (Optional)</legend>
         <div class="form-row-3">
           <div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="qt-expt"
-              placeholder="e.g. 22"></div>
+              placeholder="e.g. 22" data-i18n-placeholder="gui_ph_ex_port"></div>
           <div class="form-group"><label data-i18n="gui_ex_src">Exclude Source</label><input id="qt-exsrc"
-              placeholder="e.g. env=Kube, 10.9.9.9"></div>
+              placeholder="e.g. env=Kube, 10.9.9.9" data-i18n-placeholder="gui_ph_ex_src"></div>
           <div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="qt-exdst"
-              placeholder="e.g. 8.8.8.8"></div>
+              placeholder="e.g. 8.8.8.8" data-i18n-placeholder="gui_ph_ex_dst"></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label data-i18n="gui_ex_any_label">Exclude Either Side Label</label><input id="qt-ex-any-label"
-              placeholder="e.g. env=Dev"></div>
+              placeholder="e.g. env=Dev" data-i18n-placeholder="gui_ph_ex_any_label"></div>
           <div class="form-group"><label data-i18n="gui_ex_any_ip">Exclude Either Side IP</label><input id="qt-ex-any-ip"
-              placeholder="e.g. 192.168.0.0/16"></div>
+              placeholder="e.g. 192.168.0.0/16" data-i18n-placeholder="gui_ph_ex_any_ip"></div>
         </div>
       </fieldset>
       <div class="modal-actions">
@@ -1609,7 +1609,7 @@
         <legend data-i18n="gui_col_filters">Filters</legend>
         <div class="form-row">
           <div class="form-group"><label data-i18n="gui_port">Port</label><input id="tr-port"
-              placeholder="e.g. 80, 443"></div>
+              placeholder="e.g. 80, 443" data-i18n-placeholder="gui_ph_port"></div>
           <div class="form-group"><label data-i18n="gui_protocol">Protocol</label><select id="tr-proto">
               <option value="" data-i18n="gui_both">Both</option>
               <option value="6" data-i18n="gui_tcp">TCP</option>
@@ -1618,20 +1618,20 @@
         </div>
         <div class="form-row">
           <div class="form-group"><label data-i18n="gui_source">Source (Label/IP)</label><input id="tr-src"
-              placeholder="e.g. role=Web, 10.0.0.0/8, 192.168.1.1"></div>
+              placeholder="e.g. role=Web, 10.0.0.0/8, 192.168.1.1" data-i18n-placeholder="gui_ph_src"></div>
           <div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="tr-dst"
-              placeholder="e.g. app=DB, 10.1.1.5"></div>
+              placeholder="e.g. app=DB, 10.1.1.5" data-i18n-placeholder="gui_ph_dst"></div>
         </div>
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_excludes">Excludes (Optional)</legend>
         <div class="form-row-3">
           <div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="tr-expt"
-              placeholder="e.g. 22"></div>
+              placeholder="e.g. 22" data-i18n-placeholder="gui_ph_ex_port"></div>
           <div class="form-group"><label data-i18n="gui_ex_src">Exclude Source</label><input id="tr-exsrc"
-              placeholder="e.g. env=Kube, 10.9.9.9"></div>
+              placeholder="e.g. env=Kube, 10.9.9.9" data-i18n-placeholder="gui_ph_ex_src"></div>
           <div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="tr-exdst"
-              placeholder="e.g. 8.8.8.8"></div>
+              placeholder="e.g. 8.8.8.8" data-i18n-placeholder="gui_ph_ex_dst"></div>
         </div>
       </fieldset>
       <fieldset>
@@ -1679,23 +1679,23 @@
       <fieldset>
         <legend data-i18n="gui_col_filters">Filters</legend>
         <div class="form-row-3">
-          <div class="form-group"><label data-i18n="gui_port">Port</label><input id="bw-port" placeholder="e.g. 443">
+          <div class="form-group"><label data-i18n="gui_port">Port</label><input id="bw-port" placeholder="e.g. 443" data-i18n-placeholder="gui_ph_port">
           </div>
           <div class="form-group"><label data-i18n="gui_source">Source (Label/IP)</label><input id="bw-src"
-              placeholder="e.g. role=Web, 10.0.0.0/8"></div>
+              placeholder="e.g. role=Web, 10.0.0.0/8" data-i18n-placeholder="gui_ph_src"></div>
           <div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="bw-dst"
-              placeholder="e.g. app=DB, 10.1.1.5"></div>
+              placeholder="e.g. app=DB, 10.1.1.5" data-i18n-placeholder="gui_ph_dst"></div>
         </div>
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_excludes">Excludes (Optional)</legend>
         <div class="form-row-3">
           <div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="bw-expt"
-              placeholder="e.g. 22"></div>
+              placeholder="e.g. 22" data-i18n-placeholder="gui_ph_ex_port"></div>
           <div class="form-group"><label data-i18n="gui_ex_src">Exclude Source</label><input id="bw-exsrc"
-              placeholder="e.g. env=Kube, 10.9.9.9"></div>
+              placeholder="e.g. env=Kube, 10.9.9.9" data-i18n-placeholder="gui_ph_ex_src"></div>
           <div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="bw-exdst"
-              placeholder="e.g. 8.8.8.8"></div>
+              placeholder="e.g. 8.8.8.8" data-i18n-placeholder="gui_ph_ex_dst"></div>
         </div>
       </fieldset>
       <fieldset>

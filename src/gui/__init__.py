@@ -2626,7 +2626,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         ana = Analyzer(cm, api, rep)
         ana.run_analysis()
         rep.send_alerts()
-        return jsonify({"ok": True, "output": "Analysis cycle and alerts completed."})
+        return jsonify({"ok": True, "output": t("gui_action_run_completed")})
 
     @app.route('/api/actions/debug', methods=['POST'])
     def api_debug():
