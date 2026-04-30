@@ -42,7 +42,7 @@ def test_default_key_algorithm_ecdsa():
 
 
 def test_ssl_context_min_tls12():
-    """SSLContext built the same way as _run_https() must enforce TLS 1.2 minimum."""
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    """_build_ssl_context() must produce a context with TLS 1.2 as the minimum version."""
+    from src.gui import _build_ssl_context
+    ctx = _build_ssl_context({"min_version": "TLSv1.2", "ciphers": None})
     assert ctx.minimum_version == ssl.TLSVersion.TLSv1_2

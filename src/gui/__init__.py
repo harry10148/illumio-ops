@@ -12,6 +12,7 @@ import io
 import json
 import datetime
 import threading
+import ssl as _ssl
 import hmac as _hmac
 from loguru import logger
 import ipaddress
@@ -3240,7 +3241,7 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
             .not_valid_before(now)
             .not_valid_after(now + _datetime.timedelta(days=days))
             .add_extension(_x509.SubjectAlternativeName(san_entries), critical=False)
-            .add_extension(_x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .add_extension(_x509.BasicConstraints(ca=False, path_length=None), critical=True)
             .sign(private_key, _hashes.SHA256())
         )
 
@@ -3429,9 +3430,42 @@ def _run_http(app, host: str, port: int) -> None:
         server.stop()
 
 
+def _build_ssl_context(tls_cfg: dict) -> "_ssl.SSLContext":
+    """Build and return a hardened ssl.SSLContext from a tls config dict.
+
+    Args:
+        tls_cfg: dict with optional keys ``min_version`` (str) and ``ciphers`` (str|None).
+
+    Returns:
+        Configured :class:`ssl.SSLContext` (PROTOCOL_TLS_SERVER).
+    """
+    _min_ver_str = tls_cfg.get("min_version", "TLSv1.2")
+    _min_ver_map = {
+        "TLSv1.2": _ssl.TLSVersion.TLSv1_2,
+        "TLSv1.3": _ssl.TLSVersion.TLSv1_3,
+    }
+    _min_ver = _min_ver_map.get(_min_ver_str, _ssl.TLSVersion.TLSv1_2)
+
+    _cipher_cfg = tls_cfg.get("ciphers")
+    _safe_ciphers = (
+        "ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM"
+        ":!aNULL:!MD5:!DSS:!RC4:!3DES:!EXPORT"
+    )
+    _ciphers = _cipher_cfg if _cipher_cfg else _safe_ciphers
+
+    ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
+    ctx.minimum_version = _min_ver
+    ctx.set_ciphers(_ciphers)
+    ctx.options |= (
+        _ssl.OP_NO_COMPRESSION
+        | _ssl.OP_SINGLE_DH_USE
+        | _ssl.OP_SINGLE_ECDH_USE
+    )
+    return ctx
+
+
 def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None:
     """HTTPS via cheroot — production-grade WSGI server with hardened TLS."""
-    import ssl as _ssl
     import threading as _threading
     from cheroot import wsgi as _cheroot_wsgi
     from cheroot.ssl.builtin import BuiltinSSLAdapter as _SSLAdapter
@@ -3443,30 +3477,8 @@ def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None
     except Exception:
         _tls_cfg = {}
 
-    _min_ver_str = _tls_cfg.get("min_version", "TLSv1.2")
-    _min_ver_map = {
-        "TLSv1.2": _ssl.TLSVersion.TLSv1_2,
-        "TLSv1.3": _ssl.TLSVersion.TLSv1_3,
-    }
-    _min_ver = _min_ver_map.get(_min_ver_str, _ssl.TLSVersion.TLSv1_2)
-
-    _cipher_cfg = _tls_cfg.get("ciphers")
-    _safe_ciphers = (
-        "ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM"
-        ":!aNULL:!MD5:!DSS:!RC4:!3DES:!EXPORT"
-    )
-    _ciphers = _cipher_cfg if _cipher_cfg else _safe_ciphers
-
-    # Build hardened SSL context and inject into cheroot adapter
-    ctx = _ssl.SSLContext(_ssl.PROTOCOL_TLS_SERVER)
+    ctx = _build_ssl_context(_tls_cfg)
     ctx.load_cert_chain(cert_file, key_file)
-    ctx.minimum_version = _min_ver
-    ctx.set_ciphers(_ciphers)
-    ctx.options |= (
-        _ssl.OP_NO_COMPRESSION
-        | _ssl.OP_SINGLE_DH_USE
-        | _ssl.OP_SINGLE_ECDH_USE
-    )
 
     adapter = _SSLAdapter(cert_file, key_file)
     adapter.context = ctx
