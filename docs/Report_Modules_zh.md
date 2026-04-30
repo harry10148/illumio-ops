@@ -12,6 +12,8 @@
 | Architecture | [Architecture.md](./Architecture.md) | [Architecture_zh.md](./Architecture_zh.md) |
 | PCE Cache | [PCE_Cache.md](./PCE_Cache.md) | [PCE_Cache_zh.md](./PCE_Cache_zh.md) |
 | API Cookbook | [API_Cookbook.md](./API_Cookbook.md) | [API_Cookbook_zh.md](./API_Cookbook_zh.md) |
+| Glossary | [Glossary.md](./Glossary.md) | [Glossary_zh.md](./Glossary_zh.md) |
+| Troubleshooting | [Troubleshooting.md](./Troubleshooting.md) | [Troubleshooting_zh.md](./Troubleshooting_zh.md) |
 <!-- END:doc-map -->
 
 ---
@@ -278,13 +280,9 @@ Daemon 迴圈每 60 秒檢查排程，並執行任何已到達設定時間的排
 
 ---
 
-## 附錄 A — 報表模組清單
+## 附錄 A — 報表模組清單與導讀指南
 
-> 從 `docs/report_module_inventory_zh.md`（ed20df0~1）翻譯 — Phase B 更新。
-
-# 報表模組清單與導讀指南
-
-本文盤點 illumio-ops 既有報表模組的實務價值，並定義每個章節應補充的導讀內容。目標是讓報表讀者不只看到圖表和表格，而是能理解「這章在回答什麼問題」、「哪些現象需要注意」、「下一步該做什麼」。
+本附錄依 persona 為每個報表模組評分，並定義每個章節應提供的導讀內容（「這章在回答什麼問題」、「哪些訊號要注意」、「如何判讀」、「下一步該做什麼」）。對應的英文 README（[Report_Modules.md](Report_Modules.md)）目前指向本附錄；後續若翻譯為英文，主文將遷移過去。
 
 ## NotebookLM 佐證摘要
 

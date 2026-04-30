@@ -12,6 +12,8 @@
 | Architecture | [Architecture.md](./Architecture.md) | [Architecture_zh.md](./Architecture_zh.md) |
 | PCE Cache | [PCE_Cache.md](./PCE_Cache.md) | [PCE_Cache_zh.md](./PCE_Cache_zh.md) |
 | API Cookbook | [API_Cookbook.md](./API_Cookbook.md) | [API_Cookbook_zh.md](./API_Cookbook_zh.md) |
+| Glossary | [Glossary.md](./Glossary.md) | [Glossary_zh.md](./Glossary_zh.md) |
+| Troubleshooting | [Troubleshooting.md](./Troubleshooting.md) | [Troubleshooting_zh.md](./Troubleshooting_zh.md) |
 <!-- END:doc-map -->
 
 ---
@@ -275,6 +277,22 @@ cp config/config.json.example config/config.json
 | `api.verify_ssl` | SSL certificate verification | `true` or `false` |
 
 > **How to obtain an API Key**: In the PCE Web Console, navigate to **User Menu → My API Keys → Add**. Select the appropriate role (minimum: `read_only` for monitoring, `owner` for quarantine operations).
+
+
+## 1.4 Shell Tab Completion (bash)
+
+The `scripts/illumio-ops-completion.bash` file provides Click-generated completions for `illumio-ops` subcommands and option flags.
+
+| Scenario | Command |
+|---|---|
+| Try it once for the current shell (development) | `source scripts/illumio-ops-completion.bash` |
+| Install globally on Linux | `sudo cp scripts/illumio-ops-completion.bash /etc/bash_completion.d/illumio-ops` |
+| RPM / offline-bundle install | Already installed by `scripts/install.sh` — nothing to do |
+| Verify it works | Type `illumio-ops <Tab><Tab>` and confirm subcommand suggestions appear |
+
+The completion script targets the kebab-case entry point (`illumio-ops`). It works only when the entry script is on `PATH` (e.g. via offline bundle install at `/opt/illumio_ops/illumio-ops.py`); for direct dev runs (`python illumio-ops.py`), bash completion is not invoked.
+
+For zsh / fish, install the corresponding `_CLICK_COMPLETION_BASH_SOURCE` equivalent — see [Click documentation](https://click.palletsprojects.com/en/stable/shell-completion/).
 
 
 ## See also

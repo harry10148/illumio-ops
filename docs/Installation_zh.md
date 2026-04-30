@@ -12,6 +12,8 @@
 | Architecture | [Architecture.md](./Architecture.md) | [Architecture_zh.md](./Architecture_zh.md) |
 | PCE Cache | [PCE_Cache.md](./PCE_Cache.md) | [PCE_Cache_zh.md](./PCE_Cache_zh.md) |
 | API Cookbook | [API_Cookbook.md](./API_Cookbook.md) | [API_Cookbook_zh.md](./API_Cookbook_zh.md) |
+| Glossary | [Glossary.md](./Glossary.md) | [Glossary_zh.md](./Glossary_zh.md) |
+| Troubleshooting | [Troubleshooting.md](./Troubleshooting.md) | [Troubleshooting_zh.md](./Troubleshooting_zh.md) |
 <!-- END:doc-map -->
 
 ---
@@ -270,6 +272,22 @@ cp config/config.json.example config/config.json
 | `api.verify_ssl` | SSL 憑證驗證 | `true` 或 `false` |
 
 > **如何取得 API Key**：在 PCE 網頁主控台點選 **使用者選單 → My API Keys → Add**。選擇適當角色（監控最低需 `read_only`，隔離操作需 `owner`）。
+
+
+## 1.4 Shell Tab Completion（bash）
+
+`scripts/illumio-ops-completion.bash` 提供 Click 生成的 `illumio-ops` 子命令與選項補全。
+
+| 情境 | 命令 |
+|---|---|
+| 目前 shell 暫時試用（開發） | `source scripts/illumio-ops-completion.bash` |
+| Linux 全域安裝 | `sudo cp scripts/illumio-ops-completion.bash /etc/bash_completion.d/illumio-ops` |
+| RPM / 離線 bundle 安裝 | `scripts/install.sh` 已自動安裝，無需操作 |
+| 驗證 | 鍵入 `illumio-ops <Tab><Tab>` 確認出現子命令建議 |
+
+補全腳本以 kebab-case 進入點（`illumio-ops`）為目標，需要進入點位於 `PATH`（例如離線 bundle 安裝後位於 `/opt/illumio_ops/illumio-ops.py`）；直接以 `python illumio-ops.py` 啟動時 bash completion 不會被呼叫。
+
+zsh / fish 請安裝對應的 `_CLICK_COMPLETION_BASH_SOURCE` 等價物，詳見 [Click 文件](https://click.palletsprojects.com/en/stable/shell-completion/)。
 
 
 ## 延伸閱讀

@@ -12,11 +12,26 @@
 | Architecture | [Architecture.md](./Architecture.md) | [Architecture_zh.md](./Architecture_zh.md) |
 | PCE Cache | [PCE_Cache.md](./PCE_Cache.md) | [PCE_Cache_zh.md](./PCE_Cache_zh.md) |
 | API Cookbook | [API_Cookbook.md](./API_Cookbook.md) | [API_Cookbook_zh.md](./API_Cookbook_zh.md) |
+| Glossary | [Glossary.md](./Glossary.md) | [Glossary_zh.md](./Glossary_zh.md) |
+| Troubleshooting | [Troubleshooting.md](./Troubleshooting.md) | [Troubleshooting_zh.md](./Troubleshooting_zh.md) |
 <!-- END:doc-map -->
 
 ---
 
 ## 1. Execution Modes
+
+There are four ways to run the tool. Pick based on what you need:
+
+| Your situation | Recommended mode | How to launch |
+|---|---|---|
+| One-off ad hoc CLI session (look at rules, generate a report manually) | **Interactive CLI** | `python illumio-ops.py` |
+| Just need the Web dashboard for someone non-CLI | **Standalone Web GUI** | `python illumio-ops.py --gui` |
+| Production: continuous monitoring, scheduled reports, SIEM dispatch — no GUI | **Background Daemon** | `python illumio-ops.py --monitor --interval 5` |
+| Production: continuous monitoring + Web GUI on the same host (recommended default) | **Persistent Mode** | `python illumio-ops.py --monitor-gui --interval 5 --port 5001` |
+
+If unsure, use **Persistent Mode** — it covers the most common case (long-running daemon + web access) in a single process. For headless servers without browser access, use the plain Background Daemon.
+
+For systemd / NSSM service registration, see [§7 Advanced Deployment](#7-advanced-deployment).
 
 ### 1.1 Interactive CLI
 
@@ -284,6 +299,29 @@ illumio-ops config show --section web_gui
 ---
 
 ## 2. Rule Types & Configuration
+
+### How rules, alerts, and reports relate
+
+Three runtime flows share the same data sources but produce different outputs:
+
+```text
+                        ┌─ event rules ────► event_alerts  ─┐
+   PCE events ──► Cache ─┤                                   ├─► Reporter ──► Email / LINE / Webhook
+                        └─ traffic rules ──► traffic_alerts ─┘
+   PCE flows  ──► Cache ─┐
+                        └─ bandwidth rules ──► metric_alerts ─► Reporter
+   Health checks   ──────► health_alerts ─────────────────────► Reporter
+
+   Cache ──► Report Engine ──► HTML / CSV (15 traffic + 4 audit + Policy Usage + VEN Status)
+   Cache ──► SIEM Dispatcher ──► CEF / JSON / HEC out
+```
+
+- **Rules** (this section) decide *when to fire* an alert based on PCE data.
+- **[Alert channels](#4-alert-channels)** decide *where to send* the alert (Email / LINE / Webhook).
+- **[Reports](Report_Modules.md)** are independent of rules — they summarize data on a schedule, regardless of whether any rule fired.
+- **[SIEM dispatch](SIEM_Integration.md)** is also independent of rules — it forwards raw events / flows from the cache to your SIEM.
+
+A typical production setup uses all three: rules fire alerts to Email/LINE for incident response; reports go to stakeholders weekly; SIEM stays continuously fed for forensics.
 
 ### 2.1 Event Rules
 
@@ -621,6 +659,53 @@ The system implements **multi-layer Draft state protection**:
 
 ## 9. Settings Reference
 
+All settings live in `config/config.json`. Below is the top-level structure; subsequent sections cover the blocks that are not self-explanatory.
+
+```text
+{
+  "pce_profiles":   [ … ]            // Multi-PCE profile slots (see §6)
+  "active_pce_id":  …                // Currently selected profile id
+  "api":            { … }            // Mirror of the active profile (auto-synced)
+  "alerts":         { active: [], line_*, webhook_url }   // §4 channels
+  "email":          { sender, recipients }                // §4.1
+  "smtp":           { host, port, user, password, … }     // §4.1
+  "settings":       { timezone, language, theme, … }      // §9.1, §9.2
+  "rules":          [ … ]            // Event/Traffic/Bandwidth rules (§2)
+  "report":         { schedule, format, retention_days, … }  // §9.3
+  "report_schedules": [ … ]                               // Recurring reports (§8 / §9.5)
+  "rule_scheduler": { enabled, check_interval_seconds }   // §8
+  "web_gui":        { username, password (Argon2id), tls, allowed_ips }  // §3 / §9.4
+  "pce_cache":      { enabled, db_path, *_retention_days, … }  // §9.6 / PCE_Cache.md
+  "siem":           { … }            // SIEM forwarder (SIEM_Integration.md)
+  "logging":        { json_sink, level }                  // §5 / Troubleshooting.md
+}
+```
+
+### Minimal config — getting started
+
+The smallest file that makes the tool usable is just PCE credentials and one alert recipient. Drop this into `config/config.json` and the tool will fill in every other field with defaults on first launch:
+
+```json
+{
+    "pce_profiles": [
+        {
+            "id": 1,
+            "name": "Production PCE",
+            "url": "https://pce.example.com:8443",
+            "org_id": "1",
+            "key": "api_xxxxxxxxxxxxxx",
+            "secret": "your-api-secret-here",
+            "verify_ssl": true
+        }
+    ],
+    "active_pce_id": 1,
+    "email": { "sender": "monitor@example.com", "recipients": ["soc@example.com"] },
+    "smtp":  { "host": "smtp.example.com", "port": 587, "enable_auth": true, "enable_tls": true }
+}
+```
+
+After first start, the file will be auto-augmented with `web_gui.password` (Argon2id), `web_gui.secret_key`, default TLS settings, etc. See `config/config.json.example` for a fully-populated template.
+
 ### 9.1 Timezone
 
 The timezone setting controls how timestamps are displayed in reports and schedule input fields. Configure it in Web GUI → **Settings → Timezone**, or directly in `config.json`:
@@ -710,39 +795,22 @@ Example `config.json` fragment:
 
 ### 9.6 PCE Cache
 
-The `pce_cache` block controls the local SQLite cache that stores events and traffic flows for fast offline analysis.
+The `pce_cache` block controls the local SQLite cache that stores events and traffic flows for fast offline analysis. Key reference:
 
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `pce_cache.enabled` | bool | `false` | Enable background ingestion from the PCE |
-| `pce_cache.db_path` | string | `data/pce_cache.sqlite` | Path to the SQLite database file (relative to project root or absolute) |
+| `pce_cache.db_path` | string | `data/pce_cache.sqlite` | SQLite database file (relative to project root or absolute) |
 | `pce_cache.events_retention_days` | int | `90` | Keep audit events for this many days |
 | `pce_cache.traffic_raw_retention_days` | int | `7` | Keep raw per-flow records for this many days |
-| `pce_cache.traffic_agg_retention_days` | int | `90` | Keep hourly-aggregated traffic for this many days |
-| `pce_cache.events_poll_interval_seconds` | int | `300` | How often (in seconds) the events poller fetches new events from the PCE |
-| `pce_cache.traffic_poll_interval_seconds` | int | `3600` | How often (in seconds) the traffic poller runs an async query |
+| `pce_cache.traffic_agg_retention_days` | int | `90` | Keep hourly-aggregated traffic |
+| `pce_cache.events_poll_interval_seconds` | int | `300` | Events poller cadence |
+| `pce_cache.traffic_poll_interval_seconds` | int | `3600` | Traffic poller cadence (async query) |
 | `pce_cache.rate_limit_per_minute` | int | `400` | Maximum PCE API calls per minute (max 500) |
 
-**Enabling the cache:**
-
-```json
-{
-    "pce_cache": {
-        "enabled": true,
-        "db_path": "data/pce_cache.sqlite",
-        "events_retention_days": 90,
-        "traffic_raw_retention_days": 7,
-        "traffic_agg_retention_days": 90,
-        "events_poll_interval_seconds": 300,
-        "traffic_poll_interval_seconds": 3600,
-        "rate_limit_per_minute": 400
-    }
-}
-```
+For the full enabling JSON snippet, table reference, disk sizing, monitoring, retention tuning (`cache retention --run`), backfill workflow, and alerts-on-cache mechanics, see **[PCE Cache](PCE_Cache.md)** — that's the canonical document for this subsystem.
 
 > **SIEM dependency:** The SIEM forwarder requires the PCE cache to be enabled. Traffic and event data is ingested into `pce_cache.sqlite` first, then dispatched to SIEM destinations from the `siem_dispatch` table.
-
-> **Disk sizing:** Raw traffic rows are kept for only 7 days by default. For a typical PCE with 200,000 flows/day, expect approximately 1 GB per 7-day window. Aggregated traffic (hourly summaries) uses ~5 % of raw storage.
 
 ### 9.7 Alert Channels Reference
 

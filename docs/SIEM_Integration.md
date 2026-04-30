@@ -12,6 +12,8 @@
 | Architecture | [Architecture.md](./Architecture.md) | [Architecture_zh.md](./Architecture_zh.md) |
 | PCE Cache | [PCE_Cache.md](./PCE_Cache.md) | [PCE_Cache_zh.md](./PCE_Cache_zh.md) |
 | API Cookbook | [API_Cookbook.md](./API_Cookbook.md) | [API_Cookbook_zh.md](./API_Cookbook_zh.md) |
+| Glossary | [Glossary.md](./Glossary.md) | [Glossary_zh.md](./Glossary_zh.md) |
+| Troubleshooting | [Troubleshooting.md](./Troubleshooting.md) | [Troubleshooting_zh.md](./Troubleshooting_zh.md) |
 <!-- END:doc-map -->
 
 ---
@@ -184,8 +186,105 @@ Failed sends are retried with exponential backoff capped at 1 hour:
 | 10 | 3600s (cap) |
 
 
+## CLI Reference
+
+The `illumio-ops siem` subcommand group manages destinations and the dispatch queue. The table below summarises the subcommands shipped in `src/cli/siem.py`; for full option syntax see [User Manual §1.5](./User_Manual.md#illumio-ops-siem-subcommands).
+
+| Command | Purpose |
+|---|---|
+| `illumio-ops siem test <name>` | Send a synthetic `siem.test` event to a configured destination and report latency |
+| `illumio-ops siem status` | Show per-destination pending / sent / failed counts and DLQ depth |
+| `illumio-ops siem dlq --dest <name>` | List dead-letter queue entries for a destination |
+| `illumio-ops siem replay --dest <name>` | Requeue DLQ entries as pending dispatch rows |
+| `illumio-ops siem purge --dest <name>` | Delete DLQ entries older than N days (default 30) |
+
+> Note: there is no `siem flush` subcommand. The dispatcher drains the queue automatically on its `siem.dispatch_tick_seconds` interval (default 5 s).
+
+Examples:
+
+```bash
+illumio-ops siem test splunk-hec
+illumio-ops siem status
+illumio-ops siem dlq --dest splunk-hec --limit 20
+illumio-ops siem replay --dest splunk-hec --limit 500
+illumio-ops siem purge --dest splunk-hec --older-than 7
+```
+
+## Receiver Examples
+
+Sample receiver configurations for the most common SIEM / log platforms. Pair each receiver with a matching destination block in `config/config.json` (see [Destination Config Schema](#destination-config-schema)).
+
+### Splunk HEC
+
+In Splunk Web → Settings → Data inputs → HTTP Event Collector:
+
+1. Create a new token with source type `_json` and index `illumio_ops`.
+2. Note the token; place the URL in the destination's `endpoint` and the token in `hec_token`.
+
+Verify with curl:
+
+```bash
+curl -k -H "Authorization: Splunk <TOKEN>" \
+  https://splunk:8088/services/collector/event \
+  -d '{"event":"test"}'
+```
+
+### Splunk via Syslog (UDP / TCP)
+
+`inputs.conf`:
+
+```conf
+[udp://514]
+sourcetype = cef
+index = illumio_ops
+
+[tcp://1514]
+sourcetype = cef
+index = illumio_ops
+```
+
+### Logstash (JSON line)
+
+```conf
+input {
+  tcp { port => 5044  codec => json_lines }
+}
+filter {
+  if [event_type] {
+    mutate { add_tag => ["illumio_event"] }
+  }
+}
+output {
+  elasticsearch { hosts => ["es:9200"] index => "illumio-ops-%{+YYYY.MM.dd}" }
+}
+```
+
+### rsyslog (CEF over UDP)
+
+`/etc/rsyslog.d/illumio.conf`:
+
+```conf
+$ModLoad imudp
+$UDPServerRun 514
+:msg, contains, "CEF:0|Illumio" /var/log/illumio.log
+& stop
+```
+
+### Filebeat (tail JSON sink file)
+
+```yaml
+filebeat.inputs:
+  - type: log
+    paths: ["/opt/illumio_ops/logs/illumio_ops.json.log"]
+    json.keys_under_root: true
+output.elasticsearch:
+  hosts: ["es:9200"]
+  index: "illumio-ops-%{+yyyy.MM.dd}"
+```
+
 ## See also
 
+- [User Manual §1.5 — `illumio-ops siem` subcommands](./User_Manual.md#illumio-ops-siem-subcommands) — full subcommand syntax and options
 - [User Manual](./User_Manual.md) — Execution modes, alert channels, and advanced deployment
 - [Architecture](./Architecture.md) — System overview, module map, PCE Cache, REST API Cookbook
 - [README](../README.md) — Project entry and Quickstart

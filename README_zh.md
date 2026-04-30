@@ -12,6 +12,8 @@
 | Architecture | [Architecture.md](docs/Architecture.md) | [Architecture_zh.md](docs/Architecture_zh.md) |
 | PCE Cache | [PCE_Cache.md](docs/PCE_Cache.md) | [PCE_Cache_zh.md](docs/PCE_Cache_zh.md) |
 | API Cookbook | [API_Cookbook.md](docs/API_Cookbook.md) | [API_Cookbook_zh.md](docs/API_Cookbook_zh.md) |
+| Glossary | [Glossary.md](docs/Glossary.md) | [Glossary_zh.md](docs/Glossary_zh.md) |
+| Troubleshooting | [Troubleshooting.md](docs/Troubleshooting.md) | [Troubleshooting_zh.md](docs/Troubleshooting_zh.md) |
 <!-- END:doc-map -->
 
 ![Version](https://img.shields.io/badge/Version-v3.20.0--report--intelligence-blue?style=flat-square)
@@ -20,7 +22,23 @@
 
 > **[English](README.md)** | **[繁體中文](README_zh.md)**
 
-針對 **Illumio Core (PCE)** 的進階 **agentless** 監控與自動化工具，透過 REST API 提供即時安全事件偵測、智慧流量分析、含自動化資安發現的進階報表產生、報表排程派送、以及多通道警示。
+針對 **Illumio Core (PCE)** 的進階 **agentless** 監控與自動化工具，僅透過 REST API 與 PCE 互動。
+
+---
+
+## 這個工具解決什麼問題
+
+Illumio PCE 負責 workload 微分段策略運算與流量遙測，但日常維運所需的功能（排程報表、多通道警示、SIEM 轉送、規則排程、多 PCE 切換）並未內建於 Web Console。**illumio-ops** 以 agentless 方式補齊這些缺口。
+
+如果您符合下列任一情境，這個工具大概對您有用：
+
+- 您運維一個或多個 PCE，並希望以 Email 自動派送 **流量 / 稽核 / VEN 狀態 / Policy Usage 排程報表**。
+- 您需要 **持續監控 PCE 稽核事件與流量異常**，並透過 Email、LINE、Webhook（Slack/Teams）發出警示。
+- 您想 **將 PCE 事件 / 流量推送到 SIEM**（Splunk HEC、Splunk syslog、ELK、Sentinel）而不想額外架設 forwarder。
+- 您管理 **多座 PCE**，希望以單一工具切換。
+- 您需要 **安全的規則排程器**，自動啟用 / 停用 PCE 規則並有三層 Draft 保護。
+
+如果只是偶爾透過 PCE Web Console 做手動查詢，您不需要這個工具。
 
 ---
 
@@ -29,136 +47,73 @@
 | 功能 | 說明 |
 |:---|:---|
 | **執行模式** | 背景 daemon (`--monitor`)、互動式 CLI、獨立 Web GUI (`--gui`)，或 **常駐監控 + UI** (`--monitor-gui`) |
-| **企業級安全** | **Web GUI 連線安全**：**登入速率限制**（5/分鐘）、**CSRF synchronizer token**、**IP 白名單**（CIDR / Subnet）。密碼以 Argon2id 雜湊儲存，首次登入強制變更；HTTPS 預設啟用（ECDSA P-256 自簽憑證）。 |
+| **企業級安全** | Argon2id 密碼雜湊 + 首次登入強制變更、HTTPS 預設啟用（ECDSA P-256 自簽憑證）、CSRF synchronizer token、登入速率限制、IP 白名單（CIDR/Subnet） |
 | **安全事件監控** | 透過 anchor-based timestamp 追蹤 PCE audit 事件 — 保證零重複警示 |
 | **高效能流量引擎** | 將規則合併為單一 bulk API query；對大資料集採 O(1) memory streaming |
 | **進階報表引擎** | 15 模組的 Traffic 報表附 **Bulk-Delete** 管理；4 模組 Audit 報表、Policy Usage 報表，以及 VEN Status 庫存報表 — HTML + CSV |
-| **資安發現** | 19 條自動化規則：B 系列（勒索軟體、覆蓋率）+ L 系列（橫向移動、外洩） |
+| **資安發現** | 19 條自動化規則：B 系列（勒索軟體、覆蓋率）+ L 系列（橫向移動、外洩）+ R 系列（Draft Policy 對齊） |
 | **報表排程** | Cron 風格的循環報表（每日/每週/每月）並自動以 Email 派送 |
 | **規則排程器** | 自動啟用/停用 PCE 規則；**三層 Draft 保護**避免誤 provision |
 | **Workload Quarantine** | 以 Quarantine label 隔離受感染 workload；支援 IP/CIDR/subnet 搜尋 |
 | **多通道警示** | Email (SMTP)、LINE Notifications、Webhook 同時派送 |
 | **多語系** | CLI、Web GUI、報表、警示完整支援英文 + 繁體中文 |
 
+> [!WARNING]
+> **SIEM 狀態（Preview）** — 內建 SIEM 轉送器目前處於 **Preview** 階段。既有部署可繼續沿用以維持相容性，但在 runtime pipeline 缺口補齊前，不建議新環境上線。
+
 ---
 
-## SIEM 狀態（Preview）
-
-> [!WARNING]
-> 內建 SIEM 轉送器目前處於 **Preview** 階段。
-> 既有部署可繼續沿用以維持相容性，但在 runtime pipeline 缺口補齊前，不建議新環境上線。
-
 ## 快速開始
-
-### 1. 系統需求
-
-- **Python 3.8+**（已測試至 3.12）
-- **安裝：** `pip install -r requirements.txt` — 鎖定套件涵蓋 Flask + 安全中介層（`flask-wtf`、`flask-limiter`、`flask-talisman`、`flask-login`、`argon2-cffi`、`cryptography`）、報表 + 圖表（`pandas`、`pyyaml`、`openpyxl`、`reportlab`、`matplotlib`、`plotly`、`pygments`）、HTTP 客戶端（`requests`、`orjson`、`cachetools`）、設定驗證（`pydantic`）、排程 + 快取（`APScheduler`、`SQLAlchemy`）、結構化日誌（`loguru`）、CLI UX（`rich`、`questionary`、`click`、`humanize`）、生產級 WSGI server（`cheroot`）。
-- **離線隔離目標：** 使用 `scripts/build_offline_bundle.sh` 產生含所有預建 wheel 的自包含 tarball；完整 bundle 工作流程請見[使用手冊 §1](docs/User_Manual_zh.md)。
-- **PDF 匯出：** `reportlab` 預設包含（純 Python；不需 WeasyPrint / Pango / Cairo / GTK / GDK-PixBuf）。PDF 內容為靜態英文摘要；HTML 與 XLSX 是完整本地化內容的建議格式。
-
-### 2. 安裝與啟動
 
 ```bash
 git clone <repo-url>
 cd illumio-ops
 cp config/config.json.example config/config.json    # 編輯填入 PCE 認證資訊
+pip install -r requirements.txt
 
-# 互動式 CLI：
-python illumio-ops.py
-
-# Web 視覺化介面：
-python illumio-ops.py --gui
-
-# 常駐模式（Daemon + Web GUI）：
+# 最常見：常駐 daemon + Web GUI 於 https://127.0.0.1:5001
 python illumio-ops.py --monitor-gui --interval 5 --port 5001
-
-# 純背景 Daemon：
-python illumio-ops.py --monitor --interval 5
-
-# 新版 subcommand 風格（Phase 1+）：
-python illumio-ops.py monitor -i 5
-python illumio-ops.py status
-python illumio-ops.py version
 ```
 
-### Shell Tab Completion (bash)
+RHEL / Ubuntu / Windows 離線 bundle 安裝、隔離環境部署、systemd / NSSM 服務註冊、相依套件詳情，請見 **[安裝指南](docs/Installation_zh.md)**。
 
-```bash
-# 開發時手動 source
-source scripts/illumio-ops-completion.bash
+所有執行模式（`--gui` / `--monitor` / 互動式 CLI）、完整子命令參考、操作流程說明，請見 **[使用手冊 §1](docs/User_Manual_zh.md)**。
 
-# 全域安裝（RPM 會自動完成）：
-sudo cp scripts/illumio-ops-completion.bash /etc/bash_completion.d/illumio-ops
-```
+### 首次登入
 
-### 3. 首次登入
+預設帳號為 `illumio`。首次啟動時若 `web_gui.password` 為空，系統會自動產生初始密碼並存於 `config.json` 的 `web_gui._initial_password`，首次登入會強制變更。完整流程：**[使用手冊 §3](docs/User_Manual_zh.md#3-web-gui-安全性)**。
 
-**預設帳號：** `illumio`。應用程式首次啟動時，若 `web_gui.password` 為空，會自動產生隨機初始密碼並印到 console / 寫入 log，同時保存於 `config.json` 的 `_initial_password` 欄位。帳號會被標記 `must_change_password=true`，因此首次登入會強制要求變更密碼後才能進入其他功能。
+### Logging
 
-1. 從 console 輸出（或 `config/config.json` → `web_gui._initial_password`）取得初始密碼。
-2. 登入後系統會自動導向 **Settings → Web GUI Security** 設定新密碼。
-3. 設定 **IP 白名單** 限制信任網段存取。
-
-> [!WARNING]
-> 若忘記密碼，請刪除 `config/config.json` 中 `web_gui.password` 與（若存在）`web_gui._initial_password`。下次啟動時會重新產生初始密碼並重新觸發強制變更流程。
-
-### 4. 安全機制
-
-| 功能 | 細節 |
-|:---|:---|
-| **Web GUI 密碼** | 以 Argon2id 雜湊（`$argon2id$…`）儲存於 `config.json` 的 `web_gui.password`。若管理員手動填入明文，下次載入會自動雜湊。首次部署需使用自動產生的初始密碼。 |
-| **HTTPS 預設啟用** | `web_gui.tls.enabled=true`；若未提供憑證會產生 ECDSA P-256 自簽憑證（僅支援 TLS 1.2+ ciphers）。 |
-| **速率限制** | 每 IP 每 60 秒最多 5 次登入嘗試；超量回 HTTP 429 |
-| **CSRF 保護** | Synchronizer token 模式，透過 `<meta>` tag 注入（避免 XSS-readable cookie） |
-| **安全標頭** | flask-talisman：CSP（每請求 nonce）、`X-Frame-Options: DENY`、`X-Content-Type-Options: nosniff`、`Referrer-Policy: strict-origin-when-cross-origin`、TLS 啟用時自動加上 HSTS |
-| **IP 白名單** | 支援單一 IP、CIDR 範圍、subnet mask |
-| **SMTP 認證** | 設定 `ILLUMIO_SMTP_PASSWORD` 環境變數，避免將密碼寫入 config |
-
-### 5. Logging (loguru)
-
-日誌寫入 `logs/illumio_ops.log`，10 MB 自動 rotate、保留最近 10 個檔案。
-
-**SIEM / JSON sink** — 在 `config/config.json` 加入下列設定即可啟用結構化 JSON log：
-```json
-{
-  "logging": {
-    "json_sink": true,
-    "level": "INFO"
-  }
-}
-```
-此功能會將每行 JSON 物件寫入 `logs/illumio_ops.json.log`，可被 Splunk、Elasticsearch、Datadog 等工具直接消費。
+純文字 log 寫入 `logs/illumio_ops.log`（10 MB × 10 檔案輪替）。SIEM 用結構化 log 可在 `config.json` 加上 `logging.json_sink: true` 以額外輸出 `logs/illumio_ops.json.log`。Log 診斷見 **[疑難排解 §7](docs/Troubleshooting_zh.md)**。
 
 ---
 
-## 報表引擎
+## 文件 — 依角色
 
-報表可從 Web GUI、CLI 選單，或自動依排程產生。
+**首次安裝部署**
+- [安裝指南](docs/Installation_zh.md) — RHEL/Ubuntu/Windows 安裝、離線 bundle、systemd/NSSM
+- [使用手冊 §1](docs/User_Manual_zh.md) — 執行模式、CLI 子命令
 
-### Traffic Report — 15 個分析模組
+**日常運維**
+- [使用手冊](docs/User_Manual_zh.md) — 警示、隔離、多 PCE、設定參考
+- [報表模組](docs/Report_Modules_zh.md) — 各報表章節含義
+- [疑難排解](docs/Troubleshooting_zh.md) — 常見錯誤與解法
 
-| 模組 | 說明 |
-|:---|:---|
-| Executive Summary | KPI 卡片：總流量、覆蓋率 %、top 安全發現 |
-| 1 · Traffic Overview | 總流量、policy decision 分佈、top ports |
-| 2 · Policy Decisions | 每個 decision 的 inbound/outbound 分流 + 各 port 覆蓋率 % |
-| 3 · Uncovered Flows | 沒有 allow rule 的流量；port 缺口排名；未覆蓋服務 |
-| 4 · Ransomware Exposure | **調查標的**（允許流量於 critical/high-risk ports） |
-| ... | 完整清單請見 [使用手冊](docs/User_Manual_zh.md) |
+**安全分析**
+- [安全規則參考](docs/Security_Rules_Reference_zh.md) — B/L/R 規則目錄、嚴重性模型
+- [報表模組](docs/Report_Modules_zh.md) — 模組層級資安發現
 
----
+**整合**
+- [SIEM 整合](docs/SIEM_Integration_zh.md) — CEF/JSON/HEC 格式、接收端範例
+- [API Cookbook](docs/API_Cookbook_zh.md) — PCE REST API 模式；本工具的 HTTP API
 
-## 文件
+**儲存 / 進階**
+- [PCE 快取](docs/PCE_Cache_zh.md) — 本機 SQLite 快取；backfill；retention
 
-- [安裝指南](docs/Installation_zh.md) ([English](docs/Installation.md)) — RHEL/Ubuntu/Windows/開發環境安裝、離線 bundle 建置/安裝/升級/移除、systemd
-- [使用手冊](docs/User_Manual_zh.md) ([English](docs/User_Manual.md)) — CLI 子命令、GUI 導覽、daemon 模式、警示、隔離、多 PCE、設定、疑難排解
-- [報表模組](docs/Report_Modules_zh.md) ([English](docs/Report_Modules.md)) — 全部 22+ 分析模組（mod01-mod15、R3 智慧分析、Policy Usage）、輸出格式、排程、draft_pd 行為
-- [安全規則參考](docs/Security_Rules_Reference_zh.md) ([English](docs/Security_Rules_Reference.md)) — B 系列、L 系列、R 系列規則目錄；嚴重性模型；compute_draft 自動啟用
-- [SIEM 整合](docs/SIEM_Integration_zh.md) ([English](docs/SIEM_Integration.md)) — CEF/JSON 格式、UDP/TCP/TLS/HEC 傳輸、forwarder 設定、欄位對應
-- [架構文件](docs/Architecture_zh.md) ([English](docs/Architecture.md)) — Illumio 平台背景；系統概觀；模組地圖；資料流
-- [PCE 快取](docs/PCE_Cache_zh.md) ([English](docs/PCE_Cache.md)) — SQLite WAL 快取層；更新策略；操作員命令
-- [API Cookbook](docs/API_Cookbook_zh.md) ([English](docs/API_Cookbook.md)) — PCE REST API 整合模式；認證/分頁/非同步任務；常用端點
+**背景知識**
+- [架構文件](docs/Architecture_zh.md) — Illumio 平台入門 + 本工具內部結構
+- [詞彙表](docs/Glossary_zh.md) — Illumio 與工具特有術語
 
 ---
 
@@ -177,6 +132,8 @@ illumio-ops/
 │   ├── i18n.py                 # i18n 引擎（EN/ZH_TW，~1400+ string keys）
 │   ├── events/                 # 事件 pipeline（catalog、normalize、dedup、throttle）
 │   ├── report/                 # 報表引擎（15 個 traffic 模組 + audit + policy usage）
+│   ├── pce_cache/              # SQLite WAL 快取 + ingestor
+│   ├── siem/                   # SIEM forwarder（CEF/JSON/Syslog、UDP/TCP/TLS/HEC）
 │   └── alerts/                 # 警示 plugin（mail、LINE、webhook）
 ├── config/                     # config.json、report_config.yaml
 ├── docs/                       # EN + ZH_TW 文件

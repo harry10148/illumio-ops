@@ -12,9 +12,25 @@
 | Architecture | [Architecture.md](./Architecture.md) | [Architecture_zh.md](./Architecture_zh.md) |
 | PCE Cache | [PCE_Cache.md](./PCE_Cache.md) | [PCE_Cache_zh.md](./PCE_Cache_zh.md) |
 | API Cookbook | [API_Cookbook.md](./API_Cookbook.md) | [API_Cookbook_zh.md](./API_Cookbook_zh.md) |
+| Glossary | [Glossary.md](./Glossary.md) | [Glossary_zh.md](./Glossary_zh.md) |
+| Troubleshooting | [Troubleshooting.md](./Troubleshooting.md) | [Troubleshooting_zh.md](./Troubleshooting_zh.md) |
 <!-- END:doc-map -->
 
 > **[English](Architecture.md)** | **[繁體中文](Architecture_zh.md)**
+
+---
+
+## Reading guide
+
+This document is long. Pick a path based on your role:
+
+| You are… | Read this |
+|---|---|
+| **New to Illumio** — want to understand workloads, labels, policy, enforcement | [Background](#background--illumio-platform) (5 short subsections), then the [Glossary](Glossary.md). Skip the rest. |
+| **Operator / SRE** — want a mental model of how this tool moves data | [§1 System Architecture Overview](#1-system-architecture-overview) (Mermaid diagram + 5-box conceptual flow), [§4 Data Flow Diagram](#4-data-flow-diagram). |
+| **Maintainer / contributor** — about to change code | [§2 Directory Structure](#2-directory-structure), [§3 Module Deep Dive](#3-module-deep-dive), [§6 How to Modify This Project](#6-how-to-modify-this-project). |
+
+For step-by-step tasks like installing, running reports, or configuring SIEM, this is the wrong document — see the role-based map in [README §Documentation](../README.md#documentation--by-role).
 
 ---
 
@@ -89,6 +105,26 @@ Selective mode lets administrators enforce specific network segments while merel
 ---
 
 ## 1. System Architecture Overview
+
+### 1.0 The 30-second mental model
+
+Before diving into the full diagram, here is the conceptual flow in five boxes:
+
+```text
+   ┌──────────────┐      ┌──────────────┐      ┌─────────────────────────────┐
+   │  Illumio PCE │ ───► │  PCE Cache   │ ───► │  Consumers                  │
+   │  (REST API)  │ poll │  (SQLite WAL)│ read │  • Reports (HTML/CSV)       │
+   └──────────────┘      └──────────────┘      │  • Alerts (Email/LINE/Webhook)│
+                                ▲              │  • SIEM (CEF/JSON/HEC)      │
+                                │              │  • Web GUI (live dashboard) │
+                                │              └─────────────────────────────┘
+                          ingestors run on a
+                          scheduler (APScheduler)
+```
+
+The cache decouples PCE polling from report / alert / SIEM consumers. If the cache is disabled (`pce_cache.enabled=false`), reports fall back to live API queries; alerts and SIEM still run from the cache when enabled.
+
+The Mermaid diagram below shows the same flow with all real components.
 
 ```mermaid
 graph TB
@@ -378,21 +414,17 @@ The analyzer supports flexible filter conditions for traffic rules:
 
 ### 3.3 `reporter.py` — Alert Dispatcher
 
-**Responsibility**: Format and send alerts through configured channels.
+**Responsibility**: Format and route alerts through configured channels.
 
-**Alert Categories**: `health_alerts`, `event_alerts`, `traffic_alerts`, `metric_alerts`
+Internal dispatch entry points:
 
-**Output Formats**:
-- **Email**: Rich HTML tables with color-coded severity badges, embedded flow snapshots, and auto-scaled bandwidth units. Event alerts include username and IP for login failure notifications.
-- **LINE**: Plain text summary (LINE API character limits)
-- **Webhook**: Raw JSON payload (full structured data for SOAR ingestion)
-
-**Report Email Methods**:
 | Method | Purpose |
 |:---|:---|
-| `send_alerts()` | Route alerts to configured channels |
-| `send_report_email()` | Send on-demand report with single attachment |
-| `send_scheduled_report_email()` | Send scheduled report with multiple attachments and custom recipients |
+| `send_alerts()` | Route the four alert categories (`health_alerts`, `event_alerts`, `traffic_alerts`, `metric_alerts`) to active channels |
+| `send_report_email()` | Send an on-demand report with a single attachment |
+| `send_scheduled_report_email()` | Send a scheduled report with multiple attachments and per-schedule recipients |
+
+For channel-specific configuration (Email/LINE/Webhook activation, payload schema, SMTP env-var override), see [User Manual §4 Alert Channels](User_Manual.md#4-alert-channels) — this section only covers internals.
 
 ### 3.4 `config.py` — Configuration Manager
 
@@ -410,13 +442,19 @@ The analyzer supports flexible filter conditions for traffic rules:
 
 **Architecture**: Flask backend exposing ~40 JSON API endpoints, consumed by a Vanilla JS frontend (`templates/index.html`).
 
-- **Security Middleware**: Mandates login authentication for all routes and enforces IP Allowlisting (CIDR support) via `@app.before_request`. Unauthorized requests are blocked with 401/403 status.
-- **Password storage**: web GUI password is **Argon2id-hashed** (`$argon2id$…`) in `config.json` `web_gui.password`. On first startup with an empty `web_gui.password`, the loader generates a random initial password (URL-safe, 12 bytes) into `web_gui._initial_password` and sets `must_change_password=true`; the GUI then enforces a force-change flow (HTTP 423 on all other endpoints) until the user picks a new password.
-- **Login Rate Limiting**: In-memory per-IP tracker with thread-safe locking. 5 attempts per 60-second window; returns HTTP 429 on excess.
-- **CSRF Protection**: Uses the **Synchronizer Token Pattern**: token is stored in Flask session and injected into `index.html` via a `<meta name="csrf-token">` tag. JavaScript reads the token from the meta tag (not from a cookie). The CSRF cookie has been removed.
-- **Session Security**: Cryptographically signed session cookies. The `session_secret` is automatically generated on first run.
-- **SMTP Password**: Can be provided via `ILLUMIO_SMTP_PASSWORD` environment variable, which takes precedence over the config file value.
-- **Threading Model (--monitor-gui)**: The daemon loop runs in a dedicated `threading.Thread` while the Flask app occupies the main thread to handle signals and web requests correctly.
+For end-user-visible auth behaviour (initial password generation, force-change flow, configurable settings, rate limit / CSRF / TLS / IP allowlisting / security headers), see [User Manual §3 Web GUI Security](User_Manual.md#3-web-gui-security) — that's the canonical description. This section only covers internals.
+
+Implementation map:
+
+| Concern | Where |
+|---|---|
+| Login rate limiting | `flask-limiter` `@limiter.limit("5 per minute")` on `/api/login` |
+| CSRF | `flask-wtf` CSRFProtect; token in Flask session, exposed via `<meta name="csrf-token">` |
+| Session | `flask-login` strong mode; signed cookies; `session_secret` auto-generated by `_ensure_web_gui_secret()` |
+| Force-change gate | `@app.before_request` returns HTTP 423 when `must_change_password=true` (see `src/gui/__init__.py:714`) |
+| Security headers | `flask-talisman` initialised in `gui.py` `_init_security_middleware()` with per-request CSP nonce |
+| TLS termination | `cheroot` HTTPS server; cert generated by `src/web_gui/tls.py` if not provided |
+| Threading (`--monitor-gui`) | Daemon loop in dedicated `threading.Thread`; Flask on main thread for signal handling |
 
 **Key Endpoints**:
 
