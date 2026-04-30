@@ -114,11 +114,37 @@ def cache_status():
 
 
 @cache_group.command("retention")
-def cache_retention():
-    """Show configured cache retention policy."""
+@click.option("--run", "do_run", is_flag=True, default=False, help="Execute retention purge now.")
+def cache_retention(do_run: bool):
+    """Show configured cache retention policy, or run it immediately with --run."""
     cfg = _get_cache_config()
     table = Table("Setting", "Days")
     table.add_row("events_retention_days", str(cfg.get("events_retention_days", 90)))
     table.add_row("traffic_raw_retention_days", str(cfg.get("traffic_raw_retention_days", 7)))
     table.add_row("traffic_agg_retention_days", str(cfg.get("traffic_agg_retention_days", 365)))
     console.print(table)
+
+    if not do_run:
+        return
+
+    import sys
+    sf = _get_db_session_factory()
+    if sf is None:
+        console.print("[red]Cannot connect to cache database. Is pce_cache.db_path configured?[/red]")
+        sys.exit(1)
+    try:
+        from src.pce_cache.retention import RetentionWorker
+        worker = RetentionWorker(sf)
+        result = worker.run_once(
+            events_days=int(cfg.get("events_retention_days", 90)),
+            traffic_raw_days=int(cfg.get("traffic_raw_retention_days", 7)),
+            traffic_agg_days=int(cfg.get("traffic_agg_retention_days", 365)),
+        )
+        result_table = Table("Table", "Rows deleted")
+        for key, count in result.items():
+            result_table.add_row(key, str(count))
+        console.print(result_table)
+        console.print("[green]Retention purge complete.[/green]")
+    except Exception as exc:
+        console.print(f"[red]Retention failed: {exc}[/red]")
+        sys.exit(1)
