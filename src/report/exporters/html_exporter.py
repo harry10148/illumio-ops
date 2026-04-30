@@ -24,7 +24,7 @@ from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from src.humanize_ext import human_number
 from src.report.section_guidance import get_guidance, visible_in
-from src.i18n import t
+from src.i18n import t, get_language
 
 _CSS = build_css('traffic')
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -139,8 +139,9 @@ def _format_evidence(evidence: dict) -> str:
         return ''
     import ast
     pills = []
+    _sl = get_language()
     for k, v in evidence.items():
-        label = k.replace('_', ' ').title()
+        label = STRINGS.get(f"rpt_col_{k}", {}).get(_sl) or k.replace('_', ' ').title()
         v_str = str(v)
         # Try to parse Python-literal dicts/lists for nicer display
         try:
@@ -391,7 +392,7 @@ class HtmlExporter:
         _raw_kpis = mod12.get('kpis', [])
         if isinstance(_raw_kpis, dict):
             # New-style: dict of kpi_name -> numeric value (from _security_risk_kpis)
-            _kpi_items = [{"label": k.replace("_", " ").title(), "value": v}
+            _kpi_items = [{"label": t(f"mod12_kpi_{k}", default=k.replace("_", " ").title()), "value": v}
                           for k, v in _raw_kpis.items() if not isinstance(v, dict)]
         else:
             _kpi_items = list(_raw_kpis)
@@ -780,9 +781,9 @@ class HtmlExporter:
             out += self._three_col_tables(
                 f'<h4>{_s("rpt_tr_top_app_flows")}</h4>',
                 _df_to_html(dm.get('top_app_flows'), lang=_lang),
-                f'<h4>Top Inbound Ports ({status})</h4>',
+                f'<h4>{_s("rpt_mod02_top_inbound_ports")} ({status})</h4>',
                 _df_to_html(dm.get('top_inbound_ports'), lang=_lang),
-                f'<h4>Top Outbound Ports ({status})</h4>',
+                f'<h4>{_s("rpt_mod02_top_outbound_ports")} ({status})</h4>',
                 _df_to_html(dm.get('top_outbound_ports'), lang=_lang),
             )
         return out
@@ -1112,7 +1113,7 @@ class HtmlExporter:
             for mode, count in sorted(enforcement_dist.items(), key=lambda x: {'full': 0, 'selective': 1, 'visibility_only': 2}.get(x[0], 9)):
                 pct = round(count / max(total_wl, 1) * 100, 1)
                 color = mode_colors.get(mode, '#6B7280')
-                label = mode.replace('_', ' ').title()
+                label = STRINGS.get(f"rpt_enforce_mode_{mode}", {}).get(self._lang) or mode.replace('_', ' ').title()
                 bars.append(
                     f'<div style="width:{pct}%;background:{color};min-width:40px" title="{label}: {count}">{count}</div>'
                 )
@@ -1127,7 +1128,7 @@ class HtmlExporter:
                 + ''.join(
                     f'<span><span style="display:inline-block;width:12px;height:12px;border-radius:2px;'
                     f'background:{mode_colors.get(md, "#6B7280")};margin-right:4px"></span>'
-                    f'{md.replace("_", " ").title()}: {ct}</span>'
+                    f'{STRINGS.get(f"rpt_enforce_mode_{md}", {{}}).get(self._lang) or md.replace("_", " ").title()}: {ct}</span>'
                     for md, ct in sorted(enforcement_dist.items(), key=lambda x: {'full': 0, 'selective': 1, 'visibility_only': 2}.get(x[0], 9))
                 )
                 + '</div>'
@@ -1267,13 +1268,13 @@ class HtmlExporter:
             html += f'<h4>{_s("rpt_tr_top_risk_sources")}</h4>' + _df_to_html(source_risk, lang=_lang)
         bridge_nodes = m.get('bridge_nodes')
         if bridge_nodes is not None and not bridge_nodes.empty:
-            html += '<h4>Bridge Nodes (Articulation)</h4>' + _df_to_html(bridge_nodes, lang=_lang)
+            html += f'<h4>{_s("rpt_mod15_bridge_nodes")}</h4>' + _df_to_html(bridge_nodes, lang=_lang)
         reachable_nodes = m.get('top_reachable_nodes')
         if reachable_nodes is not None and not reachable_nodes.empty:
-            html += '<h4>Top Reachable Nodes</h4>' + _df_to_html(reachable_nodes, lang=_lang)
+            html += f'<h4>{_s("rpt_mod15_top_reachable")}</h4>' + _df_to_html(reachable_nodes, lang=_lang)
         attack_paths = m.get('attack_paths')
         if attack_paths is not None and not attack_paths.empty:
-            html += '<h4>Attack Paths (Depth-Bounded)</h4>' + _df_to_html(attack_paths, lang=_lang)
+            html += f'<h4>{_s("rpt_mod15_attack_paths")}</h4>' + _df_to_html(attack_paths, lang=_lang)
         app_chains = m.get('app_chains')
         if app_chains is not None and not app_chains.empty:
             html += f'<h4>{_s("rpt_tr_app_chains")}</h4>' + _df_to_html(app_chains, lang=_lang)

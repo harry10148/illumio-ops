@@ -49,8 +49,8 @@ STRINGS: _StringMap = _StringMap({
     "rpt_pill_period": _entry("Period", "期間"),
     "rpt_pill_attention": _entry("Attention", "重點關注"),
     "rpt_pill_lookback": _entry("Lookback", "回看區間"),
-    "rpt_pill_online": _entry("Online", "Online"),
-    "rpt_pill_offline": _entry("Offline", "Offline"),
+    "rpt_pill_online": _entry("Online", "在線"),
+    "rpt_pill_offline": _entry("Offline", "離線"),
     "rpt_pill_lost_24h": _entry("Lost <24h", "失聯 <24h"),
     "rpt_pill_lost_48h": _entry("Lost 24-48h", "失聯 24-48h"),
     "rpt_focus_traffic": _entry("Traffic Analytics", "流量分析"),
@@ -687,6 +687,28 @@ STRINGS: _StringMap = _StringMap({
         "% of remote-access flows (RDP/SSH/VNC) that have a matching allow policy",
         "遠端存取流量（RDP/SSH/VNC）中已有允許 Policy 對應的比率",
     ),
+    # mod02 port-section sub-headings (status shown in parentheses, kept in English as Illumio term)
+    "rpt_mod02_top_inbound_ports": _entry("Top Inbound Ports", "Inbound 熱門 Port"),
+    "rpt_mod02_top_outbound_ports": _entry("Top Outbound Ports", "Outbound 熱門 Port"),
+    # mod15 graph-analysis sub-headings
+    "rpt_mod15_bridge_nodes": _entry("Bridge Nodes (Articulation)", "橋接節點（連結點）"),
+    "rpt_mod15_top_reachable": _entry("Top Reachable Nodes", "可達節點排行"),
+    "rpt_mod15_attack_paths": _entry("Attack Paths (Depth-Bounded)", "攻擊路徑（深度限制）"),
+    # Enforcement mode labels for mod13 distribution bar/legend
+    "rpt_enforce_mode_full": _entry("Full", "Full（完整）"),
+    "rpt_enforce_mode_selective": _entry("Selective", "Selective（選擇性）"),
+    "rpt_enforce_mode_visibility_only": _entry("Visibility Only", "Visibility Only（僅監控）"),
+    "rpt_enforce_mode_idle": _entry("Idle", "Idle（閒置）"),
+    # policy_usage_html_exporter card labels
+    "rpt_pu_enabled": _entry("Enabled", "已啟用"),
+    "rpt_pu_disabled": _entry("Disabled", "已停用"),
+    "rpt_pu_stat_hits": _entry("hits", "命中"),
+    "rpt_pu_stat_unused": _entry("Unused", "未使用"),
+    "rpt_pu_rule_created": _entry("Created:", "建立時間："),
+    "rpt_pu_flow_source": _entry("Source", "來源"),
+    "rpt_pu_flow_dest": _entry("Dest", "目的端"),
+    "rpt_pu_flow_service": _entry("Service", "Service"),
+    "rpt_pu_chart_hit_rate_title": _entry("Rule Hit Rate", "規則命中率"),
 })
 
 for key, pair in {
@@ -875,6 +897,13 @@ for suffix, pair in {
     "dst_role": ("Dst Role", "目的 Role"),
     "src_loc": ("Src Loc", "來源位置"),
     "dst_loc": ("Dst Loc", "目的位置"),
+    # evidence pill label keys (used by _format_evidence in html_exporter.py)
+    "allowed_ratio": ("Allowed Ratio", "Allow 比率"),
+    "blocked_ratio": ("Blocked Ratio", "Blocked 比率"),
+    "blocked_or_pb_flow_count": ("Block/PB Count", "Block/PB 流量數"),
+    "ringfence_ratio": ("Ringfence Ratio", "Ringfence 比率"),
+    "remote_flow_count": ("Remote Flow Count", "遠端 Flow 數"),
+    "remote_allowed_ratio": ("Remote Allowed %", "遠端 Allow 比率"),
     # mod13 Enforcement Readiness display columns
     "app_env": ("App (Env)", "App（環境）"),
     "readiness_score": ("Readiness Score", "就緒度分數"),

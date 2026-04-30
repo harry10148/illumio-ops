@@ -172,21 +172,21 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
     enforcement_dist = _enforcement_mode_distribution(results)
 
     kpis = [
-        {"label": "Total Flows", "value": _fmt(mod01.get("total_flows", 0))},
-        {"label": "Total Connections", "value": _fmt(mod01.get("total_connections", 0))},
-        {"label": "Unique Source IPs", "value": _fmt(mod01.get("unique_src_ips", 0))},
-        {"label": "Unique Dest IPs", "value": _fmt(mod01.get("unique_dst_ips", 0))},
-        {"label": "Enforced Coverage", "value": f"{enforced_cov}%"},
-        {"label": "Staged Coverage", "value": f"{staged_cov}%"},
-        {"label": "True Gap", "value": f"{true_gap}%"},
-        {"label": "Blocked Flows", "value": _fmt(mod01.get("blocked_flows", 0))},
-        {"label": "PB Uncovered Exposure", "value": _fmt(
+        {"label": t("mod12_kpi_total_flows", default="Total Flows"), "value": _fmt(mod01.get("total_flows", 0))},
+        {"label": t("mod12_kpi_total_connections", default="Total Connections"), "value": _fmt(mod01.get("total_connections", 0))},
+        {"label": t("mod12_kpi_unique_src_ips", default="Unique Source IPs"), "value": _fmt(mod01.get("unique_src_ips", 0))},
+        {"label": t("mod12_kpi_unique_dst_ips", default="Unique Dest IPs"), "value": _fmt(mod01.get("unique_dst_ips", 0))},
+        {"label": t("mod12_kpi_enforced_coverage", default="Enforced Coverage"), "value": f"{enforced_cov}%"},
+        {"label": t("mod12_kpi_staged_coverage", default="Staged Coverage"), "value": f"{staged_cov}%"},
+        {"label": t("mod12_kpi_true_gap", default="True Gap"), "value": f"{true_gap}%"},
+        {"label": t("mod12_kpi_blocked_flows", default="Blocked Flows"), "value": _fmt(mod01.get("blocked_flows", 0))},
+        {"label": t("mod12_kpi_pb_uncovered", default="PB Uncovered Exposure"), "value": _fmt(
             mod01.get("potentially_blocked_flows") or
             mod03.get("pb_uncovered_count", mod03.get("n_potentially_blocked", 0))
         )},
-        {"label": "Unmanaged Src %", "value": f"{100 - mod01.get('src_managed_pct', 100):.1f}%"},
-        {"label": "Total Data Volume", "value": f"{mod01.get('total_mb', 0):.1f} MB"},
-        {"label": "Date Range", "value": mod01.get("date_range", "N/A")},
+        {"label": t("mod12_kpi_unmanaged_src_pct", default="Unmanaged Src %"), "value": f"{100 - mod01.get('src_managed_pct', 100):.1f}%"},
+        {"label": t("mod12_kpi_total_data_volume", default="Total Data Volume"), "value": f"{mod01.get('total_mb', 0):.1f} MB"},
+        {"label": t("mod12_kpi_date_range", default="Date Range"), "value": mod01.get("date_range", "N/A")},
     ]
 
     # Add enforcement mode distribution KPIs if available
@@ -194,8 +194,8 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
         for mode in ("full", "selective", "visibility_only", "idle"):
             count = enforcement_dist.get(mode, 0)
             if count > 0:
-                label = mode.replace("_", " ").title()
-                kpis.append({"label": f"Enforcement: {label}", "value": _fmt(count)})
+                mode_label = t(f"mod12_kpi_enforce_mode_{mode}", default=mode.replace("_", " ").title())
+                kpis.append({"label": t("mod12_kpi_enforcement_prefix", default="Enforcement:") + f" {mode_label}", "value": _fmt(count)})
 
     findings_summary: dict[str, int] = {}
     for f in findings:

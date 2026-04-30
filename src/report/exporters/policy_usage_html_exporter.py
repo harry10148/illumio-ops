@@ -30,9 +30,9 @@ def _e(val) -> str:
 def _rule_cards_html(df, mode: str = "hit", lang: str = "en") -> str:
     """Render hit/unused rules as compact card rows instead of a wide flat table."""
     import html as _html
+    _s = lambda k: STRINGS[k].get(lang) or STRINGS[k]["en"]
     if df is None or (hasattr(df, "empty") and df.empty):
-        no_data = STRINGS.get("rpt_no_data", {}).get(lang) or STRINGS.get("rpt_no_data", {}).get("en", "No data")
-        return f'<p class="note">{no_data}</p>'
+        return f'<p class="note">{_s("rpt_no_data")}</p>'
 
     rows_html = []
     for _, row in df.iterrows():
@@ -49,7 +49,7 @@ def _rule_cards_html(df, mode: str = "hit", lang: str = "en") -> str:
 
         type_cls  = "pu-badge-deny" if "deny" in rtype.lower() else "pu-badge-allow"
         en_cls    = "pu-badge-enabled" if str(enabled).lower() in ("true","1","yes") else "pu-badge-disabled"
-        en_label  = "Enabled" if str(enabled).lower() in ("true","1","yes") else "Disabled"
+        en_label  = _s("rpt_pu_enabled") if str(enabled).lower() in ("true","1","yes") else _s("rpt_pu_disabled")
 
         meta_parts = []
         if rule_no: meta_parts.append(f"#{_e(str(rule_no))}")
@@ -62,15 +62,15 @@ def _rule_cards_html(df, mode: str = "hit", lang: str = "en") -> str:
             top_ports = _e(row.get("Top Hit Ports", ""))
             stat_html = (
                 f'<div class="pu-hit-count">{_html.escape(str(hit_count))}</div>'
-                '<div class="pu-stat-label">hits</div>'
+                f'<div class="pu-stat-label">{_s("rpt_pu_stat_hits")}</div>'
                 + (f'<div class="pu-stat-ports">{top_ports}</div>' if top_ports else "")
             )
         else:
             obs_ports = _e(row.get("Observed Hit Ports", ""))
             stat_html = (
-                '<div class="pu-unused-label">Unused</div>'
+                f'<div class="pu-unused-label">{_s("rpt_pu_stat_unused")}</div>'
                 + (f'<div class="pu-stat-ports">{obs_ports}</div>' if obs_ports else "")
-                + (f'<div class="pu-stat-label" style="margin-top:6px">Created: {created}</div>' if created else "")
+                + (f'<div class="pu-stat-label" style="margin-top:6px">{_s("rpt_pu_rule_created")} {created}</div>' if created else "")
             )
 
         rows_html.append(
@@ -85,9 +85,9 @@ def _rule_cards_html(df, mode: str = "hit", lang: str = "en") -> str:
             f'</div></div>'
             # col 2: flow
             f'<div class="pu-col"><div class="pu-flow-block">'
-            f'<div class="pu-flow-row"><span class="pu-flow-label">Source</span><span class="pu-flow-val">{src}</span></div>'
-            f'<div class="pu-flow-row"><span class="pu-flow-label">Dest</span><span class="pu-flow-val">{dst}</span></div>'
-            + (f'<div class="pu-services"><span class="pu-flow-label">Service</span> {services}</div>' if services else "")
+            f'<div class="pu-flow-row"><span class="pu-flow-label">{_s("rpt_pu_flow_source")}</span><span class="pu-flow-val">{src}</span></div>'
+            f'<div class="pu-flow-row"><span class="pu-flow-label">{_s("rpt_pu_flow_dest")}</span><span class="pu-flow-val">{dst}</span></div>'
+            + (f'<div class="pu-services"><span class="pu-flow-label">{_s("rpt_pu_flow_service")}</span> {services}</div>' if services else "")
             + (f'<div class="pu-desc">{desc}</div>' if desc and desc != "No description" else "")
             + '</div></div>'
             # col 3: stats
@@ -412,9 +412,9 @@ class PolicyUsageHtmlExporter:
             try:
                 spec = {
                     "type": "pie",
-                    "title": "Rule Hit Rate",
+                    "title": self._s("rpt_pu_chart_hit_rate_title"),
                     "data": {
-                        "labels": ["Hit Rules", "Unused Rules"],
+                        "labels": [self._s("rpt_pu_nav_hit"), self._s("rpt_pu_nav_unused")],
                         "values": [hit, unused],
                     },
                 }
