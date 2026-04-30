@@ -15,6 +15,8 @@ import threading
 import ssl as _ssl
 import hmac as _hmac
 import urllib.parse
+import uuid as _uuid
+import traceback as _traceback
 from loguru import logger
 import ipaddress
 from contextlib import redirect_stdout
@@ -25,6 +27,7 @@ import struct
 try:
     from flask import Flask, request, jsonify, render_template, send_from_directory, session, redirect
     from werkzeug.utils import secure_filename
+    from werkzeug.exceptions import HTTPException
     HAS_FLASK = True
     FLASK_IMPORT_ERROR = ""
 except ImportError:
@@ -678,9 +681,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
     @app.errorhandler(Exception)
     def handle_unexpected_error(exc):
-        import uuid as _uuid_err
-        import traceback as _traceback
-        req_id = str(_uuid_err.uuid4())[:8]
+        if isinstance(exc, HTTPException):
+            return exc
+        req_id = str(_uuid.uuid4())[:8]
         logger.error(f"[GUI] Unhandled exception req={req_id}: {_traceback.format_exc()}")
         return jsonify({"ok": False, "error": "Internal server error", "request_id": req_id}), 500
 
