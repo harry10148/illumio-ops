@@ -14,6 +14,7 @@ import datetime
 import threading
 import ssl as _ssl
 import hmac as _hmac
+import urllib.parse
 from loguru import logger
 import ipaddress
 from contextlib import redirect_stdout
@@ -119,18 +120,16 @@ def _validate_allowed_ips(values) -> tuple[list, list]:
             invalid.append(item)
     return normalized, invalid
 
-_SECRET_FIELDS = frozenset({
-    "password", "secret", "key", "token",
-    "webhook_url", "line_channel_access_token",
-    "smtp_password",
-})
+_SECRET_PATTERN = re.compile(
+    r'(?:^|_)(?:password|secret|key|token|webhook_url|line_channel_access_token|smtp_password)$'
+)
 
 def _redact_secrets(obj):
     """Recursively redact secret fields for API responses."""
     if isinstance(obj, dict):
         out = {}
         for k, v in obj.items():
-            if any(s in k.lower() for s in _SECRET_FIELDS):
+            if _SECRET_PATTERN.search(k.lower()):
                 out[k] = "*" * min(len(str(v)), 8) if v else ""
                 out[f"{k}__set"] = bool(v)
                 out[f"{k}__length"] = len(str(v)) if v else 0
@@ -1556,7 +1555,6 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     @app.route('/api/settings', methods=['POST'])
     @limiter.limit("30 per hour")
     def api_save_settings():
-        import urllib.parse as _urlparse
         d = request.json
         if 'api' in d:
             api_in = d['api']
@@ -1564,7 +1562,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             # Validate url scheme before accepting it
             if 'url' in api_in:
                 _url_val = str(api_in['url']).strip()
-                _scheme = _urlparse.urlparse(_url_val).scheme.lower()
+                _scheme = urllib.parse.urlparse(_url_val).scheme.lower()
                 if _scheme not in ('http', 'https'):
                     return jsonify({"ok": False, "error": "api.url must use http or https scheme"}), 400
                 if _scheme == 'http':
