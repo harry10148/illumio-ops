@@ -18,7 +18,7 @@
 
 ## 1.1 系統需求
 - **Python 3.8+**（已測試至 3.12）
-- 可透過 HTTPS 連線至 Illumio PCE（預設埠 `8443`）
+- **網路存取：** 可透過 HTTPS 連線至 Illumio PCE（預設埠 `8443`）
 - **安裝：** `pip install -r requirements.txt` — 約 25 個鎖定套件，涵蓋 Flask + 安全中介層（`flask-wtf`、`flask-limiter`、`flask-talisman`、`flask-login`）、報表 + 圖表（`pandas`、`pyyaml`、`openpyxl`、`reportlab`、`matplotlib`、`plotly`、`pygments`）、HTTP 客戶端（`requests`、`orjson`、`cachetools`）、設定驗證（`pydantic`）、排程 + 快取（`APScheduler`、`SQLAlchemy`）、結構化日誌（`loguru`）、CLI UX（`rich`、`questionary`、`click`、`humanize`）。
 - **離線隔離目標：** 使用 `scripts/build_offline_bundle.sh` 產生含所有預建 wheel 的自包含 tarball；完整 bundle 工作流程請見 [§1.2](#12-安裝)。
 - **PDF 匯出：** `reportlab` 預設包含（純 Python；不需 WeasyPrint / Pango / Cairo / GTK / GDK-PixBuf）。PDF 內容為靜態英文摘要；HTML 與 XLSX 是完整本地化內容的建議格式。
@@ -29,11 +29,14 @@
 
 ```bash
 git clone <repo-url>
-cd illumio_ops
+cd illumio-ops
 cp config/config.json.example config/config.json
 
 # 從 AppStream 安裝選用相依套件（無需 EPEL）
 sudo dnf install python3-flask python3-pandas python3-pyyaml
+
+# 安裝其餘 Python 套件（RHEL 8+ 無 PEP 668 限制，可直接 pip install）
+pip install -r requirements.txt
 ```
 
 ### Red Hat / CentOS — 離線 Bundle（air-gapped 安裝）
@@ -49,7 +52,7 @@ sudo dnf install python3-flask python3-pandas python3-pyyaml
 
 ```bash
 git clone <repo-url>
-cd illumio_ops
+cd illumio-ops
 bash scripts/build_offline_bundle.sh
 # Output: dist/illumio_ops-<version>-offline-linux-x86_64.tar.gz
 ```
@@ -98,7 +101,7 @@ sudo systemctl start illumio-ops
 sudo systemctl status illumio-ops
 
 # 5. Verify the new version
-/opt/illumio_ops/python/bin/python3 /opt/illumio_ops/illumio_ops.py --version
+/opt/illumio_ops/python/bin/python3 /opt/illumio_ops/illumio-ops.py --version
 ```
 
 > **若 `report_config.yaml` 已自訂：** 升級時會以 bundle 內附版本覆寫（可能新增分析參數）。升級前請先備份並在之後重新套用您的修改：
@@ -130,7 +133,7 @@ sudo systemctl status illumio-ops
 
 ```bash
 git clone <repo-url>
-cd illumio_ops
+cd illumio-ops
 bash scripts/build_offline_bundle.sh
 # Output: dist/illumio_ops-<version>-offline-windows-x86_64.zip
 ```
@@ -193,7 +196,7 @@ Get-Service IllumioOps   # should show Running
 sudo apt install python3-venv
 
 git clone <repo-url>
-cd illumio_ops
+cd illumio-ops
 cp config/config.json.example config/config.json
 
 # Create and activate a virtual environment inside the project directory
@@ -210,7 +213,7 @@ pip install -r requirements.txt
 
 ```bash
 git clone <repo-url>
-cd illumio_ops
+cd illumio-ops
 pip install -r requirements.txt
 ```
 

@@ -29,11 +29,14 @@
 
 ```bash
 git clone <repo-url>
-cd illumio_ops
+cd illumio-ops
 cp config/config.json.example config/config.json
 
 # Install optional dependencies from AppStream (no EPEL required)
 sudo dnf install python3-flask python3-pandas python3-pyyaml
+
+# Install remaining Python packages (RHEL 8+ has no PEP 668 restriction — direct pip install is fine)
+pip install -r requirements.txt
 ```
 
 ### Red Hat / CentOS — Offline Bundle (air-gapped install)
@@ -52,7 +55,7 @@ target host.
 
 ```bash
 git clone <repo-url>
-cd illumio_ops
+cd illumio-ops
 bash scripts/build_offline_bundle.sh
 # Output: dist/illumio_ops-<version>-offline-linux-x86_64.tar.gz
 ```
@@ -101,7 +104,7 @@ sudo systemctl start illumio-ops
 sudo systemctl status illumio-ops
 
 # 5. Verify the new version
-/opt/illumio_ops/python/bin/python3 /opt/illumio_ops/illumio_ops.py --version
+/opt/illumio_ops/python/bin/python3 /opt/illumio_ops/illumio-ops.py --version
 ```
 
 > **If `report_config.yaml` was customised:** the upgrade replaces it with the
@@ -135,7 +138,7 @@ and place `nssm.exe` in your system PATH or in the bundle's `deploy\` directory.
 
 ```bash
 git clone <repo-url>
-cd illumio_ops
+cd illumio-ops
 bash scripts/build_offline_bundle.sh
 # Output: dist/illumio_ops-<version>-offline-windows-x86_64.zip
 ```
@@ -198,7 +201,7 @@ Modern Ubuntu (22.04+) and Debian (12+) enforce **PEP 668** — direct `pip inst
 sudo apt install python3-venv
 
 git clone <repo-url>
-cd illumio_ops
+cd illumio-ops
 cp config/config.json.example config/config.json
 
 # Create and activate a virtual environment inside the project directory
@@ -215,7 +218,7 @@ pip install -r requirements.txt
 
 ```bash
 git clone <repo-url>
-cd illumio_ops
+cd illumio-ops
 pip install -r requirements.txt
 ```
 

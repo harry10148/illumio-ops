@@ -26,7 +26,7 @@ stage_app() {
     local dest="$1"
     mkdir -p "$dest/app"
     rsync -a --exclude='__pycache__' --exclude='*.pyc' --exclude='.git' \
-        "$REPO_ROOT/illumio_ops.py" \
+        "$REPO_ROOT/illumio-ops.py" \
         "$REPO_ROOT/src" \
         "$dest/app/"
     # config templates only — NEVER bundle config.json (API credentials) or runtime data
