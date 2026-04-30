@@ -223,15 +223,15 @@ def test_api_security_endpoints(app_persistent):
     res = client.post('/api/security', json={
         "username": "admin2",
         "old_password": "testpass",
-        "new_password": "newpass",
+        "new_password": "newpassword123",
         "allowed_ips": ["10.0.0.0/8", "127.0.0.1", "192.168.1.0/24"]
     }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
     assert res.status_code == 200
     assert res.json['ok'] is True
-    
+
     # Re-login with new password
     client.post('/logout', environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
-    res = client.post('/api/login', json={"username": "admin2", "password": "newpass"}, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    res = client.post('/api/login', json={"username": "admin2", "password": "newpassword123"}, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
     assert res.status_code == 200
     assert res.json['ok'] is True
 

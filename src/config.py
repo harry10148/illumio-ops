@@ -4,24 +4,23 @@ import time
 from loguru import logger
 from src.utils import Colors
 from src.i18n import t, set_language
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 
 _SECRET_FIELD_TOKENS = {"key", "secret", "password", "secret_key", "token"}
 
+_PH = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
+
 
 def hash_password(plain: str) -> str:
-    from argon2 import PasswordHasher
-    ph = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
-    return ph.hash(plain)
+    return _PH.hash(plain)
 
 
 def verify_password(plain: str, stored: str) -> bool:
     if not stored:
         return False
-    from argon2 import PasswordHasher
-    from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
-    ph = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
     try:
-        return ph.verify(stored, plain)
+        return _PH.verify(stored, plain)
     except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
 

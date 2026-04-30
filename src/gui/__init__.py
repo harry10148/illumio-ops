@@ -12,6 +12,7 @@ import io
 import json
 import datetime
 import threading
+import hmac as _hmac
 from loguru import logger
 import ipaddress
 from contextlib import redirect_stdout
@@ -517,7 +518,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
     # ── flask-login setup ──────────────────────────────────────────────────────
     from flask_login import LoginManager, current_user, login_required, login_user, logout_user
-    from src.auth_models import AdminUser, LoginForm
+    from src.auth_models import AdminUser, LoginForm, PasswordChangeForm
 
     login_manager = LoginManager(app)
     login_manager.login_view = "login_page"
@@ -702,10 +703,12 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         saved_username = gui_cfg.get("username", "illumio")
         saved_password = gui_cfg.get("password", "")
 
-        import hmac as _hmac
         if _hmac.compare_digest(username.strip(), saved_username.strip()) and verify_password(password, saved_password):
             session.permanent = True
             login_user(AdminUser(username))
+            if gui_cfg.get("_initial_password"):
+                gui_cfg.pop("_initial_password", None)
+                cm.save()
             return jsonify({"ok": True, "csrf_token": generate_csrf()})
 
         return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
@@ -746,11 +749,20 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             gui_cfg["allowed_ips"] = allowed_ips
             
         if "new_password" in d and d["new_password"]:
+            # Use a placeholder old_password when no password is set yet (initial setup)
+            old_pw_for_form = d.get("old_password") or "placeholder"
+            try:
+                change_form = PasswordChangeForm.model_validate({
+                    "old_password": old_pw_for_form,
+                    "new_password": d["new_password"],
+                    "confirm_password": d.get("confirm_password", d["new_password"]),
+                })
+            except Exception as e:
+                return jsonify({"ok": False, "error": str(e)}), 400
             if gui_cfg.get("password"):
-                old_pass = d.get("old_password", "")
-                if not verify_password(old_pass, gui_cfg.get("password", "")):
+                if not verify_password(d.get("old_password", ""), gui_cfg.get("password", "")):
                     return jsonify({"ok": False, "error": t("gui_err_invalid_old_pass")}), 401
-            gui_cfg["password"] = hash_password(d["new_password"])
+            gui_cfg["password"] = hash_password(change_form.new_password)
             gui_cfg.pop("_initial_password", None)
             gui_cfg.pop("must_change_password", None)
             
