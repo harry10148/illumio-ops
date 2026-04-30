@@ -98,15 +98,13 @@ def cache_status():
         from src.pce_cache.models import PceEvent, PceTrafficFlowRaw, PceTrafficFlowAgg
         table = Table("Source", "Rows", "Last ingested")
         with sf() as s:
-            for model, label in [
-                (PceEvent, "events"),
-                (PceTrafficFlowRaw, "traffic_raw"),
-                (PceTrafficFlowAgg, "traffic_agg"),
+            for model, label, ts_col in [
+                (PceEvent, "events", PceEvent.ingested_at),
+                (PceTrafficFlowRaw, "traffic_raw", PceTrafficFlowRaw.ingested_at),
+                (PceTrafficFlowAgg, "traffic_agg", PceTrafficFlowAgg.bucket_day),
             ]:
                 count = s.execute(select(func.count()).select_from(model)).scalar() or 0
-                last = s.execute(
-                    select(func.max(model.ingested_at))
-                ).scalar()
+                last = s.execute(select(func.max(ts_col))).scalar()
                 table.add_row(label, str(count), str(last or "—"))
         console.print(table)
     except Exception as exc:

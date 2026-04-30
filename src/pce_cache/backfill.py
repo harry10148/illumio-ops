@@ -83,23 +83,20 @@ class BackfillRunner:
         for fl in flows:
             try:
                 with self._sf.begin() as s:
-                    last_detected_raw = fl.get("last_detected", "")
+                    ts_range = fl.get("timestamp_range") or {}
+                    last_detected_raw = fl.get("last_detected") or ts_range.get("last_detected", "")
                     last_detected = _parse_iso(last_detected_raw) if last_detected_raw else now
-                    first_detected_raw = fl.get("first_detected", "")
+                    first_detected_raw = fl.get("first_detected") or ts_range.get("first_detected", "")
                     first_detected = _parse_iso(first_detected_raw) if first_detected_raw else now
-                    # Map PCE API fields to model columns
-                    # API may return nested src/dst with workload hrefs, or flat src_ip/dst_ip
                     src_wl = (fl.get("src") or {}).get("workload") or {}
                     dst_wl = (fl.get("dst") or {}).get("workload") or {}
                     svc = fl.get("service") or {}
-                    src_ip = fl.get("src_ip", "")
-                    dst_ip = fl.get("dst_ip", "")
+                    src_ip = fl.get("src_ip", "") or (fl.get("src") or {}).get("ip", "")
+                    dst_ip = fl.get("dst_ip", "") or (fl.get("dst") or {}).get("ip", "")
                     port = svc.get("port") if svc else fl.get("port", 0)
-                    proto_raw = svc.get("proto") if svc else fl.get("protocol", "tcp")
-                    protocol = _proto_to_str(proto_raw)
-                    # policy_decision maps to action; flow_count maps to flow_count
-                    action = fl.get("action", fl.get("policy_decision", "unknown"))
-                    flow_count = fl.get("flow_count", fl.get("num_connections", 1))
+                    protocol = _proto_to_str(svc.get("proto") if svc else fl.get("protocol", "tcp"))
+                    action = fl.get("action") or fl.get("policy_decision", "unknown")
+                    flow_count = fl.get("flow_count") or fl.get("num_connections", 1)
                     s.add(PceTrafficFlowRaw(
                         flow_hash=_backfill_flow_hash(fl),
                         src_ip=src_ip,
@@ -110,8 +107,8 @@ class BackfillRunner:
                         protocol=protocol,
                         action=action,
                         flow_count=flow_count,
-                        bytes_in=fl.get("bytes_in", 0),
-                        bytes_out=fl.get("bytes_out", 0),
+                        bytes_in=fl.get("bytes_in") or fl.get("dst_bi", 0),
+                        bytes_out=fl.get("bytes_out") or fl.get("dst_bo", 0),
                         first_detected=first_detected,
                         last_detected=last_detected,
                         raw_json=orjson.dumps(fl).decode("utf-8"),
@@ -128,12 +125,14 @@ def _backfill_flow_hash(flow: dict) -> str:
     src_wl = (flow.get("src") or {}).get("workload") or {}
     dst_wl = (flow.get("dst") or {}).get("workload") or {}
     svc = flow.get("service") or {}
+    ts_range = flow.get("timestamp_range") or {}
+    first_detected = flow.get("first_detected") or ts_range.get("first_detected", "")
     key = "|".join([
-        flow.get("src_ip", "") or src_wl.get("href", ""),
-        flow.get("dst_ip", "") or dst_wl.get("href", ""),
+        flow.get("src_ip", "") or (flow.get("src") or {}).get("ip", "") or src_wl.get("href", ""),
+        flow.get("dst_ip", "") or (flow.get("dst") or {}).get("ip", "") or dst_wl.get("href", ""),
         str(svc.get("port", "") or flow.get("port", "")),
         str(svc.get("proto", "") or flow.get("protocol", "")),
-        flow.get("first_detected", ""),
+        first_detected,
     ])
     return hashlib.sha1(key.encode("utf-8")).hexdigest()
 

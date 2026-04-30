@@ -249,8 +249,14 @@ class ApiClient:
         return []
 
     def get_traffic_flows_async(self, max_results=200000, rate_limit: bool = False, since=None, **kwargs):
-        """Async traffic flows pull (stub for Phase 13; Phase 14 will flesh this out)."""
-        return []
+        """Pull traffic flows for cache ingestion via the async query endpoint."""
+        import contextlib, io
+        from datetime import datetime, timezone, timedelta
+        end_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        if since is None:
+            since = (datetime.now(timezone.utc) - timedelta(hours=24)).replace(microsecond=0).isoformat()
+        with contextlib.redirect_stdout(io.StringIO()):
+            return self.fetch_traffic_for_report(start_time_str=since, end_time_str=end_time) or []
 
     # ═══════════════════════════════════════════════════════════════════════
     # LabelResolver delegation wrappers
