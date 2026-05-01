@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/static/css/app.css">
   <link rel="stylesheet" href="/static/pygments.css">
   <script nonce="{{ csp_nonce() }}">window._INIT_TRANSLATIONS = {{ ui_translations_json | safe }};</script>
+  <script src="{{ url_for('static', filename='js/_event_dispatcher.js') }}"></script>
 </head>
 
 <body>
@@ -150,8 +151,8 @@
           <option value="comfortable" data-i18n="gui_comfortable">Comfortable</option>
         </select>
       </div>
-      <button class="btn btn-sm" onclick="mlOpen()" data-i18n="gui_ml_logs_btn" style="padding:3px 10px;">Logs</button>
-      <button class="btn btn-secondary btn-sm" onclick="stopGui()" title="{{ t('gui_stop_web_gui') }}" data-i18n="gui_stop">
+      <button class="btn btn-sm" data-action="mlOpen" data-i18n="gui_ml_logs_btn" style="padding:3px 10px;">Logs</button>
+      <button class="btn btn-secondary btn-sm" data-action="stopGui" title="{{ t('gui_stop_web_gui') }}" data-i18n="gui_stop">
         <svg class="icon" aria-hidden="true" focusable="false">
           <use href="#icon-stop"></use>
         </svg> Stop
@@ -160,42 +161,42 @@
   </div>
 
   <div class="tabs" role="tablist" aria-label="Main sections">
-    <button class="tab active" type="button" role="tab" aria-selected="true" aria-controls="p-dashboard" data-tab="dashboard" onclick="switchTab('dashboard')" data-i18n="gui_tab_dashboard">
+    <button class="tab active" type="button" role="tab" aria-selected="true" aria-controls="p-dashboard" data-tab="dashboard" data-action="switchTab" data-args='["dashboard"]' data-i18n="gui_tab_dashboard">
       <svg class="icon">
         <use href="#icon-activity"></use>
       </svg> Dashboard
     </button>
-    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-traffic-workload" data-tab="traffic-workload" onclick="switchTab('traffic-workload')" data-i18n="gui_tab_traffic_workload">
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-traffic-workload" data-tab="traffic-workload" data-action="switchTab" data-args='["traffic-workload"]' data-i18n="gui_tab_traffic_workload">
       <svg class="icon">
         <use href="#icon-search"></use>
       </svg> Traffic & Workloads
     </button>
-    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-events" data-tab="events" onclick="switchTab('events')">
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-events" data-tab="events" data-action="switchTab" data-args='["events"]'>
       <svg class="icon">
         <use href="#icon-search"></use>
       </svg> <span data-i18n="gui_tab_events">Event Viewer</span>
     </button>
-    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-rules" data-tab="rules" onclick="switchTab('rules')" data-i18n="gui_tab_rules">
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-rules" data-tab="rules" data-action="switchTab" data-args='["rules"]' data-i18n="gui_tab_rules">
       <svg class="icon">
         <use href="#icon-shield"></use>
       </svg> Rules
     </button>
-    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-reports" data-tab="reports" onclick="switchTab('reports')" data-i18n="gui_tab_reports">
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-reports" data-tab="reports" data-action="switchTab" data-args='["reports"]' data-i18n="gui_tab_reports">
       <svg class="icon">
         <use href="#icon-activity"></use>
       </svg> Reports
     </button>
-    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-rule-scheduler" data-tab="rule-scheduler" onclick="switchTab('rule-scheduler')">
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-rule-scheduler" data-tab="rule-scheduler" data-action="switchTab" data-args='["rule-scheduler"]'>
       <svg class="icon">
         <use href="#icon-clock"></use>
       </svg> <span data-i18n="gui_rs_tab">Rule Scheduler</span>
     </button>
     <button class="tab" type="button" role="tab" aria-selected="false"
             aria-controls="p-integrations" data-tab="integrations"
-            onclick="switchTab('integrations')" data-i18n="gui_tab_integrations">
+            data-action="switchTab" data-args='["integrations"]' data-i18n="gui_tab_integrations">
       <svg class="icon"><use href="#icon-settings"></use></svg> Integrations
     </button>
-    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-settings" data-tab="settings" onclick="switchTab('settings')" data-i18n="gui_tab_settings">
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-settings" data-tab="settings" data-action="switchTab" data-args='["settings"]' data-i18n="gui_tab_settings">
       <svg class="icon">
         <use href="#icon-settings"></use>
       </svg> Settings
@@ -253,17 +254,17 @@
 
     <!-- Sub Navigation for Traffic & Quarantine -->
     <div class="sub-nav">
-      <button class="sub-nav-btn active" onclick="switchQTab('traffic')" id="qbtn-traffic">
+      <button class="sub-nav-btn active" data-action="switchQTab" data-args='["traffic"]' id="qbtn-traffic">
         <svg class="icon">
           <use href="#icon-activity"></use>
         </svg> <span data-i18n="gui_traffic_analyzer">Traffic Analyzer</span>
       </button>
-      <button class="sub-nav-btn" onclick="switchQTab('workloads')" id="qbtn-workloads">
+      <button class="sub-nav-btn" data-action="switchQTab" data-args='["workloads"]' id="qbtn-workloads">
         <svg class="icon">
           <use href="#icon-search"></use>
         </svg> <span data-i18n="gui_workload_search">Workload Search</span>
       </button>
-      <button class="sub-nav-btn" onclick="switchQTab('legacy')" id="qbtn-legacy"
+      <button class="sub-nav-btn" data-action="switchQTab" data-args='["legacy"]' id="qbtn-legacy"
         style="margin-left:auto; opacity: 0.7;">
         <span data-i18n="gui_top10_widgets">Rankings</span>
       </button>
@@ -299,19 +300,19 @@
           </div>
 
           <div class="spacer"></div>
-          <button class="btn btn-secondary" onclick="openQtFiltersModal()" style="height: 42px; align-self:flex-end;"
+          <button class="btn btn-secondary" data-action="openQtFiltersModal" style="height: 42px; align-self:flex-end;"
             title="Advanced Filters" data-i18n-title="gui_adv_filters_tooltip">
             <svg class="icon">
               <use href="#icon-settings"></use>
             </svg> <span data-i18n="gui_filter_settings">Filter Settings</span>
           </button>
-          <button class="btn btn-secondary" onclick="openQtGuideModal()" style="height: 42px; align-self:flex-end;"
+          <button class="btn btn-secondary" data-action="openQtGuideModal" style="height: 42px; align-self:flex-end;"
             title="Parameter Guide" data-i18n-title="gui_param_guide">
             <svg class="icon">
               <use href="#icon-help-circle"></use>
             </svg> <span data-i18n="gui_param_guide">Guide</span>
           </button>
-          <button id="btn-run-traffic-query" class="btn btn-primary" onclick="runTrafficAnalyzer()" style="height: 42px; align-self:flex-end;">
+          <button id="btn-run-traffic-query" class="btn btn-primary" data-action="runTrafficAnalyzer" style="height: 42px; align-self:flex-end;">
             <svg class="icon">
               <use href="#icon-search"></use>
             </svg> <span data-i18n="gui_query_flow">Query Flow</span>
@@ -352,9 +353,9 @@
             <option value="50">50</option>
             <option value="100">100</option>
           </select>
-          <button class="btn btn-sm btn-secondary" onclick="qtPrevPage()" data-i18n="gui_prev">Prev</button>
+          <button class="btn btn-sm btn-secondary" data-action="qtPrevPage" data-i18n="gui_prev">Prev</button>
           <span id="qt-page-num" style="font-size:12px; font-weight:bold;">1</span>
-          <button class="btn btn-sm btn-secondary" onclick="qtNextPage()" data-i18n="gui_next">Next</button>
+          <button class="btn btn-sm btn-secondary" data-action="qtNextPage" data-i18n="gui_next">Next</button>
         </div>
       </fieldset>
     </div>
@@ -379,7 +380,7 @@
             <input id="qw-host" name="workload-hostname" autocomplete="workload-hostname" spellcheck="false"
               placeholder="Hostname match" data-i18n-placeholder="gui_ws_hostname_placeholder">
           </div>
-          <button id="btn-run-workload-search" class="btn btn-primary" onclick="runWorkloadSearch()" style="height: 42px; align-self:flex-end;">
+          <button id="btn-run-workload-search" class="btn btn-primary" data-action="runWorkloadSearch" style="height: 42px; align-self:flex-end;">
             <svg class="icon">
               <use href="#icon-search"></use>
             </svg> <span data-i18n="gui_find">Find</span>
@@ -418,9 +419,9 @@
             <option value="50">50</option>
             <option value="100">100</option>
           </select>
-          <button class="btn btn-sm btn-secondary" onclick="qwPrevPage()" data-i18n="gui_prev">Prev</button>
+          <button class="btn btn-sm btn-secondary" data-action="qwPrevPage" data-i18n="gui_prev">Prev</button>
           <span id="qw-page-num" style="font-size:12px; font-weight:bold;">1</span>
-          <button class="btn btn-sm btn-secondary" onclick="qwNextPage()" data-i18n="gui_next">Next</button>
+          <button class="btn btn-sm btn-secondary" data-action="qwNextPage" data-i18n="gui_next">Next</button>
         </div>
       </fieldset>
     </div>
@@ -508,9 +509,9 @@
           <input id="d-global-min" type="number" value="30"
             style="width:100px;background:var(--bg);border:1px solid var(--border);color:var(--fg);padding:8px 12px;border-radius:6px;">
           <span style="flex:1"></span>
-          <button class="btn btn-secondary btn-sm" onclick="openQueryModal()" data-i18n="gui_add_query_widget"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Add
+          <button class="btn btn-secondary btn-sm" data-action="openQueryModal" data-i18n="gui_add_query_widget"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Add
             Query Widget</button>
-          <button class="btn btn-primary btn-sm" onclick="runAllQueries()" data-i18n="gui_run_all_queries"><svg
+          <button class="btn btn-primary btn-sm" data-action="runAllQueries" data-i18n="gui_run_all_queries"><svg
               class="icon">
               <use href="#icon-play"></use>
             </svg> Run All</button>
@@ -530,7 +531,7 @@
     <div style="color:var(--fg); font-size:1rem;">
       <span data-i18n="gui_selected">Selected</span> <span class="sel-count" id="bulk-sel-count">0</span> <span data-i18n="gui_workloads">workloads</span>
     </div>
-    <button class="btn btn-danger" onclick="openQuarantineModal(null, true)" data-i18n="gui_q_apply">
+    <button class="btn btn-danger" data-action="openQuarantineModal" data-args='[null, true]' data-i18n="gui_q_apply">
       <svg class="icon">
         <use href="#icon-alert"></use>
       </svg> Apply Quarantine
@@ -583,10 +584,10 @@
           <label data-i18n="gui_search">Search</label>
           <input id="ev-search" data-i18n-placeholder="gui_ev_search_placeholder" placeholder="event type, actor, target, IP, action..." onkeydown="if(event.key==='Enter') loadEventViewer(true)">
         </div>
-        <button class="btn btn-primary" onclick="loadEventViewer(true)" style="height:42px;" data-i18n="gui_refresh">
+        <button class="btn btn-primary" data-action="loadEventViewer" data-args='[true]' style="height:42px;" data-i18n="gui_refresh">
           <svg class="icon"><use href="#icon-search"></use></svg> Refresh
         </button>
-        <button class="btn btn-secondary" onclick="loadMoreEventViewer()" style="height:42px;display:none;" id="ev-load-more-top" data-i18n="gui_load_more">
+        <button class="btn btn-secondary" data-action="loadMoreEventViewer" style="height:42px;display:none;" id="ev-load-more-top" data-i18n="gui_load_more">
           Load More
         </button>
       </div>
@@ -614,7 +615,7 @@
         </div>
 
         <div style="display:flex;justify-content:flex-end;margin-top:12px;">
-          <button class="btn btn-secondary" onclick="loadMoreEventViewer()" id="ev-load-more-bottom" style="display:none;" data-i18n="gui_load_more">Load More</button>
+          <button class="btn btn-secondary" data-action="loadMoreEventViewer" id="ev-load-more-bottom" style="display:none;" data-i18n="gui_load_more">Load More</button>
         </div>
       </div>
 
@@ -633,8 +634,8 @@
 
   <div class="panel" id="p-rules">
     <div class="rs-tab-bar">
-      <button class="btn btn-primary rs-active" onclick="rulesSubTab('rules')" id="rules-tab-rules" data-i18n="gui_tab_rules">Rules</button>
-      <button class="btn" onclick="rulesSubTab('actions')" id="rules-tab-actions" data-i18n="gui_tab_actions">Actions</button>
+      <button class="btn btn-primary rs-active" data-action="rulesSubTab" data-args='["rules"]' id="rules-tab-rules" data-i18n="gui_tab_rules">Rules</button>
+      <button class="btn" data-action="rulesSubTab" data-args='["actions"]' id="rules-tab-actions" data-i18n="gui_tab_actions">Actions</button>
     </div>
 
     <!-- ?? Rules sub-view ?? -->
@@ -646,14 +647,14 @@
           <input type="text" id="r-search" placeholder="Filter rules..." data-i18n-placeholder="gui_rules_search_placeholder" oninput="filterRules()">
           <span class="counter" id="r-search-count"></span>
         </div>
-        <button class="btn btn-sm" style="margin-left:8px;background:var(--dim);color:#fff" onclick="openModal('m-help')"
+        <button class="btn btn-sm" style="margin-left:8px;background:var(--dim);color:#fff" data-action="openModal" data-args='["m-help"]'
           data-i18n="gui_param_guide"><svg class="icon" aria-hidden="true"><use href="#icon-help-circle"></use></svg> Parameter Guide</button>
         <div class="spacer"></div>
-        <button class="btn btn-warn btn-sm" onclick="openModal('m-event')" data-i18n="gui_add_event"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> + Event</button>
-        <button class="btn btn-warn btn-sm" onclick="openModal('m-system')" data-i18n="gui_add_system_health"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg> + System Health</button>
-        <button class="btn btn-warn btn-sm" onclick="openModal('m-traffic')" data-i18n="gui_add_traffic"><svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg> + Connection Count</button>
-        <button class="btn btn-warn btn-sm" onclick="openModal('m-bw')" data-i18n="gui_add_bw"><svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg> + Bandwidth / Transfer</button>
-        <button class="btn btn-danger btn-sm" onclick="deleteSelected()" data-i18n="gui_delete"><svg class="icon" aria-hidden="true"><use href="#icon-cross"></use></svg> Delete</button>
+        <button class="btn btn-warn btn-sm" data-action="openModal" data-args='["m-event"]' data-i18n="gui_add_event"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> + Event</button>
+        <button class="btn btn-warn btn-sm" data-action="openModal" data-args='["m-system"]' data-i18n="gui_add_system_health"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg> + System Health</button>
+        <button class="btn btn-warn btn-sm" data-action="openModal" data-args='["m-traffic"]' data-i18n="gui_add_traffic"><svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg> + Connection Count</button>
+        <button class="btn btn-warn btn-sm" data-action="openModal" data-args='["m-bw"]' data-i18n="gui_add_bw"><svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg> + Bandwidth / Transfer</button>
+        <button class="btn btn-danger btn-sm" data-action="deleteSelected" data-i18n="gui_delete"><svg class="icon" aria-hidden="true"><use href="#icon-cross"></use></svg> Delete</button>
       </div>
       <table class="rule-table">
         <thead>
@@ -677,7 +678,7 @@
         <div class="action-card">
           <h3 data-i18n="gui_run_once"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg> Run Monitor Once</h3>
           <p data-i18n="gui_run_once_desc">Execute full cycle: Health ??Fetch ??Analyze ??Alert</p><button
-            class="btn btn-primary" onclick="runAction('run')" data-i18n="gui_run_btn">Run</button>
+            class="btn btn-primary" data-action="runAction" data-args='["run"]' data-i18n="gui_run_btn">Run</button>
         </div>
         <div class="action-card">
           <h3 data-i18n="gui_debug_mode"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg> Debug Mode</h3>
@@ -690,20 +691,20 @@
                 <option value="3" data-i18n="gui_pd_all" selected>All</option>
               </select></div>
           </div>
-          <button class="btn btn-primary" onclick="runDebug()" data-i18n="gui_run_debug">Run Debug</button>
+          <button class="btn btn-primary" data-action="runDebug" data-i18n="gui_run_debug">Run Debug</button>
         </div>
         <div class="action-card">
           <h3 data-i18n="gui_test_alert"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Send Test Alert</h3>
           <p data-i18n="gui_test_alert_desc">Verify Email / LINE / Webhook delivery</p>
           <div id="a-test-alert-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 8px;">
-            <button class="btn btn-primary" onclick="runAction('test-alert')" data-i18n="gui_send">Send</button>
+            <button class="btn btn-primary" data-action="runAction" data-args='["test-alert"]' data-i18n="gui_send">Send</button>
           </div>
           <div id="a-test-alert-status" style="color:var(--dim);font-size:0.82rem;line-height:1.6;" data-i18n="gui_loading_alert_status">Loading alert channel status...</div>
         </div>
         <div class="action-card">
           <h3 data-i18n="gui_best_practices"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg> Load Best Practices</h3>
           <p data-i18n="gui_best_practices_desc">Append missing recommended rules by default, or replace all after confirmation</p><button
-            class="btn btn-danger" onclick="confirmBestPractices()" data-i18n="gui_load">Load</button>
+            class="btn btn-danger" data-action="confirmBestPractices" data-i18n="gui_load">Load</button>
         </div>
       </div>
       <h3 style="color:var(--accent2);margin-bottom:8px;" data-i18n="gui_output">Output</h3>
@@ -715,27 +716,27 @@
   <!-- Reports -->
   <div class="panel" id="p-reports">
     <div class="rs-tab-bar">
-      <button class="btn btn-primary rs-active" onclick="reportsSubTab('list')" id="reports-tab-list" data-i18n="gui_tab_reports">Reports</button>
-      <button class="btn" onclick="reportsSubTab('schedules')" id="reports-tab-schedules" data-i18n="gui_tab_report_schedules">Report Schedules</button>
+      <button class="btn btn-primary rs-active" data-action="reportsSubTab" data-args='["list"]' id="reports-tab-list" data-i18n="gui_tab_reports">Reports</button>
+      <button class="btn" data-action="reportsSubTab" data-args='["schedules"]' id="reports-tab-schedules" data-i18n="gui_tab_report_schedules">Report Schedules</button>
     </div>
 
     <!-- ?? Reports list sub-view ?? -->
     <div id="reports-sv-list" class="reports-subview">
       <div class="toolbar" style="gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-danger btn-sm" id="btn-bulk-del-reports" onclick="deleteSelectedReports()" style="display:none;">
+        <button class="btn btn-danger btn-sm" id="btn-bulk-del-reports" data-action="deleteSelectedReports" style="display:none;">
           <svg class="icon"><use href="#icon-cross"></use></svg> <span data-i18n="gui_delete_selected">Delete Selected</span>
         </button>
         <div class="spacer"></div>
-        <button class="btn btn-primary btn-sm" id="btn-gen-report" onclick="openReportGenModal('traffic')">
+        <button class="btn btn-primary btn-sm" id="btn-gen-report" data-action="openReportGenModal" data-args='["traffic"]'>
           <svg class="icon"><use href="#icon-play"></use></svg> <span data-i18n="gui_btn_traffic_report">Traffic Report</span>
         </button>
-        <button class="btn btn-primary btn-sm" id="btn-gen-audit" onclick="openReportGenModal('audit')" style="background:var(--accent2);">
+        <button class="btn btn-primary btn-sm" id="btn-gen-audit" data-action="openReportGenModal" data-args='["audit"]' style="background:var(--accent2);">
           <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_btn_audit_report">Audit Summary</span>
         </button>
-        <button class="btn btn-primary btn-sm" id="btn-gen-ven" onclick="openReportGenModal('ven')" style="background:var(--accent);">
+        <button class="btn btn-primary btn-sm" id="btn-gen-ven" data-action="openReportGenModal" data-args='["ven"]' style="background:var(--accent);">
           <svg class="icon"><use href="#icon-cpu"></use></svg> <span data-i18n="gui_btn_ven_report">VEN Status</span>
         </button>
-        <button class="btn btn-primary btn-sm" id="btn-gen-pu" onclick="openReportGenModal('policy_usage')" style="background:var(--accent2);">
+        <button class="btn btn-primary btn-sm" id="btn-gen-pu" data-action="openReportGenModal" data-args='["policy_usage"]' style="background:var(--accent2);">
           <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_btn_pu_report">Policy Usage</span>
         </button>
       </div>
@@ -761,7 +762,7 @@
     <div id="reports-sv-schedules" class="reports-subview" style="display:none;">
       <div class="toolbar" style="gap:8px;flex-wrap:wrap;margin-bottom:14px;">
         <div class="spacer"></div>
-        <button class="btn btn-primary btn-sm" onclick="openSchedModal()">
+        <button class="btn btn-primary btn-sm" data-action="openSchedModal">
           <svg class="icon"><use href="#icon-plus"></use></svg>
           <span data-i18n="gui_sched_add">+ Add Schedule</span>
         </button>
@@ -952,21 +953,21 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal('m-sched')" data-i18n="gui_gen_cancel">??</button>
-        <button class="btn btn-success" onclick="saveSchedule()"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> <span data-i18n="gui_save">Save</span></button>
+        <button class="btn btn-secondary" data-action="closeModal" data-args='["m-sched"]' data-i18n="gui_gen_cancel">??</button>
+        <button class="btn btn-success" data-action="saveSchedule"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> <span data-i18n="gui_save">Save</span></button>
       </div>
     </div>
   </div>
 
   <div class="panel" id="p-integrations">
     <div class="sub-tab-bar" style="display:flex;gap:8px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:10px;">
-      <button class="btn sub-tab active" onclick="integrationsSwitch('overview')"
+      <button class="btn sub-tab active" data-action="integrationsSwitch" data-args='["overview"]'
               data-i18n="gui_it_overview">Overview</button>
-      <button class="btn sub-tab" onclick="integrationsSwitch('cache')"
+      <button class="btn sub-tab" data-action="integrationsSwitch" data-args='["cache"]'
               data-i18n="gui_it_cache">Cache</button>
-      <button class="btn sub-tab" onclick="integrationsSwitch('siem')"
+      <button class="btn sub-tab" data-action="integrationsSwitch" data-args='["siem"]'
               data-i18n="gui_it_siem">SIEM</button>
-      <button class="btn sub-tab" onclick="integrationsSwitch('dlq')"
+      <button class="btn sub-tab" data-action="integrationsSwitch" data-args='["dlq"]'
               data-i18n="gui_it_dlq">DLQ</button>
     </div>
     <div id="it-pane-overview" class="it-pane"></div>
@@ -985,12 +986,12 @@
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:14px;">
-      <button class="btn btn-primary" onclick="testConn()" data-i18n="gui_test_conn"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg> Test Connection</button>
+      <button class="btn btn-primary" data-action="testConn" data-i18n="gui_test_conn"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg> Test Connection</button>
     </div>
     <div class="log-box" id="s-log" style="height:80px;margin-bottom:14px;font-size:0.85rem;">[Ready]</div>
     <div id="s-form"></div>
     <div style="text-align:right;margin-top:16px;">
-      <button class="btn btn-success" onclick="saveSettings()" data-i18n="gui_save_all"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Save All Settings</button>
+      <button class="btn btn-success" data-action="saveSettings" data-i18n="gui_save_all"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Save All Settings</button>
     </div>
   </div>
 
@@ -1085,9 +1086,9 @@
 
     <!-- Sub-tabs -->
     <div class="rs-tab-bar">
-      <button class="btn btn-primary rs-active" onclick="rsSubTab('browse')" id="rs-tab-browse" data-i18n="gui_rs_browse_add">Browse & Add</button>
-      <button class="btn" onclick="rsSubTab('schedules')" id="rs-tab-schedules" data-i18n="gui_rs_schedules">Schedules</button>
-      <button class="btn" onclick="rsSubTab('logs')" id="rs-tab-logs" data-i18n="gui_rs_logs">Ruleset Logs</button>
+      <button class="btn btn-primary rs-active" data-action="rsSubTab" data-args='["browse"]' id="rs-tab-browse" data-i18n="gui_rs_browse_add">Browse & Add</button>
+      <button class="btn" data-action="rsSubTab" data-args='["schedules"]' id="rs-tab-schedules" data-i18n="gui_rs_schedules">Schedules</button>
+      <button class="btn" data-action="rsSubTab" data-args='["logs"]' id="rs-tab-logs" data-i18n="gui_rs_logs">Ruleset Logs</button>
     </div>
 
     <!-- ?? Browse & Add sub-view ?? -->
@@ -1100,8 +1101,8 @@
           <option value="rule_desc" data-i18n="gui_rs_scope_rule_desc">Ruleset Scope Rule Desc</option>
         </select>
         <input id="rs-search" style="max-width:300px;" placeholder="" data-i18n-placeholder="gui_rs_search_placeholder" onkeydown="if(event.key==='Enter')rsDoSearch()">
-        <button class="btn btn-primary" onclick="rsDoSearch()" data-i18n="gui_rs_search_btn">Search</button>
-        <button class="btn" onclick="rsResetSearch()" data-i18n="gui_rs_refresh_all">Refresh All</button>
+        <button class="btn btn-primary" data-action="rsDoSearch" data-i18n="gui_rs_search_btn">Search</button>
+        <button class="btn" data-action="rsResetSearch" data-i18n="gui_rs_refresh_all">Refresh All</button>
       </div>
       <div style="margin:0 0 12px;font-size:.78rem;color:var(--dim);padding-left:2px;">
         <span class="rs-mark-rs">★</span> = <span data-i18n="gui_rs_legend_rs">RS scheduled</span> &nbsp;
@@ -1168,8 +1169,8 @@
     <!-- ?? Schedules sub-view ?? -->
     <div id="rs-schedules" class="rs-subview" style="display:none;">
       <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
-        <button class="btn btn-primary" onclick="rsLoadSchedules()" data-i18n="gui_rs_refresh_btn">Refresh</button>
-        <button class="btn btn-danger" onclick="rsDeleteSelected()" data-i18n="gui_rs_delete_selected">Delete Selected</button>
+        <button class="btn btn-primary" data-action="rsLoadSchedules" data-i18n="gui_rs_refresh_btn">Refresh</button>
+        <button class="btn btn-danger" data-action="rsDeleteSelected" data-i18n="gui_rs_delete_selected">Delete Selected</button>
       </div>
       <div class="table-container">
         <table class="rule-table">
@@ -1197,15 +1198,15 @@
     <!-- ?? Logs sub-view ?? -->
     <div id="rs-logs" class="rs-subview" style="display:none;">
       <div style="display:flex;gap:8px;margin-bottom:12px;">
-        <button class="btn btn-primary" onclick="rsRunCheck()" data-i18n="gui_rs_run_check">Run Manual Check</button>
-        <button class="btn" onclick="rsLoadLogHistory()" data-i18n="gui_rs_refresh">Refresh</button>
-        <button class="btn" onclick="$('rs-log-output').textContent=''" data-i18n="gui_rs_clear">Clear</button>
+        <button class="btn btn-primary" data-action="rsRunCheck" data-i18n="gui_rs_run_check">Run Manual Check</button>
+        <button class="btn" data-action="rsLoadLogHistory" data-i18n="gui_rs_refresh">Refresh</button>
+        <button class="btn" data-action="rsClearLog" data-i18n="gui_rs_clear">Clear</button>
       </div>
       <div class="log-box" id="rs-log-output" style="min-height:300px;font-family:'Courier New',Consolas,monospace;font-size:.82rem;white-space:pre-wrap;overflow:auto;" data-i18n="gui_rs_log_ready">Ready.</div>
     </div>
 
     <!-- Detail popup (shared, positioned via JS) -->
-    <div id="rs-detail-popup"><span class="popup-close" onclick="rsClosePopup()">&times;</span><div class="popup-title" id="rs-popup-title"></div><div id="rs-popup-body"></div></div>
+    <div id="rs-detail-popup"><span class="popup-close" data-action="rsClosePopup">&times;</span><div class="popup-title" id="rs-popup-title"></div><div id="rs-popup-body"></div></div>
   </div>
 
   <!-- Module Log Viewer Modal -->
@@ -1214,9 +1215,9 @@
       <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">
         <span style="font-weight:600;font-size:1rem;" data-i18n="gui_ml_title">Module Logs</span>
         <select id="ml-module-select" class="form-control" style="width:auto;min-width:150px;" onchange="mlLoadLogs()"></select>
-        <button class="btn btn-sm" onclick="mlLoadLogs()" data-i18n="gui_rs_refresh">Ruleset Refresh</button>
+        <button class="btn btn-sm" data-action="mlLoadLogs" data-i18n="gui_rs_refresh">Ruleset Refresh</button>
         <span style="flex:1"></span>
-        <button class="btn btn-sm" onclick="mlClose()" style="padding:2px 10px;">??/button>
+        <button class="btn btn-sm" data-action="mlClose" style="padding:2px 10px;">??/button>
       </div>
       <div id="ml-log-output" class="log-box" style="flex:1;overflow:auto;padding:14px 16px;font-family:'Courier New',Consolas,monospace;font-size:.8rem;white-space:pre-wrap;min-height:320px;" data-i18n="gui_rs_log_ready">Ready.</div>
     </div>
@@ -1293,8 +1294,8 @@
       </div>
 
       <div class="modal-actions">
-        <button class="btn" onclick="closeModal('m-rs-schedule')" data-i18n="gui_rs_cancel">Cancel</button>
-        <button class="btn btn-success" onclick="rsSaveSchedule()"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> <span data-i18n="gui_rs_save">Save Schedule</span></button>
+        <button class="btn" data-action="closeModal" data-args='["m-rs-schedule"]' data-i18n="gui_rs_cancel">Cancel</button>
+        <button class="btn btn-success" data-action="rsSaveSchedule"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> <span data-i18n="gui_rs_save">Save Schedule</span></button>
       </div>
     </div>
   </div>
@@ -1362,8 +1363,8 @@
               placeholder="e.g. 192.168.0.0/16" data-i18n-placeholder="gui_ph_ex_any_ip"></div>
         </div>
       </fieldset>
-      <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-query')"
-          data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveDashboardQuery()"
+      <div class="modal-actions"><button class="btn btn-secondary" data-action="closeModal" data-args='["m-query"]'
+          data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" data-action="saveDashboardQuery"
           data-i18n="gui_save"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Save</button></div>
     </div>
   </div>
@@ -1437,8 +1438,8 @@
         </div>
       </fieldset>
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal('modal-qt-filters')" data-i18n="gui_cancel">Cancel</button>
-        <button class="btn btn-success" onclick="applyQtFilters()" data-i18n="gui_apply_query">Apply & Query</button>
+        <button class="btn btn-secondary" data-action="closeModal" data-args='["modal-qt-filters"]' data-i18n="gui_cancel">Cancel</button>
+        <button class="btn btn-success" data-action="applyQtFilters" data-i18n="gui_apply_query">Apply & Query</button>
       </div>
     </div>
   </div>
@@ -1479,8 +1480,8 @@
         </select>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal('m-quarantine')" data-i18n="gui_cancel">Cancel</button>
-        <button class="btn btn-danger" id="btn-apply-q" onclick="applyQuarantine()" data-i18n="gui_q_apply">Apply
+        <button class="btn btn-secondary" data-action="closeModal" data-args='["m-quarantine"]' data-i18n="gui_cancel">Cancel</button>
+        <button class="btn btn-danger" id="btn-apply-q" data-action="applyQuarantine" data-i18n="gui_q_apply">Apply
           Quarantine</button>
       </div>
     </div>
@@ -1551,8 +1552,8 @@
           <div style="margin-top:8px;color:var(--dim);font-size:.85rem;line-height:1.65;" data-i18n="gui_ev_threshold_help_body">Immediate means every matching event is eligible to alert. Cumulative means the event must occur N times within the window first. Cooldown pauses repeats after an alert is sent. Throttle adds an extra cap such as 2 alerts per 10 minutes and is usually only needed for noisy rules.</div>
         </details>
       </fieldset>
-      <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-event')"
-          data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveEvent()"
+      <div class="modal-actions"><button class="btn btn-secondary" data-action="closeModal" data-args='["m-event"]'
+          data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" data-action="saveEvent"
           data-i18n="gui_save"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Save</button></div>
     </div>
   </div>
@@ -1585,7 +1586,7 @@
           <div class="form-group"><label data-i18n="gui_ev_throttle">Throttle</label><input id="sys-throttle" data-i18n-placeholder="gui_ev_throttle_placeholder" placeholder="e.g. 2/10m or 5/1h"></div>
         </div>
       </fieldset>
-      <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-system')" data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveSystemRule()" data-i18n="gui_save"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Save</button></div>
+      <div class="modal-actions"><button class="btn btn-secondary" data-action="closeModal" data-args='["m-system"]' data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" data-action="saveSystemRule" data-i18n="gui_save"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Save</button></div>
     </div>
   </div>
 
@@ -1646,8 +1647,8 @@
         </div>
         <div class="form-group"><label data-i18n="gui_ev_throttle">Throttle</label><input id="tr-throttle" data-i18n-placeholder="gui_ev_throttle_placeholder" placeholder="e.g. 2/10m or 5/1h"></div>
       </fieldset>
-      <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-traffic')"
-          data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveTraffic()"
+      <div class="modal-actions"><button class="btn btn-secondary" data-action="closeModal" data-args='["m-traffic"]'
+          data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" data-action="saveTraffic"
           data-i18n="gui_save"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Save</button></div>
     </div>
   </div>
@@ -1712,8 +1713,8 @@
         <div id="bw-val-help" style="color:var(--dim);font-size:.82rem;margin-top:4px;" data-i18n="gui_bw_help_bandwidth">Use Mbps for peak bandwidth threshold.</div>
         <div class="form-group"><label data-i18n="gui_ev_throttle">Throttle</label><input id="bw-throttle" data-i18n-placeholder="gui_ev_throttle_placeholder" placeholder="e.g. 2/10m or 5/1h"></div>
       </fieldset>
-      <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-bw')"
-          data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" onclick="saveBW()"
+      <div class="modal-actions"><button class="btn btn-secondary" data-action="closeModal" data-args='["m-bw"]'
+          data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" data-action="saveBW"
           data-i18n="gui_save"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Save</button></div>
     </div>
   </div>
@@ -1835,8 +1836,8 @@
       </div>
       <p id="m-gen-note" style="display:none;font-size:0.85rem;color:var(--dim);margin-top:8px;" data-i18n="gui_gen_snapshot_note">Gen Snapshot Note</p>
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal('m-gen-report')" data-i18n="gui_gen_cancel">Cancel</button>
-        <button class="btn btn-success" id="m-gen-confirm" onclick="confirmReportGen()">
+        <button class="btn btn-secondary" data-action="closeModal" data-args='["m-gen-report"]' data-i18n="gui_gen_cancel">Cancel</button>
+        <button class="btn btn-success" id="m-gen-confirm" data-action="confirmReportGen">
           <svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg> <span data-i18n="gui_gen_generate">?Ｙ?</span>
         </button>
       </div>
@@ -1874,7 +1875,7 @@
           <li data-i18n="gui_help_pd_all"><strong>Allowed:</strong> Traffic permitted by policy.</li>
         </ul>
       </div>
-      <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal('m-help')"
+      <div class="modal-actions"><button class="btn btn-secondary" data-action="closeModal" data-args='["m-help"]'
           data-i18n="gui_help_close">Close window</button>
       </div>
     </div>
@@ -1912,7 +1913,7 @@
         </ul>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick="closeModal('modal-qt-guide')" data-i18n="gui_cancel">Close</button>
+        <button class="btn btn-secondary" data-action="closeModal" data-args='["modal-qt-guide"]' data-i18n="gui_cancel">Close</button>
       </div>
     </div>
   </div>

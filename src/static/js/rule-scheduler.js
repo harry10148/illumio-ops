@@ -1,11 +1,20 @@
 // ═══ Rule Scheduler ═══
-// Safe escaping for text used inside onclick="...func('ARG')..." attributes.
+// Safe escaping for text used inside HTML attribute values (e.g. data-args).
 // escapeHtml() is wrong here: it converts ' → &#039;, which the HTML parser re-decodes to ' before JS runs, breaking the string.
 const jsStr = s => (s == null ? '' : String(s))
   .replace(/\\/g, '\\\\')    // \ → \\
   .replace(/'/g, "\\'")      // ' → \'
   .replace(/\r?\n|\r/g, ' ') // newlines → space
   .replace(/"/g, '&quot;');  // " → &quot; (keeps HTML attribute valid)
+
+// Build a single-quoted-HTML-attribute-safe data-args value from a JS array.
+// JSON.stringify already escapes inner double-quotes; we then HTML-escape the
+// characters that would break a single-quoted attribute value.
+const rsDataArgs = arr => JSON.stringify(arr)
+  .replace(/&/g, '&amp;')
+  .replace(/'/g, '&#39;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;');
 let rsCurrentPage = 1;
 let rsSearchQuery = '';
 let rsSearchScope = 'rs_name';
@@ -201,8 +210,20 @@ async function rsFetchRulesets() {
       .replace('{page}', data.page)
       .replace('{totalPages}', totalPages)
       .replace('{total}', data.total) + '</span>';
-    if (data.page > 1) pg.innerHTML += '<button class="btn btn-sm" onclick="rsCurrentPage--;rsFetchRulesets()">' + _t('gui_rs_prev') + '</button>';
-    if (data.page < totalPages) pg.innerHTML += '<button class="btn btn-sm" onclick="rsCurrentPage++;rsFetchRulesets()">' + _t('gui_rs_next') + '</button>';
+    if (data.page > 1) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm';
+      btn.textContent = _t('gui_rs_prev');
+      btn.addEventListener('click', () => { rsCurrentPage--; rsFetchRulesets(); });
+      pg.appendChild(btn);
+    }
+    if (data.page < totalPages) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm';
+      btn.textContent = _t('gui_rs_next');
+      btn.addEventListener('click', () => { rsCurrentPage++; rsFetchRulesets(); });
+      pg.appendChild(btn);
+    }
     initTableResizers();
   } catch (e) {
     const msg = e.name === 'AbortError' ? _t('gui_rs_request_timed_out_unreachable') : e.message;
@@ -240,8 +261,13 @@ async function rsViewRuleset(rsId) {
       ? '<span class="rs-badge rs-badge-on">ON</span>'
       : '<span class="rs-badge rs-badge-off">OFF</span>';
     const schRsBadge = rsRow.is_scheduled ? ' &nbsp; <span class="rs-mark-rs" title="' + _t('gui_rs_sch_badge_sched') + '">★ ' + _t('gui_rs_sch_badge_sched') + '</span>' : '';
-    $('rs-detail-meta').innerHTML = 'ID: ' + rsRow.id + ' &nbsp; ' + provBadge + ' &nbsp; ' + statusBadge + schRsBadge +
-      ' &nbsp; <button class="btn btn-sm btn-primary" onclick="rsOpenScheduleModal(\'' + jsStr(rsRow.href) + '\',\'' + jsStr(rsRow.name) + '\',true,\'' + jsStr(rsRow.name) + '\')">' + _t('gui_rs_schedule_rs_btn') + '</button>';
+    const detailMeta = $('rs-detail-meta');
+    detailMeta.innerHTML = 'ID: ' + rsRow.id + ' &nbsp; ' + provBadge + ' &nbsp; ' + statusBadge + schRsBadge + ' &nbsp; ';
+    const schedBtn = document.createElement('button');
+    schedBtn.className = 'btn btn-sm btn-primary';
+    schedBtn.textContent = _t('gui_rs_schedule_rs_btn');
+    schedBtn.addEventListener('click', () => rsOpenScheduleModal(rsRow.href, rsRow.name, true, rsRow.name));
+    detailMeta.appendChild(schedBtn);
 
     const tbody = $('rs-rules-body');
     tbody.innerHTML = '';
@@ -258,21 +284,30 @@ async function rsViewRuleset(rsId) {
       const descLabel = _t('gui_rs_col_desc');
       const noDesc = _t('gui_rs_no_desc');
       const descHtml = r.description
-        ? '<td class="rs-clickable" onclick="rsShowPopup(event,\'' + jsStr(descLabel) + '\',\'' + jsStr(r.description) + '\')">' + rsTruncate(r.description, 30) + '</td>'
+        ? '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([descLabel, r.description]) + '\'>' + rsTruncate(r.description, 30) + '</td>'
         : '<td><span style="color:var(--dim)">' + noDesc + '</span></td>';
 
       const srcLabel = _t('gui_rs_col_source');
       const dstLabel = _t('gui_rs_col_dest');
       const svcLabel = _t('gui_rs_col_service');
-      const srcHtml = '<td class="rs-clickable" onclick="rsShowPopup(event,\'' + jsStr(srcLabel) + '\',\'' + jsStr(r.source) + '\')">' + rsTruncate(r.source, 25) + '</td>';
-      const dstHtml = '<td class="rs-clickable" onclick="rsShowPopup(event,\'' + jsStr(dstLabel) + '\',\'' + jsStr(r.dest) + '\')">' + rsTruncate(r.dest, 25) + '</td>';
-      const svcHtml = '<td class="rs-clickable" onclick="rsShowPopup(event,\'' + jsStr(svcLabel) + '\',\'' + jsStr(r.service) + '\')">' + rsTruncate(r.service, 25) + '</td>';
+      const srcHtml = '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([srcLabel, r.source]) + '\'>' + rsTruncate(r.source, 25) + '</td>';
+      const dstHtml = '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([dstLabel, r.dest]) + '\'>' + rsTruncate(r.dest, 25) + '</td>';
+      const svcHtml = '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([svcLabel, r.service]) + '\'>' + rsTruncate(r.service, 25) + '</td>';
 
       const ruleTypeBadge = r.rule_type === 'override_deny'
         ? '<span class="rs-badge rs-badge-block">' + _t('gui_rs_rule_type_override_deny') + '</span>'
         : r.rule_type === 'deny'
           ? '<span class="rs-badge rs-badge-off">' + _t('gui_rs_rule_type_deny') + '</span>'
           : '<span class="rs-badge rs-badge-on">' + _t('gui_rs_rule_type_allow') + '</span>';
+      const ruleSchedArgs = rsDataArgs([
+        r.href,
+        r.description || (_t('gui_rs_type_rule') + ' ' + r.id),
+        false,
+        rsRow.name,
+        r.source,
+        r.dest,
+        r.service,
+      ]);
       tr.innerHTML =
         '<td>' + schIcon + '</td>' +
         '<td style="color:var(--dim);font-size:.8rem;">' + (r.no || '') + '</td>' +
@@ -281,7 +316,7 @@ async function rsViewRuleset(rsId) {
         '<td>' + st + '</td>' +
         '<td>' + ruleTypeBadge + '</td>' +
         descHtml + srcHtml + dstHtml + svcHtml +
-        '<td><button class="btn btn-sm btn-primary" onclick="rsOpenScheduleModal(\'' + jsStr(r.href) + '\',\'' + jsStr(r.description || (_t('gui_rs_type_rule') + ' ' + r.id)) + '\',false,\'' + jsStr(rsRow.name) + '\',\'' + jsStr(r.source) + '\',\'' + jsStr(r.dest) + '\',\'' + jsStr(r.service) + '\')">' + _t('gui_rs_schedule_btn') + '</button></td>';
+        '<td><button class="btn btn-sm btn-primary" data-action="rsOpenScheduleModal" data-args=\'' + ruleSchedArgs + '\'>' + _t('gui_rs_schedule_btn') + '</button></td>';
       tbody.appendChild(tr);
     });
     initTableResizers();
@@ -301,15 +336,18 @@ function rsTruncate(s, max) {
   return t.length > max ? t.substring(0, max) + '...' : t;
 }
 
-/* ── Detail popup for clickable cells ── */
-function rsShowPopup(event, title, text) {
-  event.stopPropagation();
+/* ── Detail popup for clickable cells ──
+ * Invoked via the global event dispatcher (see _event_dispatcher.js).
+ * `this` is bound to the clicked cell; bubbling is left intact and the
+ * outside-click handler below uses closest('.rs-clickable') to ignore
+ * clicks that originate inside any clickable cell. */
+function rsShowPopup(title, text) {
   const popup = $('rs-detail-popup');
   $('rs-popup-title').textContent = title;
-  $('rs-popup-body').textContent = text.replace(/\\'/g, "'");
+  $('rs-popup-body').textContent = String(text == null ? '' : text).replace(/\\'/g, "'");
   popup.style.display = 'block';
-  // Position near click
-  const rect = event.target.getBoundingClientRect();
+  // Position near the cell that was clicked
+  const rect = (this && this.getBoundingClientRect) ? this.getBoundingClientRect() : { right: 0, left: 0, top: 0 };
   let left = rect.right + 8;
   let top = rect.top;
   if (left + 420 > window.innerWidth) left = rect.left - 430;
@@ -323,10 +361,12 @@ function rsClosePopup() {
   $('rs-detail-popup').style.display = 'none';
 }
 
-// Close popup on outside click
+// Close popup on outside click. Use closest() so clicks on elements nested
+// inside an .rs-clickable cell (e.g. the inner <span> from rsTruncate) are
+// treated as clicks on the cell and don't dismiss the popup.
 document.addEventListener('click', function(e) {
   const popup = $('rs-detail-popup');
-  if (popup && popup.style.display === 'block' && !popup.contains(e.target) && !e.target.classList.contains('rs-clickable')) {
+  if (popup && popup.style.display === 'block' && !popup.contains(e.target) && !e.target.closest('.rs-clickable')) {
     popup.style.display = 'none';
   }
 });
@@ -468,15 +508,15 @@ async function rsLoadSchedules() {
         '<td><input type="checkbox" class="rs-sch-cb" value="' + escapeHtml(s.href) + '"></td>' +
         '<td>' + typeStr + '</td>' +
         '<td>' + liveBadge + '</td>' +
-        '<td class="rs-clickable" onclick="rsShowPopup(event,\'' + jsStr(_t('gui_rs_col_name')) + '\',\'' + jsStr(rsName) + '\')">' + rsTruncate(s.detail_rs, 20) + '</td>' +
-        '<td class="rs-clickable" onclick="rsShowPopup(event,\'' + jsStr(descLabel) + '\',\'' + jsStr(descText) + '\')">' + rsTruncate(s.detail_name || s.name, 20) + '</td>' +
-        '<td class="rs-clickable" onclick="rsShowPopup(event,\'' + jsStr(srcLabel) + '\',\'' + jsStr(srcText) + '\')">' + rsTruncate(s.detail_src, 20) + '</td>' +
-        '<td class="rs-clickable" onclick="rsShowPopup(event,\'' + jsStr(dstLabel) + '\',\'' + jsStr(dstText) + '\')">' + rsTruncate(s.detail_dst, 20) + '</td>' +
-        '<td class="rs-clickable" onclick="rsShowPopup(event,\'' + jsStr(svcLabel) + '\',\'' + jsStr(svcText) + '\')">' + rsTruncate(s.detail_svc, 20) + '</td>' +
+        '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([_t('gui_rs_col_name'), rsName]) + '\'>' + rsTruncate(s.detail_rs, 20) + '</td>' +
+        '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([descLabel, descText]) + '\'>' + rsTruncate(s.detail_name || s.name, 20) + '</td>' +
+        '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([srcLabel, srcText]) + '\'>' + rsTruncate(s.detail_src, 20) + '</td>' +
+        '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([dstLabel, dstText]) + '\'>' + rsTruncate(s.detail_dst, 20) + '</td>' +
+        '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([svcLabel, svcText]) + '\'>' + rsTruncate(s.detail_svc, 20) + '</td>' +
         '<td>' + actionBadge + '</td>' +
         '<td style="font-size:.8rem;">' + timing + '</td>' +
         '<td>' + s.id + '</td>' +
-        '<td><button class="rs-edit-btn" onclick="rsEditSchedule(' + s.id + ')">' + _t('gui_rs_col_edit') + '</button></td>';
+        '<td><button class="rs-edit-btn" data-action="rsEditSchedule" data-args=\'' + rsDataArgs([s.id]) + '\'>' + _t('gui_rs_col_edit') + '</button></td>';
       tbody.appendChild(tr);
     });
     initTableResizers();
@@ -548,6 +588,11 @@ async function rsDeleteSelected() {
 }
 
 /* ── Logs / Manual check ── */
+function rsClearLog() {
+  const log = $('rs-log-output');
+  if (log) log.textContent = '';
+}
+
 async function rsLoadLogHistory() {
   const log = $('rs-log-output');
   try {

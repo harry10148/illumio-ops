@@ -20,8 +20,10 @@
       if (pane) pane.style.display = (n === name) ? '' : 'none';
     });
     document.querySelectorAll('#p-integrations .sub-tab').forEach(function (btn) {
-      btn.classList.toggle('active',
-        btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf("'" + name + "'") >= 0);
+      // After M1 (CSP) the buttons use data-action/data-args instead of onclick.
+      var args = [];
+      try { args = JSON.parse(btn.getAttribute('data-args') || '[]'); } catch (_) { args = []; }
+      btn.classList.toggle('active', args[0] === name);
     });
     if (name === 'overview') renderOverview();
     else if (name === 'cache') renderCache();
