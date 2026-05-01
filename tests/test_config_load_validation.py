@@ -105,3 +105,104 @@ def test_load_redacts_secret_input_in_logs(tmp_path, caplog):
     combined = " ".join(r.message for r in caplog.records)
     assert "99999" not in combined, "secret value leaked to logs"
     assert "[REDACTED]" in combined or "secret" in combined.lower()
+
+
+# ─── Alerts split-file tests ────────────────────────────────────────────────
+
+def test_alerts_round_trip_uses_separate_file(tmp_path):
+    """alerts persists to alerts.json, not config.json."""
+    from src.config import ConfigManager
+    cfg = tmp_path / "config.json"
+    alerts = tmp_path / "alerts.json"
+    cfg.write_text(json.dumps({
+        "api": {"url": "https://p.test", "org_id": "1", "key": "k", "secret": "s"},
+    }), encoding="utf-8")
+
+    cm = ConfigManager(str(cfg), alerts_file=str(alerts))
+    cm.config["alerts"]["webhook_url"] = "https://hooks.example/abc"
+    cm.config["alerts"]["line_channel_access_token"] = "secret-line-token"
+    cm.save()
+
+    # alerts.json now exists with the alert values
+    assert alerts.exists()
+    saved_alerts = json.loads(alerts.read_text(encoding="utf-8"))
+    assert saved_alerts["webhook_url"] == "https://hooks.example/abc"
+    assert saved_alerts["line_channel_access_token"] == "secret-line-token"
+
+    # config.json must NOT contain alerts
+    saved_config = json.loads(cfg.read_text(encoding="utf-8"))
+    assert "alerts" not in saved_config, "alerts must not be persisted in config.json"
+
+    # Reload through a fresh ConfigManager — alerts come back from alerts.json
+    cm2 = ConfigManager(str(cfg), alerts_file=str(alerts))
+    assert cm2.config["alerts"]["webhook_url"] == "https://hooks.example/abc"
+    assert cm2.config["alerts"]["line_channel_access_token"] == "secret-line-token"
+
+
+def test_alerts_migration_from_legacy_single_file(tmp_path):
+    """Pre-split installs have alerts inside config.json; first save() splits them out."""
+    from src.config import ConfigManager
+    cfg = tmp_path / "config.json"
+    alerts = tmp_path / "alerts.json"
+    cfg.write_text(json.dumps({
+        "api": {"url": "https://p.test", "org_id": "1", "key": "k", "secret": "s"},
+        "alerts": {
+            "active": ["mail", "webhook"],
+            "webhook_url": "https://legacy.example/hook",
+            "line_channel_access_token": "legacy-token",
+            "line_target_id": "C123",
+        },
+    }), encoding="utf-8")
+    assert not alerts.exists()
+
+    cm = ConfigManager(str(cfg), alerts_file=str(alerts))
+    # In-memory alerts inherited from config.json
+    assert cm.config["alerts"]["webhook_url"] == "https://legacy.example/hook"
+    assert cm.config["alerts"]["line_channel_access_token"] == "legacy-token"
+
+    cm.save()
+
+    # alerts.json now exists with the migrated values
+    assert alerts.exists()
+    migrated = json.loads(alerts.read_text(encoding="utf-8"))
+    assert migrated["webhook_url"] == "https://legacy.example/hook"
+    assert migrated["line_channel_access_token"] == "legacy-token"
+    assert migrated["active"] == ["mail", "webhook"]
+
+    # config.json no longer carries alerts
+    cleaned = json.loads(cfg.read_text(encoding="utf-8"))
+    assert "alerts" not in cleaned
+
+
+def test_alerts_file_missing_falls_back_to_defaults(tmp_path):
+    """If both config.json and alerts.json lack alerts, defaults are used."""
+    from src.config import ConfigManager
+    cfg = tmp_path / "config.json"
+    alerts = tmp_path / "alerts.json"
+    cfg.write_text(json.dumps({
+        "api": {"url": "https://p.test", "org_id": "1", "key": "k", "secret": "s"},
+    }), encoding="utf-8")
+
+    cm = ConfigManager(str(cfg), alerts_file=str(alerts))
+    # Defaults from _DEFAULT_CONFIG
+    assert cm.config["alerts"]["active"] == ["mail"]
+    assert cm.config["alerts"]["webhook_url"] == ""
+
+
+def test_alerts_corrupt_file_keeps_app_running(tmp_path, caplog):
+    """A corrupt alerts.json must not crash startup — it's logged and treated as empty."""
+    import logging
+    from src.config import ConfigManager
+    cfg = tmp_path / "config.json"
+    alerts = tmp_path / "alerts.json"
+    cfg.write_text(json.dumps({
+        "api": {"url": "https://p.test", "org_id": "1", "key": "k", "secret": "s"},
+    }), encoding="utf-8")
+    alerts.write_text("{ this is not valid json", encoding="utf-8")
+
+    caplog.set_level(logging.ERROR)
+    cm = ConfigManager(str(cfg), alerts_file=str(alerts))
+    # alerts dict still exists (empty/defaults), no exception
+    assert isinstance(cm.config["alerts"], dict)
+    combined = " ".join(r.message for r in caplog.records)
+    assert "alerts" in combined.lower() or "Error reading alerts" in combined

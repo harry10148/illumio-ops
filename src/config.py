@@ -35,6 +35,10 @@ def _format_error_input(loc: tuple, raw_input):
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
 CONFIG_FILE = os.path.join(ROOT_DIR, "config", "config.json")
+# Alerts (notification destinations + tokens) live in their own file so
+# that secret values can be rotated/locked-down independently of the
+# system config. In-memory access via cm.config["alerts"] is unchanged.
+ALERTS_FILE = os.path.join(ROOT_DIR, "config", "alerts.json")
 
 # Default configuration template
 _DEFAULT_CONFIG = {
@@ -104,8 +108,9 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return merged
 
 class ConfigManager:
-    def __init__(self, config_file: str = CONFIG_FILE):
+    def __init__(self, config_file: str = CONFIG_FILE, alerts_file: str = ALERTS_FILE):
         self.config_file = config_file
+        self.alerts_file = alerts_file
         self.config = json.loads(json.dumps(_DEFAULT_CONFIG))  # deep copy
         self.load()
 
@@ -123,6 +128,14 @@ class ConfigManager:
                 logger.error(f"Error reading config file: {e}")
                 print(f"{Colors.FAIL}{t('error_loading_config', error=e)}{Colors.ENDC}")
                 # Fall through with raw_data={} to use defaults
+
+        # Alerts live in their own file. If alerts.json exists, it wins;
+        # otherwise inherit any "alerts" still present in config.json (so
+        # an existing single-file install migrates transparently — the
+        # next save() will write alerts.json and strip from config.json).
+        alerts_data = self._read_alerts_file()
+        if alerts_data is not None:
+            raw_data["alerts"] = alerts_data
 
         # Merge defaults with raw data (deep merge preserves legacy behavior)
         merged = _deep_merge(json.loads(json.dumps(_DEFAULT_CONFIG)), raw_data)
@@ -177,10 +190,15 @@ class ConfigManager:
 
     def save(self):
         try:
-            # Atomic write: write to temp file first, then rename
+            # Persist alerts to its own file first so an interruption between
+            # the two writes never leaves stale alerts in config.json.
+            self._write_alerts_file()
+
+            # Atomic write: write config.json without the "alerts" section.
+            config_for_disk = {k: v for k, v in self.config.items() if k != "alerts"}
             tmp_file = self.config_file + ".tmp"
             with open(tmp_file, 'w', encoding='utf-8') as f:
-                json.dump(self.config, f, indent=4, ensure_ascii=False)
+                json.dump(config_for_disk, f, indent=4, ensure_ascii=False)
             # On Windows, os.replace handles atomic rename
             os.replace(tmp_file, self.config_file)
             try:
@@ -194,6 +212,36 @@ class ConfigManager:
         except (IOError, OSError) as e:
             logger.error(f"Error saving config: {e}")
             print(f"{Colors.FAIL}{t('error_saving_config', error=e)}{Colors.ENDC}")
+
+    def _read_alerts_file(self):
+        """Return alerts dict from alerts.json, or None if file is missing.
+
+        Missing file is the migration trigger: callers fall back to whatever
+        "alerts" still lives in config.json, then the next save() splits it
+        out. JSON / I/O errors return {} (empty alerts) and log loudly so
+        the user sees the corruption rather than silently using defaults.
+        """
+        if not os.path.exists(self.alerts_file):
+            return None
+        try:
+            with open(self.alerts_file, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError, OSError) as e:
+            logger.error(f"Error reading alerts file: {e}")
+            return {}
+
+    def _write_alerts_file(self):
+        """Atomically write self.config['alerts'] to alerts.json with 0o600."""
+        alerts = self.config.get("alerts", {})
+        os.makedirs(os.path.dirname(self.alerts_file), exist_ok=True)
+        tmp_file = self.alerts_file + ".tmp"
+        with open(tmp_file, 'w', encoding='utf-8') as f:
+            json.dump(alerts, f, indent=4, ensure_ascii=False)
+        os.replace(tmp_file, self.alerts_file)
+        try:
+            os.chmod(self.alerts_file, 0o600)
+        except OSError:
+            pass
 
     def add_or_update_rule(self, new_rule):
         for i, rule in enumerate(self.config["rules"]):
