@@ -634,17 +634,17 @@ def main():
 
     gui_cfg = _early_cm.config.get("web_gui", {})
     if gui_cfg.get("_initial_password"):
-        # L2: show the auto-generated initial password once, then leave it
-        # in config until first successful login. The login handler removes
-        # it via cm.save().
+        # L2: print the default admin credentials once. After first login the
+        # M4 gate forces a password change and _initial_password is removed,
+        # so this banner only appears on the very first run of an install.
         pw = gui_cfg["_initial_password"]
         sys.stderr.write("\n" + "=" * 60 + "\n")
         sys.stderr.write(t("initial_password_banner",
-                           default="INITIAL ADMIN PASSWORD (will only be shown once after this run):") + "\n")
+                           default="DEFAULT ADMIN LOGIN — change required on first login:") + "\n")
         sys.stderr.write(f"  username: {gui_cfg.get('username', 'illumio')}\n")
         sys.stderr.write(f"  password: {pw}\n")
         sys.stderr.write(t("initial_password_hint",
-                           default="Change it immediately at the Settings page after first login.") + "\n")
+                           default="Sign in once with these credentials, then change the password at the Settings page.") + "\n")
         sys.stderr.write("=" * 60 + "\n\n")
         sys.stderr.flush()
 

@@ -2138,6 +2138,6 @@
   "gui_ph_ex_any_label": "e.g. env=Dev",
   "gui_ph_ex_any_ip": "e.g. 192.168.0.0/16",
   "gui_ph_query_name": "E.g. Core Services Top Clients",
-  "initial_password_banner": "INITIAL ADMIN PASSWORD (will only be shown once after this run):",
-  "initial_password_hint": "Change it immediately at the Settings page after first login."
+  "initial_password_banner": "DEFAULT ADMIN LOGIN — change required on first login:",
+  "initial_password_hint": "Sign in once with these credentials, then change the password at the Settings page."
 }
