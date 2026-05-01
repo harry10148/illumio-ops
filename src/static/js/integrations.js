@@ -295,16 +295,32 @@ async function cacheBackfill() {
     headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
     body: JSON.stringify({since: start, until: end}),
   });
+  var body = await r.json().catch(function() { return {}; });
   if (!r.ok) {
-    var err = await r.json().catch(function() { return {}; });
-    alert('Backfill failed: ' + (err.error || r.status));
+    alert('Backfill failed: ' + (body.error || r.status));
     return;
   }
-  alert('Backfill submitted');
+  alert('Backfill done — inserted: ' + (body.inserted || 0)
+    + ', duplicates: ' + (body.duplicates || 0)
+    + ', total: ' + (body.total_rows || 0)
+    + ', elapsed: ' + (body.elapsed_seconds || 0) + 's');
 }
 
 async function cacheRetentionNow() {
-  alert('Run "Retention now" via CLI; HTTP trigger not yet implemented.');
+  if (!confirm('Run retention purge now? This will delete cache rows older than the configured retention days.')) return;
+  var r = await fetch('/api/cache/retention/run', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
+  });
+  var body = await r.json().catch(function() { return {}; });
+  if (!r.ok) {
+    alert('Retention failed: ' + (body.error || r.status));
+    return;
+  }
+  alert('Retention done — events: ' + (body.events || 0)
+    + ', traffic_raw: ' + (body.traffic_raw || 0)
+    + ', traffic_agg: ' + (body.traffic_agg || 0)
+    + ', dead_letter: ' + (body.dead_letter || 0));
 }
 
 // ── Cache traffic_filter section ────────────────────────────────────────────

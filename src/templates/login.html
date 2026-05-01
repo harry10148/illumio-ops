@@ -194,22 +194,49 @@
         <button type="submit" class="btn" id="login-btn">{{ t('login_btn') }}</button>
       </form>
 
+      <form id="change-pw-form" autocomplete="off" style="display:none;">
+        <p id="change-pw-banner" style="margin:0 0 12px 0; padding:10px 12px; background:rgba(255,162,47,.15); border-left:3px solid var(--accent2); border-radius:4px; color:var(--fg); font-size:13px;">
+          {{ t('login_must_change_banner') }}
+        </p>
+        <div class="form-group">
+          <label for="new-password">{{ t('login_new_password') }}</label>
+          <input type="password" id="new-password" name="new-password" required autocomplete="new-password" minlength="8">
+        </div>
+        <div class="form-group">
+          <label for="confirm-password">{{ t('login_confirm_password') }}</label>
+          <input type="password" id="confirm-password" name="confirm-password" required autocomplete="new-password" minlength="8">
+        </div>
+        <button type="submit" class="btn" id="change-pw-btn">{{ t('login_change_pw_btn') }}</button>
+      </form>
+
       <div class="footer">{{ t('login_footer') }}</div>
     </div>
   </div>
 
   <script nonce="{{ csp_nonce() }}">
     const form = document.getElementById('login-form');
+    const changeForm = document.getElementById('change-pw-form');
     const errBox = document.getElementById('error-msg');
     const btn = document.getElementById('login-btn');
+    const changeBtn = document.getElementById('change-pw-btn');
 
     const i18n = {
       signing_in: "{{ t('login_btn_signing_in') }}",
       success: "{{ t('login_btn_success') }}",
       btn_default: "{{ t('login_btn') }}",
       invalid_auth: "{{ t('gui_err_invalid_auth') }}",
-      network_error: "{{ t('gui_err_network') }}"
+      network_error: "{{ t('gui_err_network') }}",
+      changing: "{{ t('login_btn_changing') }}",
+      change_btn_default: "{{ t('login_change_pw_btn') }}",
+      mismatch: "{{ t('login_err_pw_mismatch') }}",
+      pw_too_short: "{{ t('login_err_pw_short') }}"
     };
+
+    // First-run state captured at login so we can POST /api/security with
+    // the correct old_password (still required by the H2 sensitive-change
+    // gate even during forced-change) and CSRF token.
+    let _oldPassword = '';
+    let _csrfToken = '';
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -228,6 +255,19 @@
         });
         const data = await res.json();
         if (data.ok) {
+          if (data.must_change_password) {
+            // Hold the just-validated password and CSRF token for the
+            // POST /api/security call; switch the page to the
+            // change-password form before redirecting to the dashboard.
+            _oldPassword = password;
+            _csrfToken = data.csrf_token || '';
+            btn.textContent = i18n.btn_default;
+            btn.disabled = false;
+            form.style.display = 'none';
+            changeForm.style.display = '';
+            document.getElementById('new-password').focus();
+            return;
+          }
           btn.textContent = i18n.success;
           setTimeout(() => { window.location.href = '/'; }, 300);
         } else {
@@ -243,6 +283,58 @@
         errBox.style.display = 'block';
         btn.textContent = i18n.btn_default;
         btn.disabled = false;
+      }
+    });
+
+    changeForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const newPw = document.getElementById('new-password').value;
+      const confirmPw = document.getElementById('confirm-password').value;
+
+      errBox.style.display = 'none';
+
+      if (newPw.length < 8) {
+        errBox.textContent = i18n.pw_too_short;
+        errBox.style.display = 'block';
+        return;
+      }
+      if (newPw !== confirmPw) {
+        errBox.textContent = i18n.mismatch;
+        errBox.style.display = 'block';
+        return;
+      }
+
+      changeBtn.textContent = i18n.changing;
+      changeBtn.disabled = true;
+
+      try {
+        const res = await fetch('/api/security', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': _csrfToken
+          },
+          body: JSON.stringify({
+            old_password: _oldPassword,
+            new_password: newPw,
+            confirm_password: confirmPw
+          })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          changeBtn.textContent = i18n.success;
+          setTimeout(() => { window.location.href = '/'; }, 300);
+        } else {
+          errBox.textContent = data.error || i18n.invalid_auth;
+          errBox.style.display = 'block';
+          changeBtn.textContent = i18n.change_btn_default;
+          changeBtn.disabled = false;
+        }
+      } catch {
+        errBox.textContent = i18n.network_error;
+        errBox.style.display = 'block';
+        changeBtn.textContent = i18n.change_btn_default;
+        changeBtn.disabled = false;
       }
     });
   </script>

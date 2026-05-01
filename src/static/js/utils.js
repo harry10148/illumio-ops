@@ -44,6 +44,15 @@ const api = async (url, opt = {}) => {
     r = await fetch(url, _withFreshCsrf(opt));
     data = await parse(r);
   }
+  // M4 first-run gate: every protected endpoint returns 423 with
+  // {error: "must_change_password"} until the admin changes the default
+  // password. Bounce back to /login so the inline change-password form
+  // can run; otherwise the dashboard would silently fail every fetch.
+  if (r.status === 423 && data && data.error === 'must_change_password') {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+      window.location.href = '/login';
+    }
+  }
   return data;
 };
 const post = (url, body) => api(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() }, body: JSON.stringify(body) });

@@ -108,8 +108,18 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return merged
 
 class ConfigManager:
-    def __init__(self, config_file: str = CONFIG_FILE, alerts_file: str = ALERTS_FILE):
+    def __init__(self, config_file: str = CONFIG_FILE, alerts_file: str | None = None):
         self.config_file = config_file
+        # If alerts_file is not specified, derive it from config_file's
+        # directory so test fixtures (and any caller passing a custom
+        # config_file path) don't accidentally read the repo's real
+        # config/alerts.json. The default install still uses ALERTS_FILE
+        # because callers pass CONFIG_FILE which lives next to it.
+        if alerts_file is None:
+            if config_file == CONFIG_FILE:
+                alerts_file = ALERTS_FILE
+            else:
+                alerts_file = os.path.join(os.path.dirname(os.path.abspath(config_file)), "alerts.json")
         self.alerts_file = alerts_file
         self.config = json.loads(json.dumps(_DEFAULT_CONFIG))  # deep copy
         self.load()

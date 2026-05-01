@@ -848,7 +848,15 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             if gui_cfg.get("_initial_password"):
                 gui_cfg.pop("_initial_password", None)
                 cm.save()
-            return jsonify({"ok": True, "csrf_token": generate_csrf()})
+            return jsonify({
+                "ok": True,
+                "csrf_token": generate_csrf(),
+                # Surface the must_change_password gate to the login UI so it
+                # can show an inline change-password form before letting the
+                # user reach the dashboard (M4 gate would otherwise 423 every
+                # API call and the UI would look broken).
+                "must_change_password": bool(gui_cfg.get("must_change_password")),
+            })
 
         return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
 

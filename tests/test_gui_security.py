@@ -15,15 +15,21 @@ def _csrf(login_response) -> str:
 
 @pytest.fixture
 def temp_config_file():
-    fd, path = tempfile.mkstemp(suffix=".json")
-    os.close(fd)
-    
+    # Use a fresh temp directory so the auto-derived alerts.json sibling is
+    # also test-private (otherwise tests in the same /tmp share alerts.json
+    # across runs and across processes — verified to leak real lab tokens
+    # in earlier runs).
+    tmpdir = tempfile.mkdtemp(prefix="illumio_ops_test_")
+    path = os.path.join(tmpdir, "config.json")
+
     # Init empty config
     with open(path, 'w') as f:
         json.dump({"api": {"url": "test", "key": "test", "secret": "test", "org_id": "1"}, "rules": []}, f)
-        
+
     yield path
-    os.unlink(path)
+    # Cleanup config + sibling alerts.json (created on first save)
+    import shutil
+    shutil.rmtree(tmpdir, ignore_errors=True)
 
 @pytest.fixture
 def app_persistent(temp_config_file):
@@ -1207,3 +1213,80 @@ def test_save_settings_accepts_new_secret_value(client, temp_config_file):
     assert saved["api"]["key"] == "new-real-key"
     assert saved["api"]["secret"] == "new-real-secret"
 
+
+
+def test_login_response_carries_must_change_flag_for_default_install():
+    """Default-fresh-install: /api/login surfaces must_change_password=True
+    so login.html can show the inline change-password form before
+    redirecting to the dashboard."""
+    import json, tempfile, os
+    from src.config import ConfigManager
+    from src.gui import build_app as _create_app
+    d = tempfile.mkdtemp()
+    cfg = os.path.join(d, "config.json")
+    with open(cfg, "w") as f:
+        json.dump({"api": {"url": "https://x", "org_id": "1", "key": "k", "secret": "s"}}, f)
+    cm = ConfigManager(cfg, alerts_file=os.path.join(d, "alerts.json"))
+    app = _create_app(cm)
+    app.config["TESTING"] = True
+    c = app.test_client()
+    r = c.post("/api/login", json={"username": "illumio", "password": "illumio"})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["ok"] is True
+    assert body["must_change_password"] is True
+    assert "csrf_token" in body
+
+
+def test_login_then_change_password_flow_clears_must_change(temp_config_file):
+    """End-to-end: login with default illumio/illumio → POST /api/security
+    with new_password → must_change_password and _initial_password are
+    cleared and subsequent dashboard calls work."""
+    import os
+    from src.config import ConfigManager
+    from src.gui import build_app as _create_app
+    # Reset to a fresh default-install state (illumio/illumio + must-change)
+    with open(temp_config_file, "w") as f:
+        json.dump({
+            "api": {"url": "https://x", "org_id": "1", "key": "k", "secret": "s"},
+            "rules": [],
+        }, f)
+    cm = ConfigManager(temp_config_file, alerts_file=temp_config_file + ".alerts")
+    assert cm.config["web_gui"]["_initial_password"] == "illumio"
+    assert cm.config["web_gui"]["must_change_password"] is True
+
+    app = _create_app(cm, persistent_mode=True)
+    app.config["TESTING"] = True
+    c = app.test_client()
+
+    # Step 1: login
+    r = c.post("/api/login",
+               json={"username": "illumio", "password": "illumio"},
+               environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["must_change_password"] is True
+    csrf = body["csrf_token"]
+
+    # Step 2: a protected endpoint should be 423 BEFORE password change
+    r2 = c.get("/api/status", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert r2.status_code == 423
+    assert r2.get_json().get("error") == "must_change_password"
+
+    # Step 3: change password via /api/security
+    r3 = c.post("/api/security",
+                json={"old_password": "illumio",
+                      "new_password": "n3w-stronger-pw",
+                      "confirm_password": "n3w-stronger-pw"},
+                headers={"X-CSRF-Token": csrf},
+                environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert r3.status_code == 200, r3.get_data(as_text=True)
+    assert r3.get_json().get("ok") is True
+
+    # Step 4: must_change flags are cleared
+    assert "must_change_password" not in cm.config["web_gui"]
+    assert "_initial_password" not in cm.config["web_gui"]
+
+    # Step 5: protected endpoints now succeed (no 423)
+    r4 = c.get("/api/status", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert r4.status_code == 200
