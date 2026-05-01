@@ -35,13 +35,23 @@ def _parse_csp(headers) -> dict[str, str]:
     return result
 
 
-def test_csp_no_unsafe_inline(client):
+def test_csp_script_src_no_unsafe_inline(client):
+    """script-src must stay strict — 'unsafe-inline' there enables XSS."""
     r = client.get("/login")
     csp = _parse_csp(r.headers)
     assert "'unsafe-inline'" not in csp.get("script-src", ""), \
         "script-src must not contain 'unsafe-inline'"
-    assert "'unsafe-inline'" not in csp.get("style-src", ""), \
-        "style-src must not contain 'unsafe-inline'"
+
+
+def test_csp_style_src_allows_unsafe_inline(client):
+    """style-src intentionally allows 'unsafe-inline' so that the 344+ inline
+    style="..." attributes throughout the templates are honoured. Style
+    injection cannot execute scripts, so this is the widely-accepted middle
+    ground; script-src remains strict (covered by the test above)."""
+    r = client.get("/login")
+    csp = _parse_csp(r.headers)
+    assert "'unsafe-inline'" in csp.get("style-src", ""), \
+        "style-src must allow 'unsafe-inline' (see src/gui/__init__.py CSP comment)"
 
 
 def test_csp_has_nonce(client):
