@@ -365,3 +365,34 @@ def test_logout_succeeds_with_csrf_token(app_client):
     r_post = client.get('/api/status')
     assert r_post.status_code in (302, 401), \
         f"after logout, /api/status returned {r_post.status_code} — session not cleared"
+
+
+def test_app_secret_key_never_empty_even_if_config_has_empty_string(tmp_path):
+    """L1: even if config.json has \"secret_key\": \"\", the app must use
+    a freshly generated secret rather than the empty string."""
+    import json as _json
+    from src.config import ConfigManager
+    from src.gui import _create_app
+    cfg_dir = tmp_path / 'config'
+    cfg_dir.mkdir()
+    cfg_file = cfg_dir / 'config.json'
+    cfg = {
+        "web_gui": {
+            "username": "illumio",
+            "password": "",
+            "secret_key": "",
+            "allowed_ips": [],
+            "tls": {"enabled": False},
+        },
+    }
+    cfg_file.write_text(_json.dumps(cfg))
+    cm = ConfigManager(str(cfg_file))
+    # Force the empty string back (bypassing _ensure_web_gui_secret which
+    # would normally fill it on load). _create_app calls cm.load() again,
+    # which would re-trigger _ensure_web_gui_secret and refill secret_key —
+    # so we also neutralize cm.load to keep the corrupted state in place.
+    cm.config["web_gui"]["secret_key"] = ""
+    cm.load = lambda: None
+    app = _create_app(cm)
+    assert app.secret_key, "app.secret_key was empty string"
+    assert len(app.secret_key) >= 32, f"app.secret_key too short: {len(app.secret_key)}"

@@ -545,7 +545,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     # Initialize session secret
     cm.load()
     gui_cfg = cm.config.get("web_gui", {})
-    app.secret_key = gui_cfg.get("secret_key", secrets.token_hex(32))
+    app.secret_key = gui_cfg.get("secret_key") or secrets.token_hex(32)
     # Always set Secure cookie flag (TLS is the default)
     tls_cfg = gui_cfg.get("tls", {})
     app.config['SESSION_COOKIE_SECURE'] = True
