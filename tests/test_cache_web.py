@@ -89,3 +89,43 @@ def test_put_cache_bad_poll_interval(client):
                       json={"events_poll_interval_seconds": 5},
                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert resp.status_code == 422
+
+
+def test_retention_run_returns_counts(client):
+    resp = client.post("/api/cache/retention/run",
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert set(body.keys()) >= {"events", "traffic_raw", "traffic_agg", "dead_letter"}
+    for v in body.values():
+        assert isinstance(v, int)
+
+
+def test_retention_run_requires_login(tmp_path):
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    try:
+        with open(path, "w") as f:
+            json.dump({
+                "web_gui": {
+                    "username": "admin",
+                    "password": "pw",
+                    "secret_key": "s",
+                    "allowed_ips": ["127.0.0.1"],
+                },
+                "pce_cache": {
+                    "enabled": False,
+                    "db_path": str(tmp_path / "cache.sqlite"),
+                },
+            }, f)
+        cm = ConfigManager(config_file=path)
+        from src.gui import _create_app
+        app = _create_app(cm, persistent_mode=True)
+        app.config["TESTING"] = True
+        app.config["WTF_CSRF_ENABLED"] = False
+        with app.test_client() as c:
+            resp = c.post("/api/cache/retention/run",
+                          environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+            assert resp.status_code in (302, 401)
+    finally:
+        os.unlink(path)

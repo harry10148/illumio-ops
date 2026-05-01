@@ -232,10 +232,8 @@
       pw_too_short: "{{ t('login_err_pw_short') }}"
     };
 
-    // First-run state captured at login so we can POST /api/security with
-    // the correct old_password (still required by the H2 sensitive-change
-    // gate even during forced-change) and CSRF token.
-    let _oldPassword = '';
+    // First-run state: capture CSRF token from /api/login so the inline
+    // change-password POST to /api/security can satisfy CSRF.
     let _csrfToken = '';
 
     form.addEventListener('submit', async (e) => {
@@ -256,10 +254,8 @@
         const data = await res.json();
         if (data.ok) {
           if (data.must_change_password) {
-            // Hold the just-validated password and CSRF token for the
-            // POST /api/security call; switch the page to the
-            // change-password form before redirecting to the dashboard.
-            _oldPassword = password;
+            // Capture CSRF token, swap the page to the change-password form,
+            // then POST /api/security with the new password.
             _csrfToken = data.csrf_token || '';
             btn.textContent = i18n.btn_default;
             btn.disabled = false;
@@ -315,7 +311,6 @@
             'X-CSRF-Token': _csrfToken
           },
           body: JSON.stringify({
-            old_password: _oldPassword,
             new_password: newPw,
             confirm_password: confirmPw
           })

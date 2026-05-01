@@ -321,9 +321,8 @@ async function loadSettings() {
     <div class="form-group"><label data-i18n="gui_username">Username</label><input id="s-sec-user" value="${sec.username || 'admin'}"></div>
     <div class="form-group"><label data-i18n="gui_allowed_ips">Allowed IPs (comma separated IP or CIDR)</label><input id="s-sec-ips" value="${(sec.allowed_ips || []).join(', ')}" placeholder="e.g. 192.168.1.100, 10.0.0.0/8"></div>
   </div>
-  <p style="color:var(--dim); font-size:0.85em; margin-bottom:12px;" data-i18n="gui_leave_blank_pass">Leave passwords blank to keep current password.</p>
+  <p style="color:var(--dim); font-size:0.85em; margin-bottom:12px;" data-i18n="gui_leave_blank_pass">Leave password blank to keep current password.</p>
   <div class="form-row">
-    <div class="form-group"><label data-i18n="gui_old_password">Old Password</label><input id="s-sec-oldpass" type="password"></div>
     <div class="form-group"><label data-i18n="gui_new_password">New Password</label><input id="s-sec-newpass" type="password"></div>
   </div>
 </fieldset>`;
@@ -428,7 +427,6 @@ async function saveSettings() {
   const ips_raw = $('s-sec-ips').value.split(',').map(s => s.trim()).filter(Boolean);
   await post('/api/security', {
     username: $('s-sec-user').value.trim(),
-    old_password: $('s-sec-oldpass').value,
     new_password: $('s-sec-newpass').value,
     allowed_ips: ips_raw
   });
@@ -449,8 +447,7 @@ async function saveSettings() {
     auto_renew_days: autoRenewDays,
   });
 
-  // Clear password fields after save
-  $('s-sec-oldpass').value = '';
+  // Clear password field after save
   $('s-sec-newpass').value = '';
   await loadTranslations();
   if (typeof renderQtPage === 'function') renderQtPage();

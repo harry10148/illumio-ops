@@ -39,5 +39,26 @@
         "start": "08:00",
         "end": "18:00",
         "pce_status": "deleted"
+    },
+    "/orgs/1/sec_policy/draft/rule_sets/559/deny_rules/263": {
+        "type": "recurring",
+        "name": "Rule 263",
+        "is_ruleset": false,
+        "action": "block",
+        "detail_rs": "G-Deny",
+        "detail_src": "ams",
+        "detail_dst": "ams",
+        "detail_svc": "S-SYSLOG (UDP/514,TCP/514)",
+        "detail_name": "Rule 263",
+        "days": [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday"
+        ],
+        "start": "08:00",
+        "end": "18:00",
+        "timezone": "UTC+8"
     }
 }

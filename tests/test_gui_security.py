@@ -243,6 +243,34 @@ def test_api_security_endpoints(app_persistent):
     assert res.json['ok'] is True
 
 
+def test_api_security_save_does_not_require_old_password(app_persistent):
+    """An authenticated session is sufficient to change credentials and
+    settings; old_password is no longer requested or verified."""
+    client = app_persistent.test_client()
+    res_login = client.post('/api/login', json={
+        "username": "admin",
+        "password": "testpass",
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(res_login)
+
+    # No-op save (nothing changed) — still 200.
+    res = client.post('/api/security', json={
+        "username": "admin",
+        "allowed_ips": ["127.0.0.1", "192.168.1.0/24"],
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+       headers={'X-CSRF-Token': csrf_token})
+    assert res.status_code == 200
+    assert res.json["ok"] is True
+
+    # Password change without old_password — also succeeds.
+    res = client.post('/api/security', json={
+        "new_password": "freshPassword42",
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+       headers={'X-CSRF-Token': csrf_token})
+    assert res.status_code == 200
+    assert res.json["ok"] is True
+
+
 def test_api_security_rejects_invalid_allowlist(client):
     res_login = client.post('/api/login', json={
         "username": "admin",

@@ -82,6 +82,28 @@ def api_cache_backfill():
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/retention/run", methods=["POST"])
+@login_required
+def api_cache_retention_run():
+    """Run retention purge immediately using configured retention days."""
+    try:
+        sf = _get_sf()
+    except Exception as e:
+        return jsonify({"error": f"cache not configured: {e}"}), 503
+    cfg = current_app.config["CM"].models.pce_cache
+    try:
+        from src.pce_cache.retention import RetentionWorker
+        result = RetentionWorker(sf).run_once(
+            events_days=int(cfg.events_retention_days),
+            traffic_raw_days=int(cfg.traffic_raw_retention_days),
+            traffic_agg_days=int(cfg.traffic_agg_retention_days),
+        )
+        return jsonify(result)
+    except Exception as e:
+        logger.exception("cache retention error: {}", e)
+        return jsonify({"error": str(e)}), 500
+
+
 @bp.route("/status", methods=["GET"])
 @login_required
 def api_cache_status():

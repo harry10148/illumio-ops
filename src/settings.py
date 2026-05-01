@@ -1549,7 +1549,13 @@ def web_gui_security_menu(cm: ConfigManager):
                 
             new_pass = safe_input(t("wgs_new_pass", default="New Password"), str, allow_cancel=True)
             if new_pass:
-                cm.config["web_gui"]["password"] = new_pass
+                from src.config import hash_password
+                cm.config["web_gui"]["password"] = hash_password(new_pass)
+                # CLI is the forgot-password recovery path. Once the admin has
+                # reset the credential locally, don't bounce them back through
+                # the must-change gate at next web login.
+                cm.config["web_gui"].pop("_initial_password", None)
+                cm.config["web_gui"].pop("must_change_password", None)
                 print(f"\n{Colors.GREEN}Password updated.{Colors.ENDC}")
                 cm.save()
             input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")

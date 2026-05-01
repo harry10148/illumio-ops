@@ -129,8 +129,8 @@ function buildCacheStatusCards(status, s) {
     + '</div>'
     + '</div>'
     + '<div class="toolbar" style="margin-bottom:16px;">'
-    + '<button class="btn btn-sm" onclick="cacheBackfill()" data-i18n="gui_backfill">Backfill</button>'
-    + '<button class="btn btn-sm" onclick="cacheRetentionNow()" data-i18n="gui_retention_now">Retention now</button>'
+    + '<button class="btn btn-sm" data-action="cacheBackfill" data-i18n="gui_backfill">Backfill</button>'
+    + '<button class="btn btn-sm" data-action="cacheRetentionNow" data-i18n="gui_retention_now">Retention now</button>'
     + '</div>';
 }
 
@@ -322,6 +322,8 @@ async function cacheRetentionNow() {
     + ', traffic_agg: ' + (body.traffic_agg || 0)
     + ', dead_letter: ' + (body.dead_letter || 0));
 }
+window.cacheBackfill = cacheBackfill;
+window.cacheRetentionNow = cacheRetentionNow;
 
 // ── Cache traffic_filter section ────────────────────────────────────────────
 function renderTrafficFilter(s) {
