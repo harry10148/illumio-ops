@@ -1,20 +1,31 @@
 // ═══ Rule Scheduler ═══
-// Safe escaping for text used inside HTML attribute values (e.g. data-args).
-// escapeHtml() is wrong here: it converts ' → &#039;, which the HTML parser re-decodes to ' before JS runs, breaking the string.
-const jsStr = s => (s == null ? '' : String(s))
-  .replace(/\\/g, '\\\\')    // \ → \\
-  .replace(/'/g, "\\'")      // ' → \'
-  .replace(/\r?\n|\r/g, ' ') // newlines → space
-  .replace(/"/g, '&quot;');  // " → &quot; (keeps HTML attribute valid)
-
-// Build a single-quoted-HTML-attribute-safe data-args value from a JS array.
-// JSON.stringify already escapes inner double-quotes; we then HTML-escape the
-// characters that would break a single-quoted attribute value.
-const rsDataArgs = arr => JSON.stringify(arr)
-  .replace(/&/g, '&amp;')
-  .replace(/'/g, '&#39;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;');
+// Tiny DOM-builder helper used in place of string-concatenated HTML.
+// Avoids the escaping pitfalls of innerHTML for user-supplied values.
+function h(tag, props, ...children) {
+  const el = document.createElement(tag);
+  if (props) {
+    for (const [k, v] of Object.entries(props)) {
+      if (v == null) continue;
+      if (k === 'class') el.className = v;
+      else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+      else if (k.startsWith('on') && typeof v === 'function') el.addEventListener(k.slice(2), v);
+      else if (k.startsWith('data-')) el.dataset[k.slice(5)] = v;
+      else el.setAttribute(k, v);
+    }
+  }
+  for (const c of children) {
+    if (c == null || c === false) continue;
+    if (Array.isArray(c)) {
+      for (const cc of c) {
+        if (cc == null || cc === false) continue;
+        el.appendChild(cc instanceof Node ? cc : document.createTextNode(String(cc)));
+      }
+    } else {
+      el.appendChild(c instanceof Node ? c : document.createTextNode(String(c)));
+    }
+  }
+  return el;
+}
 let rsCurrentPage = 1;
 let rsSearchQuery = '';
 let rsSearchScope = 'rs_name';
@@ -138,21 +149,22 @@ async function rsFetchRulesBySearch(q, scope) {
       tr.style.cursor = 'pointer';
       tr.onclick = function() { rsViewRuleset(item.rs_id); };
       const ruleTypeBadge = item.rule_type === 'override_deny'
-        ? '<span class="rs-badge rs-badge-block" style="font-size:.7rem;">Override Deny</span>'
+        ? h('span', { class: 'rs-badge rs-badge-block', style: { fontSize: '.7rem' } }, 'Override Deny')
         : item.rule_type === 'deny'
-          ? '<span class="rs-badge rs-badge-off" style="font-size:.7rem;">Deny</span>'
-          : '<span class="rs-badge rs-badge-on" style="font-size:.7rem;">Allow</span>';
+          ? h('span', { class: 'rs-badge rs-badge-off', style: { fontSize: '.7rem' } }, 'Deny')
+          : h('span', { class: 'rs-badge rs-badge-on', style: { fontSize: '.7rem' } }, 'Allow');
       const stBadge = item.enabled
-        ? '<span class="rs-badge rs-badge-on">ON</span>'
-        : '<span class="rs-badge rs-badge-off">OFF</span>';
-      const rsName = item.rs_name.length > 20 ? escapeHtml(item.rs_name.substring(0, 20)) + '…' : escapeHtml(item.rs_name);
-      tr.innerHTML =
-        '<td></td>' +
-        '<td style="color:var(--accent2);font-weight:600;">' + escapeHtml(String(item.rule_id)) + '</td>' +
-        '<td></td>' +
-        '<td>' + stBadge + '</td>' +
-        '<td>' + rsName + '</td>' +
-        '<td>' + ruleTypeBadge + ' ' + escapeHtml(item.description || '(' + _t('gui_rs_no_desc') + ')') + '</td>';
+        ? h('span', { class: 'rs-badge rs-badge-on' }, 'ON')
+        : h('span', { class: 'rs-badge rs-badge-off' }, 'OFF');
+      const rsNameStr = item.rs_name.length > 20 ? item.rs_name.substring(0, 20) + '…' : item.rs_name;
+      tr.replaceChildren(
+        h('td'),
+        h('td', { style: { color: 'var(--accent2)', fontWeight: '600' } }, String(item.rule_id)),
+        h('td'),
+        h('td', null, stBadge),
+        h('td', null, rsNameStr),
+        h('td', null, ruleTypeBadge, ' ', item.description || '(' + _t('gui_rs_no_desc') + ')'),
+      );
       tbody.appendChild(tr);
     });
     $('rs-pagination').innerHTML = '<span class="rs-pg-info">' + data.items.length + ' ' + _t('gui_rs_rule_results') + '</span>';
@@ -180,27 +192,28 @@ async function rsFetchRulesets() {
     }
     data.items.forEach(rs => {
       const schMark = rs.schedule_type === 1
-        ? '<span class="rs-mark-rs" title="' + _t('gui_rs_sch_badge_sched') + '">★</span>'
+        ? h('span', { class: 'rs-mark-rs', title: _t('gui_rs_sch_badge_sched') }, '★')
         : rs.schedule_type === 2
-          ? '<span class="rs-mark-child" title="' + _t('gui_rs_sch_badge_child') + '">●</span>'
-          : '';
+          ? h('span', { class: 'rs-mark-child', title: _t('gui_rs_sch_badge_child') }, '●')
+          : null;
       const provBadge = rs.provision_state === 'DRAFT'
-        ? '<span class="rs-badge rs-badge-draft">DRAFT</span>'
-        : '<span class="rs-badge rs-badge-active">ACTIVE</span>';
+        ? h('span', { class: 'rs-badge rs-badge-draft' }, 'DRAFT')
+        : h('span', { class: 'rs-badge rs-badge-active' }, 'ACTIVE');
       const statusBadge = rs.enabled
-        ? '<span class="rs-badge rs-badge-on">ON</span>'
-        : '<span class="rs-badge rs-badge-off">OFF</span>';
+        ? h('span', { class: 'rs-badge rs-badge-on' }, 'ON')
+        : h('span', { class: 'rs-badge rs-badge-off' }, 'OFF');
       const tr = document.createElement('tr');
       tr.style.cursor = 'pointer';
       tr.onclick = function() { rsViewRuleset(rs.id); };
       if (rs.id === rsSelectedRsId) tr.style.background = 'rgba(255,85,0,.1)';
-      tr.innerHTML =
-        '<td>' + schMark + '</td>' +
-        '<td>' + escapeHtml(String(rs.id)) + '</td>' +
-        '<td>' + provBadge + '</td>' +
-        '<td>' + statusBadge + '</td>' +
-        '<td>' + escapeHtml(String(rs.rules_count)) + '</td>' +
-        '<td>' + escapeHtml(rs.name) + '</td>';
+      tr.replaceChildren(
+        h('td', null, schMark),
+        h('td', null, String(rs.id)),
+        h('td', null, provBadge),
+        h('td', null, statusBadge),
+        h('td', null, String(rs.rules_count)),
+        h('td', null, rs.name),
+      );
       tbody.appendChild(tr);
     });
     // Pagination
@@ -275,31 +288,41 @@ async function rsViewRuleset(rsId) {
     data.rules.forEach(r => {
       const tr = document.createElement('tr');
       const prov = r.provision_state === 'DRAFT'
-        ? '<span class="rs-badge rs-badge-draft">DRAFT</span>'
-        : '<span class="rs-badge rs-badge-active">ACTIVE</span>';
+        ? h('span', { class: 'rs-badge rs-badge-draft' }, 'DRAFT')
+        : h('span', { class: 'rs-badge rs-badge-active' }, 'ACTIVE');
       const st = r.enabled
-        ? '<span class="rs-badge rs-badge-on">ON</span>'
-        : '<span class="rs-badge rs-badge-off">OFF</span>';
-      const schIcon = r.is_scheduled ? '<span class="rs-mark-child" title="' + _t('gui_rs_sch_badge_child') + '">●</span>' : '';
+        ? h('span', { class: 'rs-badge rs-badge-on' }, 'ON')
+        : h('span', { class: 'rs-badge rs-badge-off' }, 'OFF');
+      const schIcon = r.is_scheduled
+        ? h('span', { class: 'rs-mark-child', title: _t('gui_rs_sch_badge_child') }, '●')
+        : null;
       const descLabel = _t('gui_rs_col_desc');
       const noDesc = _t('gui_rs_no_desc');
-      const descHtml = r.description
-        ? '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([descLabel, r.description]) + '\'>' + rsTruncate(r.description, 30) + '</td>'
-        : '<td><span style="color:var(--dim)">' + noDesc + '</span></td>';
+      const clickableTd = (label, value, max) => {
+        const td = h('td', { class: 'rs-clickable' }, rsTruncateNode(value, max));
+        td.dataset.action = 'rsShowPopup';
+        td.dataset.args = JSON.stringify([label, value == null ? '' : String(value)]);
+        return td;
+      };
+      const descTd = r.description
+        ? clickableTd(descLabel, r.description, 30)
+        : h('td', null, h('span', { style: { color: 'var(--dim)' } }, noDesc));
 
       const srcLabel = _t('gui_rs_col_source');
       const dstLabel = _t('gui_rs_col_dest');
       const svcLabel = _t('gui_rs_col_service');
-      const srcHtml = '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([srcLabel, r.source]) + '\'>' + rsTruncate(r.source, 25) + '</td>';
-      const dstHtml = '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([dstLabel, r.dest]) + '\'>' + rsTruncate(r.dest, 25) + '</td>';
-      const svcHtml = '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([svcLabel, r.service]) + '\'>' + rsTruncate(r.service, 25) + '</td>';
+      const srcTd = clickableTd(srcLabel, r.source, 25);
+      const dstTd = clickableTd(dstLabel, r.dest, 25);
+      const svcTd = clickableTd(svcLabel, r.service, 25);
 
       const ruleTypeBadge = r.rule_type === 'override_deny'
-        ? '<span class="rs-badge rs-badge-block">' + _t('gui_rs_rule_type_override_deny') + '</span>'
+        ? h('span', { class: 'rs-badge rs-badge-block' }, _t('gui_rs_rule_type_override_deny'))
         : r.rule_type === 'deny'
-          ? '<span class="rs-badge rs-badge-off">' + _t('gui_rs_rule_type_deny') + '</span>'
-          : '<span class="rs-badge rs-badge-on">' + _t('gui_rs_rule_type_allow') + '</span>';
-      const ruleSchedArgs = rsDataArgs([
+          ? h('span', { class: 'rs-badge rs-badge-off' }, _t('gui_rs_rule_type_deny'))
+          : h('span', { class: 'rs-badge rs-badge-on' }, _t('gui_rs_rule_type_allow'));
+      const schedBtn = h('button', { class: 'btn btn-sm btn-primary' }, _t('gui_rs_schedule_btn'));
+      schedBtn.dataset.action = 'rsOpenScheduleModal';
+      schedBtn.dataset.args = JSON.stringify([
         r.href,
         r.description || (_t('gui_rs_type_rule') + ' ' + r.id),
         false,
@@ -308,15 +331,16 @@ async function rsViewRuleset(rsId) {
         r.dest,
         r.service,
       ]);
-      tr.innerHTML =
-        '<td>' + schIcon + '</td>' +
-        '<td style="color:var(--dim);font-size:.8rem;">' + (r.no || '') + '</td>' +
-        '<td>' + r.id + '</td>' +
-        '<td>' + prov + '</td>' +
-        '<td>' + st + '</td>' +
-        '<td>' + ruleTypeBadge + '</td>' +
-        descHtml + srcHtml + dstHtml + svcHtml +
-        '<td><button class="btn btn-sm btn-primary" data-action="rsOpenScheduleModal" data-args=\'' + ruleSchedArgs + '\'>' + _t('gui_rs_schedule_btn') + '</button></td>';
+      tr.replaceChildren(
+        h('td', null, schIcon),
+        h('td', { style: { color: 'var(--dim)', fontSize: '.8rem' } }, r.no || ''),
+        h('td', null, String(r.id)),
+        h('td', null, prov),
+        h('td', null, st),
+        h('td', null, ruleTypeBadge),
+        descTd, srcTd, dstTd, svcTd,
+        h('td', null, schedBtn),
+      );
       tbody.appendChild(tr);
     });
     initTableResizers();
@@ -329,11 +353,11 @@ async function rsViewRuleset(rsId) {
   }
 }
 
-/* ── Truncate helper ── */
-function rsTruncate(s, max) {
-  if (!s) return '<span style="color:var(--dim)">' + _t('gui_rs_all') + '</span>';
-  const t = escapeHtml(s);
-  return t.length > max ? t.substring(0, max) + '...' : t;
+/* ── Truncate helper (returns a DOM Node for safe insertion) ── */
+function rsTruncateNode(s, max) {
+  if (!s) return h('span', { style: { color: 'var(--dim)' } }, _t('gui_rs_all'));
+  const str = String(s);
+  return document.createTextNode(str.length > max ? str.substring(0, max) + '...' : str);
 }
 
 /* ── Detail popup for clickable cells ──
@@ -362,7 +386,7 @@ function rsClosePopup() {
 }
 
 // Close popup on outside click. Use closest() so clicks on elements nested
-// inside an .rs-clickable cell (e.g. the inner <span> from rsTruncate) are
+// inside an .rs-clickable cell (e.g. the inner <span> from rsTruncateNode) are
 // treated as clicks on the cell and don't dismiss the popup.
 document.addEventListener('click', function(e) {
   const popup = $('rs-detail-popup');
@@ -468,55 +492,61 @@ async function rsLoadSchedules() {
       const typeStr = s.is_ruleset ? _t('gui_rs_type_ruleset') : _t('gui_rs_type_rule');
       // Live status badge
       const liveBadge = s.pce_status === 'deleted'
-        ? '<span class="rs-badge rs-badge-deleted">' + _t('gui_rs_status_deleted') + '</span>'
+        ? h('span', { class: 'rs-badge rs-badge-deleted' }, _t('gui_rs_status_deleted'))
         : s.live_enabled === true
-          ? '<span class="rs-badge rs-badge-on">ON</span>'
+          ? h('span', { class: 'rs-badge rs-badge-on' }, 'ON')
           : s.live_enabled === false
-            ? '<span class="rs-badge rs-badge-off">OFF</span>'
-            : '<span style="color:var(--dim)">--</span>';
+            ? h('span', { class: 'rs-badge rs-badge-off' }, 'OFF')
+            : h('span', { style: { color: 'var(--dim)' } }, '--');
       // Action badge
-      let actionBadge = '';
+      let actionBadge;
       if (s.type === 'recurring') {
         actionBadge = s.action === 'allow'
-          ? '<span class="rs-badge rs-badge-allow">' + _t('gui_rs_enable_label') + '</span>'
-          : '<span class="rs-badge rs-badge-block">' + _t('gui_rs_disable_label') + '</span>';
+          ? h('span', { class: 'rs-badge rs-badge-allow' }, _t('gui_rs_enable_label'))
+          : h('span', { class: 'rs-badge rs-badge-block' }, _t('gui_rs_disable_label'));
       } else {
-        actionBadge = '<span class="rs-badge rs-badge-expire">' + _t('gui_rs_expire') + '</span>';
+        actionBadge = h('span', { class: 'rs-badge rs-badge-expire' }, _t('gui_rs_expire'));
       }
       // Timing - map day names for i18n
       const dayMap = {'Monday': _t('gui_rs_mon'),'Tuesday': _t('gui_rs_tue'),'Wednesday': _t('gui_rs_wed'),'Thursday': _t('gui_rs_thu'),'Friday': _t('gui_rs_fri'),'Saturday': _t('gui_rs_sat'),'Sunday': _t('gui_rs_sun')};
-      let timing = '';
       const tzLabel = s.timezone && s.timezone !== 'local' ? s.timezone : _t('gui_rs_local_tz');
+      const tzSpan = h('span', { style: { color: 'var(--accent2)', fontSize: '.75rem' } }, '(' + tzLabel + ')');
+      let timingChildren;
       if (s.type === 'recurring') {
         const days = (s.days || []).length === 7 ? _t('gui_rs_everyday') : (s.days || []).map(d => dayMap[d] || d.substring(0, 3)).join(', ');
-        timing = days + ' ' + (s.start || '') + ' - ' + (s.end || '') + ' <span style="color:var(--accent2);font-size:.75rem;">(' + escapeHtml(tzLabel) + ')</span>';
+        timingChildren = [days + ' ' + (s.start || '') + ' - ' + (s.end || '') + ' ', tzSpan];
       } else {
-        timing = _t('gui_rs_until') + ' ' + (s.expire_at || '').replace('T', ' ') + ' <span style="color:var(--accent2);font-size:.75rem;">(' + escapeHtml(tzLabel) + ')</span>';
+        timingChildren = [_t('gui_rs_until') + ' ' + (s.expire_at || '').replace('T', ' ') + ' ', tzSpan];
       }
-      // Description (rule desc or RS name)
-      const descText = escapeHtml(s.detail_name || s.name || '');
-      const rsName = escapeHtml(s.detail_rs || '');
-      const srcText = escapeHtml(s.detail_src || _t('gui_rs_all'));
-      const dstText = escapeHtml(s.detail_dst || _t('gui_rs_all'));
-      const svcText = escapeHtml(s.detail_svc || _t('gui_rs_all'));
-
+      // Description (rule desc or RS name) - raw text; DOM API escapes via textContent.
       const descLabel = _t('gui_rs_col_desc');
       const srcLabel = _t('gui_rs_col_source');
       const dstLabel = _t('gui_rs_col_dest');
       const svcLabel = _t('gui_rs_col_service');
-      tr.innerHTML =
-        '<td><input type="checkbox" class="rs-sch-cb" value="' + escapeHtml(s.href) + '"></td>' +
-        '<td>' + typeStr + '</td>' +
-        '<td>' + liveBadge + '</td>' +
-        '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([_t('gui_rs_col_name'), rsName]) + '\'>' + rsTruncate(s.detail_rs, 20) + '</td>' +
-        '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([descLabel, descText]) + '\'>' + rsTruncate(s.detail_name || s.name, 20) + '</td>' +
-        '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([srcLabel, srcText]) + '\'>' + rsTruncate(s.detail_src, 20) + '</td>' +
-        '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([dstLabel, dstText]) + '\'>' + rsTruncate(s.detail_dst, 20) + '</td>' +
-        '<td class="rs-clickable" data-action="rsShowPopup" data-args=\'' + rsDataArgs([svcLabel, svcText]) + '\'>' + rsTruncate(s.detail_svc, 20) + '</td>' +
-        '<td>' + actionBadge + '</td>' +
-        '<td style="font-size:.8rem;">' + timing + '</td>' +
-        '<td>' + s.id + '</td>' +
-        '<td><button class="rs-edit-btn" data-action="rsEditSchedule" data-args=\'' + rsDataArgs([s.id]) + '\'>' + _t('gui_rs_col_edit') + '</button></td>';
+      const popupTd = (label, value, displaySource, max) => {
+        const td = h('td', { class: 'rs-clickable' }, rsTruncateNode(displaySource, max));
+        td.dataset.action = 'rsShowPopup';
+        td.dataset.args = JSON.stringify([label, value == null ? '' : String(value)]);
+        return td;
+      };
+      const cb = h('input', { type: 'checkbox', class: 'rs-sch-cb', value: s.href || '' });
+      const editBtn = h('button', { class: 'rs-edit-btn' }, _t('gui_rs_col_edit'));
+      editBtn.dataset.action = 'rsEditSchedule';
+      editBtn.dataset.args = JSON.stringify([s.id]);
+      tr.replaceChildren(
+        h('td', null, cb),
+        h('td', null, typeStr),
+        h('td', null, liveBadge),
+        popupTd(_t('gui_rs_col_name'), s.detail_rs || '', s.detail_rs, 20),
+        popupTd(descLabel, s.detail_name || s.name || '', s.detail_name || s.name, 20),
+        popupTd(srcLabel, s.detail_src || _t('gui_rs_all'), s.detail_src, 20),
+        popupTd(dstLabel, s.detail_dst || _t('gui_rs_all'), s.detail_dst, 20),
+        popupTd(svcLabel, s.detail_svc || _t('gui_rs_all'), s.detail_svc, 20),
+        h('td', null, actionBadge),
+        h('td', { style: { fontSize: '.8rem' } }, ...timingChildren),
+        h('td', null, String(s.id)),
+        h('td', null, editBtn),
+      );
       tbody.appendChild(tr);
     });
     initTableResizers();
