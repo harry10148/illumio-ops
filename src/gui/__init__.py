@@ -433,8 +433,8 @@ def _load_state_for_charts() -> dict:
         if os.path.exists(state_file):
             with open(state_file, "r", encoding="utf-8") as f:
                 return json.load(f)
-    except Exception:
-        pass
+    except Exception as _e:
+        logger.debug(f"[GUI:load_state] swallowed: {_e}")  # missing/corrupt state file → empty dict
     return {}
 
 
@@ -471,8 +471,8 @@ def _build_policy_decisions_spec(cm_ref) -> dict:
             allowed = snap.get("allowed_flows", 0)
             blocked = snap.get("blocked_flows", 0)
             potential = snap.get("potentially_blocked_flows", 0)
-    except Exception:
-        pass
+    except Exception as _e:
+        logger.debug(f"[GUI:snapshot_parse] swallowed: {_e}")  # missing/corrupt snapshot → zero counts
     return {
         "type": "pie",
         "title": t("rpt_dash_pd_title", default="Policy Decisions (Latest Report)"),
@@ -2765,7 +2765,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             from src.module_log import ModuleLog as _ML
             _ML.get("actions").info("Manually triggered monitoring analysis")
         except Exception:
-            pass
+            pass  # intentional: audit-log best-effort, must not block primary action
         from src.api_client import ApiClient
         from src.reporter import Reporter
         from src.analyzer import Analyzer
@@ -2798,7 +2798,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             from src.module_log import ModuleLog as _ML
             _ML.get("actions").info("Manually triggered test alert")
         except Exception:
-            pass
+            pass  # intentional: audit-log best-effort, must not block primary action
         data = request.json or {}
         channel = str(data.get("channel", "") or "").strip()
         channels = [channel] if channel else None
@@ -2825,7 +2825,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             from src.module_log import ModuleLog as _ML
             _ML.get("actions").info("Load best practice rules")
         except Exception:
-            pass
+            pass  # intentional: audit-log best-effort, must not block primary action
         data = request.json or {}
         mode = str(data.get("mode", "append_missing") or "append_missing")
         result = cm.apply_best_practices(mode=mode)
@@ -2846,7 +2846,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             from src.module_log import ModuleLog as _ML
             _ML.get("actions").info("Testing PCE connection")
         except Exception:
-            pass
+            pass  # intentional: audit-log best-effort, must not block primary action
         try:
             from src.api_client import ApiClient
             api = ApiClient(cm)
@@ -2857,14 +2857,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 from src.module_log import ModuleLog as _ML
                 _ML.get("actions").info(f"Connection result: status={status}")
             except Exception:
-                pass
+                pass  # intentional: audit-log best-effort, must not block primary action
             return jsonify({"ok": status == 200, "status": status, "body": clean_body[:500]})
         except Exception as e:
             try:
                 from src.module_log import ModuleLog as _ML
                 _ML.get("actions").error(f"Connection failed: {e}")
             except Exception:
-                pass
+                pass  # intentional: audit-log best-effort, must not block primary action
             return _err_with_log("pce_test_connection", e)
 
     @app.route('/api/shutdown', methods=['POST'])
@@ -2912,8 +2912,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         size = int(request.args.get('size', 50))
         try:
             api.update_label_cache(silent=True)
-        except Exception:
-            pass
+        except Exception as _e:
+            logger.debug(f"[GUI:label_cache_refresh] swallowed: {_e}")  # best-effort cache warm-up
 
         try:
             if q:
@@ -2958,8 +2958,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             return jsonify({"items": []})
         try:
             api.update_label_cache(silent=True)
-        except Exception:
-            pass
+        except Exception as _e:
+            logger.debug(f"[GUI:label_cache_refresh] swallowed: {_e}")  # best-effort cache warm-up
         all_rs = api.get_all_rulesets()
         results = []
         q_lower = q.lower()
@@ -3001,8 +3001,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         db, api, _ = _get_rs_components()
         try:
             api.update_label_cache(silent=True)
-        except Exception:
-            pass
+        except Exception as _e:
+            logger.debug(f"[GUI:label_cache_refresh] swallowed: {_e}")  # best-effort cache warm-up
         try:
             rs = api.get_ruleset_by_id(rs_id)
         except Exception as e:
@@ -3164,8 +3164,8 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         for href in hrefs:
             try:
                 api.update_rule_note(href, "", remove=True)
-            except Exception:
-                pass
+            except Exception as _e:
+                logger.debug(f"[GUI:rule_note_clear] swallowed: {_e}")  # best-effort note removal
             if db.delete(href):
                 deleted.append(_extract_id_href(href))
         return jsonify({"ok": True, "deleted": deleted})
@@ -3212,13 +3212,13 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         from src.siem.web import bp as siem_bp
         app.register_blueprint(siem_bp)
     except Exception:
-        pass
+        pass  # intentional: optional module — siem blueprint absent on slim installs
 
     try:
         from src.pce_cache.web import bp as cache_bp
         app.register_blueprint(cache_bp)
     except Exception:
-        pass
+        pass  # intentional: optional module — pce_cache blueprint absent on slim installs
 
     @app.route('/api/daemon/restart', methods=['POST'])
     @limiter.limit("5 per hour")
@@ -3639,7 +3639,7 @@ def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None
             try:
                 _rserver.stop()
             except Exception:
-                pass
+                pass  # intentional: shutdown best-effort, secondary errors not actionable
 
     _t = _threading.Thread(target=_start_redirect_server, daemon=True, name="http-redirect")
     _t.start()
