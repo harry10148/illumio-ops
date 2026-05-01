@@ -176,3 +176,17 @@ def test_security_post_username_change_succeeds_with_old_password(app_client):
     }, headers={'X-CSRF-Token': csrf_token})
     assert r.status_code == 200
     assert r.get_json()['ok'] is True
+
+
+def test_gui_init_has_no_str_e_leaks_in_routes():
+    """H3 regression guard: scan src/gui/__init__.py for the pattern
+    `jsonify({"ok": False, "error": str(<exc_var>)` which leaks exception
+    text. The unified handler at the app level catches truly-unhandled cases."""
+    import re
+    from pathlib import Path
+    src = Path(__file__).resolve().parents[1] / 'src' / 'gui' / '__init__.py'
+    assert src.exists(), f"GUI source file not found at {src}"
+    text = src.read_text(encoding='utf-8')
+    # Catch any common identifier name in str(...) inside an error field
+    leaks = re.findall(r'jsonify\(\{[^}]*"error"\s*:\s*str\((?:e|exc|err|ex)\)', text)
+    assert not leaks, f"Found {len(leaks)} `str(<exc>)` leak(s) in src/gui/__init__.py: {leaks[:3]}"

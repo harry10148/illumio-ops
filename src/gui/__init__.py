@@ -352,6 +352,24 @@ def _safe_log(s: str, max_len: int = 200) -> str:
     """Strip CRLF and truncate for safe log output."""
     return str(s).replace('\r', '').replace('\n', '').replace('\t', ' ')[:max_len]
 
+def _err_with_log(category: str, exc: Exception, status: int = 500):
+    """H3: log full exception detail server-side, return generic error to client.
+
+    Logs ``[GUI:{category}] req={req_id}: <traceback>`` via ``loguru.error`` and
+    returns ``(jsonify({"ok": False, "error": "<i18n>", "request_id": req_id}), status)``.
+    The 8-char request_id is for log correlation only — not a security token.
+
+    ``category`` is a short label like 'pce_profile' or 'dashboard_summary' used
+    only in the log line, never in the response.
+    """
+    req_id = str(_uuid.uuid4())[:8]
+    logger.error(f"[GUI:{category}] req={req_id}: {_traceback.format_exc()}")
+    return jsonify({
+        "ok": False,
+        "error": t("gui_err_internal", default="Internal server error"),
+        "request_id": req_id,
+    }), status
+
 def _get_active_pce_url(cm: 'ConfigManager') -> str:
     """Return the active PCE profile URL, falling back to config['api']['url']."""
     active_id = cm.config.get('active_pce_id')
@@ -1704,7 +1722,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 "cert_info": info,
             })
         except RuntimeError as e:
-            return jsonify({"ok": False, "error": str(e)}), 500
+            return _err_with_log("cert_renew", e)
 
     @app.route('/api/pce-profiles', methods=['GET'])
     def api_list_pce_profiles():
@@ -1846,7 +1864,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 data = json.load(f)
             return jsonify({"ok": True, "snapshot": data})
         except Exception as e:
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("dashboard_snapshot", e)
 
     @app.route('/api/dashboard/audit_summary', methods=['GET'])
     def api_dashboard_audit_summary():
@@ -1860,7 +1878,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 data = json.load(f)
             return jsonify({"ok": True, "summary": data})
         except Exception as e:
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("dashboard_audit_summary", e)
 
     @app.route('/api/dashboard/policy_usage_summary', methods=['GET'])
     def api_dashboard_policy_usage_summary():
@@ -1874,7 +1892,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 data = json.load(f)
             return jsonify({"ok": True, "summary": data})
         except Exception as e:
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("dashboard_policy_usage_summary", e)
 
     # ??? API: Reports ??????????????????????????????????????????????????????
 
@@ -2116,8 +2134,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     _rlog.error(f"Traffic report failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            logger.error(f"Report generation failed: {e}", exc_info=True)
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("report_traffic_generate", e)
 
     @app.route('/api/audit_report/generate', methods=['POST'])
     def api_generate_audit_report():
@@ -2168,8 +2185,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     _arlog.error(f"Audit report generation failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            logger.error(f"Audit generation failed: {e}", exc_info=True)
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("report_audit_generate", e)
 
     # ??? API: VEN Status Report ????????????????????????????????????????????
     @app.route('/api/ven_status_report/generate', methods=['POST'])
@@ -2217,8 +2233,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     _vrlog.error(f"VEN status report generation failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            logger.error(f"VEN status report failed: {e}", exc_info=True)
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("report_ven_status_generate", e)
 
     # ??? API: Policy Usage Report ??????????????????????????????????????????
     @app.route('/api/policy_usage_report/generate', methods=['POST'])
@@ -2280,8 +2295,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                     _pulog.error(f"Policy usage report generation failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            logger.error(f"Policy usage report failed: {e}", exc_info=True)
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("report_policy_usage_generate", e)
 
     # ??? API: Report Schedules ?????????????????????????????????????????????
 
@@ -2323,7 +2337,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             sched = cm.add_report_schedule(d)
             return jsonify({"ok": True, "schedule": sched})
         except Exception as e:
-            return jsonify({"ok": False, "error": str(e)}), 400
+            return _err_with_log("report_schedule_create", e, 400)
 
     @app.route('/api/report-schedules/<int:schedule_id>', methods=['PUT'])
     def api_update_report_schedule(schedule_id):
@@ -2335,7 +2349,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 return jsonify({"ok": False, "error": t("gui_schedule_not_found")}), 404
             return jsonify({"ok": True})
         except Exception as e:
-            return jsonify({"ok": False, "error": str(e)}), 400
+            return _err_with_log("report_schedule_update", e, 400)
 
     @app.route('/api/report-schedules/<int:schedule_id>', methods=['DELETE'])
     def api_delete_report_schedule(schedule_id):
@@ -2346,7 +2360,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 return jsonify({"ok": False, "error": t("gui_schedule_not_found")}), 404
             return jsonify({"ok": True})
         except Exception as e:
-            return jsonify({"ok": False, "error": str(e)}), 400
+            return _err_with_log("report_schedule_delete", e, 400)
 
     @app.route('/api/report-schedules/<int:schedule_id>/toggle', methods=['POST'])
     def api_toggle_report_schedule(schedule_id):
@@ -2360,7 +2374,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             cm.update_report_schedule(schedule_id, {"enabled": new_enabled})
             return jsonify({"ok": True, "enabled": new_enabled})
         except Exception as e:
-            return jsonify({"ok": False, "error": str(e)}), 400
+            return _err_with_log("report_schedule_toggle", e, 400)
 
     @app.route('/api/report-schedules/<int:schedule_id>/run', methods=['POST'])
     def api_run_report_schedule(schedule_id):
@@ -2393,7 +2407,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             t_thread.start()
             return jsonify({"ok": True, "message": t("gui_msg_sched_started")})
         except Exception as e:
-            return jsonify({"ok": False, "error": str(e)}), 400
+            return _err_with_log("report_schedule_run", e, 400)
 
     @app.route('/api/report-schedules/<int:schedule_id>/history', methods=['GET'])
     def api_report_schedule_history(schedule_id):
@@ -2406,7 +2420,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             entry = states.get(str(schedule_id), {})
             return jsonify({"ok": True, "history": [entry] if entry else []})
         except Exception as e:
-            return jsonify({"ok": False, "error": str(e)}), 400
+            return _err_with_log("report_schedule_history", e, 400)
 
     # ??? API: Traffic & Quarantine ?????????????????????????????????????????
     @app.route('/api/quarantine/search', methods=['POST'])
@@ -2471,8 +2485,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 
             return jsonify({"ok": True, "data": results})
         except Exception as e:
-            logger.error(f"Quarantine Search Error: {e}", exc_info=True)
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("quarantine_search", e)
 
     @app.route('/api/dashboard/top10', methods=['POST'])
     def api_dashboard_top10():
@@ -2590,8 +2603,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 
             return jsonify({"ok": True, "data": top10, "total": len(sorted_v)})
         except Exception as e:
-            logger.error(f"Top 10 Query Error: {e}", exc_info=True)
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("dashboard_top10", e)
 
     @app.route('/api/workloads', methods=['GET', 'POST'])
     def api_search_workloads():
@@ -2664,8 +2676,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
             return jsonify({"ok": True, "data": workloads})
         except Exception as e:
-            logger.error(f"Search Workload Error: {e}", exc_info=True)
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("workloads_search", e)
 
     @app.route('/api/quarantine/apply', methods=['POST'])
     def api_quarantine_apply():
@@ -2701,8 +2712,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             else:
                 return jsonify({"ok": False, "error": t("gui_api_update_failed")})
         except Exception as e:
-            logger.error(f"Quarantine Apply Error: {e}")
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("quarantine_apply", e)
 
     @app.route('/api/quarantine/bulk_apply', methods=['POST'])
     def api_quarantine_bulk_apply():
@@ -2745,8 +2755,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
             return jsonify({"ok": True, "results": results})
         except Exception as e:
-            logger.error(f"Bulk Quarantine Error: {e}")
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("quarantine_bulk_apply", e)
 
     # ??? API: Actions ?????????????????????????????????????????????????????
     @app.route('/api/actions/run', methods=['POST'])
@@ -2855,7 +2864,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
                 _ML.get("actions").error(f"Connection failed: {e}")
             except Exception:
                 pass
-            return jsonify({"ok": False, "error": str(e)})
+            return _err_with_log("pce_test_connection", e)
 
     @app.route('/api/shutdown', methods=['POST'])
     @limiter.limit("5 per hour")
@@ -3224,7 +3233,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
             _self._DAEMON_SCHEDULER = _self._DAEMON_RESTART_FN()
             return jsonify({"ok": True}), 200
         except Exception as exc:
-            return jsonify({"ok": False, "error": str(exc)}), 500
+            return _err_with_log("daemon_restart", exc)
 
     return app
 

@@ -516,6 +516,7 @@
   "gui_err_invalid_auth": "帳號或密碼錯誤。",
   "gui_err_invalid_ip": "無效 IP 位址",
   "gui_err_invalid_old_pass": "舊密碼不正確。",
+  "gui_err_internal": "內部伺服器錯誤",
   "gui_err_invalid_password_form": "密碼格式無效",
   "gui_err_ip_not_allowed": "您的 IP 位址不在允許清單中。",
   "gui_err_network": "網路錯誤，請稍後再試。",
