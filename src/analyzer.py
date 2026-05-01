@@ -490,6 +490,10 @@ class Analyzer:
 
     def _legacy_event_pull(self):
         """Fetch events from the PCE API (legacy path used when no cache subscriber)."""
+        logger.warning(
+            "[deprecated] _legacy_event_pull called — pce_cache path should be "
+            "preferred; remove after pce_cache.enabled becomes the default."
+        )
         event_batch = self._fetch_event_batch()
         events = event_batch.events
         self.stats.record_pce_success("events", status=200, message=f"fetched={len(events)}")
@@ -589,6 +593,10 @@ class Analyzer:
 
     def _legacy_fetch_traffic(self):
         """Fetch traffic from the PCE API (legacy path used when no cache subscriber)."""
+        logger.warning(
+            "[deprecated] _legacy_fetch_traffic called — pce_cache path should be "
+            "preferred; remove after pce_cache.enabled becomes the default."
+        )
         now_utc = datetime.datetime.now(datetime.timezone.utc)
         max_win = max([r.get('threshold_window', 10) for r in self.cm.config["rules"]
                        if r["type"] in ["traffic", "bandwidth", "volume"]])
