@@ -32,14 +32,25 @@
   }
   window.integrationsSwitch = integrationsSwitch;
 
-  // Hook into the project's existing switchTab to auto-render Overview on first visit.
-  var originalSwitchTab = window.switchTab;
-  if (typeof originalSwitchTab === 'function') {
-    window.switchTab = function (name) {
+  // Hook into the project's existing switchTab to auto-render Overview on
+  // first visit. integrations.js loads BEFORE tabs.js (which defines
+  // switchTab), so an immediate wrap would no-op. Try once now, otherwise
+  // wrap on DOMContentLoaded — by then tabs.js has parsed.
+  function wrapSwitchTab() {
+    var originalSwitchTab = window.switchTab;
+    if (typeof originalSwitchTab !== 'function') return false;
+    if (originalSwitchTab.__integrationsWrapped) return true;
+    var wrapped = function (name) {
       var r = originalSwitchTab.apply(this, arguments);
       if (name === 'integrations') integrationsSwitch('overview');
       return r;
     };
+    wrapped.__integrationsWrapped = true;
+    window.switchTab = wrapped;
+    return true;
+  }
+  if (!wrapSwitchTab()) {
+    document.addEventListener('DOMContentLoaded', wrapSwitchTab);
   }
 
   // Placeholder renderers — later tasks replace each body.

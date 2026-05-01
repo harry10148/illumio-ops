@@ -51,6 +51,26 @@ _ASYNC_JOB_CACHE_MAX_AGE_DAYS = 7
 _ASYNC_JOB_PRUNE_INTERVAL_SECONDS = 3600
 
 
+_TLS_VERIFY_DISABLED_WARNED = False
+
+
+def _warn_tls_verification_disabled_once() -> None:
+    """Emit the TLS-verification-disabled warning once per process.
+
+    ApiClient is constructed many times (per request handler, per scheduler
+    job, per CLI run); without this gate, the warning floods logs. The
+    security reminder still appears once at first construction.
+    """
+    global _TLS_VERIFY_DISABLED_WARNED
+    if _TLS_VERIFY_DISABLED_WARNED:
+        return
+    _TLS_VERIFY_DISABLED_WARNED = True
+    logger.warning(
+        "TLS certificate verification is disabled for PCE API — security risk "
+        "(this warning is logged once per process)"
+    )
+
+
 class EventFetchError(RuntimeError):
     """Raised when the PCE events API cannot be fetched safely."""
 
@@ -106,7 +126,7 @@ class ApiClient:
         _verify_cfg = self.api_cfg.get('verify_ssl', True)
         self._session.verify = _verify_cfg if isinstance(_verify_cfg, str) else bool(_verify_cfg)
         if not self._session.verify:
-            logger.warning("TLS certificate verification is disabled for PCE API — security risk")
+            _warn_tls_verification_disabled_once()
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         self._session.headers.update({
