@@ -143,6 +143,30 @@ def _redact_secrets(obj):
         return [_redact_secrets(item) for item in obj]
     return obj
 
+
+def _strip_redaction_placeholders(obj):
+    """Drop masked secret values from an incoming settings payload.
+
+    GET /api/settings replaces secret fields with up-to-8 asterisks via
+    _redact_secrets. If the GUI POSTs the unchanged response back, the
+    masked value would overwrite the real secret. This helper strips
+    secret-named keys whose value is purely asterisks (1-8 chars) so the
+    existing stored value is preserved.
+    """
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            if (_SECRET_PATTERN.search(k.lower())
+                    and isinstance(v, str)
+                    and 1 <= len(v) <= 8
+                    and v == "*" * len(v)):
+                continue
+            out[k] = _strip_redaction_placeholders(v)
+        return out
+    elif isinstance(obj, list):
+        return [_strip_redaction_placeholders(item) for item in obj]
+    return obj
+
 _SETTINGS_ALLOWLISTS = {
     "smtp": {"host", "port", "user", "password", "enable_auth", "enable_tls"},
     "alerts": {"active", "line_channel_access_token", "line_target_id", "webhook_url"},
@@ -1612,7 +1636,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     @app.route('/api/settings', methods=['POST'])
     @limiter.limit("30 per hour")
     def api_save_settings():
-        d = request.json
+        d = _strip_redaction_placeholders(request.json or {})
         if 'api' in d:
             api_in = d['api']
             api_allowlist = _SETTINGS_ALLOWLISTS["api"]
