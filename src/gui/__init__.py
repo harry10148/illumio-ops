@@ -601,7 +601,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 
     @app.errorhandler(CSRFError)
     def handle_csrf_error(error):
-        if request.path.startswith('/api/'):
+        # /logout is a fetch-driven endpoint (no form), so emit JSON 400 like /api/*
+        # rather than redirecting — the SPA can refresh the token and retry.
+        if request.path.startswith('/api/') or request.path == '/logout':
             return jsonify({
                 "ok": False,
                 "code": "csrf_error",
@@ -815,7 +817,6 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
 
     @app.route('/logout', methods=['POST'])
-    @csrf.exempt
     def logout():
         logout_user()
         session.clear()

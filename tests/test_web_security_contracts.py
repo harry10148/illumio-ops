@@ -94,8 +94,9 @@ def test_csrf_required_on_post_after_login(app_client):
 
 def test_logout_clears_session(app_client):
     client, _cm = app_client
-    client.post("/api/login", json={"username": "illumio", "password": "illumio"})
-    client.post("/logout")
+    r = client.post("/api/login", json={"username": "illumio", "password": "illumio"})
+    csrf_token = (r.get_json() or {}).get("csrf_token", "")
+    client.post("/logout", headers={"X-CSRFToken": csrf_token})
     # After logout, protected endpoint should be unauthorized
     r = client.get("/api/dashboard")
     assert r.status_code in (302, 401), f"Logout must unauth; got {r.status_code}"
@@ -324,3 +325,43 @@ def test_password_change_clears_must_change_flag(app_client_initial):
         "must_change_password not persisted (still True after reload from disk)"
     assert '_initial_password' not in cm.config.get('web_gui', {}), \
         "_initial_password not persisted as removed (still present after reload from disk)"
+
+
+# ----------------------------------------------------------------------------
+# M8: /logout must require CSRF token (no @csrf.exempt)
+# ----------------------------------------------------------------------------
+
+def test_logout_requires_csrf_token(app_client):
+    """M8: POST /logout without a CSRF token should be rejected."""
+    client, _cm = app_client
+    # Log in
+    r = client.post('/api/login', json={'username': 'illumio', 'password': 'illumio'})
+    assert r.status_code == 200
+    # POST /logout without a CSRF token (or with a wrong one)
+    r = client.post('/logout', headers={'X-CSRFToken': 'wrong'})
+    assert r.status_code == 400, \
+        f"logout without CSRF token returned {r.status_code}; CSRF guard not enforced"
+
+
+def test_logout_succeeds_with_csrf_token(app_client):
+    """M8: POST /logout with the right CSRF token works AND clears the session."""
+    client, _cm = app_client
+    r = client.post('/api/login', json={'username': 'illumio', 'password': 'illumio'})
+    assert r.status_code == 200
+    csrf_token = r.get_json().get('csrf_token')
+    assert csrf_token, "login did not return csrf_token"
+
+    # Verify we are actually authed before logout
+    r_pre = client.get('/api/status')
+    assert r_pre.status_code == 200, \
+        f"pre-logout /api/status should succeed, got {r_pre.status_code}"
+
+    r = client.post('/logout', headers={'X-CSRFToken': csrf_token})
+    # 200 response or 302 redirect to /login is success
+    assert r.status_code in (200, 302), \
+        f"logout with valid CSRF returned {r.status_code}"
+
+    # Session must be cleared — subsequent authed call should be rejected
+    r_post = client.get('/api/status')
+    assert r_post.status_code in (302, 401), \
+        f"after logout, /api/status returned {r_post.status_code} — session not cleared"
