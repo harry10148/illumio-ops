@@ -3,15 +3,58 @@
 setup_loguru(log_file, level, json_sink, rotation, retention)
   - Configures loguru sinks: console (TTY-aware) + file (rotating) + optional JSON
   - Intercepts stdlib logging from 3rd-party libs via _StdLibInterceptHandler
+  - L4: Sink-level redaction filter scrubs secret-looking key=value pairs
+    from log messages before they hit any sink (console/file/JSON).
   - Idempotent: removes prior sinks on each call
 """
 from __future__ import annotations
 
 import logging
+import re as _re
 import sys
 from pathlib import Path
 
 from loguru import logger
+
+
+# L4: Patterns of secret-looking values inside log messages.
+# Field names matched: api_key, secret, password, token, webhook_url,
+# line_channel_access_token, smtp_password, authorization (header).
+# The optional `Bearer ` prefix lets us strip the token from
+# `Authorization: Bearer <token>` style headers without keeping the value.
+_LOG_SECRET_FIELD = _re.compile(
+    r'\b('
+    r'api[_-]?key'
+    r'|secret(?:[_-]?key)?'
+    r'|password'
+    r'|(?:line[_-]?channel[_-]?access[_-]?)?token'
+    r'|webhook[_-]?url'
+    r'|authorization'
+    r'|smtp[_-]?password'
+    r')\b'
+    r'["\']?'         # optional closing quote of a quoted JSON-style key
+    r'\s*[:=]\s*'
+    r'["\']?(?:Bearer\s+)?([^,"\'\s}\)]{4,})',
+    _re.IGNORECASE,
+)
+
+
+def _redact_log_record(record):
+    """Loguru filter: replace secret-like values in record['message'].
+
+    Idempotent: re-running the filter on already-redacted text is a no-op
+    (the [REDACTED] marker contains no field-name pattern). Loguru shares
+    the record dict across sinks, so the first sink's mutation is observed
+    by subsequent sinks — this is fine because of idempotency.
+    """
+    msg = record.get('message') or ''
+    if not msg:
+        return True
+    record['message'] = _LOG_SECRET_FIELD.sub(
+        lambda m: m.group(0).replace(m.group(2), '[REDACTED]'),
+        msg,
+    )
+    return True
 
 
 _NOISY_LIBS = frozenset({
@@ -63,6 +106,7 @@ def setup_loguru(
         sys.stderr,
         level=level,
         colorize=True,
+        filter=_redact_log_record,  # L4: redact secrets even on console
         format=(
             "<green>{time:YYYY-MM-DD HH:mm:ss}</green> "
             "<level>{level: <8}</level> "
@@ -79,6 +123,7 @@ def setup_loguru(
         retention=retention,
         encoding="utf-8",
         enqueue=True,
+        filter=_redact_log_record,  # L4
         format="{time:YYYY-MM-DD HH:mm:ss} {level: <8} {name}:{line} - {message}",
     )
 
@@ -91,6 +136,7 @@ def setup_loguru(
             retention=retention,
             serialize=True,
             enqueue=True,
+            filter=_redact_log_record,  # L4
         )
 
     logging.basicConfig(handlers=[_StdLibInterceptHandler()], level=0, force=True)

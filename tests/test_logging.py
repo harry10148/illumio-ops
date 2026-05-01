@@ -79,3 +79,44 @@ def test_internal_server_error_hides_details():
             assert "RuntimeError" not in body_text
     finally:
         os.unlink(path)
+
+
+def test_log_redacts_password_field(tmp_path):
+    """L4: loguru sinks should redact secret-looking key=value pairs."""
+    from loguru import logger as _logger
+    from src.loguru_config import setup_loguru
+    log_file = tmp_path / 'test.log'
+    setup_loguru(log_file=str(log_file), level='DEBUG')
+    _logger.info('Connecting with password=hunter2-secret-value')
+    _logger.info('PCE response: {"api_key": "abcd1234secret"}')
+    _logger.info('webhook_url=https://hooks.example.com/abc123')
+    _logger.info('authorization: Bearer my-bearer-token-xyz')
+    # Flush all enqueued sinks deterministically.
+    _logger.complete()
+    text = log_file.read_text()
+    # The secret values must be scrubbed
+    assert 'hunter2-secret-value' not in text
+    assert 'abcd1234secret' not in text
+    assert 'abc123' not in text
+    assert 'my-bearer-token-xyz' not in text
+    # The redaction marker must appear
+    assert '[REDACTED]' in text
+
+
+def test_log_does_not_redact_non_secret_fields(tmp_path):
+    """L4: regression guard — common non-secret fields must not match."""
+    from loguru import logger as _logger
+    from src.loguru_config import setup_loguru
+    log_file = tmp_path / 'test.log'
+    setup_loguru(log_file=str(log_file), level='DEBUG')
+    _logger.info('User login: username=alice')
+    _logger.info('Cache hit: cache_key=session-12345')
+    _logger.info('Partition: partition_key=tenant-foo')
+    _logger.info('Connecting to port=8443')
+    _logger.complete()
+    text = log_file.read_text()
+    assert 'username=alice' in text, "username should not be redacted"
+    assert 'cache_key=session-12345' in text, "cache_key (not api_key) should not be redacted"
+    assert 'partition_key=tenant-foo' in text, "partition_key should not be redacted"
+    assert 'port=8443' in text, "port should not be redacted"
+    assert '[REDACTED]' not in text, "no redaction marker should appear in this output"
