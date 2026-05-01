@@ -176,7 +176,12 @@ class ConfigManager:
             changed = True
 
         if not gui.get("password") and not gui.get("_initial_password"):
-            initial = _secrets.token_urlsafe(12)
+            # Default initial password is the well-known "illumio". The
+            # must_change_password gate (M4) forces a change on first login,
+            # so this fixed default is only ever valid for the very first
+            # session. _initial_password is also cleared on first successful
+            # login so the password ceases to be discoverable from disk.
+            initial = "illumio"
             gui["password"] = hash_password(initial)
             gui["_initial_password"] = initial
             gui["must_change_password"] = True
