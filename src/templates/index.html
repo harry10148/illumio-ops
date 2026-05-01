@@ -138,7 +138,7 @@
     <div class="header-right">
       <div class="ui-pref" aria-label="Theme mode selector">
         <label for="ui-theme-mode" data-i18n="gui_theme">Theme</label>
-        <select id="ui-theme-mode" onchange="onUiThemeModeChange(this.value)">
+        <select id="ui-theme-mode" data-on-change="onUiThemeModeChange" data-arg-source="value">
           <option value="auto" data-i18n="gui_auto">Auto</option>
           <option value="dark" data-i18n="gui_dark">Dark</option>
           <option value="light" data-i18n="gui_light">Light</option>
@@ -146,7 +146,7 @@
       </div>
       <div class="ui-pref" aria-label="Density selector">
         <label for="ui-density" data-i18n="gui_density">Density</label>
-        <select id="ui-density" onchange="onUiDensityChange(this.value)">
+        <select id="ui-density" data-on-change="onUiDensityChange" data-arg-source="value">
           <option value="compact" data-i18n="gui_compact">Compact</option>
           <option value="comfortable" data-i18n="gui_comfortable">Comfortable</option>
         </select>
@@ -324,7 +324,7 @@
             <thead>
               <tr>
                 <th style="width:44px;text-align:center;"><input type="checkbox" id="qt-chkall"
-                    onchange="toggleQChecks('qt-chk')"></th>
+                    data-on-change="toggleQChecks" data-args='["qt-chk"]'></th>
                 <th style="width:120px" data-i18n="gui_metric">Metric</th>
                 <th style="width:110px" data-i18n="gui_first_last_seen">First/Last Seen</th>
                 <th data-i18n="gui_source_identity">Source Identity</th>
@@ -349,7 +349,7 @@
           <div style="flex:1"></div>
           <label style="font-size:12px;" data-i18n="gui_page_size">Page Size</label>
           <select id="qt-page-size" style="width:70px; padding:4px; font-size:12px; height:28px;"
-            onchange="_qt_page=1; renderQtPage();">
+            data-on-change="qtSearchModeChanged">
             <option value="50">50</option>
             <option value="100">100</option>
           </select>
@@ -391,7 +391,7 @@
           <table class="rule-table">
             <thead>
               <tr>
-                <th style="width:50px"><input type="checkbox" id="qw-chkall" onchange="toggleQChecks('qw-chk')"></th>
+                <th style="width:50px"><input type="checkbox" id="qw-chkall" data-on-change="toggleQChecks" data-args='["qw-chk"]'></th>
                 <th style="width:180px" data-i18n="gui_ws_col_status">Status / Name</th>
                 <th style="width:100px" data-i18n="gui_ws_col_management">Management</th>
                 <th style="width:150px" data-i18n="gui_ws_col_ip">IP & Interface</th>
@@ -415,7 +415,7 @@
           <div class="spacer"></div>
           <label style="font-size:12px;" data-i18n="gui_page_size">Page Size</label>
           <select id="qw-page-size" style="width:70px; padding:4px; font-size:12px; height:28px;"
-            onchange="_qw_page=1; renderQwPage();">
+            data-on-change="qwSearchModeChanged">
             <option value="50">50</option>
             <option value="100">100</option>
           </select>
@@ -564,25 +564,25 @@
         </div>
         <div class="form-group" style="margin-bottom:0; min-width:180px;">
           <label data-i18n="gui_category">Category</label>
-          <select id="ev-category" onchange="onEventViewerCategoryChange()" style="width:180px;">
+          <select id="ev-category" data-on-change="onEventViewerCategoryChange" style="width:180px;">
             <option value="" data-i18n="gui_ev_all_categories">All Categories</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0; min-width:180px;">
           <label data-i18n="gui_ev_type_group">Type Group</label>
-          <select id="ev-group" onchange="onEventViewerGroupChange()" style="width:180px;">
+          <select id="ev-group" data-on-change="onEventViewerGroupChange" style="width:180px;">
             <option value="" data-i18n="gui_ev_all_groups">All Groups</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0; min-width:220px;">
           <label data-i18n="gui_event_type">Event Type</label>
-          <select id="ev-viewer-type" onchange="loadEventViewer(true)" style="width:220px;">
+          <select id="ev-viewer-type" data-on-change="loadEventViewer" data-args='[true]' style="width:220px;">
             <option value="" data-i18n="gui_ev_all_event_types">All Event Types</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0; min-width:240px; flex:1;">
           <label data-i18n="gui_search">Search</label>
-          <input id="ev-search" data-i18n-placeholder="gui_ev_search_placeholder" placeholder="event type, actor, target, IP, action..." onkeydown="if(event.key==='Enter') loadEventViewer(true)">
+          <input id="ev-search" data-i18n-placeholder="gui_ev_search_placeholder" placeholder="event type, actor, target, IP, action..." data-on-keydown="loadEventViewer" data-on-keydown-key="Enter" data-args='[true]'>
         </div>
         <button class="btn btn-primary" data-action="loadEventViewer" data-args='[true]' style="height:42px;" data-i18n="gui_refresh">
           <svg class="icon"><use href="#icon-search"></use></svg> Refresh
@@ -644,7 +644,7 @@
         <span class="badge" id="r-badge">0</span>
         <div class="rules-search">
           <svg class="search-icon" aria-hidden="true"><use href="#icon-search"></use></svg>
-          <input type="text" id="r-search" placeholder="Filter rules..." data-i18n-placeholder="gui_rules_search_placeholder" oninput="filterRules()">
+          <input type="text" id="r-search" placeholder="Filter rules..." data-i18n-placeholder="gui_rules_search_placeholder" data-on-input="filterRules">
           <span class="counter" id="r-search-count"></span>
         </div>
         <button class="btn btn-sm" style="margin-left:8px;background:var(--dim);color:#fff" data-action="openModal" data-args='["m-help"]'
@@ -659,7 +659,7 @@
       <table class="rule-table">
         <thead>
           <tr>
-            <th style="width:44px"><input type="checkbox" id="r-chkall" onchange="toggleAll(this)"></th>
+            <th style="width:44px"><input type="checkbox" id="r-chkall" data-on-change="toggleAll" data-arg-source="self"></th>
             <th data-i18n="gui_col_type">Type</th>
             <th data-i18n="gui_col_name">Name</th>
             <th style="width:110px" data-i18n="gui_col_status">Status</th>
@@ -744,7 +744,7 @@
         <table class="rule-table">
           <thead>
             <tr>
-              <th style="width:44px;"><input type="checkbox" id="rt-chkall" onchange="toggleReportChecks(this)"></th>
+              <th style="width:44px;"><input type="checkbox" id="rt-chkall" data-on-change="toggleReportChecks" data-arg-source="self"></th>
               <th data-i18n="gui_col_filename">Filename</th>
               <th data-i18n="gui_col_date_created">Date Created</th>
               <th data-i18n="gui_col_size">Size</th>
@@ -802,7 +802,7 @@
       <div class="form-row">
         <div class="form-group">
           <label data-i18n="gui_sched_report_type">Report Type</label>
-          <select id="sched-report-type" style="width:100%;" onchange="onSchedReportTypeChange()">
+          <select id="sched-report-type" style="width:100%;" data-on-change="onSchedReportTypeChange">
             <option value="traffic" data-i18n="gui_sched_rt_traffic">Traffic Flow Report</option>
             <option value="audit" data-i18n="gui_sched_rt_audit">Audit Report</option>
             <option value="ven_status" data-i18n="gui_sched_rt_ven">VEN Status Report</option>
@@ -824,7 +824,7 @@
       <div class="form-row">
         <div class="form-group">
           <label data-i18n="gui_sched_freq">Frequency</label>
-          <select id="sched-freq" style="width:100%;" onchange="onSchedFreqChange()">
+          <select id="sched-freq" style="width:100%;" data-on-change="onSchedFreqChange">
             <option value="daily" data-i18n="gui_sched_freq_daily">Daily</option>
             <option value="weekly" data-i18n="gui_sched_freq_weekly">Weekly</option>
             <option value="monthly" data-i18n="gui_sched_freq_monthly">Monthly</option>
@@ -880,7 +880,7 @@
       </div>
 
       <div class="form-group">
-        <div class="chk"><label><input type="checkbox" id="sched-email" onchange="onSchedEmailChange()"> <span data-i18n="gui_sched_email">Send by Email</span></label></div>
+        <div class="chk"><label><input type="checkbox" id="sched-email" data-on-change="onSchedEmailChange"> <span data-i18n="gui_sched_email">Send by Email</span></label></div>
       </div>
 
       <div id="row-recipients" style="display:none;" class="form-group">
@@ -1100,7 +1100,7 @@
           <option value="rule_id" data-i18n="gui_rs_scope_rule_id">Ruleset Scope Rule ID</option>
           <option value="rule_desc" data-i18n="gui_rs_scope_rule_desc">Ruleset Scope Rule Desc</option>
         </select>
-        <input id="rs-search" style="max-width:300px;" placeholder="" data-i18n-placeholder="gui_rs_search_placeholder" onkeydown="if(event.key==='Enter')rsDoSearch()">
+        <input id="rs-search" style="max-width:300px;" placeholder="" data-i18n-placeholder="gui_rs_search_placeholder" data-on-keydown="rsDoSearch" data-on-keydown-key="Enter">
         <button class="btn btn-primary" data-action="rsDoSearch" data-i18n="gui_rs_search_btn">Search</button>
         <button class="btn" data-action="rsResetSearch" data-i18n="gui_rs_refresh_all">Refresh All</button>
       </div>
@@ -1176,7 +1176,7 @@
         <table class="rule-table">
           <thead>
             <tr>
-              <th style="width:28px"><input type="checkbox" id="rs-sch-all" onchange="rsToggleAll(this)"></th>
+              <th style="width:28px"><input type="checkbox" id="rs-sch-all" data-on-change="rsToggleAll" data-arg-source="self"></th>
               <th style="width:60px" data-i18n="gui_rs_col_type">Type</th>
               <th style="width:54px" data-i18n="gui_rs_col_status">Status</th>
               <th style="width:140px" data-i18n="gui_rs_col_name">RS Name</th>
@@ -1214,7 +1214,7 @@
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;width:min(860px,95vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden;">
       <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);">
         <span style="font-weight:600;font-size:1rem;" data-i18n="gui_ml_title">Module Logs</span>
-        <select id="ml-module-select" class="form-control" style="width:auto;min-width:150px;" onchange="mlLoadLogs()"></select>
+        <select id="ml-module-select" class="form-control" style="width:auto;min-width:150px;" data-on-change="mlLoadLogs"></select>
         <button class="btn btn-sm" data-action="mlLoadLogs" data-i18n="gui_rs_refresh">Ruleset Refresh</button>
         <span style="flex:1"></span>
         <button class="btn btn-sm" data-action="mlClose" style="padding:2px 10px;">??/button>
@@ -1246,8 +1246,8 @@
       <fieldset>
         <legend data-i18n="gui_rs_sch_type">Schedule Type</legend>
         <div class="radio-group">
-          <label><input type="radio" name="rs-sch-type" value="recurring" checked onchange="rsSchTypeChanged()"> <span data-i18n="gui_rs_recurring">Recurring (Weekly)</span></label>
-          <label><input type="radio" name="rs-sch-type" value="one_time" onchange="rsSchTypeChanged()"> <span data-i18n="gui_rs_one_time">One-Time Expiration</span></label>
+          <label><input type="radio" name="rs-sch-type" value="recurring" checked data-on-change="rsSchTypeChanged"> <span data-i18n="gui_rs_recurring">Recurring (Weekly)</span></label>
+          <label><input type="radio" name="rs-sch-type" value="one_time" data-on-change="rsSchTypeChanged"> <span data-i18n="gui_rs_one_time">One-Time Expiration</span></label>
         </div>
       </fieldset>
 
@@ -1492,10 +1492,10 @@
     <div class="modal">
       <h2><span data-i18n="gui_add_event_rule" id="me-title">Add Event Rule</span></h2>
       <div class="form-group"><label data-i18n="gui_category">Category</label><select id="ev-cat"
-          onchange="populateEvents()">
+          data-on-change="populateEvents">
           <option value="" data-i18n="gui_select">Select??/option>
         </select></div>
-      <div class="form-group"><label data-i18n="gui_event_type">Event Type</label><select id="ev-type" onchange="updateEventFilters()">
+      <div class="form-group"><label data-i18n="gui_event_type">Event Type</label><select id="ev-type" data-on-change="updateEventFilters">
           <option value="" data-i18n="gui_select_category_first">Select category first</option>
         </select></div>
       <div id="ev-info" style="display:none;margin:-4px 0 14px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);">
@@ -1534,9 +1534,9 @@
       <fieldset>
         <legend data-i18n="gui_threshold">Threshold</legend>
         <div class="form-group"><label data-i18n="gui_type">Type</label>
-          <div class="radio-group"><label><input type="radio" name="ev-tt" value="immediate" checked onchange="onEvTtChange()"> <span
+          <div class="radio-group"><label><input type="radio" name="ev-tt" value="immediate" checked data-on-change="onEvTtChange"> <span
                 data-i18n="gui_tt_immediate">Immediate</span></label><label><input type="radio" name="ev-tt"
-                value="count" onchange="onEvTtChange()"> <span data-i18n="gui_tt_count">Cumulative</span></label></div>
+                value="count" data-on-change="onEvTtChange"> <span data-i18n="gui_tt_count">Cumulative</span></label></div>
         </div>
         <div class="form-row-3">
           <div class="form-group" id="ev-cnt-wrap" style="display:none"><label data-i18n="gui_count">Count</label><input id="ev-cnt" type="number" value="5">
@@ -1662,9 +1662,9 @@
       <fieldset>
         <legend data-i18n="gui_metric_type">Metric Type</legend>
         <div class="radio-group">
-          <label><input type="radio" name="bw-mt" value="bandwidth" checked onchange="onBwMetricTypeChange()"> <span data-i18n="gui_mt_bw">Bandwidth
+          <label><input type="radio" name="bw-mt" value="bandwidth" checked data-on-change="onBwMetricTypeChange"> <span data-i18n="gui_mt_bw">Bandwidth
               (Mbps, Max)</span></label>
-          <label><input type="radio" name="bw-mt" value="volume" onchange="onBwMetricTypeChange()"> <span data-i18n="gui_mt_vol">Transfer Volume (MB,
+          <label><input type="radio" name="bw-mt" value="volume" data-on-change="onBwMetricTypeChange"> <span data-i18n="gui_mt_vol">Transfer Volume (MB,
               Sum)</span></label>
         </div>
       </fieldset>
@@ -1726,8 +1726,8 @@
       <div id="m-gen-source-row" style="margin-bottom:12px; display:none;">
         <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--dim);" data-i18n="gui_gen_data_source">Data Source</label>
         <div class="radio-group">
-          <label><input type="radio" name="traffic-source" value="api" checked onchange="toggleTrafficSource()"> <span data-i18n="gui_gen_source_api">API (Fetch from PCE)</span></label>
-          <label><input type="radio" name="traffic-source" value="csv" onchange="toggleTrafficSource()"> <span data-i18n="gui_gen_source_csv">CSV Upload</span></label>
+          <label><input type="radio" name="traffic-source" value="api" checked data-on-change="toggleTrafficSource"> <span data-i18n="gui_gen_source_api">API (Fetch from PCE)</span></label>
+          <label><input type="radio" name="traffic-source" value="csv" data-on-change="toggleTrafficSource"> <span data-i18n="gui_gen_source_csv">CSV Upload</span></label>
         </div>
       </div>
       <div id="m-gen-csv-upload" style="display:none; margin-bottom:12px;">

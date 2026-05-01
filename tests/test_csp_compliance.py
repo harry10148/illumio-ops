@@ -18,6 +18,28 @@ def test_index_html_has_no_inline_onclick():
     assert not onclicks, f"Found {len(onclicks)} inline onclick(s) in index.html"
 
 
+def test_index_html_has_no_inline_event_handlers():
+    """M1 + follow-up: inline on*= attributes break CSP nonce mode for scripts."""
+    tpl = REPO_ROOT / "src" / "templates" / "index.html"
+    text = tpl.read_text(encoding="utf-8")
+    # HTML attribute form: on followed by a known event name, then = .
+    # The leading negative-lookbehind avoids matching identifiers like
+    # "function onClick" or text inside comments.
+    EVENTS = (
+        "click", "change", "input", "keydown", "keyup", "submit",
+        "focus", "blur", "mouseover", "mouseout",
+    )
+    pat = re.compile(
+        r"(?<![a-zA-Z_])on(?:" + "|".join(EVENTS) + r")\s*=",
+        re.IGNORECASE,
+    )
+    hits = pat.findall(text)
+    assert not hits, (
+        f"Found {len(hits)} inline event-handler attribute(s) in "
+        f"index.html: {hits[:5]}"
+    )
+
+
 def test_rule_scheduler_js_has_no_string_built_onclick():
     """M1: rule-scheduler.js builds buttons via string-HTML; switch to DOM."""
     js = REPO_ROOT / "src" / "static" / "js" / "rule-scheduler.js"

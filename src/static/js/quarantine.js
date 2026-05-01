@@ -17,6 +17,12 @@ function toggleQChecks(clsPrefix) {
   updateBulkBar();
 }
 
+// CSP-friendly wrappers for inline handlers that previously did
+// `_qt_page=1; renderQtPage();` and the qw equivalent. Used via
+// data-on-change="qtSearchModeChanged" / "qwSearchModeChanged".
+function qtSearchModeChanged() { _qt_page = 1; renderQtPage(); }
+function qwSearchModeChanged() { _qw_page = 1; renderQwPage(); }
+
 function updateBulkBar() {
   // Check both traffic and workload tables for checks
   const checked = document.querySelectorAll('.qt-chk:checked, .qw-chk:checked');
