@@ -640,9 +640,14 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     _csp = {
         'default-src': "'self'",
         'script-src': "'self'",   # nonce added by Talisman per-request
-        'style-src': "'self'",    # nonce added by Talisman per-request
+        # 'unsafe-inline' for STYLES is widely accepted as low-risk: style
+        # injection cannot execute scripts. The 344+ inline `style="..."`
+        # attributes scattered across templates would otherwise be blocked,
+        # breaking layout. script-src remains strict ('self' + nonce).
+        'style-src': ["'self'", "'unsafe-inline'"],
         'img-src': ["'self'", "data:"],
-        'font-src': ["'self'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
+        # Fonts are bundled locally (src/static/fonts/); no external font CDN.
+        'font-src': "'self'",
         'connect-src': "'self'",
     }
 
