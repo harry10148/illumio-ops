@@ -1467,6 +1467,15 @@ function renderDashboardQueries() {
   if (typeof applyLang === "function") applyLang();
 }
 
+// Quick-window preset for Ranking Summary (top10) — sets d-global-min and
+// re-runs the query so the user sees the new range immediately.
+function setTop10Window(mins) {
+  const el = document.getElementById('d-global-min');
+  if (el) el.value = String(mins);
+  if (typeof runAllQueries === 'function') runAllQueries();
+}
+window.setTop10Window = setTop10Window;
+
 function openQueryModal(idx = -1) {
   $('dq-idx').value = idx;
   if (idx < 0) {
