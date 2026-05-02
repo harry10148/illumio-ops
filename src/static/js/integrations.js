@@ -287,20 +287,26 @@ async function doDaemonRestart(btn, msgSpan) {
 }
 
 async function cacheBackfill() {
+  var source = (prompt('Source (events / traffic)', 'events') || '').trim().toLowerCase();
+  if (source !== 'events' && source !== 'traffic') {
+    alert("Invalid source: must be 'events' or 'traffic'.");
+    return;
+  }
   var start = prompt('Start date (YYYY-MM-DD)');
   var end = prompt('End date (YYYY-MM-DD)');
   if (!start || !end) return;
   var r = await fetch('/api/cache/backfill', {
     method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
-    body: JSON.stringify({since: start, until: end}),
+    body: JSON.stringify({source: source, since: start, until: end}),
   });
   var body = await r.json().catch(function() { return {}; });
   if (!r.ok) {
     alert('Backfill failed: ' + (body.error || r.status));
     return;
   }
-  alert('Backfill done — inserted: ' + (body.inserted || 0)
+  alert('Backfill done — source: ' + source
+    + ', inserted: ' + (body.inserted || 0)
     + ', duplicates: ' + (body.duplicates || 0)
     + ', total: ' + (body.total_rows || 0)
     + ', elapsed: ' + (body.elapsed_seconds || 0) + 's');
