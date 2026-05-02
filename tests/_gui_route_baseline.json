@@ -1,0 +1,668 @@
+[
+  {
+    "url": "/",
+    "endpoint": "index",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/actions/best-practices",
+    "endpoint": "api_best_practices",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/actions/debug",
+    "endpoint": "api_debug",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/actions/run",
+    "endpoint": "api_run_once",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/actions/test-alert",
+    "endpoint": "api_test_alert",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/actions/test-connection",
+    "endpoint": "api_test_conn",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/alert-plugins",
+    "endpoint": "api_alert_plugins",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/audit_report/generate",
+    "endpoint": "api_generate_audit_report",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/cache/backfill",
+    "endpoint": "pce_cache.api_cache_backfill",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/cache/retention/run",
+    "endpoint": "pce_cache.api_cache_retention_run",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/cache/settings",
+    "endpoint": "pce_cache.get_cache_settings",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/cache/settings",
+    "endpoint": "pce_cache.put_cache_settings",
+    "methods": [
+      "PUT"
+    ]
+  },
+  {
+    "url": "/api/cache/status",
+    "endpoint": "pce_cache.api_cache_status",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/csrf-token",
+    "endpoint": "api_csrf_token",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/daemon/restart",
+    "endpoint": "api_daemon_restart",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/dashboard/audit_summary",
+    "endpoint": "api_dashboard_audit_summary",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/dashboard/chart/<chart_id>",
+    "endpoint": "api_dashboard_chart",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/dashboard/policy_usage_summary",
+    "endpoint": "api_dashboard_policy_usage_summary",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/dashboard/queries",
+    "endpoint": "api_get_dashboard_queries",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/dashboard/queries",
+    "endpoint": "api_save_dashboard_query",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/dashboard/queries/<int:idx>",
+    "endpoint": "api_delete_dashboard_query",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
+    "url": "/api/dashboard/snapshot",
+    "endpoint": "api_dashboard_snapshot",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/dashboard/top10",
+    "endpoint": "api_dashboard_top10",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/event-catalog",
+    "endpoint": "api_event_catalog",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/events/rule_test",
+    "endpoint": "api_events_rule_test",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/events/shadow_compare",
+    "endpoint": "api_events_shadow_compare",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/events/viewer",
+    "endpoint": "api_events_viewer",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/init_quarantine",
+    "endpoint": "api_init_quarantine",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/login",
+    "endpoint": "api_login",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/logs",
+    "endpoint": "api_log_list",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/logs/<module_name>",
+    "endpoint": "api_log_get",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/pce-profiles",
+    "endpoint": "api_list_pce_profiles",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/pce-profiles",
+    "endpoint": "api_pce_profiles_action",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/policy_usage_report/generate",
+    "endpoint": "api_generate_policy_usage_report",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/quarantine/apply",
+    "endpoint": "api_quarantine_apply",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/quarantine/bulk_apply",
+    "endpoint": "api_quarantine_bulk_apply",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/quarantine/search",
+    "endpoint": "api_quarantine_search",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/report-schedules",
+    "endpoint": "api_list_report_schedules",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/report-schedules",
+    "endpoint": "api_create_report_schedule",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/report-schedules/<int:schedule_id>",
+    "endpoint": "api_delete_report_schedule",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
+    "url": "/api/report-schedules/<int:schedule_id>",
+    "endpoint": "api_update_report_schedule",
+    "methods": [
+      "PUT"
+    ]
+  },
+  {
+    "url": "/api/report-schedules/<int:schedule_id>/history",
+    "endpoint": "api_report_schedule_history",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/report-schedules/<int:schedule_id>/run",
+    "endpoint": "api_run_report_schedule",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/report-schedules/<int:schedule_id>/toggle",
+    "endpoint": "api_toggle_report_schedule",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/reports",
+    "endpoint": "api_list_reports",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/reports/<path:filename>",
+    "endpoint": "api_delete_report",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
+    "url": "/api/reports/bulk-delete",
+    "endpoint": "api_bulk_delete_reports",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/reports/generate",
+    "endpoint": "api_generate_report",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/rule_scheduler/check",
+    "endpoint": "rs_check",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/rule_scheduler/logs",
+    "endpoint": "rs_log_history_api",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/rule_scheduler/rules/search",
+    "endpoint": "rs_rules_search",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/rule_scheduler/rulesets",
+    "endpoint": "rs_rulesets",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/rule_scheduler/rulesets/<rs_id>",
+    "endpoint": "rs_ruleset_detail",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/rule_scheduler/schedules",
+    "endpoint": "rs_schedules_list",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/rule_scheduler/schedules",
+    "endpoint": "rs_schedule_create",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/rule_scheduler/schedules/<path:href>",
+    "endpoint": "rs_schedule_detail",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/rule_scheduler/schedules/delete",
+    "endpoint": "rs_schedule_delete",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/rule_scheduler/status",
+    "endpoint": "rs_status",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/rules",
+    "endpoint": "api_rules",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/rules/<int:idx>",
+    "endpoint": "api_delete_rule",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
+    "url": "/api/rules/<int:idx>",
+    "endpoint": "api_get_rule",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/rules/<int:idx>",
+    "endpoint": "api_update_rule",
+    "methods": [
+      "PUT"
+    ]
+  },
+  {
+    "url": "/api/rules/<int:idx>/highlight",
+    "endpoint": "api_rule_highlight",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/rules/bandwidth",
+    "endpoint": "api_add_bw_rule",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/rules/event",
+    "endpoint": "api_add_event_rule",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/rules/system",
+    "endpoint": "api_add_system_rule",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/rules/traffic",
+    "endpoint": "api_add_traffic_rule",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/security",
+    "endpoint": "api_security_get",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/security",
+    "endpoint": "api_security_post",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/settings",
+    "endpoint": "api_get_settings",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/settings",
+    "endpoint": "api_save_settings",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/shutdown",
+    "endpoint": "api_shutdown",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/siem/destinations",
+    "endpoint": "siem.list_destinations",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/siem/destinations",
+    "endpoint": "siem.add_destination",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/siem/destinations/<name>",
+    "endpoint": "siem.delete_destination",
+    "methods": [
+      "DELETE"
+    ]
+  },
+  {
+    "url": "/api/siem/destinations/<name>",
+    "endpoint": "siem.update_destination",
+    "methods": [
+      "PUT"
+    ]
+  },
+  {
+    "url": "/api/siem/destinations/<name>/test",
+    "endpoint": "siem.test_destination",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/siem/dlq",
+    "endpoint": "siem.list_dlq",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/siem/dlq/export",
+    "endpoint": "siem.dlq_export",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/siem/dlq/purge",
+    "endpoint": "siem.purge_dlq",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/siem/dlq/replay",
+    "endpoint": "siem.replay_dlq",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/siem/forwarder",
+    "endpoint": "siem.get_forwarder",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/siem/forwarder",
+    "endpoint": "siem.put_forwarder",
+    "methods": [
+      "PUT"
+    ]
+  },
+  {
+    "url": "/api/siem/status",
+    "endpoint": "siem.dispatch_status",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/status",
+    "endpoint": "api_status",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/tls/config",
+    "endpoint": "api_tls_config",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/tls/renew",
+    "endpoint": "api_tls_renew",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/tls/status",
+    "endpoint": "api_tls_status",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/ui_translations",
+    "endpoint": "api_ui_translations",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/api/ven_status_report/generate",
+    "endpoint": "api_generate_ven_status_report",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/api/workloads",
+    "endpoint": "api_search_workloads",
+    "methods": [
+      "GET",
+      "POST"
+    ]
+  },
+  {
+    "url": "/login",
+    "endpoint": "login_page",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/logout",
+    "endpoint": "logout",
+    "methods": [
+      "POST"
+    ]
+  },
+  {
+    "url": "/reports/<path:filename>",
+    "endpoint": "api_serve_report",
+    "methods": [
+      "GET"
+    ]
+  },
+  {
+    "url": "/static/<path:filename>",
+    "endpoint": "static",
+    "methods": [
+      "GET"
+    ]
+  }
+]
