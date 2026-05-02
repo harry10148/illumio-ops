@@ -432,6 +432,32 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
 # Default validity period for self-signed certs. 5 years keeps the cert
 # effectively "set and forget" for internal deployments while still giving
 # the auto-renew path meaningful runway before expiry.
+def _run_server(app, host: str, port: int, ssl_context,
+                cert_file: str = "", key_file: str = "") -> None:
+    """HTTP and HTTPS both served by cheroot (thread pool, native SSL)."""
+    if ssl_context is None:
+        _run_http(app, host, port)
+    else:
+        _run_https(app, host, port, cert_file, key_file)
+
+
+def _run_http(app, host: str, port: int) -> None:
+    from cheroot import wsgi as _cheroot_wsgi
+    logger.info("Starting HTTP server via cheroot on {}:{}", host, port)
+    server = _cheroot_wsgi.Server((host, port), app, numthreads=10)
+    try:
+        server.start()
+    except OSError as e:
+        if "Address already in use" in str(e):
+            logger.error("Port {} is already in use. Stop the existing process first (fuser -k {}/tcp) then retry.", port, port)
+        else:
+            raise
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.stop()
+
+
 def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None:
     """HTTPS via cheroot — production-grade WSGI server with hardened TLS."""
     import threading as _threading
