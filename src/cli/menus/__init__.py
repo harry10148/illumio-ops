@@ -8,3 +8,4 @@ from src.cli.menus.event import add_event_menu  # noqa: F401
 from src.cli.menus.system_health import add_system_health_menu  # noqa: F401
 from src.cli.menus.traffic import add_traffic_menu  # noqa: F401
 from src.cli.menus.bandwidth import add_bandwidth_volume_menu  # noqa: F401
+from src.cli.menus.manage_rules import manage_rules_menu  # noqa: F401
