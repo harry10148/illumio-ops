@@ -1,6 +1,6 @@
 """Reader-guide rendering: when a module has registered guidance, the HTML
 section starts with a guidance card that includes the four labels."""
-import src.i18n._legacy as i18n_mod
+import src.i18n.engine as i18n_mod
 from src.report.exporters.html_exporter import render_section_guidance
 
 

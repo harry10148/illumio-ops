@@ -55,7 +55,7 @@ REPORT_PATH = Path(__file__).resolve().parent / "audit_i18n_report.md"
 
 # Files that ARE the translation tables — scanning them for CJK would be noise.
 I18N_SOURCE_FILES = {
-    SRC / "i18n" / "_legacy.py",
+    SRC / "i18n" / "engine.py",
     SRC / "i18n_en.json",
     SRC / "i18n_zh_TW.json",
     SRC / "report" / "exporters" / "report_i18n.py",

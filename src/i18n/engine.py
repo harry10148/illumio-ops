@@ -6,6 +6,7 @@ import threading
 from functools import lru_cache
 from pathlib import Path
 
+# engine.py lives at src/i18n/, but i18n_en.json / i18n_zh_TW.json sit at src/.
 _ROOT = Path(__file__).resolve().parent.parent
 _EN_MESSAGES_PATH = _ROOT / "i18n_en.json"
 _ZH_MESSAGES_PATH = _ROOT / "i18n_zh_TW.json"

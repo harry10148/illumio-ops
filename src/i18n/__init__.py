@@ -6,7 +6,7 @@ Public API:
 - set_language(lang)
 - get_language()
 """
-from src.i18n._legacy import (  # noqa: F401
+from src.i18n.engine import (  # noqa: F401
     t,
     get_messages,
     set_language,
