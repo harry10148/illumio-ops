@@ -6,6 +6,44 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to a `<major>.<minor>.<patch>-<topic-slug>` versioning
 scheme aligned with the git tag conventions.
 
+## [3.22.0-h4-i18n] — 2026-05-02
+
+H4 sub-plan from Batch 4 of the code review: convert `src/i18n.py`
+(2275 lines, dominated by ~2000 lines of literal Chinese-translation
+data) into the package `src/i18n/` with engine code in `engine.py`
+(~340 lines) and data in `data/*.json` (~78 KB across four JSON files).
+Public API (`t`, `get_messages`, `set_language`, `get_language`)
+unchanged; 59 importers continue to use `from src.i18n import …`
+without modification.
+
+### Added
+- `src/i18n/__init__.py` — re-exports the public API plus 5 engine
+  internals (`EN_MESSAGES`, `ZH_MESSAGES`, `_ZH_EXPLICIT`,
+  `_humanize_key_en`, `_humanize_key_zh`) needed by
+  `scripts/audit_i18n_usage.py` and `tests/test_i18n_quality.py`.
+- `src/i18n/engine.py` — pure engine code (state, humanize, translate,
+  build_messages, public API).
+- `src/i18n/data/zh_explicit.json` — 1432 keys, merged from a
+  four-stage in-code merge (initial literal + 3 individual patches +
+  2 `.update()` blocks).
+- `src/i18n/data/token_map_en.json` (115 entries),
+  `src/i18n/data/token_map_zh.json` (306 entries).
+- `src/i18n/data/phrase_overrides.json` (32 entries).
+- `src/i18n/.gitignore` — un-ignores `data/` against the root
+  `.gitignore`'s blanket exclusion.
+
+### Changed
+- `tests/test_reader_guide_render.py` — monkeypatch target updated to
+  `src.i18n.engine` (the test patches private symbols `_build_messages`,
+  `EN_MESSAGES`, `_normalized_en_messages`).
+- `scripts/audit_i18n_usage.py` — `I18N_SOURCE_FILES` entry updated
+  from `SRC / "i18n.py"` to `SRC / "i18n" / "engine.py"`.
+
+### Verified
+- Tests: 824 passed, 1 skipped (back to pre-H4 baseline).
+- i18n audit: 0 findings.
+- mypy strict on the typed core: 0 errors.
+
 ## [3.21.0-code-review-fixes] — 2026-05-02
 
 Resolves 24 of 27 findings from the 2026-05-01 全面 code review (H1–H3,
