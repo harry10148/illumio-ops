@@ -43,107 +43,22 @@ def _make_subscribers(cm):
 
 
 # ─── Daemon / Monitor Loop ───────────────────────────────────────────────────
-
-import threading
-
-_shutdown_event = threading.Event()
-
-def _signal_handler(signum, _frame):
-    logger.info(f"Received signal {signum}. Shutting down gracefully...")
-    _shutdown_event.set()
-
-def _register_signals():
-    """Register SIGINT/SIGTERM handlers. Must only be called from the main thread."""
-    import signal as _signal
-    _signal.signal(_signal.SIGINT, _signal_handler)
-    try:
-        _signal.signal(_signal.SIGTERM, _signal_handler)
-    except (AttributeError, ValueError):
-        # SIGTERM not available on Windows for non-console handlers; skip silently
-        pass
+#
+# Daemon startup logic now lives in src.cli._runtime so the argparse path
+# below and the click subcommands (src/cli/monitor.py, src/cli/gui_cmd.py)
+# share a single implementation. The wrappers below preserve the legacy
+# (interval_minutes[, port]) signatures used by tests and external callers.
 
 def run_daemon_loop(interval_minutes: int):
-    """Headless monitoring loop — APScheduler-backed.
+    """Backwards-compatible wrapper around src.cli._runtime.run_daemon_loop."""
+    from src.cli._runtime import run_daemon_loop as _run
+    return _run(ConfigManager(), interval=interval_minutes)
 
-    Replaces the previous self-rolled while/wait(60) loop with a
-    BackgroundScheduler (3 jobs: monitor_cycle, tick_report_schedules,
-    tick_rule_schedules).  Resolves Status.md A3 (single-threaded blocking).
-    """
-    # Signal handlers can only be registered from the main thread.
-    # When called as a background thread (run_daemon_with_gui), the caller
-    # registers signals before spawning; skip here to avoid ValueError.
-    if threading.current_thread() is threading.main_thread():
-        _register_signals()
-
-    _shutdown_event.clear()
-
-    from src.scheduler import build_scheduler
-    from src.scheduler.jobs import run_monitor_cycle
-    from src.siem.preview import emit_preview_warning
-
-    cm = ConfigManager()
-    emit_preview_warning(cm, context="daemon_startup")
-    print(t("daemon_start", interval=interval_minutes))
-    print(t("daemon_stop_hint"))
-    logger.info("Starting scheduler-backed daemon (interval={}m)", interval_minutes)
-
-    sched = build_scheduler(cm, interval_minutes=interval_minutes)
-
-    try:
-        # C2: start() inside try so a startup failure doesn't trigger shutdown
-        # of a never-started scheduler (would raise SchedulerNotRunningError).
-        sched.start()
-
-        # Fire the first monitor cycle immediately without blocking signal-driven
-        # shutdown of the daemon entrypoint.
-        threading.Thread(target=run_monitor_cycle, args=(cm,), daemon=True).start()
-
-        # Block until shutdown signal (1-second poll keeps signal responsive)
-        while not _shutdown_event.is_set():
-            _shutdown_event.wait(timeout=1)
-    finally:
-        logger.info("Shutting down scheduler...")
-        # Guard against never-started scheduler raising SchedulerNotRunningError
-        if getattr(sched, "running", False):
-            sched.shutdown(wait=True)
-        logger.info("Scheduler stopped")
-        print(f"\n{t('daemon_stopped')}")
 
 def run_daemon_with_gui(interval_minutes: int, port: int):
-    """Headless monitoring loop running in background thread + Flask GUI in main thread."""
-    cm = ConfigManager()
-    logger.info(f"Starting daemon loop with Web GUI (interval={interval_minutes}m, port={port})")
-
-    # Register signals here (main thread) — run_daemon_loop skips them when threaded
-    _register_signals()
-
-    # Start daemon in background thread
-    t_daemon = threading.Thread(target=run_daemon_loop, args=(interval_minutes,), daemon=True)
-    t_daemon.start()
-
-    # Start Flask blocking in main thread
-    from src.gui import launch_gui, HAS_FLASK
-    if not HAS_FLASK:
-        print(t("report_requires_flask"))
-        print(t("cli_pip_install_hint", pkg="flask"))
-        sys.exit(1)
-
-    # Install restart hook so the GUI can restart the daemon scheduler.
-    import src.gui as _gui
-    from src.scheduler import build_scheduler
-
-    def _restart():
-        if _gui._DAEMON_SCHEDULER is not None and getattr(_gui._DAEMON_SCHEDULER, "running", False):
-            _gui._DAEMON_SCHEDULER.shutdown(wait=False)
-        cm.load()
-        new_sched = build_scheduler(cm, interval_minutes=interval_minutes)
-        new_sched.start()
-        return new_sched
-
-    _gui._GUI_OWNS_DAEMON = True
-    _gui._DAEMON_RESTART_FN = _restart
-
-    launch_gui(cm, port=port, persistent_mode=True)
+    """Backwards-compatible wrapper around src.cli._runtime.run_daemon_with_gui."""
+    from src.cli._runtime import run_daemon_with_gui as _run
+    return _run(ConfigManager(), interval=interval_minutes, port=port)
 
 def view_logs(log_file):
     """Simple log viewer for the CLI."""
@@ -717,16 +632,8 @@ def main():
     elif args.monitor:
         run_daemon_loop(args.interval)
     elif args.gui:
-        from src.gui import launch_gui, HAS_FLASK, FLASK_IMPORT_ERROR
-
-        if not HAS_FLASK:
-            print(t("report_requires_flask"))
-            if FLASK_IMPORT_ERROR:
-                print(f"Import error: {FLASK_IMPORT_ERROR}")
-            print(t("cli_pip_install_hint", pkg="flask"))
-            sys.exit(1)
-        cm = ConfigManager()
-        launch_gui(cm, port=args.port)
+        from src.cli._runtime import run_gui_only
+        run_gui_only(ConfigManager(), port=args.port)
     else:
         try:
             main_menu()
