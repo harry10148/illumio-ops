@@ -163,11 +163,11 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         return _hn(n) if n is not None else "-"
 
     # ── flask-login setup ──────────────────────────────────────────────────────
-    from flask_login import LoginManager, current_user, login_required, login_user, logout_user
-    from src.auth_models import AdminUser, LoginForm
+    from flask_login import LoginManager, current_user, login_required
+    from src.auth_models import AdminUser
 
     login_manager = LoginManager(app)
-    login_manager.login_view = "login_page"
+    login_manager.login_view = "auth.login_page"
     login_manager.session_protection = "strong"
 
     @login_manager.user_loader
@@ -296,10 +296,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
     except (ValueError, KeyError):
         pass  # Talisman internals changed; fall back to always-on (production safe)
 
-    # SPA endpoint to refresh tokens without full reload
-    @app.route('/api/csrf-token')
-    def api_csrf_token():
-        return jsonify({"csrf_token": generate_csrf()})
+    # ── Auth Blueprint ─────────────────────────────────────────────────────────
+    from src.gui.routes.auth import make_auth_blueprint
+    app.register_blueprint(make_auth_blueprint(cm, csrf, limiter, login_required))
 
     @app.errorhandler(_RstDrop)
     def handle_rst_drop(e):
@@ -341,7 +340,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         if current_user.is_authenticated:
             gui_cfg = cm.config.get("web_gui", {})
             if gui_cfg.get("must_change_password") and request.endpoint not in (
-                'api_security_get', 'api_security_post', 'logout', 'api_csrf_token'
+                'api_security_get', 'api_security_post', 'auth.logout', 'auth.api_csrf_token'
             ):
                 return jsonify({"ok": False, "error": "must_change_password", "code": 423}), 423
 
@@ -364,80 +363,6 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False) -> 'Flask':
         if request.path.startswith('/static/'):
             response.headers['Cache-Control'] = 'no-store'
         return response
-
-    # ??? Frontend SPA ?????????????????????????????????????????????????????
-    @app.route('/')
-    def index():
-        import datetime as _dt
-        import json as _json
-        cm.load()
-        pce_url = _get_active_pce_url(cm)
-        rules_count = len(cm.config.get("rules", []))
-        schedules_count = len(cm.config.get("report_schedules", []))
-        config_loaded_at = _dt.datetime.now()
-        lang = cm.config.get("settings", {}).get("language", "en")
-        ui_translations = _ui_translation_dict(lang)
-        return render_template(
-            'index.html',
-            pce_url=pce_url,
-            rules_count=rules_count,
-            schedules_count=schedules_count,
-            config_loaded_at=config_loaded_at,
-            ui_translations_json=_json.dumps(ui_translations, ensure_ascii=False).replace('</', '<\\/'),
-        )
-
-    # ??? Auth Routes ??????????????????????????????????????????????????????
-    @app.route('/login', methods=['GET'])
-    def login_page():
-        return render_template('login.html')
-
-    @app.route('/api/login', methods=['POST'])
-    @csrf.exempt
-    @limiter.limit("5 per minute")
-    def api_login():
-        from pydantic import ValidationError as _ValidationError
-        try:
-            form = LoginForm.model_validate(request.get_json(silent=True) or {})
-        except _ValidationError as e:
-            return jsonify({"ok": False, "error": "invalid_form", "detail": str(e)}), 400
-
-        username = form.username
-        password = form.password
-
-        cm.load()
-        gui_cfg = cm.config.get("web_gui", {})
-
-        saved_username = gui_cfg.get("username", "illumio")
-        saved_password = gui_cfg.get("password", "")
-
-        # H1: always run verify_password to equalize timing, even if username
-        # is wrong. We compare the boolean results last to avoid short-circuit.
-        # Do NOT insert early returns or blank lines between these two lines.
-        username_ok = _hmac.compare_digest(username.strip(), saved_username.strip())
-        password_ok = verify_password(password, saved_password)
-        if username_ok and password_ok:
-            session.permanent = True
-            login_user(AdminUser(username))
-            if gui_cfg.get("_initial_password"):
-                gui_cfg.pop("_initial_password", None)
-                cm.save()
-            return jsonify({
-                "ok": True,
-                "csrf_token": generate_csrf(),
-                # Surface the must_change_password gate to the login UI so it
-                # can show an inline change-password form before letting the
-                # user reach the dashboard (M4 gate would otherwise 423 every
-                # API call and the UI would look broken).
-                "must_change_password": bool(gui_cfg.get("must_change_password")),
-            })
-
-        return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
-
-    @app.route('/logout', methods=['POST'])
-    def logout():
-        logout_user()
-        session.clear()
-        return redirect('/login')
 
     @app.route('/api/security', methods=['GET'])
     def api_security_get():
