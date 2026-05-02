@@ -43,9 +43,6 @@ def get_language() -> str:
     """Return the active UI language code (thread-safe). Public API."""
     return _I18N_STATE.get_language()
 
-def _entry(en: str, zh_tw: str | None = None) -> tuple[str, str]:
-    return en, zh_tw or en
-
 def _load_en_messages() -> dict[str, str]:
     try:
         return json.loads(_EN_MESSAGES_PATH.read_text(encoding="utf-8"))
