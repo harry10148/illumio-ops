@@ -54,11 +54,6 @@ def header_client(tmp_path):
     return app.test_client()
 
 
-def _csrf(login_response) -> str:
-    """Extract CSRF token from login response JSON (new synchronizer token pattern)."""
-    return (login_response.get_json() or {}).get('csrf_token', '')
-
-
 @pytest.fixture
 def temp_config_file():
     # Use a fresh temp directory so the auto-derived alerts.json sibling is
