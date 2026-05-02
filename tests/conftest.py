@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import shutil
 import sys
+import tempfile
 
 import pytest
 from loguru import logger
@@ -50,3 +52,56 @@ def header_client(tmp_path):
     app = build_app(ConfigManager(str(cfg)))
     app.config["TESTING"] = True
     return app.test_client()
+
+
+def _csrf(login_response) -> str:
+    """Extract CSRF token from login response JSON (new synchronizer token pattern)."""
+    return (login_response.get_json() or {}).get('csrf_token', '')
+
+
+@pytest.fixture
+def temp_config_file():
+    # Use a fresh temp directory so the auto-derived alerts.json sibling is
+    # also test-private (otherwise tests in the same /tmp share alerts.json
+    # across runs and across processes — verified to leak real lab tokens
+    # in earlier runs).
+    tmpdir = tempfile.mkdtemp(prefix="illumio_ops_test_")
+    path = os.path.join(tmpdir, "config.json")
+
+    # Init empty config
+    with open(path, 'w') as f:
+        json.dump({"api": {"url": "test", "key": "test", "secret": "test", "org_id": "1"}, "rules": []}, f)
+
+    yield path
+    # Cleanup config + sibling alerts.json (created on first save)
+    shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+@pytest.fixture
+def app_persistent(temp_config_file):
+    from src.config import ConfigManager, hash_password as _hash_password
+    from src.gui import build_app as _create_app
+
+    # Override ConfigManager path for testing
+    cm = ConfigManager(config_file=temp_config_file)
+    cm.load()
+
+    cm.config["web_gui"] = {
+        "username": "admin",
+        "password": _hash_password("testpass"),
+        "allowed_ips": ["127.0.0.1", "192.168.1.0/24"],
+        "secret_key": "test-secret"
+    }
+    cm.save()
+
+    app = _create_app(cm, persistent_mode=True)
+    app.config.update({
+        "TESTING": True,
+    })
+
+    yield app
+
+
+@pytest.fixture
+def client(app_persistent):
+    return app_persistent.test_client()
