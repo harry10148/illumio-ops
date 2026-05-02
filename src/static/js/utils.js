@@ -219,6 +219,21 @@ function formatDateZ(utcString) {
   }
 }
 
+// Quick-range date picker helper. Sets <prefix>-start to today-N days ago and
+// <prefix>-end to today, both as YYYY-MM-DD. Used by the Reports modal
+// (m-gen-{start,end}) and the Cache Backfill modal (cb-{start,end}).
+function setDateRange(prefix, days) {
+  if (!prefix || typeof days !== 'number') return;
+  const now = new Date();
+  const start = new Date(now.getTime() - days * 24 * 3600 * 1000);
+  const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const startEl = document.getElementById(prefix + '-start');
+  const endEl = document.getElementById(prefix + '-end');
+  if (startEl) startEl.value = fmt(start);
+  if (endEl) endEl.value = fmt(now);
+}
+window.setDateRange = setDateRange;
+
 let _labelDimensions = {
   'role': { bg: '#ce93d8', fg: '#ffffff' },
   'app': { bg: '#42a5f5', fg: '#ffffff' },

@@ -551,6 +551,8 @@
             <option value="360" data-i18n="gui_ev_window_6h">Last 6h</option>
             <option value="1440" data-i18n="gui_ev_window_24h">Last 24h</option>
             <option value="10080" data-i18n="gui_ev_window_7d">Last 7d</option>
+            <option value="43200" data-i18n="gui_ev_window_30d">Last 30d</option>
+            <option value="86400" data-i18n="gui_ev_window_60d">Last 60d</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0;">
@@ -1487,6 +1489,45 @@
     </div>
   </div>
 
+  <!-- Cache Backfill -->
+  <div class="modal-bg" role="dialog" aria-modal="true" id="m-cache-backfill">
+    <div class="modal" style="max-width:480px;">
+      <h2 data-i18n="gui_cb_title">Cache Backfill</h2>
+      <div style="margin-bottom:16px; color:var(--dim); font-size:13px; line-height:1.5;" data-i18n="gui_cb_desc">Pull historical events or traffic flows from the PCE API into the local cache. Reports covering this period will then read from cache instead of re-querying the PCE.</div>
+      <div class="form-group">
+        <label data-i18n="gui_cb_source">Source</label>
+        <select id="cb-source">
+          <option value="events" data-i18n="gui_cb_source_events">Events (audit log)</option>
+          <option value="traffic" data-i18n="gui_cb_source_traffic">Traffic (flow logs)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label data-i18n="gui_gen_start_date">Start Date</label>
+          <input type="date" id="cb-start">
+        </div>
+        <div class="form-group">
+          <label data-i18n="gui_gen_end_date">End Date</label>
+          <input type="date" id="cb-end">
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:6px;">
+        <label style="font-size:11px; color:var(--dim);" data-i18n="gui_quick_range">Quick range</label>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+          <button type="button" class="btn btn-sm btn-secondary" data-action="setDateRange" data-args='["cb", 1]' style="padding:4px 10px;">1d</button>
+          <button type="button" class="btn btn-sm btn-secondary" data-action="setDateRange" data-args='["cb", 7]' style="padding:4px 10px;">7d</button>
+          <button type="button" class="btn btn-sm btn-secondary" data-action="setDateRange" data-args='["cb", 30]' style="padding:4px 10px;">30d</button>
+          <button type="button" class="btn btn-sm btn-secondary" data-action="setDateRange" data-args='["cb", 60]' style="padding:4px 10px;">60d</button>
+        </div>
+      </div>
+      <div id="cb-result" style="margin-top:12px; padding:8px; background:var(--surface,var(--bg2)); border-radius:4px; font-size:12px; color:var(--dim); display:none;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" data-action="closeModal" data-args='["m-cache-backfill"]' data-i18n="gui_cancel">Cancel</button>
+        <button class="btn btn-primary" id="cb-submit" data-action="submitCacheBackfill" data-i18n="gui_backfill">Backfill</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Event -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="m-event">
     <div class="modal">
@@ -1743,6 +1784,15 @@
           <div class="form-group">
             <label data-i18n="gui_gen_end_date">End Date</label>
             <input type="date" id="m-gen-end">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:6px;">
+          <label style="font-size:11px; color:var(--dim);" data-i18n="gui_quick_range">Quick range</label>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+            <button type="button" class="btn btn-sm btn-secondary" data-action="setDateRange" data-args='["m-gen", 1]' style="padding:4px 10px;">1d</button>
+            <button type="button" class="btn btn-sm btn-secondary" data-action="setDateRange" data-args='["m-gen", 7]' style="padding:4px 10px;">7d</button>
+            <button type="button" class="btn btn-sm btn-secondary" data-action="setDateRange" data-args='["m-gen", 30]' style="padding:4px 10px;">30d</button>
+            <button type="button" class="btn btn-sm btn-secondary" data-action="setDateRange" data-args='["m-gen", 60]' style="padding:4px 10px;">60d</button>
           </div>
         </div>
       </div>

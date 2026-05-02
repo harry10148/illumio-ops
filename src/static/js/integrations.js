@@ -286,30 +286,64 @@ async function doDaemonRestart(btn, msgSpan) {
   }
 }
 
-async function cacheBackfill() {
-  var source = (prompt('Source (events / traffic)', 'events') || '').trim().toLowerCase();
-  if (source !== 'events' && source !== 'traffic') {
-    alert("Invalid source: must be 'events' or 'traffic'.");
+// Open the Cache Backfill modal with a sensible default (last 7 days).
+function cacheBackfill() {
+  if (typeof setDateRange === 'function') setDateRange('cb', 7);
+  var src = document.getElementById('cb-source');
+  if (src) src.value = 'events';
+  var result = document.getElementById('cb-result');
+  if (result) { result.style.display = 'none'; result.textContent = ''; }
+  if (typeof openModal === 'function') openModal('m-cache-backfill');
+}
+
+async function submitCacheBackfill() {
+  var sourceEl = document.getElementById('cb-source');
+  var startEl = document.getElementById('cb-start');
+  var endEl = document.getElementById('cb-end');
+  var btn = document.getElementById('cb-submit');
+  var result = document.getElementById('cb-result');
+  var source = (sourceEl && sourceEl.value) || 'events';
+  var start = startEl && startEl.value;
+  var end = endEl && endEl.value;
+  if (!start || !end) {
+    if (result) {
+      result.style.display = 'block';
+      result.style.color = 'var(--danger)';
+      result.textContent = (typeof _t === 'function' ? _t('gui_cb_dates_required') : 'Start and end dates are required.');
+    }
     return;
   }
-  var start = prompt('Start date (YYYY-MM-DD)');
-  var end = prompt('End date (YYYY-MM-DD)');
-  if (!start || !end) return;
-  var r = await fetch('/api/cache/backfill', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
-    body: JSON.stringify({source: source, since: start, until: end}),
-  });
-  var body = await r.json().catch(function() { return {}; });
-  if (!r.ok) {
-    alert('Backfill failed: ' + (body.error || r.status));
-    return;
+  if (btn) btn.disabled = true;
+  if (result) {
+    result.style.display = 'block';
+    result.style.color = 'var(--dim)';
+    result.textContent = (typeof _t === 'function' ? _t('gui_cb_running') : 'Running…');
   }
-  alert('Backfill done — source: ' + source
-    + ', inserted: ' + (body.inserted || 0)
-    + ', duplicates: ' + (body.duplicates || 0)
-    + ', total: ' + (body.total_rows || 0)
-    + ', elapsed: ' + (body.elapsed_seconds || 0) + 's');
+  try {
+    var r = await fetch('/api/cache/backfill', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
+      body: JSON.stringify({source: source, since: start, until: end}),
+    });
+    var body = await r.json().catch(function() { return {}; });
+    if (!r.ok) {
+      if (result) {
+        result.style.color = 'var(--danger)';
+        result.textContent = 'Backfill failed: ' + (body.error || r.status);
+      }
+      return;
+    }
+    if (result) {
+      result.style.color = 'var(--accent2,var(--fg))';
+      result.textContent = 'Done — source: ' + source
+        + ' · inserted: ' + (body.inserted || 0)
+        + ' · duplicates: ' + (body.duplicates || 0)
+        + ' · total: ' + (body.total_rows || 0)
+        + ' · ' + (body.elapsed_seconds || 0) + 's';
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function cacheRetentionNow() {
@@ -329,6 +363,7 @@ async function cacheRetentionNow() {
     + ', dead_letter: ' + (body.dead_letter || 0));
 }
 window.cacheBackfill = cacheBackfill;
+window.submitCacheBackfill = submitCacheBackfill;
 window.cacheRetentionNow = cacheRetentionNow;
 
 // ── Cache traffic_filter section ────────────────────────────────────────────
