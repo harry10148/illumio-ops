@@ -6,6 +6,66 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to a `<major>.<minor>.<patch>-<topic-slug>` versioning
 scheme aligned with the git tag conventions.
 
+## [3.24.0-h6-cli-menus] — 2026-05-02
+
+H6 sub-plan from Batch 4 — final code-review-fixes item: split
+`src/settings.py` (2218 lines, a grab-bag of CLI wizard menus + event
+catalog data) into focused modules. The misnamed `settings.py` is gone.
+
+### Added
+- `src/settings/__init__.py` (47 lines) — backwards-compat shim that
+  re-exports every public symbol so all `from src.settings import X`
+  keep working unchanged.
+- `src/events/catalog.py` — `FULL_EVENT_CATALOG`, `ACTION_EVENTS`,
+  `SEVERITY_FILTER_EVENTS`, `DISCOVERY_EVENTS`, `EVENT_DESCRIPTION_KEYS`,
+  `EVENT_TIPS_KEYS`, plus the catalog builder + override dicts. Catalog
+  now lives next to the existing `src/events/` package, not buried in
+  `settings`.
+- `src/cli/menus/` package — interactive wizard functions, one file each:
+  - `_helpers.py` — `_menu_hints`, `_wizard_step`, `_wizard_confirm`,
+    `_tz_offset_info`, `_utc_to_local_hour`, `_local_to_utc_hour`,
+    `_empty_uses_default`
+  - `event.py` — `add_event_menu`
+  - `system_health.py` — `add_system_health_menu`
+  - `traffic.py` — `add_traffic_menu`
+  - `bandwidth.py` — `add_bandwidth_volume_menu`
+  - `manage_rules.py` — `manage_rules_menu` + `_parse_manage_rules_command`
+  - `alert.py` — `alert_settings_menu`
+  - `web_gui.py` — `web_gui_security_menu`, `_web_gui_tls_menu`,
+    `_clear_screen`
+  - `report_schedule.py` — `manage_report_schedules_menu`
+  - `_root.py` — `settings_menu` (top-level wizard)
+
+### Changed
+- `tests/test_wizard_default_enter.py` — `safe_input` patches updated
+  to target the new module locations (`_traffic_module.safe_input`
+  / `_bandwidth_module.safe_input`) since the new modules import at
+  module level rather than lazily.
+
+### Removed
+- `src/settings.py` (the 2218-line monolith). `src/settings/_legacy.py`
+  was used as a transitional shim during Tasks 5-10 and is now deleted.
+
+### Verified
+- Tests: 824 passed, 1 skipped.
+- i18n audit: 0 findings.
+- mypy strict on the typed core: 0 errors.
+- Catalog baseline snapshot guarded every move; no drift detected.
+
+## Batch 4 (H4 + H5 + H6) summary
+
+The three large refactors are complete; Batch 4 of the 2026-05-01 code
+review is done. Combined impact:
+- `src/i18n.py` (2275 lines) → package with 338-line engine + JSON data.
+- `src/gui/__init__.py` (3821 lines) → 627-line shell + 9 Blueprints
+  (~2720 lines total) + `_helpers.py` (871 lines).
+- `src/settings.py` (2218 lines) → 47-line shim + `src/cli/menus/`
+  (10 files, ~2100 lines total) + catalog moved to `src/events/`.
+
+Net structural improvement: 8000+ lines of code that lived in three
+giant files now live in 25+ focused modules. Public APIs unchanged;
+all test coverage preserved.
+
 ## [3.23.0-h5-gui-blueprints] — 2026-05-02
 
 H5 sub-plan from Batch 4: split `src/gui/__init__.py` (3821 lines, 76 routes
