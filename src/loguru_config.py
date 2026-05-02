@@ -144,3 +144,14 @@ def setup_loguru(
     # Suppress verbose INFO/DEBUG noise from PDF/font rendering libraries
     for _lib in ("fontTools", "weasyprint", "pydyf", "cssselect2", "tinycss2", "brotli"):
         logging.getLogger(_lib).setLevel(logging.WARNING)
+
+
+def setup_logger(
+    name: str,
+    log_file: str,
+    level: str = "INFO",
+    json_sink: bool = False,
+    **_kwargs,
+) -> None:
+    """Configure logging — delegates to setup_loguru. Signature kept for back-compat."""
+    setup_loguru(log_file, level=level, json_sink=json_sink)

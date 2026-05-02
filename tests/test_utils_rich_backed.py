@@ -103,9 +103,11 @@ def test_colors_fail_is_non_empty_when_tty(monkeypatch):
     pass all other tests.
     """
     from rich.style import Style as _RichStyle
-    import src.utils as utils_mod
+    # _ansi/_stdout_is_tty live in src.cli._render after the L8 refactor;
+    # src.utils still re-exports them for back-compat.
+    import src.cli._render as render_mod
     # Bypass the Colors class and test _ansi directly with a TTY mock
-    with patch.object(utils_mod, "_stdout_is_tty", return_value=True):
-        result = utils_mod._ansi(_RichStyle(color="red"))
+    with patch.object(render_mod, "_stdout_is_tty", return_value=True):
+        result = render_mod._ansi(_RichStyle(color="red"))
     assert result != "", "_ansi returned empty even when TTY — _make_ansi_codes broken"
     assert "\033[" in result, f"expected ANSI SGR, got {result!r}"
