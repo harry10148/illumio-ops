@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to a `<major>.<minor>.<patch>-<topic-slug>` versioning
 scheme aligned with the git tag conventions.
 
+## [3.23.0-h5-gui-blueprints] — 2026-05-02
+
+H5 sub-plan from Batch 4: split `src/gui/__init__.py` (3821 lines, 76 routes
+in one giant `_create_app` factory) into Flask Blueprints organised by topic.
+
+### Added
+- `src/gui/_helpers.py` (871 lines) — shared utilities (`_ok`, `_err`,
+  `_err_with_log`, `_redact_secrets`, `_validate_allowed_ips`, TLS helpers,
+  chart-spec builders, etc.). Re-exported from `src.gui` for backwards
+  compat.
+- `src/gui/routes/` package with 9 Blueprint factories (each
+  `make_<topic>_blueprint(cm, csrf, limiter, login_required) -> Blueprint`):
+  - `auth.py` (5 routes) — login/logout/CSRF/index
+  - `dashboard.py` (10 routes) — dashboard charts, status, UI translations
+  - `config.py` (10 routes) — settings, security, PCE profiles, TLS
+  - `rules.py` (9 routes) — rules CRUD
+  - `events.py` (4 routes) — events viewer + catalog
+  - `reports.py` (15 routes) — reports + report-schedules
+  - `actions.py` (10 routes) — quarantine, run-once, debug, test-alert,
+    best-practices, test-conn, workloads search
+  - `rule_scheduler.py` (10 routes) — rule scheduler + log history
+  - `admin.py` (3 routes) — logs, shutdown
+- 1 residual app-level route (`api_daemon_restart`) stays in
+  `_create_app` because it reads module-level `_GUI_OWNS_DAEMON` /
+  `_DAEMON_RESTART_FN` state assigned by `cli/_runtime.py`.
+
+### Changed
+- `src/gui/__init__.py` shrunk from **3821 lines → 627 lines**.
+- Endpoint names gain Blueprint prefix (e.g. `auth.api_login`,
+  `dashboard.api_status`). `security_check` and `login_manager.login_view`
+  updated to use the new prefixed names; literal-path checks unaffected.
+- `tests/test_web_security_contracts.py`, `tests/test_gui_dashboard.py`,
+  `tests/test_gui_rules.py` — monkeypatch targets follow symbols into
+  their new Blueprint modules.
+
+### Verified
+- Tests: 824 passed, 1 skipped (no behaviour change).
+- Route-map baseline snapshot test guarded every Blueprint move.
+- i18n audit: 0 findings; mypy strict on the typed core: 0 errors.
+
 ## [3.22.0-h4-i18n] — 2026-05-02
 
 H4 sub-plan from Batch 4 of the code review: convert `src/i18n.py`

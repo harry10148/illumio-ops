@@ -1,1 +1,1 @@
-__version__ = "3.22.0-h4-i18n"
+__version__ = "3.23.0-h5-gui-blueprints"
