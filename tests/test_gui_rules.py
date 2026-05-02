@@ -243,7 +243,7 @@ def test_rules_api_returns_throttle_state(client, monkeypatch, tmp_path):
             }
         }
     }), encoding='utf-8')
-    monkeypatch.setattr("src.gui._resolve_state_file", lambda: str(state_file))
+    monkeypatch.setattr("src.gui.routes.rules._resolve_state_file", lambda: str(state_file))
 
     rules = client.get('/api/rules', environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
     assert rules.status_code == 200
