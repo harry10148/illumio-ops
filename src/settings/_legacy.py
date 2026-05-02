@@ -1,4 +1,5 @@
 import os
+import sys
 import datetime
 import re
 from src.events.catalog import KNOWN_EVENT_TYPES
@@ -1391,14 +1392,15 @@ def manage_rules_menu(cm: ConfigManager):
                     f"\n{Colors.CYAN}{t('modifying_rule', name=rule['name'])}{Colors.ENDC}"
                 )
                 rtype = rule["type"]
+                _s = sys.modules.get("src.settings", sys.modules[__name__])
                 if rtype == "event":
-                    add_event_menu(cm, edit_rule=rule)
+                    _s.add_event_menu(cm, edit_rule=rule)
                 elif rtype == "system":
-                    add_system_health_menu(cm, edit_rule=rule)
+                    _s.add_system_health_menu(cm, edit_rule=rule)
                 elif rtype == "traffic":
-                    add_traffic_menu(cm, edit_rule=rule)
+                    _s.add_traffic_menu(cm, edit_rule=rule)
                 elif rtype in ["bandwidth", "volume"]:
-                    add_bandwidth_volume_menu(cm, edit_rule=rule)
+                    _s.add_bandwidth_volume_menu(cm, edit_rule=rule)
             except Exception as e:
                 print(t("error_modifying", error=str(e)))
 

@@ -88,7 +88,7 @@ BILINGUAL_DATA_LINES: set[tuple[str, str]] = {
     ("src/report/report_generator.py", "Attack Summary"),
     # Settings input parser accepts zh confirmations so a TW user can answer
     # 是/好 in addition to y/yes.
-    ("src/settings.py", '"是"'),
+    ("src/settings/_legacy.py", '"是"'),
     # Column-name match keyword, not a display string.
     ("src/report/exporters/html_exporter.py", "_INT_COL_KEYWORDS"),
     # JS lang selector shows native names ("English" / "繁體中文") in both modes.
