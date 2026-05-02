@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import sys
@@ -28,3 +29,24 @@ def _loguru_caplog_bridge(caplog):
         logger.remove(handler_id)
     except ValueError:
         pass  # setup_loguru() may have already removed all handlers
+
+
+@pytest.fixture
+def header_client(tmp_path):
+    """Minimal Flask test client for security-header contract tests.
+
+    Used by tests/test_security_headers.py and tests/test_flask_talisman_headers.py;
+    these previously duplicated the same fixture verbatim. Other suites that need a
+    richer config (auth, CSRF) build their own clients on top of `app_persistent`.
+    """
+    cfg = tmp_path / "config.json"
+    cfg.write_text(json.dumps({
+        "api": {"url": "https://pce.test", "org_id": "1", "key": "k", "secret": "s"},
+        "web_gui": {"username": "illumio", "password": "illumio",
+                    "secret_key": "", "allowed_ips": []},
+    }), encoding="utf-8")
+    from src.config import ConfigManager
+    from src.gui import build_app
+    app = build_app(ConfigManager(str(cfg)))
+    app.config["TESTING"] = True
+    return app.test_client()
