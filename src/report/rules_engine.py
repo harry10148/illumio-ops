@@ -11,12 +11,23 @@ All findings are returned as a list[Finding] for direct use by Module 12
 from __future__ import annotations
 
 from loguru import logger
-from dataclasses import dataclass, field
 from typing import Optional
 
 import pandas as pd
 
 from src.i18n import t
+
+# Backwards-compat re-exports — see src/report/rules/ for new homes
+from src.report.rules import (  # noqa: F401
+    Finding,
+    _DraftPdRuleMixin,
+    R01DraftDenyDetected,
+    R02OverrideDenyDetected,
+    R03VisibilityBoundaryBreach,
+    R04AllowedAcrossBoundary,
+    R05DraftReportedMismatch,
+)
+
 
 def _fmt_bytes(n: float) -> str:
     """Return human-readable byte string (B / KB / MB / GB / TB)."""
@@ -25,189 +36,6 @@ def _fmt_bytes(n: float) -> str:
             return f"{n:.1f} {unit}"
         n /= 1024
     return f"{n:.1f} TB"
-
-# ─── Finding model ───────────────────────────────────────────────────────────
-
-SEVERITY_RANK = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'INFO': 4}
-
-@dataclass
-class Finding:
-    rule_id: str
-    rule_name: str
-    severity: str            # CRITICAL | HIGH | MEDIUM | LOW | INFO
-    category: str            # e.g. Ransomware, LateralMovement, Policy
-    description: str
-    recommendation: str
-    evidence: dict = field(default_factory=dict)   # supporting data for the finding
-
-    @property
-    def severity_rank(self) -> int:
-        return SEVERITY_RANK.get(self.severity, 99)
-
-    def to_dict(self) -> dict:
-        return {
-            'rule_id': self.rule_id,
-            'rule_name': self.rule_name,
-            'severity': self.severity,
-            'category': self.category,
-            'description': self.description,
-            'recommendation': self.recommendation,
-            **{f'evidence_{k}': v for k, v in self.evidence.items()},
-        }
-
-# ─── Draft policy-decision standalone rules (R01–R05) ────────────────────────
-
-class _DraftPdRuleMixin:
-    """Mixin that marks a rule as requiring draft_policy_decision data."""
-
-    def needs_draft_pd(self) -> bool:
-        return True
-
-    def _has_draft(self, flows_df: pd.DataFrame) -> bool:
-        return "draft_policy_decision" in flows_df.columns
-
-
-class R01DraftDenyDetected(_DraftPdRuleMixin):
-    """R01: Flows currently allowed but a draft deny rule would block them."""
-
-    severity = "HIGH"
-
-    def evaluate(self, flows_df: pd.DataFrame, ctx: dict) -> list[Finding]:
-        if not self._has_draft(flows_df):
-            return []
-        _deny_values = {"blocked_by_boundary", "blocked_by_override_deny"}
-        matched = flows_df[
-            (flows_df["policy_decision"] == "allowed") &
-            flows_df["draft_policy_decision"].isin(_deny_values)
-        ]
-        if matched.empty:
-            return []
-        return [Finding(
-            rule_id="R01",
-            rule_name=t("rule_r01_name"),
-            severity=self.severity,
-            category="DraftPolicy",
-            description=t("rule_r01_desc"),
-            recommendation=t("rule_r01_rec"),
-            evidence={
-                "matching_flows": len(matched),
-                "draft_decisions": str(matched["draft_policy_decision"].value_counts().to_dict()),
-            },
-        )]
-
-
-class R02OverrideDenyDetected(_DraftPdRuleMixin):
-    """R02: Override deny rule present in draft — cannot be overridden by any allow rule."""
-
-    severity = "HIGH"
-
-    def evaluate(self, flows_df: pd.DataFrame, ctx: dict) -> list[Finding]:
-        if not self._has_draft(flows_df):
-            return []
-        matched = flows_df[
-            flows_df["draft_policy_decision"].str.endswith("_override_deny", na=False)
-        ]
-        if matched.empty:
-            return []
-        return [Finding(
-            rule_id="R02",
-            rule_name=t("rule_r02_name"),
-            severity=self.severity,
-            category="DraftPolicy",
-            description=t("rule_r02_desc"),
-            recommendation=t("rule_r02_rec"),
-            evidence={
-                "matching_flows": len(matched),
-                "draft_decisions": str(matched["draft_policy_decision"].value_counts().to_dict()),
-            },
-        )]
-
-
-class R03VisibilityBoundaryBreach(_DraftPdRuleMixin):
-    """R03: VEN in visibility/test mode and a deny boundary draft exists for this flow."""
-
-    severity = "MEDIUM"
-
-    def evaluate(self, flows_df: pd.DataFrame, ctx: dict) -> list[Finding]:
-        if not self._has_draft(flows_df):
-            return []
-        matched = flows_df[
-            (flows_df["policy_decision"] == "potentially_blocked") &
-            (flows_df["draft_policy_decision"] == "potentially_blocked_by_boundary")
-        ]
-        if matched.empty:
-            return []
-        return [Finding(
-            rule_id="R03",
-            rule_name=t("rule_r03_name"),
-            severity=self.severity,
-            category="DraftPolicy",
-            description=t("rule_r03_desc"),
-            recommendation=t("rule_r03_rec"),
-            evidence={
-                "matching_flows": len(matched),
-            },
-        )]
-
-
-class R04AllowedAcrossBoundary(_DraftPdRuleMixin):
-    """R04: Allow rule overrides a regular deny boundary. Verify this is intentional."""
-
-    severity = "LOW"
-
-    def evaluate(self, flows_df: pd.DataFrame, ctx: dict) -> list[Finding]:
-        if not self._has_draft(flows_df):
-            return []
-        matched = flows_df[
-            flows_df["draft_policy_decision"] == "allowed_across_boundary"
-        ]
-        if matched.empty:
-            return []
-        return [Finding(
-            rule_id="R04",
-            rule_name=t("rule_r04_name"),
-            severity=self.severity,
-            category="DraftPolicy",
-            description=t("rule_r04_desc"),
-            recommendation=t("rule_r04_rec"),
-            evidence={
-                "matching_flows": len(matched),
-            },
-        )]
-
-
-class R05DraftReportedMismatch(_DraftPdRuleMixin):
-    """R05: Aggregated list of workload pairs where reported=allowed but draft suggests block."""
-
-    severity = "INFO"
-
-    def evaluate(self, flows_df: pd.DataFrame, ctx: dict) -> list[Finding]:
-        if not self._has_draft(flows_df):
-            return []
-        matched = flows_df[
-            (flows_df["policy_decision"] == "allowed") &
-            flows_df["draft_policy_decision"].str.startswith("blocked_", na=False)
-        ]
-        if matched.empty:
-            return []
-        src_col = "src" if "src" in flows_df.columns else "src_ip" if "src_ip" in flows_df.columns else None
-        dst_col = "dst" if "dst" in flows_df.columns else "dst_ip" if "dst_ip" in flows_df.columns else None
-        if src_col and dst_col:
-            top_pairs = matched[[src_col, dst_col]].head(20).to_dict("records")
-        else:
-            top_pairs = []
-        return [Finding(
-            rule_id="R05",
-            rule_name=t("rule_r05_name"),
-            severity=self.severity,
-            category="DraftPolicy",
-            description=t("rule_r05_desc"),
-            recommendation=t("rule_r05_rec"),
-            evidence={
-                "mismatch_count": len(matched),
-                "top_pairs": str(top_pairs),
-            },
-        )]
 
 
 # Registry of standalone draft-PD rules (R01–R05)
