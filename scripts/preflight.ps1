@@ -15,7 +15,7 @@ function Pass { param($msg) Write-Host "  PASS  $msg" -ForegroundColor Green }
 function Warn { param($msg) Write-Host "  WARN  $msg" -ForegroundColor Yellow }
 function Fail { param($msg) Write-Host "  FAIL  $msg" -ForegroundColor Red; $script:FailCount++ }
 
-Write-Host "illumio_ops pre-install check"
+Write-Host "illumio-ops pre-install check"
 Write-Host "=============================="
 
 # 1. OS version (Win10 / Server 2019+)
@@ -84,7 +84,7 @@ if (Test-Path $bundledPython) {
 }
 
 # 8. Upgrade detection
-$installRoot = "C:\illumio_ops"
+$installRoot = "C:\illumio-ops"
 if (Test-Path (Join-Path $installRoot "config\config.json")) {
     Warn "Existing installation at $installRoot — this is an UPGRADE"
     Warn "config.json and rule_schedules.json will be preserved"

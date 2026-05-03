@@ -1,6 +1,6 @@
 [Unit]
 Description=Illumio PCE Ops (offline bundle)
-Documentation=https://github.com/your-org/illumio_ops
+Documentation=https://github.com/your-org/illumio-ops
 After=network-online.target
 Wants=network-online.target
 

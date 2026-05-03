@@ -13,7 +13,7 @@ pass() { echo -e "  ${GRN}PASS${NC}  $1"; }
 warn() { echo -e "  ${YEL}WARN${NC}  $1"; }
 fail() { echo -e "  ${RED}FAIL${NC}  $1"; FAIL_COUNT=$((FAIL_COUNT + 1)); }
 
-echo "illumio_ops pre-install check"
+echo "illumio-ops pre-install check"
 echo "=============================="
 
 # 1. Architecture
