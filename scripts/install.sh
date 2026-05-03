@@ -18,6 +18,50 @@ SERVICE_NAME="illumio-ops"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 SRC="$(cd "$(dirname "$0")" && pwd)"
 
+migrate_from_underscore_root() {
+    local OLD_ROOT="/opt/illumio_ops"
+    local NEW_ROOT="/opt/illumio-ops"
+
+    # Only migrate when old exists and new doesn't (and we haven't migrated already)
+    if [[ ! -d "$OLD_ROOT" ]]; then return 0; fi
+    if [[ -d "$NEW_ROOT" && -f "$NEW_ROOT/MIGRATED_FROM" ]]; then return 0; fi
+    if [[ -d "$NEW_ROOT" ]]; then
+        echo "ERROR: Both $OLD_ROOT and $NEW_ROOT exist. Manual cleanup required." >&2
+        exit 1
+    fi
+
+    echo "==> Migrating $OLD_ROOT → $NEW_ROOT"
+
+    # Pre-flight
+    if id illumio-ops &>/dev/null; then
+        echo "ERROR: User 'illumio-ops' already exists; cannot rename illumio_ops." >&2
+        exit 1
+    fi
+    if [[ "$(stat -c %d "$OLD_ROOT")" != "$(stat -c %d "$(dirname "$NEW_ROOT")")" ]]; then
+        echo "ERROR: $OLD_ROOT and $NEW_ROOT parent are on different filesystems." >&2
+        echo "       Run 'rsync -aHAX $OLD_ROOT/ $NEW_ROOT/ && rm -rf $OLD_ROOT' manually." >&2
+        exit 1
+    fi
+
+    systemctl stop illumio-ops 2>/dev/null || true
+    usermod -l illumio-ops illumio_ops || { echo "FAIL: usermod"; exit 1; }
+    groupmod -n illumio-ops illumio_ops || { echo "FAIL: groupmod"; usermod -l illumio_ops illumio-ops; exit 1; }
+    mv "$OLD_ROOT" "$NEW_ROOT" || {
+        echo "FAIL: mv — rolling back user/group rename"
+        usermod -l illumio_ops illumio-ops
+        groupmod -n illumio_ops illumio-ops
+        exit 1
+    }
+    echo "$OLD_ROOT" > "$NEW_ROOT/MIGRATED_FROM"
+    chown illumio-ops:illumio-ops "$NEW_ROOT/MIGRATED_FROM"
+    echo "==> Migration complete; $NEW_ROOT/MIGRATED_FROM records source path."
+}
+
+# Run migration only for the default install root (custom paths bypass migration).
+if [[ "$INSTALL_ROOT" == "/opt/illumio-ops" ]]; then
+    migrate_from_underscore_root
+fi
+
 IS_UPGRADE=false
 [ -f "$INSTALL_ROOT/config/config.json" ] && IS_UPGRADE=true
 
