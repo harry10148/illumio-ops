@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build illumio_ops offline bundles for Linux and Windows.
+# Build illumio-ops offline bundles for Linux and Windows.
 # Requires: curl, tar, zip, git, any Linux x86_64 with Python 3.10+.
 # Output:
 #   dist/illumio-ops-<version>-offline-linux-x86_64.tar.gz
