@@ -242,13 +242,18 @@ class ReportGenerator:
         # nothing older than what the cache already holds.
         if clip_to_cache and self._cache is not None:
             cache_earliest = self._cache.earliest_data_timestamp("traffic")
-            if cache_earliest is not None and cache_earliest > start_dt:
+            if cache_earliest is not None and cache_earliest > start_dt and cache_earliest <= end_dt:
                 logger.info(
                     "ReportGenerator: clip_to_cache clipping start {} → {}",
                     start_dt, cache_earliest,
                 )
                 start_dt = cache_earliest
                 start_date = start_dt.isoformat().replace("+00:00", "Z")
+            elif cache_earliest is not None and cache_earliest > end_dt:
+                logger.info(
+                    "ReportGenerator: clip_to_cache requested but cache earliest ({}) is after request end ({}); skipping clip",
+                    cache_earliest, end_dt,
+                )
             now_utc = datetime.datetime.now(datetime.timezone.utc)
             if end_dt > now_utc:
                 end_dt = now_utc
