@@ -21,37 +21,20 @@
 ## 1.1 System Requirements
 - **Python 3.8+** (tested up to 3.12)
 - **Network Access** to Illumio PCE (HTTPS, default port `8443`)
-- **Install:** `pip install -r requirements.txt` — pinned packages spanning Flask + security middleware (`flask-wtf`, `flask-limiter`, `flask-talisman`, `flask-login`, `argon2-cffi`, `cryptography`), reports + charts (`pandas`, `pyyaml`, `openpyxl`, `reportlab`, `matplotlib`, `plotly`, `pygments`), HTTP client (`requests`, `orjson`, `cachetools`), config validation (`pydantic`), scheduler + cache (`APScheduler`, `SQLAlchemy`), structured logging (`loguru`), CLI UX (`rich`, `questionary`, `click`, `humanize`), production WSGI server (`cheroot`).
-- **Offline-isolated targets:** use `scripts/build_offline_bundle.sh` to produce a self-contained tarball with all wheels pre-built; see [§1.2](#12-installation) for the full bundle workflow.
+- **Production deployment:** use `scripts/build_offline_bundle.sh` to produce a self-contained tarball with a portable CPython 3.12 interpreter and all wheels pre-built; see [§1.2](#12-installation) for the full Linux + Windows bundle workflow.
+- **Dependencies (pinned in `requirements.txt`):** Flask + security middleware (`flask-wtf`, `flask-limiter`, `flask-talisman`, `flask-login`, `argon2-cffi`, `cryptography`), reports + charts (`pandas`, `pyyaml`, `openpyxl`, `reportlab`, `matplotlib`, `plotly`, `pygments`), HTTP client (`requests`, `orjson`, `cachetools`), config validation (`pydantic`), scheduler + cache (`APScheduler`, `SQLAlchemy`), structured logging (`loguru`), CLI UX (`rich`, `questionary`, `click`, `humanize`), production WSGI server (`cheroot`). The offline bundle pre-builds wheels for all of these.
+- **Development from source:** `pip install -r requirements.txt` (use a venv on Ubuntu 22.04+ / Debian 12+ due to PEP 668).
 - **PDF export:** `reportlab` is included by default (pure Python; no WeasyPrint / Pango / Cairo / GTK / GDK-PixBuf required). PDF output is a static English summary; HTML and XLSX are the recommended formats for full localized content.
 
 ## 1.2 Installation
 
-### Red Hat / CentOS (RHEL 8+)
-
-```bash
-git clone <repo-url>
-cd illumio-ops
-cp config/config.json.example config/config.json
-
-# Install optional dependencies from AppStream (no EPEL required)
-sudo dnf install python3-flask python3-pandas python3-pyyaml
-
-# Install remaining Python packages (RHEL 8+ has no PEP 668 restriction — direct pip install is fine)
-pip install -r requirements.txt
-```
-
-### Red Hat / CentOS — Offline Bundle (air-gapped install)
+### Linux — Offline Bundle (air-gapped install)
 
 Use this method when the target host has no internet access and cannot reach PyPI
 or any package mirror. The bundle includes a portable CPython 3.12 interpreter and
 all pre-built Python wheels — no `dnf`, no `python3`, no network required on the
-target host.
-
-> **Note:** PDF reports (`--format pdf`) are not available in the offline bundle.
-> PDF export uses ReportLab (pure Python) and does not require WeasyPrint, Pango, Cairo, GTK, or GDK-PixBuf,
-> but the ReportLab wheel is excluded from the air-gapped bundle to keep bundle size small.
-> All other formats (HTML, XLSX, CSV) work normally.
+target host. All report formats (HTML, XLSX, CSV, PDF) work; PDF uses pure-Python
+ReportLab and ships in the bundle.
 
 ##### Build the bundle (on any internet-connected Linux or WSL machine)
 
@@ -121,7 +104,8 @@ sudo systemctl status illumio-ops
 ##### Verify offline build integrity
 
 ```bash
-# Confirm reportlab is absent (offline bundle) and all other packages imported successfully
+# Confirm every required production package imports under the bundled Python.
+# Exit 0 = all PASS, exit 1 = any FAIL — safe to run before enabling the service.
 /opt/illumio_ops/python/bin/python3 \
     /opt/illumio_ops/scripts/verify_deps.py --offline-bundle
 ```
@@ -131,10 +115,8 @@ sudo systemctl status illumio-ops
 **Prerequisites:** NSSM (Non-Sucking Service Manager) — download from https://nssm.cc/download
 and place `nssm.exe` in your system PATH or in the bundle's `deploy\` directory.
 
-> **Note:** PDF reports (`--format pdf`) are not available in the offline bundle.
-> PDF export uses ReportLab (pure Python) and does not require WeasyPrint, Pango, Cairo, GTK, or GDK-PixBuf,
-> but the ReportLab wheel is excluded from the air-gapped bundle to keep bundle size small.
-> All other formats (HTML, XLSX, CSV) work normally.
+All report formats (HTML, XLSX, CSV, PDF) work; PDF uses pure-Python ReportLab
+and ships in the bundle.
 
 ##### Build the bundle (on any internet-connected Linux or WSL machine)
 

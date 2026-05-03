@@ -26,11 +26,10 @@
 | 症狀 | 可能原因 | 解決方案 |
 |---|---|---|
 | Ubuntu/Debian 出現 `externally-managed-environment` pip 錯誤 | Ubuntu 22.04+ / Debian 12+ 受 PEP 668 限制，禁止系統範圍 `pip install` | 建立 venv：`python3 -m venv venv && source venv/bin/activate && venv/bin/pip install -r requirements.txt`。每次開新終端都需重新啟用 venv。 |
-| Web GUI / `--monitor` 無法啟動，出現缺少模組錯誤 | 在當前直譯器下未安裝相依套件 | **Ubuntu/Debian**：`venv/bin/pip install -r requirements.txt`。**RHEL**：`python3 -m venv venv && venv/bin/pip install -r requirements.txt`。 |
+| Web GUI / `--monitor` 無法啟動，出現缺少模組錯誤 | 在當前直譯器下未安裝相依套件 | **正式（離線 bundle）**：執行 `/opt/illumio_ops/python/bin/python3 /opt/illumio_ops/scripts/verify_deps.py` 找出缺少的套件，再重新執行 `sudo ./install.sh`。**開發**：`pip install -r requirements.txt`（Ubuntu 22.04+ / Debian 12+ 須改用 venv）。 |
 | systemd：`illumio-ops` 服務啟動後立即退出 | `config.json` 錯誤、`data/` 或 `logs/` 路徑無寫入權限，或 PCE 憑證遺漏 | 執行 `sudo systemctl status illumio-ops -l` 與 `sudo journalctl -u illumio-ops -n 100`。對安裝根目錄執行 `illumio-ops config validate`。確認 `illumio_ops` 系統帳號擁有 `/opt/illumio_ops/{data,logs,config}`。 |
 | Windows：`IllumioOps` 服務啟動後立即停止 | NSSM 找不到內附 Python、`config.json` 無效，或服務帳號對安裝目錄缺少權限 | 檢查 `C:\illumio_ops\logs\illumio_ops.log`；執行 `nssm.exe get IllumioOps Application` 確認指向內附 `python\python.exe`；以系統管理員身分重新執行 `.\install.ps1`。 |
 | Windows：安裝過程顯示 `nssm.exe not found` | NSSM 不在 PATH 或 bundle `deploy\` 中 | 自 https://nssm.cc/download 下載 NSSM，將 `nssm.exe` 加入 PATH 或放置於 bundle `deploy\` 資料夾，重新執行 `.\install.ps1`。 |
-| 出現 `PDF export is not available in this build` | 離線 bundle 為了縮小體積排除了 `reportlab` | 改用 `--format html` 或 `--format xlsx`。若需 PDF，請於可連網主機以 `pip install -r requirements.txt` 安裝。 |
 | 升級後仍載入舊設定 | `install.sh` / `install.ps1` 刻意保留整個 `config/` 目錄 | 與新範本比對：`diff /opt/illumio_ops/config/config.json.example /opt/illumio_ops/config/config.json`，並手動合併新欄位。 |
 | `--purge` 意外移除設定 | `uninstall.sh --purge` 文件記載為具破壞性，會移除 `config/` | 從備份還原。不含 `--purge` 時，預設解除安裝始終保留 `config/`。 |
 | 升級後 `report_config.yaml` 被重置 | 安裝程式會替換內附的 `report_config.yaml`（可能含新分析參數） | 升級前先備份：`sudo cp config/report_config.yaml config/report_config.yaml.bak`，執行 `sudo ./install.sh`，再合併您的修改。 |

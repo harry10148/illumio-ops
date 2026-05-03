@@ -21,34 +21,16 @@
 ## 1.1 系統需求
 - **Python 3.8+**（已測試至 3.12）
 - **網路存取：** 可透過 HTTPS 連線至 Illumio PCE（預設埠 `8443`）
-- **安裝：** `pip install -r requirements.txt` — 鎖定套件涵蓋 Flask + 安全中介層（`flask-wtf`、`flask-limiter`、`flask-talisman`、`flask-login`、`argon2-cffi`、`cryptography`）、報表 + 圖表（`pandas`、`pyyaml`、`openpyxl`、`reportlab`、`matplotlib`、`plotly`、`pygments`）、HTTP 客戶端（`requests`、`orjson`、`cachetools`）、設定驗證（`pydantic`）、排程 + 快取（`APScheduler`、`SQLAlchemy`）、結構化日誌（`loguru`）、CLI UX（`rich`、`questionary`、`click`、`humanize`）、生產級 WSGI server（`cheroot`）。
-- **離線隔離目標：** 使用 `scripts/build_offline_bundle.sh` 產生含所有預建 wheel 的自包含 tarball；完整 bundle 工作流程請見 [§1.2](#12-安裝)。
+- **正式部署：** 使用 `scripts/build_offline_bundle.sh` 建立自包含 tarball，內含可攜式 CPython 3.12 直譯器與所有預建 wheel；完整 Linux + Windows bundle 流程請見 [§1.2](#12-安裝)。
+- **相依套件（鎖定於 `requirements.txt`）：** Flask + 安全中介層（`flask-wtf`、`flask-limiter`、`flask-talisman`、`flask-login`、`argon2-cffi`、`cryptography`）、報表 + 圖表（`pandas`、`pyyaml`、`openpyxl`、`reportlab`、`matplotlib`、`plotly`、`pygments`）、HTTP 客戶端（`requests`、`orjson`、`cachetools`）、設定驗證（`pydantic`）、排程 + 快取（`APScheduler`、`SQLAlchemy`）、結構化日誌（`loguru`）、CLI UX（`rich`、`questionary`、`click`、`humanize`）、生產級 WSGI server（`cheroot`）。離線 bundle 已為以上全部預建 wheel。
+- **從原始碼開發：** `pip install -r requirements.txt`（Ubuntu 22.04+ / Debian 12+ 因 PEP 668 需改用 venv）。
 - **PDF 匯出：** `reportlab` 預設包含（純 Python；不需 WeasyPrint / Pango / Cairo / GTK / GDK-PixBuf）。PDF 內容為靜態英文摘要；HTML 與 XLSX 是完整本地化內容的建議格式。
 
 ## 1.2 安裝
 
-### Red Hat / CentOS（RHEL 8+）
+### Linux — 離線 Bundle（air-gapped 安裝）
 
-```bash
-git clone <repo-url>
-cd illumio-ops
-cp config/config.json.example config/config.json
-
-# 從 AppStream 安裝選用相依套件（無需 EPEL）
-sudo dnf install python3-flask python3-pandas python3-pyyaml
-
-# 安裝其餘 Python 套件（RHEL 8+ 無 PEP 668 限制，可直接 pip install）
-pip install -r requirements.txt
-```
-
-### Red Hat / CentOS — 離線 Bundle（air-gapped 安裝）
-
-當目標主機無法連線網際網路且無法存取 PyPI 或任何套件鏡像時，請使用此方式。Bundle 包含可攜式 CPython 3.12 直譯器及所有預建的 Python wheel — 目標主機上無需 `dnf`、`python3` 或網路連線。
-
-> **注意：** 離線 bundle 不支援 PDF 報表（`--format pdf`）。
-> PDF 匯出使用 ReportLab（純 Python），不需要 WeasyPrint、Pango、Cairo、GTK 或 GDK-PixBuf，
-> 但 ReportLab wheel 已從 air-gapped bundle 中排除以縮小 bundle 體積。
-> 所有其他格式（HTML、XLSX、CSV）均可正常使用。
+當目標主機無法連線網際網路且無法存取 PyPI 或任何套件鏡像時，請使用此方式。Bundle 包含可攜式 CPython 3.12 直譯器及所有預建的 Python wheel — 目標主機上無需 `dnf`、`python3` 或網路連線。所有報表格式（HTML、XLSX、CSV、PDF）皆可使用；PDF 採用純 Python 的 ReportLab，已內含於 bundle。
 
 ##### 建置 bundle（在任何可連線網際網路的 Linux 或 WSL 機器上執行）
 
@@ -116,7 +98,8 @@ sudo systemctl status illumio-ops
 ##### 驗證離線 bundle 完整性
 
 ```bash
-# Confirm reportlab is absent (offline bundle) and all other packages imported successfully
+# 確認所有必要的 production 套件都能在 bundle Python 下成功 import。
+# Exit 0 = 全部 PASS，exit 1 = 有任何 FAIL — 啟用服務前可放心執行。
 /opt/illumio_ops/python/bin/python3 \
     /opt/illumio_ops/scripts/verify_deps.py --offline-bundle
 ```
@@ -126,10 +109,7 @@ sudo systemctl status illumio-ops
 **必要條件：** NSSM（Non-Sucking Service Manager）— 從 https://nssm.cc/download 下載，
 並將 `nssm.exe` 放入系統 PATH 或 bundle 的 `deploy\` 目錄。
 
-> **注意：** 離線 bundle 不支援 PDF 報表（`--format pdf`）。
-> PDF 匯出使用 ReportLab（純 Python），不需要 WeasyPrint、Pango、Cairo、GTK 或 GDK-PixBuf，
-> 但 ReportLab wheel 已從 air-gapped bundle 中排除以縮小 bundle 體積。
-> 所有其他格式（HTML、XLSX、CSV）均可正常使用。
+所有報表格式（HTML、XLSX、CSV、PDF）皆可使用；PDF 採用純 Python 的 ReportLab，已內含於 bundle。
 
 ##### 建置 bundle（在任何可連線網際網路的 Linux 或 WSL 機器上執行）
 

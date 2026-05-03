@@ -542,25 +542,6 @@ nssm start IllumioOps
 
 > **Preferred daemon flag:** Use `--monitor-gui` to run the scheduler and Web GUI together in a single process (Persistent Mode). Use `--monitor` only when you want a headless daemon with no GUI.
 
-#### RHEL / CentOS (system Python)
-
-```ini
-# /etc/systemd/system/illumio-ops.service
-[Unit]
-Description=Illumio PCE Ops
-After=network.target
-
-[Service]
-Type=simple
-User=illumio
-WorkingDirectory=/opt/illumio_ops
-ExecStart=/usr/bin/python3 /opt/illumio_ops/illumio-ops.py --monitor-gui --interval 5
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-```
-
 #### Ubuntu / Debian (venv)
 
 Create the venv first, then point `ExecStart` at the venv interpreter:
@@ -593,15 +574,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now illumio-ops
 ```
 
-#### Red Hat / CentOS — Offline Bundle (air-gapped install)
+#### Linux — Offline Bundle (air-gapped install)
 
 Use this method when the target host has no internet access and cannot reach
 PyPI or any package mirror. The bundle includes a portable CPython 3.12
 interpreter and all pre-built Python wheels — no `dnf`, no `python3`, no
-network required on the target host.
-
-> **Note:** PDF reports (`--format pdf`) are not available in the offline
-> bundle. All other formats (HTML, XLSX, CSV) work normally.
+network required on the target host. All report formats (HTML, XLSX, CSV,
+PDF) work; PDF uses pure-Python ReportLab and ships in the bundle.
 
 ##### Build the bundle (on any internet-connected Linux or WSL machine)
 
@@ -657,7 +636,7 @@ sudo systemctl start illumio-ops
 sudo systemctl status illumio-ops
 
 # 5. Verify the new version
-/opt/illumio_ops/python/bin/python3 /opt/illumio_ops/illumio_ops.py --version
+/opt/illumio_ops/python/bin/python3 /opt/illumio_ops/illumio-ops.py --version
 ```
 
 > **If `report_config.yaml` was customised:** the upgrade replaces it with the
@@ -681,10 +660,8 @@ sudo systemctl status illumio-ops
 
 **Prerequisites:** NSSM (Non-Sucking Service Manager) — download from
 https://nssm.cc/download and place `nssm.exe` in your system PATH or in the
-bundle's `deploy\` folder.
-
-> **Note:** PDF reports (`--format pdf`) are not available in the offline
-> bundle. All other formats (HTML, XLSX, CSV) work normally.
+bundle's `deploy\` folder. All report formats (HTML, XLSX, CSV, PDF) work;
+PDF uses pure-Python ReportLab and ships in the bundle.
 
 ##### Build the bundle (on any internet-connected Linux or WSL machine)
 
@@ -1019,14 +996,13 @@ Channels not listed in `alerts.active` are silently skipped even if their creden
 | `401 Unauthorized` | Invalid API credentials | Regenerate API Key in PCE Console |
 | `410 Gone` | Async query expired | The traffic query result was cleaned up; re-run the query |
 | `429 Too Many Requests` | API rate limiting | The system auto-retries with backoff; reduce query frequency if persistent |
-| Web GUI won't start | Dependencies not installed | **Ubuntu/Debian**: use venv — `venv/bin/pip install -r requirements.txt`. **RHEL**: `python3 -m venv venv && venv/bin/pip install -r requirements.txt` |
+| Web GUI won't start | Dependencies not installed | **Production (offline bundle)**: run `/opt/illumio_ops/python/bin/python3 /opt/illumio_ops/scripts/verify_deps.py` then re-run `sudo ./install.sh`. **Development**: `pip install -r requirements.txt` (use a venv on Ubuntu 22.04+ / Debian 12+) |
 | `externally-managed-environment` pip error | Ubuntu/Debian PEP 668 | Create a venv: `python3 -m venv venv && venv/bin/pip install -r requirements.txt` |
 | No alerts received | Channel not activated | Ensure `alerts.active` array includes your channel(s) |
 | Report shows all VENs as online | Old cached state | Ensure `hours_since_last_heartbeat` is returned by your PCE version; check PCE API response for `agent.status` fields |
 | Rule Scheduler shows `[SKIP]` log | Rule or parent Ruleset in Draft | Complete and Provision the policy edits in PCE Console; the schedule will resume automatically |
 | PCE profile switch has no effect | ApiClient not reinitialized | Use the GUI "Activate" button or CLI profile switch, which triggers reinitialization |
 | Policy Usage report shows 0 hits | Rules are draft-only | Only active (provisioned) rules are queried; provision draft rules first |
-| `PDF export is not available in this build` | Offline bundle excludes reportlab (pure Python; no WeasyPrint/Pango/Cairo/GTK required) | Use `--format html` or `--format xlsx` instead |
 | After upgrade: old config loaded | `config.json` preserved as-is | Compare with `config.json.example` and add any new fields |
 | Windows: `nssm.exe not found` | NSSM not in PATH or bundle deploy\ | Add `nssm.exe` to PATH or place it in the bundle `deploy\` folder |
 | `Cache database not configured` | `pce_cache.enabled` is false or `db_path` is wrong | Set `pce_cache.enabled: true` and verify the `db_path` is writable |

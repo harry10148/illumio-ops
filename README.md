@@ -63,19 +63,21 @@ If you only need the PCE web console for occasional manual queries, you don't ne
 
 ---
 
-## Quick Start
+## Quick Start (development from source)
+
+> Production deployments use the self-contained offline bundle (no system Python, no network on target). See **[Installation](docs/Installation.md#12-installation)** for the bundle workflow on Linux and Windows.
 
 ```bash
 git clone <repo-url>
 cd illumio-ops
 cp config/config.json.example config/config.json    # Edit with your PCE credentials
-pip install -r requirements.txt
+pip install -r requirements.txt                     # Use a venv on Ubuntu 22.04+ / Debian 12+ (PEP 668)
 
 # Most common: persistent daemon + Web GUI on https://127.0.0.1:5001
 python illumio-ops.py --monitor-gui --interval 5 --port 5001
 ```
 
-For RHEL / Ubuntu / Windows offline-bundle installs, air-gapped deployments, systemd / NSSM service registration, and dependency details, see **[Installation](docs/Installation.md)**.
+For air-gapped deployments, systemd / NSSM service registration, and the full dependency list, see **[Installation](docs/Installation.md)**.
 
 For all execution modes (`--gui` / `--monitor` / interactive CLI), the full subcommand reference, and the operational walkthrough, see **[User Manual §1](docs/User_Manual.md)**.
 
