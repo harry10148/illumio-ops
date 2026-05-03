@@ -75,7 +75,7 @@ def test_max_instances_is_one():
     assert sched._job_defaults.get("max_instances") == 1
 
 
-def test_cache_ingest_jobs_have_next_run_time_within_30s(monkeypatch, tmp_path):
+def test_cache_ingest_jobs_have_next_run_time_within_30s(tmp_path):
     """Ingest jobs must fire within ~10s of scheduler start, not after
     a full traffic_poll_interval_seconds delay. Otherwise daemon restarts
     keep resetting the timer and ingest never runs."""

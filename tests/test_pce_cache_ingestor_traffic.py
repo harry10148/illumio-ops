@@ -108,3 +108,25 @@ def test_run_once_logs_poll_summary_even_on_empty(session_factory, caplog):
     # Must contain a poll-summary line that names fetched + inserted counts
     assert any("Traffic ingest poll" in rec.message for rec in caplog.records), \
         f"expected 'Traffic ingest poll' line; got: {[r.message for r in caplog.records]}"
+
+
+def test_run_once_emits_poll_log_even_when_insert_batch_raises(session_factory, caplog):
+    """Regression: if _insert_batch raises mid-run (e.g., DB locked), the
+    poll-summary log must still emit so the operator's timeline isn't blank
+    on the failure case."""
+    import logging
+    from unittest.mock import MagicMock
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    fake = MagicMock()
+    fake.get_traffic_flows_async = MagicMock(return_value=[{"src_ip": "1.1.1.1"}])
+    ing = TrafficIngestor(api=fake, session_factory=session_factory,
+                           watermark=WatermarkStore(session_factory))
+    # Force _insert_batch to raise
+    ing._insert_batch = MagicMock(side_effect=RuntimeError("DB locked"))
+    with caplog.at_level(logging.INFO, logger="src.pce_cache.ingestor_traffic"):
+        with __import__("pytest").raises(RuntimeError):
+            ing.run_once()
+    assert any("Traffic ingest poll" in rec.message for rec in caplog.records), \
+        f"expected poll log on insert failure; got: {[r.message for r in caplog.records]}"
