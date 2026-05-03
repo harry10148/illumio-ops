@@ -93,16 +93,24 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     try:
         cache_cfg = cm.models.pce_cache
         if cache_cfg.enabled:
+            import datetime as _dt
             from apscheduler.triggers.interval import IntervalTrigger as _IT
             from src.scheduler.jobs import (
                 run_events_ingest, run_traffic_ingest,
                 run_traffic_aggregate, run_cache_retention,
             )
             from src.pce_cache.lag_monitor import run_cache_lag_monitor
+            # Fire ingest jobs ~10s after scheduler start so daemon restarts
+            # don't keep resetting the timer to (now + full interval), which
+            # previously kept periodic ingest from ever firing across many
+            # restarts within one interval window.
+            _kick = _dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(seconds=10)
             sched.add_job(run_events_ingest, _IT(seconds=cache_cfg.events_poll_interval_seconds),
-                          args=[cm], id="pce_cache_ingest_events", replace_existing=True)
+                          args=[cm], id="pce_cache_ingest_events", replace_existing=True,
+                          next_run_time=_kick)
             sched.add_job(run_traffic_ingest, _IT(seconds=cache_cfg.traffic_poll_interval_seconds),
-                          args=[cm], id="pce_cache_ingest_traffic", replace_existing=True)
+                          args=[cm], id="pce_cache_ingest_traffic", replace_existing=True,
+                          next_run_time=_kick)
             sched.add_job(run_traffic_aggregate, _IT(hours=1),
                           args=[cm], id="pce_cache_aggregate", replace_existing=True)
             sched.add_job(run_cache_retention, _IT(hours=24),

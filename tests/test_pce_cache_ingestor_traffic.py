@@ -88,3 +88,23 @@ def test_traffic_ingestor_applies_sampler_to_allowed(session_factory):
     count = ing.run_once()
     # 1:10 sampling → expect 5–15 out of 100
     assert 5 <= count <= 20
+
+
+def test_run_once_logs_poll_summary_even_on_empty(session_factory, caplog):
+    """Empty PCE response must still emit an INFO line so silent skips
+    are visible in the log timeline."""
+    import logging
+    from unittest.mock import MagicMock
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    fake = MagicMock()
+    fake.get_traffic_flows_async = MagicMock(return_value=[])
+    ing = TrafficIngestor(api=fake, session_factory=session_factory,
+                           watermark=WatermarkStore(session_factory))
+    with caplog.at_level(logging.INFO, logger="src.pce_cache.ingestor_traffic"):
+        n = ing.run_once()
+    assert n == 0
+    # Must contain a poll-summary line that names fetched + inserted counts
+    assert any("Traffic ingest poll" in rec.message for rec in caplog.records), \
+        f"expected 'Traffic ingest poll' line; got: {[r.message for r in caplog.records]}"

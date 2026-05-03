@@ -106,7 +106,7 @@
     "traffic_raw_retention_days": 7,
     "traffic_agg_retention_days": 90,
     "events_poll_interval_seconds": 300,
-    "traffic_poll_interval_seconds": 3600,
+    "traffic_poll_interval_seconds": 600,
     "rate_limit_per_minute": 400
   },
   "siem": {

@@ -49,10 +49,16 @@ class TrafficIngestor:
             return 0
 
         inserted = self._insert_batch(flows)
+        watermark_advanced = False
         if flows:
             last = max(_ts(f, "last_detected") for f in flows)
             if last:
                 self._wm.advance(self.SOURCE, last_timestamp=_parse_iso(last))
+                watermark_advanced = True
+        logger.info(
+            "Traffic ingest poll: fetched={} inserted={} watermark_advanced={} since={}",
+            len(flows), inserted, watermark_advanced, since,
+        )
         return inserted
 
     def _since_cursor(self) -> Optional[str]:

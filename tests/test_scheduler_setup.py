@@ -73,3 +73,41 @@ def test_max_instances_is_one():
     from src.scheduler import build_scheduler
     sched = build_scheduler(_fake_cm(), interval_minutes=10)
     assert sched._job_defaults.get("max_instances") == 1
+
+
+def test_cache_ingest_jobs_have_next_run_time_within_30s(monkeypatch, tmp_path):
+    """Ingest jobs must fire within ~10s of scheduler start, not after
+    a full traffic_poll_interval_seconds delay. Otherwise daemon restarts
+    keep resetting the timer and ingest never runs."""
+    import datetime as _dt
+    from src.scheduler import build_scheduler
+
+    class _CM:
+        def __init__(self):
+            self.config = {"scheduler": {}, "rule_scheduler": {"check_interval_seconds": 300}}
+            class _PCE:
+                enabled = True
+                db_path = str(tmp_path / "c.sqlite")
+                events_poll_interval_seconds = 300
+                traffic_poll_interval_seconds = 600
+                rate_limit_per_minute = 400
+                async_threshold_events = 10000
+                class _S:
+                    sample_ratio_allowed = 1
+                    max_rows_per_batch = 200000
+                traffic_sampling = _S()
+                traffic_filter = type("F", (), {"actions": [], "workload_label_env": [],
+                                                "ports": [], "protocols": [], "exclude_src_ips": []})()
+                events_retention_days = 90
+                traffic_raw_retention_days = 7
+                traffic_agg_retention_days = 90
+            class _SIEM:
+                enabled = False
+            self.models = type("M", (), {"pce_cache": _PCE(), "siem": _SIEM()})()
+
+    sched = build_scheduler(_CM(), interval_minutes=10)
+    now = _dt.datetime.now(_dt.timezone.utc)
+    job = sched.get_job("pce_cache_ingest_traffic")
+    assert job is not None
+    delta = (job.next_run_time - now).total_seconds()
+    assert -5 <= delta <= 30, f"expected first fire within ~30s of start; got delta={delta}s"
