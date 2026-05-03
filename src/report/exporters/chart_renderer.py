@@ -89,13 +89,26 @@ def _resolve_chart_text(spec: dict[str, Any], field: str, *, lang: str = "en") -
       1. spec[f"{field}_key"] -> STRINGS[key].get(lang) if both present
       2. spec[field] (literal fallback for backward compat)
       3. "" if neither present
+
+    NOTE on silent failure: when the key IS set but the entry is missing
+    from STRINGS (typo or stale key), we log a WARNING and fall back to
+    the literal. This catches translation gaps in CI/dev logs that would
+    otherwise pass unnoticed (a zh_TW PDF showing English for one chart
+    is hard to spot in visual review).
     """
     key = spec.get(f"{field}_key")
     if key:
         from src.report.exporters.report_i18n import STRINGS
-        translated = STRINGS.get(key, {}).get(lang)
-        if translated:
-            return translated
+        if key not in STRINGS:
+            logger.warning(
+                "chart i18n key not found: {!r} (field={}, lang={}) — "
+                "falling back to literal",
+                key, field, lang,
+            )
+        else:
+            translated = STRINGS[key].get(lang)
+            if translated:
+                return translated
     return str(spec.get(field, ""))
 
 

@@ -146,14 +146,16 @@ def test_filter_existing_font_families_keeps_real_font_when_present():
     assert "DejaVu Sans" in out
 
 
-def test_render_matplotlib_resolves_title_key_for_lang():
+def test_render_matplotlib_resolves_title_key_for_lang(monkeypatch):
     """If chart_spec carries title_key, the renderer resolves it via STRINGS+lang."""
     from src.report.exporters import chart_renderer
     from src.report.exporters import report_i18n
-    # Inject a temporary i18n entry the renderer can resolve.
-    report_i18n.STRINGS["rpt_chart_test_title"] = {
-        "en": "English Title", "zh_TW": "中文標題",
-    }
+    # monkeypatch.setitem ensures the synthetic entry is removed after the test
+    monkeypatch.setitem(
+        report_i18n.STRINGS,
+        "rpt_chart_test_title",
+        {"en": "English Title", "zh_TW": "中文標題"},
+    )
     spec = {
         "type": "bar",
         "title": "English Title",        # backward-compat literal
