@@ -138,6 +138,13 @@ build_windows() {
     cp "$REPO_ROOT/scripts/preflight.ps1" "$BUILD/"
     cp "$REPO_ROOT/scripts/install.ps1" "$BUILD/"
 
+    # NSSM (Windows service manager) — bundled so air-gapped hosts don't need
+    # to fetch nssm.exe from nssm.cc separately. install_service.ps1 picks it
+    # up automatically from $PSScriptRoot/nssm.exe (i.e. deploy/nssm.exe).
+    echo "==> [Windows] Bundling NSSM"
+    unzip -j -o "$REPO_ROOT/vendor/windows/nssm-2.24.zip" \
+        "nssm-2.24/win64/nssm.exe" -d "$BUILD/deploy/" >/dev/null
+
     echo "==> [Windows] Creating $ARCHIVE"
     (cd "$(dirname "$BUILD")" && zip -r "$DIST_DIR/$ARCHIVE" "$(basename "$BUILD")" -x "*.pyc" -x "__pycache__/*")
     echo "    Size: $(du -sh "$DIST_DIR/$ARCHIVE" | cut -f1)"

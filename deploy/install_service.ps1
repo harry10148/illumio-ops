@@ -81,8 +81,8 @@ else {
     }
     else {
         Write-Host "ERROR: NSSM not found." -ForegroundColor Red
-        Write-Host "  Option 1: Download from https://nssm.cc/download and add to PATH"
-        Write-Host "  Option 2: Use -NssmPath parameter to specify the full path"
+        Write-Host "  The offline bundle ships nssm.exe under deploy\nssm.exe — re-extract"
+        Write-Host "  the bundle if it is missing, or use -NssmPath to point at another copy."
         Write-Host "  Example:  .\install_service.ps1 -Action install -NssmPath 'C:\Tools\nssm.exe'"
         exit 1
     }

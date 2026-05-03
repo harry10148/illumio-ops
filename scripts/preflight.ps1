@@ -48,7 +48,7 @@ $nssmCmd    = Get-Command nssm.exe -ErrorAction SilentlyContinue
 $nssmBundle = Join-Path $BundleDir "deploy\nssm.exe"
 if ($nssmCmd) { Pass "NSSM: found at $($nssmCmd.Source)" }
 elseif (Test-Path $nssmBundle) { Pass "NSSM: found in bundle at $nssmBundle" }
-else { Fail "NSSM: not found — download nssm.exe from https://nssm.cc/download and place in PATH or deploy\" }
+else { Fail "NSSM: not found — bundle should ship deploy\nssm.exe; re-extract the bundle or place nssm.exe in PATH" }
 
 # 6. Disk space >= 500 MB on C:\
 $drive = (Get-PSDrive C -ErrorAction SilentlyContinue)

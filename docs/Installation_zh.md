@@ -106,10 +106,7 @@ sudo systemctl status illumio-ops
 
 ### Windows — 離線 Bundle（air-gapped 安裝）
 
-**必要條件：** NSSM（Non-Sucking Service Manager）— 從 https://nssm.cc/download 下載，
-並將 `nssm.exe` 放入系統 PATH 或 bundle 的 `deploy\` 目錄。
-
-所有報表格式（HTML、XLSX、CSV、PDF）皆可使用；PDF 採用純 Python 的 ReportLab，已內含於 bundle。
+NSSM（Non-Sucking Service Manager）已內含於 `deploy\nssm.exe`，服務安裝程式會自動採用。所有報表格式（HTML、XLSX、CSV、PDF）皆可使用；PDF 採用純 Python 的 ReportLab，已內含於 bundle。
 
 ##### 建置 bundle（在任何可連線網際網路的 Linux 或 WSL 機器上執行）
 

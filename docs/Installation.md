@@ -112,11 +112,9 @@ sudo systemctl status illumio-ops
 
 ### Windows — Offline Bundle (air-gapped install)
 
-**Prerequisites:** NSSM (Non-Sucking Service Manager) — download from https://nssm.cc/download
-and place `nssm.exe` in your system PATH or in the bundle's `deploy\` directory.
-
-All report formats (HTML, XLSX, CSV, PDF) work; PDF uses pure-Python ReportLab
-and ships in the bundle.
+NSSM (Non-Sucking Service Manager) is bundled at `deploy\nssm.exe`; the
+service installer picks it up automatically. All report formats (HTML, XLSX,
+CSV, PDF) work; PDF uses pure-Python ReportLab and ships in the bundle.
 
 ##### Build the bundle (on any internet-connected Linux or WSL machine)
 
