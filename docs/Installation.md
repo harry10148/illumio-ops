@@ -56,11 +56,11 @@ cd illumio-ops-<version>-offline-linux-x86_64
 # Validate the host environment before installing (exits 1 on any FAIL)
 bash ./preflight.sh
 
-# Install to /opt/illumio_ops, register systemd unit
+# Install to /opt/illumio-ops, register systemd unit
 sudo ./install.sh
 
 # Fill in PCE API credentials (config.json was created from the example template)
-sudo nano /opt/illumio_ops/config/config.json
+sudo nano /opt/illumio-ops/config/config.json
 
 # Enable and start the service
 sudo systemctl enable --now illumio-ops
@@ -89,15 +89,15 @@ sudo systemctl start illumio-ops
 sudo systemctl status illumio-ops
 
 # 5. Verify the new version
-/opt/illumio_ops/python/bin/python3 /opt/illumio_ops/illumio-ops.py --version
+/opt/illumio-ops/python/bin/python3 /opt/illumio-ops/illumio-ops.py --version
 ```
 
 > **If `report_config.yaml` was customised:** the upgrade replaces it with the
 > bundled version (which may add new analysis parameters). Back it up before
 > upgrading and re-apply your changes afterwards:
 > ```bash
-> sudo cp /opt/illumio_ops/config/report_config.yaml \
->         /opt/illumio_ops/config/report_config.yaml.bak
+> sudo cp /opt/illumio-ops/config/report_config.yaml \
+>         /opt/illumio-ops/config/report_config.yaml.bak
 > # then run sudo ./install.sh, then merge your changes back
 > ```
 
@@ -106,8 +106,8 @@ sudo systemctl status illumio-ops
 ```bash
 # Confirm every required production package imports under the bundled Python.
 # Exit 0 = all PASS, exit 1 = any FAIL — safe to run before enabling the service.
-/opt/illumio_ops/python/bin/python3 \
-    /opt/illumio_ops/scripts/verify_deps.py --offline-bundle
+/opt/illumio-ops/python/bin/python3 \
+    /opt/illumio-ops/scripts/verify_deps.py --offline-bundle
 ```
 
 ### Windows — Offline Bundle (air-gapped install)
@@ -137,11 +137,11 @@ Expand-Archive illumio-ops-<version>-offline-windows-x86_64.zip -DestinationPath
 cd C:\illumio-ops-<version>-offline-windows-x86_64
 .\preflight.ps1
 
-# Install to C:\illumio_ops, register IllumioOps Windows service
+# Install to C:\illumio-ops, register IllumioOps Windows service
 .\install.ps1
 
 # Fill in PCE API credentials
-notepad C:\illumio_ops\config\config.json
+notepad C:\illumio-ops\config\config.json
 
 # Verify the service is running
 Get-Service IllumioOps
@@ -169,8 +169,8 @@ Get-Service IllumioOps   # should show Running
 
 > **If `report_config.yaml` was customised:** back it up before upgrading:
 > ```powershell
-> Copy-Item C:\illumio_ops\config\report_config.yaml `
->           C:\illumio_ops\config\report_config.yaml.bak
+> Copy-Item C:\illumio-ops\config\report_config.yaml `
+>           C:\illumio-ops\config\report_config.yaml.bak
 > # then run .\install.ps1, then merge changes back
 > ```
 
@@ -219,8 +219,8 @@ The systemd unit file is updated automatically to reference the chosen path.
 On upgrade, `install.sh` detects `config/config.json` and skips the entire `config/` tree (comment in source: *"Preserve all of config/ on upgrade — never overwrite operator-owned files"*). Only `*.example` templates are updated so operators can diff for new keys:
 
 ```bash
-diff /opt/illumio_ops/config/config.json.example \
-     /opt/illumio_ops/config/config.json
+diff /opt/illumio-ops/config/config.json.example \
+     /opt/illumio-ops/config/config.json
 ```
 
 ### Uninstall
@@ -229,16 +229,16 @@ The installer places `uninstall.sh` inside the install root so removal is self-c
 
 ```bash
 # Preserve config/ (default — safe for re-install)
-sudo /opt/illumio_ops/uninstall.sh
+sudo /opt/illumio-ops/uninstall.sh
 
 # Remove everything, including config/ (--purge)
-sudo /opt/illumio_ops/uninstall.sh --purge
+sudo /opt/illumio-ops/uninstall.sh --purge
 
 # When running from a bundle directory, or with a custom install root
 sudo ./uninstall.sh --install-root /opt/custom_path
 ```
 
-Both variants stop and disable the `illumio-ops` systemd unit, remove the service file, and delete the `illumio_ops` system user. The default (no `--purge`) preserves `config/` in place — run `sudo rm -rf /opt/illumio_ops` afterwards to complete a full removal.
+Both variants stop and disable the `illumio-ops` systemd unit, remove the service file, and delete the `illumio_ops` system user. The default (no `--purge`) preserves `config/` in place — run `sudo rm -rf /opt/illumio-ops` afterwards to complete a full removal.
 
 ## 1.3 Configuration (`config.json`)
 
@@ -270,7 +270,7 @@ The `scripts/illumio-ops-completion.bash` file provides Click-generated completi
 | RPM / offline-bundle install | Already installed by `scripts/install.sh` — nothing to do |
 | Verify it works | Type `illumio-ops <Tab><Tab>` and confirm subcommand suggestions appear |
 
-The completion script targets the kebab-case entry point (`illumio-ops`). It works only when the entry script is on `PATH` (e.g. via offline bundle install at `/opt/illumio_ops/illumio-ops.py`); for direct dev runs (`python illumio-ops.py`), bash completion is not invoked.
+The completion script targets the kebab-case entry point (`illumio-ops`). It works only when the entry script is on `PATH` (e.g. via offline bundle install at `/opt/illumio-ops/illumio-ops.py`); for direct dev runs (`python illumio-ops.py`), bash completion is not invoked.
 
 For zsh / fish, install the corresponding `_CLICK_COMPLETION_BASH_SOURCE` equivalent — see [Click documentation](https://click.palletsprojects.com/en/stable/shell-completion/).
 

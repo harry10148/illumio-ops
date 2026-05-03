@@ -52,11 +52,11 @@ cd illumio-ops-<version>-offline-linux-x86_64
 # Validate the host environment before installing (exits 1 on any FAIL)
 bash ./preflight.sh
 
-# Install to /opt/illumio_ops, register systemd unit
+# Install to /opt/illumio-ops, register systemd unit
 sudo ./install.sh
 
 # Fill in PCE API credentials (config.json was created from the example template)
-sudo nano /opt/illumio_ops/config/config.json
+sudo nano /opt/illumio-ops/config/config.json
 
 # Enable and start the service
 sudo systemctl enable --now illumio-ops
@@ -85,13 +85,13 @@ sudo systemctl start illumio-ops
 sudo systemctl status illumio-ops
 
 # 5. Verify the new version
-/opt/illumio_ops/python/bin/python3 /opt/illumio_ops/illumio-ops.py --version
+/opt/illumio-ops/python/bin/python3 /opt/illumio-ops/illumio-ops.py --version
 ```
 
 > **若 `report_config.yaml` 已自訂：** 升級時會以 bundle 內附版本覆寫（可能新增分析參數）。升級前請先備份並在之後重新套用您的修改：
 > ```bash
-> sudo cp /opt/illumio_ops/config/report_config.yaml \
->         /opt/illumio_ops/config/report_config.yaml.bak
+> sudo cp /opt/illumio-ops/config/report_config.yaml \
+>         /opt/illumio-ops/config/report_config.yaml.bak
 > # then run sudo ./install.sh, then merge your changes back
 > ```
 
@@ -100,8 +100,8 @@ sudo systemctl status illumio-ops
 ```bash
 # 確認所有必要的 production 套件都能在 bundle Python 下成功 import。
 # Exit 0 = 全部 PASS，exit 1 = 有任何 FAIL — 啟用服務前可放心執行。
-/opt/illumio_ops/python/bin/python3 \
-    /opt/illumio_ops/scripts/verify_deps.py --offline-bundle
+/opt/illumio-ops/python/bin/python3 \
+    /opt/illumio-ops/scripts/verify_deps.py --offline-bundle
 ```
 
 ### Windows — 離線 Bundle（air-gapped 安裝）
@@ -129,11 +129,11 @@ Expand-Archive illumio-ops-<version>-offline-windows-x86_64.zip -DestinationPath
 cd C:\illumio-ops-<version>-offline-windows-x86_64
 .\preflight.ps1
 
-# Install to C:\illumio_ops, register IllumioOps Windows service
+# Install to C:\illumio-ops, register IllumioOps Windows service
 .\install.ps1
 
 # Fill in PCE API credentials
-notepad C:\illumio_ops\config\config.json
+notepad C:\illumio-ops\config\config.json
 
 # Verify the service is running
 Get-Service IllumioOps
@@ -161,8 +161,8 @@ Get-Service IllumioOps   # should show Running
 
 > **若 `report_config.yaml` 已自訂：** 升級前先備份：
 > ```powershell
-> Copy-Item C:\illumio_ops\config\report_config.yaml `
->           C:\illumio_ops\config\report_config.yaml.bak
+> Copy-Item C:\illumio-ops\config\report_config.yaml `
+>           C:\illumio-ops\config\report_config.yaml.bak
 > # then run .\install.ps1, then merge changes back
 > ```
 
@@ -211,8 +211,8 @@ systemd 單元檔案會自動更新以參照所選路徑。
 升級時，`install.sh` 偵測到 `config/config.json` 後會跳過整個 `config/` 樹（原始碼中的備註：*「升級時保留所有 config/ — 絕不覆寫操作者擁有的檔案」*）。僅更新 `*.example` 範本，讓操作者可以 diff 確認新增的設定鍵：
 
 ```bash
-diff /opt/illumio_ops/config/config.json.example \
-     /opt/illumio_ops/config/config.json
+diff /opt/illumio-ops/config/config.json.example \
+     /opt/illumio-ops/config/config.json
 ```
 
 ### 解除安裝
@@ -221,16 +221,16 @@ diff /opt/illumio_ops/config/config.json.example \
 
 ```bash
 # Preserve config/ (default — safe for re-install)
-sudo /opt/illumio_ops/uninstall.sh
+sudo /opt/illumio-ops/uninstall.sh
 
 # Remove everything, including config/ (--purge)
-sudo /opt/illumio_ops/uninstall.sh --purge
+sudo /opt/illumio-ops/uninstall.sh --purge
 
 # When running from a bundle directory, or with a custom install root
 sudo ./uninstall.sh --install-root /opt/custom_path
 ```
 
-兩種方式均會停止並停用 `illumio-ops` systemd 單元、移除服務檔案，並刪除 `illumio_ops` 系統使用者。預設（不含 `--purge`）會保留 `config/` — 之後執行 `sudo rm -rf /opt/illumio_ops` 以完成完全移除。
+兩種方式均會停止並停用 `illumio-ops` systemd 單元、移除服務檔案，並刪除 `illumio_ops` 系統使用者。預設（不含 `--purge`）會保留 `config/` — 之後執行 `sudo rm -rf /opt/illumio-ops` 以完成完全移除。
 
 ## 1.3 設定檔（`config.json`）
 
@@ -262,7 +262,7 @@ cp config/config.json.example config/config.json
 | RPM / 離線 bundle 安裝 | `scripts/install.sh` 已自動安裝，無需操作 |
 | 驗證 | 鍵入 `illumio-ops <Tab><Tab>` 確認出現子命令建議 |
 
-補全腳本以 kebab-case 進入點（`illumio-ops`）為目標，需要進入點位於 `PATH`（例如離線 bundle 安裝後位於 `/opt/illumio_ops/illumio-ops.py`）；直接以 `python illumio-ops.py` 啟動時 bash completion 不會被呼叫。
+補全腳本以 kebab-case 進入點（`illumio-ops`）為目標，需要進入點位於 `PATH`（例如離線 bundle 安裝後位於 `/opt/illumio-ops/illumio-ops.py`）；直接以 `python illumio-ops.py` 啟動時 bash completion 不會被呼叫。
 
 zsh / fish 請安裝對應的 `_CLICK_COMPLETION_BASH_SOURCE` 等價物，詳見 [Click 文件](https://click.palletsprojects.com/en/stable/shell-completion/)。
 

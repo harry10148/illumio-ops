@@ -268,7 +268,7 @@ $UDPServerRun 514
 ```yaml
 filebeat.inputs:
   - type: log
-    paths: ["/opt/illumio_ops/logs/illumio_ops.json.log"]
+    paths: ["/opt/illumio-ops/logs/illumio_ops.json.log"]
     json.keys_under_root: true
 output.elasticsearch:
   hosts: ["es:9200"]
