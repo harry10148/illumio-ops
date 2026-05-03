@@ -22,21 +22,38 @@ _ASCII_SAFE_RE = re.compile(r"^[\x09\x0a\x0d\x20-\x7e]*$")
 # Landscape A4 usable width: 297mm - 24mm margins = 273mm
 _PAGE_USABLE_W = 273 * mm
 
-_CJK_FONT_NAME = "Helvetica"
+_CJK_FONT_NAME = "Helvetica"  # overwritten below by _try_register_cjk()
 _CJK_FONT_BOLD = "Helvetica-Bold"
 
-_CJK_FONT_SEARCH = [
-    os.path.join(os.path.dirname(__file__), "..", "..", "..", "assets", "fonts", "NotoSansCJKtc-Regular.otf"),
-    "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+# Registration order:
+#  1. ReportLab's built-in CID font for Traditional Chinese (no file needed,
+#     ships with reportlab, renders both Latin and CJK glyphs).
+#  2. TrueType-flavoured filesystem fallbacks. NOT used for Noto Sans CJK
+#     OTF/TTC files — those are PostScript/CFF outlines, which reportlab's
+#     TTFont cannot parse ("postscript outlines are not supported").
+_CJK_TTF_FALLBACKS: list[str] = [
+    # Add TTF fallbacks here if a deployment ships a TrueType-flavoured CJK
+    # font. Note: bundled NotoSansCJKtc-Regular.otf is CFF-flavoured and
+    # CANNOT be loaded by reportlab — leave it for matplotlib's use only.
 ]
 
 
 def _try_register_cjk() -> str:
-    """Attempt to register a CJK-capable font; return its name or 'Helvetica'."""
+    """Register a CJK-capable font that also has Latin coverage. Return its name."""
     from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
     from reportlab.pdfbase.ttfonts import TTFont
-    for path in _CJK_FONT_SEARCH:
+
+    # Primary: ReportLab built-in CID font for Traditional Chinese.
+    try:
+        pdfmetrics.registerFont(UnicodeCIDFont("MSung-Light"))
+        logger.info("PDF CJK font registered: MSung-Light (built-in CID)")
+        return "MSung-Light"
+    except Exception as exc:
+        logger.warning("PDF MSung-Light registration failed: {}", exc)
+
+    # Fallback: TrueType-flavoured files only.
+    for path in _CJK_TTF_FALLBACKS:
         if not os.path.isfile(path):
             continue
         try:
@@ -45,9 +62,10 @@ def _try_register_cjk() -> str:
             return "CJKFont"
         except Exception as exc:
             logger.debug("PDF font {} failed: {}", path, exc)
+
     logger.warning(
-        "No CJK font found for PDF; Chinese text will display as-is with Helvetica "
-        "(may show boxes in some PDF viewers). Place a TTF font in assets/fonts/ to fix."
+        "No CJK font registered for PDF; Chinese AND ASCII text may render "
+        "as blank glyphs with Helvetica fallback."
     )
     return "Helvetica"
 
