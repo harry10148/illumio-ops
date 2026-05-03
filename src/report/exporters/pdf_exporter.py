@@ -124,7 +124,11 @@ def _deltas_to_df(deltas: dict) -> pd.DataFrame:
     return pd.DataFrame(rows) if rows else pd.DataFrame()
 
 
-def _append_module(story: list[Any], styles, name: str, module: dict[str, Any], lang: str = "en") -> None:
+def _append_module(story: list[Any], styles, name: str, module: dict[str, Any],
+                   lang: str = "en", chart_paths: list[str] | None = None) -> None:
+    # chart_paths: caller-owned list that collects temp PNG paths so the caller
+    # can unlink them AFTER doc.build() reads the files. Unlinking here would
+    # delete the file before reportlab's lazy ImageReader opens it.
     from src.report.exporters.report_i18n import STRINGS
 
     raw_title = module.get("title")
@@ -172,9 +176,10 @@ def _append_module(story: list[Any], styles, name: str, module: dict[str, Any], 
             with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as fh:
                 fh.write(png)
                 chart_path = fh.name
+            if chart_paths is not None:
+                chart_paths.append(chart_path)
             content_blocks.append(Image(chart_path, width=160 * mm, height=90 * mm, kind="proportional"))
             content_blocks.append(Spacer(1, 8 * mm))
-            os.unlink(chart_path)
         except Exception as exc:
             logger.warning("PDF chart render failed for {}: {}", name, exc)
 
@@ -220,10 +225,18 @@ def export_report_pdf(
     for key, value in (metadata or {}).items():
         story.append(Paragraph(f"{_sanitize_pdf_value(key)}: {_sanitize_pdf_value(value)}", styles["Normal"]))
     story.append(Spacer(1, 8 * mm))
+    chart_paths: list[str] = []
     for name, module in (module_results or {}).items():
         if isinstance(module, dict):
-            _append_module(story, styles, name, module, lang=lang)
-    doc.build(story)
+            _append_module(story, styles, name, module, lang=lang, chart_paths=chart_paths)
+    try:
+        doc.build(story)
+    finally:
+        for p in chart_paths:
+            try:
+                os.unlink(p)
+            except OSError:
+                pass  # best-effort cleanup; tempfile may already be gone
     logger.info("pdf report written to {}", output_path)
 
 

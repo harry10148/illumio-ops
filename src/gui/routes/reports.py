@@ -43,7 +43,7 @@ def make_reports_blueprint(
 
         reports = []
         for f in os.listdir(reports_dir):
-            if f.endswith('.html') or f.endswith('.zip'):
+            if f.endswith(('.html', '.zip', '.pdf', '.xlsx')):
                 report_path = os.path.join(reports_dir, f)
                 stat = os.stat(report_path)
                 metadata = {}
@@ -240,14 +240,21 @@ def make_reports_blueprint(
             output_dir = _resolve_reports_dir(cm)
 
             paths = gen.export(result, fmt=fmt, output_dir=output_dir, send_email=str(d.get('send_email', '')).lower() == 'true', reporter=reporter, traffic_report_profile=traffic_report_profile, lang=lang)
+            export_errors = getattr(gen, 'last_export_errors', {}) or {}
 
             filenames = [os.path.basename(p) for p in paths]
             try:
                 if _rlog:
-                    _rlog.info(f"Completed: {filenames}")
+                    _rlog.info(f"Completed: {filenames}"
+                               + (f" errors={export_errors}" if export_errors else ""))
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            return jsonify({"ok": True, "files": filenames, "record_count": result.record_count})
+            ok = bool(filenames) and not export_errors
+            resp = {"ok": ok, "files": filenames, "record_count": result.record_count}
+            if export_errors:
+                resp["errors"] = export_errors
+                resp["error"] = "; ".join(f"{k}: {v}" for k, v in export_errors.items())
+            return jsonify(resp)
         except Exception as e:
             try:
                 if _rlog:
