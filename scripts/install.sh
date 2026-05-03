@@ -45,14 +45,6 @@ migrate_from_underscore_root() {
         exit 1
     fi
 
-    # Fix 4 (I3): if OLD_ROOT exists but illumio_ops user has been manually deleted,
-    # usermod -l would fail cryptically — detect and surface it now.
-    if ! id illumio_ops &>/dev/null; then
-        echo "ERROR: Directory $OLD_ROOT exists but user 'illumio_ops' does not." >&2
-        echo "       Manual cleanup required: rename or remove $OLD_ROOT, then re-run." >&2
-        exit 1
-    fi
-
     # Fix 1 (C1): detect partial-migration (usermod completed, mv did not).
     if id illumio-ops &>/dev/null; then
         if [[ -d "$OLD_ROOT" ]]; then
@@ -69,6 +61,14 @@ migrate_from_underscore_root() {
         else
             echo "ERROR: User 'illumio-ops' already exists; cannot rename illumio_ops." >&2
         fi
+        exit 1
+    fi
+
+    # Fix 4 (I3): if OLD_ROOT exists but illumio_ops user has been manually deleted,
+    # usermod -l would fail cryptically — detect and surface it now.
+    if ! id illumio_ops &>/dev/null; then
+        echo "ERROR: Directory $OLD_ROOT exists but user 'illumio_ops' does not." >&2
+        echo "       Manual cleanup required: rename or remove $OLD_ROOT, then re-run." >&2
         exit 1
     fi
 
