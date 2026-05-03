@@ -311,6 +311,9 @@ class ReportGenerator:
 
         set_language(lang)
         paths = []
+        # Per-format errors surface to the GUI so the user can see why a format
+        # produced no file (previously swallowed by silent except → empty paths).
+        self.last_export_errors: dict[str, str] = {}
 
         if fmt in ('html', 'all', 'all_raw'):
             path = HtmlExporter(
@@ -346,7 +349,8 @@ class ReportGenerator:
                 paths.append(pdf_path)
                 print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
             except Exception as exc:
-                logger.warning('PDF export failed: {}', exc)
+                logger.error('PDF export failed: {}', exc, exc_info=True)
+                self.last_export_errors['pdf'] = str(exc) or exc.__class__.__name__
 
         if fmt in ('xlsx', 'all'):
             try:
@@ -376,7 +380,8 @@ class ReportGenerator:
                 paths.append(xlsx_path)
                 print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}"))
             except Exception as exc:
-                logger.warning('XLSX export failed: {}', exc)
+                logger.error('XLSX export failed: {}', exc, exc_info=True)
+                self.last_export_errors['xlsx'] = str(exc) or exc.__class__.__name__
 
         if fmt in ('csv', 'all', 'all_raw'):
             export_data = dict(result.module_results)
