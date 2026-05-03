@@ -6,8 +6,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=illumio_ops
-Group=illumio_ops
+User=illumio-ops
+Group=illumio-ops
 WorkingDirectory=/opt/illumio-ops
 ExecStart=/opt/illumio-ops/python/bin/python3 /opt/illumio-ops/illumio-ops.py --monitor-gui --interval 10
 Restart=always

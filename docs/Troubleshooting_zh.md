@@ -27,7 +27,7 @@
 |---|---|---|
 | Ubuntu/Debian 出現 `externally-managed-environment` pip 錯誤 | Ubuntu 22.04+ / Debian 12+ 受 PEP 668 限制，禁止系統範圍 `pip install` | 建立 venv：`python3 -m venv venv && source venv/bin/activate && venv/bin/pip install -r requirements.txt`。每次開新終端都需重新啟用 venv。 |
 | Web GUI / `--monitor` 無法啟動，出現缺少模組錯誤 | 在當前直譯器下未安裝相依套件 | **正式（離線 bundle）**：執行 `/opt/illumio-ops/python/bin/python3 /opt/illumio-ops/scripts/verify_deps.py` 找出缺少的套件，再重新執行 `sudo ./install.sh`。**開發**：`pip install -r requirements.txt`（Ubuntu 22.04+ / Debian 12+ 須改用 venv）。 |
-| systemd：`illumio-ops` 服務啟動後立即退出 | `config.json` 錯誤、`data/` 或 `logs/` 路徑無寫入權限，或 PCE 憑證遺漏 | 執行 `sudo systemctl status illumio-ops -l` 與 `sudo journalctl -u illumio-ops -n 100`。對安裝根目錄執行 `illumio-ops config validate`。確認 `illumio_ops` 系統帳號擁有 `/opt/illumio-ops/{data,logs,config}`。 |
+| systemd：`illumio-ops` 服務啟動後立即退出 | `config.json` 錯誤、`data/` 或 `logs/` 路徑無寫入權限，或 PCE 憑證遺漏 | 執行 `sudo systemctl status illumio-ops -l` 與 `sudo journalctl -u illumio-ops -n 100`。對安裝根目錄執行 `illumio-ops config validate`。確認 `illumio-ops` 系統帳號擁有 `/opt/illumio-ops/{data,logs,config}`。 |
 | Windows：`IllumioOps` 服務啟動後立即停止 | NSSM 找不到內附 Python、`config.json` 無效，或服務帳號對安裝目錄缺少權限 | 檢查 `C:\illumio-ops\logs\illumio_ops.log`；執行 `nssm.exe get IllumioOps Application` 確認指向內附 `python\python.exe`；以系統管理員身分重新執行 `.\install.ps1`。 |
 | Windows：安裝過程顯示 `nssm.exe not found` | `deploy\nssm.exe` 被刪除或解壓不完整 | NSSM 已內含於 bundle `deploy\nssm.exe`；重新解壓 bundle ZIP，再執行 `.\install.ps1`。 |
 | 升級後仍載入舊設定 | `install.sh` / `install.ps1` 刻意保留整個 `config/` 目錄 | 與新範本比對：`diff /opt/illumio-ops/config/config.json.example /opt/illumio-ops/config/config.json`，並手動合併新欄位。 |

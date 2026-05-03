@@ -41,12 +41,12 @@ fi
     --no-index --find-links "$SRC/wheels" \
     -r "$INSTALL_ROOT/requirements-offline.txt" --quiet
 
-if ! id illumio_ops &>/dev/null; then
-    useradd --system --no-create-home --shell /sbin/nologin illumio_ops
+if ! id illumio-ops &>/dev/null; then
+    useradd --system --no-create-home --shell /sbin/nologin illumio-ops
 fi
 cp "$SRC/uninstall.sh" "$INSTALL_ROOT/uninstall.sh"
 chmod +x "$INSTALL_ROOT/uninstall.sh"
-chown -R illumio_ops:illumio_ops "$INSTALL_ROOT"
+chown -R illumio-ops:illumio-ops "$INSTALL_ROOT"
 chmod 600 "$INSTALL_ROOT/config/config.json" 2>/dev/null || true
 chmod 600 "$INSTALL_ROOT/config/alerts.json" 2>/dev/null || true
 

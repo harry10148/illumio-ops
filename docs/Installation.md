@@ -238,7 +238,7 @@ sudo /opt/illumio-ops/uninstall.sh --purge
 sudo ./uninstall.sh --install-root /opt/custom_path
 ```
 
-Both variants stop and disable the `illumio-ops` systemd unit, remove the service file, and delete the `illumio_ops` system user. The default (no `--purge`) preserves `config/` in place — run `sudo rm -rf /opt/illumio-ops` afterwards to complete a full removal.
+Both variants stop and disable the `illumio-ops` systemd unit, remove the service file, and delete the `illumio-ops` system user. The default (no `--purge`) preserves `config/` in place — run `sudo rm -rf /opt/illumio-ops` afterwards to complete a full removal.
 
 ## 1.3 Configuration (`config.json`)
 

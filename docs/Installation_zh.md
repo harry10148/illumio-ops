@@ -230,7 +230,7 @@ sudo /opt/illumio-ops/uninstall.sh --purge
 sudo ./uninstall.sh --install-root /opt/custom_path
 ```
 
-兩種方式均會停止並停用 `illumio-ops` systemd 單元、移除服務檔案，並刪除 `illumio_ops` 系統使用者。預設（不含 `--purge`）會保留 `config/` — 之後執行 `sudo rm -rf /opt/illumio-ops` 以完成完全移除。
+兩種方式均會停止並停用 `illumio-ops` systemd 單元、移除服務檔案，並刪除 `illumio-ops` 系統使用者。預設（不含 `--purge`）會保留 `config/` — 之後執行 `sudo rm -rf /opt/illumio-ops` 以完成完全移除。
 
 ## 1.3 設定檔（`config.json`）
 
