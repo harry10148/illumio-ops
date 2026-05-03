@@ -8,8 +8,8 @@ Wants=network-online.target
 Type=simple
 User=illumio_ops
 Group=illumio_ops
-WorkingDirectory=/opt/illumio_ops
-ExecStart=/opt/illumio_ops/python/bin/python3 /opt/illumio_ops/illumio-ops.py --monitor-gui --interval 10
+WorkingDirectory=/opt/illumio-ops
+ExecStart=/opt/illumio-ops/python/bin/python3 /opt/illumio-ops/illumio-ops.py --monitor-gui --interval 10
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -20,7 +20,7 @@ SyslogIdentifier=illumio-ops
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/illumio_ops
+ReadWritePaths=/opt/illumio-ops
 
 [Install]
 WantedBy=multi-user.target

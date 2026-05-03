@@ -9,17 +9,17 @@
 .PARAMETER Action
     install (default) | uninstall
 .PARAMETER InstallRoot
-    Installation directory. Default: C:\illumio_ops
+    Installation directory. Default: C:\illumio-ops
 .EXAMPLE
     .\install.ps1
     .\install.ps1 -Action uninstall
-    .\install.ps1 -InstallRoot D:\illumio_ops
-    .\install.ps1 -Action uninstall -InstallRoot D:\illumio_ops
+    .\install.ps1 -InstallRoot D:\illumio-ops
+    .\install.ps1 -Action uninstall -InstallRoot D:\illumio-ops
 #>
 param(
     [ValidateSet("install", "uninstall")]
     [string]$Action = "install",
-    [string]$InstallRoot = "C:\illumio_ops"
+    [string]$InstallRoot = "C:\illumio-ops"
 )
 
 # Require elevation

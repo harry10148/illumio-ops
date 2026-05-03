@@ -65,7 +65,7 @@ if [ -x "$BUNDLED_PY" ]; then pass "Bundled Python: $("$BUNDLED_PY" --version 2>
 else fail "Bundled Python not executable: $BUNDLED_PY"; fi
 
 # 7. Upgrade detection (informational)
-INSTALL_ROOT="/opt/illumio_ops"
+INSTALL_ROOT="/opt/illumio-ops"
 if [ -f "$INSTALL_ROOT/config/config.json" ]; then
     warn "Existing installation at $INSTALL_ROOT — this is an UPGRADE"
     warn "config.json and rule_schedules.json will be preserved"

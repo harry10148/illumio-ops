@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Uninstall illumio_ops from this machine.
 # Run as root:
-#   sudo /opt/illumio_ops/uninstall.sh           # preserve config (default)
-#   sudo /opt/illumio_ops/uninstall.sh --purge   # remove everything including config
-#   sudo ./uninstall.sh                          # from bundle (defaults to /opt/illumio_ops)
+#   sudo /opt/illumio-ops/uninstall.sh           # preserve config (default)
+#   sudo /opt/illumio-ops/uninstall.sh --purge   # remove everything including config
+#   sudo ./uninstall.sh                          # from bundle (defaults to /opt/illumio-ops)
 #   sudo ./uninstall.sh --install-root /custom   # override install root
 set -euo pipefail
 
@@ -12,7 +12,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 if [[ -f "$SCRIPT_DIR/illumio_ops.py" ]]; then
     INSTALL_ROOT="$SCRIPT_DIR"
 else
-    INSTALL_ROOT="/opt/illumio_ops"
+    INSTALL_ROOT="/opt/illumio-ops"
 fi
 PURGE=false
 

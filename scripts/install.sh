@@ -6,7 +6,7 @@
 #   sudo ./install.sh --install-root /opt/custom   # custom path
 set -euo pipefail
 
-INSTALL_ROOT="/opt/illumio_ops"
+INSTALL_ROOT="/opt/illumio-ops"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --install-root) INSTALL_ROOT="$2"; shift 2 ;;
@@ -50,7 +50,7 @@ chown -R illumio_ops:illumio_ops "$INSTALL_ROOT"
 chmod 600 "$INSTALL_ROOT/config/config.json" 2>/dev/null || true
 chmod 600 "$INSTALL_ROOT/config/alerts.json" 2>/dev/null || true
 
-sed "s|/opt/illumio_ops|$INSTALL_ROOT|g" "$SRC/deploy/illumio-ops.service" > "$SERVICE_FILE"
+sed "s|/opt/illumio-ops|$INSTALL_ROOT|g" "$SRC/deploy/illumio-ops.service" > "$SERVICE_FILE"
 chmod 0644 "$SERVICE_FILE"
 systemctl daemon-reload
 
