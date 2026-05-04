@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Test stub for `systemctl`. Replaces the real binary on PATH during migration
+# tests. install.sh only calls `systemctl is-active --quiet <svc>` and
+# `systemctl stop <svc>`. We always report "not active" so the stop branch is
+# never taken (keeps tests hermetic).
+exit 1

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Test stub for `chown`. Replaces the real binary on PATH during migration tests
+# so the function can `chown illumio-ops:illumio-ops $NEW_ROOT/MIGRATED_FROM`
+# without needing the real user to exist.
+exit 0

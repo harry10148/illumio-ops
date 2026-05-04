@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Test stub for `id`. Replaces the real binary on PATH during migration tests.
+#
+# Behavior: looks up the queried username in $MIGRATION_TEST_USERS (newline- or
+# colon-separated). Exits 0 if found, 1 if not. Mirrors what install.sh cares
+# about: `id <user> &>/dev/null` returning success means the user exists.
+#
+# We intentionally ignore flags and only treat the LAST positional argument as
+# the username, because install.sh always invokes `id <user>` with no flags.
+
+set -u
+
+# Find the username (last non-flag arg).
+user=""
+for arg in "$@"; do
+    case "$arg" in
+        -*) ;;  # skip flags
+        *) user="$arg" ;;
+    esac
+done
+
+if [[ -z "$user" ]]; then
+    # Real `id` with no args prints current user; we just succeed.
+    exit 0
+fi
+
+# Match against MIGRATION_TEST_USERS (split on : or newline).
+users="${MIGRATION_TEST_USERS:-}"
+IFS=$':\n' read -r -d '' -a known < <(printf '%s\0' "$users") || true
+for u in "${known[@]}"; do
+    if [[ "$u" == "$user" ]]; then
+        exit 0
+    fi
+done
+exit 1

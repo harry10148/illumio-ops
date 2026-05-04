@@ -419,17 +419,79 @@ function Invoke-MigrateFromUnderscoreRoot {
 
 - [ ] **Step 2:** Call `Invoke-MigrateFromUnderscoreRoot` at the top of the install action (before `Test-Path config\config.json` check).
 
-### Task 4.3: Add migration tests
+### Task 4.3: Add migration tests (option A — refactor for testability)
 
-**Files:** `tests/test_install_migration.py` (new)
+**Decision (2026-05-03 handoff):** The plan's original sketch assumed `OLD_ROOT`/`NEW_ROOT` could be overridden by sourcing — but `migrate_from_underscore_root()` hardcodes both paths inside the function body. Plus the function calls `usermod -l` / `groupmod -n` which require real system mutations. To make the function testable in CI without touching real users, **refactor the function to accept overrides**:
 
-- [ ] **Step 1:** Write a Python test that invokes `install.sh` migrate function in a sandbox using `bash -c "source install.sh; migrate_from_underscore_root"` with `OLD_ROOT` / `NEW_ROOT` overrides to a temp dir, and asserts:
-  - Old dir disappears
-  - New dir exists with same content
-  - `MIGRATED_FROM` file present
-  - Re-running is a no-op
+- Allow `OLD_ROOT`, `NEW_ROOT`, and `SERVICE_NAME` to be set via environment variables (default to `/opt/illumio_ops`, `/opt/illumio-ops`, `illumio-ops`)
+- Optionally accept a `MIGRATE_USER_CMD` env var (default `usermod -l`) so tests can stub it with `:` (no-op) or a fake script that records calls
+- Same for `MIGRATE_GROUP_CMD`
 
-(Skeleton only — the subagent fills in details. PowerShell function is harder to unit-test from Python; document a manual test plan instead.)
+**Files (this task):**
+- `scripts/install.sh` — refactor `migrate_from_underscore_root()` to support env-var overrides; default behavior unchanged
+- `tests/test_install_migration.sh` (new — bash integration test) OR `tests/test_install_migration.py` (Python wrapper invoking bash)
+- `tests/migration_test_helpers/` (optional) — stub `usermod` / `groupmod` scripts that just `echo` and exit 0
+
+**Test scenarios to cover:**
+
+- [ ] **T1: Happy path** — pre-create fake old root with `config/config.json`; invoke migrate; assert new root exists with same content, old root gone, `MIGRATED_FROM` marker present and contains old path.
+- [ ] **T2: Idempotency** — re-run migrate after T1 succeeded; assert no-op (early return, no error, no double-write of marker).
+- [ ] **T3: OLD_ROOT absent** — invoke migrate with no old root present; assert no-op (early return).
+- [ ] **T4: Dual-existence** — pre-create both old root and new root (no marker); assert exit 1 with "Both ... exist" error.
+- [ ] **T5: Already-migrated marker** — pre-create new root with marker, no old root; assert no-op.
+- [ ] **T6: Pre-flight ordering — partial-migration scenario A** — pre-create old root + new user (`illumio-ops`) but no old user (`illumio_ops`); assert C1 message (partial migration detected) fires, NOT I3 message (which would tell operator to delete data). This is the regression test for the `ab353d6` Critical fix.
+
+**Out of scope for tests:**
+- usermod/groupmod actual mutation (use stubs)
+- systemctl operations (use stubs or skip)
+- Cross-filesystem detection (hard to test without two real filesystems; rely on manual test)
+- Windows `Invoke-MigrateFromUnderscoreRoot` (PowerShell — document manual test plan instead, see below)
+
+**Test invocation pattern:**
+
+```bash
+# tests/test_install_migration.sh
+TEST_DIR=$(mktemp -d)
+export OLD_ROOT="$TEST_DIR/old"
+export NEW_ROOT="$TEST_DIR/new"
+export PATH="$REPO_ROOT/tests/migration_test_helpers:$PATH"  # stub usermod/groupmod
+
+# Setup fake old install
+mkdir -p "$OLD_ROOT/config"
+echo '{}' > "$OLD_ROOT/config/config.json"
+
+# Source install.sh (function only) and invoke
+source <(sed -n '/^migrate_from_underscore_root()/,/^}/p' "$REPO_ROOT/scripts/install.sh")
+migrate_from_underscore_root
+
+# Assert
+test -d "$NEW_ROOT" || { echo "FAIL: new root missing"; exit 1; }
+test ! -d "$OLD_ROOT" || { echo "FAIL: old root still exists"; exit 1; }
+test -f "$NEW_ROOT/MIGRATED_FROM" || { echo "FAIL: marker missing"; exit 1; }
+echo "PASS: T1 happy path"
+```
+
+**Refactor pattern for `install.sh`:**
+
+```bash
+migrate_from_underscore_root() {
+    local OLD_ROOT="${OLD_ROOT:-/opt/illumio_ops}"
+    local NEW_ROOT="${NEW_ROOT:-/opt/illumio-ops}"
+    local USERMOD_CMD="${USERMOD_CMD:-usermod -l}"
+    local GROUPMOD_CMD="${GROUPMOD_CMD:-groupmod -n}"
+    # ... rest of function unchanged, just substitute $USERMOD_CMD where usermod was
+}
+```
+
+**Windows manual test plan (no automation):**
+
+Document in `docs/superpowers/plans/manual-tests/2026-05-03-windows-migration-manual-test.md`:
+- Setup: clean Windows VM, install previous bundle to `C:\illumio_ops`
+- Scenario 1: full migration (clean kill at end)
+- Scenario 2: SIGKILL between Move-Item and nssm sets — verify partial-resume on next install.ps1 run
+- Scenario 3: SIGKILL between nssm sets and marker — verify marker-only resume
+
+### 🛂 Verification gate — Batch 4
 
 ### 🛂 Verification gate — Batch 4
 
