@@ -97,7 +97,6 @@ _DEFAULT_CONFIG = {
             "ciphers": None,
             "key_algorithm": "ecdsa-p256",
             "validity_days": 397,
-            "http_redirect_port": 80,
         }
     }
 }

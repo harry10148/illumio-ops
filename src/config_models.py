@@ -124,7 +124,6 @@ class WebGuiTls(_Base):
     ciphers: Optional[str] = None
     key_algorithm: str = "ecdsa-p256"
     validity_days: int = Field(default=397, ge=1)
-    http_redirect_port: int = Field(default=80, ge=1, le=65535)
 
 class WebGuiSettings(_Base):
     # extra="allow" so that operational flags like ``_initial_password`` and

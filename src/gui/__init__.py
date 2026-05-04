@@ -463,7 +463,6 @@ def _run_http(app, host: str, port: int) -> None:
 
 def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None:
     """HTTPS via cheroot — production-grade WSGI server with hardened TLS."""
-    import threading as _threading
     from cheroot import wsgi as _cheroot_wsgi
     from cheroot.ssl.builtin import BuiltinSSLAdapter as _SSLAdapter
 
@@ -504,42 +503,6 @@ def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None
 
     server.error_log = _filtered_error_log
     server.ssl_adapter = adapter
-
-    # HTTP → HTTPS redirect server (daemon thread, best-effort)
-    _redirect_port = int(_tls_cfg.get("http_redirect_port", 80))
-    _https_port = port
-
-    def _redirect_app(environ, start_response):
-        _host_hdr = environ.get("HTTP_HOST", f"localhost:{_https_port}").split(":")[0]
-        _path = environ.get("PATH_INFO", "/")
-        _qs = environ.get("QUERY_STRING", "")
-        _location = f"https://{_host_hdr}:{_https_port}{_path}"
-        if _qs:
-            _location += f"?{_qs}"
-        start_response("308 Permanent Redirect", [
-            ("Location", _location),
-            ("Content-Length", "0"),
-        ])
-        return [b""]
-
-    def _start_redirect_server():
-        _rserver = _cheroot_wsgi.Server((host, _redirect_port), _redirect_app, numthreads=2)
-        try:
-            _rserver.start()
-        except OSError as _e:
-            logger.warning(
-                "HTTP redirect server could not bind port {} ({}). "
-                "Skipping redirect — HTTPS is still available.",
-                _redirect_port, _e,
-            )
-        finally:
-            try:
-                _rserver.stop()
-            except Exception:
-                pass  # intentional: shutdown best-effort, secondary errors not actionable
-
-    _t = _threading.Thread(target=_start_redirect_server, daemon=True, name="http-redirect")
-    _t.start()
 
     try:
         server.start()

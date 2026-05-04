@@ -902,7 +902,6 @@ The `web_gui` block in `config.json` controls authentication and the web server 
 | `web_gui.tls.min_version` | string | `TLSv1.2` | Minimum TLS protocol version. |
 | `web_gui.tls.validity_days` | int | `397` | Self-signed cert lifetime (CA/B Forum maximum for publicly-trusted certs). |
 | `web_gui.tls.auto_renew` | bool | `true` | Renew self-signed cert when `auto_renew_days` from expiry. |
-| `web_gui.tls.http_redirect_port` | int | `80` | HTTP port that redirects to HTTPS (set to `0` to disable redirect). |
 
 **Port:** the GUI port is set on the command line via `--port N` (default `5001`); it is not persisted in `config.json`.
 
