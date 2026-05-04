@@ -1,10 +1,11 @@
 """Regression: chart slice/bar labels in zh_TW PDFs.
 
 Only mod04 risk levels (Critical/High/Medium/Low) are translated — those are
-generic severity terminology. mod01/mod02 verdicts (Allowed/Blocked/Potentially
-Blocked/Unknown) are Illumio policy-decision technical terms and stay English
-by design; the guard test below pins down that contract so a future contributor
-can't silently re-introduce translation.
+generic severity terminology. Illumio-specific product terminology — mod01/mod02
+policy verdicts (Allowed/Blocked/Potentially Blocked/Unknown) and mod08
+managed/unmanaged host distinction — stays English by design; the guard test
+below pins down that contract so a future contributor can't silently
+re-introduce translation.
 """
 from __future__ import annotations
 
@@ -16,8 +17,9 @@ from src.i18n import set_language, get_language
 
 def _make_traffic_df() -> pd.DataFrame:
     """Minimal traffic DataFrame that exercises every chart_spec branch
-    in mod01 / mod02 / mod04 — all four policy decisions and at least one
-    flow on critical/high/medium ransomware-risk ports."""
+    in mod01 / mod02 / mod04 / mod08 — all four policy decisions, at least
+    one flow on critical/high/medium ransomware-risk ports, and at least one
+    unmanaged source so mod08's managed-vs-unmanaged pie has both slices."""
     return pd.DataFrame({
         "src_ip":            ["10.0.0.1", "10.0.0.2", "10.0.0.3", "10.0.0.4"],
         "dst_ip":            ["10.0.1.1", "10.0.1.2", "10.0.1.3", "10.0.1.4"],
@@ -32,6 +34,7 @@ def _make_traffic_df() -> pd.DataFrame:
         "last_detected":     pd.to_datetime(["2024-01-02"] * 4),
         "src_app":           ["web", "db", "admin", "web"],
         "dst_app":           ["db", "cache", "web", "api"],
+        "dst_hostname":      ["db-1", "cache-1", "web-1", "api-1"],
     })
 
 
@@ -74,15 +77,18 @@ def test_mod04_ransomware_exposure_labels_translate_to_zh_tw(zh_tw_lang):
     assert "Low" not in labels
 
 
-def test_illumio_verdicts_stay_english_in_zh_tw(zh_tw_lang):
-    """Allowed/Blocked/Potentially Blocked/Unknown are Illumio policy-decision
-    technical terms and MUST NOT be translated in the zh_TW PDF.
+def test_illumio_terms_stay_english_in_zh_tw(zh_tw_lang):
+    """Illumio product terminology — policy verdicts (Allowed/Blocked/
+    Potentially Blocked/Unknown) and the managed-vs-unmanaged host distinction
+    — MUST stay English in zh_TW PDFs. These are technical terms operators
+    recognize from the Illumio console, not user-facing language.
 
     This test pins down the user's stated requirement so a future contributor
     can't silently re-introduce translation by wrapping the literals in t().
     """
     from src.report.analysis.mod01_traffic_overview import traffic_overview
     from src.report.analysis.mod02_policy_decisions import policy_decision_analysis
+    from src.report.analysis.mod08_unmanaged_hosts import unmanaged_traffic
 
     df = _make_traffic_df()
 
@@ -100,4 +106,12 @@ def test_illumio_verdicts_stay_english_in_zh_tw(zh_tw_lang):
             f"Illumio verdict {verdict!r} should remain English in zh_TW "
             f"(it is product terminology, not user-facing language). "
             f"mod02 labels were: {mod02_labels!r}"
+        )
+
+    mod08_labels = unmanaged_traffic(df)["chart_spec"]["data"]["labels"]
+    for term in ("Managed", "Unmanaged"):
+        assert term in mod08_labels, (
+            f"Illumio host classification {term!r} should remain English in "
+            f"zh_TW (it is product terminology, not user-facing language). "
+            f"mod08 labels were: {mod08_labels!r}"
         )
