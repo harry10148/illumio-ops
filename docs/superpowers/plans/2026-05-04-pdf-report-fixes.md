@@ -775,9 +775,201 @@ EOF
 
 ---
 
+## Task 5: Translate hardcoded English categorical labels in pie/bar slices
+
+**Background:** Task 4's final review surfaced an integration gap. Task 4 translates chart `title` / `x_label` / `y_label`, but the slice / bar labels live in `chart_spec.data["labels"]` and are populated by each analyzer. The codebase has TWO patterns:
+
+1. **Already-correct** (mod08, mod13, mod03): uses `t('rpt_<key>', default='English')` so labels are language-resolved at analyzer-execution time. Works.
+2. **Broken** (mod01, mod02, mod04): hardcodes English literals (`'Allowed'`, `'Blocked'`, `'Potentially Blocked'`, `'Unknown'`) or computes them from English dict keys (`[lvl.capitalize() for lvl in risk_levels]`). The zh_TW PDF then shows the chart title in Chinese but the slices stay English — visually inconsistent.
+
+**Fix:** Convert the broken sites to use the `t()` pattern, matching the existing convention. NO new mechanism — extend what mod08/mod13 already do.
+
+**In-scope sites** (3 files):
+- `src/report/analysis/mod01_traffic_overview.py:101-105` — pie labels `['Allowed', 'Blocked', 'Potentially Blocked', 'Unknown']`
+- `src/report/analysis/mod02_policy_decisions.py:100-104` — pie labels `['Allowed', 'Blocked', 'Potentially Blocked']`
+- `src/report/analysis/mod04_ransomware_exposure.py:131` — bar labels `[lvl.capitalize() for lvl in risk_levels]` (risk_levels = `['critical', 'high', 'medium', 'low']`)
+
+**Out of scope** (correctly NOT translated — these are data identifiers, not categorical enums):
+- `mod05_remote_access.py` (top5_labels — IPs/hosts)
+- `mod06_user_process.py` (process/user names)
+- `mod07_cross_label_matrix.py` (label dimension values like "Kubernetes")
+- `mod09_traffic_distribution.py` (port numbers)
+- `mod11_bandwidth.py` (application names)
+
+### Files
+- Modify: `src/report/exporters/report_i18n.py` — add 7 new entries (`rpt_allowed`, `rpt_blocked`, `rpt_potentially_blocked`, `rpt_unknown`, `rpt_risk_critical`, `rpt_risk_high`, `rpt_risk_medium`, `rpt_risk_low`)
+- Modify: `src/report/analysis/mod01_traffic_overview.py` — wrap each label with `t('rpt_xxx', default='English')`
+- Modify: `src/report/analysis/mod02_policy_decisions.py` — same
+- Modify: `src/report/analysis/mod04_ransomware_exposure.py` — replace `.capitalize()` list with explicit `t('rpt_risk_xxx', default='Critical')` per level
+- Add: `tests/test_chart_label_i18n.py` (new) — one test per affected analyzer asserts zh_TW labels appear
+
+### Step 1: Add i18n entries
+
+In `src/report/exporters/report_i18n.py`, find the existing `rpt_managed` / `rpt_enforced` block (around line 600 — pre-existing labels). Add a sibling block:
+
+```python
+    # --- Categorical pie/bar slice labels (analyzer-side translation via t()) ---
+    "rpt_allowed": _entry("Allowed", "已允許"),
+    "rpt_blocked": _entry("Blocked", "已封鎖"),
+    "rpt_potentially_blocked": _entry("Potentially Blocked", "可能被封鎖"),
+    "rpt_unknown": _entry("Unknown", "未知"),
+    "rpt_risk_critical": _entry("Critical", "嚴重"),
+    "rpt_risk_high": _entry("High", "高"),
+    "rpt_risk_medium": _entry("Medium", "中"),
+    "rpt_risk_low": _entry("Low", "低"),
+```
+
+If any of these keys already exist (`rpt_allowed` etc.), reuse them — DO NOT duplicate. Verify before adding via `grep -n 'rpt_allowed\|rpt_risk_critical' src/report/exporters/report_i18n.py`.
+
+### Step 2: Write the failing test
+
+Create `tests/test_chart_label_i18n.py`:
+
+```python
+"""Regression: pie/bar slice labels must be translated to zh_TW for the PDF.
+
+Task 4 plumbed `title_key` / `*_label_key` for chart titles and axes, but the
+slice/bar labels (chart_spec.data["labels"]) are populated by each analyzer.
+mod01/mod02/mod04 hardcoded English; this test ensures they now produce
+Chinese when the language is set to zh_TW.
+"""
+import pandas as pd
+import pytest
+```
+
+NOTE: the import for the language-setter and the analyzer entry-point function names depend on this codebase's actual API. **Discover them** via:
+
+```bash
+grep -rn 'def set_language\|def get_language' src/ | head
+grep -n '^def ' src/report/analysis/mod01_traffic_overview.py src/report/analysis/mod02_policy_decisions.py src/report/analysis/mod04_ransomware_exposure.py | head
+```
+
+Then write the fixture and tests following this skeleton — adapt the import path and function names to what the codebase actually exposes:
+
+```python
+@pytest.fixture
+def zh_tw_lang():
+    # Adapt to actual API discovered above
+    from src.shared.i18n import set_language  # placeholder path
+    set_language("zh_TW")
+    yield
+    set_language("en")  # restore for other tests
+
+
+def test_mod01_traffic_overview_labels_translate_to_zh_tw(zh_tw_lang):
+    from src.report.analysis.mod01_traffic_overview import <actual_function>
+    df = pd.DataFrame([...])  # minimal df that exercises the chart_spec branch
+    out = <actual_function>(df)
+    labels = out.get("chart_spec", {}).get("data", {}).get("labels", [])
+    assert "已允許" in labels
+    assert "Allowed" not in labels
+
+
+# Similar for mod02 and mod04. Use minimum-viable DataFrames — look at
+# existing tests/test_analyzer.py and tests/test_analyzer_*.py for fixture
+# patterns each analyzer expects.
+```
+
+If a fixture-construction snag blocks you, simplify to direct testing of the chart_spec result via mocking `t()` — but prefer the realistic path.
+
+### Step 3: Run test, expect failure
+
+```bash
+/home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_chart_label_i18n.py -v
+```
+
+Expected: 3 FAIL — labels are English (`Allowed` etc.), not Chinese.
+
+### Step 4: Apply the fix
+
+**`src/report/analysis/mod01_traffic_overview.py:101-105`** — replace:
+
+```python
+            'labels': [
+                'Allowed',
+                'Blocked',
+                'Potentially Blocked',
+                'Unknown',
+            ],
+```
+
+with:
+
+```python
+            'labels': [
+                t('rpt_allowed', default='Allowed'),
+                t('rpt_blocked', default='Blocked'),
+                t('rpt_potentially_blocked', default='Potentially Blocked'),
+                t('rpt_unknown', default='Unknown'),
+            ],
+```
+
+(Verify `t` is already imported in the file — `grep -n 'import.*\bt\b' src/report/analysis/mod01_traffic_overview.py`. If not, add the import matching mod08's pattern.)
+
+**`src/report/analysis/mod02_policy_decisions.py:100-104`** — same replacement (3 labels: Allowed, Blocked, Potentially Blocked).
+
+**`src/report/analysis/mod04_ransomware_exposure.py:131`** — replace:
+
+```python
+            'labels': [lvl.capitalize() for lvl in risk_levels if lvl in level_counts],
+```
+
+with an explicit per-level mapping (more readable than hiding `t()` calls inside a comprehension):
+
+```python
+            'labels': [
+                t(f'rpt_risk_{lvl}', default=lvl.capitalize())
+                for lvl in risk_levels if lvl in level_counts
+            ],
+```
+
+### Step 5: Run test, expect pass
+
+```bash
+/home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_chart_label_i18n.py -v
+```
+
+Expected: 3 PASS.
+
+### Step 6: Run full slice + analyzer regression
+
+```bash
+/home/harry/rd/illumio-ops/venv/bin/python -m pytest tests/test_chart_label_i18n.py tests/test_chart_renderer.py tests/test_chart_spec_coverage.py tests/test_pdf_exporter.py tests/test_analyzer*.py -v 2>&1 | tail -10
+```
+
+Expected: all PASS, no regressions in existing analyzer tests. If any pre-existing test asserts English labels in `chart_spec.data["labels"]`, that test will need updating — flag as a concern in your report and update minimally (don't assume the existing test was wrong; verify it was checking the now-broken English assumption).
+
+### Step 7: Visual verification
+
+Defer to user (manual).
+
+### Step 8: Commit
+
+```bash
+git add src/report/exporters/report_i18n.py src/report/analysis/mod01_traffic_overview.py \
+        src/report/analysis/mod02_policy_decisions.py src/report/analysis/mod04_ransomware_exposure.py \
+        tests/test_chart_label_i18n.py
+git commit -m "$(cat <<'EOF'
+fix(charts): translate hardcoded categorical pie/bar slice labels to zh_TW
+
+Task 4 plumbed title_key/x_label_key/y_label_key but slice and bar labels
+(chart_spec.data["labels"]) were populated by each analyzer, and three
+analyzers hardcoded English strings — leaving zh_TW PDFs with translated
+chart titles but English category labels (Allowed/Blocked, Critical/Medium).
+
+Apply the existing t('rpt_xxx', default='English') pattern (already used
+by mod08/mod13/mod03) to mod01/mod02/mod04. Add 7 new rpt_* i18n entries
+for the verdict and risk-level enums. Add regression test that runs each
+analyzer with lang=zh_TW and asserts Chinese labels appear.
+EOF
+)"
+```
+
+---
+
 ## 🛂 Final verification
 
-After all four tasks land:
+After all five tasks land:
 
 - [ ] **Step 1: Full test run**
 
