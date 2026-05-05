@@ -88,11 +88,26 @@ _（評估執行階段尚未填入）_
 
 ##### a7 — UI 依賴 external resources（違反 C1）
 
-違規清單（掃描填入）：
+掃描日期：2026-05-04
+總命中數：7（其中真正違反 C1 = 2；其餘 5 筆為 namespace 屬性、placeholder 文字、文件 URL、後端 API endpoint，非瀏覽器載入資源）
 
-| 檔案 | 行 | URL | 資源類型（CSS/JS/font/img/icon） | 是否被 HTTPS 阻擋 | 替代本地 asset 建議 |
+| 檔案 | 行 | URL | 資源類型 | 被 HTTPS 阻擋 | 替代本地 asset 建議 |
 |---|---|---|---|---|---|
-| _TBD by scan_ | | | | | |
+| src/templates/login.html | 7 | https://fonts.googleapis.com | font/CSS preconnect | ✓ | vendor/fonts/（self-host Montserrat woff2） |
+| src/templates/login.html | 8 | https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap | CSS/webfont | ✓ | vendor/fonts/ + vendor/css/（@font-face 自建） |
+| src/templates/login.html | 173 | http://www.w3.org/2000/svg | SVG namespace | N/A | （不載入 — XML namespace 屬性，無網路請求） |
+| src/static/js/settings.js | 208 | https://pce.example.com:8443 | placeholder 文字 | N/A | （不載入 — UI input placeholder） |
+| src/static/fonts/LICENSE-NotoSansCJK.txt | 5 | https://github.com/notofonts/noto-cjk | 文件 URL | N/A | （不載入 — license 文件說明） |
+| src/alerts/plugins.py | 80 | https://api.line.me/v2/bot/message/push | 後端 API endpoint | N/A | （不載入 — 伺服器端 HTTP call，非瀏覽器資源） |
+| src/alerts/metadata.py | 95 | https://hooks.example.com/events | placeholder 文字 | N/A | （不載入 — webhook URL 欄位 placeholder） |
+
+Vendor 化目標位置（彙整）：
+- vendor/fonts/ ← 2 個 webfont 資源（Montserrat woff2 各字重：400/500/600/700）
+- vendor/css/ ← 1 個 CSS（@font-face 替代 Google Fonts stylesheet）
+
+掃描範圍說明：`src/templates`、`src/static`、`src/alerts` 三個目錄均已掃描；binary 檔案（.otf、.pyc）grep 命中已排除。
+
+P0 hard-gate 狀態：BLOCKED — login.html 第 7–8 行直接從 Google Fonts CDN 載入 Montserrat 字型，部署於強制 HTTPS 的離線環境將因混合內容或無法連外而失敗。須於 Task B.2 完成 vendor 化後方可解除。
 
 #### §3.1.1 整體現況量化
 
