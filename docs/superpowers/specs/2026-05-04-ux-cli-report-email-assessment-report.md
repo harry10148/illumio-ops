@@ -394,7 +394,20 @@ _（每候選跑 §2.6 五 Gate 評估執行階段填入）_
 
 #### §3.1.5 推薦組合
 
-_（評估執行階段尚未填入）_
+**推薦路徑**: Phase 0 (a6/a7 解除) → Phase 1 (per-card 優化 quick wins) → Phase 2 Track A token 化 + B (industrial-editorial direction)
+
+**5 Gate 評估**:
+- Gate 1 Offline      : ✓（vendor 化 a7 + Track A 全 self-host fonts）
+- Gate 2 多痛點共因   : Track A 解 a1+a2+c3+d2 共 4 個（主視覺 + chart + email subset）
+- Gate 3 Touch radius : 中（app.css + chart_renderer + email template subset）
+- Gate 4 Persona 衝擊 : 低（CSS-only token，不破功能）
+- Gate 5 Reversibility: ✓（token 可漸進 fallback）
+
+**執行順序**: Phase 0 a6/a7 → Phase 1 quick wins（defer/async, skeleton, debounce）→ Phase 2 Track A
+
+**不推薦**: C modern-saas（generic, Distinct=1）；Vue 3（offline cost > 收益，persona P1 不需 SPA）
+
+**預期 rubric 提升**: §3 perf 0→2, §8 forms 1→2, Distinctiveness 1→2
 
 ---
 
@@ -644,7 +657,20 @@ _（評估執行階段填入推薦結果）_
 
 #### §3.2.6 推薦組合
 
-_（評估執行階段尚未填入）_
+**推薦路徑**: Phase 0（capability 修補 isatty/NO_COLOR/--json/--quiet）→ Phase 2 Track B 共享輸出層 → Phase 3 Track C 統一入口（視 Track B 進度）
+
+**5 Gate 評估**:
+- Gate 1 Offline      : ✓
+- Gate 2 多痛點共因   : Track B 解 b3+b4+b6+b7 共 4 個（output + error + tty + exit）；Track C 解 b1+b2+b5+b8 共 4 個（entry + naming + dual-entry + completion）
+- Gate 3 Touch radius : Track B 中；Track C 大（重新設計命令樹）
+- Gate 4 Persona 衝擊 : Track B 低；Track C 中（deprecation alias 緩衝）
+- Gate 5 Reversibility: Track B ✓；Track C ✓（alias 4 versions）
+
+**執行順序**: Phase 1 quick patches（1-2 day）→ Phase 2 Track B（week+）→ Phase 3 Track C（mid-term）
+
+**不推薦**: L4（Click + Typer 完整重寫）— OQ-6 default 不採；cost > 收益，P1 已可達標 via Track B+C
+
+**預期 rubric 提升**: composability 0→3, error actionability 0→2, capability 1→3
 
 ---
 
@@ -808,7 +834,20 @@ _（評估執行階段尚未填入）_
 
 #### §3.3.6 推薦組合
 
-_（評估執行階段尚未填入）_
+**推薦路徑**: Phase 1（per-report exec summary 200 字 + cross-report sidebar + chart i18n + colorblind palette）→ Phase 2 Track A 套用 §6.2 B editorial-magazine direction（cover/divider/footer/page）→ Phase 3 i18n reorg（OQ-2）配合
+
+**5 Gate 評估**:
+- Gate 1 Offline      : ✓（Source Serif 4 OFL + Inter）
+- Gate 2 多痛點共因   : Track A 解 c1+c3 + 共享 GUI 視覺 token（D.3）
+- Gate 3 Touch radius : 中（report_css + chart_renderer + html_exporter）
+- Gate 4 Persona 衝擊 : 低（內容無變；排版升級）
+- Gate 5 Reversibility: ✓
+
+**執行順序**: Phase 1 quick（4 day，4 reports × 1 day）→ Phase 2 Track A 全套用 → Phase 3 i18n reorg 配合
+
+**不推薦**: C data-journalism（P5 認知成本中）；D corporate-formal（Distinct 1 拖累）
+
+**預期 rubric 提升**: HTML §3.3.3 12→15；PDF 6→11（Backgrounds 0→2，cover/footer 修補）
 
 ---
 
@@ -968,7 +1007,20 @@ _（評估執行階段尚未填入）_
 | L3 模板系統化 | `templates/email/*.html.j2` + 共享 partials | ✅ | 中 | 中 |
 | L4 MJML 預編譯 | MJML 寫 → cross-client safe HTML，產物進 vendor / 編譯產物 | ✅（編譯產物） | 中 | 中 |
 
-_（評估執行階段填入推薦結果）_
+**推薦路徑**: Phase 1 quick patches（table layout + bgcolor + multipart + preheader + subject pattern + CTA）→ Phase 2 Track D MJML 預編譯（mid-term）
+
+**5 Gate 評估**:
+- Gate 1 Offline      : ✓（MJML compile-time，產物即 HTML）
+- Gate 2 多痛點共因   : Track D 解 d2+d3 共 2 個 + 共享 D.3 signal token
+- Gate 3 Touch radius : 中（mail_wrapper + plugins.py + reporter.py）
+- Gate 4 Persona 衝擊 : 中（P5 主管 inbox 體感大改善）
+- Gate 5 Reversibility: ✓（compile-time，source 仍是文字）
+
+**執行順序**: Phase 1 quick（1 week，7/8 checklist + 4/4 actionability）→ Phase 2 Track D MJML
+
+**不推薦**: 純 HTML 手寫繼續維護（cross-client 雷區持續，維護成本高）
+
+**預期 rubric 提升**: §3.4.2 cross-client 2/8→8/8；§3.4.4 actionability 0/4→4/4
 
 ---
 
