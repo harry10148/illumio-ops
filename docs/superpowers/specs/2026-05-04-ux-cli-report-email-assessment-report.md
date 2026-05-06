@@ -1645,7 +1645,49 @@ _（評估執行階段尚未填入）_
 
 ### §6.3 跨兩套的共享 primitive（OQ-7 default）
 
-_（評估執行階段尚未填入）_
+##### Decision (OQ-7 default)
+
+**共享**：色票 signal primitives（`--color-signal-success/warning/danger/info`）— 跨 surface 認知一致性
+**分開**：type-scale（字體大小階梯）+ spacing-scale（間距階梯）— 媒介物理特性差異
+
+**理由：**
+判定色（Allowed/Blocked/Potentially-Blocked）在 GUI badge、Report verdict cell、Email status pill 三處必須眼睛識別一致——Safeguard Green 就是「允許」，Risk Red 就是「封鎖」，不允許任何 surface 自行詮釋。共享 signal primitive 是零成本的認知一致性保證，也消除了未來「GUI 綠 ≠ Report 綠」的 QA 問題。
+
+type-scale 各自有其需求：GUI 以 4px grid、螢幕 pixel density 驅動（14–36px），Report 以 CSS `@page` print pt 單位驅動（10–36pt），Email 無法依賴 webfont 因此退回 system stack 並固定 px；三套 scale 若強制共享反而需要大量 `@media print` 覆蓋，維護成本升高。spacing-scale 同理：GUI 高密度 4px baseline grid，Report editorial 8px baseline grid，Email table-cell padding 在各 client 渲染不一，各自定義才能精確控制。
+
+##### 共享色票表（GUI / Report+PDF / Email）
+
+| Token | GUI value | Report+PDF value | Email value (inline) |
+|---|---|---|---|
+| `--color-signal-success` | `#2D9B5E` (Safeguard Green) | `#2D9B5E` (same) | `style="background:#2D9B5E"` + `bgcolor="#2D9B5E"` |
+| `--color-signal-warning` | `#C47A00` (Circuit Gold) | `#C47A00` (same) | `style="background:#C47A00"` + `bgcolor="#C47A00"` |
+| `--color-signal-danger` | `#D93025` (Risk Red) | `#D93025` (same) | `style="background:#D93025"` + `bgcolor="#D93025"` |
+| `--color-signal-info` | `#0077CC` (System Blue) | `#0077CC` (same) | `style="background:#0077CC"` + `bgcolor="#0077CC"` |
+| `--color-base` | `#F8F9FA` | `#F8F9FA` | `bgcolor="#F8F9FA"` |
+| `--color-surface` | `#FFFFFF` | `#FFFFFF` | `bgcolor="#FFFFFF"` |
+| `--color-text-primary` | `#0D1117` | `#0D1117` | `style="color:#0D1117"` |
+
+> **注**：Report CSS 前綴為 `--report-color-signal-*`，值與 GUI `--color-signal-*` 完全相同；Email 無 CSS custom property，一律 inline hex。
+
+##### 用途映射範例
+
+| Verdict / state | `--signal-*` token | 例：GUI badge | 例：Report verdict cell | 例：Email status pill |
+|---|---|---|---|---|
+| Allowed | `success` (`#2D9B5E`) | green badge + ✓ icon | green cell + ✓ icon + text "Allowed" | `bgcolor="#2D9B5E"` pill，白字 "Allowed" |
+| Blocked | `danger` (`#D93025`) | red badge + ✗ icon | red cell + ✗ icon + text "Blocked" | `bgcolor="#D93025"` pill，白字 "Blocked" |
+| Potentially-Blocked | `warning` (`#C47A00`) | amber badge + ⚠ icon | amber cell + text "Potentially Blocked" | `bgcolor="#C47A00"` pill，白字 "Potentially Blocked" |
+| Info / metadata | `info` (`#0077CC`) | blue badge + ℹ icon | blue cell + text | `bgcolor="#0077CC"` pill，白字 |
+
+##### Token 命名 contract
+
+```
+GUI:         CSS custom property  --color-signal-{success|warning|danger|info}
+Report HTML: CSS custom property  --report-color-signal-{success|warning|danger|info}  (值 = GUI 值)
+Report PDF:  同 Report HTML（WeasyPrint / Puppeteer 讀 CSS）
+Email:       inline style="background:<hex>"  AND  bgcolor="<hex>"  attribute（Outlook fallback）
+```
+
+**Email 雙軌原則**：inline CSS 供現代 client（Gmail web, Apple Mail, Outlook 2019+），`bgcolor` attr 供 Outlook 2007-2016（Word HTML engine 忽略 inline `background-color` 但讀 `bgcolor`）。兩者 hex 必須一致，不得差異。
 
 ---
 
