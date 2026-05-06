@@ -1509,6 +1509,106 @@ Hand-off：可靠性 sprint（詳見 §3.1.0 a7）。
 
 ---
 
+### 4.13 — c1 Report 摘要 / 長度
+
+| | |
+|---|---|
+| Subsystem | Report |
+| 觸及 persona | P5 |
+| Pre-condition | 無獨立 pre-condition；與 c3（圖表可讀性）及 b5（CLI 雙入口）有共因，可獨立優化 |
+| Score | Impact 2 × PersonaWeight 3 (P5) × Frequency 2 (每週產報告) = **12** |
+| 優先級 | **P2** |
+
+**現況片段** — `§3.4.2 A.6`：5 份生成器（`audit_report.py` 878 L；`policy_usage_report.py` 656 L；`ven_status_report.py` 368 L；`traffic_report.py` 16-section；`dashboard_summaries.py`）；exporter infra 共 5272 行。`mod00` exec summary 區塊已存在於各報告，但 standalone 執行摘要能力（無需閱讀全文即可抓重點）待驗。`§3.4.4 C.4`：跨報告連結數量 = 0；在 audit ↔ policy 之間切換時使用者需完全重新 navigate。Traffic 報告含 16 個 section，無章節進度指示。Audit 報告 `mod00` 含 5 個執行摘要子模組；policy_usage 含 6 個 mod00 exec + execution stats；ven_status 含 5 個 KPI card。
+
+**影響** — P5 主管開啟報告後，200 字以內無法 standalone 抓到關鍵訊息，需要向下捲動閱讀才能判斷狀態。跨報告無連結導致 audit ↔ policy 切換時重新 navigate，認知摩擦高。Traffic 16 section 無章節節奏指示，閱讀路徑不明確。exec summary 若只能作為「前言」而非可獨立查閱的摘要，則在行動裝置或快速掃描情境下使用率趨零。
+
+**UX rubric 觸及項** — §3.3.2 length distribution = 1（exec summary 存在但 standalone density 未驗證）；summary density 是 Report 核心評分項。§3.3.1 overall structure = 2（章節架構存在，但 traffic 16-section 無節奏分組）。
+
+**Visual rubric 觸及項** — 章節節奏（D.2 已規範 H1/H2/H3 上下空白與 Source Serif 4 字體）；exec summary block 的視覺權重（需與 body 段落有足夠區隔）；sidebar nav 的版面容納性（D.2 @page first 封面 + footer 頁碼已確立，sidebar 需與此兼容）。
+
+**優化路線（小改）**
+1. 每份報告加 200 字 standalone executive summary 區塊（統一放 mod00 開頭，格式：3 個 KPI bullet + 1 句 next action）：audit / policy_usage / ven_status 各 1 day，共 3 day
+2. Traffic 報告加章節進度 TOC sidebar（HTML：sticky `<nav>`；PDF：頁眉節名）：1 day
+3. 各報告末尾加跨報告 sidebar nav（HTML: `<aside>` 連結其他 3 份報告；PDF: footer 連結文字）：1 day
+- Touch radius：中（各 report 生成器 mod00 + HTML/PDF exporter template；不動 exporter infra 核心）
+- 與 §5 cross-cutting 衝突？與 Track A token 化配合：sidebar nav 樣式可先硬碼，重構時改接 design token
+
+**重構路線（Track A — 排隊）**
+1. Track A：Report exporter infra token 化（`report_css.py` + `html_exporter.py`）+ 章節結構模板化（Section dataclass → jinja2 partial）
+2. 與 OQ-2 i18n reorg 配合：exec summary 語言版本切換時自動套用對應翻譯的摘要模板
+3. 建立 cross-report nav component（共享 `_nav_sidebar.html.j2`），在所有 5 份報告複用
+- Touch radius：大（5272 行 exporter infra + 各 report 生成器）
+- 與 §5 cross-cutting 同源：§5.1「Report exporter 整併」
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（exec summary 與 sidebar nav 均為靜態 HTML/PDF，無外部依賴）
+- Gate 2 多痛點共因    : 共因 3 個（c1 摘要結構 + c3 圖表可讀性 + d3 Email 摘要一致性） → 重構分 +1
+- Gate 3 Touch radius  : 優化中（4 生成器 mod00 + 2 exporter template）；重構大
+- Gate 4 Persona 衝擊  : P5 主管每週必看報告，standalone 摘要缺失直接影響決策效率 → 高衝擊
+- Gate 5 Reversibility : ✓（exec summary block 可獨立移除；sidebar nav 為新增 HTML 元素，可 feature-flag）
+
+**推薦** — 優化先行（4 day patch：3 份報告 exec summary × 1 day + TOC sidebar 1 day）+ 重構排隊 Track A。優化路線可將 §3.3.2 summary density 從未驗證 → 明確 pass，不需等重構。
+
+**驗收標準** — 採用優化路線後：
+- audit / policy_usage / ven_status 三份報告各含 ≤ 200 字 standalone executive summary（KPI bullet × 3 + next action × 1）
+- Cross-report sidebar nav 存在於每份報告（HTML sidebar + PDF footer link）
+- Traffic 報告含章節 TOC sidebar，可直接跳至任一 section
+- §3.3.2 length distribution: 1 → 2；§3.3.1 overall structure: 2 → 3
+
+---
+
+### 4.14 — c3 圖表閱讀性
+
+| | |
+|---|---|
+| Subsystem | Report |
+| 觸及 persona | P5 |
+| Pre-condition | 需確認 `chart_renderer.py` 調色板實作位置與 `report_css.py` token 共用狀態；D.3 signal hex 已確立 |
+| Score | Impact 2 × PersonaWeight 3 (P5) × Frequency 3 (每份報告必有圖表) = **18** |
+| 優先級 | **P2** |
+
+**現況片段** — `§3.4.4 C.4`：VEN 餅圖 label 硬編碼英文（繞過 i18n 管線）；4 處 verdict 字面不一致（`Allowed` / `已允許` / `OK`）；`rpt_tr_sec_allowed` 中文 key 存在但 nav 顯示英文。`§3.4.5 C.5`：HTML chart Plotly responsive（Spatial 3/3），但無 `aria-label` 屬性；PDF chart 為靜態圖片，color verdict 未統一遷移（PDF Color 1/3，Backgrounds 0/3）。完整 chart 調色板實作分散於 `chart_renderer.py` 與 `report_css.py`。`§3.4.4 C.4` i18n_zh_TW：134 jinja2 key，共 4 處不一致；跨報告連結 = 0。
+
+**影響** — P5 讀圖時 verdict 字面不一致（Allowed vs 已允許 vs OK）造成認知摩擦，無法快速判斷「允許 = 已允許 = OK」是否為同一狀態。VEN 餅圖英文 label 在全中文介面中突兀，繁體用戶信任度下降。螢幕閱讀器（SR）使用者因 HTML chart 無 `aria-label`，圖表資訊完全無障礙。PDF chart 缺 colorblind-safe palette，報告列印後（黑白或 deuteranopia）圖例失效。
+
+**UX rubric 觸及項** — §10 charts = 1（Plotly responsive，但無 accessibility；PDF 靜態無互動）；§3.1.2 Accessibility = 1（chart aria-label 缺失為關鍵缺口）；§10 = 1 為 cross-cutting visual 核心評分項。
+
+**Visual rubric 觸及項** — Color（semantic palette + colorblind-safe）：D.3 已給定 4 個 signal hex（綠/黃/紅/灰）；當前 PDF chart color 未統一採用 D.3 signal；`chart_renderer.py` 調色板與 `report_css.py` CSS token 是否共享待確認。
+
+**優化路線（小改）**
+1. VEN 餅圖 label 改接 i18n key（`ven_status_report.py`，定位 hardcoded string → 替換為 `t('ven_status_label_managed')` 等）：2 hours
+2. 補 colorblind-safe palette：`chart_renderer.py` 採用 D.3 signal hex（綠 `#2E7D32` / 黃 `#F9A825` / 紅 `#C62828` / 灰 `#757575`），確保 PDF 與 HTML 一致：1 day
+3. 補 `font-feature-settings: "tnum"` tabular figures 至 chart axis label CSS（`report_css.py`）：半天
+4. 補 HTML chart `aria-label` + `<table>` fallback（Plotly `config.toImageButtonOptions` 旁加 `aria` attribute + `<noscript>` 等價表格）：3 days
+- Touch radius：中（`chart_renderer.py` + `report_css.py` + `ven_status_report.py`；不動 exporter infra 核心）
+- 與 §5 cross-cutting 衝突？可並行；與 c1 patch 共用 exporter template 改動窗口，建議同 sprint
+
+**重構路線（Track A — 排隊）**
+1. Track A：統一 `chart_renderer.py` + `report_css.py` signal color token（D.3 共享 palette dataclass）
+2. 建立 chart accessibility wrapper（HTML `<figure>` + `<figcaption>` + `<table>` template，供所有報告複用）
+3. PDF chart 遷移至 SVG 矢量輸出（替代靜態 PNG），支援 colorblind filter 後仍可讀
+- Touch radius：大（chart_renderer.py 全改 + 5 份報告生成器 chart 呼叫點）
+- 與 §5 cross-cutting 同源：§5.1「Report exporter 整併」+ §5.1「Token 化 design system」
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（調色板 hex、aria-label、tabular figures 均為純本地靜態改動，無外部依賴）
+- Gate 2 多痛點共因    : 共因 3 個（c3 圖表 + c1 報告摘要結構 + d2 Email 視覺設計）→ 重構分 +1
+- Gate 3 Touch radius  : 優化中（3 個檔案 + 4 點修補）；重構大
+- Gate 4 Persona 衝擊  : P5 每份報告必有圖表，verdict 不一致與無障礙缺口影響中至高；SR users 完全 inaccessible → 衝擊中-高
+- Gate 5 Reversibility : ✓（palette 可 feature-flag；aria-label 為純新增屬性，不破壞現有渲染）
+
+**推薦** — 並行優化（4 點補丁，1 week 並行，建議與 c1 patch 同 sprint）+ Track A 接手長線重構。優化路線可將 §10 charts: 1 → 2，§3.1.2 Accessibility: 1 → 2，不需等重構。
+
+**驗收標準** — 採用優化路線後：
+- VEN 餅圖 label 在 zh_TW 介面下顯示繁體中文（不再硬編碼英文）
+- HTML chart `aria-label` 覆蓋率 100%；每個 Plotly 圖表含對應 `<table>` fallback
+- PDF chart 調色板採用 D.3 signal hex（colorblind-safe 驗證：Coblis deuteranopia filter 後仍可區分）
+- chart axis label 採用 tabular figures（`font-feature-settings: "tnum"`）
+- §10 charts: 1 → 2；§3.1.2 Accessibility: 1 → 2
+
+---
+
 ## §5 Cross-cutting Recommendations
 
 ### §5.1 共因識別（Mining）
