@@ -193,6 +193,91 @@ P0 hard-gate 狀態：BLOCKED — login.html 第 7–8 行直接從 Google Fonts
 - `login.html` 第 7–8 行：Google Fonts CDN（Montserrat），違反 C1（外部依賴）
 - 同上：CDN 載入在強制 HTTPS 離線環境下將因混合內容或無法連外失敗
 
+##### Bundle 載入順序與依賴圖
+
+**資料來源**：`src/templates/index.html` 全文掃描（13 個 `<script src=` 標籤）、`src/static/js/` 所有 .js 檔案符號分析。
+
+---
+
+**Bundle 載入順序**（依 index.html 出現順序）
+
+1. `js/_event_dispatcher.js`（`<head>`，line 13）— CSP-friendly 事件委派層；立即執行 IIFE，無 global export，靠 `window[fnName]` 解析其他模組函式
+2. *(inline script, line 17)* — 翻譯初始化（`window._INIT_TRANSLATIONS`），套用 `data-i18n` 屬性
+3. `js/integrations.js`（body 中段，line 989）— 嵌入於 integrations panel HTML 之後，於其他功能模組**之前**載入
+4. `js/utils.js`（body 末端，line 1988）— 核心 HTTP 工具（`api`/`post`/`put`/`del`）、CSRF、i18n（`_t`）、時區、`escapeHtml`；**所有功能模組的基礎依賴**
+5. `js/tabs.js`（body 末端，line 1989）— `switchTab()` 全域函式
+6. `js/dashboard.js`（body 末端，line 1990）— 主儀表板（1,778 行）
+7. `js/dashboard_v2.js`（body 末端，line 1991）— 過渡副本（見五）；覆蓋 dashboard.js 中 6 個同名函式
+8. `js/events.js`（body 末端，line 1992）— Event Viewer 模組
+9. `js/rules.js`（body 末端，line 1993）— Alert Rules 模組；定義 `showSkeleton`/`showSpinner`/`hideSpinner` 等被多模組共用的 DOM 工具
+10. `js/settings.js`（body 末端，line 1994）— Settings 模組
+11. `js/actions.js`（body 末端，line 1995）— Alert Channel 動作
+12. `js/quarantine.js`（body 末端，line 1996）— Quarantine 模組
+13. `js/rule-scheduler.js`（body 末端，line 1997）— Rule Scheduler 模組
+14. `js/module-log.js`（body 末端，line 1998）— Module Log 檢視器
+
+（共 13 個外部 `<script src=>`，另有 2 個 inline `<script nonce=>`；合計 15 個 `<script>` 區塊）
+
+---
+
+**JS 模組關聯（全域命名空間隱式依賴）**
+
+無 ES module `import` / CommonJS `require`。所有模組均掛載於 `window.*`，透過 `_event_dispatcher.js` 的 `window[fnName]` 查找完成呼叫。依賴關係為**隱式**，由載入順序強制保證。
+
+```
+window._INIT_TRANSLATIONS (inline)
+        │
+_event_dispatcher.js  ──────────────────────────┐
+        │ delegates clicks/change/input/keydown  │
+        ▼                                        │
+utils.js                                         │
+  ├─ api / post / put / del (CSRF)               │
+  ├─ _t (i18n)                                   │
+  ├─ escapeHtml                                  │
+  └─ _editIdx (shared modal state) ──────────────┼─► rules.js (openModal/closeModal)
+        │                                        │
+        ├──► tabs.js (switchTab)  ◄──────────────┘ (data-action="switchTab")
+        │
+        ├──► integrations.js  (api, post, put, del, _t, escapeHtml, switchTab)
+        │       └─ 早於 utils.js 載入（line 989 < 1988）⚠  ← 載入順序缺陷
+        │
+        ├──► dashboard.js     (api, post, put, del, _t, escapeHtml, showSkeleton*)
+        │       └─ showSkeleton / showSpinner / hideSpinner 定義於 rules.js
+        │
+        ├──► dashboard_v2.js  (同名覆蓋：_dashboardSetCard, _pickValue, ensureDashboardLayout 等)
+        │       └─ 過渡副本，停更，應刪除
+        │
+        ├──► events.js        (api, post, del, _t, escapeHtml)
+        ├──► rules.js         (api, post, put, del, _t, escapeHtml, _editIdx)
+        │       └─ 定義 showSkeleton / showSpinner / hideSpinner（被 dashboard.js 使用）
+        ├──► settings.js      (api, post, put, del, _t, escapeHtml)
+        ├──► actions.js       (api, post, put, del, _t, escapeHtml)
+        ├──► quarantine.js    (api, post, del, _t, escapeHtml, showSkeleton, switchTab)
+        ├──► rule-scheduler.js(api, post, put, del, _t, escapeHtml, showSkeleton, switchTab)
+        └──► module-log.js    (api, _t, escapeHtml)
+```
+
+> `*` showSkeleton/showSpinner/hideSpinner 定義在 rules.js（line 200–219），被 dashboard.js、quarantine.js、rule-scheduler.js 呼叫。這三個函式語義上屬 utils 層但位於 rules.js，為**隱性共用 DOM 工具跨模組散佈**的典型案例。
+
+---
+
+**defer / async 使用率**
+
+| 統計項目 | 數值 |
+|---|---:|
+| 總 `<script src=>` 標籤數 | 13 |
+| 含 `defer` 屬性 | 0 |
+| 含 `async` 屬性 | 0 |
+| defer/async 使用率 | **0%** |
+
+所有腳本均為同步阻塞載入（render-blocking），其中 `_event_dispatcher.js` 位於 `<head>` 更是最早阻塞點。
+
+---
+
+**⚠ 關鍵觀察：integrations.js 載入時序缺陷**
+
+`integrations.js`（line 989）在 `utils.js`（line 1988）之前載入，但大量使用 `api`、`post`、`_t`、`escapeHtml` 等 utils 符號。此時 utils.js 尚未執行，`integrations.js` 中的頂層立即呼叫（若有）將因符號未定義而失敗。目前程式碼依賴「頂層無立即呼叫，所有函式僅在使用者互動後觸發」的隱式慣例來迴避這個競態——脆弱且不可自驗。
+
 #### §3.1.2 UX rubric 結果（10 類）
 
 _（評估執行階段尚未填入）_
