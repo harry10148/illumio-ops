@@ -1142,6 +1142,14 @@ class Reporter:
 
     # ── Mail sender ──────────────────────────────────────────────────────────
 
+    def _build_mail_plain(self, subject: str) -> str:
+        """Render a plain-text version of the alert email.
+
+        Reuses _build_line_message which already renders line_digest.txt.tmpl
+        from the same alert lists, ensuring parity with LINE channel content.
+        """
+        return self._build_line_message(subject)
+
     def _build_mail_html(self, subj: str) -> str:
         def esc(text: Any) -> str:
             return html.escape(str(text), quote=True)
