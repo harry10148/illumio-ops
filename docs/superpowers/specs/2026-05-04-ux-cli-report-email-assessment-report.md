@@ -581,7 +581,55 @@ _（評估執行階段尚未填入）_
 
 #### §3.2.4 Rubric 打分
 
-_（評估執行階段尚未填入）_
+##### ui-ux-pro-max 轉譯 7 類（CLI 適用子集）
+
+評分基礎：§3.2.1 inventory（24 commands）+ §3.2.2 consistency matrix（6 類不一致）+ `src/cli/_render.py` 直接讀取。
+
+| 類別 | Score | Finding（≤2 行） | 觸及痛點 |
+|---|---|---|---|
+| §1 Accessibility (CRITICAL) | 1 | `--help` 存在（Click 預設）但無使用範例、無 common pitfalls、無相關連結；`-h` 短旗標因 `context_settings` 限制僅部分命令支援；無 man page；無 screen reader 適配文件。 | b1 |
+| §3 Performance | 1 | `Spinner`（rich.status）+ `progress_bar`（inline bar）存在但均無 ETA；backfill 長任務（可達數分鐘）無進度百分比估算；daemon loop 的 APScheduler 無任務剩餘時間提示。 | b4 |
+| §5 Layout & Responsive | 2 | `get_terminal_width()` 存在；box-char fallback（Unicode → ASCII）在非 UTF-8 terminal 正確退化；`pad_string` 處理 CJK 全形寬度；rich Table 在窄 terminal 無強制折行保護。 | — |
+| §7 Animation | 1 | `Spinner`（rich dots）有語義（表示等待）；`progress_bar` 有 `\r` 原地更新；但兩者均未檢查 `NO_COLOR`/`TERM=dumb` 是否應停用動畫；`prefers-reduced-motion` CLI 等效（`NO_COLOR`）完全未處理。 | b6 |
+| §8 Forms & Feedback (CRITICAL) | 1 | `safe_input` 有型別驗證 + range check + 帶 help_text；錯誤僅顯示「Value out of range」，無 recovery path 建議（例如「有效值：1-30，請重新輸入」）；CLI 命令錯誤訊息一律 `[red]...[/red]`，無結構化 cause + fix。 | b2 |
+| §9 Navigation Patterns | 2 | Click 命令樹（group → subgroup → command）結構清晰；`-h`/`--help` 雙入口於 root group；`0=back`/`-1=cancel` 互動選單導航一致；但 4 個純 menu 命令（edit-settings 等）在 CLI 樹中不可達，無 deprecation 路徑。 | b5 |
+| §10 Charts & Data | 0 | 0/24 命令支援 `--json`；rich Table 在 pipe 模式（isatty=false）仍輸出 box characters + ANSI markup，完全無法被 `grep`/`jq`/`awk` 消費；無任何 machine-readable 輸出格式。 | b3 |
+
+**UX 7 類總分：8/21（平均 1.1/3）**
+
+---
+
+##### CLI rubric 12 條（§2.5 TTY 規範）
+
+| # | 規則 | Score | Finding（≤2 行） | 觸及痛點 |
+|---|---|---|---|---|
+| 1 | 命令文法一致性 | 1 | 6 類不一致（§3.2.2）：`--since`/`--start-date` 同義異名；`--source` 同名異義；`DESTINATION` positional vs `--dest` option；report 子命令以 noun 取代 verb；flag default 值不一致（`--limit` 50 vs 100）；0 global flag at root。 | b2 |
+| 2★ | 能力偵測 | 1 | `_stdout_is_tty()` 存在（`_render.py:67`）且用於 Colors ANSI 停用；`safe_input` 的 questionary 路徑亦偵測 stdin+stdout isatty（`_render.py:237-240`）；但 **NO_COLOR=0**（整個 src/ 無任何讀取）、**TERM=0**、**COLORTERM=0**；rich Console 未透過 isatty 切換 box-char → plain 模式。 | b6 |
+| 3★ | Composability | 0 | 0/24 `--json`；0/24 `--quiet`；rich Table/Console 輸出全走 stdout，錯誤訊息（`[red]...[/red]`）**同走 stdout 非 stderr**（`cache.py:55` console.print → stdout）；pipe 場景完全不可用（box characters + ANSI + 訊息混入 stdout）。**自動 P1。** | b3 |
+| 4★ | Exit codes | 1 | 0（成功）/ 1（錯誤）有使用；但 **exit 2（用法錯誤）完全缺席**（無 `sys.exit(2)` 或 `UsageError`，日期格式錯誤也是 exit 1）；**exit 130（SIGINT）**：`_runtime.py` 捕捉 SIGINT 後 graceful shutdown 但回傳 0 而非 130；3 個 menu 入口（pce_cache_cli / rule_scheduler_cli / siem_cli）永遠 exit 0。 | b7 |
+| 5 | Idempotency / dry-run | 1 | `cache retention --run`（flag 才執行，預設 dry）是良好模式；`rule edit --no-preview` 存在；但**無 `--dry-run` 通用旗標**，`cache backfill` 無冪等保護（重複執行會重複插入，靠應用層去重），`siem purge` 無 dry-run 預覽。 | — |
+| 6 | 配置層級 | 1 | 配置層級：flag > config file > 預設（三層）；但 **env var 層完全缺席**：僅 1 個 `ILLUMIO_OPS_*` 變數存在（`ILLUMIO_OPS_I18N_STRICT`，隱藏開發旗標）；無 `ILLUMIO_OPS_CONFIG`、`ILLUMIO_OPS_LOG_LEVEL` 等操作旗標；Click 的 `auto_envvar_prefix` 未啟用。 | b8 |
+| 7 | 互動 vs 非互動雙模 | 1 | `safe_input` 在非 TTY 正確 fallback 至 `input()`（`_render.py:237-240`）；但 rich Table 在 pipe 不降級（box char 直輸）；menu 入口無 `--non-interactive` / `--ci` flag；pipe 輸入無法驅動互動選單（無合理 fail-fast 或預設值自動選取）。 | b6 |
+| 8 | 長任務 | 1 | `Spinner`（rich.status dots）+ `progress_bar`（inline `█░` bar）存在（`_render.py:475-527`）；workload list 使用 `rich.progress.Progress + SpinnerColumn`（`workload.py:36`）；但**無 ETA**；SIGINT 捕捉存在（`_runtime.py:29`）但 graceful shutdown 僅對 daemon，backfill 長任務中斷後無 resume 路徑、無 log 路徑提示。 | b4 |
+| 9 | --help / man | 1 | Click 自動生成 `--help`（`-h`/`--help` 雙入口於 root）；各 group/command 有一行說明；但**無使用範例**（無 `Examples:` section）、無 common pitfalls、無相關連結；3 個 menu 入口（argparse path）的 `--help` 完全未整合至 root CLI 樹。 | b1 |
+| 10 | Auto-completion | 2 | `scripts/illumio-ops-completion.bash` + `scripts/completions/illumio-ops.bash` 存在；使用 Click 的 `_ILLUMIO_OPS_COMPLETE=bash_source` 機制動態生成；但**僅 bash**，無 zsh / fish completion；無自動安裝機制（需手動 source）。 | — |
+| 11 | 雙入口整合 | 1 | 14/24 命令（58%）同時存在於互動 menu 與 root CLI，但**實作完全分離**（menu 用 `print()`，CLI 用 rich）；3 個純 menu 命令在 CLI 不可達；無 deprecation 路徑；menu 選單無法透過 `illumio-ops` 根命令的子命令直接替代。 | b5 |
+| 12 | Error actionability | 0 | **0** 處 `difflib`/`get_close_matches`/`did you mean`；錯誤訊息格式為 `[red]<exception message>[/red]`（直接暴露 Python exception 文字）；無 cause + recovery path 結構；錯誤走 stdout 非 stderr（rule 3 同源缺陷）；`siem test` 對不存在的 destination 僅回 "not found or disabled"，無可用名稱建議。**自動 P1。** | b2 |
+
+**CLI 12 條總分：11/36（平均 0.9/3）**
+
+---
+
+**合計：UX 7 = 8/21，CLI 12 = 11/36；總計 19/57（33%）**
+
+**CLI 整體 UX 體質總結：**
+
+CLI 的核心體質問題集中於 composability 完全缺失——0/24 `--json`、錯誤訊息混入 stdout、rich markup 無 TTY-aware 降級，使整個工具在 pipe/script/CI 場景完全不可用。能力偵測（rule 2★）雖有 `isatty()` 基礎，但 `NO_COLOR`/`TERM` 未讀取，導致 daemon/service 模式下仍輸出 ANSI 序列。Exit code 語義（rule 4★）缺少 exit 2（用法錯誤）和 exit 130（SIGINT），且 menu 路徑永遠 exit 0，破壞 shell script 錯誤偵測。正向亮點：terminal width 自適應、box-char Unicode fallback、bash completion 腳本均已存在，顯示有 TTY 意識的工程基礎，但未延伸至 composability 層。
+
+**自動 P1 痛點：**
+- **rule 3★ Composability = 0** → **b3**（stdout/stderr 混用 + 無 --json）
+- **rule 12 Error actionability = 0** → **b2**（無 cause+recovery，錯誤走 stdout）
+- **§10 Charts & Data = 0**（CLI 側）→ 同 b3（machine-readable 輸出完全缺失）
 
 #### §3.2.5 可選方向
 
