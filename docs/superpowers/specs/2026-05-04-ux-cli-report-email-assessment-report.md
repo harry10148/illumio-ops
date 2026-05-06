@@ -319,7 +319,26 @@ utils.js                                         │
 
 #### §3.1.2 UX rubric 結果（10 類）
 
-_（評估執行階段尚未填入）_
+| 類別 | Score | Key Finding（≤2 行） | 觸及痛點 |
+|---|---|---|---|
+| §1 Accessibility (CRITICAL) | 2 | tablist/role=tab/aria-selected/aria-modal/aria-live(toast)/skip-link 完整；但 13 個 modal 缺 aria-labelledby，無 focus-trap，鍵盤使用者無法在 modal 內 Tab 循環。 | a1 |
+| §2 Touch & Interaction | 1 | btn-pad-y 預設 8px → 按鈕高度約 32px < WCAG 44px；comfortable 模式僅升至 ~36px；無手勢支援（拖拉/swipe）。 | — |
+| §3 Performance (CRITICAL) | 0 | 13 個 `<script>` 全部無 defer/async（其中 dashboard.js 81 KB、integrations.js 55 KB），0 個 preload；整包 JS 291 KB 阻塞首次渲染；integrations.js (line 989) 在 utils.js (line 1988) 之前載入（a3 時序缺陷）。 | a2 |
+| §4 Style Selection | 2 | 47 個 CSS custom property（Illumio 品牌色彩 token：--accent #FF5500、dark/light 雙主題）；token 系統一致但無字體大小 token（硬編碼 px/rem 混用）。 | a2 |
+| §5 Layout & Responsive | 2 | 5 個 @media 斷點（1080/960/780/640px + prefers-reduced-motion）；CSS Grid 用於 dashboard；但行動裝置（<640px）側邊欄摺疊行為未見完整設計。 | a6 |
+| §6 Typography & Color | 2 | Montserrat 自託管 woff2（font-display: swap）；type scale 存在（2rem/1.6rem/.95rem/.86rem/.82rem）；dark/light 雙配色完整；但 --dim (#989A9B on #1A2C32) 對比率約 3.5:1，低於 WCAG AA 4.5:1。 | — |
+| §7 Animation | 2 | 5 個 @keyframes（fadeIn/pulseDot/fadeInModal/loading/spin），30 處 transition；prefers-reduced-motion 正確覆寫所有 animation/transition；modal fadeInModal 有意義而非純裝飾。 | — |
+| §8 Forms & Feedback (CRITICAL) | 1 | toast (role=status/aria-live=polite) 提供全域回饋；login.html 有 required/autocomplete；但主 app 162 個 input 無 aria-invalid/aria-describedby，無 inline 欄位級錯誤訊息，modal dialog 缺 aria-labelledby。 | a2 |
+| §9 Navigation Patterns | 2 | role=tablist + role=tab + aria-selected 完整；skip-link 存在；Escape 鍵關閉 modal（rules.js:157）；但無 breadcrumb，深層頁面無回上層的 UI 語意。 | a1 |
+| §10 Charts & Data | 1 | Plotly（server-render JSON + Plotly.react，responsive:true）；60 秒自動刷新；但 4 個 chart div 無 aria-label/role="img"，無文字替代內容，資料無障礙訪問完全缺失。 | — |
+
+**總分：15/30（平均 1.5/3）**
+
+GUI UX 體質總結：token 設計系統與 ARIA 語意結構顯示有基礎意識，但效能面完全未優化——0% defer/async 造成 291 KB JS 同步阻塞首次渲染，為最嚴重痛點。Accessibility 次佳（score 2）但存在系統性缺口：13 個 modal 無 aria-labelledby 且缺 focus-trap，鍵盤使用者無法安全操作；表單回饋依賴全域 toast 而非欄位級 aria-invalid，Forms 類得分僅 1。觸控裝置支援薄弱（按鈕高度 ~32px）。Plotly 圖表無任何 aria 替代，對 P1 使用螢幕閱讀器的邊緣場景完全不可用。
+
+**自動拉 P1 痛點：**
+- §3 Performance (score 0) → 觸及 **a2**（bundle 與載入時序問題）
+- §8 Forms & Feedback (score 1 < threshold) → 觸及 **a2**（主 app 表單缺 aria-invalid inline 回饋）
 
 #### §3.1.3 Visual Identity 現況評估
 
