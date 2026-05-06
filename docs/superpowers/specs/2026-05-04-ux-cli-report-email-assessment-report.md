@@ -1122,6 +1122,202 @@ Hand-off：可靠性 sprint（詳見 §3.1.0 a7）。
 
 ---
 
+### 4.5 — b1 CLI 互動 menu 層級
+
+| | |
+|---|---|
+| Subsystem | CLI |
+| 觸及 persona | P1 |
+| Pre-condition | 無獨立 pre-condition；menu 重複問題可獨立修復 |
+| Score | Impact 2 × PersonaWeight 3 (P1) × Frequency 3 (每次 CLI 互動) = **18** |
+| 優先級 | **P2** |
+
+**現況片段** — `§3.2.3 interaction model audit`：24 個 commands 中 14 個（58%）在互動式 menu 與直接子命令兩處皆出現，形成入口重複。menu 選單無 breadcrumb 顯示當前層級，無 `back` / ESC 提示。按 Ctrl-C 離開 submenu 後整個 CLI 程序終止，不回父 menu。無任何 state preservation 機制（進入 submenu 前的選擇不保留）。
+
+**影響** — P1 網管進入巢狀 menu 後路徑不明，`back` 行為不一致，誤按 Ctrl-C 中斷整個工作流。14/24 重複入口造成認知混亂：不確定該走 menu 路徑還是直接子命令路徑，help-grep cycle 增加。
+
+**UX rubric 觸及項** — §9 Navigation = 2（中等）：有 menu 層級但無 breadcrumb / back hint；§1 Accessibility = 1：鍵盤逃脫路徑不明。
+
+**優化路線（小改）**
+1. 統一在每個 submenu 頂部印出 `[parent > current]` breadcrumb（1 day）
+2. 所有 menu prompt 底部加 `[b]ack / Ctrl-C exits` 提示行（半天）
+3. 以 `questionary` / `InquirerPy` 替換裸 `input()` call，統一 ESC = back 行為（2 day）
+- Touch radius：小（CLI menu 顯示邏輯，不觸及業務邏輯）
+- 與 §5 cross-cutting 衝突？優化可獨立執行；Track C 統一入口重構後本卡自動合併解決
+
+**重構路線（大改）**
+1. Track C：統一 CLI 入口設計——消除 menu / 子命令重複，單一命令樹
+2. 引入 `typer` 或 `click` group hierarchy，breadcrumb 由框架自動生成
+3. 實作 state preservation（session-level context dict 傳遞）
+- Touch radius：大（影響全部 24 個 commands 的入口定義）
+- 與 §5 cross-cutting 同源：§5.2 Track C
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（breadcrumb / back hint 純 terminal 輸出，無網路依賴）
+- Gate 2 多痛點共因    : 共因 3 個（b1 menu / b2 命名 / b5 entry duplication）→ 重構分 +1
+- Gate 3 Touch radius  : 優化小；重構大
+- Gate 4 Persona 衝擊  : P1 每次 CLI 操作必觸；頻率 3 → 衝擊實際高於 score 呈現
+- Gate 5 Reversibility : ✓（breadcrumb 純增量 print；questionary 替換可 flag 回退）
+
+**推薦** — Track C 已涵蓋此問題；在 Track C 排程前，優化路線（breadcrumb + back hint）可即時降低 P1 迷路頻率，1 sprint 內可完成。
+
+**驗收標準** — 採用優化路線後：
+- 所有 submenu 頂部出現 `[parent > child]` breadcrumb
+- menu prompt 底部顯示 `[b]ack / Ctrl-C exits` 提示
+- ESC / b 鍵回父 menu（不終止程序）
+- §9 Navigation: 2 → 3
+
+---
+
+### 4.6 — b2 CLI 命名 / 參數一致性
+
+| | |
+|---|---|
+| Subsystem | CLI |
+| 觸及 persona | P1 |
+| Pre-condition | 無獨立 pre-condition |
+| Score | Impact 3 × PersonaWeight 3 (P1) × Frequency 2 (命名問題在新功能 / 新用戶首遇) = **18** |
+| 優先級 | **P2** |
+
+**現況片段** — `§3.2.4 A.5 六類不一致`：
+1. `--source` 同名異義：在 `cache` 系列命令中指「快取來源路徑」，在 `report` 系列命令中指「資料來源類型」，語義完全不同但 option 名稱相同。
+2. verb-noun 衝突：5 處命令使用名詞優先（`siem-test`）而其他命令使用動詞優先（`run-report`、`send-email`），風格不一致。
+3. positional vs. `--dest` 混用：`siem test` 接受 positional argument，而 `siem replay` / `dlq purge` 使用 `--dest`，同族命令參數風格分裂。
+4. 無 `did-you-mean` 機制：輸入錯誤命令名稱直接噴 `No such command`，無相近命令建議。
+
+**影響** — P1 網管誤用 `--source` 傳入錯誤語義值，導致靜默錯誤或 unexpected behavior。verb-noun 不一致增加 help-grep cycle（必須記憶每個命令的命名風格）。`did-you-mean` 缺失造成 typo 後需重翻 help，P1 自助修復路徑延長。
+
+**UX rubric 觸及項** — §1 Accuracy & Alignment = 1：命令語義與名稱不對齊；CLI 命名一致性規則 = 0（未達任何統一風格）。
+
+**優化路線（小改）**
+1. 建立命名一致性表（verb-noun 正規化清單），為 `--source` 語義衝突引入 alias（`--cache-source` / `--report-source`），保留 `--source` 作 deprecation alias 並在 help 顯示 `[deprecated, use --cache-source]`（2 day）
+2. 引入 `difflib.get_close_matches` 於頂層 command dispatcher，輸入錯誤命令時顯示 `Did you mean: siem-test?`（1 day）
+3. alias 保留 4 個版本 compat 週期，不立即 breaking（0 extra cost）
+- Touch radius：小（CLI option 定義層 + dispatcher，不觸及業務邏輯）
+- 與 §5 cross-cutting 衝突？優化可獨立執行；Track C 重新設計命令樹時正式廢除 deprecated alias
+
+**重構路線（大改）**
+1. Track C：重新設計統一命令樹，強制 verb-noun 規範（`<verb>-<noun>` 或 `<noun> <verb>`，選一）
+2. 全面稽核 positional / named option 使用規則，以 ADR 記錄
+3. 產出 CLI naming guide，作為 lint rule 的 spec 基礎
+- Touch radius：大（全部 24 commands option 定義重命名）
+- 與 §5 cross-cutting 同源：§5.2 Track C
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（命名 / alias / difflib 純 CLI 邏輯，無網路依賴）
+- Gate 2 多痛點共因    : 共因 3 個（b1 menu / b2 命名 / b5 entry 共用同一 Track C）→ 重構分 +1
+- Gate 3 Touch radius  : 優化小；重構大
+- Gate 4 Persona 衝擊  : P1 新功能 / 首次使用時高頻觸及；誤用後靜默失敗影響嚴重性高
+- Gate 5 Reversibility : ✓（alias 保留 compat 4 版本；did-you-mean 純增量）
+
+**推薦** — 優化路線先行（3 day）補 `did-you-mean` + deprecation alias，Track C 排入重構排程正式統一命名規範。
+
+**驗收標準** — 採用優化路線後：
+- `--source` 語義歧義解除（alias 覆蓋原有用法，help 顯示 deprecated 提示）
+- 輸入錯誤命令名稱顯示 `Did you mean: <closest-match>?`
+- verb-noun 正規化清單寫入 `docs/cli-naming-guide.md`
+- §1 Accuracy: 1 → 2
+
+---
+
+### 4.7 — b3 CLI 輸出格式
+
+| | |
+|---|---|
+| Subsystem | CLI |
+| 觸及 persona | P1 P3 |
+| Pre-condition | 無獨立 pre-condition |
+| Score | Impact 3 × PersonaWeight 3 (P1+P3) × Frequency 3 (每次 CLI 執行) = **27** |
+| 優先級 | **P1** |
+
+**現況片段** — `§3.2.2 A.4 / A.5`：輸出層分裂為三條路徑——`rich.console` 13 個命令（62%）、`click.echo` 5 個（24%）、裸 `print()` 3 個（14%）。0/24 命令支援 `--json` flag，0/24 命令使用 `sys.stdout.isatty()` 條件渲染，導致 pipe 下直接輸出 ANSI escape codes（`\x1b[32m` 等），污染下游 `jq` / `grep` pipeline。無 `--quiet` 壓制非必要輸出，無 `--verbose` 展開 debug 資訊。`NO_COLOR` env var 未被偵測。
+
+**影響** — CI/CD pipeline 中 CLI 輸出含 ANSI 導致 log aggregator（如 Elastic/Splunk）解析失敗；`jq` pipeline 完全不可能（無 `--json` 模式）；自動化腳本必須用 `sed` 剝除 ANSI 作 workaround，增加維護負擔。P3 自動化腳本作者（運維自動化場景）完全無法將 CLI 納入 composable pipeline。
+
+**UX rubric 觸及項** — §3 Performance = 1（ANSI 輸出拖慢 log 處理）；§10 Charts & Data = 0（CRITICAL）：structured output 完全缺失；CLI composability 規則 3★ = 0（`--json` / `isatty` / `NO_COLOR` 三項全缺）。P1 escalation：Composability = 0 觸發 CRITICAL。
+
+**優化路線（小改，並行 Track B 前置）**
+1. 在所有 `print()` call 點加 `isatty()` guard（TTY → 保留 ANSI；非 TTY → 剝除 ANSI）（1 day）
+2. 偵測 `NO_COLOR` env var，存在時強制無色輸出（半天）
+3. 為最高頻使用的 5 個命令增加 `--json` flag，輸出標準 JSON 結構（2 day）
+- Touch radius：小（各命令輸出點，不觸及業務邏輯）
+- 與 §5 cross-cutting 衝突？為 Track B 共用輸出層的安全前置，不衝突
+
+**重構路線（Track B 共用輸出層）**
+1. Track B：設計共享 `OutputManager` 類別（Console + isatty 條件 + `--json` / `--quiet` / `--verbose` 統一旗標）
+2. 所有 24 個命令改用 `OutputManager.print()` 替換現有三條輸出路徑
+3. `--json` flag 注入 Click group，所有子命令自動繼承
+4. 整合 `rich.Console(no_color=True)` 作為非 TTY fallback
+- Touch radius：中（輸出層統一，業務邏輯不動）
+- 與 §5 cross-cutting 同源：§5.1「共享 CLI 輸出層」
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（isatty / NO_COLOR / --json 純 CLI 邏輯，無網路依賴）
+- Gate 2 多痛點共因    : 共因 4 個（b3 輸出 / b4 錯誤訊息 / b6 log 污染 / b7 CI pipe 失敗）→ 重構分 +2
+- Gate 3 Touch radius  : 優化小；重構中
+- Gate 4 Persona 衝擊  : P1 每次 CLI 執行必觸；P3 自動化場景完全 blocked → 衝擊最高
+- Gate 5 Reversibility : ✓（isatty guard 可 flag 回退；OutputManager 採漸進式替換）
+
+**推薦** — 並行策略：優化先補 isatty / NO_COLOR（1 day），同步啟動 Track B 共用輸出層開發（1 week）。Track B 完成後優化路線的臨時 patch 自動被取代。
+
+**驗收標準** — Track B 完成後：
+- `--json` 覆蓋率 24/24 命令
+- isatty 條件渲染覆蓋率 24/24 命令
+- `NO_COLOR` env var 偵測覆蓋率 24/24 命令
+- CI/CD pipe 全綠（無 ANSI 污染，`jq` pipeline 可正常運作）
+- §10 Charts & Data: 0 → 2；CLI composability 規則 3★: 0 → 3
+
+---
+
+### 4.8 — b4 CLI 錯誤訊息
+
+| | |
+|---|---|
+| Subsystem | CLI |
+| 觸及 persona | P1 |
+| Pre-condition | 無獨立 pre-condition |
+| Score | Impact 3 × PersonaWeight 3 (P1) × Frequency 2 (錯誤發生頻率中等，但影響嚴重) = **18** |
+| 優先級 | **P1**（§8 Forms & Feedback CRITICAL = 0 觸發升級） |
+
+**現況片段** — `§3.2.5 A.5`：CLI 無 `difflib.get_close_matches` 整合，命令輸入錯誤時直接顯示 Click 框架的裸 `Error: No such command 'xxx'.`，無相近命令建議。業務邏輯錯誤（如 API 連線失敗、設定檔格式錯誤）直接噴 Python traceback（`Traceback (most recent call last): ...`），無 cause + recovery 結構。無統一頂層 `try/except` 攔截未預期 exception，錯誤訊息格式隨 exception 類型而異（KeyError / ConnectionError / FileNotFoundError 各有不同輸出）。exit code 有三種風格（0/1/-1 混用），CI/CD 腳本無法統一依賴 exit code 判斷成功失敗。
+
+**影響** — P1 網管遇到錯誤後無法自助修復：缺乏 cause（為什麼出錯）+ recovery（如何修復）結構，只能 Google traceback 或提 support ticket。裸 Python traceback 暴露內部堆疊，增加安全性 surface area（路徑資訊、模組結構可見）。exit code 不穩定導致 CI/CD 誤判（-1 在某些 shell 被解讀為 255，破壞 `$?` 判斷邏輯）。support load 上升。
+
+**UX rubric 觸及項** — §8 Forms & Feedback = 1（CRITICAL）：無結構化錯誤訊息，無 inline recovery 提示；CLI rule 12（錯誤明確性）= 0。P1 escalation：Error actionability = 0 觸發 CRITICAL → P1。
+
+**優化路線（小改）**
+1. 頂層 CLI entry point 加統一 `try/except Exception as e` wrapper，攔截未預期 exception，轉換為 `[ERROR] <cause>\n[FIX] <recovery hint>` 格式輸出，exit code 統一為 1（1 day）
+2. 建立 `error_helper.py`：`format_error(cause, recovery, suggestion=None)` → 輸出統一格式；常見 exception 類型（`ConnectionError` / `FileNotFoundError` / `PermissionError`）預設 recovery hint 表（2 day）
+3. 在 command dispatcher 層加 `difflib.get_close_matches` 建議（與 4.6 b2 共用實作，1 day）
+4. exit code 正規化：成功 = 0，user error = 1，system error = 2（半天）
+- Touch radius：小（頂層 entry + error_helper 新模組，業務邏輯不動）
+- 與 §5 cross-cutting 衝突？`error_helper` 設計與 Track B OutputManager 協同，不衝突
+
+**重構路線（併入 Track B）**
+1. Track B：`OutputManager` 統一 error 輸出路徑，`error_helper` 成為 OutputManager 的 error channel
+2. 所有 business error 改用 `OutputManager.error(cause, recovery)` 呼叫，廢除裸 `print()` / `click.echo()` 錯誤輸出
+3. 整合 `--json` 模式下的結構化 error payload（`{"error": {"cause": "...", "recovery": "..."}, "exit_code": 1}`）
+- Touch radius：中（錯誤路徑統一，含 --json 結構化輸出）
+- 與 §5 cross-cutting 同源：§5.1「共享 CLI 輸出層」Track B
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（error_helper / top-level try-except 純 CLI 邏輯，無網路依賴）
+- Gate 2 多痛點共因    : 共因 3 個（b4 錯誤訊息 / b3 輸出格式 / b2 did-you-mean 共用 difflib）→ 重構分 +1
+- Gate 3 Touch radius  : 優化小；重構中
+- Gate 4 Persona 衝擊  : P1 每次遇錯必觸；裸 traceback 阻斷自助修復，support load 上升 → 高衝擊
+- Gate 5 Reversibility : ✓（top-level try/except 可 flag 回退；error_helper 純增量模組）
+
+**推薦** — 優化路線優先（3 day）；Track B 完成時，`error_helper` 自動接入 OutputManager error channel，無需重寫。
+
+**驗收標準** — 採用優化路線後：
+- 所有 CLI 錯誤輸出為 `[ERROR] <cause>\n[FIX] <recovery>` 格式（無裸 traceback）
+- exit code 正規化：成功 0，user error 1，system error 2（CI/CD `$?` 判斷穩定）
+- `difflib.get_close_matches` 建議覆蓋命令層輸入錯誤
+- 結構化錯誤 payload 可在 `--json` 模式下輸出
+- §8 Forms & Feedback: 1 → 2；CLI rule 12: 0 → 2
+
+---
+
 ## §5 Cross-cutting Recommendations
 
 ### §5.1 共因識別（Mining）
