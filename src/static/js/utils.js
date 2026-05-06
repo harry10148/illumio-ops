@@ -430,3 +430,13 @@ function toast(msg, type) {
 function dlog(msg) { const l = $('d-log'); l.textContent += '\n[' + new Date().toLocaleTimeString() + '] ' + msg; l.scrollTop = l.scrollHeight }
 function slog(msg) { const l = $('s-log'); if (l) { l.textContent += '\n[' + new Date().toLocaleTimeString() + '] ' + msg; l.scrollTop = l.scrollHeight } }
 function alog(msg) { const l = $('a-log'); l.textContent += '\n' + msg; l.scrollTop = l.scrollHeight }
+
+// Phase 1 quick win for a2: debounce filter inputs
+window.debounce = function debounce(fn, wait = 300) {
+  let timer;
+  return function debounced(...args) {
+    clearTimeout(timer);
+    const ctx = this;
+    timer = setTimeout(() => fn.apply(ctx, args), wait);
+  };
+};

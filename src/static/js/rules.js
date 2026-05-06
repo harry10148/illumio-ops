@@ -165,11 +165,16 @@ document.querySelectorAll('.modal-bg').forEach(bg => {
 });
 
 /* ─── Rules search/filter (W2.1) ─────────────────────────────────── */
-let _filterDebounce = null;
-function filterRules() {
-  clearTimeout(_filterDebounce);
-  _filterDebounce = setTimeout(_doFilterRules, 150);
-}
+const filterRules = window.debounce(function filterRules() {
+  const input = $('r-search');
+  if (input) {
+    input.classList.add('input-loading');
+    _doFilterRules();
+    setTimeout(() => input.classList.remove('input-loading'), 50);
+  } else {
+    _doFilterRules();
+  }
+}, 300);
 function _doFilterRules() {
   const q = ($('r-search').value || '').toLowerCase().trim();
   const rows = $('r-body')?.querySelectorAll('tr') || [];
