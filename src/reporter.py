@@ -509,6 +509,24 @@ class Reporter:
             body += "\n"
         return body
 
+    @staticmethod
+    def _highest_severity(issues: list[dict]) -> str:
+        """Pick highest severity from a list of issue dicts; returns 'critical', 'warning', or 'info'."""
+        # Map raw severity values to canonical three-level labels used by mail_severity_* i18n keys
+        _rank = {'critical': 3, 'crit': 3, 'emerg': 3, 'alert': 2, 'err': 2, 'error': 2, 'warning': 2, 'warn': 2, 'info': 1}
+        _canonical = {'critical': 'critical', 'crit': 'critical', 'emerg': 'critical',
+                      'alert': 'warning', 'err': 'warning', 'error': 'warning', 'warning': 'warning', 'warn': 'warning',
+                      'info': 'info'}
+        cur = 0
+        out = 'info'
+        for issue in issues:
+            sev = (issue.get('severity') or 'info').lower()
+            rank = _rank.get(sev, 0)
+            if rank > cur:
+                cur = rank
+                out = _canonical.get(sev, 'info')
+        return out
+
     def send_alerts(self, force_test: bool = False, channels: list[str] | None = None) -> list[dict[str, Any]]:
         if (
             not any(
@@ -536,11 +554,28 @@ class Reporter:
             + len(self.traffic_alerts)
             + len(self.metric_alerts)
         )
-        subj = (
-            t("mail_subject_test")
-            if force_test
-            else t("mail_subject", count=total_issues)
-        )
+        if force_test:
+            subj = t("mail_subject_test")
+        elif total_issues > 0:
+            all_issues = (
+                self.health_alerts
+                + self.event_alerts
+                + self.traffic_alerts
+                + self.metric_alerts
+            )
+            sev = self._highest_severity(all_issues)
+            sev_label = t(f"mail_severity_{sev}")
+            primary = all_issues[0] if all_issues else {}
+            obj = (
+                primary.get("source")
+                or primary.get("resource_name")
+                or primary.get("rule")
+                or t("mail_object_default")
+            )
+            action = primary.get("action") or primary.get("desc") or t("mail_action_default")
+            subj = t("mail_subject_structured", severity=sev_label, object=obj, action=action)
+        else:
+            subj = t("mail_subject", count=total_issues)
         results = []
         registry = get_output_registry()
         ordered_channels = []
