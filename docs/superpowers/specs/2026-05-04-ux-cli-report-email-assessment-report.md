@@ -1012,18 +1012,239 @@ _（評估執行階段尚未填入）_
 
 ### §6.1 GUI direction
 
-候選評估表（評估執行階段用 frontend-design 5 維度逐項打分）：
+#### Step 1 — 4 候選評分（5+1 維度，0-3 分）
 
-| 候選 | Typography | Color | Motion | Spatial | Backgrounds | Distinct | 適用 P1 / P2 |
-|---|---|---|---|---|---|---|---|
-| A. 維持現狀 | _TBD_ | | | | | | |
-| B. industrial-editorial | | | | | | | |
-| C. modern-saas | | | | | | | |
-| D. dark-ops 終端感 | | | | | | | |
+評分依據：§3.1.3 現況為基線（Distinctiveness=1，Typography=2，Color=3，Motion=2，Spatial=2，Backgrounds=2），各候選相對現狀評估可達成分數，並考量 P1 網管 / P2 SOC 工作場景與 C1 offline 硬約束。
 
-#### Adopted Direction Spec Sheet
+| 候選 | Typography | Color | Motion | Spatial | Backgrounds | Distinct | 適用 P1 | 適用 P2 | **合計** |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| A. 維持現狀 | 2 | 3 | 2 | 2 | 2 | 1 | 中（引 §3.1.3 = 12/18，"稱職 ops admin"） | 高 | **14** |
+| B. industrial-editorial | 3 | 3 | 2 | 3 | 2 | 2 | **高** | 中 | **15** |
+| C. modern-saas | 1 | 2 | 2 | 1 | 1 | 1 | 中 | 中 | **8** |
+| D. dark-ops 終端感 | 3 | 3 | 2 | 2 | 3 | 3 | 中 | **高** | **16** |
 
-_（採用後評估執行階段填入）_
+評分說明：
+- **A. 維持現狀**：現況數據直接引用 §3.1.3，Distinctiveness=1 為結構缺陷（Montserrat 兼任標題/正文導致無字族對比），Color 3 為唯一亮點。適用 P2 SOC「高」是因為現有深色主題 cyan-teal 已有終端感基礎，但未深化。
+- **B. industrial-editorial**：引入 display 字族（如 Space Grotesk）對比 body（Inter），tabular figures 強化數據可讀性；Typography 升至 3；Spatial 升至 3（因 editorial grid 強調資訊層級構圖）；Distinct 升至 2（有明確 editorial 工具個性但非顛覆）。對 P1 網管的表單/列表密集場景最契合，P2 SOC 次之（無強烈終端感）。
+- **C. modern-saas**：Linear/Vercel 美學，字族與 Montserrat 差異小，排版個性不足；配色因走更亮的 SaaS 風格而與 Illumio 深色品牌稍偏離；Spatial 偏向大留白低密度，與 P1 高密度操作場景衝突；整體 Distinctiveness 不高於現狀。
+- **D. dark-ops 終端感**：引入 monospace 為核心字族（JetBrains Mono 標題 / 數值），深色底（#0A0F14）+ 窄邊框 grid；Backgrounds=3（noise texture / scanline overlay / grid lines 等細節）；Distinct=3（獨特視覺語言，不易被誤認）；P2 SOC 高度契合；P1 網管「中」因高密度 mono 字型在長時間表單操作時略增視覺負擔。
+
+---
+
+#### Step 2 — B / C / D 候選完整 Spec Sheet
+
+##### 候選 B — industrial-editorial
+
+| 欄位 | 內容 |
+|---|---|
+| **描述** | 高密度 editorial 工具感：display 字族 × body 字族雙層對比，tabular figures 對齊數據欄位，克制配色保留 Illumio 品牌，grid 構圖強調資訊層級。類比：GitLab Data Viz、IBM Carbon、Oxide Console。 |
+| **適用 persona** | P1 網管（主）— 表單/規則/設定高密度操作；P2 SOC（次）— 事件列表 tabular 閱讀；P5 主管（弱）— dashboard 摘要可讀性尚可 |
+| **Color palette light** | base `#F8F9FA`（近白灰）／surface `#FFFFFF`／accent `#FF5500`（Illumio Orange）／success `#2D9B5E`（Safeguard Green 調亮）／warning `#C47A00`（Circuit Gold 調暗）／danger `#D93025`（Risk Red） |
+| **Color palette dark** | base `#0D1117`（近黑）／surface `#161B22`／accent `#FF6B35`（Orange 微調亮）／success `#3AB86F`／warning `#E8A020`／danger `#EF4444` |
+| **Typography** | heading：Space Grotesk Bold/SemiBold（offline self-host woff2，OFL），fallback `'Segoe UI', system-ui`；body：Inter Regular/Medium（offline self-host woff2，OFL），fallback `system-ui, -apple-system`；mono：JetBrains Mono（code blocks / log 輸出，offline self-host），fallback `'Cascadia Code', 'Fira Code', monospace` |
+| **Iconset** | Lucide（vendor 化 SVG sprite，MIT license，offline 友善，~400 icon subset） |
+| **Motion** | `--motion-fast: 120ms ease-out`（hover / focus 狀態切換）；`--motion-base: 200ms ease-out`（panel slide / tab switch）；`--motion-slow: 350ms cubic-bezier(0.4,0,0.2,1)`（modal / overlay enter）；無裝飾性動畫 |
+| **Density level** | dashboard 高（row-height 36px，gap 8px）／settings 中（row-height 44px，gap 12px）／empty state 低（center layout，gap 24px） |
+| **Touch radius** | 最小 tap target 40×40px（settings / form field）；table row 點擊區 36px height，側邊操作 icon 32px + 4px padding；符合 WCAG 2.5.5 |
+| **Risk** | 低-中。Space Grotesk + Inter 均為主流 OFL 字型，woff2 subset 可控制在 100 KB 以內；SVG sprite 無 CDN 依賴；最大實作風險為現有 Montserrat heading 替換後的 line-height / letter-spacing 微調，影響範圍約 30–40 個 heading selector。 |
+
+##### 候選 C — modern-saas
+
+| 欄位 | 內容 |
+|---|---|
+| **描述** | Linear / Vercel / Notion 美學：大留白、低密度、圓角卡片、柔和陰影、sans-serif 單字族。Generic SaaS 工具感，缺乏 security/ops 工具個性。 |
+| **適用 persona** | P5 主管（次）— 低資訊密度符合偶發瀏覽；P1 網管（弱）— 低密度與高頻操作需求衝突；P2 SOC（弱）— 缺乏終端感/緊張感不符事件分析情境 |
+| **Color palette light** | base `#FFFFFF`／surface `#F5F5F5`／accent `#6366F1`（Indigo，偏離 Illumio 品牌）／success `#22C55E`／warning `#F59E0B`／danger `#EF4444` |
+| **Color palette dark** | base `#09090B`／surface `#18181B`／accent `#818CF8`／success `#4ADE80`／warning `#FCD34D`／danger `#F87171` |
+| **Typography** | heading + body：Inter（單字族，無 display 對比），fallback `system-ui`；mono：`monospace`（無具名 offline 字型） |
+| **Iconset** | Heroicons（MIT，offline 友善 SVG sprite） |
+| **Motion** | `--motion-fast: 150ms ease`；`--motion-base: 250ms ease-out`；含大量裝飾性 hover 動畫（scale / shadow lift），與操作工具場景略顯浮誇 |
+| **Density level** | dashboard 低（row-height 48px，gap 16px）／settings 低-中（row-height 48px，gap 16px）／empty 低（插圖型） |
+| **Touch radius** | 44×44px（充足）；`--radius-lg: 12px`（大圓角，與 Illumio 現有 8px 有落差） |
+| **Risk** | 低（實作簡單），但**設計風險高**：Distinctiveness 1，與現狀無提升；且偏離 Illumio 品牌色 (Indigo 非品牌色)；若強行保留 Illumio Orange 則美學自相矛盾。不推薦。 |
+
+##### 候選 D — dark-ops 終端感
+
+| 欄位 | 內容 |
+|---|---|
+| **描述** | Bloomberg Terminal / 終端機 UI 美學：monospace 字型貫穿介面，深色底（近黑 navy）+ 細邊框 grid，數據欄位等寬對齊，scanline / noise texture 強化終端質感。系統管理員 "power tool" 個性強烈。 |
+| **適用 persona** | P2 SOC（主）— 事件分析、log 審查，終端感契合工作情境；P1 網管（中）— 熟悉 CLI/終端環境，接受度高，但長時間表單操作略增視覺負擔；P5 主管（弱）— 視覺複雜度高，不適合偶發摘要閱讀 |
+| **Color palette light** | （此候選以深色為主版；light 版為有限支援）base `#F0F2F5`／surface `#FFFFFF`／accent `#00C8C8`（System Cyan 調亮）／success `#1A7A4A`／warning `#B86A00`／danger `#CC2222` |
+| **Color palette dark** | base `#0A0F14`（near-black navy）／surface `#111820`／accent `#00E5E5`（System Cyan 亮化）／success `#00B060`／warning `#E8A020`（Circuit Gold）／danger `#FF4040`（Risk Red 亮化）；另有 grid-line `rgba(0,200,200,0.08)` + noise overlay `url(noise.svg) opacity 0.03` |
+| **Typography** | heading + 數值：JetBrains Mono Bold/Regular（offline self-host，OFL）—等寬對齊數據欄、monospace 個性強；body prose（說明段落）：Inter Regular，fallback `system-ui`；mono（log/code）：JetBrains Mono，與 heading 共用，fallback `'Cascadia Code', monospace` |
+| **Iconset** | Phosphor Icons（MIT，offline SVG sprite，含 Terminal / Shield / Network 等 ops 語境 icon，風格細線與 mono 字型契合） |
+| **Motion** | `--motion-fast: 100ms linear`（光標閃爍感，刻意快速）；`--motion-base: 180ms ease-out`；`--motion-slow: 300ms ease-out`；可加 `scanline-flicker` CSS animation（選用，`prefers-reduced-motion: reduce` 時關閉） |
+| **Density level** | dashboard 高（row-height 32px，gap 4px，monospace 字元對齊）／settings 中（row-height 40px）／empty 低（ASCII-art 型 placeholder） |
+| **Touch radius** | 最小 tap target 36px（桌面 ops tool，鍵盤優先操作情境）；需注意 WCAG 2.5.5 在觸控設備上的合規性，若有行動端需求須補 44px override |
+| **Risk** | 中。JetBrains Mono 作為 UI heading 字型需驗證多語言（中文 label 仍需 CJK fallback：`'Noto Sans CJK TC', sans-serif`）；noise.svg / scanline overlay 需實測不同 DPI 螢幕渲染品質；P1 長時間 mono 閱讀疲勞需 A/B 驗證；整體 CSS 改動幅度大於 B（影響 150+ selector）。 |
+
+---
+
+#### Step 3 — 推薦方向
+
+**推薦：B (industrial-editorial)**
+
+理由：
+
+1. **槓桿點對齊**：§3.1.3 明確指出 Distinctiveness=1 的根因是「Montserrat 兼任標題/正文，無字族對比」，B 方向以 Space Grotesk（display）× Inter（body）雙字族直接攻克此結構缺陷，Distinctiveness 可升至 2，Typography 升至 3，總分可達 15/18，突破「稱職 ops admin」定位。
+
+2. **Persona weight P1 優先**：P1 網管為最高優先人群，其核心場景為高密度表單、規則列表、設定操作（呼應 §3.1.2 UX rubric a2 forms 弱點）。B 方向 editorial grid + tabular figures 直接強化此場景可讀性；D 方向的 monospace heading 在長時間表單場景增加視覺負擔，P1 適用性降為「中」。
+
+3. **C1 offline 友善**：Space Grotesk + Inter + JetBrains Mono 均有 OFL 授權，woff2 subset 可 vendor 化於 `vendor/fonts/`，與 §3.1.0 a7 Vendor 化執行 plan 完全一致，不引入新 CDN 依賴。
+
+4. **實作風險最低**：B 方向影響約 30–40 個 heading selector，CSS token 改動範圍可控；D 方向影響 150+ selector 且需驗證 CJK fallback 與多 DPI 渲染，實作複雜度顯著更高。
+
+**保留 D 作為「SOC 深色 variant」選項**：若 P2 SOC 使用者回饋要求更強的終端感，可在 B 方向的 dark mode 中疊加 scanline overlay 與 Phosphor icon，作為 opt-in 密度層，不需全面重寫。
+
+---
+
+#### Step 4 — Adopted Direction Spec Sheet（B: industrial-editorial）
+
+```css
+/* ============================================================
+   Illumio Ops — Industrial-Editorial Design System
+   Direction: B (industrial-editorial)
+   Offline strategy: all fonts self-hosted via vendor/fonts/
+   Fonts: Space Grotesk (OFL), Inter (OFL), JetBrains Mono (OFL)
+   Icons: Lucide SVG sprite (MIT), vendor/icons/lucide-sprite.svg
+   ============================================================ */
+
+:root {
+  /* --- Color (Light) --- */
+  --color-base:             #F8F9FA;   /* page background */
+  --color-surface:          #FFFFFF;   /* card / panel */
+  --color-surface-raised:   #F1F3F5;   /* table header / sidebar */
+  --color-border:           #DEE2E6;
+  --color-border-subtle:    #E9ECEF;
+  --color-text-primary:     #0D1117;
+  --color-text-secondary:   #495057;
+  --color-text-muted:       #868E96;
+  --color-accent:           #FF5500;   /* Illumio Orange */
+  --color-accent-hover:     #E64D00;
+  --color-accent-subtle:    rgba(255, 85, 0, 0.08);
+  --color-cyan:             #00B4C8;   /* System Cyan (toned for light bg) */
+  --color-signal-success:   #2D9B5E;   /* Safeguard Green */
+  --color-signal-warning:   #C47A00;   /* Circuit Gold (darkened) */
+  --color-signal-danger:    #D93025;   /* Risk Red */
+  --color-signal-info:      #0077CC;
+
+  /* --- Spacing --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+
+  /* --- Radius --- */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-pill: 9999px;
+
+  /* --- Shadow --- */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.08), 0 4px 6px rgba(0, 0, 0, 0.05);
+
+  /* --- Motion --- */
+  --motion-fast: 120ms ease-out;   /* hover / focus state */
+  --motion-base: 200ms ease-out;   /* tab switch / panel slide */
+  --motion-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1); /* modal / overlay */
+
+  /* --- Typography --- */
+  /* Space Grotesk: vendor/fonts/SpaceGrotesk/{Regular,Medium,SemiBold,Bold}.woff2 */
+  --font-heading: 'Space Grotesk', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  /* Inter: vendor/fonts/Inter/{Regular,Medium,SemiBold}.woff2 */
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* JetBrains Mono: vendor/fonts/JetBrainsMono/{Regular,Medium}.woff2 */
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+
+  /* Type scale (rem) */
+  --text-xs:   0.75rem;   /* 12px — label / badge */
+  --text-sm:   0.875rem;  /* 14px — table cell / secondary */
+  --text-base: 1rem;      /* 16px — body default */
+  --text-lg:   1.125rem;  /* 18px — section intro */
+  --text-xl:   1.5rem;    /* 24px — card heading */
+  --text-2xl:  2rem;      /* 32px — page title */
+  --text-3xl:  3rem;      /* 48px — dashboard KPI (display use) */
+
+  /* Tabular figures for numeric columns */
+  --font-feature-tabular: "tnum" 1, "ss01" 1;
+
+  /* --- Density: Dashboard (高) --- */
+  --density-row-height: 36px;
+  --density-gap: var(--space-2);
+  --density-padding-y: var(--space-2);
+  --density-padding-x: var(--space-3);
+
+  /* --- Iconset --- */
+  /* Lucide SVG sprite: vendor/icons/lucide-sprite.svg (MIT, ~400 icon subset) */
+}
+
+/* --- Dark theme overrides --- */
+[data-theme="dark"] {
+  --color-base:             #0D1117;
+  --color-surface:          #161B22;
+  --color-surface-raised:   #1C2128;
+  --color-border:           #30363D;
+  --color-border-subtle:    #21262D;
+  --color-text-primary:     #E6EDF3;
+  --color-text-secondary:   #8B949E;
+  --color-text-muted:       #6E7681;
+  --color-accent:           #FF6B35;   /* Orange 微調亮，深色底適讀 */
+  --color-accent-hover:     #FF8555;
+  --color-accent-subtle:    rgba(255, 107, 53, 0.12);
+  --color-cyan:             #00C8DC;   /* System Cyan 亮化 */
+  --color-signal-success:   #3AB86F;
+  --color-signal-warning:   #E8A020;   /* Circuit Gold */
+  --color-signal-danger:    #EF4444;
+  --color-signal-info:      #3B82F6;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.30);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.40);
+}
+
+/* --- Density modifier: settings (中) --- */
+[data-density="comfortable"] {
+  --density-row-height: 44px;
+  --density-gap: var(--space-3);
+  --density-padding-y: var(--space-3);
+  --density-padding-x: var(--space-4);
+}
+
+/* --- Offline font self-host @font-face stubs (填入 vendor 化後補完) ---
+   vendor/fonts/SpaceGrotesk/SpaceGrotesk-{Regular,Medium,SemiBold,Bold}.woff2
+   vendor/fonts/Inter/Inter-{Regular,Medium,SemiBold}.woff2
+   vendor/fonts/JetBrainsMono/JetBrainsMono-{Regular,Medium}.woff2
+   vendor/css/fonts.css  ← 統一 @font-face 宣告，login.html / index.html 引入此檔
+   CJK fallback: 'Noto Sans CJK TC' 或系統 font-stack，不自帶（體積過大）
+   --- */
+```
+
+**Token table 補充說明：**
+
+| Token 群 | 說明 | 注意事項 |
+|---|---|---|
+| `--color-accent` | Illumio Orange `#FF5500` (light) / `#FF6B35` (dark) | 保留品牌色，深色版微調亮以確保對比 ≥ 4.5:1 |
+| `--color-cyan` | System Cyan，用於 active tab / focus ring / badge | 非 accent 主色，作為品牌輔助色使用 |
+| `--font-heading` | Space Grotesk — editorial 個性字族 | woff2 subset 約 60 KB；取代現有 Montserrat heading 用途 |
+| `--font-body` | Inter — 螢幕可讀性最優之 sans | woff2 subset 約 50 KB；取代 Montserrat body 用途 |
+| `--font-mono` | JetBrains Mono — log / code / KPI 數值 | 已於現有 Montserrat mono fallback chain，升為具名首選 |
+| `--font-feature-tabular` | `tnum` — tabular figures | 數值欄位（dashboard KPI / table cell）開啟等寬數字 |
+| `--density-*` | 三級密度：高（dashboard）/ 中（settings）/ 低（empty） | 現有 `[data-density="comfortable"]` 機制可直接擴充 |
+| `--motion-fast/base/slow` | 120 / 200 / 350 ms | 無裝飾性動畫；`prefers-reduced-motion` 需全數歸零 |
+
+**Offline self-host 執行計畫（簡表）：**
+
+| 字型 | License | 來源 | vendor 路徑 | 估算大小 |
+|---|---|---|---|---|
+| Space Grotesk | OFL | `@fontsource/space-grotesk` 或 GitHub fontsource | `vendor/fonts/SpaceGrotesk/` | ~80 KB（4 字重 woff2） |
+| Inter | OFL | `@fontsource/inter` | `vendor/fonts/Inter/` | ~70 KB（3 字重 woff2 subset） |
+| JetBrains Mono | OFL | `@fontsource/jetbrains-mono` 或 JetBrains GitHub | `vendor/fonts/JetBrainsMono/` | ~50 KB（2 字重 woff2） |
+| Lucide sprite | MIT | `lucide` npm，build SVG sprite | `vendor/icons/lucide-sprite.svg` | ~200 KB（400 icon subset） |
+| **合計** | | | | **~400 KB（解壓縮）；壓縮後 ~130 KB** |
 
 ### §6.2 Report + Email direction
 
