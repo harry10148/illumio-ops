@@ -1,4 +1,4 @@
-﻿"""
+"""
 Illumio PCE Ops ??Flask Web GUI.
 Optional dependency: pip install flask
 
