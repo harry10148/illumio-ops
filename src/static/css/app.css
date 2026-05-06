@@ -1389,3 +1389,12 @@
         scroll-behavior: auto !important;
       }
     }
+
+/* ── Skeleton loader card variants (Phase 1 quick win for a1) ────── */
+.skeleton.skeleton-tall { height: 64px; }
+.skeleton.skeleton-card { height: 120px; }
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

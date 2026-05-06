@@ -199,9 +199,22 @@ function _clearHighlight(tr) {
 /* ─── Skeleton / Spinner helpers ─────────────────────────────────── */
 function showSkeleton(tbodyId, cols, rows = 4) {
   const el = $(tbodyId); if (!el) return;
-  el.innerHTML = Array.from({length: rows}, () =>
-    `<tr>${Array.from({length: cols}, () => '<td><span class="skeleton skel-text" style="display:inline-block;width:' + (40 + Math.random()*40) + '%;height:14px"></span></td>').join('')}</tr>`
-  ).join('');
+  // Uses createElement + replaceChildren — no innerHTML, no XSS surface.
+  const fragment = document.createDocumentFragment();
+  for (let r = 0; r < rows; r++) {
+    const tr = document.createElement('tr');
+    tr.className = 'skel-tr';
+    for (let c = 0; c < cols; c++) {
+      const td = document.createElement('td');
+      const span = document.createElement('span');
+      span.className = 'skeleton skel-text';
+      span.style.cssText = 'display:inline-block;width:' + (40 + Math.random() * 40) + '%;height:14px';
+      td.appendChild(span);
+      tr.appendChild(td);
+    }
+    fragment.appendChild(tr);
+  }
+  el.replaceChildren(fragment);
 }
 function showSpinner(containerId, label) {
   let ov = document.querySelector(`#${containerId} .spinner-overlay`);
