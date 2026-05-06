@@ -324,6 +324,38 @@ POLICY_USAGE_CSS = """\
   }
 """
 
+EXEC_SUMMARY_CSS = """
+.exec-summary {
+  border: 2px solid var(--color-signal-info, #0077CC);
+  border-radius: 8px;
+  padding: 24px;
+  margin: 0 0 32px 0;
+  background: rgba(0,119,204,0.04);
+}
+.exec-summary h2 {
+  margin-top: 0;
+  font-size: 1.4rem;
+  color: var(--color-signal-info, #0077CC);
+}
+.exec-summary .verdict { font-weight: 600; font-size: 1.1rem; }
+.exec-summary .kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+.exec-summary .kpi { display: flex; flex-direction: column; align-items: flex-start; }
+.exec-summary .kpi-label { font-size: 0.85rem; color: var(--color-text-secondary, #6F7274); }
+.exec-summary .kpi-value {
+  font-size: 1.6rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.exec-summary .summary-text { margin: 12px 0; line-height: 1.6; }
+.exec-summary .notes { margin: 12px 0 0 20px; color: var(--color-text-secondary, #6F7274); }
+"""
+
+
 def build_css(exporter_type: str) -> str:
     extra = {
         "traffic": TRAFFIC_CSS,
@@ -331,7 +363,7 @@ def build_css(exporter_type: str) -> str:
         "ven": VEN_CSS,
         "policy_usage": POLICY_USAGE_CSS,
     }.get(exporter_type, "")
-    return f"{FONT_LINK}\n<style>\n{BASE_CSS}\n{extra}\n</style>\n"
+    return f"{FONT_LINK}\n<style>\n{BASE_CSS}\n{EXEC_SUMMARY_CSS}\n{extra}\n</style>\n"
 
 TABLE_JS = r"""
 <script>
