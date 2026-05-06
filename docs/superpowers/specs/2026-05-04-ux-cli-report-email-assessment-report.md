@@ -1770,17 +1770,48 @@ Hand-off：可靠性 sprint（詳見 §3.1.0 a7）。
 
 ### §5.1 共因識別（Mining）
 
-| 共用重構 | 解的痛點 | Touch radius | Offline 友善 |
-|---|---|---|---|
-| Token 化 `app.css` + design system | a1 a2 c3 d2 + visual 一致性 | 中 | ✅ |
-| 共享 CLI 輸出層 | b3 b4 b6 b7（+ b1 副作用） | 中 | ✅ |
-| 統一 CLI 入口 | b1 b2 b5 b8 | 大 | ✅ |
-| Email 模板系統化（MJML 預編譯） | d2 d3 | 中 | ✅ |
-| 拆 `index.html` monolith | a1 a2（+ 開發體驗 spillover） | 大 | ✅ |
-| Backend async + SSE（OQ-1 conditional） | a1 (loading via SSE)、c1 (long report progress) | 大 | ✅（FastAPI / Starlette） |
-| Report exporter 整併（若 `html_exporter.py` 71 KB 是 legacy） | c1 c3 + 維護性 | 大 | ✅ |
+##### 共因 (root cause) 識別
 
-_（評估執行階段依掃描結果驗證與更新）_
+從 16 張痛點卡的「重構路線」欄位抽取共用 refactor，發現多個痛點共享同一根因。將具有相同根因或高度相依的重構動作 bundle 為單一 Track，以降低 touch radius 的重疊風險並提升批次執行效益。
+
+##### 共用重構表
+
+| 共用重構 | 解的痛點 | Touch radius | Offline 友善 | 註 |
+|---|---|---|---|---|
+| Token 化 app.css + design system | a1 a2 c3 d2 + visual 一致性 | 中 | ✅ | Track A — Source Serif 4/Inter/JetBrains Mono 自託管 |
+| 共享 CLI 輸出層 (Console + isatty + --json/--quiet/--verbose) | b3 b4 b6 b7 (+ b1 副作用 menu/CLI parity) | 中 | ✅ | Track B |
+| 統一 CLI 入口 (illumio-ops 根命令 + shell mode) | b1 b2 b5 b8 | 大 | ✅ | Track C — deprecation alias 4 versions |
+| Email 模板系統化 (MJML 預編譯 → cross-client safe HTML) | d2 d3 | 中 | ✅ 編譯產物 | Track D |
+| 拆 index.html monolith + blueprint per-tab | a1 a2 (+ devx) | 大 | ✅ | Track A 子集 |
+| Backend async + SSE for long ops | a1 殘留 + c1 progress | 大 | ✅ FastAPI/Starlette wheels | Track E (conditional) |
+| Report exporter 整併 (audit/policy/ven 共享 base) | c1 c3 + 維護性 | 大 | ✅ | Track A 子集，視 §3.3.1 legacy 確認 |
+
+##### 共因彙整 (痛點 → Track 映射)
+
+| 痛點 anchor | 主 Track | 副 Track | 說明 |
+|---|---|---|---|
+| a1 | Track A | Track E (conditional) | bundle / token / SSE |
+| a2 | Track A | — | filter component primitive |
+| a6 | (Pre-condition) | — | §3.1.0 hand-off |
+| a7 | (Pre-condition) | — | §3.1.0 vendor 化 |
+| b1 | Track C | — | menu/CLI parity |
+| b2 | Track C | — | naming consistency |
+| b3 | Track B | — | output layer |
+| b4 | Track B | — | error layer |
+| b5 | Track C | — | dual-entry |
+| b6 | Track B | — | tty/composability |
+| b7 | Track B | — | exit codes |
+| b8 | Track C | — | completion |
+| c1 | Track A | Track E (conditional) | report shape + progress |
+| c3 | Track A | — | chart visual |
+| d2 | Track D | Track A (subset) | cross-client + signal token |
+| d3 | Track D | — | actionability |
+
+##### 結論
+- 5 條主 Track 涵蓋 16 個痛點 (a6/a7 為 pre-condition, 不算入 Track)
+- Track A 範圍最廣 (a1/a2/c3/d2-subset/c1-subset)
+- Track B + C 互補 (B 先 C 後; B 不依賴 C 但 C 依賴 B 已套用)
+- Track E 為 conditional (Phase 1-3 後重評估)
 
 ### §5.2 Bundled Refactor Tracks
 
