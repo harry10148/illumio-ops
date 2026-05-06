@@ -331,11 +331,46 @@ _（評估執行階段尚未填入）_
 
 #### §3.2.1 Command Inventory
 
-攤平表（掃描填入）：
+掃描 4 個入口（`src/cli/root.py` 的 Click 樹、`src/pce_cache_cli.py`、`src/rule_scheduler_cli.py`、`src/siem_cli.py`）並逐一讀取原始碼後填入：
 
 | 入口 | 命令 | verb | noun | flags | 輸出格式 | exit codes | isatty 處理 | --json | menu 也露出？ |
 |---|---|---|---|---|---|---|---|---|---|
-| _TBD by scan_ | | | | | | | | | |
+| root | cache backfill | backfill | cache | --source (req), --since (req), --until | rich Console (plain text progress) | 0 / 1 | no | no | yes (pce_cache_cli 選單 5) |
+| root | cache status | status | cache | — | rich Table | 0 only | no | no | yes (pce_cache_cli 選單 1) |
+| root | cache retention | retention | cache | --run | rich Table | 0 / 1 | no | no | yes (pce_cache_cli 選單 6) |
+| root | config show | show | config | --section | rich console_json (pretty JSON) | 0 only | no | no | no |
+| root | config validate | validate | config | --file | rich Console (plain text) | 0 only | no | no | no |
+| root | gui | launch | gui | --port, --host | 無（啟動 server） | 0 only | no | no | yes (main_menu 選單 5) |
+| root | monitor | run | monitor | --interval | 無（daemon 模式） | 0 only | no | no | no |
+| root | report traffic | generate | report | --source, --file, --format, --output-dir, --email, --profile | click.echo (file path list, plain text) | 0 / 1 (ClickException) | no | no | yes (report_generation_menu 選單 1) |
+| root | report audit | generate | report | --start-date, --end-date, --format, --output-dir | click.echo (file path list, plain text) | 0 / 1 (ClickException) | no | no | yes (report_generation_menu 選單 2) |
+| root | report ven-status | generate | report | --format, --output-dir | click.echo (file path list, plain text) | 0 / 1 (ClickException) | no | no | yes (report_generation_menu 選單 3) |
+| root | report policy-usage | generate | report | --source, --file, --start-date, --end-date, --format, --output-dir | click.echo (file path list, plain text) | 0 / 1 (ClickException) | no | no | yes (report_generation_menu 選單 4) |
+| root | rule list | list | rule | --type, --enabled-only | rich Table | 0 only | no | no | no |
+| root | rule edit | edit | rule | RULE_ID (arg), --no-preview | rich Syntax (JSON diff) + questionary | 0 only | no | no | no |
+| root | siem status | status | siem | — | rich Table | 0 / 1 | no | no | yes (siem_cli 選單 1) |
+| root | siem test | test | siem | DESTINATION (arg) | rich Console (plain text) | 0 / 1 | no | no | yes (siem_cli 選單 7) |
+| root | siem dlq | list | siem-dlq | --dest (req), --limit | rich Table | 0 / 1 | no | no | yes (siem_cli 選單 8a) |
+| root | siem replay | replay | siem-dlq | --dest (req), --limit | rich Console (plain text) | 0 / 1 | no | no | yes (siem_cli 選單 8b) |
+| root | siem purge | purge | siem-dlq | --dest (req), --older-than | rich Console (plain text) | 0 / 1 | no | no | yes (siem_cli 選單 8c/d) |
+| root | status | status | daemon | — | rich Table | 0 only | no | no | no |
+| root | version | version | app | — | click.echo (plain text) | 0 only | no | no | no |
+| root | workload list | list | workload | --env, --limit, --enforcement, --managed-only | rich Table (with Progress spinner) | 0 only | no | no | no |
+| pce_cache_cli | pce-cache view-status | view | cache | — (互動式) | plain print() | none | no | no | yes (main_menu 選單 7) |
+| pce_cache_cli | pce-cache backfill | backfill | cache | 互動輸入 start/end | plain print() | none | no | no | yes (main_menu 選單 7) |
+| rule_scheduler_cli | rule-scheduler manage | manage | rule-schedule | 互動選單 (a/e/d/r) | ANSI Colors + plain print() | none | no | no | yes (main_menu 選單 3) |
+
+**觀察摘要（Summary Observations）**
+
+1. **Verb 一致性差**：根 CLI 共使用 8 個動詞（backfill, status, retention, show, validate, launch, run, generate, list, edit, test, replay, purge, version），但 verb 語義並不統一——report 的子命令省略 verb 直接以 noun 分類（traffic/audit/ven-status/policy-usage），而 cache/siem/rule 則以動詞為子命令名稱，風格混雜。
+
+2. **--json 支援率：0/24（0%）**：所有命令均無 `--json` 旗標，無法用於 pipeline 或機器消費。rich Table 輸出在 pipe 場景（isatty=false）仍會渲染 ANSI markup，造成 b3（輸出格式）和 b6（isatty/pipe 友善）的雙重缺失。
+
+3. **isatty 切換輸出：0/24（0%）**：`_render.py` 的 `_stdout_is_tty()` 僅用於 Colors ANSI 和 safe_input 模式切換（questionary vs plain input()）；**不** 用於在 non-TTY 場合改為輸出 plain text 或 JSON，即 root CLI 的 rich Table 在被 pipe 時也照常渲染 box characters。
+
+4. **exit codes 不完整**：root CLI 部分命令（cache, siem）使用 `sys.exit(1)` 或 `raise SystemExit(1)`，但 report 命令仰賴 `click.ClickException`（自動 exit 1），而互動 menu 入口（pce_cache_cli, rule_scheduler_cli, siem_cli）**完全無** exit code 語義，永遠回傳 0（b7 缺陷）。
+
+5. **menu 雙重入口（b5 痛點）**：24 個命令中，14 個（58%）同時透過互動選單和 root CLI 公開，但兩個路徑的實作完全分離——menu 版本用 plain `print()`，root CLI 版本用 rich，行為不一致且無法共享。3 個純 menu 命令（pce_cache 的 edit-settings/traffic-filter/sampling 等）**僅** 在互動路徑存在，root CLI 無法觸達。
 
 #### §3.2.2 Consistency Matrix
 
