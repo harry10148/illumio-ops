@@ -533,14 +533,34 @@ _（評估執行階段尚未填入）_
 
 #### §3.3.1 Report Inventory
 
-| Report | Generator | Exporters | i18n keys 數 | 平均輸出大小 | 主要 sections |
-|---|---|---|---|---|---|
-| audit | `audit_generator.py` | `audit_html_exporter.py` + pdf + csv + xlsx | _TBD_ | _TBD_ | _TBD_ |
-| policy_usage | `policy_usage_generator.py` | `policy_usage_html_exporter.py` + pdf + csv + xlsx | | | |
-| ven_status | `ven_status_generator.py` | `ven_html_exporter.py` + pdf + csv + xlsx | | | |
-| dashboard_summaries | `dashboard_summaries.py` | (內嵌至其他報告) | | | |
-| (legacy?) | `report_generator.py` | `html_exporter.py` ⚠ | | | |
-| 共用 | — | `pdf_exporter.py`、`chart_renderer.py`、`table_renderer.py`、`code_highlighter.py`、`report_css.py`、`report_i18n.py` | | | |
+| Report | Generator | Exporters | i18n keys 數（EN） | 平均輸出大小 | 主要 sections | 狀態 |
+|---|---|---|---|---|---|---|
+| audit | `audit_generator.py` (878 行) | `audit_html_exporter.py` (519L) + pdf + csv + xlsx | 48 (`rpt_au_*`) | 須 in-situ 觀察（本評估暫缺） | Executive summary, Health, Users, Policy changes, Correlations | active |
+| policy_usage | `policy_usage_generator.py` (656 行) | `policy_usage_html_exporter.py` (532L) + pdf + csv + xlsx | 39 (`rpt_pu_*`) | 須 in-situ 觀察 | Executive summary, Rule overview, Hit detail, Unused rules, Deny effectiveness, Draft PD | active |
+| ven_status | `ven_status_generator.py` (368 行) | `ven_html_exporter.py` (209L) + pdf + csv + xlsx | 13 (`rpt_ven_*`) | 須 in-situ 觀察 | Summary, Online inventory, Offline, Lost heartbeat today, Lost heartbeat yesterday | active |
+| traffic（主報告） | `report_generator.py` (857 行) | `html_exporter.py` (1337L) + pdf + csv + xlsx | 322 (`rpt_*` 共用) | 須 in-situ 觀察 | mod01–mod15 + ringfence + change_impact（17 個 _mod HTML 方法） | active — 統一入口 |
+| dashboard_summaries | `dashboard_summaries.py` (154 行) | 內嵌輸出 JSON（無獨立檔案） | 10 (`*dashboard*`) | n/a（Web UI 用） | audit 摘要, policy_usage 摘要 | active |
+
+**Report Generator / Exporter Legacy 判定：**
+
+`report_generator.py` 與 `html_exporter.py` **均為 active，非 legacy**。
+
+- `report_generator.py` 是系統統一入口：`src/main.py`、`src/cli/report.py`、`src/gui/routes/reports.py`、`src/report_scheduler.py` 四處均直接 `import ReportGenerator`。最後修改涵蓋至最新 commit（`clip_to_cache`、i18n 強化等功能持續在此演進）。
+- `html_exporter.py` 是 Traffic 報告的 HTML 輸出核心（17 個 section renderer），同時作為共用基礎設施被三個專屬 HTML exporter（`audit_html_exporter.py`、`policy_usage_html_exporter.py`、`ven_html_exporter.py`）繼承其 `render_section_guidance()`、`_trend_deltas_section()` 等工具函數。
+- **建議：保留，不刪除。** 若日後抽出 Traffic 報告為獨立模組，再考慮重命名為 `traffic_html_exporter.py`。
+
+**共用基礎設施（Shared Infra）：**
+
+| 元件 | 路徑 | 行數 | 職責 |
+|---|---|---|---|
+| `pdf_exporter.py` | `src/report/exporters/` | 280 | ReportLab 純 Python PDF，支援 CJK |
+| `chart_renderer.py` | `src/report/exporters/` | 378 | Plotly HTML chart 嵌入 |
+| `table_renderer.py` | `src/report/exporters/` | 104 | DataFrame → HTML table，統一樣式 |
+| `code_highlighter.py` | `src/report/exporters/` | 22 | syntax highlight CSS 生成 |
+| `report_css.py` | `src/report/exporters/` | 653 | 全域 CSS（含 dark mode、CJK 字型） |
+| `report_i18n.py` | `src/report/exporters/` | 1057 | 報告層 EN/zh-TW 字串（STRINGS dict + lang toggle HTML） |
+| `csv_exporter.py` | `src/report/exporters/` | 81 | CSV 輸出（Traffic 用） |
+| `xlsx_exporter.py` | `src/report/exporters/` | 99 | XLSX 輸出（多 sheet） |
 
 #### §3.3.2 Content Audit
 
