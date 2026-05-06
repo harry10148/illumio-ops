@@ -1340,15 +1340,30 @@ class Reporter:
         )
         preheader = self._build_preheader_text(all_issues)
 
+        body_html = f"""
+<div style="margin-bottom:20px;">
+  <div style="background:#FF5500;color:#FFFFFF;display:inline-block;padding:6px 14px;border-radius:999px;font-weight:800;font-size:14px;letter-spacing:0.02em;margin-bottom:8px;">Illumio PCE Ops</div>
+  <div style="font-size:12px;color:#6F7274;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">{esc(t('alert_tpl_summary'))}</div>
+  <div style="font-size:12px;color:#8C8E8F;margin-bottom:8px;">{esc(t('alert_tpl_aggregated_blurb'))}</div>
+  <div style="font-size:12px;color:#6F7274;margin-bottom:4px;">{esc(t('alert_tpl_generated_at'))}: <strong>{esc(generated_at)}</strong></div>
+</div>
+{summary_html}
+{health_section_html}
+{event_section_html}
+{traffic_section_html}
+{metric_section_html}
+<div style="margin-top:32px;padding:20px 0 4px;border-top:1px solid #ECE7DD;text-align:center;">
+  <p style="color:#8C8E8F;font-size:11px;line-height:1.8;margin:0;">
+    {esc(t('alert_tpl_auto_generated'))}<br>
+    {esc(t('alert_tpl_act_per_runbook'))}
+  </p>
+</div>
+"""
+
         return render_alert_template(
             "mail_wrapper.html.tmpl",
-            subject_html=esc(subj),
-            generated_at_html=esc(generated_at),
-            summary_html=summary_html,
-            health_section_html=health_section_html,
-            event_section_html=event_section_html,
-            traffic_section_html=traffic_section_html,
-            metric_section_html=metric_section_html,
+            title=esc(subj),
+            body_html=body_html,
             preheader=preheader,
         )
 
