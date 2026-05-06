@@ -229,6 +229,7 @@
   "error_deleting": "Delete failed",
   "error_format": "Invalid format.",
   "error_generic": "Error: {error}",
+  "error_invalid_url": "URL must start with http:// or https://",
   "error_loading_config": "Error loading config: {error}",
   "error_manage_rules_command": "Invalid format. Use m <index> or d <index>[,index...].",
   "error_manage_rules_modify_single": "Modify accepts exactly one index. Use m <index>.",

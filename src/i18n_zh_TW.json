@@ -229,6 +229,7 @@
   "error_deleting": "刪除失敗",
   "error_format": "格式不正確。",
   "error_generic": "錯誤：{error}",
+  "error_invalid_url": "網址必須以 http:// 或 https:// 開頭",
   "error_loading_config": "載入設定時發生錯誤：{error}",
   "error_manage_rules_command": "格式不正確。請輸入 m <編號> 或 d <編號>[,編號...]。",
   "error_manage_rules_modify_single": "修改指令一次只能指定一個編號。請輸入 m <編號>。",

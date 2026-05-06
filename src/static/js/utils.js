@@ -440,3 +440,22 @@ window.debounce = function debounce(fn, wait = 300) {
     timer = setTimeout(() => fn.apply(ctx, args), wait);
   };
 };
+
+// Phase 1 quick win for a2: inline form validation.
+// Uses textContent (not innerHTML) so i18n strings are never parsed as HTML.
+window.setFieldError = function setFieldError(input, message) {
+  input.setAttribute('aria-invalid', 'true');
+  let err = input.parentElement.querySelector('.field-error');
+  if (!err) {
+    err = document.createElement('span');
+    err.className = 'field-error';
+    err.setAttribute('role', 'alert');
+    input.insertAdjacentElement('afterend', err);
+  }
+  err.textContent = message;  // safe: text only, no HTML parsing
+};
+window.clearFieldError = function clearFieldError(input) {
+  input.removeAttribute('aria-invalid');
+  const err = input.parentElement.querySelector('.field-error');
+  if (err) err.remove();
+};
