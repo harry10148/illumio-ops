@@ -123,6 +123,31 @@ Vendor 化目標位置（彙整）：
 
 P0 hard-gate 狀態：BLOCKED — login.html 第 7–8 行直接從 Google Fonts CDN 載入 Montserrat 字型，部署於強制 HTTPS 的離線環境將因混合內容或無法連外而失敗。須於 Task B.2 完成 vendor 化後方可解除。
 
+###### Vendor 化執行 plan（hand-off 給 implementation）
+
+| URL（原） | License | Vendor 路徑 | 取得方式 | size |
+|---|---|---|---|---|
+| https://fonts.googleapis.com (preconnect) | n/a | （移除標籤） | 改成本地 link | 0 |
+| https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap | OFL | vendor/fonts/Montserrat/{Regular,Medium,SemiBold,Bold}.woff2 + vendor/css/montserrat.css | npm `@fontsource/montserrat` 或 GitHub release `JulietaUla/Montserrat` | ~150 KB (4 woff2) + ~1 KB CSS |
+
+實作步驟：
+1. `npm download @fontsource/montserrat`（或從 GitHub release `JulietaUla/Montserrat` 下載 woff2）→ 4 個 .woff2 檔
+2. 放入 `vendor/fonts/Montserrat/`（檔名：Montserrat-Regular.woff2、Montserrat-Medium.woff2、Montserrat-SemiBold.woff2、Montserrat-Bold.woff2）
+3. 建 `vendor/css/montserrat.css` with @font-face declarations（4 個字重，各指向本地 woff2）
+4. `src/templates/login.html` 移除第 7–8 行 Google Fonts CDN，改 `<link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/montserrat.css') }}">`（或對應 vendor 靜態路由）
+5. 確認 CSP `font-src` 包含 `'self'`（已是 — src/gui/__init__.py:251）→ 自動 unblock
+6. 跑 offline bundle build 確認新增資源被打包
+
+bundle 影響：
+- vendor/ 增加 ~151 KB（fonts 150 + css 1）
+- offline bundle (.tar.gz) 增量 ~50–100 KB（壓縮後）
+- 解除 a6 + a7 雙痛點，無新依賴
+
+聯合修復收益：
+- 移除 CDN 依賴 → 滿足 C1 offline 硬約束
+- 解除 CSP font-src 阻擋 → 修復 a6 layout 破版（B.1 根因：CSP `font-src 'self'` 阻擋 Google Fonts）
+- 字型載入時間：CDN ~200–400 ms (cold) → local ~10 ms (always)
+
 #### §3.1.1 整體現況量化
 
 ##### 一、檔案大小表（降冪排序）
