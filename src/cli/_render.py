@@ -354,11 +354,23 @@ _CONSOLE_SINGLETON: "_RichConsole | None" = None
 
 
 def _get_console() -> _RichConsole:
-    """Lazily build a shared Console so encoding / color detection runs once."""
+    """Lazily build a shared Console honoring TTY status and NO_COLOR.
+
+    Capability detection in priority order:
+    1. NO_COLOR env (https://no-color.org/) — disables color even in TTY
+    2. TERM=dumb — disables color
+    3. _stdout_is_tty() — controls is_terminal (force_terminal=False if not)
+    """
     global _CONSOLE_SINGLETON
     if _CONSOLE_SINGLETON is None:
+        no_color = (
+            os.environ.get('NO_COLOR') is not None
+            or os.environ.get('TERM') == 'dumb'
+        )
+        is_tty = _stdout_is_tty()
         _CONSOLE_SINGLETON = _RichConsole(
-            force_terminal=None,  # auto-detect
+            force_terminal=is_tty,
+            no_color=no_color,
             safe_box=True,        # degrades to ASCII when terminal can't render unicode
             highlight=False,      # don't auto-colorize numbers/URLs (keeps existing look)
         )
