@@ -324,6 +324,34 @@ POLICY_USAGE_CSS = """\
   }
 """
 
+SIDEBAR_CSS = """
+.report-sidebar {
+  position: sticky;
+  top: 16px;
+  float: right;
+  width: 200px;
+  margin-left: 24px;
+  padding: 16px;
+  border: 1px solid var(--color-border, #D6D7D7);
+  border-radius: 6px;
+  background: var(--color-surface, #FFFFFF);
+  font-size: 0.9rem;
+}
+.report-sidebar h3 { margin: 0 0 12px; font-size: 1rem; }
+.report-sidebar ul { list-style: none; padding: 0; margin: 0; }
+.report-sidebar li { margin: 6px 0; }
+.report-sidebar li.current {
+  font-weight: 600;
+  color: var(--color-signal-info, #0077CC);
+  border-left: 3px solid currentColor;
+  padding-left: 8px;
+}
+.report-sidebar a { color: var(--color-text-primary, #313638); text-decoration: none; }
+.report-sidebar a:hover { text-decoration: underline; }
+
+@media print { .report-sidebar { display: none; } }
+"""
+
 EXEC_SUMMARY_CSS = """
 .exec-summary {
   border: 2px solid var(--color-signal-info, #0077CC);
@@ -363,7 +391,7 @@ def build_css(exporter_type: str) -> str:
         "ven": VEN_CSS,
         "policy_usage": POLICY_USAGE_CSS,
     }.get(exporter_type, "")
-    return f"{FONT_LINK}\n<style>\n{BASE_CSS}\n{EXEC_SUMMARY_CSS}\n{extra}\n</style>\n"
+    return f"{FONT_LINK}\n<style>\n{BASE_CSS}\n{SIDEBAR_CSS}\n{EXEC_SUMMARY_CSS}\n{extra}\n</style>\n"
 
 TABLE_JS = r"""
 <script>

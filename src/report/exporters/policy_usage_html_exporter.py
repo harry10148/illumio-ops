@@ -19,6 +19,7 @@ from .html_exporter import render_section_guidance
 from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 from src.report.exporters._exec_summary import render_exec_summary_html
+from src.report.exporters._sidebar import render_sidebar_html
 
 _CSS = build_css("policy_usage")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -177,8 +178,10 @@ class PolicyUsageHtmlExporter:
         )
 
         exec_html = render_exec_summary_html(mod00, report_name='Policy Usage Report')
+        sidebar_html = render_sidebar_html('policy_usage')
         body = (
-            exec_html
+            sidebar_html
+            + exec_html
             + '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
             f'<div class="report-kicker">{_s("rpt_kicker_policy")}</div>'

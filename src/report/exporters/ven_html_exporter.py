@@ -19,6 +19,7 @@ from .html_exporter import render_section_guidance
 from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 from src.report.exporters._exec_summary import render_exec_summary_html
+from src.report.exporters._sidebar import render_sidebar_html
 
 _CSS = build_css("ven")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -126,8 +127,10 @@ class VenHtmlExporter:
                                    render_cell=_render_cell, lang=_sl)
 
         exec_html = render_exec_summary_html(_ven_mod00, report_name='VEN Status Report')
+        sidebar_html = render_sidebar_html('ven_status')
         body = (
-            exec_html
+            sidebar_html
+            + exec_html
             + '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
             f'<div class="report-kicker">{_s("rpt_kicker_ven")}</div>'

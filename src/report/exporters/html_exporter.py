@@ -20,6 +20,7 @@ import pandas as pd
 from .report_i18n import STRINGS, lang_btn_html, COL_I18N as _COL_I18N
 from .report_css import build_css, TABLE_JS
 from src.report.exporters._exec_summary import render_exec_summary_html
+from src.report.exporters._sidebar import render_sidebar_html
 from .table_renderer import render_df_table
 from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
@@ -546,8 +547,10 @@ class HtmlExporter:
         nav_html = '<nav>' + ''.join(_nav_links) + '</nav>'
 
         exec_html = render_exec_summary_html(_traffic_mod00, report_name='Traffic Report')
+        sidebar_html = render_sidebar_html('traffic')
         body = (
-            exec_html
+            sidebar_html
+            + exec_html
             + '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
             f'<div class="report-kicker">{_s("rpt_kicker_traffic")}</div>'
