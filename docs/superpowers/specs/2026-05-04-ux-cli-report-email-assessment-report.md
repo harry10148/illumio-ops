@@ -1815,11 +1815,141 @@ Hand-off：可靠性 sprint（詳見 §3.1.0 a7）。
 
 ### §5.2 Bundled Refactor Tracks
 
-_（評估執行階段尚未填入）_
+#### Track A — Visual System
+
+**解的痛點**: a1 (bundle/perf), a2 (table filter), c3 (chart visual), d2 (email subset), + cross-cutting 視覺一致性
+**Touch radius**: 中
+- app.css token 化 (依 §6.1 B industrial-editorial direction)
+- 跨 JS bundle 套用 (defer/async + skeleton)
+- chart_renderer 共用 token (signal hex from D.3)
+- Email subset (table layout + bgcolor 雙軌)
+- index.html monolith 拆 (blueprint per-tab) — 子集
+
+**Offline 友善**: ✅ (Source Serif 4 OFL + Inter + JetBrains Mono 全 self-host ~280KB; Montserrat ~150KB)
+
+**預估完成後 rubric 提升**:
+- §3.1.2 (GUI UX): §3 perf 0→2, §8 forms 1→2 (+ 加 inline aria-invalid)
+- §3.1.3 (GUI VI): Typography 2→3, Distinctiveness 1→2 (透過字族對比)
+- §3.3.3 (Report VI): HTML 12→15, PDF 6→11 (cover/divider/footer/page)
+- §3.4.2 (Email): cross-client 2/8→6/8 (Email subset 部分)
+
+#### Track B — CLI Output Layer
+
+**解的痛點**: b3 (output format), b4 (error message), b6 (isatty/NO_COLOR), b7 (exit codes); 副: b1 menu/CLI parity 起點
+**Touch radius**: 中
+- 共用 Console wrapper (isatty + NO_COLOR + force-tty 條件)
+- 共用 --json/--quiet/--verbose flag handler
+- 共用 error-clarity helper (cause + recovery + did-you-mean)
+- 統一 exit code map (sysexits.h-style)
+- SIGINT/SIGTERM 標準處理 (130/143)
+
+**Offline 友善**: ✅ (純 stdlib + rich + click)
+
+**預估**:
+- §3.2.4 CLI rule 2★ capability 1→3, rule 3★ composability 0→3, rule 4★ exit codes 1→3, rule 12 actionability 0→2
+- §3.2.4 §1 Acc CRITICAL 1→2
+
+#### Track C — CLI Entry Unification
+
+**解的痛點**: b1 (menu 層級), b2 (naming), b5 (dual-entry), b8 (auto-completion)
+**Touch radius**: 大
+- 統一 `illumio-ops` 根命令 (Click root group)
+- 3 standalone CLI deprecate → group 子命令 (alias 維持 4 versions)
+- 互動 menu → `illumio-ops shell` mode (REPL on Click root)
+- 統一 verb-noun 順序 (rule list / cache backfill)
+- bash/zsh/fish completion 自動產 (Click + click_completion)
+
+**Offline 友善**: ✅
+
+**預估**:
+- §3.2.4 §9 nav 2→3, rule 1 一致性 1→3, rule 11 雙入口 1→3, rule 10 completion 2→3
+
+#### Track D — Email System
+
+**解的痛點**: d2 (cross-client), d3 (actionability)
+**Touch radius**: 中
+- MJML 預編譯 → cross-client safe HTML (table + VML CTA + bgcolor)
+- 共享 D.3 signal token (success/warning/danger/info hex)
+- preheader primitive (50-90 char hidden div)
+- bulletproof CTA primitive (VML + table + role=button)
+- subject line pattern: `[<severity>] <object>: <action>`
+- multipart/alternative w/ line_digest.txt fallback
+
+**Offline 友善**: ✅ (MJML compile-time 即產 HTML, 無 runtime CDN)
+
+**預估**:
+- §3.4.2 cross-client 2/8→8/8
+- §3.4.4 actionability 0/4→4/4
+
+#### Track E (conditional) — Backend Async
+
+**啟動條件**: Phase 1-3 完成後 a1 / c1 仍未達 rubric ≥ 2 → 啟動
+**解的痛點**: a1 殘留 (仍卡在 perf=1), c1 殘留 (long-op progress)
+**Touch radius**: 大
+- FastAPI / Starlette swap (Flask→async)
+- SSE for long-op progress streaming
+- async DB / async PCE client
+
+**Offline 友善**: ✅ (FastAPI/Starlette + uvicorn wheels)
+
+**Risk**: 需確認所有現有 blueprint 可平移; 需確認 Talisman / CSP 等 Flask middleware 在 ASGI 對等
+
+**預估** (if triggered): §3.1.2 §3 perf 2→3, §3.3.2 c1 length/summary 偏向 progressive disclosure
 
 ### §5.3 推薦執行順序
 
-_（評估執行階段尚未填入）_
+#### Phase 0 (Pre-conditions, mandatory blocking)
+- a6 HTTPS layout 破版 hand-off → 可靠性 sprint (B.1 完成)
+- a7 vendor 化 → vendor/fonts/Montserrat (B.2 完成 plan)
+- 修正: integrations.js 載入順序 (A.3 finding); src/gui/__init__.py 移除 BOM
+
+#### Phase 1 (Quick wins, 2-3 sprint)
+- 各痛點優化路線中的小改項目
+- 加 defer/async 到所有 script tag
+- 加 debounce + visual loading state
+- isatty + NO_COLOR + 基本 stderr 分流
+- per-report 200 字 executive summary
+- email subject pattern + preheader + multipart
+
+**目標**: 8 P1 痛點全達標 ≥ rubric 1 (基本可用)
+
+#### Phase 2 (並行)
+- Track A Visual System (週)
+- Track B CLI Output Layer (週)
+- 兩者獨立, 可並行 ship
+
+**目標**: GUI/CLI 主視覺 + 輸出體質達標 ≥ rubric 2
+
+#### Phase 3
+- Track C CLI Entry Unification (依賴 Track B 已 ship)
+- Track D Email MJML (獨立)
+
+**目標**: CLI 命令樹 + Email 系統化, 全達 ≥ rubric 2
+
+#### Phase 4 (conditional)
+- Track E Backend Async — 僅當 a1/c1 仍未達 ≥ rubric 2 時啟動
+
+#### 依賴圖
+
+```
+a6 (handoff) ─┐
+              ├─→ Phase 1 (quick wins, 4 子系統並行)
+a7 (vendor)  ─┘             │
+                             ↓
+                Phase 2 (Track A | Track B)  ── 並行 ship
+                             │
+                             ↓
+                Phase 3 (Track C ← Track B  | Track D)
+                             │
+                             ↓
+                Phase 4 (Track E if a1/c1 < 2)
+```
+
+#### 衝突 / 依賴註記
+- Track C 依賴 Track B 已套用共用輸出層 (避免重複實作)
+- Track A + B 互不衝突 (CSS vs CLI domain)
+- Track D 與 Track A 共享 D.3 signal token (single source of truth)
+- a6/a7 解除是 Track A 起點 (CSP unblock + vendor 路徑)
 
 ---
 
