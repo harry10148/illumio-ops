@@ -873,16 +873,39 @@ _（評估執行階段尚未填入）_
 
 #### §3.4.2 Cross-client Compatibility Audit
 
-渲染矩陣（known-issue checklist）：
+##### Known-issue checklist（mail_wrapper.html.tmpl 靜態審查）
 
-| Client | 已知雷區 |
-|---|---|
-| Outlook (Win / Mac / 365) | VML for buttons、`<style>` quirks、`word-wrap`、不支援 flexbox/grid |
-| Gmail (web / iOS / Android) | `<style>` 部分支援、可能移除 class、image proxy |
-| Apple Mail | dark mode auto-invert |
-| Thunderbird | CSS 限制 |
+| 檢查項 | 通過? | 說明 |
+|---|---|---|
+| Table-based layout（vs div） | ✗ | 整個骨架全為 `<div>` 巢狀；line 3–37 無 `<table>` 存在。Outlook 不支援 div-based 佈局，欄寬將跑版。 |
+| Inline CSS（vs `<style>` block） | ✓ | 無 `<style>` block；所有樣式均以 `style="..."` 行內撰寫（plugins.py:32 只注入 HTML body）。Gmail / Outlook 的 `<style>` strip 問題在此不適用。 |
+| Img alt + width/height | ✓ | 模板中無 `<img>` 標籤，無圖片引用，此項風險不存在。 |
+| Webfont 不引用 | ✗ | line 2：`font-family:'Montserrat',Arial,sans-serif`。未引用 @font-face / googleapis（無外部請求），但 Montserrat 在多數 email client 中不可用；Arial fallback 可接受，但 font-stack 宣告仍構成視覺落差。 |
+| Position / flex / grid 不使用 | ✗ | line 6：`display:flex; align-items:center; gap:14px`；line 13：`display:flex; flex-wrap:wrap; gap:18px`。Outlook 2007–2019 完全不支援 flexbox，header 與 meta 欄位將塌陷成垂直堆疊。 |
+| Bulletproof CTA（VML） | ✗ | 無 `<v:roundrect>` 或任何 `<!--[if mso]>` 條件注釋。若未來加入按鈕，Outlook 將顯示純文字連結而非樣式化按鈕。 |
+| Dark mode 反轉處理 | ✗ | 無 `<meta name="color-scheme">` 及 `prefers-color-scheme` media query。Apple Mail / Outlook iOS 在 dark mode 會自動反轉背景（`#F3F0E9` → 深色），橘色 logo badge（`#FF5500`）與文字對比可能失效。 |
+| 文字版 fallback | ✗ | `plugins.py:28`：`MIMEMultipart()` 預設為 `mixed`，非 `alternative`；`plugins.py:32` 只 attach `MIMEText(body, "html")`，無 `text/plain` part。`reporter.py:1373–1377` 同樣問題。`line_digest.txt.tmpl` 雖存在但從未被 attach 至 email。 |
 
-_（實測結果評估執行階段填入）_
+**審查結果：2 / 8 通過（inline CSS ✓、無圖片 ✓）；6 項不通過。**
+
+##### Client 風險矩陣
+
+| Client | 已知雷區 | 對 mail_wrapper 影響 |
+|---|---|---|
+| Outlook（Win / Mac / 365） | 不支援 flexbox/grid、VML for buttons、`<style>` quirks | **高風險**：header（line 6）與 meta 欄（line 13）的 flex 佈局塌陷；無 VML CTA；整體 layout 以 div 為根，Outlook 可能完全錯位 |
+| Gmail（web / iOS / Android） | `<style>` 部分支援、可能移除 class、image proxy | **中風險**：inline CSS 可躲過 `<style>` strip；無外部圖片（image proxy 不觸發）；但 flex gap 在舊版 Gmail App 不支援 |
+| Apple Mail | dark mode 自動反轉 | **中風險**：無 color-scheme meta，dark mode 下橘色 badge 與淺色背景可能遭反轉，品牌識別受損 |
+| Thunderbird | CSS 限制、flex 支援不穩 | **低-中風險**：inline CSS 通過；flex 視版本而定；整體比 Outlook 容忍度高 |
+
+##### 總結
+
+2 / 8 通過，**3 個高風險或中風險 client**（Outlook 高風險、Gmail 中風險、Apple Mail 中風險）。
+
+主要建議（優先序）：
+1. **換用 table-based layout**（最高優先）— 解決 Outlook / 舊版 email client 根本不相容問題
+2. **加入 `text/plain` MIME part**（plugins.py + reporter.py）— `MIMEMultipart('alternative')` + attach text 版本；`line_digest.txt.tmpl` 已備妥，只缺 attach 邏輯
+3. **加入 `<meta name="color-scheme" content="light">` + forced-light CSS**（Apple Mail dark mode）
+4. **移除 Montserrat 從 font-stack 或改用系統字型**（視覺落差低優先）
 
 #### §3.4.3 Visual Identity 評估
 
