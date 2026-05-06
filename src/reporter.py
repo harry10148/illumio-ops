@@ -527,6 +527,28 @@ class Reporter:
                 out = _canonical.get(sev, 'info')
         return out
 
+    @staticmethod
+    def _build_preheader_text(issues_list, max_chars=90):
+        """Build a 50-90 char standalone preview shown in inbox.
+
+        Picks first 1-2 issues and joins their summaries; truncates with
+        ellipsis if over budget. HTML-escapes the result before returning
+        so it's safe to interpolate into the template via string.Template.
+        """
+        import html as _html
+        if not issues_list:
+            return ''
+        parts = []
+        for i in issues_list[:2]:
+            s = (i.get('summary') or i.get('action') or i.get('desc')
+                 or i.get('rule') or i.get('source') or '')
+            if s:
+                parts.append(str(s))
+        text = ' • '.join(parts)
+        if len(text) > max_chars:
+            text = text[:max_chars - 1].rsplit(' ', 1)[0] + '…'
+        return _html.escape(text)
+
     def send_alerts(self, force_test: bool = False, channels: list[str] | None = None) -> list[dict[str, Any]]:
         if (
             not any(
@@ -1310,6 +1332,14 @@ class Reporter:
       </div>
 """
 
+        all_issues = (
+            self.health_alerts
+            + self.event_alerts
+            + self.traffic_alerts
+            + self.metric_alerts
+        )
+        preheader = self._build_preheader_text(all_issues)
+
         return render_alert_template(
             "mail_wrapper.html.tmpl",
             subject_html=esc(subj),
@@ -1319,6 +1349,7 @@ class Reporter:
             event_section_html=event_section_html,
             traffic_section_html=traffic_section_html,
             metric_section_html=metric_section_html,
+            preheader=preheader,
         )
 
     def _send_mail(self, subj: str) -> dict[str, Any]:
