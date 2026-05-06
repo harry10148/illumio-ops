@@ -1,8 +1,9 @@
 ---
 Title: UX / CLI / Report / Email 全域評估報告
 Source spec: docs/superpowers/specs/2026-05-04-ux-cli-report-email-assessment-design.md
-Status: complete (Phases A-H 已完成; §7 Mockups skipped per OQ-4)
+Status: complete
 Generated: 2026-05-04
+Commit at: 5cce1254e4b0af9423200b721f5d338394143629
 ---
 
 # UX / CLI / Report / Email 全域評估報告
@@ -2920,3 +2921,37 @@ Email:       inline style="background:<hex>"  AND  bgcolor="<hex>"  attribute（
 - `docs/superpowers/plans/2026-04-25-report-r03-new-analysis.md`
 - `docs/superpowers/plans/2026-05-02-h5-gui-blueprint-split.md`（§9 Out-of-scope 假設完成）
 - `docs/superpowers/plans/2026-05-02-h6-settings-rename-reorg.md`（同上）
+
+## §12 下一步
+
+本評估報告產出後，建議以下接續工作（不在本 plan 範圍）：
+
+### 1. Phase 0 啟動（mandatory pre-conditions）
+- **a6 HTTPS layout 破版** → 可靠性 sprint owner; CSP `font-src='self'` 確認 (B.1) + DevTools 實測剩 hypotheses 1, 4
+- **a7 vendor 化執行** → 開新 plan `2026-MM-DD-vendor-external-resources.md`，依 §3.1.0 a7 vendor mapping plan (B.2) 落地; ~150 KB Montserrat self-host
+- **integrations.js 載入順序** → 在 src/templates/index.html 中將 utils.js 移至 integrations.js 之前 (A.3 finding)
+- **src/gui/__init__.py BOM** → 移除 U+FEFF 字元 (A.2 finding, 影響 radon 解析)
+
+### 2. Phase 1 quick wins（建議集中為一份 plan）
+依 §3.1.5 / §3.2.6 / §3.3.6 / §3.4.6 推薦組合的「優化路線」項目：
+- GUI: defer/async + skeleton + debounce + aria-invalid (1-2 sprint)
+- CLI: isatty + NO_COLOR + --json/--quiet/--verbose + error-clarity (1-2 sprint)
+- Report: 4 reports × 200 字 executive summary + cross-report sidebar (1 week)
+- Email: subject pattern + preheader + table layout + multipart fallback (1 week)
+**目標**: 8 P1 痛點全達 rubric ≥ 1
+
+### 3. Phase 2 並行（建議各開獨立 plan）
+- **Track A — Visual System**: 套用 §6.1 B industrial-editorial direction + §6.2 B editorial-magazine + D.3 共享 signal token; 涵蓋 GUI app.css + chart_renderer + email subset
+- **Track B — CLI Output Layer**: Console wrapper + flag handler + error helper + exit code map
+**目標**: GUI/CLI 主視覺 + 輸出體質達 rubric ≥ 2
+
+### 4. Phase 3 並行
+- **Track C — CLI Entry Unification**: 依賴 Track B 已 ship; 統一 illumio-ops 根命令 + shell mode + zsh/fish completion
+- **Track D — Email System**: MJML 預編譯 + bulletproof CTA primitive + preheader primitive
+**目標**: CLI 命令樹 + Email 系統化全達 rubric ≥ 2
+
+### 5. Phase 4 conditional
+- **Track E — Backend Async** 是否啟動，依 Phase 1-3 完成後 a1 / c1 rubric 重評結果決定（FastAPI/Starlette + Uvicorn + SSE）
+
+### 引用方式
+每條 Track 開 plan 時，可引用本報告的對應 §3.x.5/.6 推薦組合 + §4 痛點卡作為 acceptance criteria；§5.2 Track 定義 + §5.3 phasing 提供 dependency view。
