@@ -772,7 +772,24 @@ zh_TW 空態文字：`rpt_ven_no_data = "沒有 VEN 資料"` / `report_no_data =
 
 #### §3.3.3 Visual Identity 現況評估（document context）
 
-_（評估執行階段尚未填入）_
+**評分來源**：`src/report/exporters/report_css.py`、`src/report/exporters/pdf_exporter.py`、`src/report/exporters/chart_renderer.py`。HTML 滿分 18（6 維度 × 3），PDF 滿分 15（Motion = N/A，5 維度 × 3）。
+
+| 維度 | HTML | PDF | 關鍵證據 |
+|---|:---:|:---:|---|
+| Typography | 2 | 2 | HTML：Montserrat 主字 + JetBrains Mono 等寬、h1–h4 四層層次、`font-variant-numeric: tabular-nums` 廣泛用於數值欄位；無 `@font-face` 本地嵌入（依 CDN）。PDF：MSung-Light CID 字體 fallback 已修（commit 4cca064）；`_make_cell_style` 依欄位數動態 8/7px；單一字體無字重差異。 |
+| Color | 2 | 1 | HTML：完整 CSS token（`--cyan-120/110/100/90`、`--orange`、`--gold`、`--green`、`--red`、`--tan`）；CRITICAL/HIGH/MEDIUM/LOW badge 四色語意一致；`prefers-color-scheme: dark` 僅覆蓋 `.section-guidance`（局部）。PDF：表頭 `colors.white` 背景，無 verdict badge 色彩移植，資料列全灰白。 |
+| Motion | 1 | N/A | HTML：table row hover `transition: background .12s`、sort indicator `transition: opacity .12s`；無 expand/collapse `@keyframes`，互動微弱。PDF：靜態輸出，不適用。 |
+| Spatial | 3 | 2 | HTML：固定 210px 側欄 + `main` content area；`dual-grid`（2 × 1fr）、`tri-grid`（2fr+1fr+1fr）響應式 grid；`@media` + CSS Container Query 雙層斷點；`chart-container` max-width 860px 控幅；card `margin-bottom: 24px` 節奏一致。PDF：Landscape A4、12mm 四邊 margin；`KeepTogether` 防孤兒標題；8mm Spacer 章節間距；表格等寬欄、圖表 160×90mm；無 page-break-before 章節控制。 |
+| Backgrounds & Details | 2 | 0 | HTML：`.report-hero` 雙層漸層 cover card（radial + linear）；table panel `linear-gradient`；shadow token 三層（card/panel/panel-strong）；`footer` 極簡存在。PDF：無 cover page、無 header/footer、無頁碼、無章節分隔線；`SimpleDocTemplate` 純白預設，無任何品牌背景處理。 |
+| Distinctiveness | 2 | 1 | HTML：深青（`#1A2C32`）+ 橙（`#FF5500`）品牌色一致貫穿；chart `_PALETTE` 首色 `#FF5500/#FFA22F` 沿用；整體偏「整潔儀表板」而非 editorial 個性。PDF：ReportLab 預設外觀，無 Illumio 品牌色應用，無視覺差異化。 |
+| **合計** | **12/18** | **6/15** | |
+
+**主要 gap**：
+
+- **PDF Backgrounds（0/3）**：缺 cover page、頁眉/頁腳、頁碼是最大單點缺口；`SimpleDocTemplate` 需加 `onFirstPage`/`onLaterPages` callback 才能植入品牌頁首。
+- **PDF Color（1/3）**：HTML 的四色 severity badge 語意未移植到 PDF；`_dataframe_to_table` 的 `TableStyle` 無條件著色邏輯。
+- **HTML Motion（1/3）**：缺少 expand/collapse 動畫（findings card 可摺疊）與 section fade-in；目前僅有 hover/sort transition。
+- **HTML Color dark mode（局部）**：`prefers-color-scheme: dark` 僅覆蓋 `.section-guidance`，其餘元素（nav、card、badge）在深色系統下對比度未驗證。
 
 #### §3.3.4 可選方向
 
