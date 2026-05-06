@@ -913,7 +913,48 @@ _（評估執行階段尚未填入）_
 
 #### §3.4.4 Actionability Audit（命中 d3）
 
-_（評估執行階段尚未填入）_
+##### Subject line audit
+
+| Pattern | 通過? | 證據 |
+|---|---|---|
+| 含關鍵資訊（severity / source / object） | ✗ | `i18n_en.json:1300` `"Illumio PCE Ops Alert ({count} issue(s))"` — 只有 count，無 severity / 受影響物件 |
+| 長度合理（50–78 chars） | ✗ | 最長 35 chars（`count=99`）；未充分利用 subject 空間傳遞資訊 |
+| 避免模糊詞（Alert / Notification 開頭） | ✗ | 模板以 `Alert` 結尾且無具體脈絡；`mail_subject_test` 為 `"… Alert — Test"`，同樣模糊 |
+
+> **實際值**（`src/reporter.py:542` → `src/i18n_en.json:1300`）：  
+> `"Illumio PCE Ops Alert ({count} issue(s))"` → 範例：`Illumio PCE Ops Alert (3 issue(s))`
+
+##### Preheader audit
+
+| 項目 | 結果 | 說明 |
+|---|---|---|
+| Hidden preheader 存在 | ✗ | `mail_wrapper.html.tmpl` 全文無 `display:none` / `preheader` / `preview` — grep exit 1，表示完全缺席 |
+| 長度 30–90 chars | ✗ | 無 preheader，無從評估；email 預覽列將直接抓到 `<body>` 第一段文字（「Official Alert Notification」） |
+| Standalone summary（離開 subject 可讀） | ✗ | 無法判斷，因不存在 |
+
+##### CTA + deep link
+
+| 項目 | 結果 | 說明 |
+|---|---|---|
+| Button styled CTA | △ 條件性 | `reporter.py:806-807`：event 區段若 `pce_link` 存在則渲染 `"View on PCE"` 深色按鈕；wrapper footer、health / traffic / metric 區段均無 CTA |
+| Deep link to GUI page | △ 條件性 | `reporter.py:148-161` `_event_console_link()` 根據 event `href` 欄位拼出 `{base}/#/{path}`；但此 link 僅在 event 資料有 `href` 時才呈現 |
+| Deep link 正確帶參數 | △ 部分 | 連結格式 `{pce_base}/#/{org_path}` 可讓瀏覽器跳至 PCE console，但無 UTM / 查詢篩選參數；health / traffic / metric 告警完全無對應 deep link |
+
+##### Hierarchy（5 秒 What-Why-Action）
+
+- **What（發生什麼）**：✓ — header 有 `{count} issue(s)` 計數 + 四區段 summary 卡片（health / event / traffic / metric 各別數字）
+- **Why（為何觸發）**：✗ — 無 severity 等級、無觸發閾值說明；`alert_tpl_aggregated_blurb` 僅為通用說明文字，非當次告警原因
+- **Action（應採取什麼行動）**：✗ — footer 僅有 `"Confirm and act per your alert runbook."` 靜態文字，無具體操作連結、無 runbook URL、無 escalation 路徑
+
+##### 痛點 d3 命中總結
+
+1. **Subject 無差異化**：固定格式 `"Alert (N issue(s))"` 讓所有告警 subject 幾乎相同；無 severity 前綴（如 `[CRIT]`）導致 inbox 無法排序優先級。
+2. **Preheader 完全缺席**：主流 email client（Gmail / Outlook / Apple Mail）會擷取 body 首段文字作為 preview — 目前顯示 `"Official Alert Notification"`，毫無資訊價值。
+3. **CTA 覆蓋率低**：僅 event 類別有條件性 "View on PCE" 按鈕；health / traffic / metric 告警收件者讀完後無任何可點行動。
+4. **Why 層完全缺失**：收件者無法從 email 本身判斷告警嚴重程度或觸發原因，必須另行登入 PCE 才能確認，增加 MTTR。
+5. **Action 層為靜態佔位**：`"Confirm and act per your alert runbook."` 無 runbook 連結，實際上無法驅動操作；manager persona（P5）閱讀後無任何可執行下一步。
+
+**改善建議**：① Subject 加 `[CRIT/WARN/INFO]` 前綴 + 最高嚴重性告警名稱（50–70 chars）；② 加入 30–90 chars hidden preheader div（`display:none;max-height:0`）；③ wrapper footer 加統一 "Open PCE Dashboard" CTA 按鈕（帶 `{pce_base}/` deep link）；④ 每個告警區段標示觸發閾值（Why）。
 
 #### §3.4.5 痛點對應 finding
 
