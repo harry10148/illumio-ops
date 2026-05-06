@@ -84,7 +84,21 @@ _（評估執行階段尚未填入）_
 
 ##### a6 — HTTPS 啟用後 layout 破版
 
-_（評估執行階段尚未填入）_
+驗證日期：2026-05-04
+本評估狀態：成因清單已給可靠性 sprint，本 spec 不修。
+
+成因假設驗證表：
+| 假設 | 狀態 | 證據 |
+|---|---|---|
+| 1. Mixed-content blocking | 待驗證 | DevTools 重現待你方執行；GUI 未運行，無法靜態確認 |
+| 2. external resources 走 http:// | 已排除 | A.1 a7 共 7 個外部資源，2 個真正違反皆 https:// (Google Fonts)，0 個 http:// |
+| 3. CSP 配置缺失或過嚴 | 已確認（過嚴） | `src/gui/__init__.py:251` font-src 僅允許 `'self'`，但 `src/templates/login.html:7-8` 仍載入 Google Fonts CDN (fonts.googleapis.com / fonts.gstatic.com)；啟用 HTTPS 後 Talisman 套用 CSP，外部字型被阻擋，造成 layout 破版 |
+| 4. Cookie SameSite/Secure | 待驗證 | `src/gui/__init__.py:131,140` SESSION_COOKIE_SAMESITE=Strict、SESSION_COOKIE_SECURE=True（硬編碼）；Strict 模式在跨站重導向時可能丟失 session，但與 layout 破版關係間接，需實際瀏覽器測試確認 |
+
+相關歷史變更：commit 24fe5ff 已移除 HTTP→HTTPS 自動重導向 server（5 files，41 deletions）。
+
+Hand-off owner：可靠性 sprint
+建議優先處理：a7 vendor 化（將 Google Fonts 本地化，同時解決 CSP font-src 阻擋與 mixed-content 風險，與假設 2、3 同源關係最強）
 
 ##### a7 — UI 依賴 external resources（違反 C1）
 
