@@ -374,7 +374,135 @@ _（評估執行階段尚未填入）_
 
 #### §3.2.2 Consistency Matrix
 
-_（評估執行階段尚未填入）_
+掃描基礎：`cli-tty-flags.txt`（Step 1）+ §3.2.1 inventory（24 commands）。
+
+---
+
+##### 1. 旗標命名不一致清單
+
+同一概念在不同命令使用不同旗標名稱：
+
+| 概念 | 命令 A | 旗標 A | 命令 B | 旗標 B | 備註 |
+|---|---|---|---|---|---|
+| 時間範圍起點 | `cache backfill` | `--since` | `report audit`, `report policy-usage` | `--start-date` | 相同語義（YYYY-MM-DD），旗標名不同 |
+| 時間範圍終點 | `cache backfill` | `--until` | `report audit`, `report policy-usage` | `--end-date` | 相同語義，旗標名不同 |
+| 資料來源 | `cache backfill` | `--source` (Choice: events\|traffic) | `report traffic`, `report policy-usage` | `--source` (Choice: api\|csv) | **同名異義**：旗標名相同但語義完全不同 |
+| SIEM 目標名稱 | `siem test` | positional `DESTINATION` (arg) | `siem replay`, `siem dlq`, `siem purge` | `--dest` (option, required) | 同一概念分別用 positional arg 和具名 option |
+| 資料筆數限制 | `siem dlq` | `--limit` (default 50) | `siem replay` | `--limit` (default 100) | 旗標同名但 default 值不一致（50 vs 100） |
+
+**小結**：5 個不一致點，其中 `--source` 同名異義最嚴重（影響自動補全與文件）；`DESTINATION` vs `--dest` 混用 positional/option 破壞 pipeline 脚本相容性。
+
+---
+
+##### 2. verb-noun 順序不一致清單
+
+root CLI 整體採 `noun verb` 風格（group → subcommand），但內部存在風格裂縫：
+
+| 命令路徑 | 實際排列 | 風格 | 備註 |
+|---|---|---|---|
+| `illumio-ops rule list` | noun → verb | noun-first ✓ | `rule` = noun group, `list` = verb |
+| `illumio-ops cache backfill` | noun → verb | noun-first ✓ | |
+| `illumio-ops report traffic` | noun → noun-as-type | **無 verb** | `traffic` 是報告類型，非動詞；`generate` 隱含在函式名 `generate_traffic_report` |
+| `illumio-ops report audit` | noun → noun-as-type | **無 verb** | 同上；report 子命令全部以 noun 為名（traffic/audit/ven-status/policy-usage） |
+| `illumio-ops siem status` | noun → verb | noun-first ✓ | |
+| `illumio-ops siem test` | noun → verb | noun-first ✓ | `test` 既是 noun 也是 verb，語義模糊 |
+| `pce_cache_cli` (menu) | 互動選單，無 CLI 命令名稱 | — | 無命令樹，僅數字選單 |
+| `rule_scheduler_cli` (menu) | 互動選單，無 CLI 命令名稱 | — | 無命令樹，僅字母選單 |
+
+**小結**：root CLI 共 8 個 group/command 中，`report` 子命令（4 個）違背 verb-subcommand 慣例，以類型 noun 取代動詞，與 `rule list`、`cache backfill` 等風格不一致。3 個純 menu 入口完全無命令結構。
+
+---
+
+##### 3. 輸出格式預設不一致清單
+
+| 命令 | 輸出方式 | 是否 TTY-aware | pipe 下行為 |
+|---|---|---|---|
+| `cache backfill` | `rich.Console` (進度文字) | no | ANSI markup 直接輸出 |
+| `cache status` | `rich.Table` | no | box characters 直接輸出 |
+| `cache retention` | `rich.Table` | no | box characters 直接輸出 |
+| `config show` | `rich.Console.print_json` | no | JSON-formatted, ANSI 上色 |
+| `config validate` | `rich.Console` (plain text) | no | ANSI 上色 |
+| `rule list` | `rich.Table` | no | box characters 直接輸出 |
+| `rule edit` | `rich.Syntax` (JSON diff) | no | ANSI syntax highlight |
+| `siem status` | `rich.Table` | no | box characters 直接輸出 |
+| `siem test` | `rich.Console` (plain text) | no | ANSI 上色 |
+| `siem dlq` | `rich.Table` | no | box characters 直接輸出 |
+| `siem replay` | `rich.Console` (plain text) | no | ANSI 上色 |
+| `siem purge` | `rich.Console` (plain text) | no | ANSI 上色 |
+| `status` | `rich.Table` | no | box characters 直接輸出 |
+| `workload list` | `rich.Table` + Progress spinner | no | box characters + spinner 殘留 |
+| `report traffic` | `click.echo` (plain file path) | no | plain text ✓ |
+| `report audit` | `click.echo` (plain file path) | no | plain text ✓ |
+| `report ven-status` | `click.echo` (plain file path) | no | plain text ✓ |
+| `report policy-usage` | `click.echo` (plain file path) | no | plain text ✓ |
+| `version` | `click.echo` (plain text) | no | plain text ✓ |
+| `gui` | 無（啟動 server） | no | — |
+| `monitor` | 無（daemon 模式） | no | — |
+| `pce_cache_cli` view-status | plain `print()` | no | plain text（無 rich） |
+| `pce_cache_cli` backfill | plain `print()` | no | plain text（無 rich） |
+| `rule_scheduler_cli` manage | `print()` + ANSI Colors 類 | no | ANSI escape codes 殘留 |
+
+**量化**：21 個有輸出命令中，rich 輸出 13 個（62%），click.echo 5 個（24%），plain print 3 個（14%）。**0/21 會在 non-TTY 情境自動切換格式**（`_stdout_is_tty()` 存在於 `_render.py` 但不連接至任何 rich Console 或 Table 的條件渲染）。
+
+---
+
+##### 4. 退出碼定義 / 未定義清單
+
+| 命令 / 入口 | 退出碼實作方式 | 碼值 | 問題 |
+|---|---|---|---|
+| `cache backfill/status/retention` | `sys.exit(1)` 明確呼叫（6 處） | 0 / 1 | ✓ 有定義，但無文件 |
+| `siem test/status/replay/purge/dlq` | `raise SystemExit(1)`（7 處） | 0 / 1 | ✓ 有定義；**風格異於** cache 的 `sys.exit(1)` |
+| `report *` (4 個子命令) | `raise click.ClickException(...)` | 0 / 1 (Click 自動) | ✓ 有定義，靠 Click 機制；不明確 |
+| `_runtime.py` (daemon/gui 啟動) | `sys.exit(1)`（2 處） | 0 / 1 | ✓ |
+| `main.py` (頂層 dispatcher) | `sys.exit(exc.exit_code)` | 自訂（唯一處） | `exit_code` 值未見文件 |
+| `rule list`, `rule edit` | 無 explicit exit；依賴 Click default | 0 only | ⚠ 錯誤時仍回傳 0 |
+| `config show`, `config validate` | 無 explicit exit | 0 only | ⚠ |
+| `workload list` | 無 explicit exit | 0 only | ⚠ |
+| `status`, `version`, `gui`, `monitor` | 無 explicit exit | 0 only | ⚠ |
+| `pce_cache_cli`（menu 入口） | 無任何 sys.exit；while True loop | none | ✗ 錯誤與成功均無差異 |
+| `rule_scheduler_cli`（menu 入口） | 無任何 sys.exit | none | ✗ 同上 |
+| `siem_cli`（menu 入口） | 無任何 sys.exit | none | ✗ 同上 |
+
+**小結**：3 個 menu 入口完全無退出碼語義（永遠 0）；root CLI 有退出碼的命令（cache, siem, report）風格不統一（`sys.exit` vs `SystemExit` vs `ClickException`）；`exc.exit_code` 自訂值僅出現一處且無文件。
+
+---
+
+##### 5. global flags 位置不一致
+
+| 旗標 | 是否存在 | 位置 | 有此旗標的命令 | 備註 |
+|---|---|---|---|---|
+| `--json` | **不存在** | — | 0/24 | 無任何命令支援機器可讀輸出 |
+| `--quiet` | **不存在** | — | 0/24 | 無靜默模式 |
+| `--verbose` | **不存在** | — | 0/24 | 無詳細輸出模式 |
+| `--config` / `--config-file` | 部分存在 | per-command | `config validate` 有 `--file`；其餘命令無法指定 config 路徑 | 不在 root group 層級 |
+| `--output-dir` | 部分存在 | per-command | 4 個 report 子命令各自定義 | 未提升至 `report` group 層級 |
+| `--format` | 部分存在 | per-command | 4 個 report 子命令各自定義 | 未提升至 `report` group 層級 |
+| `-i` / `--interval` | 僅 monitor | per-command | `monitor` 命令 | 有短旗標 |
+| `-p` / `--port`, `-h` / `--host` | 僅 gui | per-command | `gui` 命令 | 有短旗標；-h 與 Click 預設 --help 衝突（被 context_settings 排除） |
+
+**小結**：root CLI 群組層級（`cli` group）**零個** global flag。`--output-dir` 和 `--format` 在 4 個 report 子命令重複定義，應提升至 `report` group；`--json`/`--quiet`/`--verbose` 完全缺席（composability 基本盤全失）。短旗標僅 monitor（`-i`）和 gui（`-p`,`-h`）有，其餘命令無短旗標。
+
+---
+
+##### 6. `ILLUMIO_OPS_*` 命中率
+
+掃描結果（`grep -rnE 'ILLUMIO_OPS_' src/`）：
+
+| 環境變數 | 定義位置 | 用途 | 文件化？ |
+|---|---|---|---|
+| `ILLUMIO_OPS_I18N_STRICT` | `src/report/exporters/report_i18n.py:9` | i18n key 找不到時是否拋出例外 | 無（隱藏旗標） |
+
+**命中率：1/∞**（僅 1 個 `ILLUMIO_OPS_*` 環境變數存在於整個 src/ 目錄）。
+
+**問題**：
+- **極低發現率**：只有 1 個 env var，且僅控制 i18n strict mode，屬於開發除錯旗標，非操作旗標。
+- **完全無文件**：`ILLUMIO_OPS_I18N_STRICT` 未出現於任何 README、help text 或 --help 輸出。
+- **覆蓋率空白**：常見需求（config path override、log level、API timeout、offline mode）均無對應 `ILLUMIO_OPS_*` 環境變數，用戶必須修改 `config.json`，無法透過環境變數控制（影響 CI/CD 場景）。
+- 對照同類工具（如 `kubectl`、`gh`）通常有 5–15 個 `<APP>_*` env var 作為旗標補充；此專案接近零。
+
+---
+
+**§3.2.2 總結**：所有 6 類不一致均為系統性問題，非個案。0/24 isatty 處理、0/24 `--json` 支援、0 global flags、3 個 menu 入口無 exit code，構成 composability 三項基本盤全部缺失。
 
 #### §3.2.3 Interaction Model Audit（互動 menu 專屬）
 
