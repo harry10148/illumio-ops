@@ -527,6 +527,43 @@ class Reporter:
                 out = _canonical.get(sev, 'info')
         return out
 
+    def _gui_base_url(self) -> str:
+        """Return the PCE web console base URL for CTA deep links.
+
+        Strips /api/v2 (and v1) suffixes from the configured API URL so the
+        result points at the web GUI root.  Returns '' if no URL is configured
+        — callers must treat '' as "skip CTA".
+        """
+        raw = self._active_pce_url().rstrip("/")
+        if not raw:
+            return ""
+        for suffix in ("/api/v2", "/api/v1", "/api"):
+            if raw.endswith(suffix):
+                raw = raw[: -len(suffix)]
+                break
+        return raw
+
+    @staticmethod
+    def _render_cta(label: str, url: str) -> str:
+        """Render a bulletproof CTA button (Outlook-safe table-based).
+
+        Both label and url are HTML-escaped inside this helper.
+        Callers must urlencode any dynamic id values in url query strings
+        before passing url here.
+        """
+        import html as _html
+        label_html = _html.escape(label)
+        url_html = _html.escape(url, quote=True)
+        return (
+            f'<table role="presentation" border="0" cellpadding="0" cellspacing="0" '
+            f'style="margin:16px 0;">'
+            f'<tr><td bgcolor="#0077CC" style="border-radius:4px;">'
+            f'<a href="{url_html}" '
+            f'style="display:inline-block;padding:10px 20px;color:#FFFFFF;'
+            f'text-decoration:none;font-weight:600;">{label_html}</a>'
+            f'</td></tr></table>'
+        )
+
     @staticmethod
     def _build_preheader_text(issues_list, max_chars=90):
         """Build a 50-90 char standalone preview shown in inbox.
@@ -1194,6 +1231,10 @@ class Reporter:
         td_style = "padding:14px 14px; border-bottom:1px solid #F0ECE4; font-size:13px; color:#313638; vertical-align:top; word-break:break-word; font-family:'Montserrat',Arial,sans-serif; line-height:1.55;"
         section_note_style = "padding:0 20px 18px 20px; font-size:12px; line-height:1.6; color:#6F7274; background:#FFFFFF;"
 
+        gui_base = self._gui_base_url()
+        if not gui_base:
+            logger.debug("_build_mail_html: no gui_base_url resolved — CTAs suppressed")
+
         health_section_html = ""
         if self.health_alerts:
             rows = []
@@ -1207,6 +1248,10 @@ class Reporter:
             </tr>
 """
                 )
+            health_cta = (
+                self._render_cta(t('mail_cta_view_health'), f'{gui_base}/dashboard?tab=health')
+                if gui_base else ""
+            )
             health_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#BE122F; color:#FFFFFF;">{esc(t('health_alerts_header'))}</div>
@@ -1223,6 +1268,7 @@ class Reporter:
 {''.join(rows)}
           </tbody>
         </table>
+        {f'<div style="padding:0 20px 16px 20px;">{health_cta}</div>' if health_cta else ''}
       </div>
 """
 
@@ -1244,6 +1290,10 @@ class Reporter:
                     detail_html = self._render_vendor_event_detail_html(alert, esc)
                     row_html += f"<tr><td colspan='4' style='padding:14px 14px 16px; background:#FCFAF6; border-bottom:1px solid #E6E2D8;'>{detail_html}</td></tr>"
                 rows.append(row_html)
+            event_cta = (
+                self._render_cta(t('mail_cta_view_event'), f'{gui_base}/dashboard?tab=events')
+                if gui_base else ""
+            )
             event_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#1A2C32; color:#FFFFFF;">{esc(t('security_events_header'))}</div>
@@ -1261,6 +1311,7 @@ class Reporter:
 {''.join(rows)}
           </tbody>
         </table>
+        {f'<div style="padding:0 20px 16px 20px;">{event_cta}</div>' if event_cta else ''}
       </div>
 """
 
@@ -1283,6 +1334,10 @@ class Reporter:
             </tr>
 """
                 )
+            traffic_cta = (
+                self._render_cta(t('mail_cta_view_traffic'), f'{gui_base}/traffic')
+                if gui_base else ""
+            )
             traffic_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#FF5500; color:#FFFFFF;">{esc(t('traffic_alerts_header'))}</div>
@@ -1299,6 +1354,7 @@ class Reporter:
 {''.join(rows)}
           </tbody>
         </table>
+        {f'<div style="padding:0 20px 16px 20px;">{traffic_cta}</div>' if traffic_cta else ''}
       </div>
 """
 
@@ -1321,6 +1377,10 @@ class Reporter:
             </tr>
 """
                 )
+            metric_cta = (
+                self._render_cta(t('mail_cta_view_metric'), f'{gui_base}/dashboard?tab=metrics')
+                if gui_base else ""
+            )
             metric_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#F97607; color:#FFFFFF;">{esc(t('metric_alerts_header'))}</div>
@@ -1337,6 +1397,7 @@ class Reporter:
 {''.join(rows)}
           </tbody>
         </table>
+        {f'<div style="padding:0 20px 16px 20px;">{metric_cta}</div>' if metric_cta else ''}
       </div>
 """
 
