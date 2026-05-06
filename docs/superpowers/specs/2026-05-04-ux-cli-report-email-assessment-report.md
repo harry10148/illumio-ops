@@ -2674,20 +2674,23 @@ _（評估執行階段尚未填入）_
 
 ## §8 Open Questions
 
-| ID | 問題 | 狀態 | Default / 答案 |
-|---|---|---|---|
-| OQ-1 | 是否接受打破 Flask 換 FastAPI / Starlette / Litestar？ | **Resolved** | 可換，前提 = offline bundle 安裝（C1 仍硬） |
-| OQ-2 | 是否接受打破既有 i18n keys 命名空間？ | **Resolved** | 可重組；deploy 期附 migration mapping |
-| OQ-3 | GUI redesign Task 6 視覺驗證是否視為 §3.1.0 延伸 pre-condition？ | Open | Default：是，先收 Task 6 → 再啟動 GUI 實作 |
-| OQ-4 | Mockup light/dark 兩版策略確認？ | Open | Default：M1 兩版 / M4 light only / M5 兩版 |
-| OQ-5 | §3.4.2 Email 渲染矩陣是否需實測？ | Open | Default：spec 列 known-issue 矩陣，實測列為下游 implementation 任務 |
-| OQ-6 | §3.2 CLI 的 L4「Click + Rich + Typer 完全重寫」是否上推薦清單？ | Open | Default：列出選項但默認不推薦，除非 Track C 過程經驗證需要 |
-| OQ-7 | §6.1 GUI 與 §6.2 Report/Email 的兩套視覺方向是否共享 token primitive？ | Open | Default：共享色票 primitive；type-scale 與 spacing-scale 各自 |
-| OQ-8 | spec 寫作期是否強制執行 §3.1.0 a7 掃描並填入違規清單？ | Open | Default：是，spec 不能空著 a7 表（這是唯一的 P0 hard-gate） |
-| OQ-9 | 若推薦 Track E（Backend Async），是否同步切換到 ASGI server？ | Open | Default：是，FastAPI / Starlette + Uvicorn（offline wheel ready） |
-| OQ-10 | Illumio 既有英文術語（Allowed/Blocked/Managed/Unmanaged/boundary 等）的留英 vs 譯中策略，是否要在本 spec 內定義「判定原則」？ | Open | Default：是，§3.3.2 內列「Illumio 工程術語留英、UI 動詞與狀態譯中」原則 |
+##### Open Questions — 解決狀態
 
-_（評估執行階段逐一解決 Open 項目並更新狀態）_
+| # | 議題 | 狀態 | 結論 / 引用 |
+|---|---|---|---|
+| OQ-1 | Backend 升級是否在範圍? | Resolved (design spec) | 在範圍 (Track E conditional) |
+| OQ-2 | i18n 結構重組是否在範圍? | Resolved | 不在本評估範圍 — 列為 Track A/D 配合空間 (§9 defer) |
+| OQ-3 | Integrations UI Task 6 是否為延伸 pre-condition? | Resolved | 是 — 假設完成; 否則加入 Phase 0 |
+| OQ-4 | Mockup 兩版策略 (before/after)? | Skipped | Phase G 跳過 in this execution; 下游 implementation plan 可分別產出 M1/M4/M5 |
+| OQ-5 | §3.4.2 渲染矩陣是否實測? | Resolved | 不實測 — C.6 已用 known-issue checklist (2/8 通過); 列為 Track D 套用後重測 |
+| OQ-6 | CLI L4 (Click + Typer 完整重寫) 是否推薦? | Resolved | 不推薦 — Track C entry unification 為主路徑; L4 cost > 收益, P1 已可達標 via Track B+C |
+| OQ-7 | §6.1/§6.2 是否共享 primitive? | Resolved (D.3) | 共享 signal color primitives (success/warning/danger/info hex), 分開 type-scale + spacing-scale |
+| OQ-8 | §3.1.0 a7 強制掃描 hard-gate? | Resolved (A.1) | **BLOCKED** — 2 真正違反 Google Fonts in login.html:7-8; vendor plan ready (B.2 / Track A) |
+| OQ-9 | Track E 是否同步切 ASGI? | Resolved | 是 — FastAPI/Starlette + Uvicorn 全 ASGI; 啟動條件: Phase 1-3 完成後 a1/c1 仍未達 rubric ≥ 2 |
+| OQ-10 | Illumio 術語留英策略? | Resolved (C.4) | 留英: Allowed/Blocked/Managed/Unmanaged/boundary/ringfence/ven/href/enforcement_mode; 譯中: UI verbs / state pills / action buttons; 邊界參考 commits 455f5f0/25d0926/c349f37/c70ba52 |
+
+##### 結論
+全部 OQ 已解，無懸而未決項目。OQ-4 (mockups) 為本 execution scope 排除, 不阻塞下游 implementation。
 
 ---
 
