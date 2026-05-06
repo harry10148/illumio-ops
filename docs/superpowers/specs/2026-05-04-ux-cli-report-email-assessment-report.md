@@ -1609,6 +1609,111 @@ Hand-off：可靠性 sprint（詳見 §3.1.0 a7）。
 
 ---
 
+### 4.15 — d2 Email 跨 client 顯示
+
+| | |
+|---|---|
+| Subsystem | Email |
+| 觸及 persona | P5 |
+| Pre-condition | A.7 已確認 3 個模板（mail_wrapper.html.tmpl 2.5 KB、line_digest.txt.tmpl 393 B、webhook_payload.json.tmpl 317 B）；D.2 決策選 B（`<table role="presentation">` + bulletproof CTA + bgcolor + Georgia,...,serif fallback，無 `@font-face`）；D.3 signal hex 已確立 |
+| Score | Impact 3 × PersonaWeight 3 (P5) × Frequency 2 (高 severity 事件觸發) = **18** |
+| 優先級 | **P1** |
+
+**現況片段** — `§3.4.2 C.6`：2/8 pass；`mail_wrapper.html.tmpl` 使用 `<div>` + `display:flex` 佈局（Outlook flex 塌陷）；引用 Montserrat font-stack（webmail 載入失敗時視覺落差）；無 `<meta name="color-scheme">` dark-mode meta；無 `multipart/alternative`（`line_digest.txt.tmpl` 存在但未作為 plaintext part attach）。完整 8 項 known-issues 清單見 `§3.4.2 C.6`。
+
+**影響** — P5 主管使用 Outlook 365 → flex 塌陷，版面破損無法閱讀；Apple Mail dark mode 自動反色 → 文字與背景對比失效，無法讀取內容；純文字 client（Thunderbird 無 HTML mode）無 plaintext fallback，顯示空白或原始 HTML tag；Montserrat font-stack 在無 Google Fonts 環境（離線部署）退回 sans-serif，與 Report/GUI 字型視覺落差。
+
+**UX rubric 觸及項** — `§3.4.2 C.6` 8 項 known-issues 全數失敗（2/8 pass）；`§1 Acc`：dark-mode 反色為 Accessibility 中等缺口。
+
+**Visual rubric 觸及項** — Color（D.3 signal token：success `#2D9B5E` / warning `#C47A00` / danger `#D93025` / info `#0077CC`，需雙軌 inline CSS + bgcolor 雙寫，不依賴 `@font-face` 或 CSS variable）；Typography（D.2 Email subset 限制：系統 serif `Georgia, "Times New Roman", Times, serif`，禁用 webfont 引用）。
+
+**優化路線（小改）**
+1. 將 `<div>` + `display:flex` 改為 `<table role="presentation">` 表格佈局（依 D.2 決策 B）：1 day
+2. Inline CSS + bgcolor 雙軌：所有背景色以 `bgcolor` attribute + `background-color` inline 雙寫（D.3 hex 直接引用）：1 day
+3. 加 `<meta name="color-scheme" content="light dark">` + `<meta name="supported-color-schemes" content="light dark">`（`mail_wrapper.html.tmpl` `<head>` 段）：1 hour
+4. 加 `multipart/alternative`：`src/reporter.py` email builder 附加 `line_digest.txt.tmpl` 渲染結果為 `text/plain` part：1 day
+5. 移除 Montserrat font-stack 引用，改為 `Georgia, "Times New Roman", Times, serif`（D.2 Email subset）：15 min
+- Touch radius：中（`mail_wrapper.html.tmpl` 全面改表格 + `src/reporter.py` builder 加 multipart）
+- 與 §5 cross-cutting 衝突？與 d3 patch 共用同一 template 改動窗口，建議同 sprint
+
+**重構路線（Track D — 中期）**
+1. Track D：引入 MJML 預編譯管線（`mail_wrapper.mjml` → cross-client safe HTML），取代手工維護 `<table>` 嵌套
+2. Build pipeline 加 `mjml` compile step（CI：`npx mjml src/email/*.mjml -o dist/email/`）
+3. MJML component 封裝 preheader、signal color block、bulletproof CTA primitive（與 d3 改動共享）
+- Touch radius：大（新增 MJML build step + 所有現有 `.tmpl` 遷移至 `.mjml`）
+- 與 §5 cross-cutting 同源：§5.1「Email renderer 整併」
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（table 佈局、inline bgcolor、meta tag、multipart 均為純本地靜態改動；MJML compile-time 亦離線可執行）
+- Gate 2 多痛點共因    : 共因 3 個（d2 跨 client + d3 actionability + a7 external resource → Email 系統統一）→ 重構分 +1
+- Gate 3 Touch radius  : 優化中（`mail_wrapper.html.tmpl` + `src/reporter.py`）；重構大
+- Gate 4 Persona 衝擊  : P5 Outlook 365 flex 塌陷為高衝擊（主要閱讀管道破損）；dark-mode 與純文字 client 為中衝擊
+- Gate 5 Reversibility : ✓（table 佈局為純增量替換；multipart 為新增 part，不移除現有 HTML part；均可 feature-flag）
+
+**推薦** — 並行：優化路線 5 點（1 week，清補 7/8 items）+ Track D MJML（mid-term，系統化解跨 client 相容）。優化路線可將 `§3.4.2 C.6` 2/8 → 7/8，不需等重構。
+
+**驗收標準** — 採用優化路線後：
+- Outlook 365 渲染正確（無 flex 塌陷；`<table>` 佈局驗證）
+- Gmail / Apple Mail / Thunderbird 渲染正確（`§3.4.2 C.6` 8/8 checklist 全綠）
+- Apple Mail dark mode 下文字對比可讀（`color-scheme` meta 生效）
+- 純文字 client 收到可讀 plaintext（`multipart/alternative` 含 `line_digest.txt` 渲染結果）
+- Font-stack 為 `Georgia,...,serif`（無 Montserrat 引用）
+
+---
+
+### 4.16 — d3 Email 主旨 / 摘要 actionability
+
+| | |
+|---|---|
+| Subsystem | Email |
+| 觸及 persona | P5 |
+| Pre-condition | C.7 已確認 0/4 pass；D.2 決策 B 已確立 Email subset spec；D.3 signal hex 已確立；`src/reporter.py` email builder 可取得 severity / object 欄位 |
+| Score | Impact 3 × PersonaWeight 3 (P5) × Frequency 3 (每封告警郵件必觸及) = **27** |
+| 優先級 | **P1** |
+
+**現況片段** — `§3.4.3 C.7`：0/4 pass；Subject 固定為 `"Illumio PCE Ops Alert ({count} issue(s))"` 無 severity / object；preheader 缺席（inbox preview 顯示 `"Official Alert Notification"`）；CTA 按鈕僅出現在 event 區段，其他區段無 CTA；Why 層（severity badge + threshold + trigger context）缺席；Action 層 runbook 文字存在但為純文字，無可點 link。完整 4 項 actionability checklist 見 `§3.4.3 C.7`。
+
+**影響** — P5 主管 inbox 排序失效（無 severity 無法快速識別 CRITICAL vs INFO）；email preview 行顯示無資訊的 `"Official Alert Notification"`，需開信才能判斷是否需立即處理；CTA 覆蓋率不足 → 主管需自行切換到 GUI 找對應入口，MTTR 上升；Why 層缺席 → 無法在不開 GUI 的情況下 self-route 判斷是否需要升級；Action 層 runbook 無 link → 無法在行動裝置直接開啟。
+
+**UX rubric 觸及項** — `§3.4.3 C.7` 4 項 actionability 全數失敗（0/4 pass）。
+
+**Visual rubric 觸及項** — Hierarchy（sky-eye 5 秒 What-Why-Action 三層結構：Subject 為 What，preheader 為 Why 前導，CTA 為 Action 入口）；Color（D.3 signal token 應用於 severity badge：success `#2D9B5E` / warning `#C47A00` / danger `#D93025` / info `#0077CC`）。
+
+**優化路線（小改）**
+1. Subject pattern 改為 `[<severity>] <object>: <action>`（例：`[CRITICAL] PCE 192.168.1.1: VEN offline > 30min`）：`src/reporter.py` email builder 取 severity + object 欄位組裝：1 day
+2. 加 hidden preheader 50–90 chars（`<div style="display:none;max-height:0;overflow:hidden;">` 段）至 `mail_wrapper.html.tmpl`，內容為獨立摘要（不重複 subject）：2 hours
+3. 補 CTA 至所有區段（event / policy / workload / VEN）+ deep link 帶參數（例：`<gui-base>/dashboard?alert_id=<id>&severity=<sev>`）：`src/reporter.py` builder + `mail_wrapper.html.tmpl` 各區段模板：2 days
+4. Why 區補 severity badge + threshold + trigger context（`mail_wrapper.html.tmpl` Why section；badge 採 D.3 signal hex inline bgcolor）：1 day
+5. Action 區補 inline runbook link（`mail_wrapper.html.tmpl` Action section；`src/reporter.py` 取 runbook_url 欄位）：4 hours
+- Touch radius：中（`src/reporter.py` builder 欄位取用 + `mail_wrapper.html.tmpl` 結構新增）
+- 與 §5 cross-cutting 衝突？與 d2 patch 共用同一 template 改動窗口，建議同 sprint
+
+**重構路線（Track D — 中期）**
+1. Track D MJML 包含 preheader / CTA primitive 封裝（與 d2 MJML 共享 component library）
+2. 配合 OQ-2 i18n reorg：subject pattern key 抽為 `alert_subject_critical` / `alert_subject_warning` 等，preheader key 為 `alert_preheader_*`（`i18n_zh_TW.py`）
+3. CTA deep link URL 規則抽為 `email_cta_url_builder`（集中管理 `gui-base` + 參數結構）
+- Touch radius：大（i18n key 重組 + MJML component + URL builder 抽象層）
+- 與 §5 cross-cutting 同源：§5.1「Email renderer 整併」+ OQ-2 i18n
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（Subject 組裝、preheader div、CTA link、Why/Action template 均為純本地靜態改動）
+- Gate 2 多痛點共因    : 共因 2 個（d3 actionability + d2 跨 client → Track D Email 系統統一）→ 重構分 +1
+- Gate 3 Touch radius  : 優化中（`src/reporter.py` + `mail_wrapper.html.tmpl`）；重構大
+- Gate 4 Persona 衝擊  : P5 每封告警郵件必觸及；Subject 無 severity 為高衝擊（inbox 排序失效）；CTA 缺失為高衝擊（MTTR 上升）
+- Gate 5 Reversibility : ✓（Subject pattern 可 feature-flag；preheader 為純新增 div；CTA link 為新增元素，不移除現有內容）
+
+**推薦** — 並行：優化全 5 點（1 week，其中項目 2/5 為簡單 2–4 hours 改動，可先行）+ Track D 統一（mid-term，含 i18n reorg + MJML）。
+
+**驗收標準** — 採用優化路線後：
+- `§3.4.3 C.7` 4/4 actionability checklist 全綠
+- Subject 格式符合 `[<severity>] <object>: <action>` pattern；inbox 排序可依 `[CRITICAL]` / `[WARNING]` 等前綴區分
+- Preheader 在 Gmail / Apple Mail 預覽行顯示獨立 standalone summary（50–90 chars，非 subject 重複）
+- CTA 覆蓋率 100%（所有區段均有 CTA；deep link 帶 `alert_id` + `severity` 參數）
+- Why 區含 severity badge（D.3 signal hex bgcolor）+ threshold + trigger context
+- Action 區含可點 inline runbook link
+
+---
+
 ## §5 Cross-cutting Recommendations
 
 ### §5.1 共因識別（Mining）
