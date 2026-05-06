@@ -16,6 +16,7 @@ from .table_renderer import render_df_table
 from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from .html_exporter import render_section_guidance
+from src.i18n import t
 from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 from src.report.exporters._exec_summary import render_exec_summary_html
@@ -107,7 +108,7 @@ class VenHtmlExporter:
                     "type": "pie",
                     "title": "VEN Status Distribution",
                     "data": {
-                        "labels": ["Online", "Offline", "Lost <24h", "Lost 24-48h"],
+                        "labels": [t("chart_ven_online"), t("chart_ven_offline"), t("chart_ven_lost_24h"), t("chart_ven_lost_48h")],
                         "values": [online_count, offline_count, today_count, yest_count],
                     },
                 }
