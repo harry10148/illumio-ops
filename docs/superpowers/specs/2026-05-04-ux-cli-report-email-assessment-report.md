@@ -1248,18 +1248,400 @@ _（評估執行階段尚未填入）_
 
 ### §6.2 Report + Email direction
 
-候選評估表（Typography 權重最高、Motion 權重最低）：
+#### Step 1 — 4 候選評分（Typography 高權重 / Motion 最低）
 
-| 候選 | Typography | Color | Spatial | Backgrounds | Distinct | 適用 P5 |
-|---|---|---|---|---|---|---|
-| A. 維持現狀 | _TBD_ | | | | | |
-| B. editorial-magazine | | | | | | |
-| C. data-journalism | | | | | | |
-| D. corporate-formal | | | | | | |
+評分依據：C.5 現況基線 HTML=12/18、PDF=6/15（PDF Backgrounds 0/3 為 critical gap）；C.6 Email 跨 client 2/8 fail。各候選評估可達成分數，并考量 P5 主管收件人為 Report/Email 衝突優先 persona（§1.2）、C1 offline 硬約束（無 CDN webfont 於 Email）。
 
-#### Adopted Direction Spec Sheet
+維度滿分各 3，Motion 對 Report/Email 不適用故填 N/A（最低權重 = 不計分）。
 
-_（採用後評估執行階段填入）_
+| 候選 | Typography | Color | Spatial | Backgrounds | Distinct | 適用 P5 | **合計** |
+|---|:---:|:---:|:---:|:---:|:---:|---|:---:|
+| A. 維持現狀 | 2 | 2 | 3 | 0(PDF) | 1 | 低（引 §3.3.3；PDF Backgrounds 0/3 結構缺陷） | **8** |
+| B. editorial-magazine | 3 | 3 | 3 | 2 | 2 | **高**（商業報告閱讀體驗 + 主管閱讀節奏） | **13** |
+| C. data-journalism | 3 | 3 | 3 | 2 | 2 | 中（圖表密度高，主管須花時間解讀） | **13** |
+| D. corporate-formal | 3 | 2 | 3 | 2 | 1 | 高（合規/法務閱讀清單，低 Distinctiveness） | **11** |
+
+評分說明：
+- **A. 維持現狀**：PDF Backgrounds 0/3（封面/分隔頁/頁首頁尾均無印刷背景色），與 §3.3.3 評估一致；Typography 2 沿用現有 sans 無 display 對比；Distinct 1 報告毫無個性，等同系統預設 HTML 輸出。
+- **B. editorial-magazine**：Source Serif 4（印刷款 Serif，heading）× Inter（body）形成強烈字族對比，帶來商業報告「出版物感」；Color 3 沿用 signal 語義色票；Backgrounds 2（cover band + section divider 可有色彩背景，PDF 印刷友善）；Distinct 2（有明確 editorial 工具個性而不過度裝飾）；適用 P5 高——執行層閱讀節奏在 editorial 排版下最自然。
+- **C. data-journalism**：與 B 同分（13/15），差異在 P5 適用評為「中」：圖表即首要載體，非圖表區文字仍是 editorial，但主管須投入更多解讀每張圖的認知成本；若報告以圖表為主（KPI dashboard export）則 C 可反超 B。
+- **D. corporate-formal**：Typography 3（serif）；Backgrounds 2（可有色封面）；但 Color 2（全色票走低飽和灰藍，signal 色變淡，verdicts 鮮明度下滑）；Distinct 1（套公司模板感，與 A 接近，無個性提升）。合規場景適用，但非最佳選擇。
+
+---
+
+#### Step 2 — B / C / D 候選完整 Spec Sheet
+
+##### 候選 B — editorial-magazine
+
+| 欄位 | 內容 |
+|---|---|
+| **描述** | 商業出版物排版：Serif display 字族 × sans body 雙層對比，寬版心 + 呼吸感留白，cover page 色帶呈現 verdict，章節間 section divider 有輕量色塊背景。類比：Economist / McKinsey report / IPCC chapter。 |
+| **適用 persona** | P5 主管（主）— 執行摘要快速掃描；P2 SOC（次）— 技術細節章節仍 sans-serif body 閱讀舒適；合規（次）— editorial restraint 符合正式文件期望 |
+| **Print type scale (PDF)** | Title 36pt / Subtitle 20pt / H1 28pt / H2 22pt / H3 18pt / body 11pt / table 10pt / caption 9pt / @page header/footer 8pt |
+| **Print fonts** | heading：Source Serif 4 SemiBold/Regular（OFL，`vendor/fonts/SourceSerif4/`，woff2 + 嵌入 PDF）；body：Inter Regular/Medium（共用 GUI vendor，`vendor/fonts/Inter/`）；table figures：JetBrains Mono Regular，`font-feature-settings: "tnum" 1`（等寬對齊數值欄）；fallback（無 embed）：`Georgia, 'Times New Roman', serif` |
+| **Cover page 設計** | Title (36pt, Source Serif 4 Bold, white) / Subtitle (20pt, white 80% opacity) / Date + Org (13pt, white 60% opacity, tabular date format) 置於左上三分之二；右下 Verdict summary band (10px padding, signal 色依結論填色：#2D9B5E=Pass / #C47A00=Warning / #D93025=Fail)，band 內 verdict label (12pt Inter SemiBold, uppercase, white)；封面底色 `#0D1117`（與 GUI dark base 一致），非全白封面 |
+| **章節節奏** | H1 前 48pt / 後 24pt；H2 前 32pt / 後 16pt；H3 前 24pt / 後 12pt；paragraph spacing 14pt；section divider：4px top border `--color-accent` (#FF5500) + 12pt 空白後接 H2 |
+| **Tabular figures** | `font-feature-settings: "tnum" 1, "ss01" 1`；數值欄 text-align: right；column header text-align: right when numeric；JetBrains Mono 用於 table body 數值，Inter 用於 table 欄位名稱 |
+| **圖表配色** | 語義色票 (signal): success `#2D9B5E` / warning `#C47A00` / danger `#D93025` / info `#0077CC`；中性序列（非語義）：5-step `#DEE2E6→#868E96→#495057→#212529→#0D1117`；Colorblind-safe 驗證：所有 signal 色通過 Deuteranopia + Protanopia 模擬（signal 不依賴 hue 唯一性，以明度差距 ≥ 40% 補強）；PDF 印刷：CMYK 近似注記於 spec |
+| **@page 規則（CSS/PDF）** | `@page { margin: 25mm 20mm 30mm 20mm; }` 含 header（章節名 8pt Inter，left）+ footer（頁碼 8pt Inter，right；`content: counter(page) " / " counter(pages)`）；封面頁 `@page :first { margin: 0; }` 全出血 |
+| **Email 子集處理** | **刪除**：`@font-face`（webfont）、`display: grid`、`display: flex`、`position: absolute/fixed`、`background: linear-gradient`、`border-radius > 4px`（部分 client 不支援）；**保留**：色票 primitive `--color-signal-*`（轉 inline style `color: #2D9B5E` 等）、table-based layout（`<table role="presentation">`）、inline CSS `font-family: Georgia, 'Times New Roman', serif`（email serif fallback）、signal verdict badge 以 `<td>` + inline bgcolor 實現 |
+| **Email HTML 結構** | `<table>` wrapper (max-width 680px) → preheader (display:none, 100 char) → header band (bgcolor=#0D1117, white logo) → body table → verdict band (bgcolor per signal) → CTA button (bulletproof: `<a>` + inline border + bgcolor) → footer (muted, 8px font, unsubscribe) |
+| **Risk** | 低-中。Source Serif 4 為 Google Fonts OFL，woff2 subset 含 Latin + 基礎數字約 80 KB；PDF 內嵌字型 subset 可由 WeasyPrint / Puppeteer 自動完成；Email subset 無 webfont 依賴，Outlook 2016–2023 + Apple Mail + Gmail Web 均可安全渲染 |
+
+##### 候選 C — data-journalism
+
+| 欄位 | 內容 |
+|---|---|
+| **描述** | 圖表為第一公民：寬幅圖表佔版面 60%+，文字為圖表注解而非主體；帶狀背景色區塊分隔章節；condensed sans 字族強調資訊密度。類比：The Guardian Data / FiveThirtyEight / Our World in Data 報告頁。 |
+| **適用 persona** | P5 主管（中）— 快速掃描 chart，閱讀 takeaway caption；技術人員（次）— 認可圖表細節；合規（弱）— 高圖表密度不符合規文件期望 |
+| **Print type scale (PDF)** | Title 34pt / H1 26pt / H2 20pt / H3 16pt / body 10.5pt / caption 9pt（caption 比 body 小以示輔助角色）/ table 9.5pt |
+| **Print fonts** | heading：DM Sans SemiBold/Bold（OFL，condensed感，`vendor/fonts/DMSans/`）；body + caption：Inter Regular（共用）；chart label：Inter Medium 8–9pt；table figures：JetBrains Mono，`"tnum" 1` |
+| **Cover page 設計** | 全版大型圖表（summary spider/bar chart）置封面右側 65% 寬；左側標題區 Title (30pt, DM Sans Bold, dark) / Date / Org；verdict band 橫跨底部全寬（高 40px），依 signal 色填色 |
+| **章節節奏** | 章節以色帶背景分隔（`background: #F1F3F5` 淺灰 section card）；H1 前 40pt / 後 20pt；圖表與文字交替排列，圖前 20pt / 圖後 16pt / caption 後 8pt；paragraph spacing 12pt |
+| **Tabular figures** | 同 B（`"tnum" 1` + JetBrains Mono for table figures）；chart tick label 另用 Inter 9pt tabular |
+| **圖表配色** | 同 B signal 色票（語義一致性）；另有 category 色板：7-step accessible（Tableau 10 subset，無紅綠相鄰）；圖表背景 `#F8F9FA`，grid line `#DEE2E6`；Print 去 grid line 改 tick only |
+| **@page 規則（CSS/PDF）** | 同 B margin；圖表允許跨頁（`page-break-inside: avoid` 僅對 caption + figure 組合）；每章首頁可有 section color band |
+| **Email 子集處理** | **刪除**：同 B（webfont, flex/grid, gradient）；**注意**：全版大圖 Email 無法 render，改以 verdict table（文字版）替代圖表；保留 signal badge inline style；CTA bulletproof 同 B |
+| **Email HTML 結構** | 同 B wrapper；圖表位置改為 verdict summary table（3 欄：指標 / 得分 / 狀態 badge）；无圖表 fallback `<img>` alt text 完整 |
+| **Risk** | 中。圖表主導版面需圖表函式庫（如 Vega-Lite / matplotlib）支援 PDF 輸出格式；Email 圖表完全降級為 table，須維護兩套渲染路徑；DM Sans 需額外 vendor 化 |
+
+##### 候選 D — corporate-formal
+
+| 欄位 | 內容 |
+|---|---|
+| **描述** | 傳統企業/合規報告格式：serif 標題、內縮段落、保守配色、全頁 logo watermark、嚴格的 header/footer 規範。類比：PwC 合規報告 / Big4 風險報告格式。 |
+| **適用 persona** | 合規/法務（主）— 符合傳統文件格式期望；P5 主管（次）— 熟悉但無驚喜；技術人員（弱）— 格式過重，資訊密度不足 |
+| **Print type scale (PDF)** | Title 32pt / H1 24pt / H2 20pt / H3 16pt / body 11pt / table 10pt / caption 9pt（保守，與 Word 預設接近）|
+| **Print fonts** | heading：Garamond / Source Serif 4（合規場景偏 Garamond，若 vendor 化難度高則降回 Source Serif 4）；body：Inter Regular；table：Inter Regular 10pt（不用 mono，合規文件偏向全 sans-serif 數字）|
+| **Cover page 設計** | 上方公司 logo 置中；Title 居中 (32pt serif)；版本/機密等級 label（10pt，灰色）；Date + 委託機構底部居中；底部細線 (`1px #DEE2E6`) 分隔頁尾；封面底色全白；無 verdict band（verdict 移至 Executive Summary 第一段）|
+| **章節節奏** | H1 前 36pt / 後 18pt；H2 前 24pt / 後 12pt；首段不縮排，後續段落首行縮排 1em；paragraph spacing 14pt；頁眉頁腳格式嚴格：左頁眉 = 章節名，右頁眉 = 文件編號，左頁腳 = 機密等級，右頁腳 = 頁碼 |
+| **Tabular figures** | `"tnum" 1`，但不使用 JetBrains Mono（合規文件避免 monospace 數字），保持 serif/sans tabular figures |
+| **圖表配色** | 低飽和度版本：success `#4A9E6B`（調淡）/ warning `#B8860B`（深金）/ danger `#C0392B`（暗紅）/ info `#2980B9`（暗藍）；避免鮮豔色票，符合傳統印刷期望 |
+| **@page 規則（CSS/PDF）** | `@page { margin: 30mm 25mm 30mm 25mm; }`（更大邊距，合規文件標準）；header 左 = 章節 / 右 = 文件號；footer 左 = 機密等級 / 右 = 頁碼 |
+| **Email 子集處理** | **刪除**：同 B；**保留**：保守 inline styles，signal 色用調淡版本；CTA button 改為純文字連結（合規 email 偏向低 HTML 複雜度）|
+| **Email HTML 結構** | 純文字優先 multipart；HTML 部分為保守 `<table>` layout，max-width 600px，無色帶背景，verdict 以粗體文字 + 方括號標示 [PASS] / [WARNING] / [FAIL] |
+| **Risk** | 低（實作簡單，保守設計）；但**設計風險高**：Distinct 1，與 A 現況無差異感；signal 色調淡後 accessibility contrast 需重新驗證（danger `#C0392B` 在白底 contrast ratio 約 5.8:1，勉強通過 WCAG AA）|
+
+---
+
+#### Step 3 — 推薦方向
+
+**推薦：B (editorial-magazine)**
+
+理由：
+
+1. **直接修復 C.5 PDF Backgrounds 0/3 critical gap**：B 方向的 cover page 設計帶有深色底色塊（`#0D1117`）+ verdict signal band，section divider 有 accent border，@page header/footer 完整定義；這三處直接對應 PDF Backgrounds 三個失分點，可將 Backgrounds 分數從 0/3 拉至 2/3（滿分需測試印刷出血）。
+
+2. **P5 主管閱讀節奏最契合**：editorial-magazine 排版（Serif heading × sans body 雙字族、呼吸感留白、chapter rhythm）是商業出版物的成熟 UX pattern，P5 主管的閱讀習慣（Executive Summary → verdict → 關鍵圖表）可在 B 方向獲得最流暢的視覺引導；C 方向圖表密度高但非所有主管願意解讀每圖，D 方向無 Distinctiveness 提升。
+
+3. **與 D.1 GUI 方向 B (industrial-editorial) 和諧**：GUI 選 B（Space Grotesk display × Inter body）；Report 選 editorial-magazine（Source Serif 4 heading × Inter body）；兩套均以 Inter 為 body，signal 色票完全共享（§6.3），且均走「克制 editorial + 資訊密度」路線，視覺語言一致而不相同（GUI 用 sans display，Report 用 serif heading，媒介適配正確）。
+
+4. **C1 offline 約束最友善**：Source Serif 4 + Inter + JetBrains Mono 均 OFL，woff2 subset 已在 GUI vendor 計畫中（Inter + JetBrains Mono 共用）；Email subset 完全無 webfont 依賴，不增加 C1 風險。
+
+5. **Email cross-client 修復 C.6 2/8 fail**：B 的 Email subset 明確刪除 flex/grid/webfont/gradient，改採 `<table role="presentation">` layout + inline style，bulletproof CTA button，直接攻克 Outlook 2016/2019 渲染失敗的根因。
+
+---
+
+#### Step 4 — Adopted Direction Spec Sheet（B: editorial-magazine）
+
+```css
+/* ============================================================
+   Illumio Ops — Report + Email Design System
+   Direction: B (editorial-magazine)
+   Scope: HTML report / PDF @print / Email HTML subset
+   Offline strategy: all fonts self-hosted via vendor/fonts/
+   Fonts: Source Serif 4 (OFL), Inter (OFL, shared w/ GUI),
+          JetBrains Mono (OFL, shared w/ GUI)
+   ============================================================ */
+
+/* ── Print / PDF 專用 type scale ─────────────────────────── */
+/* 注意：pt 單位用於 @media print 與 @page 規則；
+   HTML preview 以 rem 對應（1pt ≈ 1.333px）               */
+
+:root {
+  /* --- Print fonts --- */
+  /* Source Serif 4: vendor/fonts/SourceSerif4/{Regular,SemiBold,Bold}.woff2 */
+  --report-font-heading: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  /* Inter: shared with GUI, vendor/fonts/Inter/{Regular,Medium,SemiBold}.woff2 */
+  --report-font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* JetBrains Mono: shared with GUI, vendor/fonts/JetBrainsMono/{Regular,Medium}.woff2 */
+  --report-font-mono: 'JetBrains Mono', 'Cascadia Code', 'Courier New', monospace;
+
+  /* --- Signal color tokens (shared primitives with GUI §6.1) --- */
+  --report-color-signal-success:  #2D9B5E;   /* Safeguard Green */
+  --report-color-signal-warning:  #C47A00;   /* Circuit Gold (darkened) */
+  --report-color-signal-danger:   #D93025;   /* Risk Red */
+  --report-color-signal-info:     #0077CC;
+  --report-color-accent:          #FF5500;   /* Illumio Orange */
+  --report-color-base:            #F8F9FA;
+  --report-color-surface:         #FFFFFF;
+  --report-color-text-primary:    #0D1117;
+  --report-color-text-secondary:  #495057;
+  --report-color-text-muted:      #868E96;
+  --report-color-border:          #DEE2E6;
+  --report-color-cover-bg:        #0D1117;   /* cover page dark background */
+
+  /* --- Tabular figures --- */
+  --report-font-feature-tabular: "tnum" 1, "ss01" 1;
+}
+
+/* ── @page rules (PDF / WeasyPrint / Puppeteer) ─────────── */
+@page {
+  size: A4;
+  margin: 25mm 20mm 30mm 20mm;
+
+  @top-left {
+    content: string(chapter-title);
+    font-family: var(--report-font-body);
+    font-size: 8pt;
+    color: #868E96;
+  }
+  @top-right {
+    content: "ILLUMIO OPS ASSESSMENT";
+    font-family: var(--report-font-body);
+    font-size: 8pt;
+    color: #868E96;
+    letter-spacing: 0.05em;
+  }
+  @bottom-right {
+    content: counter(page) " / " counter(pages);
+    font-family: var(--report-font-body);
+    font-size: 8pt;
+    color: #868E96;
+    font-feature-settings: "tnum" 1;
+  }
+}
+
+/* Cover page: full-bleed, no header/footer */
+@page :first {
+  margin: 0;
+  @top-left { content: none; }
+  @top-right { content: none; }
+  @bottom-right { content: none; }
+}
+
+/* ── Cover page layout ──────────────────────────────────── */
+.report-cover {
+  background: var(--report-color-cover-bg);   /* #0D1117 */
+  min-height: 100vh;                           /* full A4 page */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 60pt 50pt 0 50pt;
+  color: #FFFFFF;
+}
+
+.report-cover__title {
+  font-family: var(--report-font-heading);
+  font-size: 36pt;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #FFFFFF;
+  margin: 0 0 16pt 0;
+  max-width: 70%;
+}
+
+.report-cover__subtitle {
+  font-family: var(--report-font-heading);
+  font-size: 20pt;
+  font-weight: 400;
+  color: rgba(255,255,255,0.80);
+  margin: 0 0 32pt 0;
+}
+
+.report-cover__meta {
+  font-family: var(--report-font-body);
+  font-size: 13pt;
+  color: rgba(255,255,255,0.60);
+  font-feature-settings: "tnum" 1;
+  margin: 0;
+  /* format: "2026-05-06 · Illumio Inc." */
+}
+
+/* Verdict band — bottom of cover page */
+.report-cover__verdict-band {
+  margin-top: auto;
+  padding: 14pt 50pt;
+  /* bgcolor set inline per verdict: success/warning/danger */
+  display: flex;
+  align-items: center;
+  gap: 12pt;
+}
+
+.report-cover__verdict-band--pass    { background: #2D9B5E; }
+.report-cover__verdict-band--warning { background: #C47A00; }
+.report-cover__verdict-band--fail    { background: #D93025; }
+
+.report-cover__verdict-label {
+  font-family: var(--report-font-body);
+  font-size: 12pt;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #FFFFFF;
+}
+
+/* ── Type scale — body / sections ───────────────────────── */
+/* Print pt sizes; HTML preview uses rem approximation */
+
+.report-body h1 {        /* 28pt */
+  font-family: var(--report-font-heading);
+  font-size: 2.333rem;   /* ≈28pt */
+  font-weight: 600;
+  margin: 48pt 0 24pt 0;
+  border-top: 4px solid var(--report-color-accent);
+  padding-top: 12pt;
+  string-set: chapter-title content();   /* for @page header */
+  page-break-after: avoid;
+}
+
+.report-body h2 {        /* 22pt */
+  font-family: var(--report-font-heading);
+  font-size: 1.833rem;   /* ≈22pt */
+  font-weight: 600;
+  margin: 32pt 0 16pt 0;
+  page-break-after: avoid;
+}
+
+.report-body h3 {        /* 18pt */
+  font-family: var(--report-font-heading);
+  font-size: 1.5rem;     /* ≈18pt */
+  font-weight: 400;      /* regular weight for H3 */
+  margin: 24pt 0 12pt 0;
+  page-break-after: avoid;
+}
+
+.report-body p {
+  font-family: var(--report-font-body);
+  font-size: 0.917rem;   /* ≈11pt */
+  line-height: 1.65;
+  color: var(--report-color-text-primary);
+  margin: 0 0 14pt 0;
+}
+
+/* ── Table styles ────────────────────────────────────────── */
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--report-font-body);
+  font-size: 0.833rem;    /* ≈10pt */
+  page-break-inside: avoid;
+}
+
+.report-table th {
+  font-family: var(--report-font-body);
+  font-size: 0.833rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--report-color-cover-bg);
+  color: #FFFFFF;
+  padding: 8pt 10pt;
+  border: none;
+}
+
+.report-table td {
+  padding: 7pt 10pt;
+  border-bottom: 1px solid var(--report-color-border);
+  vertical-align: top;
+}
+
+/* Numeric columns: tabular figures, right-align */
+.report-table td.num,
+.report-table th.num {
+  font-family: var(--report-font-mono);
+  font-feature-settings: "tnum" 1;
+  text-align: right;
+}
+
+/* Verdict badge in table */
+.verdict-badge {
+  display: inline-block;
+  padding: 2pt 6pt;
+  border-radius: 2px;
+  font-family: var(--report-font-body);
+  font-size: 0.75rem;    /* ≈9pt */
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #FFFFFF;
+}
+.verdict-badge--pass    { background: var(--report-color-signal-success); }
+.verdict-badge--warning { background: var(--report-color-signal-warning); }
+.verdict-badge--fail    { background: var(--report-color-signal-danger);  }
+
+/* Caption */
+.report-caption {
+  font-family: var(--report-font-body);
+  font-size: 0.75rem;    /* ≈9pt */
+  color: var(--report-color-text-muted);
+  margin: 6pt 0 0 0;
+  font-style: italic;
+}
+
+/* ── Email subset CSS (inline only, no @font-face) ────────── */
+/*
+  Rules for Email HTML generation:
+  1. Convert all above tokens to inline style attributes.
+  2. REMOVE: @font-face, display:flex, display:grid,
+             position:absolute/fixed, linear-gradient,
+             border-radius > 4px, CSS custom properties.
+  3. KEEP:   Table-based layout, inline bgcolor, inline color,
+             signal color hex values (#2D9B5E / #C47A00 / #D93025),
+             font-family stack ending in serif/sans-serif.
+  4. Email font-family: Georgia,'Times New Roman',serif (heading)
+                        Arial,Helvetica,sans-serif (body)
+  5. Max-width wrapper: <table width="680" role="presentation">
+  6. Verdict band: <td bgcolor="#2D9B5E"> (bulletproof bgcolor attr)
+  7. CTA button:
+       <a href="{url}"
+          style="display:inline-block;padding:10px 24px;
+                 background:#FF5500;color:#ffffff;
+                 font-family:Arial,sans-serif;font-size:14px;
+                 font-weight:600;text-decoration:none;
+                 border:2px solid #FF5500;border-radius:4px;">
+         View Full Report
+       </a>
+
+  Email HTML structure:
+  <table width="680" role="presentation" cellpadding="0" cellspacing="0" border="0">
+    <tr><td><!-- preheader (display:none, max 100 chars) --></td></tr>
+    <tr><td bgcolor="#0D1117"><!-- header: logo --></td></tr>
+    <tr><td><!-- body: verdict summary table --></td></tr>
+    <tr><td bgcolor="{signal_color}"><!-- verdict band --></td></tr>
+    <tr><td><!-- CTA button row --></td></tr>
+    <tr><td><!-- footer: muted, 12px, unsubscribe --></td></tr>
+  </table>
+
+  Tested clients per C.6 fix target:
+  - Outlook 2016/2019 (Windows): bgcolor attr + table layout = safe
+  - Gmail Web: inline style = safe
+  - Apple Mail: safe
+  - Mobile Gmail/iOS Mail: safe
+*/
+```
+
+**Adopted Spec Sheet 補充說明：**
+
+| 項目 | 說明 | 與 GUI B 方向關係 |
+|---|---|---|
+| `--report-font-heading` | Source Serif 4（印刷 Serif）| GUI 用 Space Grotesk（screen display sans）；媒介適配差異，**intentional** |
+| `--report-font-body` | Inter（共用）| **共用** GUI `--font-body`，vendor 路徑相同 |
+| `--report-font-mono` | JetBrains Mono（共用）| **共用** GUI `--font-mono`，vendor 路徑相同 |
+| `--report-color-signal-*` | 四色 signal 語義色票 | **完全共用** GUI signal tokens（#2D9B5E / #C47A00 / #D93025 / #0077CC）→ §6.3 共享 primitive |
+| `--report-color-cover-bg` | `#0D1117`（Cover 深底色）| 與 GUI dark mode base 相同值，視覺語言延伸 |
+| @page header/footer | 8pt Inter，頁碼 tnum | PDF only，GUI 無對應 |
+| Cover verdict band | 依 signal 色 inline bgcolor | Email 以 `bgcolor` attr 實現 bulletproof |
+| Email font stack | `Georgia,...,serif` / `Arial,...,sans-serif` | 無 @font-face，offline + cross-client safe |
+
+**Offline vendor 計畫（Report 新增部分）：**
+
+| 字型 | License | 來源 | vendor 路徑 | 估算大小 |
+|---|---|---|---|---|
+| Source Serif 4 | OFL | Google Fonts / `@fontsource/source-serif-4` | `vendor/fonts/SourceSerif4/` | ~90 KB（3 字重 woff2 Latin subset） |
+| Inter | OFL | 共用 GUI plan | `vendor/fonts/Inter/`（已列）| — (已計) |
+| JetBrains Mono | OFL | 共用 GUI plan | `vendor/fonts/JetBrainsMono/`（已列）| — (已計) |
+| **Report 新增合計** | | | | **~90 KB** |
 
 ### §6.3 跨兩套的共享 primitive（OQ-7 default）
 
