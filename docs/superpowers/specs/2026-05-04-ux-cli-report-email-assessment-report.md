@@ -111,7 +111,87 @@ P0 hard-gate 狀態：BLOCKED — login.html 第 7–8 行直接從 Google Fonts
 
 #### §3.1.1 整體現況量化
 
-_（評估執行階段尚未填入）_
+##### 一、檔案大小表（降冪排序）
+
+| 檔案 | 路徑 | 行數 | 大小 | 旗標 |
+|---|---|---:|---:|---|
+| index.html | src/templates/ | 2,002 | 127.4 KB | 🔴 >20 KB |
+| dashboard.js | src/static/js/ | 1,778 | 79.2 KB | 🔴 >20 KB |
+| integrations.js | src/static/js/ | 1,232 | 54.2 KB | 🔴 >20 KB |
+| app.css | src/static/css/ | 1,391 | 31.7 KB | 🔴 >20 KB |
+| rule-scheduler.js | src/static/js/ | 666 | 28.6 KB | 🔴 >20 KB |
+| settings.js | src/static/js/ | 488 | 24.7 KB | 🔴 >20 KB |
+| quarantine.js | src/static/js/ | 571 | 23.2 KB | 🔴 >20 KB |
+| rules.js | src/static/js/ | 510 | 22.4 KB | 🔴 >20 KB |
+| utils.js | src/static/js/ | 432 | 16.1 KB | 🟡 >5 KB |
+| dashboard_v2.js | src/static/js/ | 359 | 15.4 KB | 🟡 >5 KB |
+| events.js | src/static/js/ | 287 | 10.4 KB | 🟡 >5 KB |
+| actions.js | src/static/js/ | 101 | 4.7 KB | — |
+| login.html | src/templates/ | 337 | 10.3 KB | 🟡 >5 KB |
+| _event_dispatcher.js | src/static/js/ | 74 | 2.6 KB | — |
+| module-log.js | src/static/js/ | 76 | 2.2 KB | — |
+| tabs.js | src/static/js/ | 22 | 1.1 KB | — |
+
+> 旗標標準：>5 KB → 🟡，>20 KB → 🔴（各頁面全量載入，無 code-splitting）
+
+##### 二、總計
+
+| 類別 | 總大小 | 說明 |
+|---|---:|---|
+| JS（13 檔） | ~285 KB | `wc -c` 合計 291,723 bytes |
+| CSS（1 檔） | ~31.7 KB | app.css 32,430 bytes |
+| Templates（2 檔） | ~137.7 KB | index.html 127.4 KB + login.html 10.3 KB |
+
+注：無 npm 建置流程，所有 JS/CSS 均以原始碼直接 serve，未 minify / bundle。
+
+##### 三、radon CC 高複雜度函式（CC > 10）
+
+掃描範圍：`src/gui/`（Python），`src/gui/routes/`（sub-blueprint）。
+
+| 函式 | 檔案 | CC 等級 |
+|---|---|---|
+| `_summarize_alert_channels` (line 317) | src/gui/_helpers.py | C (19) |
+| `_generate_self_signed_cert` (line 598) | src/gui/_helpers.py | C (15) |
+
+`src/gui/routes/` 全 9 個 blueprint factory：全部 A (1)，無高複雜度。
+
+附注：`src/gui/__init__.py` 含 BOM 字元（U+FEFF），radon 解析錯誤，已排除於統計外；建議修正 encoding。
+
+##### 四、radon MI 低分模組（MI < 20）
+
+無。所有可解析模組均達 A 級：
+
+| 模組 | MI 分數 |
+|---|---|
+| src/gui/_helpers.py | 21.24（A） |
+| src/gui/settings_helpers.py | 100.00（A） |
+| src/gui/routes/reports.py | 33.73（A） |
+| src/gui/routes/dashboard.py | 35.04（A） |
+| src/gui/routes/events.py | 35.63（A） |
+
+最低分為 `_helpers.py`（21.24），仍在 A 級閾值（>20）之上；不觸發警告。
+
+##### 五、dashboard.js vs dashboard_v2.js 共存觀察
+
+| 項目 | dashboard.js | dashboard_v2.js |
+|---|---|---|
+| 大小 | 79.2 KB / 1,778 行 | 15.4 KB / 359 行 |
+| 最後更新 | 2026-05-04（現行） | 2026-04-23（停更） |
+| 引入時機 | 重構前主檔 | Apr 9 重構拆分嘗試 |
+| 首個 commit | 早於 dashboard_v2.js | `4e4c3de`（Refactor vendor-aligned event engine） |
+
+**結論**：`dashboard_v2.js` 開頭 6 個函式（`_dashboardCardTone`、`_dashboardSetCard`、`_pickValue`、`_buildAuditSummaryFieldset`、`ensureTrafficWorkloadLayout`、`ensureDashboardLayout`）在 `dashboard.js` 第 17–171 行均有同名定義。兩檔於 `index.html` 第 1990–1991 行依序載入，後者覆蓋前者（無 namespace 隔離）。`dashboard_v2.js` 為 Apr 9 重構過渡產物，目前已停更，屬**進行中拆分的遺留副本**，應在拆分完成後刪除。
+
+##### 六、進行中重構訊號
+
+- **H5 Blueprint split（完成）**：`src/gui/routes/` 下已完成 9 個 blueprint factory 分拆（`actions`、`admin`、`auth`、`config`、`dashboard`、`events`、`reports`、`rule_scheduler`、`rules`），最後步驟 commit `1fa8c61`（2026 年）。
+- **H6 Settings reorg（完成）**：CLI settings 拆至 `src/cli/menus/`，共 10 步，最終 commit `31d4715` 退役 baseline scaffolding。兩項重構均已完成，但 `dashboard_v2.js` 殘留為尚未清理的過渡產物。
+
+##### 七、外部資源計數（彙總自 §3.1.0 a7）
+
+依 §3.1.0 a7 掃描結果：7 hits，**2 真正違反**（P0 hard-gate，詳見 §3.1.0）：
+- `login.html` 第 7–8 行：Google Fonts CDN（Montserrat），違反 C1（外部依賴）
+- 同上：CDN 載入在強制 HTTPS 離線環境下將因混合內容或無法連外失敗
 
 #### §3.1.2 UX rubric 結果（10 類）
 
