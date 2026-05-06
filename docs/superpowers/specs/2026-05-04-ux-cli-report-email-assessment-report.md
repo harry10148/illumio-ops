@@ -595,7 +595,60 @@ _（評估執行階段尚未填入）_
 
 #### §3.4.1 Template Inventory
 
-_（評估執行階段尚未填入）_
+**引擎**：Python `string.Template`（`safe_substitute`），實作於 `src/alerts/template_utils.py`。
+`alert_tpl_*` 前綴的 placeholder 由 `render_alert_template()` 自動從 i18n 層（`src/i18n.py`）注入，呼叫端無需手動傳入。
+
+| 模板 | 大小 | 引擎 | caller-side placeholder 數 | i18n auto-merged 數 | 來源 module | 用於通道 |
+|---|---|---|---|---|---|---|
+| `mail_wrapper.html.tmpl` | 2.5 KB | `string.Template` | 7 | 8（`alert_tpl_*`） | `src/reporter.py` `_build_mail_html()` | mail |
+| `line_digest.txt.tmpl` | 393 B | `string.Template` | 11 | 9（`alert_tpl_*`） | `src/reporter.py` `_build_line_message()` | line |
+| `webhook_payload.json.tmpl` | 317 B | `string.Template` | 8 | 0 | `src/reporter.py` `_build_webhook_payload()` | webhook |
+
+**Caller-side placeholder 明細：**
+
+`mail_wrapper.html.tmpl`（7 個，由 `_build_mail_html()` 傳入）：
+- `$subject_html` — HTML-escaped 郵件主旨，來自呼叫方 `subj` 參數
+- `$generated_at_html` — HTML-escaped 時間戳記，`self._now_str()`
+- `$summary_html` — 四個告警類別統計卡片（pre-built HTML 字串）
+- `$health_section_html` — 健康告警 HTML 表格（若無告警則為空字串）
+- `$event_section_html` — 安全事件 HTML 表格
+- `$traffic_section_html` — 流量告警 HTML 表格
+- `$metric_section_html` — 指標告警 HTML 表格
+
+`mail_wrapper.html.tmpl` auto-merged i18n（8 個，由 `render_alert_template()` 自動解析）：
+`$alert_tpl_official_notice`、`$alert_tpl_summary`、`$alert_tpl_aggregated_blurb`、`$alert_tpl_generated_at`、`$alert_tpl_scope`、`$alert_tpl_categories`、`$alert_tpl_auto_generated`、`$alert_tpl_act_per_runbook`
+
+`line_digest.txt.tmpl`（11 個，由 `_build_line_message()` 傳入）：
+- `$subject` — compact 郵件主旨
+- `$generated_at` — 時間戳記
+- `$total_issues` — 所有告警總計數
+- `$health_count`、`$event_count`、`$traffic_count`、`$metric_count` — 各類別計數
+- `$health_section`、`$event_section`、`$traffic_section`、`$metric_section` — 各類別文字摘要區塊
+
+`line_digest.txt.tmpl` auto-merged i18n（9 個）：
+`$alert_tpl_line_title`、`$alert_tpl_subject`、`$alert_tpl_generated_at`、`$alert_tpl_total_issues`、`$alert_tpl_health_alert`、`$alert_tpl_security_events`、`$alert_tpl_traffic_alert`、`$alert_tpl_metric_alert`、`$alert_tpl_see_web_for_details`
+
+`webhook_payload.json.tmpl`（8 個，由 `_build_webhook_payload()` 傳入，均為 JSON-serialized）：
+- `$subject_json` — `json.dumps(subj)`
+- `$content_model_json` — 固定值 `"vendor_pretty_cool_events_baseline"`
+- `$health_alerts_json` — `self.health_alerts` list
+- `$event_alerts_json` — `self.event_alerts` list
+- `$event_alert_payloads_json` — `self._build_all_event_alert_payloads()` 結果
+- `$traffic_alerts_json` — `self.traffic_alerts` list
+- `$metric_alerts_json` — `self.metric_alerts` list
+- `$timestamp_json` — UTC ISO-8601 時間戳記
+
+**變數契約彙整：**
+
+共用概念（跨通道語意相同，但呈現形式不同）：
+- `subject` / `subject_html` / `subject_json` — 告警主旨
+- `generated_at` / `generated_at_html` / `timestamp_json` — 產生時間
+- `health_*` / `event_*` / `traffic_*` / `metric_*` — 四類告警資料
+
+通道專屬差異：
+- **mail**：section HTML 由 Python 動態組裝後注入（7 個 caller vars）；i18n 標籤由 `render_alert_template()` 自動注入（8 個）
+- **line**：純文字段落（`*_section` 已是拼接後的純文字字串）；計數欄位獨立（`*_count`）；i18n 自動注入（9 個）
+- **webhook**：全部為 JSON 序列化物件，無 i18n；`content_model_json` 為唯一靜態欄位；資料結構直接使用 reporter 內部 list 物件
 
 #### §3.4.2 Cross-client Compatibility Audit
 
