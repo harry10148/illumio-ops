@@ -978,7 +978,147 @@ _（評估執行階段填入推薦結果）_
 >
 > 16 張卡：4.1 a1 / 4.2 a2 / 4.3 a6 / 4.4 a7 / 4.5 b1 / 4.6 b2 / 4.7 b3 / 4.8 b4 / 4.9 b5 / 4.10 b6 / 4.11 b7 / 4.12 b8 / 4.13 c1 / 4.14 c3 / 4.15 d2 / 4.16 d3
 
-_（評估執行階段尚未填入）_
+GUI 四張卡（4.1–4.4）已填入（Task E.1，2026-05-06）。CLI / Report / Email 卡（4.5–4.16）待後續 Task 填入。
+
+---
+
+### 4.1 — a1 GUI tab 載入體驗
+
+| | |
+|---|---|
+| Subsystem | GUI |
+| 觸及 persona | P1 P2 |
+| Pre-condition | 無獨立 pre-condition；與 a6/a7 同源但可獨立優化 |
+| Score | Impact 3 × PersonaWeight 3 (P1+P2) × Frequency 3 (每次開啟 GUI) = **27** |
+| 優先級 | **P1** |
+
+**現況片段** — `src/templates/index.html`：13 個 `<script>` 標籤全部無 `defer`/`async`（`§3.1.1 A.2`）；總 JS 285 KB 阻塞首次渲染。`integrations.js`（line 989）在 `utils.js`（line 1988）之前載入，存在符號未定義競態視窗（`§3.1.1` 關鍵觀察）。`dashboard_v2.js` 未被任何 template 引用（孤兒檔）。0 個 `<link rel="preload">`，0 個 skeleton placeholder。
+
+**影響** — P1 每次登入後 cold-load 時整頁白屏至 JS 全部解析完畢；SOC P2 在告警高峰期（高壓場景）尤其敏感於「進去就白屏」的感知延遲。`integrations.js` 競態若頂層有立即呼叫，會在特定瀏覽器 / 快取狀態下靜默失敗，頻率難預測。
+
+**UX rubric 觸及項** — §3 Performance = 0（CRITICAL）：0% defer/async，阻塞渲染；§9 Navigation = 2（state preservation 中等，無 skeleton）。
+
+**Visual rubric 觸及項** — Motion = 2：無頁面載入 orchestration 或 stagger 序列，tab 切換無過渡暗示載入狀態。
+
+**優化路線（小改）**
+1. 所有 `<script src="…">` 加 `defer`（30 min）→ 首次渲染非阻塞
+2. 在 `</head>` 前加 `<link rel="preload" as="script">` 給 dashboard.js + utils.js（15 min）
+3. 以 CSS skeleton（灰色閃爍條）作為 tab content 初始 placeholder（1 day）
+4. 移除或標記 `dashboard_v2.js` 孤兒（30 min）
+- Touch radius：小（index.html template + 4 script 標籤）
+- 與 §5 cross-cutting 衝突？無衝突，為 §5.1「拆 `index.html` monolith」重構的前置安全網
+
+**重構路線（大改）**
+1. Track A：設計 token 系統 + `index.html` monolith 拆分（component-per-tab）
+2. Track E（OQ-1 conditional）：長時操作改 SSE 串流，tab 切換後台非同步
+3. 引入 ES modules（`type="module"`），解決 integrations.js 載入次序問題
+- Touch radius：大（templates + static/js 全部 + 後端路由）
+- 與 §5 cross-cutting 同源：§5.2 Track A + Track E
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（defer/skeleton 完全不依賴外部服務）
+- Gate 2 多痛點共因    : 共因 3 個（a1 bundle 阻塞 / a2 filter 等待 / a6 CSP layout） → 重構分 +1
+- Gate 3 Touch radius  : 優化小；重構大
+- Gate 4 Persona 衝擊  : P1 每次使用必觸；P2 高壓告警場景敏感度高 → 高衝擊
+- Gate 5 Reversibility : ✓（defer 可 1 行回退；skeleton 獨立 CSS class）
+
+**推薦** — 優化先行（2 day）+ 重構排隊 Track A；優化路線即可將 §3 Performance 從 0 → 2，不需等重構。
+
+**驗收標準** — 採用優化路線後重跑 §2.3 rubric：
+- §3 Performance: 0 → 2（defer 覆蓋率 100%，存在 preload）
+- Cold-load（DevTools Throttle: Fast 3G）主要內容可見時間 < 2 s
+- integrations.js 競態視窗消除（defer 保證執行次序）
+- `dashboard_v2.js` 孤兒狀態解除
+
+---
+
+### 4.2 — a2 表格篩選 / 搜尋體驗
+
+| | |
+|---|---|
+| Subsystem | GUI |
+| 觸及 persona | P1 P2 |
+| Pre-condition | 無獨立 pre-condition |
+| Score | Impact 3 × PersonaWeight 3 (P1+P2) × Frequency 3 (P1 高密度表單操作為核心工作流) = **27** |
+| 優先級 | **P1** |
+
+**現況片段** — `§3.1.2 UX rubric §8 Forms & Feedback = 1`：主 app 162 個 `<input>` 無 `aria-invalid` / `aria-describedby`；無 inline 欄位級錯誤訊息（僅全域 toast）。Filter / search 輸入框未見 `debounce`（待動態確認，靜態掃描未發現 setTimeout/debounce wrapper）。`§3.1.2 §4 Style = 2`：token 系統存在但無字體大小 token（px/rem 混用）。`§3.1.3 Spatial Composition = 2`：spacing token 完整，但無 loading overlay。
+
+**影響** — P1 網管的核心工作流為高密度表單與規則列表操作；每次篩選若無 debounce，打字後即觸發請求，體感「打字→等待→跳動」循環，在 rules / integrations 大資料集尤為明顯。無 inline 錯誤訊息導致 P1 填錯表單後只能依賴 toast，需視線移動至畫面角落辨認錯誤，提高認知負擔。P2 在批次告警處理中使用篩選快速定位，延遲直接影響響應時間。
+
+**UX rubric 觸及項** — §8 Forms & Feedback = 1（CRITICAL）：inline validation 缺失；§4 Style = 2：token 系統存在但不完整；§10 Charts & Data = 1：與資料表格體驗連動（aria 缺失）。
+
+**Visual rubric 觸及項** — Spatial Composition = 2：filter 輸入框無 loading overlay / spinner 視覺狀態，使用者無回饋感。
+
+**優化路線（小改）**
+1. 所有 filter/search input 加 debounce wrapper（300ms）（1 day）
+2. 搜尋進行中加 spinner overlay 或 input disabled + 游標變更（半天）
+3. 162 個 input 加 `aria-invalid="false"` 初始值，驗證失敗時切換為 `"true"` 並加 `aria-describedby` 指向 inline error element（3 day）
+4. 新增 inline error `<span>` template（1 day）
+- Touch radius：小（static/js 篩選邏輯 + template input 標籤）
+- 與 §5 cross-cutting 衝突？無衝突；可為 Track A 共用 filter-component 鋪路
+
+**重構路線（大改）**
+1. Track A：抽取共用 `filter-component` primitive，內建 debounce + aria-invalid 生命週期
+2. 加 `aria-live` region 報告搜尋結果筆數（「找到 N 筆規則」）
+3. 字體大小改用 design token（消除 px/rem 混用）
+- Touch radius：中（共用 component 影響所有含 filter 的 tab）
+- 與 §5 cross-cutting 同源：§5.1「Token 化 `app.css`」+ §5.2 Track A
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（debounce / aria-invalid 純前端，無網路依賴）
+- Gate 2 多痛點共因    : 共因 2 個（a1 bundle 阻塞共用 index.html / a6 layout 破版 CSS token 同源） → 重構分 +1
+- Gate 3 Touch radius  : 優化小；重構中
+- Gate 4 Persona 衝擊  : P1 核心工作流高頻觸及；P2 告警響應路徑觸及 → 高衝擊
+- Gate 5 Reversibility : ✓（debounce 可 flag 回退；aria 屬性純增量，無破壞性）
+
+**推薦** — 優化路線足夠解決核心體感問題；重構放回 Track A 排程，與 filter-component primitive 統一設計。
+
+**驗收標準** — 採用優化路線後重跑 §2.3 rubric：
+- §8 Forms & Feedback: 1 → 2（aria-invalid 覆蓋率 > 80%，inline error 存在）
+- Filter debounce 300ms 生效（DevTools Network 確認：打字停頓 < 300ms 不觸發請求）
+- Spinner overlay 出現於搜尋進行中
+- （選項）`aria-live` region 報告結果筆數
+
+---
+
+### 4.3 — a6 HTTPS 啟用後 layout 破版
+
+| | |
+|---|---|
+| Subsystem | GUI |
+| 觸及 persona | P1 P2 |
+| Pre-condition | **是 → 詳情見 §3.1.0 a6** |
+| Score | （不算 score，直接 P0） |
+| 優先級 | **P0** |
+
+本卡為 §3.1.0 a6 的 cross-reference shorthand。完整成因清單、驗證步驟、hand-off owner、CSP 確認（B.1）在 §3.1.0 a6。
+
+根本原因已確認：`src/gui/__init__.py:251` CSP `font-src 'self'` 過嚴，阻擋 `src/templates/login.html:7-8` 載入的 Google Fonts CDN（fonts.googleapis.com / fonts.gstatic.com）；啟用 HTTPS 後 Talisman 套用 CSP，字型被阻擋，造成 layout 破版。
+
+聯合修復路徑：與 a7 vendor 化（4.4）一石二鳥——將 Google Fonts 本地化後，CSP `font-src 'self'` 自動合法，不需放寬 CSP 規則。
+
+Hand-off：可靠性 sprint（詳見 §3.1.0 a6）。
+
+---
+
+### 4.4 — a7 UI 依賴 external resources（違反 C1）
+
+| | |
+|---|---|
+| Subsystem | GUI |
+| 觸及 persona | P1 P2 |
+| Pre-condition | **是 → 詳情見 §3.1.0 a7** |
+| Score | （不算 score，直接 P0 BLOCKED） |
+| 優先級 | **P0 BLOCKED** |
+
+本卡為 §3.1.0 a7 的 cross-reference shorthand。完整掃描表（7 hits，2 真正違反）、vendor 計畫、hand-off owner 在 §3.1.0 a7。
+
+2 真正違反（均為 Google Fonts，`login.html:7-8`）在離線環境（C1 constraint）下會阻斷字型載入，疊加 a6 CSP 問題造成 layout 完全破版。
+
+Vendor 計畫：Montserrat woff2 subset 下載至 `vendor/fonts/`，`@font-face` 自建於 `vendor/css/`，login.html 改用本地路徑。執行後 a6 CSP `font-src 'self'` 自動合法，不需修改 CSP 規則（Task B.2）。
+
+Hand-off：可靠性 sprint（詳見 §3.1.0 a7）。
 
 ---
 
