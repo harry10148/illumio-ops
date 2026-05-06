@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/static/css/app.css">
   <link rel="stylesheet" href="/static/pygments.css">
   <script nonce="{{ csp_nonce() }}">window._INIT_TRANSLATIONS = {{ ui_translations_json | safe }};</script>
-  <script src="{{ url_for('static', filename='js/_event_dispatcher.js') }}"></script>
+  <script defer src="{{ url_for('static', filename='js/_event_dispatcher.js') }}"></script>
 </head>
 
 <body>
@@ -1983,18 +1983,18 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-  <script src="/static/js/utils.js"></script>
-  <script src="{{ url_for('static', filename='js/integrations.js') }}"></script>
-  <script src="/static/js/tabs.js"></script>
-  <script src="/static/js/dashboard.js"></script>
-  <script src="/static/js/dashboard_v2.js"></script>
-  <script src="/static/js/events.js"></script>
-  <script src="/static/js/rules.js"></script>
-  <script src="/static/js/settings.js"></script>
-  <script src="/static/js/actions.js"></script>
-  <script src="/static/js/quarantine.js"></script>
-  <script src="/static/js/rule-scheduler.js"></script>
-  <script src="/static/js/module-log.js"></script>
+  <script defer src="/static/js/utils.js"></script>
+  <script defer src="{{ url_for('static', filename='js/integrations.js') }}"></script>
+  <script defer src="/static/js/tabs.js"></script>
+  <script defer src="/static/js/dashboard.js"></script>
+  <script defer src="/static/js/dashboard_v2.js"></script>
+  <script defer src="/static/js/events.js"></script>
+  <script defer src="/static/js/rules.js"></script>
+  <script defer src="/static/js/settings.js"></script>
+  <script defer src="/static/js/actions.js"></script>
+  <script defer src="/static/js/quarantine.js"></script>
+  <script defer src="/static/js/rule-scheduler.js"></script>
+  <script defer src="/static/js/module-log.js"></script>
   </main>
 </body>
 
