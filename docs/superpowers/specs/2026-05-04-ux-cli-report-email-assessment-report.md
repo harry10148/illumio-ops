@@ -1318,6 +1318,197 @@ Hand-off：可靠性 sprint（詳見 §3.1.0 a7）。
 
 ---
 
+### 4.9 — b5 三支獨立 CLI vs menu 雙入口整合
+
+| | |
+|---|---|
+| Subsystem | CLI |
+| 觸及 persona | P1 |
+| Pre-condition | 無獨立 pre-condition；可先建命令對等表再決定整合節奏 |
+| Score | Impact 3 × PersonaWeight 3 (P1) × Frequency 2 (日常操作遇雙入口) = **18** |
+| 優先級 | **P1**（§9 Navigation = 2；CLI rule 11 雙入口整合 = 1，低於閾值觸發升級） |
+
+**現況片段** — `§3.2.4 A.4`：專案同時維護 3 支獨立 CLI 腳本（`pce_cache_cli.py`、`rule_scheduler_cli.py`、`siem_cli.py`）以及 `src/cli/menus/` 互動式選單。24 個命令中 14 個（58%）在兩處皆有入口，且各自持有獨立實作（非共用底層函式）。選單以裸 `print()` 輸出（佔 62%），獨立 CLI 改用 `rich`（佔 24%），其餘 14% 為 Click 原生輸出，三套渲染路徑並存，行為一致性無保障。
+
+**影響** — P1 網管須學習雙套命令路徑，認知負擔翻倍。14 份重複實作維護量加倍，任一修改需同步兩處，漂移風險高。輸出格式不統一使 CI/CD 腳本對接困難（grep/parse 結果依呼叫路徑而異）。
+
+**UX rubric 觸及項** — §9 Navigation = 2：有層級但無單一入口；CLI rule 11（雙入口整合）= 1（CRITICAL 閾值 = 2，未達觸發升級）；P1 escalation：學習雙倍命令路徑 + 維護重複 → 實際頻率 2 × Impact 3 → P1。
+
+**優化路線（小改）**
+1. 建立 menu / standalone 命令對等表文件（`docs/cli-command-map.md`），明確標示兩路徑的功能等價性（1 day）
+2. 將重複命令的業務邏輯提煉為共用底層函式（`src/cli/core/`），menu 與 standalone 皆呼叫同一函式，消除實作漂移（3-5 day）
+3. 在 standalone CLI `--help` 末尾加入 `see also: interactive menu` 提示，反之亦然（半天）
+- Touch radius：中（業務邏輯提煉，不動 CLI 結構與入口定義）
+- 與 §5 cross-cutting 衝突？共用底層函式為 Track C 統一入口的前置工作，不衝突
+
+**重構路線（大改）**
+1. Track C：統一 CLI 入口 `illumio-ops`——移除三支獨立腳本，以 Click group 子命令取代
+2. 以 `shell` / `--interactive` 模式取代互動式選單，底層仍為同一命令樹
+3. Deprecation alias 保留舊腳本名稱指向新入口（6 個月過渡期）
+- Touch radius：大（影響全部入口定義，含 shebang / PATH 設定）
+- 與 §5 cross-cutting 同源：§5.2 Track C 統一 CLI 入口
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（CLI 結構調整純本地，無網路依賴）
+- Gate 2 多痛點共因    : 共因 3 個（b1 menu / b2 命名一致性 / b5 雙入口）→ 重構分 +1
+- Gate 3 Touch radius  : 優化中；重構大
+- Gate 4 Persona 衝擊  : P1 每次操作必須選擇路徑；14/24 重複命令覆蓋率高 → 高衝擊
+- Gate 5 Reversibility : ✓（deprecation alias 保留舊路徑；共用底層函式可漸進替換）
+
+**推薦** — 重構路線（Track C）為最終解；優化路線（共用底層函式）是必要前置步驟，可獨立 sprint 先行，降低漂移風險，同時為 Track C 鋪路。
+
+**驗收標準** — 採用優化路線後：
+- 14 個重複命令皆呼叫共用底層函式（diff: 無同功能重複實作）
+- 輸出渲染路徑統一（rich / plain 由同一開關控制，不依呼叫路徑而異）
+- `docs/cli-command-map.md` 完整列出 24 命令的入口對等關係
+- §9 Navigation: 2 → 3；CLI rule 11: 1 → 2
+
+---
+
+### 4.10 — b6 isatty / NO_COLOR / pipe 友善度
+
+| | |
+|---|---|
+| Subsystem | CLI |
+| 觸及 persona | P1、CI/CD pipeline 操作者 |
+| Pre-condition | 無獨立 pre-condition；可獨立修復，與其他卡無強依賴 |
+| Score | Impact 3 × PersonaWeight 3 (P1) × Frequency 3 (每次 pipe/CI 觸發) = **27** |
+| 優先級 | **P1**（§1 Accessibility CRITICAL = 1；CLI rule 2★ 能力偵測 = 1；CLI rule 7 雙模 = 1，三項同時低於閾值） |
+
+**現況片段** — `§3.2.5 A.5`：codebase 有 `isatty()` 呼叫共 4 處，但均未用於條件性渲染——即使偵測到非 TTY，仍照常輸出 `rich` ANSI markup 與 `rich.box` 表格框線。`NO_COLOR` 環境變數未被讀取（`os.environ.get('NO_COLOR')` 全檔案無此查詢）。`rich.Console()` 初始化未傳入 `force_terminal=False` / `no_color` 參數。結果：在 CI 日誌、`| jq`、`> file.txt` 等非互動場景下，ANSI escape sequence 直接污染輸出流。
+
+**影響** — CI/CD pipeline 日誌充斥 ANSI 噪音，log parser 與 grep 失效。`jq` pipeline 無法直接消費 CLI 輸出（需額外 `sed` 清除 escape code）。`NO_COLOR=1` 標準（https://no-color.org）未實作，違反 POSIX-friendly 工具期望。P1 在自動化腳本中呼叫 CLI 須額外處理輸出，增加 glue code 負擔。
+
+**UX rubric 觸及項** — §1 Accessibility CRITICAL = 1（pipe 場景輸出不可用）；CLI rule 2★（能力偵測）= 1；CLI rule 7（雙模輸出：人類可讀 / 機器可讀）= 1。三項 CRITICAL baseline rule ★ 同時為 1 → P1 強制升級。
+
+**優化路線（小改）**
+1. 加 `NO_COLOR` 讀取：CLI entry point 啟動時讀取 `os.environ.get('NO_COLOR')`，為非空字串則強制純文字模式（半天）
+2. `isatty()` 條件渲染：將現有 4 處 `isatty()` 偵測結果傳入 `rich.Console(force_terminal=sys.stdout.isatty(), no_color=...)` 初始化，確保非 TTY 場景降級（1 day）
+3. 所有 CLI entry points 套用上述 Console 設定（含 3 支獨立 CLI，1 day）
+4. `rich.box` 表格在非 TTY 時改用 `box=None`（純文字 tab-separated）（半天）
+- Touch radius：小→中（Console 初始化集中，業務邏輯不動）
+- 與 §5 cross-cutting 衝突？優化可獨立；Track B 統一輸出層接管後此設定集中一處
+
+**重構路線（併入 Track B）**
+1. Track B `OutputManager` 統一管理 Console 實例，`isatty` / `NO_COLOR` 偵測邏輯集中在 `OutputManager.__init__`
+2. 所有 CLI 輸出路徑改呼叫 `OutputManager.print()` / `.table()` / `.error()`，移除散落的裸 `rich.Console()` 初始化
+3. `--json` flag 強制機器可讀模式（獨立於 isatty 偵測）
+- Touch radius：中（輸出路徑統一，業務邏輯不動）
+- 與 §5 cross-cutting 同源：§5.1「共享 CLI 輸出層」Track B
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（isatty / NO_COLOR 純本地環境變數與 fd 偵測，無網路依賴）
+- Gate 2 多痛點共因    : 共因 4 個（b3 輸出格式 / b4 error 格式 / b6 pipe 友善 / b7 exit codes）→ 重構分 +1
+- Gate 3 Touch radius  : 優化小→中；重構中
+- Gate 4 Persona 衝擊  : CI/CD 場景每次觸發；P1 自動化腳本需額外 glue code → 高衝擊
+- Gate 5 Reversibility : ✓（Console 初始化參數可 flag 回退；NO_COLOR 讀取純增量）
+
+**推薦** — 優化路線優先（1-2 day patch，可立即解除 CI 噪音）；Track B 完成後，Console 管理自動集中至 OutputManager，優化代碼可直接遷移。
+
+**驗收標準** — 採用優化路線後：
+- `CLI_OUTPUT=pipe | grep` 或 `| jq` 場景：零 ANSI escape code 出現在 stdout
+- `NO_COLOR=1 <command>` 強制純文字（覆蓋所有 4 entry points + 3 standalone CLIs）
+- CI 日誌可直接 grep 命令輸出，無需前置 `sed` 清除
+- §1 Accessibility CRITICAL: 1 → 2；CLI rule 2★: 1 → 2；CLI rule 7: 1 → 2
+
+---
+
+### 4.11 — b7 Exit codes 與 error actionability
+
+| | |
+|---|---|
+| Subsystem | CLI |
+| 觸及 persona | P1、CI/CD pipeline 操作者 |
+| Pre-condition | 無獨立 pre-condition；與 b4 error 訊息優化可協同進行 |
+| Score | Impact 2 × PersonaWeight 3 (P1) × Frequency 2 (自動化腳本 / CI 觸發) = **12** |
+| 優先級 | **P2**（CLI rule 4★ exit codes = 1，CRITICAL 閾值未達；若 shell pipeline 強依賴場景確認為 P1 use case 則升為 P1） |
+
+**現況片段** — `§3.2.5 A.5`：CLI 使用三種不同的 exit code 風格——`sys.exit(code)`、`raise SystemExit(code)`、`raise click.ClickException(msg)`（ClickException 預設 exit code = 1，但 msg 格式不統一）。3 支獨立 CLI（`pce_cache_cli.py` 等）在所有執行路徑（含錯誤）均回傳 exit code 0。全專案 0 個命令實作標準 SIGINT → exit 130（`signal.signal(SIGINTM signal.SIG_DFL)` 未設定）。`CLI rule 4★`（exit code 語義）baseline score = 1；CLI rule 12（error actionability）= 0。
+
+**影響** — Shell pipeline 的 `command || handle_error` 邏輯失效（因錯誤仍回傳 0）。CI gate 無法依 exit code 路由至正確的 failure handler（retry / alert / skip）。Ctrl-C 中斷後 exit code 非 130，破壞呼叫腳本的 trap 邏輯。錯誤類別不可區分（user error vs system error vs network error），CI/CD log 分析困難。
+
+**UX rubric 觸及項** — CLI rule 4★（exit codes）= 1（CRITICAL，標準未實作）；CLI rule 12（error actionability）= 0（無結構化錯誤分類）。與 4.8 b4 共因：exit code 正規化與 error 訊息結構化為同一 root fix。
+
+**優化路線（小改）**
+1. 定義 domain exit code map（參照 `sysexits.h`）：0 成功 / 1 user error / 2 system error / 64 用法錯誤 / 65 資料錯誤 / 69 服務不可用 / 75 暫時性失敗（1 day 設計 + 文件化）
+2. 套用至所有 24 個命令與 3 支獨立 CLI：每個錯誤路徑明確傳入對應 code（2-3 day）
+3. 加 `signal.signal(signal.SIGINT, signal.SIG_DFL)` 確保 Ctrl-C → exit 130；`SIGTERM` → exit 143（半天）
+4. 統一以 `sys.exit(code)` 取代混用的 SystemExit / ClickException exit path（1 day）
+- Touch radius：中（每個命令的 error path 須逐一標注，但業務邏輯不動）
+- 與 §5 cross-cutting 衝突？與 4.8 b4 error_helper 協同：`format_error(cause, recovery, exit_code=1)` 可同步攜帶 exit code
+
+**重構路線（併入 Track B）**
+1. Track B `OutputManager.error(cause, recovery, exit_code)` 統一 exit code 發出點
+2. 所有錯誤路徑改呼叫 `OutputManager.error()`，自動套用 exit code map
+3. `--json` 模式下 error payload 包含 `{"exit_code": N, "cause": "...", "recovery": "..."}`
+- Touch radius：中（錯誤路徑統一，exit code 由 OutputManager 集中管理）
+- 與 §5 cross-cutting 同源：§5.1「共享 CLI 輸出層」Track B
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（exit code 語義純本地 process 行為，無網路依賴）
+- Gate 2 多痛點共因    : 共因 4 個（b3 輸出 / b4 error 訊息 / b6 pipe 友善 / b7 exit codes）→ 重構分 +1
+- Gate 3 Touch radius  : 優化中；重構中
+- Gate 4 Persona 衝擊  : CI/CD 自動化場景直接依賴；shell pipeline `||` 失效場景對 P1 高影響
+- Gate 5 Reversibility : ✓（exit code map 以常數表定義，可 flag 回退至舊行為；signal handler 增量設定）
+
+**推薦** — 優化路線（1 week）與 4.8 b4 協同進行效率最高；Track B 接管後 exit code map 自動集中至 OutputManager，無需重寫。若確認 shell pipeline 為 P1 核心 use case，升級至 P1 處理。
+
+**驗收標準** — 採用優化路線後：
+- `command_that_fails; echo $?` 回傳非 0（3 支獨立 CLI 覆蓋）
+- Ctrl-C 中斷任意命令 → `$?` = 130
+- exit code map 文件化（`docs/cli-exit-codes.md`），24 命令各自對應 code 標注
+- CI pipeline `command || handle` 邏輯可正確路由（整合測試驗證）
+- CLI rule 4★: 1 → 3；CLI rule 12: 0 → 2
+
+---
+
+### 4.12 — b8 Auto-completion 缺失
+
+| | |
+|---|---|
+| Subsystem | CLI |
+| 觸及 persona | P1 |
+| Pre-condition | 需確認 `scripts/completions/` 現有 bash completion 的安裝路徑與文件狀態 |
+| Score | Impact 1 × PersonaWeight 3 (P1) × Frequency 1 (一次性設定，非每次操作) = **3** |
+| 優先級 | **P3**（CLI rule 10 completion = 2，bash 已部分實作；缺 zsh/fish；score 低不升級） |
+
+**現況片段** — `§3.2.5 A.5`：`scripts/completions/` 目錄下存在 bash completion 腳本（CLI rule 10 baseline = 2，已部分實作）。zsh 與 fish shell completion 不存在。`click_completion` 套件與 `argcomplete` 均未整合至 `pyproject.toml` / `setup.cfg` 依賴清單。bash completion 的安裝路徑（`/etc/bash_completion.d/` vs `~/.bash_completion`）與啟用方式未在 `README` 或 `docs/` 中文件化。`--help` 未提及 completion 設定方式（CLI rule 9 `--help` = 1）。
+
+**影響** — P1 在快速操作（type-fast cycle）時無 Tab 補全，依賴記憶命令名稱與參數，錯字率上升。zsh（macOS 預設 shell）用戶完全無 completion 支援。completion 存在但未文件化，等同對新成員不存在。
+
+**UX rubric 觸及項** — CLI rule 10（auto-completion）= 2（bash 已存在，zsh/fish 缺失）；CLI rule 9（`--help` 完整度）= 1（未提及 completion 設定）。score 3 → P3，不觸發升級。
+
+**優化路線（小改）**
+1. 加 zsh completion 腳本（`scripts/completions/illumio-ops.zsh`）：參照現有 bash 腳本結構，使用 `#compdef` 框架（1 day）
+2. 加 fish completion 腳本（`scripts/completions/illumio-ops.fish`）（半天）
+3. 加 `docs/cli-completion-setup.md`：記錄 bash / zsh / fish 各 shell 的安裝指令與驗證步驟（半天）
+4. 在 `illumio-ops --help` 末尾加入 `Tip: Run 'illumio-ops --install-completion' to enable tab completion` 提示（半天）
+- Touch radius：小（新增腳本與文件，不動現有 CLI 實作）
+- 與 §5 cross-cutting 衝突？獨立執行，不與其他 Track 衝突
+
+**重構路線（Track L4 — 不推薦現階段）**
+1. 遷移至 `typer`（基於 Click，但原生支援 `--install-completion` / `--show-completion`，自動生成所有主流 shell completion）
+2. 遷移後 `scripts/completions/` 手工腳本可移除，改由 typer 運行期動態生成
+- Touch radius：大（需重寫所有命令定義）
+- 與 §5 cross-cutting 同源：Track C 統一 CLI 入口若選用 typer，completion 問題自動解決
+
+**§2.6 五 Gate 評估**
+- Gate 1 Offline       : ✓（shell completion 腳本純本地，無網路依賴）
+- Gate 2 多痛點共因    : 共因 1 個（b8 completion 獨立，與 b1/b2/b5 間接關聯）→ 重構分不加
+- Gate 3 Touch radius  : 優化小；重構大
+- Gate 4 Persona 衝擊  : P1 type-fast cycle 受益；但非每次操作觸發（一次性設定）→ 衝擊低
+- Gate 5 Reversibility : ✓（新增腳本可直接移除；文件化無副作用）
+
+**推薦** — 優化路線（low-hanging fruit，2 day）；若 Track C 選用 typer，completion 問題自動解決，無需單獨重構。不推薦現階段為此單獨啟動大型重構。
+
+**驗收標準** — 採用優化路線後：
+- `Tab` 補全在 bash / zsh / fish 三種 shell 下均可用
+- `docs/cli-completion-setup.md` 提供逐步安裝指引（含驗證指令）
+- `illumio-ops --help` 末尾出現 completion 設定提示
+- CLI rule 10: 2 → 3；CLI rule 9 `--help`: 1 → 2
+
+---
+
 ## §5 Cross-cutting Recommendations
 
 ### §5.1 共因識別（Mining）
