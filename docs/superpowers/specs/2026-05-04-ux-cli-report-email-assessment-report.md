@@ -683,7 +683,92 @@ _（評估執行階段尚未填入）_
 
 #### §3.3.2 Content Audit
 
-_（評估執行階段尚未填入）_
+> 注意：樣本 HTML 輸出不可用（Task A.6 已跳過實際產出量測）。以下審計基於原始碼閱讀，非執行期 render 輸出。
+
+##### 各報告章節結構
+
+| 報告 | 章節數 | 有執行摘要？ | 空資料處理 | 跨報告連結 |
+|---|---|---|---|---|
+| audit（`audit_html_exporter.py`） | 5（summary + health + users + policy + correlation） | 有（mod00 executive：attention items + 摘要 pills） | `rpt_no_data` key 統一顯示說明文字；policy / correlation 章節依 `visible_in()` 條件省略 | 無 |
+| policy_usage（`policy_usage_html_exporter.py`） | 6（summary + overview + hit-rules + unused-rules + deny-rules + draft-pd） | 有（mod00 executive：execution stats + attention items） | `rpt_no_data` / `rpt_no_records` + `rpt_pu_draft_pd_empty` 個別覆蓋；unused / deny 章節依 profile 條件省略 | 無 |
+| ven_status（`ven_html_exporter.py`） | 5（summary + online + offline + lost-today + lost-yest） | 有（summary section：KPI cards + summary pills） | `rpt_ven_no_data` 於 generator 層提前攔截；`rpt_no_records` 於 exporter 層填空表 | 無 |
+| traffic（`html_exporter.py`，主力報告） | 16（overview / policy / uncovered / ransomware / unmanaged / distribution / allowed / bandwidth / readiness / infrastructure / lateral / ringfence / change_impact + matrix 等） | 有（mod12 executive summary：KPI、key findings、attack summary、maturity score） | `.empty` 檢查 + 條件 `visible_in()` + `rpt_no_data`；mod07 cross-label matrix 空資料提前 return | 無 |
+
+**跨報告連結**：所有報告均無跨報告 `<a href>` 連結（確認：`grep -rn 'cross-report\|cross_report\|link_to' src/report/` 無結果）。此為 §3.3.6 推薦機會。
+
+##### Jargon 分析
+
+`src/i18n_zh_TW.json` 中 Illumio 術語命中數：**134 筆**（`boundary|ringfence|enforcement|Allowed|Blocked|Managed|Unmanaged|VEN|href` 合計）。
+
+**留英**（近期 commit 455f5f0/25d0926/c349f37/c70ba52 確立的先例）：
+- `Allowed`、`Blocked`、`Potentially Blocked`、`Potentially-Blocked`
+- `Managed`、`Unmanaged`（nav / section title 保留英文；見 `rpt_tr_nav_unmanaged = "Unmanaged 主機"`）
+- `VEN`、`boundary`、`ringfence`、`href`、`enforcement_mode`、`enforcement_boundary`
+- `scope`、`label`（作為 Illumio 物件欄位）
+- `Policy`（Illumio policy 引擎物件）
+
+**已譯中**：
+- Online → 在線（`rpt_pill_online`）、Offline → 離線（`rpt_pill_offline`）
+- 狀態 pills 文字（在線 / 離線）、錯誤分類、告警動詞（離線 / 離線檢查）
+- 系統訊息：`gui_status_online = "在線"`、`gui_status_offline = "離線"`
+
+**待議邊界案例**：
+- `rpt_chart_managed_vs_unmanaged` 的 zh_TW 譯為「受管 vs 未受管流量」— 圖表標題例外翻譯，與 nav / section 保留英文 Managed/Unmanaged 不一致（見下方 Verdict 一致性）
+- `mod12_kpi_blocked_flows` zh_TW 為「Blocked 流量」（混合）vs `rpt_pill_offline` 為純中文「離線」— 相同語意結構（KPI 標籤）處理不統一
+
+##### Verdict 一致性
+
+| 場域 | 用詞 | zh_TW |
+|---|---|---|
+| 流量圖表圖例（`html_exporter.py` L773-775） | `ALLOWED` / `BLOCKED` / `POTENTIAL`（全大寫，hardcoded） | 英文（hardcoded，非 i18n） |
+| 表格欄位 / 摘要列（`report_i18n.py` L906-908） | `Allowed` / `Blocked` / `Potentially Blocked`（title case） | 英文保留 |
+| 章節標題（`rpt_tr_sec_allowed`） | Allowed Traffic | **已允許流量**（中文） |
+| Nav 連結（`rpt_tr_nav_allowed`） | Allowed Traffic | **Allowed 流量**（混合） |
+| 圖表標題（`rpt_chart_managed_vs_unmanaged`） | Managed vs Unmanaged Flows | **受管 vs 未受管流量**（中文） |
+| Nav / 章節（`rpt_tr_nav_unmanaged` / `rpt_tr_sec_unmanaged`） | Unmanaged Hosts | **Unmanaged 主機**（混合） |
+| VEN 餅圖標籤（`ven_html_exporter.py` L107） | `"Online"` / `"Offline"` / `"Lost <24h"`（hardcoded） | 英文（hardcoded，非 i18n） |
+| VEN 摘要 pills（`report_i18n.py` L52-53） | Online / Offline | **在線 / 離線**（中文） |
+
+**不一致清單（4 項）**：
+1. **Same-section nav vs heading split**：`rpt_tr_nav_allowed` = "Allowed 流量" vs `rpt_tr_sec_allowed` = "已允許流量"——同一章節兩個進入點用語不同。
+2. **Managed 圖表 vs nav/section**：`rpt_chart_managed_vs_unmanaged` 譯為「受管 vs 未受管」，但 nav / section 用 "Unmanaged 主機"——同術語在不同位置兩種處理。
+3. **Verdict 大小寫**：圖表圖例用全大寫 `ALLOWED`/`BLOCKED`/`POTENTIAL`，其他位置用 title case——視覺層次可接受，但 i18n bypass 是潛在維護風險。
+4. **VEN chart labels i18n bypass**：`ven_html_exporter.py` L107 hardcoded `["Online", "Offline", "Lost <24h", "Lost 24-48h"]`，無法跟隨 zh_TW 在線/離線翻譯。
+
+##### 跨報告連結
+
+**不存在**。所有報告為獨立 HTML 文件，報告之間無相互引用連結（audit / policy_usage / ven_status 均未引用彼此）。
+
+機會：§3.3.6 可推薦在 audit summary 加入「→ 查看 Policy Usage 報告」、在 ven_status 加入「→ 查看 Audit 報告（VEN 相關事件）」等跨報告導覽連結。
+
+##### 空資料 / 空章節處理
+
+三份報告均有明確的空資料處理，模式一致：
+- **Generator 層**：`df.empty` / `not data` 提前攔截，不傳給 exporter（`ven_status_generator.py` 有 `rpt_ven_no_data` 提前輸出）
+- **Exporter 層**：`_df_to_html()` 統一支援 `no_data_key` 參數，預設 `rpt_no_data`（audit / policy_usage）或 `rpt_no_records`（ven_status）
+- **章節省略**：`visible_in()` 條件控制章節是否渲染（非空白章節，而是直接省略）
+- **個別空態訊息**：`rpt_pu_draft_pd_empty`（policy_usage draft-pd 章節獨立 key）
+
+zh_TW 空態文字：`rpt_ven_no_data = "沒有 VEN 資料"` / `report_no_data = "這份報表沒有可用資料"`——措辭自然，無工程味。
+
+##### i18n 一致性
+
+- **鍵值數量**：`src/i18n_en.json` 與 `src/i18n_zh_TW.json` 均為 2,197 行——無遺漏 key（對稱）。
+- **report_i18n.py**：獨立管理 440 個報告專用 i18n 條目（雙語 `_entry(en, zh_TW)` 格式），與主 i18n 分層管理。
+- **已修先例**：Online/Offline → 在線/離線（commit 455f5f0/25d0926/c349f37/c70ba52）
+- **待修候選**：
+  - `rpt_tr_sec_allowed` vs `rpt_tr_nav_allowed` 統一（建議 nav 跟進改為「已允許流量」或兩者均用「Allowed 流量」）
+  - `rpt_chart_managed_vs_unmanaged` 的 "受管 vs 未受管" 改回 "Managed vs Unmanaged"（或反向，統一 nav/section 也改中文）
+  - `ven_html_exporter.py` L107 chart labels 改用 `_s("rpt_pill_online")` 等 i18n key
+- **stale 翻譯**：無明確 stale key（en/zh_TW 行數一致，且近期 commit 持續維護）
+
+##### Illumio 術語留英策略（OQ-10 default）
+
+**留英**（Illumio 工程術語不譯，避免歧義）：`Allowed`、`Blocked`、`Potentially-Blocked`、`Managed`、`Unmanaged`、`boundary`、`ringfence`、`ven`、`href`、`enforcement_mode`、`scope`、`label`、`Policy`、`VEN`、`PCE`
+
+**譯中**（UI 體驗一致）：動詞（新增 / 刪除 / 匯出 / 查看）、狀態 pill（Online → 在線，Offline → 離線）、操作按鈕、錯誤訊息分類、系統訊息、空態說明文字
+
+**判定原則**：Illumio 物件 / verdict / API 欄位 → 留英；通用 UI 詞彙 → 譯中。邊界案例參考近期 commit 455f5f0 / 25d0926 / c349f37 / c70ba52。圖表標籤與 nav / section title 應保持一致（目前 Managed/Unmanaged 有分歧，為已知待修項）。
 
 #### §3.3.3 Visual Identity 現況評估（document context）
 
