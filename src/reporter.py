@@ -538,10 +538,15 @@ class Reporter:
     def _gui_base_url(self) -> str:
         """Return the PCE web console base URL for CTA deep links.
 
-        Strips /api/v2 (and v1) suffixes from the configured API URL so the
-        result points at the web GUI root.  Returns '' if no URL is configured
-        — callers must treat '' as "skip CTA".
+        Resolution order:
+        1. web_gui.public_url (explicit GUI base, no stripping needed)
+        2. active PCE API URL with /api/v2 (and v1) suffixes stripped
+
+        Returns '' if no URL is configured — callers must treat '' as "skip CTA".
         """
+        web_gui_url = str(self.cm.config.get("web_gui", {}).get("public_url", "")).strip()
+        if web_gui_url:
+            return web_gui_url.rstrip("/")
         raw = self._active_pce_url().rstrip("/")
         if not raw:
             return ""
@@ -553,7 +558,12 @@ class Reporter:
 
     @staticmethod
     def _render_cta(label: str, url: str, severity: str = 'info') -> str:
-        """Render a bulletproof CTA button (Outlook-safe table-based).
+        """Render a bulletproof CTA button (MSO/VML wrap + table fallback).
+
+        Outlook (Word HTML engine) receives a v:roundrect via the MSO
+        conditional comment; all other clients receive the table-based
+        fallback. Both branches use the same SIGNAL_HEX-derived background
+        color so severity coloring stays consistent.
 
         Both label and url are HTML-escaped inside this helper.
         Callers must urlencode any dynamic id values in url query strings
@@ -567,13 +577,83 @@ class Reporter:
         url_html = _html.escape(url, quote=True)
         bg = SIGNAL_HEX.get(severity, SIGNAL_HEX['info'])
         return (
+            # MSO (Outlook) — VML rounded rectangle
+            f'<!--[if mso]>'
+            f'<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" '
+            f'xmlns:w="urn:schemas-microsoft-com:office:word" '
+            f'href="{url_html}" '
+            f'style="height:40px;v-text-anchor:middle;width:200px;" '
+            f'arcsize="10%" stroke="f" fillcolor="{bg}">'
+            f'<w:anchorlock/>'
+            f'<center style="color:#FFFFFF;font-family:Arial,sans-serif;'
+            f'font-size:14px;font-weight:600;">{label_html}</center>'
+            f'</v:roundrect>'
+            f'<![endif]-->'
+            # Non-MSO fallback — table-based
+            f'<!--[if !mso]><!-- -->'
             f'<table role="presentation" border="0" cellpadding="0" cellspacing="0" '
             f'style="margin:16px 0;">'
-            f'<tr><td bgcolor="{bg}" style="border-radius:4px;">'
+            f'<tr><td bgcolor="{bg}" style="border-radius:4px;background:{bg};">'
             f'<a href="{url_html}" '
             f'style="display:inline-block;padding:10px 20px;color:#FFFFFF;'
-            f'text-decoration:none;font-weight:600;">{label_html}</a>'
+            f'text-decoration:none;font-weight:600;font-family:Arial,sans-serif;">'
+            f'{label_html}</a>'
             f'</td></tr></table>'
+            f'<!--<![endif]-->'
+        )
+
+    @staticmethod
+    def _render_severity_badge(severity: str) -> str:
+        """Render an inline severity badge — small colored pill with a 4-letter
+        label (CRIT / HIGH / WARN / OK / INFO).
+
+        Uses inline `bgcolor` attr + `style=background:` dual-write so Outlook
+        renders the color correctly. Defaults to 'INFO' on unknown input.
+        """
+        import html as _html
+        sev_norm = (severity or '').lower().strip()
+        mapping = {
+            'critical': ('CRIT', SIGNAL_HEX['danger']),
+            'crit':     ('CRIT', SIGNAL_HEX['danger']),
+            'danger':   ('CRIT', SIGNAL_HEX['danger']),
+            'high':     ('HIGH', SIGNAL_HEX['danger']),
+            'emerg':    ('CRIT', SIGNAL_HEX['danger']),
+            'alert':    ('HIGH', SIGNAL_HEX['danger']),
+            'err':      ('HIGH', SIGNAL_HEX['danger']),
+            'error':    ('HIGH', SIGNAL_HEX['danger']),
+            'warning':  ('WARN', SIGNAL_HEX['warning']),
+            'warn':     ('WARN', SIGNAL_HEX['warning']),
+            'medium':   ('WARN', SIGNAL_HEX['warning']),
+            'success':  ('OK',   SIGNAL_HEX['success']),
+            'ok':       ('OK',   SIGNAL_HEX['success']),
+            'info':     ('INFO', SIGNAL_HEX['info']),
+            'low':      ('INFO', SIGNAL_HEX['info']),
+        }
+        label, bg = mapping.get(sev_norm, mapping['info'])
+        label_html = _html.escape(label)
+        return (
+            f'<span bgcolor="{bg}" '
+            f'style="display:inline-block;padding:2px 6px;margin-right:6px;'
+            f'background:{bg};color:#FFFFFF;font-size:11px;font-weight:700;'
+            f'font-family:Arial,sans-serif;border-radius:3px;letter-spacing:0.5px;">'
+            f'{label_html}</span>'
+        )
+
+    @staticmethod
+    def _render_runbook_link(runbook_url: str | None) -> str:
+        """Render an inline runbook link, or empty string if no URL provided.
+
+        Returns a small info-blue anchor styled to sit inline next to issue
+        summary text. URL is HTML-escaped (quote=True) to prevent injection.
+        """
+        if not runbook_url:
+            return ''
+        import html as _html
+        url_html = _html.escape(str(runbook_url), quote=True)
+        return (
+            f' <a href="{url_html}" '
+            f'style="color:#0077CC;text-decoration:underline;font-size:12px;'
+            f'font-family:Arial,sans-serif;">Runbook ↗</a>'
         )
 
     @staticmethod
@@ -1251,11 +1331,13 @@ class Reporter:
         if self.health_alerts:
             rows = []
             for alert in self.health_alerts:
+                sev_badge = self._render_severity_badge(alert.get('severity', alert.get('status', 'info')))
+                runbook = self._render_runbook_link(alert.get('runbook_url'))
                 rows.append(
                     f"""
             <tr>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('time',''))}</td>
-              <td style="{td_style} font-weight:700; color:#BE122F;">{esc(alert.get('status',''))}</td>
+              <td style="{td_style} font-weight:700; color:#BE122F;">{sev_badge}{esc(alert.get('status',''))}{runbook}</td>
               <td style="{td_style}">{fmt_multiline(alert.get('details',''))}</td>
             </tr>
 """
@@ -1288,13 +1370,13 @@ class Reporter:
         if self.event_alerts:
             rows = []
             for alert in self.event_alerts:
-                sev_color = "#BE122F" if alert.get("severity") in ["crit", "emerg", "alert", "err", "error"] else "#F97607"
-                sev_label = severity_labels.get(str(alert.get("severity", "")).lower(), str(alert.get("severity", "")).upper())
+                sev_badge = self._render_severity_badge(alert.get('severity', 'info'))
+                runbook = self._render_runbook_link(alert.get('runbook_url'))
                 row_html = f"""
             <tr>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('time',''))}</td>
-              <td style="{td_style}"><strong>{esc(alert.get('rule',''))}</strong><br><small style="color:#6F7274;">{esc(alert.get('desc',''))}</small></td>
-              <td style="{td_style} text-align:center;"><span style="background:{sev_color}; color:#FFFFFF; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;">{esc(sev_label)} ({esc(alert.get('count',0))})</span></td>
+              <td style="{td_style}"><strong>{esc(alert.get('rule',''))}</strong>{runbook}<br><small style="color:#6F7274;">{esc(alert.get('desc',''))}</small></td>
+              <td style="{td_style} text-align:center;">{sev_badge}<small>({esc(alert.get('count',0))})</small></td>
               <td style="{td_style}">{esc(alert.get('source',''))}</td>
             </tr>
 """
@@ -1331,10 +1413,12 @@ class Reporter:
         if self.traffic_alerts:
             rows = []
             for alert in self.traffic_alerts:
+                sev_badge = self._render_severity_badge(alert.get('severity', 'warning'))
+                runbook = self._render_runbook_link(alert.get('runbook_url'))
                 rows.append(
                     f"""
             <tr>
-              <td style="{td_style} font-weight:700; color:#FF5500;">{esc(alert.get('rule',''))}</td>
+              <td style="{td_style} font-weight:700; color:#FF5500;">{sev_badge}{esc(alert.get('rule',''))}{runbook}</td>
               <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(alert.get('count',0))}</td>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('criteria',''))}</td>
             </tr>
@@ -1374,10 +1458,12 @@ class Reporter:
         if self.metric_alerts:
             rows = []
             for alert in self.metric_alerts:
+                sev_badge = self._render_severity_badge(alert.get('severity', 'info'))
+                runbook = self._render_runbook_link(alert.get('runbook_url'))
                 rows.append(
                     f"""
             <tr>
-              <td style="{td_style} font-weight:700; color:#313638;">{esc(alert.get('rule',''))}</td>
+              <td style="{td_style} font-weight:700; color:#313638;">{sev_badge}{esc(alert.get('rule',''))}{runbook}</td>
               <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(alert.get('count',0))}</td>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('criteria',''))}</td>
             </tr>
@@ -1532,13 +1618,24 @@ class Reporter:
             )
             html_body = html_body.replace('</body></html>', warning_html + '</body></html>', 1)
 
-        msg = MIMEMultipart()
+        plain_body = self._build_line_message()
+
+        if attach_parts:
+            msg = MIMEMultipart('mixed')
+            body = MIMEMultipart('alternative')
+            body.attach(MIMEText(plain_body, 'plain', _charset='utf-8'))
+            body.attach(MIMEText(html_body, 'html', _charset='utf-8'))
+            msg.attach(body)
+            for part in attach_parts:
+                msg.attach(part)
+        else:
+            msg = MIMEMultipart('alternative')
+            msg.attach(MIMEText(plain_body, 'plain', _charset='utf-8'))
+            msg.attach(MIMEText(html_body, 'html', _charset='utf-8'))
+
         msg["Subject"] = subject
         msg["From"] = cfg["sender"]
         msg["To"] = ",".join(recipients)
-        msg.attach(MIMEText(html_body, "html"))
-        for part in attach_parts:
-            msg.attach(part)
 
         try:
             smtp_conf = self.cm.config.get("smtp", {})
@@ -1583,13 +1680,16 @@ class Reporter:
             logger.warning(t('no_recipients'))
             return False
 
-        msg = MIMEMultipart()
-        msg["Subject"] = subject
-        msg["From"] = cfg["sender"]
-        msg["To"] = ",".join(cfg["recipients"])
-        msg.attach(MIMEText(html_body, "html"))
+        import re as _re
+        plain_body = _re.sub(r'<[^>]+>', '', html_body)
+        plain_body = _re.sub(r'\s+', ' ', plain_body).strip()
 
         if attachment_path and os.path.exists(attachment_path):
+            msg = MIMEMultipart('mixed')
+            body = MIMEMultipart('alternative')
+            body.attach(MIMEText(plain_body, 'plain', _charset='utf-8'))
+            body.attach(MIMEText(html_body, 'html', _charset='utf-8'))
+            msg.attach(body)
             try:
                 with open(attachment_path, "rb") as f:
                     part = MIMEBase("application", "octet-stream")
@@ -1602,6 +1702,14 @@ class Reporter:
                 msg.attach(part)
             except (IOError, OSError) as e:
                 logger.warning(f"Warning: could not attach file {attachment_path}: {e}")
+        else:
+            msg = MIMEMultipart('alternative')
+            msg.attach(MIMEText(plain_body, 'plain', _charset='utf-8'))
+            msg.attach(MIMEText(html_body, 'html', _charset='utf-8'))
+
+        msg["Subject"] = subject
+        msg["From"] = cfg["sender"]
+        msg["To"] = ",".join(cfg["recipients"])
 
         try:
             smtp_conf = self.cm.config.get("smtp", {})
