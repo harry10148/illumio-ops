@@ -53,6 +53,12 @@ def cli(ctx: click.Context) -> None:
     --report-type, --source, --file, --format, --email, --output-dir.
     """
     if ctx.invoked_subcommand is None:
+        from src.cli._output import echo_warning
+        echo_warning(
+            ctx,
+            "Bare 'illumio-ops' invocation is deprecated; use 'illumio-ops shell' "
+            "to launch the interactive menu explicitly.",
+        )
         from src.main import main_menu
         main_menu()
 
@@ -65,6 +71,14 @@ def version() -> None:
     except ImportError:
         __version__ = "unknown"
     click.echo(f"illumio-ops {__version__}")
+
+
+@cli.command()
+@click.pass_context
+def shell(ctx: click.Context) -> None:
+    """Launch the interactive menu (replaces bare-call fallthrough)."""
+    from src.main import main_menu
+    main_menu()
 
 
 cli.add_command(cache_group)
