@@ -39,3 +39,31 @@ def test_cache_backfill_requires_since():
     runner = CliRunner()
     result = runner.invoke(cache_group, ["backfill", "--source", "events"])
     assert result.exit_code != 0  # missing --since should fail
+
+
+def test_cache_backfill_bad_date_exits_dataerr():
+    """Bad --since date should exit with EXIT_DATAERR (65) and emit an error message."""
+    from src.cli.cache import cache_group
+    from src.cli._exit_codes import EXIT_DATAERR
+    runner = CliRunner()
+    result = runner.invoke(cache_group, ["backfill", "--source", "events", "--since", "not-a-date"])
+    assert result.exit_code == EXIT_DATAERR
+    assert "error:" in result.output
+    assert "since" in result.output.lower()
+
+
+def test_cache_retention_json_output():
+    """--json flag on retention returns machine-readable config dict."""
+    import json
+    from src.cli.cache import cache_group
+    runner = CliRunner()
+    with patch("src.cli.cache._get_cache_config", return_value={
+        "events_retention_days": 30,
+        "traffic_raw_retention_days": 3,
+        "traffic_agg_retention_days": 180,
+    }):
+        result = runner.invoke(cache_group, ["retention", "--json"])
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert data["events_retention_days"] == 30
+    assert data["traffic_raw_retention_days"] == 3
