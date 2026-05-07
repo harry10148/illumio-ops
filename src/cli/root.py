@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import click
 
+from src.cli._completion import completion_group
 from src.cli._errors import format_error, suggest_command
 from src.cli._global_flags import inject_global_flags
 from src.cli.cache import cache_group
@@ -90,3 +91,4 @@ cli.add_command(rule_group)
 cli.add_command(siem_group)
 cli.add_command(status_cmd)
 cli.add_command(workload_group)
+cli.add_command(completion_group)
