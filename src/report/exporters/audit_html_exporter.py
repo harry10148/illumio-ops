@@ -207,7 +207,7 @@ class AuditHtmlExporter:
             )
             summary_pills = summary_pills.replace("</div>", data_source_pill + "</div>", 1)
 
-        exec_html = render_exec_summary_html(mod00, report_name='Audit Report')
+        exec_html = render_exec_summary_html(mod00, report_name='Audit Report', lang=self._lang)
         sidebar_html = render_sidebar_html('audit')
         body = (
             sidebar_html

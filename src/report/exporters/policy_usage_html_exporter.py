@@ -177,7 +177,7 @@ class PolicyUsageHtmlExporter:
             "</nav>"
         )
 
-        exec_html = render_exec_summary_html(mod00, report_name='Policy Usage Report')
+        exec_html = render_exec_summary_html(mod00, report_name='Policy Usage Report', lang=self._lang)
         sidebar_html = render_sidebar_html('policy_usage')
         body = (
             sidebar_html

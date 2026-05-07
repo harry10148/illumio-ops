@@ -127,7 +127,7 @@ class VenHtmlExporter:
             return render_df_table(df, col_i18n=_COL_I18N, no_data_key=no_data_key,
                                    render_cell=_render_cell, lang=_sl)
 
-        exec_html = render_exec_summary_html(_ven_mod00, report_name='VEN Status Report')
+        exec_html = render_exec_summary_html(_ven_mod00, report_name='VEN Status Report', lang=self._lang)
         sidebar_html = render_sidebar_html('ven_status')
         body = (
             sidebar_html

@@ -546,7 +546,7 @@ class HtmlExporter:
             ]
         nav_html = '<nav>' + ''.join(_nav_links) + '</nav>'
 
-        exec_html = render_exec_summary_html(_traffic_mod00, report_name='Traffic Report')
+        exec_html = render_exec_summary_html(_traffic_mod00, report_name='Traffic Report', lang=self._lang)
         sidebar_html = render_sidebar_html('traffic')
         body = (
             sidebar_html

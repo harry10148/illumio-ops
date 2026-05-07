@@ -6,8 +6,22 @@ from __future__ import annotations
 
 from html import escape
 
+from .report_i18n import STRINGS
 
-def render_exec_summary_html(mod00: dict, report_name: str) -> str:
+
+def _resolve_label(k: dict, lang: str) -> str:
+    # Some generators (e.g. ven_status_generator) emit lang-agnostic 'i18n_key'
+    # so the exporter can resolve at render time; others emit pre-resolved 'label'.
+    if k.get('label'):
+        return str(k['label'])
+    key = k.get('i18n_key')
+    if key and key in STRINGS:
+        entry = STRINGS[key]
+        return entry.get(lang) or entry.get('en') or ''
+    return ''
+
+
+def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en') -> str:
     """Return a <section> HTML block for the report header.
 
     mod00 is the executive-summary dict produced by analysis.{report}_mod00.
@@ -25,7 +39,7 @@ def render_exec_summary_html(mod00: dict, report_name: str) -> str:
     if kpis:
         items = []
         for k in kpis[:6]:
-            label = escape(str(k.get('label', '')))
+            label = escape(_resolve_label(k, lang))
             value = escape(str(k.get('value', '')))
             items.append(
                 f'<div class="kpi"><span class="kpi-label">{label}</span>'
