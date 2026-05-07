@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import click
 
+from src.cli._errors import format_error, suggest_command
 from src.cli._global_flags import inject_global_flags
 from src.cli.cache import cache_group
 from src.cli.config import config_group
@@ -14,8 +15,34 @@ from src.cli.siem import siem_group
 from src.cli.status import status_cmd
 from src.cli.workload import workload_group
 
-@click.group(invoke_without_command=True,
-             context_settings={"help_option_names": ["-h", "--help"]})
+
+class _GroupWithSuggestions(click.Group):
+    """Click group that adds 'Did you mean: X?' to UsageError on unknown subcommand."""
+
+    def resolve_command(self, ctx: click.Context, args):
+        try:
+            return super().resolve_command(ctx, args)
+        except click.UsageError as exc:
+            if args:
+                typed = args[0]
+                candidates = list(self.commands.keys())
+                suggestion = suggest_command(typed, candidates)
+                if suggestion:
+                    raise click.UsageError(
+                        format_error(
+                            cause=f"No such command '{typed}'.",
+                            recovery="Run 'illumio-ops --help' for the full list.",
+                            did_you_mean=suggestion,
+                        )
+                    ) from exc
+            raise
+
+
+@click.group(
+    cls=_GroupWithSuggestions,
+    invoke_without_command=True,
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
 @inject_global_flags
 @click.pass_context
 def cli(ctx: click.Context) -> None:
@@ -26,10 +53,9 @@ def cli(ctx: click.Context) -> None:
     --report-type, --source, --file, --format, --email, --output-dir.
     """
     if ctx.invoked_subcommand is None:
-        # No subcommand → defer to the legacy interactive main menu.
-        # Imported lazily to avoid argparse side-effects.
         from src.main import main_menu
         main_menu()
+
 
 @cli.command()
 def version() -> None:
@@ -39,6 +65,7 @@ def version() -> None:
     except ImportError:
         __version__ = "unknown"
     click.echo(f"illumio-ops {__version__}")
+
 
 cli.add_command(cache_group)
 cli.add_command(config_group)
