@@ -1,11 +1,22 @@
 from __future__ import annotations
 
 import datetime as dt
+import logging
 import os
 
 import click
 
+from src.cli._exit_codes import (
+    EXIT_DATAERR,
+    EXIT_NOINPUT,
+    EXIT_SOFTWARE,
+    EXIT_UNAVAILABLE,
+)
+from src.cli._output import echo_error, echo_json, is_json
+
 _REPORT_FORMATS = ["html", "csv", "pdf", "xlsx", "all"]
+
+log = logging.getLogger(__name__)
 
 
 def _resolve_paths(output_dir: str | None) -> tuple[str, str]:
@@ -163,6 +174,19 @@ def generate_policy_usage_report(
     return gen.export(result, fmt=fmt, output_dir=out)
 
 
+def _emit_paths(ctx: click.Context, paths: list[str], fmt: str) -> None:
+    """Emit report paths — JSON array when --json, else one path per line."""
+    if is_json(ctx):
+        data = [
+            {"output_path": p, "type": fmt, "size": os.path.getsize(p)}
+            for p in paths
+        ]
+        echo_json(ctx, data)
+    else:
+        for p in paths:
+            click.echo(p)
+
+
 @click.group("report")
 def report_group() -> None:
     """Generate reports (traffic/audit/ven/policy-usage)."""
@@ -181,17 +205,38 @@ def report_group() -> None:
     default="security_risk",
     help="Traffic report profile (security_risk or network_inventory)",
 )
-def report_traffic(source: str, file_path, fmt: str, output_dir, email: bool, traffic_report_profile: str) -> None:
+@click.pass_context
+def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool, traffic_report_profile: str) -> None:
     """Generate Traffic Flow Report."""
-    for path in generate_traffic_report(
-        source=source,
-        file_path=file_path,
-        fmt=fmt,
-        output_dir=output_dir,
-        email=email,
-        traffic_report_profile=traffic_report_profile,
-    ):
-        click.echo(path)
+    try:
+        paths = generate_traffic_report(
+            source=source,
+            file_path=file_path,
+            fmt=fmt,
+            output_dir=output_dir,
+            email=email,
+            traffic_report_profile=traffic_report_profile,
+        )
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, f"Connection failed: {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
+    except Exception as exc:
+        log.exception("traffic report failed")
+        echo_error(ctx, f"Unexpected error: {exc}")
+        ctx.exit(EXIT_SOFTWARE)
+        return
+    _emit_paths(ctx, paths, fmt)
 
 
 @report_group.command("audit")
@@ -199,24 +244,66 @@ def report_traffic(source: str, file_path, fmt: str, output_dir, email: bool, tr
 @click.option("--end-date", type=str, default=None, help="End date in YYYY-MM-DD")
 @click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
-def report_audit(start_date: str | None, end_date: str | None, fmt: str, output_dir) -> None:
+@click.pass_context
+def report_audit(ctx: click.Context, start_date: str | None, end_date: str | None, fmt: str, output_dir) -> None:
     """Generate Audit Report."""
-    for path in generate_audit_report(
-        start_date=start_date,
-        end_date=end_date,
-        fmt=fmt,
-        output_dir=output_dir,
-    ):
-        click.echo(path)
+    try:
+        paths = generate_audit_report(
+            start_date=start_date,
+            end_date=end_date,
+            fmt=fmt,
+            output_dir=output_dir,
+        )
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, f"Connection failed: {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
+    except Exception as exc:
+        log.exception("audit report failed")
+        echo_error(ctx, f"Unexpected error: {exc}")
+        ctx.exit(EXIT_SOFTWARE)
+        return
+    _emit_paths(ctx, paths, fmt)
 
 
 @report_group.command("ven-status")
 @click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
-def report_ven_status(fmt: str, output_dir) -> None:
+@click.pass_context
+def report_ven_status(ctx: click.Context, fmt: str, output_dir) -> None:
     """Generate VEN Status Report."""
-    for path in generate_ven_status_report(fmt=fmt, output_dir=output_dir):
-        click.echo(path)
+    try:
+        paths = generate_ven_status_report(fmt=fmt, output_dir=output_dir)
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, f"Connection failed: {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
+    except Exception as exc:
+        log.exception("ven-status report failed")
+        echo_error(ctx, f"Unexpected error: {exc}")
+        ctx.exit(EXIT_SOFTWARE)
+        return
+    _emit_paths(ctx, paths, fmt)
 
 
 @report_group.command("policy-usage")
@@ -226,7 +313,9 @@ def report_ven_status(fmt: str, output_dir) -> None:
 @click.option("--end-date", type=str, default=None, help="End date in YYYY-MM-DD")
 @click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
+@click.pass_context
 def report_policy_usage(
+    ctx: click.Context,
     source: str,
     file_path,
     start_date: str | None,
@@ -235,12 +324,32 @@ def report_policy_usage(
     output_dir,
 ) -> None:
     """Generate Policy Usage Report."""
-    for path in generate_policy_usage_report(
-        source=source,
-        file_path=file_path,
-        start_date=start_date,
-        end_date=end_date,
-        fmt=fmt,
-        output_dir=output_dir,
-    ):
-        click.echo(path)
+    try:
+        paths = generate_policy_usage_report(
+            source=source,
+            file_path=file_path,
+            start_date=start_date,
+            end_date=end_date,
+            fmt=fmt,
+            output_dir=output_dir,
+        )
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, f"Connection failed: {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
+    except Exception as exc:
+        log.exception("policy-usage report failed")
+        echo_error(ctx, f"Unexpected error: {exc}")
+        ctx.exit(EXIT_SOFTWARE)
+        return
+    _emit_paths(ctx, paths, fmt)

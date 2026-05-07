@@ -1,8 +1,11 @@
 """Tests for illumio-ops report subcommands and legacy report dispatch."""
+import json
+import os
 import sys
 import types
 from unittest.mock import patch
 
+import click
 import pytest
 from click.testing import CliRunner
 
@@ -101,3 +104,47 @@ def test_legacy_report_type_audit_dispatches(monkeypatch):
 
     assert exc.value.code == 0
     assert called["kwargs"] == {"fmt": "html", "output_dir": None}
+
+
+def test_report_traffic_json_output_shape(tmp_path):
+    """--json flag emits [{output_path, type, size}] for each returned path."""
+    from src.cli.root import cli
+
+    # Create a real file so os.path.getsize succeeds
+    fake_report = tmp_path / "report.html"
+    fake_report.write_text("<html/>")
+
+    runner = CliRunner()
+    with patch("src.cli.report.generate_traffic_report", return_value=[str(fake_report)]):
+        result = runner.invoke(
+            cli,
+            ["--json", "report", "traffic"],
+        )
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert isinstance(data, list)
+    assert len(data) == 1
+    item = data[0]
+    assert item["output_path"] == str(fake_report)
+    assert item["type"] == "html"
+    assert item["size"] == fake_report.stat().st_size
+
+
+def test_report_audit_click_exception_exits_dataerr():
+    """ClickException from generate_audit_report → exit code EXIT_DATAERR (65)."""
+    from src.cli.root import cli
+    from src.cli._exit_codes import EXIT_DATAERR
+
+    runner = CliRunner()
+    with patch(
+        "src.cli.report.generate_audit_report",
+        side_effect=click.ClickException("No data for report"),
+    ):
+        result = runner.invoke(
+            cli,
+            ["report", "audit"],
+        )
+
+    assert result.exit_code == EXIT_DATAERR
+    assert "No data for report" in result.output
