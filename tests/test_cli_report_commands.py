@@ -118,7 +118,8 @@ def test_report_traffic_json_output_shape(tmp_path):
     with patch("src.cli.report.generate_traffic_report", return_value=[str(fake_report)]):
         result = runner.invoke(
             cli,
-            ["--json", "report", "traffic"],
+            # Use verb-prefixed form to avoid deprecation hint polluting JSON output
+            ["--json", "report", "generate-traffic"],
         )
 
     assert result.exit_code == 0, result.output
