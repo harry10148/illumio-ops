@@ -119,7 +119,7 @@ def siem_status(ctx: click.Context):
                           str(r["failed"]), str(r["dlq"]))
         console.print(table)
     except Exception as exc:
-        echo_error(ctx, f"Error: {exc}")
+        echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
 
 
@@ -147,7 +147,7 @@ def siem_replay(ctx: click.Context, dest: str, limit: int):
         elif not is_quiet(ctx):
             console.print(f"[green]Requeued {count} entries for '{dest}'[/green]")
     except Exception as exc:
-        echo_error(ctx, f"Error: {exc}")
+        echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
 
 
@@ -175,7 +175,7 @@ def siem_purge(ctx: click.Context, dest: str, older_than: int):
         elif not is_quiet(ctx):
             console.print(f"[green]Purged {removed} DLQ entries for '{dest}'[/green]")
     except Exception as exc:
-        echo_error(ctx, f"Error: {exc}")
+        echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
 
 
@@ -227,5 +227,5 @@ def siem_dlq(ctx: click.Context, dest: str, limit: int):
                           e.last_error[:60], str(e.quarantined_at)[:19])
         console.print(table)
     except Exception as exc:
-        echo_error(ctx, f"Error: {exc}")
+        echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
