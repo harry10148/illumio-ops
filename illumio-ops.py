@@ -23,7 +23,7 @@ import sys
 import os as _os
 
 # Known click subcommand names; anything else falls back to argparse.
-_CLICK_SUBCOMMANDS = {"cache", "monitor", "gui", "report", "rule", "siem", "workload", "config", "status", "version", "-h", "--help"}
+_CLICK_SUBCOMMANDS = {"cache", "monitor", "gui", "report", "rule", "siem", "workload", "config", "status", "version", "shell", "completion", "-h", "--help"}
 
 # Route to click for shell completion generation
 _COMPLETION_ENV = _os.environ.get("_ILLUMIO_OPS_COMPLETE", "")
