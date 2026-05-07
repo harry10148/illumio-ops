@@ -8,13 +8,13 @@ All web fonts are self-hosted to satisfy C1 (offline bundle) and avoid CSP/CDN i
 |---|---|---|---|---|
 | NotoSansCJKtc-Regular.otf | OFL | https://github.com/notofonts/noto-cjk | 15.7 MB | CJK fallback (PDF, GUI when CJK glyphs needed) |
 | Montserrat-latin.woff2 | OFL | https://github.com/JulietaUla/Montserrat | 37 KB | Legacy GUI/email — superseded by Space Grotesk + Inter (Track A migration in progress) |
-| SpaceGrotesk-VF.woff2 | OFL | https://github.com/floriankarsten/space-grotesk | 52 KB | GUI heading (post Track A) |
-| Inter-VF.woff2 | OFL | https://github.com/rsms/inter | 48 KB | GUI body (post Track A); Report body |
-| JetBrainsMono-VF.woff2 | OFL | https://github.com/JetBrains/JetBrainsMono | 40 KB | Code / table figures (tnum) |
+| SpaceGrotesk-VF.woff2 | OFL | https://github.com/floriankarsten/space-grotesk | 48 KB | GUI heading (post Track A) |
+| Inter-VF.woff2 | OFL | https://github.com/fontsource/font-files/tree/main/fonts/variable/inter (latin subset) | 48 KB | GUI body (post Track A); Report body |
+| JetBrainsMono-VF.woff2 | OFL | https://github.com/fontsource/font-files/tree/main/fonts/variable/jetbrains-mono (latin subset) | 40 KB | Code / table figures (tnum) |
 
 ## How to update
 
-1. Download new variable woff2 from release page (links above).
+1. Download new variable woff2 from the Source URL above. For Inter and JetBrains Mono, the canonical source is the @fontsource-variable npm package's latin subset, NOT the upstream repo (which yields a much larger file with all languages).
 2. Verify with `fontTools.ttLib.TTFont(...).flavor == 'woff2'` and `'fvar' in font`.
 3. Replace file in `src/static/fonts/`.
 4. Update this doc with new size.
