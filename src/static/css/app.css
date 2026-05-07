@@ -45,6 +45,7 @@
       --shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
       --header-font: var(--font-heading-2);
       --body-font:   var(--font-body-2);
+      --mono-font:   var(--font-mono-2);
 
       /* Track A — new token layer (parallel; do not replace existing yet) */
       --font-heading-2: 'Space Grotesk', 'Montserrat', system-ui, sans-serif;
@@ -229,7 +230,7 @@
       padding: 5px 14px;
       font-size: .82rem;
       color: var(--fg);
-      font-family: var(--mono-font, 'Courier New', monospace);
+      font-family: var(--mono-font);
       max-width: 420px;
       min-width: 160px;
       overflow: hidden;
@@ -286,7 +287,7 @@
       overflow: auto;
       font-size: 12px;
       line-height: 1.5;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-family: var(--mono-font);
     }
 
     .ev-badge {
@@ -742,7 +743,7 @@
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 16px;
-      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-family: var(--mono-font);
       font-size: .85rem;
       color: #A3E635;
       max-height: 400px;
