@@ -4,7 +4,7 @@ from __future__ import annotations
 import click
 
 from src.cli._completion import completion_group
-from src.cli._errors import format_error, suggest_command
+from src.cli._errors import suggest_command
 from src.cli._global_flags import inject_global_flags
 from src.cli.cache import cache_group
 from src.cli.config import config_group
@@ -30,11 +30,9 @@ class _GroupWithSuggestions(click.Group):
                 suggestion = suggest_command(typed, candidates)
                 if suggestion:
                     raise click.UsageError(
-                        format_error(
-                            cause=f"No such command '{typed}'.",
-                            recovery="Run 'illumio-ops --help' for the full list.",
-                            did_you_mean=suggestion,
-                        )
+                        f"No such command '{typed}'.\n"
+                        f"Did you mean: {suggestion}?\n"
+                        f"Try: Run 'illumio-ops --help' for the full list."
                     ) from exc
             raise
 

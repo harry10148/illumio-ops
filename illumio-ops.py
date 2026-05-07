@@ -30,8 +30,20 @@ _COMPLETION_ENV = _os.environ.get("_ILLUMIO_OPS_COMPLETE", "")
 
 
 def _looks_like_click_invocation(argv: list[str]) -> bool:
-    """True when argv starts with a click subcommand (or is -h/--help)."""
-    return len(argv) >= 2 and argv[1] in _CLICK_SUBCOMMANDS
+    """True when argv looks like a click subcommand attempt.
+
+    Heuristic: route to click when argv[1] does NOT start with '-'
+    (legacy argparse flags all begin with '-' / '--'). Unknown subcommand
+    names go to click too, so click's did-you-mean can suggest a fix
+    instead of argparse's unhelpful 'unrecognized arguments' error.
+    Explicit help flags also route to click.
+    """
+    if len(argv) < 2:
+        return False
+    first = argv[1]
+    if first in ("-h", "--help"):
+        return True
+    return not first.startswith("-")
 
 
 if __name__ == "__main__":
