@@ -538,10 +538,15 @@ class Reporter:
     def _gui_base_url(self) -> str:
         """Return the PCE web console base URL for CTA deep links.
 
-        Strips /api/v2 (and v1) suffixes from the configured API URL so the
-        result points at the web GUI root.  Returns '' if no URL is configured
-        — callers must treat '' as "skip CTA".
+        Resolution order:
+        1. web_gui.public_url (explicit GUI base, no stripping needed)
+        2. active PCE API URL with /api/v2 (and v1) suffixes stripped
+
+        Returns '' if no URL is configured — callers must treat '' as "skip CTA".
         """
+        web_gui_url = str(self.cm.config.get("web_gui", {}).get("public_url", "")).strip()
+        if web_gui_url:
+            return web_gui_url.rstrip("/")
         raw = self._active_pce_url().rstrip("/")
         if not raw:
             return ""
