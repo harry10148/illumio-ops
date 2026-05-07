@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import orjson
@@ -59,11 +59,18 @@ class EventsIngestor:
             self._wm.advance(self.SOURCE, last_timestamp=_parse_iso(last), last_href=last_href)
         return inserted
 
-    def _since_cursor(self) -> Optional[str]:
+    def _since_cursor(self) -> str:
+        # PCE rejects timestamps without a tz marker (HTTP 406 invalid_timestamp).
+        # SQLite + SQLAlchemy DateTime(timezone=True) returns naive datetimes on
+        # read, so always re-attach UTC. Cold start defaults to 24h ago to mirror
+        # get_traffic_flows_async.
         wm = self._wm.get(self.SOURCE)
-        if wm and wm.last_timestamp:
-            return wm.last_timestamp.isoformat()
-        return None
+        last = wm.last_timestamp if wm else None
+        if last is None:
+            last = datetime.now(timezone.utc) - timedelta(hours=24)
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=timezone.utc)
+        return last.replace(microsecond=0).isoformat()
 
     def _insert_batch(self, events: list[dict]) -> int:
         now = datetime.now(timezone.utc)

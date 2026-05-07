@@ -84,3 +84,74 @@ def test_ingestor_switches_to_async_when_forced(session_factory):
                          async_threshold=10000)
     ing.run_once(force_async=True)
     assert fake.async_calls == 1
+
+
+class _RecordingApiClient:
+    """Captures the `since` value passed to get_events so we can assert format."""
+    def __init__(self):
+        self.since_seen = None
+
+    def get_events(self, max_results=500, since=None, rate_limit=False, **kw):
+        self.since_seen = since
+        return []
+
+    def get_events_async(self, since=None, rate_limit=False, **kw):
+        self.since_seen = since
+        return []
+
+
+def test_since_cursor_cold_start_returns_24h_ago_with_tz(session_factory):
+    from src.pce_cache.ingestor_events import EventsIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    api = _RecordingApiClient()
+    ing = EventsIngestor(api=api, session_factory=session_factory,
+                         watermark=WatermarkStore(session_factory),
+                         async_threshold=10000)
+    ing.run_once()
+
+    assert api.since_seen is not None and api.since_seen != ""
+    parsed = datetime.fromisoformat(api.since_seen)
+    assert parsed.tzinfo is not None, "PCE rejects naive timestamps (HTTP 406)"
+    delta = datetime.now(timezone.utc) - parsed
+    assert timedelta(hours=23, minutes=55) < delta < timedelta(hours=24, minutes=5)
+
+
+def test_since_cursor_normalises_naive_watermark_to_utc(session_factory):
+    from src.pce_cache.ingestor_events import EventsIngestor
+    from src.pce_cache.models import IngestionWatermark
+    from src.pce_cache.watermark import WatermarkStore
+
+    naive_ts = datetime(2026, 5, 1, 12, 0, 0)  # mimics SQLite read-back
+    with session_factory.begin() as s:
+        s.add(IngestionWatermark(source="events", last_timestamp=naive_ts,
+                                 last_sync_at=naive_ts, last_status="ok"))
+
+    api = _RecordingApiClient()
+    ing = EventsIngestor(api=api, session_factory=session_factory,
+                         watermark=WatermarkStore(session_factory),
+                         async_threshold=10000)
+    ing.run_once()
+
+    assert api.since_seen == "2026-05-01T12:00:00+00:00"
+
+
+def test_since_cursor_preserves_aware_watermark(session_factory):
+    from src.pce_cache.ingestor_events import EventsIngestor
+    from src.pce_cache.models import IngestionWatermark
+    from src.pce_cache.watermark import WatermarkStore
+
+    aware_ts = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+    with session_factory.begin() as s:
+        s.add(IngestionWatermark(source="events", last_timestamp=aware_ts,
+                                 last_sync_at=aware_ts, last_status="ok"))
+
+    api = _RecordingApiClient()
+    ing = EventsIngestor(api=api, session_factory=session_factory,
+                         watermark=WatermarkStore(session_factory),
+                         async_threshold=10000)
+    ing.run_once()
+
+    parsed = datetime.fromisoformat(api.since_seen)
+    assert parsed.tzinfo is not None
+    assert parsed.astimezone(timezone.utc) == aware_ts
