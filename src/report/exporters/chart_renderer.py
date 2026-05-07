@@ -76,6 +76,23 @@ rcParams["font.family"] = _filter_existing_font_families([
 ])
 rcParams["axes.unicode_minus"] = False  # minus sign glitch fix
 
+# D.3 共享 signal palette — must match --color-signal-* in app.css and report_css.py
+SIGNAL_COLORS = {
+    'success':  '#2D9B5E',  # Allowed / Online / passing
+    'warning':  '#C47A00',  # Potentially-Blocked / Warning
+    'danger':   '#D93025',  # Blocked / Critical / Lost
+    'info':     '#0077CC',  # Info / metadata
+}
+
+# Convenience aliases for verdict labels (Illumio terminology — 留英 per OQ-10)
+VERDICT_COLORS = {
+    'Allowed':              SIGNAL_COLORS['success'],
+    'Blocked':              SIGNAL_COLORS['danger'],
+    'Potentially-Blocked':  SIGNAL_COLORS['warning'],
+    'Potentially_Blocked':  SIGNAL_COLORS['warning'],  # alt spelling
+    'Unknown':              SIGNAL_COLORS['info'],
+}
+
 _PALETTE = [
     "#FF5500", "#FFA22F", "#299B65", "#375379", "#857ad6",
     "#38BDF8", "#F43F51", "#10B981", "#F59E0B", "#6366F1",

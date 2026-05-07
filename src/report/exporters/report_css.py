@@ -11,6 +11,27 @@ FONT_LINK = (
     'family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">'
 )
 
+REPORT_FONT_FACE_CSS = """\
+@font-face {
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 400 700;
+  src: url('/static/fonts/SpaceGrotesk-VF.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  src: url('/static/fonts/Inter-VF.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  src: url('/static/fonts/JetBrainsMono-VF.woff2') format('woff2');
+}
+"""
+
 BASE_CSS = """\
   :root {
     --cyan-120:#1A2C32; --cyan-110:#24393F; --cyan-100:#2D454C; --cyan-90:#325158;
@@ -25,6 +46,16 @@ BASE_CSS = """\
     --shadow-panel-strong: 0 10px 24px rgba(26,44,50,.10);
     --radius-panel: 10px;
     --radius-compact: 8px;
+  }
+  /* Track A — Report direction §6.2 B (editorial-magazine) parallel tokens */
+  :root {
+    --font-heading-report: 'Space Grotesk', 'Montserrat', system-ui, sans-serif;
+    --font-body-report:    'Inter', system-ui, sans-serif;
+    --font-mono-report:    'JetBrains Mono', ui-monospace, monospace;
+    --color-signal-success: #2D9B5E;
+    --color-signal-warning: #C47A00;
+    --color-signal-danger:  #D93025;
+    --color-signal-info:    #0077CC;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Montserrat', -apple-system, sans-serif; background: var(--tan); color: var(--slate); }
@@ -391,7 +422,10 @@ def build_css(exporter_type: str) -> str:
         "ven": VEN_CSS,
         "policy_usage": POLICY_USAGE_CSS,
     }.get(exporter_type, "")
-    return f"{FONT_LINK}\n<style>\n{BASE_CSS}\n{SIDEBAR_CSS}\n{EXEC_SUMMARY_CSS}\n{extra}\n</style>\n"
+    return (
+        f"{FONT_LINK}\n"
+        f"<style>\n{REPORT_FONT_FACE_CSS}\n{BASE_CSS}\n{SIDEBAR_CSS}\n{EXEC_SUMMARY_CSS}\n{extra}\n</style>\n"
+    )
 
 TABLE_JS = r"""
 <script>

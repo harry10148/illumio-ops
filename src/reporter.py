@@ -18,6 +18,14 @@ PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
 STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
 
+# D.3 signal palette — used by _render_cta for cross-surface consistent CTA color.
+SIGNAL_HEX = {
+    'success': '#2D9B5E',
+    'warning': '#C47A00',
+    'danger':  '#D93025',
+    'info':    '#0077CC',
+}
+
 class Reporter:
     def __init__(self, config_manager: Any) -> None:
         self.cm = config_manager
@@ -544,20 +552,24 @@ class Reporter:
         return raw
 
     @staticmethod
-    def _render_cta(label: str, url: str) -> str:
+    def _render_cta(label: str, url: str, severity: str = 'info') -> str:
         """Render a bulletproof CTA button (Outlook-safe table-based).
 
         Both label and url are HTML-escaped inside this helper.
         Callers must urlencode any dynamic id values in url query strings
         before passing url here.
+
+        severity: one of 'success', 'warning', 'danger', 'info' (default 'info').
+        Picks bg color from SIGNAL_HEX dict.
         """
         import html as _html
         label_html = _html.escape(label)
         url_html = _html.escape(url, quote=True)
+        bg = SIGNAL_HEX.get(severity, SIGNAL_HEX['info'])
         return (
             f'<table role="presentation" border="0" cellpadding="0" cellspacing="0" '
             f'style="margin:16px 0;">'
-            f'<tr><td bgcolor="#0077CC" style="border-radius:4px;">'
+            f'<tr><td bgcolor="{bg}" style="border-radius:4px;">'
             f'<a href="{url_html}" '
             f'style="display:inline-block;padding:10px 20px;color:#FFFFFF;'
             f'text-decoration:none;font-weight:600;">{label_html}</a>'
@@ -1249,7 +1261,7 @@ class Reporter:
 """
                 )
             health_cta = (
-                self._render_cta(t('mail_cta_view_health'), f'{gui_base}/dashboard?tab=health')
+                self._render_cta(t('mail_cta_view_health'), f'{gui_base}/dashboard?tab=health', severity='success')
                 if gui_base else ""
             )
             health_section_html = f"""
@@ -1291,7 +1303,7 @@ class Reporter:
                     row_html += f"<tr><td colspan='4' style='padding:14px 14px 16px; background:#FCFAF6; border-bottom:1px solid #E6E2D8;'>{detail_html}</td></tr>"
                 rows.append(row_html)
             event_cta = (
-                self._render_cta(t('mail_cta_view_event'), f'{gui_base}/dashboard?tab=events')
+                self._render_cta(t('mail_cta_view_event'), f'{gui_base}/dashboard?tab=events', severity='danger')
                 if gui_base else ""
             )
             event_section_html = f"""
@@ -1335,7 +1347,7 @@ class Reporter:
 """
                 )
             traffic_cta = (
-                self._render_cta(t('mail_cta_view_traffic'), f'{gui_base}/traffic')
+                self._render_cta(t('mail_cta_view_traffic'), f'{gui_base}/traffic', severity='warning')
                 if gui_base else ""
             )
             traffic_section_html = f"""
@@ -1378,7 +1390,7 @@ class Reporter:
 """
                 )
             metric_cta = (
-                self._render_cta(t('mail_cta_view_metric'), f'{gui_base}/dashboard?tab=metrics')
+                self._render_cta(t('mail_cta_view_metric'), f'{gui_base}/dashboard?tab=metrics', severity='info')
                 if gui_base else ""
             )
             metric_section_html = f"""
