@@ -598,6 +598,43 @@ class Reporter:
         )
 
     @staticmethod
+    def _render_severity_badge(severity: str) -> str:
+        """Render an inline severity badge — small colored pill with a 4-letter
+        label (CRIT / HIGH / WARN / OK / INFO).
+
+        Uses inline `bgcolor` attr + `style=background:` dual-write so Outlook
+        renders the color correctly. Defaults to 'INFO' on unknown input.
+        """
+        import html as _html
+        sev_norm = (severity or '').lower().strip()
+        mapping = {
+            'critical': ('CRIT', SIGNAL_HEX['danger']),
+            'crit':     ('CRIT', SIGNAL_HEX['danger']),
+            'danger':   ('CRIT', SIGNAL_HEX['danger']),
+            'high':     ('HIGH', SIGNAL_HEX['danger']),
+            'emerg':    ('CRIT', SIGNAL_HEX['danger']),
+            'alert':    ('HIGH', SIGNAL_HEX['danger']),
+            'err':      ('HIGH', SIGNAL_HEX['danger']),
+            'error':    ('HIGH', SIGNAL_HEX['danger']),
+            'warning':  ('WARN', SIGNAL_HEX['warning']),
+            'warn':     ('WARN', SIGNAL_HEX['warning']),
+            'medium':   ('WARN', SIGNAL_HEX['warning']),
+            'success':  ('OK',   SIGNAL_HEX['success']),
+            'ok':       ('OK',   SIGNAL_HEX['success']),
+            'info':     ('INFO', SIGNAL_HEX['info']),
+            'low':      ('INFO', SIGNAL_HEX['info']),
+        }
+        label, bg = mapping.get(sev_norm, mapping['info'])
+        label_html = _html.escape(label)
+        return (
+            f'<span bgcolor="{bg}" '
+            f'style="display:inline-block;padding:2px 6px;margin-right:6px;'
+            f'background:{bg};color:#FFFFFF;font-size:11px;font-weight:700;'
+            f'font-family:Arial,sans-serif;border-radius:3px;letter-spacing:0.5px;">'
+            f'{label_html}</span>'
+        )
+
+    @staticmethod
     def _build_preheader_text(issues_list, max_chars=90):
         """Build a 50-90 char standalone preview shown in inbox.
 
@@ -1272,11 +1309,12 @@ class Reporter:
         if self.health_alerts:
             rows = []
             for alert in self.health_alerts:
+                sev_badge = self._render_severity_badge(alert.get('severity', alert.get('status', 'info')))
                 rows.append(
                     f"""
             <tr>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('time',''))}</td>
-              <td style="{td_style} font-weight:700; color:#BE122F;">{esc(alert.get('status',''))}</td>
+              <td style="{td_style} font-weight:700; color:#BE122F;">{sev_badge}{esc(alert.get('status',''))}</td>
               <td style="{td_style}">{fmt_multiline(alert.get('details',''))}</td>
             </tr>
 """
@@ -1309,13 +1347,12 @@ class Reporter:
         if self.event_alerts:
             rows = []
             for alert in self.event_alerts:
-                sev_color = "#BE122F" if alert.get("severity") in ["crit", "emerg", "alert", "err", "error"] else "#F97607"
-                sev_label = severity_labels.get(str(alert.get("severity", "")).lower(), str(alert.get("severity", "")).upper())
+                sev_badge = self._render_severity_badge(alert.get('severity', 'info'))
                 row_html = f"""
             <tr>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('time',''))}</td>
               <td style="{td_style}"><strong>{esc(alert.get('rule',''))}</strong><br><small style="color:#6F7274;">{esc(alert.get('desc',''))}</small></td>
-              <td style="{td_style} text-align:center;"><span style="background:{sev_color}; color:#FFFFFF; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;">{esc(sev_label)} ({esc(alert.get('count',0))})</span></td>
+              <td style="{td_style} text-align:center;">{sev_badge}<small>({esc(alert.get('count',0))})</small></td>
               <td style="{td_style}">{esc(alert.get('source',''))}</td>
             </tr>
 """
@@ -1352,10 +1389,11 @@ class Reporter:
         if self.traffic_alerts:
             rows = []
             for alert in self.traffic_alerts:
+                sev_badge = self._render_severity_badge(alert.get('severity', 'warning'))
                 rows.append(
                     f"""
             <tr>
-              <td style="{td_style} font-weight:700; color:#FF5500;">{esc(alert.get('rule',''))}</td>
+              <td style="{td_style} font-weight:700; color:#FF5500;">{sev_badge}{esc(alert.get('rule',''))}</td>
               <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(alert.get('count',0))}</td>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('criteria',''))}</td>
             </tr>
@@ -1395,10 +1433,11 @@ class Reporter:
         if self.metric_alerts:
             rows = []
             for alert in self.metric_alerts:
+                sev_badge = self._render_severity_badge(alert.get('severity', 'info'))
                 rows.append(
                     f"""
             <tr>
-              <td style="{td_style} font-weight:700; color:#313638;">{esc(alert.get('rule',''))}</td>
+              <td style="{td_style} font-weight:700; color:#313638;">{sev_badge}{esc(alert.get('rule',''))}</td>
               <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(alert.get('count',0))}</td>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('criteria',''))}</td>
             </tr>
