@@ -185,3 +185,48 @@ def test_rule_list_shows_threshold():
 
     assert result.exit_code == 0
     assert "42" in result.output
+
+
+def test_rule_list_json_output():
+    """--json flag emits parseable JSON list of rules."""
+    import json
+    from src.cli.root import cli
+    from src.config import ConfigManager
+
+    rules = [
+        {"type": "event", "name": "login_fail", "enabled": True, "threshold": 5},
+        {"type": "traffic", "name": "lateral_move", "enabled": False},
+    ]
+    config = _create_default_config(rules=rules)
+
+    with patch.object(ConfigManager, '__init__', lambda self, *args, **kwargs: None):
+        with patch.object(ConfigManager, 'config', config, create=True):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["--json", "rule", "list"])
+
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert isinstance(data, list)
+    assert len(data) == 2
+    assert data[0]["name"] == "login_fail"
+    assert data[0]["index"] == 1
+    assert data[1]["enabled"] is False
+
+
+def test_rule_edit_invalid_id_exits_usage():
+    """rule edit with out-of-range rule_id exits with EXIT_USAGE (64)."""
+    from src.cli.root import cli
+    from src.cli._exit_codes import EXIT_USAGE
+    from src.config import ConfigManager
+
+    config = _create_default_config(rules=[
+        {"type": "event", "name": "only_rule", "enabled": True},
+    ])
+
+    with patch.object(ConfigManager, '__init__', lambda self, *args, **kwargs: None):
+        with patch.object(ConfigManager, 'config', config, create=True):
+            runner = CliRunner()
+            result = runner.invoke(cli, ["rule", "edit", "99"])
+
+    assert result.exit_code == EXIT_USAGE
+    assert "out of range" in result.output
