@@ -6,6 +6,84 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to a `<major>.<minor>.<patch>-<topic-slug>` versioning
 scheme aligned with the git tag conventions.
 
+## [3.25.0-tracks-abcd] — 2026-05-07
+
+UX/CLI/Report/Email global-assessment sprint — Tracks A, B, C, D were
+planned, implemented, and merged to `main`. All 16 assessment cards
+(a1–d3) reached the ≥2 rubric target; sprint closed. Track E (Flask →
+FastAPI/Starlette + SSE migration) was gated and dead-lettered as
+over-engineering once a1/c1 reached ≥2 through cheaper paths.
+
+### Track A — Visual System
+
+- Vendored variable woff2 fonts: Space Grotesk (header), Inter (body),
+  JetBrains Mono (mono) — ~140 KB total, served from `src/static/`.
+- Migrated GUI `--header-font` / `--body-font` / `--mono-font` and
+  `templates/login.html` to the new vendored families.
+- D.3 signal palette applied across surfaces:
+  `success #2D9B5E`, `warning #C47A00`, `danger #D93025`, `info #0077CC`.
+- Email CTAs and `chart_renderer` adopt the same palette so reports,
+  GUI, and email stay visually consistent.
+
+### Track B — CLI Output Layer
+
+- New shared helpers:
+  - `src/cli/_exit_codes.py` — sysexits.h-aligned exit code map and
+    `exit_for_exception()` dispatcher; SIGTERM now exits 143.
+  - `src/cli/_output.py` — `echo_info` / `echo_warning` / `echo_error`
+    / `echo_json`, plus `is_json` / `is_quiet` / `is_verbose` flag
+    accessors with TTY / `NO_COLOR` awareness.
+- 20 commands migrated across `cache`, `rule`, `workload`, `status`,
+  `report`, `monitor`, `gui`, `siem`, `config` to the new helpers.
+- Top-level excepthook routes uncaught exceptions through the typed
+  exit-code dispatcher so error reporting and shell wrappers behave
+  consistently.
+
+### Track C — CLI Entry Unification
+
+- `did-you-mean` suggester at the root: `_GroupWithSuggestions`
+  overrides `resolve_command` and surfaces close subcommand matches
+  for typos.
+- `report generate-{traffic,audit,ven-status,policy-usage}` verb
+  aliases; bare-noun forms still work but emit a deprecation hint.
+- Explicit `illumio-ops shell` subcommand for the interactive REPL;
+  bare invocation now hints rather than silently falling through.
+- `illumio-ops completion install [bash|zsh|fish]` for shell
+  autocompletion install.
+- Dispatcher heuristic: when `argv[1]` does not start with `-`, route
+  to click — including unknown names — so typos benefit from
+  `did-you-mean` instead of argparse's `unrecognized arguments` error.
+- New entry-equivalence reference: `docs/cli-command-map.md`.
+
+### Track D — Email Quick Patches
+
+- `multipart/alternative` with plaintext fallback (`reporter.py`
+  dual-render path) so non-HTML mail clients render a usable text
+  body.
+- Bulletproof CTA buttons with MSO/VML conditional wraps for Outlook.
+- Per-issue severity badge inline component wired into 4 sections
+  (the `Why` block of each issue type).
+- Inline runbook link wired into 4 sections (the `Action` block).
+- Caught and fixed a real bug: `_gui_base_url()` was missing
+  `web_gui.public_url` config-key fallback.
+- MJML pipeline intentionally **not** adopted — for 3 templates
+  totalling ~3 KB, adding a Node.js dependency is YAGNI; manual
+  patches reach the same rubric target.
+
+### Tools
+
+- `scripts/a6_https_smoke.py` — DevTools-driven HTTPS layout-break
+  smoke verifier (Playwright + Chromium); confirmed Track A vendoring
+  resolved hypotheses 1–3 of the a6 hand-off (0 mixed-content, 0 page
+  errors, 0 network failures, fonts all local-loaded).
+
+### Verified
+
+- Tests: 968 passed, 1 skipped (the pre-existing `test_i18n_audit.py`
+  skip is unrelated to this sprint).
+- Assessment §3 rubric: all 16 cards (a1–d3) at ≥2.
+- 0 regressions across CLI / GUI / Report / Email surfaces.
+
 ## [3.24.0-h6-cli-menus] — 2026-05-02
 
 H6 sub-plan from Batch 4 — final code-review-fixes item: split

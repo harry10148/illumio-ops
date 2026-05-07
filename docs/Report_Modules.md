@@ -86,7 +86,7 @@ A traffic report contains **15 analytical modules** plus the Security Findings s
 
 ## 4. Security Findings Rules
 
-The Security Findings section runs **19 automated detection rules** against every traffic dataset and groups results by severity (CRITICAL → INFO) and category.
+The Security Findings section runs **24 automated detection rules** against every traffic dataset and groups results by severity (CRITICAL → INFO) and category.
 
 **Rule series overview:**
 
@@ -94,6 +94,7 @@ The Security Findings section runs **19 automated detection rules** against ever
 |:---|:---|:---|
 | **B-series** | B001–B009 | Ransomware exposure, policy coverage gaps, behavioural anomalies |
 | **L-series** | L001–L010 | Lateral movement, credential theft, blast-radius paths, data exfiltration |
+| **R-series** | R01–R05 | Draft Policy Decision conflicts (auto-enabled when ruleset uses `draft_pd`) — see [Security Rules Reference](Security_Rules_Reference.md#r-series-draft-policy-decision-rules) |
 
 **Quick reference:**
 

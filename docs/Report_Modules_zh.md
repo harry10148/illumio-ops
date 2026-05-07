@@ -86,7 +86,7 @@ illumio-ops cache backfill --source events --since YYYY-MM-DD --until YYYY-MM-DD
 
 ## 4. 安全發現規則
 
-安全發現章節對每個流量資料集執行 **19 條自動偵測規則**，並依嚴重性（CRITICAL → INFO）與分類群組顯示結果。
+安全發現章節對每個流量資料集執行 **24 條自動偵測規則**，並依嚴重性（CRITICAL → INFO）與分類群組顯示結果。
 
 **規則系列概觀：**
 
@@ -94,6 +94,7 @@ illumio-ops cache backfill --source events --since YYYY-MM-DD --until YYYY-MM-DD
 |:---|:---|:---|
 | **B 系列** | B001–B009 | 勒索軟體暴露、政策覆蓋缺口、行為異常 |
 | **L 系列** | L001–L010 | 橫向移動、憑證竊取、爆炸半徑路徑、資料外洩 |
+| **R 系列** | R01–R05 | Draft Policy Decision 衝突（ruleset 使用 `draft_pd` 時自動啟用） — 詳見 [安全規則參考](Security_Rules_Reference_zh.md#r-系列draft-policy-decision-規則) |
 
 **快速參考：**
 

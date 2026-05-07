@@ -2,6 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **STATUS (as of 2026-05-07): Partially shipped.**
+> Implemented and present in `src/report/analysis/`: `mod_draft_actions`, `mod_draft_summary`, `mod_ringfence`, `mod_change_impact`.
+> **Deferred — never implemented:** `mod_enforcement_rollout`, `mod_exfiltration_intel`. Their i18n keys were removed from `src/i18n_en.json` / `src/i18n_zh_TW.json` because the modules do not exist; treat the corresponding tasks (#6 and #8) below as **NOT TO IMPLEMENT** unless the design is reopened. The remaining tasks in this plan are completed.
+
 **Goal:** Add five new analysis modules layered on the draft_policy_decision foundation already shipped in policy-decision-alignment B2: actionable Override Deny / Allowed Across Boundary remediation (`mod_draft_actions`), Enforcement Rollout Plan (`mod_enforcement_rollout`), Application Ringfence view (`mod_ringfence`), Change Impact via JSON snapshots (`mod_change_impact`), and Exfiltration / threat-intel hooks (`mod_exfiltration_intel`).
 
 **Architecture:** Each new module is a standalone analyzer in `src/report/analysis/` returning a result dict consumed by `html_exporter`. R3.4 introduces a small JSON snapshot store under `reports/snapshots/traffic/` with retention managed at the end of each report generation. No new top-level dependencies; everything builds on existing pandas / Plotly / openpyxl stack.

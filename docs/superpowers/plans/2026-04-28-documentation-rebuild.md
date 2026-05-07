@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **STATUS (as of 2026-05-07):** Plan executed; documentation has since advanced past v3.20.0. Two R3 modules listed in §4.3 — `mod_enforcement_rollout` and `mod_exfiltration_intel` — were **deferred and never implemented**, so any task asking you to document them is N/A (the modules and their i18n keys do not exist in the codebase). Document only the four R3 modules that shipped: `mod_change_impact`, `mod_draft_actions`, `mod_draft_summary`, `mod_ringfence`.
+
 **Goal:** Rebuild the project documentation to v3.20.0 quality with full EN/ZH parity, cross-document navigation, and coverage of every CLI subcommand, report module, security rule, SIEM transport, and the offline bundle workflow that was lost in commit `ed20df0`.
 
 **Architecture:** Six-phase rebuild — restore baselines from `git show ed20df0~1`, refresh to v3.20.0 by reading current source, supplement with NotebookLM-extracted Illumio platform background, install a uniform Documentation Map header in every file, mirror EN content into Traditional Chinese, and gate completion on a 9-point acceptance checklist.

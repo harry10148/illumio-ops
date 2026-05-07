@@ -1,5 +1,7 @@
 # Documentation Rebuild Design — 2026-04-28
 
+> **STATUS (as of 2026-05-07):** The R3 module list in this spec is aspirational, not historical. `mod_change_impact`, `mod_draft_actions`, `mod_draft_summary`, and `mod_ringfence` shipped. **`mod_enforcement_rollout` and `mod_exfiltration_intel` were deferred and never implemented**; the user-facing documentation for them has been retracted (no module file, no i18n keys). Treat any rebuild section that asks for documentation of those two modules as N/A.
+
 ## Background
 
 Commit `ed20df0` ("chore: consolidate docs and normalize report detail output", 2026-04-27) over-aggressively pruned the project documentation:

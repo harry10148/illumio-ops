@@ -16,7 +16,7 @@
 | Troubleshooting | [Troubleshooting.md](docs/Troubleshooting.md) | [Troubleshooting_zh.md](docs/Troubleshooting_zh.md) |
 <!-- END:doc-map -->
 
-![Version](https://img.shields.io/badge/Version-v3.24.0--h6--cli--menus-blue?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v3.25.0--tracks--abcd-blue?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-yellow?style=flat-square&logo=python&logoColor=white)
 ![API](https://img.shields.io/badge/Illumio_API-v25.2-green?style=flat-square)
 
@@ -51,7 +51,7 @@ If you only need the PCE web console for occasional manual queries, you don't ne
 | **Security Event Monitoring** | Tracks PCE audit events with anchor-based timestamps — guaranteed zero duplicate alerts |
 | **High-Performance Traffic Engine** | Aggregates rules into a single bulk API query; O(1) memory streaming for large datasets |
 | **Advanced Report Engine** | 15-module traffic reports with **Bulk-Delete** management; 4-module audit reports, policy usage reports, and VEN Status inventory reports — HTML, CSV, PDF, XLSX, or all formats |
-| **Security Findings** | 19 automated rules: B-series (Ransomware, Coverage) + L-series (Lateral Movement, Exfiltration) + R-series (Draft Policy alignment) |
+| **Security Findings** | 24 automated rules: B-series (B001–B009: Ransomware, Coverage) + L-series (L001–L010: Lateral Movement, Exfiltration) + R-series (R01–R05: Draft Policy alignment) |
 | **Report Schedules** | Cron-style recurring reports (daily/weekly/monthly) with automatic email delivery |
 | **Rule Scheduler** | Auto enable/disable PCE rules; **three-layer Draft protection** prevents accidental provisioning |
 | **Workload Quarantine** | Isolate compromised workloads with Quarantine labels; supports IP/CIDR/subnet search |
@@ -123,23 +123,29 @@ Plain text rotates at `logs/illumio_ops.log` (10 MB × 10). For SIEM ingest, ena
 
 ```text
 illumio-ops/
-├── illumio-ops.py          # Entry point
+├── illumio-ops.py          # Entry point — dispatcher routes to click subcommands or legacy argparse
 ├── src/
-│   ├── main.py                 # CLI argparse, daemon/GUI orchestration
+│   ├── main.py                 # Legacy argparse path (--monitor / --gui / --report); delegates to src/cli for new flags
 │   ├── api_client.py           # PCE REST API (async jobs, native filters, O(1) streaming)
+│   ├── api/                    # PCE API helpers (async jobs, labels, traffic queries)
 │   ├── analyzer.py             # Rule engine (flow matching, event analysis, state mgmt)
-│   ├── gui.py                  # Flask Web GUI (~40 JSON API endpoints, auth, CSRF)
+│   ├── cli/                    # Click subcommands + shared output / exit-code helpers (root, monitor, gui_cmd, report, rule, workload, cache, siem, status, config, menus/)
+│   ├── gui/                    # Flask Web GUI package — shell + Blueprint routes (auth/admin/dashboard/events/reports/rules/rule_scheduler/actions/config) — ~70 routes total
 │   ├── config.py               # ConfigManager (Argon2id GUI password, atomic writes)
 │   ├── reporter.py             # Multi-channel alert dispatch (SMTP, LINE, Webhook)
-│   ├── i18n.py                 # i18n engine (EN/ZH_TW, ~1400+ string keys)
+│   ├── i18n/                   # i18n engine (engine.py + JSON data) — EN/ZH_TW with ~2,200 string keys
 │   ├── events/                 # Event pipeline (catalog, normalize, dedup, throttle)
-│   ├── report/                 # Report engine (15 traffic modules + audit + policy usage)
+│   ├── report/                 # Report engine (15 traffic modules + audit + policy usage + R3 intelligence add-ons)
+│   ├── scheduler/              # Report-schedule cron jobs
+│   ├── settings/               # Interactive settings wizards (split from legacy settings.py)
 │   ├── pce_cache/              # SQLite WAL cache + ingestors
 │   ├── siem/                   # SIEM forwarder (CEF/JSON/Syslog, UDP/TCP/TLS/HEC)
-│   └── alerts/                 # Alert plugins (mail, LINE, webhook)
-├── config/                     # config.json, alerts.json, report_config.yaml
+│   ├── alerts/                 # Alert plugins (mail, LINE, webhook)
+│   ├── templates/              # Flask HTML templates (login, index)
+│   └── static/                 # Vendored fonts (Space Grotesk / Inter / JetBrains Mono), JS, CSS
+├── config/                     # config.json, alerts.json, report_config.yaml, rule_schedules.json
 ├── docs/                       # EN + ZH_TW documentation
-├── tests/                      # 19 test files (116 tests)
+├── tests/                      # ~178 test files (~970 tests)
 ├── deploy/                     # systemd (Ubuntu/RHEL) + NSSM (Windows) service configs
-└── scripts/                    # Utility scripts
+└── scripts/                    # Utility scripts (offline bundle build, install/uninstall, preflight)
 ```

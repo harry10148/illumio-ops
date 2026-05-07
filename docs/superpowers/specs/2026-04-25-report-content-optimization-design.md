@@ -1,8 +1,10 @@
 # Report Content Optimization Design
 
 **Date:** 2026-04-25
-**Status:** Design approved (brainstorming session); ready for plan writing
+**Status:** Design approved (brainstorming session); R3 partially shipped — see deferred-modules note below.
 **Target tags:** v3.18.0-report-semantics (R0+R1) → v3.19.0-report-compact (R2) → v3.20.0-report-intelligence (R3)
+
+> **STATUS (as of 2026-05-07):** R3 is partially shipped. `mod_draft_actions`, `mod_draft_summary`, `mod_ringfence`, and `mod_change_impact` exist in `src/report/analysis/`. **`mod_enforcement_rollout` and `mod_exfiltration_intel` were deferred and have no implementation in the codebase**; references to them below describe the original design, not current code. The corresponding i18n keys have been removed.
 
 ## 1. Background
 

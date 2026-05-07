@@ -246,11 +246,17 @@ illumio-ops/
 │   │   ├── async_jobs.py      # AsyncJobManager: async query job lifecycle + state persistence
 │   │   └── traffic_query.py   # TrafficQueryBuilder: traffic payload construction + streaming
 │   ├── cli/                   # Click subcommand groups registered to illumio-ops entry point
+│   │   ├── root.py            # root click group + version flag + did-you-mean suggester (_GroupWithSuggestions)
 │   │   ├── cache.py           # cache backfill / status / retention subcommands
 │   │   ├── config.py          # config show / set subcommands
 │   │   ├── monitor.py         # monitor daemon subcommand
-│   │   ├── report.py          # report generate subcommand
-│   │   ├── root.py            # root click group + version flag
+│   │   ├── report.py          # report generate subcommands (verb aliases: generate-traffic / -audit / -ven-status / -policy-usage)
+│   │   ├── _output.py         # echo_info / echo_warning / echo_error / echo_json + is_json/is_quiet/is_verbose helpers (Track B)
+│   │   ├── _exit_codes.py     # sysexits.h-aligned exit-code map + exit_for_exception() dispatcher (Track B)
+│   │   ├── _completion.py     # `completion install [bash|zsh|fish]` autocompletion installer (Track C)
+│   │   ├── _errors.py         # Top-level uncaught-exception handler
+│   │   ├── _runtime.py        # Daemon startup logic shared between argparse and click paths
+│   │   ├── menus/             # Interactive wizard functions (event / system_health / traffic / bandwidth / manage_rules / alert / web_gui / report_schedule)
 │   │   └── ...                # siem.py, workload.py, gui_cmd.py, rule.py, status.py
 │   ├── events/                # Event pipeline — polling, matching, normalization
 │   │   ├── poller.py          # EventPoller: watermark-based polling with dedup semantics
@@ -301,12 +307,12 @@ illumio-ops/
 │   ├── interfaces.py          # typing.Protocol definitions: IApiClient, IReporter, IEventStore
 │   ├── href_utils.py          # Canonical extract_id(href) helper
 │   ├── loguru_config.py       # Central loguru setup: rotating file + TTY console + optional JSON SIEM sink
-│   ├── gui.py                 # Flask Web application (~40 JSON API endpoints), login rate limiting, CSRF synchronizer token
-│   ├── settings.py            # CLI interactive menus for rule/alert configuration
+│   ├── gui/                   # Flask Web application package — shell + Blueprint routes (auth/admin/dashboard/events/reports/rules/rule_scheduler/actions/config), ~70 routes total, login rate limiting, CSRF synchronizer token
+│   ├── settings/              # Interactive settings wizards (split from legacy settings.py in v3.24.0-h6)
 │   ├── report_scheduler.py    # Scheduled report generation and email delivery
 │   ├── rule_scheduler.py      # Policy rule automation (recurring/one-time schedules, provision)
 │   ├── rule_scheduler_cli.py  # CLI and Web GUI interface for rule scheduler
-│   ├── i18n.py                # Internationalization dictionary (EN/ZH_TW) and language switching; _I18nState thread-safe singleton
+│   ├── i18n/                  # Internationalization package — `engine.py` (EN/ZH_TW switching, _I18nState thread-safe singleton) + JSON data files
 │   ├── utils.py               # Helpers: logging setup, ANSI colors, unit formatting, CJK width; _InputState thread-safe singleton
 │   ├── templates/             # Jinja2 HTML templates for Web GUI (SPA)
 │   ├── static/                # CSS/JS frontend assets
@@ -315,7 +321,7 @@ illumio-ops/
 │       ├── audit_generator.py         # Audit log report orchestrator (4 modules)
 │       ├── ven_status_generator.py    # VEN status inventory report
 │       ├── policy_usage_generator.py  # Policy rule usage analysis report
-│       ├── rules_engine.py            # 19 automated Security Findings rules (B/L series)
+│       ├── rules_engine.py            # 19 B/L-series rules (B001–B009 + L001–L010); R-series (R01–R05) rules live in src/report/rules/
 │       ├── snapshot_store.py          # KPI snapshot store for Change Impact (reports/snapshots/)
 │       ├── trend_store.py             # Trend KPI archive (per report type)
 │       ├── analysis/                  # Per-module analysis logic
@@ -439,9 +445,9 @@ For channel-specific configuration (Email/LINE/Webhook activation, payload schem
 - **PCE Profile Management**: `add_pce_profile()`, `update_pce_profile()`, `activate_pce_profile()`, `remove_pce_profile()`, `list_pce_profiles()` — supports multi-PCE environments with profile switching.
 - **Report Schedule Management**: `add_report_schedule()`, `update_report_schedule()`, `remove_report_schedule()`, `list_report_schedules()`.
 
-### 3.5 `gui.py` — Web GUI
+### 3.5 `src/gui/` — Web GUI
 
-**Architecture**: Flask backend exposing ~40 JSON API endpoints, consumed by a Vanilla JS frontend (`templates/index.html`).
+**Architecture**: Flask backend exposing ~70 routes (mostly JSON API endpoints, plus the SPA shell + login HTML), consumed by a Vanilla JS frontend (`src/templates/index.html`). Implementation lives in the `src/gui/` package: `__init__.py` is the application shell (extension wiring, CSRF, security middleware) and routes are organised into Blueprints under `src/gui/routes/` (`auth.py`, `admin.py`, `dashboard.py`, `events.py`, `reports.py`, `rules.py`, `rule_scheduler.py`, `actions.py`, `config.py`).
 
 For end-user-visible auth behaviour (initial password generation, force-change flow, configurable settings, rate limit / CSRF / TLS / IP allowlisting / security headers), see [User Manual §3 Web GUI Security](User_Manual.md#3-web-gui-security) — that's the canonical description. This section only covers internals.
 
@@ -453,7 +459,7 @@ Implementation map:
 | CSRF | `flask-wtf` CSRFProtect; token in Flask session, exposed via `<meta name="csrf-token">` |
 | Session | `flask-login` strong mode; signed cookies; `session_secret` auto-generated by `_ensure_web_gui_secret()` |
 | Force-change gate | `@app.before_request` returns HTTP 423 when `must_change_password=true` (see `src/gui/__init__.py:714`) |
-| Security headers | `flask-talisman` in `gui.py` `_init_security_middleware()`. CSP `script-src` and `style-src` carry `'unsafe-inline'` (no nonce) to support inline event handlers injected by GUI JS; XSS exposure is bounded by CSRF + `escapeHtml`/`escapeAttr` on every dynamic HTML insertion |
+| Security headers | `flask-talisman` in `src/gui/__init__.py` `_init_security_middleware()`. CSP `script-src` and `style-src` carry `'unsafe-inline'` (no nonce) to support inline event handlers injected by GUI JS; XSS exposure is bounded by CSRF + `escapeHtml`/`escapeAttr` on every dynamic HTML insertion |
 | TLS termination | `cheroot` HTTPS server; cert generated by `src/web_gui/tls.py` if not provided |
 | Threading (`--monitor-gui`) | Daemon loop in dedicated `threading.Thread`; Flask on main thread for signal handling |
 
@@ -505,13 +511,14 @@ Implementation map:
 | `/api/rule_scheduler/schedules/delete` | POST | Delete rule schedule |
 | `/api/rule_scheduler/check` | POST | Trigger schedule evaluation |
 
-### 3.6 `i18n.py` — Internationalization
+### 3.6 `src/i18n/` — Internationalization
 
 **Responsibility**: Provide translated strings for all UI text.
 
-- Contains a ~900+ entry dictionary mapping keys to translations in `{"en": {...}, "zh_TW": {...}}` structure
+- Implementation in `src/i18n/engine.py`; translation data in `src/i18n_en.json` and `src/i18n_zh_TW.json` (loaded once at import)
+- ~2,200 leaf keys per language, kept in EN/ZH_TW parity (audit script: `scripts/audit_i18n_usage.py`)
 - `t(key, **kwargs)` function returns the string in the current language with variable substitution
-- Language is set globally via `set_language("en"|"zh_TW")`
+- Language is set globally via `set_language("en"|"zh_TW")`; thread-safety via `_I18nState` singleton
 - Covers: CLI menus, event descriptions, alert templates, Web GUI labels, report terminology, filter labels, schedule types
 
 ### 3.7 `report_scheduler.py` — Report Scheduler
@@ -555,7 +562,7 @@ Implementation map:
 | `audit_generator.py` | Orchestrate 4 modules for Audit Log Reports |
 | `ven_status_generator.py` | VEN inventory report with heartbeat-based online/offline classification |
 | `policy_usage_generator.py` | Policy rule usage analysis with per-rule hit counts |
-| `rules_engine.py` | 19 automated detection rules (B001–B009, L001–L010) with configurable thresholds |
+| `rules_engine.py` | 19 B/L-series detection rules (B001–B009, L001–L010) with configurable thresholds; R-series (R01–R05) lives in `src/report/rules/` for a total of 24 rules |
 | `analysis/mod01–mod15` | Traffic analysis modules (overview, policy decisions, ransomware, remote access, etc.) |
 | `analysis/audit/` | 4 audit modules (executive summary, health events, user activity, policy changes) |
 | `analysis/policy_usage/` | 4 policy usage modules (executive, overview, hit detail, unused detail) |
@@ -566,7 +573,7 @@ Implementation map:
 
 | Report | Modules | Description |
 |:---|:---|:---|
-| **Traffic** | 15 modules (mod01–mod15) + 19 Security Findings | Comprehensive traffic analysis with ransomware, remote access, cross-env, bandwidth, lateral movement detection |
+| **Traffic** | 15 modules (mod01–mod15) + 24 Security Findings (B/L/R) | Comprehensive traffic analysis with ransomware, remote access, cross-env, bandwidth, lateral movement detection plus Draft Policy alignment |
 | **Audit** | 4 modules (audit_mod00–03) | PCE health events, user login/authentication, policy change tracking |
 | **VEN Status** | Single generator | VEN inventory with online/offline status based on heartbeat (≤1h threshold) |
 | **Policy Usage** | 4 modules (pu_mod00–03) | Per-rule traffic hit analysis, unused rule identification, executive summary |
@@ -744,7 +751,10 @@ Analysis modules (src/report/analysis/)
     — pu_mod00–05: policy usage executive, overview, hit detail, unused detail
     ↓
 RulesEngine (src/report/rules_engine.py)
-    — 19 detection rules: B001–B009 (baseline), L001–L010 (lateral)
+    — 19 B/L rules: B001–B009 (baseline), L001–L010 (lateral)
++ R-series rules (src/report/rules/r01–r05_*.py)
+    — 5 Draft Policy Decision rules: R01–R05 (auto-enabled when ruleset uses draft_pd)
+    — Total: 24 detection rules
     ↓
 Exporters (src/report/exporters/)
     — html_exporter.py: Jinja2 → standalone HTML (inline CSS/JS)
@@ -784,17 +794,17 @@ config.json
 
 ### 6.1 Add a New Rule Type
 
-1. **Define the rule schema** in `settings.py` — create a new `add_xxx_menu()` function
+1. **Define the rule schema** in `src/settings/` — add a new `add_xxx_menu()` function in the appropriate module (or create one)
 2. **Add matching logic** in `analyzer.py` → `run_analysis()` — handle the new type in the traffic loop
-3. **Add GUI support** in `gui.py` — create a new API endpoint for the rule type
-4. **Add i18n keys** in `i18n.py` for any new UI strings
+3. **Add GUI support** in `src/gui/routes/rules.py` — create a new API endpoint for the rule type on the relevant Blueprint
+4. **Add i18n keys** in `src/i18n_en.json` and `src/i18n_zh_TW.json` for any new UI strings (keep EN/ZH parity)
 
 ### 6.2 Add a New Alert Channel
 
 1. **Add config fields** in `config.py` → `_DEFAULT_CONFIG["alerts"]`
 2. **Implement the sender** in `reporter.py` — create `_send_xxx()` method
 3. **Register in dispatcher** in `reporter.py` → `send_alerts()` — add the new channel check
-4. **Add GUI settings** in `gui.py` → `api_save_settings()` and frontend
+4. **Add GUI settings** in `src/gui/routes/config.py` → settings save endpoint and frontend
 
 ### 6.3 Add a New API Endpoint
 
@@ -805,10 +815,10 @@ config.json
 
 ### 6.4 Add a New i18n Language
 
-1. Add a new top-level key in `i18n.py`'s `MESSAGES` dictionary (alongside `"en"` and `"zh_TW"`)
-2. Add the language option in `gui.py` → settings endpoint
+1. Add a new translation data file `src/i18n_<code>.json` alongside `src/i18n_en.json` / `src/i18n_zh_TW.json`, and register the language in `src/i18n/engine.py`'s loader
+2. Add the language option in `src/gui/routes/config.py` → settings endpoint
 3. Update `config.py` defaults to include the new language code
-4. Update `set_language()` in `i18n.py` to accept the new code
+4. Update `set_language()` in `src/i18n/engine.py` to accept the new code
 
 ### 6.5 Add a New Report Type
 
@@ -816,9 +826,10 @@ config.json
 2. **Create analysis modules** in `src/report/analysis/<type>/` — `pu_mod00_executive.py` pattern
 3. **Create exporter** in `src/report/exporters/` — HTML and/or CSV export
 4. **Register in scheduler** in `report_scheduler.py` — add dispatch case in `run_schedule()`
-5. **Add GUI endpoint** in `gui.py` — `api_generate_<type>_report()`
-6. **Add CLI option** in `main.py` — argparse `--report-type` choices
-7. **Add i18n keys** for report-specific terminology
+5. **Add GUI endpoint** in `src/gui/routes/reports.py` (or relevant Blueprint) — `api_generate_<type>_report()`
+6. **Add CLI subcommand** in `src/cli/report.py` — register a click command (`@report.command("<type>")`); the legacy `src/main.py` `--report-type` argparse choice is the back-compat fallback and only needs updating if you still want the old `--report` flag to expose the type
+7. **Wire dispatcher** if you add a brand-new top-level click subcommand: append the name to `_CLICK_SUBCOMMANDS` in `illumio-ops.py` so the dispatcher routes to click instead of argparse
+8. **Add i18n keys** for report-specific terminology
 
 ---
 

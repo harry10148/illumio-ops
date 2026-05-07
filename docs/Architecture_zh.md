@@ -245,11 +245,17 @@ illumio-ops/
 │   │   ├── async_jobs.py      # AsyncJobManager：非同步查詢作業生命週期 + 狀態持久化
 │   │   └── traffic_query.py   # TrafficQueryBuilder：流量 payload 建構 + 串流
 │   ├── cli/                   # 向 illumio-ops 進入點註冊的 Click 子命令群組
+│   │   ├── root.py            # 根 click 群組 + version 旗標 + did-you-mean suggester（_GroupWithSuggestions）
 │   │   ├── cache.py           # cache backfill / status / retention 子命令
 │   │   ├── config.py          # config show / set 子命令
 │   │   ├── monitor.py         # monitor daemon 子命令
-│   │   ├── report.py          # report generate 子命令
-│   │   ├── root.py            # 根 click 群組 + version 旗標
+│   │   ├── report.py          # report generate 子命令（verb aliases：generate-traffic / -audit / -ven-status / -policy-usage）
+│   │   ├── _output.py         # echo_info / echo_warning / echo_error / echo_json + is_json/is_quiet/is_verbose 旗標 helper（Track B）
+│   │   ├── _exit_codes.py     # sysexits.h 對齊的 exit-code map + exit_for_exception() 派送器（Track B）
+│   │   ├── _completion.py     # `completion install [bash|zsh|fish]` 自動補齊安裝器（Track C）
+│   │   ├── _errors.py         # 頂層未捕例外處理器
+│   │   ├── _runtime.py        # argparse 與 click 路徑共用的 daemon 啟動邏輯
+│   │   ├── menus/             # 互動式 wizard（event / system_health / traffic / bandwidth / manage_rules / alert / web_gui / report_schedule）
 │   │   └── ...                # siem.py、workload.py、gui_cmd.py、rule.py、status.py
 │   ├── events/                # 事件 pipeline — 輪詢、匹配、正規化
 │   │   ├── poller.py          # EventPoller：基於水位線的輪詢，具有去重語意
@@ -300,12 +306,12 @@ illumio-ops/
 │   ├── interfaces.py          # typing.Protocol 定義：IApiClient、IReporter、IEventStore
 │   ├── href_utils.py          # 正規 extract_id(href) 輔助工具
 │   ├── loguru_config.py       # 中央 loguru 設定：輪替檔案 + TTY 主控台 + 選用 JSON SIEM sink
-│   ├── gui.py                 # Flask Web 應用程式（~40 個 JSON API endpoints）、登入速率限制、CSRF synchronizer token
-│   ├── settings.py            # 規則/告警設定的 CLI 互動式選單
+│   ├── gui/                   # Flask Web 應用程式套件 — shell + Blueprint routes（auth/admin/dashboard/events/reports/rules/rule_scheduler/actions/config），約 70 個 route、登入速率限制、CSRF synchronizer token
+│   ├── settings/              # 互動式設定 wizard 套件（v3.24.0-h6 從 legacy settings.py 拆分）
 │   ├── report_scheduler.py    # 排程報表產生與電子郵件交付
 │   ├── rule_scheduler.py      # Policy 規則自動化（週期性/一次性排程、佈建）
 │   ├── rule_scheduler_cli.py  # rule scheduler 的 CLI 與 Web GUI 介面
-│   ├── i18n.py                # 國際化字典（EN/ZH_TW）與語言切換；_I18nState 執行緒安全單例
+│   ├── i18n/                  # 國際化套件 — `engine.py`（EN/ZH_TW 切換、_I18nState 執行緒安全單例）+ JSON 資料檔
 │   ├── utils.py               # 輔助工具：日誌設定、ANSI 顏色、單位格式化、CJK 寬度；_InputState 執行緒安全單例
 │   ├── templates/             # Web GUI 的 Jinja2 HTML 範本（SPA）
 │   ├── static/                # CSS/JS 前端資產
@@ -314,7 +320,7 @@ illumio-ops/
 │       ├── audit_generator.py         # 稽核日誌報表協調器（4 個模組）
 │       ├── ven_status_generator.py    # VEN 狀態清單報表
 │       ├── policy_usage_generator.py  # Policy 規則使用率分析報表
-│       ├── rules_engine.py            # 19 條自動化 Security Findings 規則（B/L 系列）
+│       ├── rules_engine.py            # 19 條 B/L 系列規則（B001–B009 + L001–L010）；R 系列（R01–R05）位於 src/report/rules/
 │       ├── snapshot_store.py          # Change Impact 的 KPI 快照儲存（reports/snapshots/）
 │       ├── trend_store.py             # 趨勢 KPI 存檔（按報表類型）
 │       ├── analysis/                  # 每模組分析邏輯
@@ -438,9 +444,9 @@ Analyzer 支援流量規則的彈性篩選條件：
 - **PCE Profile 管理**：`add_pce_profile()`、`update_pce_profile()`、`activate_pce_profile()`、`remove_pce_profile()`、`list_pce_profiles()` —— 支援多 PCE 環境與 profile 切換。
 - **報表排程管理**：`add_report_schedule()`、`update_report_schedule()`、`remove_report_schedule()`、`list_report_schedules()`。
 
-### 3.5 `gui.py` — Web GUI
+### 3.5 `src/gui/` — Web GUI
 
-**架構**：Flask 後端提供 ~40 個 JSON API endpoint，由 Vanilla JS 前端（`templates/index.html`）呼叫。
+**架構**：Flask 後端提供約 70 個 route（多數為 JSON API endpoint，加上 SPA shell 與 login HTML），由 Vanilla JS 前端（`src/templates/index.html`）呼叫。實作位於 `src/gui/` 套件：`__init__.py` 為應用程式 shell（extension 配線、CSRF、安全 middleware），路由分散在 `src/gui/routes/` 下的 Blueprint（`auth.py`、`admin.py`、`dashboard.py`、`events.py`、`reports.py`、`rules.py`、`rule_scheduler.py`、`actions.py`、`config.py`）。
 
 使用者可見的驗證行為（初始密碼產生、強制變更流程、可調整設定、rate limit / CSRF / TLS / IP 白名單 / 安全標頭），請見 [使用手冊 §3 Web GUI 安全性](User_Manual_zh.md#3-web-gui-安全性) — 該節為單一真相源。本節僅描述內部結構。
 
@@ -452,7 +458,7 @@ Analyzer 支援流量規則的彈性篩選條件：
 | CSRF | `flask-wtf` CSRFProtect；token 存於 Flask session，透過 `<meta name="csrf-token">` 暴露 |
 | Session | `flask-login` strong 模式；簽章 cookie；`session_secret` 由 `_ensure_web_gui_secret()` 自動產生 |
 | 強制變更閘 | `@app.before_request` 在 `must_change_password=true` 時回傳 HTTP 423（見 `src/gui/__init__.py:714`） |
-| 安全標頭 | `gui.py` 的 `_init_security_middleware()` 初始化 `flask-talisman`。CSP 的 `script-src`、`style-src` 帶 `'unsafe-inline'`（不使用 nonce）以支援 GUI JS 動態注入的 inline event handler；XSS 風險由 CSRF 與所有動態 HTML 插入的 `escapeHtml`/`escapeAttr` 控制 |
+| 安全標頭 | `src/gui/__init__.py` 的 `_init_security_middleware()` 初始化 `flask-talisman`。CSP 的 `script-src`、`style-src` 帶 `'unsafe-inline'`（不使用 nonce）以支援 GUI JS 動態注入的 inline event handler；XSS 風險由 CSRF 與所有動態 HTML 插入的 `escapeHtml`/`escapeAttr` 控制 |
 | TLS 終結 | `cheroot` HTTPS server；未提供憑證時由 `src/web_gui/tls.py` 產生 |
 | 執行緒模型（`--monitor-gui`） | Daemon 迴圈於獨立 `threading.Thread`；Flask 在主執行緒處理訊號 |
 
@@ -504,13 +510,14 @@ Analyzer 支援流量規則的彈性篩選條件：
 | `/api/rule_scheduler/schedules/delete` | POST | 刪除規則排程 |
 | `/api/rule_scheduler/check` | POST | 觸發排程評估 |
 
-### 3.6 `i18n.py` — 國際化
+### 3.6 `src/i18n/` — 國際化
 
 **職責**：為所有 UI 文字提供翻譯字串。
 
-- 包含 ~900+ 條目的字典，以 `{"en": {...}, "zh_TW": {...}}` 結構將鍵對應至翻譯
+- 實作位於 `src/i18n/engine.py`；翻譯資料位於 `src/i18n_en.json` 與 `src/i18n_zh_TW.json`（import 時載入一次）
+- 每語系約 2,200 leaf key，EN/ZH_TW 完全對齊（檢查腳本：`scripts/audit_i18n_usage.py`）
 - `t(key, **kwargs)` 函式以當前語言及變數替換回傳字串
-- 透過 `set_language("en"|"zh_TW")` 全域設定語言
+- 透過 `set_language("en"|"zh_TW")` 全域設定語言；`_I18nState` 單例提供執行緒安全
 - 涵蓋：CLI 選單、事件描述、告警範本、Web GUI label、報表術語、篩選 label、排程類型
 
 ### 3.7 `report_scheduler.py` — 報表排程器
@@ -554,7 +561,7 @@ Analyzer 支援流量規則的彈性篩選條件：
 | `audit_generator.py` | 協調 4 個模組，用於稽核日誌報表 |
 | `ven_status_generator.py` | VEN 清單報表，以心跳為基礎進行線上/離線分類 |
 | `policy_usage_generator.py` | Policy 規則使用率分析，含每規則命中計數 |
-| `rules_engine.py` | 19 條自動化偵測規則（B001–B009、L001–L010），可設定閾值 |
+| `rules_engine.py` | 19 條 B/L 系列偵測規則（B001–B009、L001–L010）；R 系列 5 條（R01–R05）位於 `src/report/rules/`，總計 24 條 |
 | `analysis/mod01–mod15` | 流量分析模組（概觀、policy 決策、勒索軟體、遠端存取等） |
 | `analysis/audit/` | 4 個稽核模組（主管摘要、健康事件、使用者活動、policy 變更） |
 | `analysis/policy_usage/` | 4 個 policy usage 模組（主管、概觀、命中詳細、未使用詳細） |
@@ -565,7 +572,7 @@ Analyzer 支援流量規則的彈性篩選條件：
 
 | 報表 | 模組 | 說明 |
 |:---|:---|:---|
-| **流量** | 15 個模組（mod01–mod15）+ 19 條 Security Findings | 完整流量分析，含勒索軟體、遠端存取、跨環境、頻寬、橫向移動偵測 |
+| **流量** | 15 個模組（mod01–mod15）+ 24 條 Security Findings（B/L/R） | 完整流量分析，含勒索軟體、遠端存取、跨環境、頻寬、橫向移動偵測，加上 Draft Policy alignment |
 | **稽核** | 4 個模組（audit_mod00–03） | PCE 健康事件、使用者登入/認證、policy 變更追蹤 |
 | **VEN 狀態** | 單一產生器 | VEN 清單，以心跳為基礎的線上/離線狀態（≤1h 閾值） |
 | **Policy Usage** | 4 個模組（pu_mod00–03） | 每規則流量命中分析、未使用規則識別、主管摘要 |
@@ -742,7 +749,10 @@ Analysis modules (src/report/analysis/)
     — pu_mod00–05: policy usage executive, overview, hit detail, unused detail
     ↓
 RulesEngine (src/report/rules_engine.py)
-    — 19 detection rules: B001–B009 (baseline), L001–L010 (lateral)
+    — 19 B/L 規則：B001–B009（baseline）、L001–L010（lateral）
++ R-series 規則（src/report/rules/r01–r05_*.py）
+    — 5 條 Draft Policy Decision 規則：R01–R05（ruleset 使用 draft_pd 時自動啟用）
+    — 合計：24 條偵測規則
     ↓
 Exporters (src/report/exporters/)
     — html_exporter.py: Jinja2 → standalone HTML (inline CSS/JS)
@@ -782,17 +792,17 @@ config.json
 
 ### 6.1 新增規則類型
 
-1. **在 `settings.py` 中定義規則 schema** —— 建立新的 `add_xxx_menu()` 函式
+1. **在 `src/settings/` 中定義規則 schema** —— 於相對應模組（或新建）加入 `add_xxx_menu()` 函式
 2. **在 `analyzer.py` 中新增匹配邏輯** → `run_analysis()` —— 在流量迴圈中處理新類型
-3. **在 `gui.py` 中新增 GUI 支援** —— 為規則類型建立新的 API endpoint
-4. **在 `i18n.py` 中新增 i18n 鍵** —— 用於任何新的 UI 字串
+3. **在 `src/gui/routes/rules.py` 中新增 GUI 支援** —— 在對應 Blueprint 上為規則類型建立新的 API endpoint
+4. **在 `src/i18n_en.json` 與 `src/i18n_zh_TW.json` 中新增 i18n 鍵** —— 任何新 UI 字串都需保持 EN/ZH 對齊
 
 ### 6.2 新增告警通道
 
 1. **在 `config.py` 中新增設定欄位** → `_DEFAULT_CONFIG["alerts"]`
 2. **在 `reporter.py` 中實作傳送器** —— 建立 `_send_xxx()` 方法
 3. **在 `reporter.py` 的 dispatcher 中註冊** → `send_alerts()` —— 新增新的通道檢查
-4. **在 `gui.py` 中新增 GUI 設定** → `api_save_settings()` 及前端
+4. **在 `src/gui/routes/config.py` 中新增 GUI 設定** → 設定儲存 endpoint 與前端
 
 ### 6.3 新增 API Endpoint
 
@@ -803,10 +813,10 @@ config.json
 
 ### 6.4 新增 i18n 語言
 
-1. 在 `i18n.py` 的 `MESSAGES` 字典中新增頂層鍵（與 `"en"` 和 `"zh_TW"` 並列）
-2. 在 `gui.py` 的設定 endpoint 中新增語言選項
+1. 新增翻譯資料檔 `src/i18n_<code>.json`（與 `src/i18n_en.json` / `src/i18n_zh_TW.json` 並列），並在 `src/i18n/engine.py` 的載入器註冊
+2. 在 `src/gui/routes/config.py` 的設定 endpoint 中新增語言選項
 3. 更新 `config.py` 預設值以包含新語言代碼
-4. 更新 `i18n.py` 中的 `set_language()` 以接受新代碼
+4. 更新 `src/i18n/engine.py` 中的 `set_language()` 以接受新代碼
 
 ### 6.5 新增報表類型
 
@@ -814,9 +824,10 @@ config.json
 2. **在 `src/report/analysis/<type>/` 中建立分析模組** —— `pu_mod00_executive.py` 模式
 3. **在 `src/report/exporters/` 中建立匯出器** —— HTML 及/或 CSV 匯出
 4. **在 `report_scheduler.py` 中向排程器註冊** —— 在 `run_schedule()` 中新增派送案例
-5. **在 `gui.py` 中新增 GUI endpoint** —— `api_generate_<type>_report()`
-6. **在 `main.py` 中新增 CLI 選項** —— argparse `--report-type` 選項
-7. **新增 i18n 鍵** —— 用於報表特定術語
+5. **在 `src/gui/routes/reports.py`（或對應 Blueprint）中新增 GUI endpoint** —— `api_generate_<type>_report()`
+6. **在 `src/cli/report.py` 中新增 CLI subcommand** —— 註冊 click 指令（`@report.command("<type>")`）；舊版 `src/main.py` 的 `--report-type` argparse 選項僅作為 backward-compat fallback，僅在仍需保留 `--report` flag 時才需更新
+7. **若新增的是頂層 click subcommand**，必須同步把名稱加入 `illumio-ops.py` 的 `_CLICK_SUBCOMMANDS` set，否則 dispatcher 會誤走 argparse 路徑
+8. **新增 i18n 鍵** —— 用於報表特定術語
 
 ---
 
