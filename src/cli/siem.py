@@ -4,6 +4,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from src.cli._output import is_json, is_quiet, echo_error, echo_warning, echo_info, echo_json
+from src.cli._exit_codes import EXIT_OK, EXIT_DATAERR, EXIT_NOINPUT, EXIT_UNAVAILABLE, EXIT_SOFTWARE, EXIT_USAGE
+
 console = Console()
 
 
@@ -20,35 +23,51 @@ def siem_group():
 
 @siem_group.command("test")
 @click.argument("destination")
-def siem_test(destination: str):
+@click.pass_context
+def siem_test(ctx: click.Context, destination: str):
     """Send a synthetic test event to DESTINATION and report success/fail."""
     from src.config import ConfigManager
     from src.siem.tester import send_test_event
 
+    # Validate destination before entering the exception-catching block so
+    # that ctx.exit(EXIT_USAGE) is not swallowed by the broad except below.
     try:
         cm = ConfigManager()
         siem_cfg = cm.models.siem
         dest_names = [d.name for d in siem_cfg.destinations if d.enabled]
-        if destination not in dest_names:
-            console.print(f"[red]Destination '{destination}' not found or disabled.[/red]")
-            raise SystemExit(1)
+    except Exception as exc:
+        echo_error(ctx, f"Test failed for '{destination}': {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+
+    if destination not in dest_names:
+        echo_error(ctx, f"Destination '{destination}' not found or disabled.")
+        ctx.exit(EXIT_USAGE)
+        return
+
+    try:
         dest_cfg = next(d for d in siem_cfg.destinations if d.name == destination)
         result = send_test_event(dest_cfg)
-    except SystemExit:
-        raise
     except Exception as exc:
-        console.print(f"[red]✗ Test failed for '{destination}': {exc}[/red]")
-        raise SystemExit(1)
+        echo_error(ctx, f"Test failed for '{destination}': {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
 
     if result.ok:
-        console.print(f"[green]✓ Test event sent to '{destination}' ({result.latency_ms} ms)[/green]")
+        if is_json(ctx):
+            echo_json(ctx, {"ok": True, "destination": destination, "latency_ms": result.latency_ms})
+        elif not is_quiet(ctx):
+            console.print(f"[green]✓ Test event sent to '{destination}' ({result.latency_ms} ms)[/green]")
     else:
-        console.print(f"[red]✗ Test failed for '{destination}': {result.error}[/red]")
-        raise SystemExit(1)
+        echo_error(ctx, f"Test failed for '{destination}': {result.error}")
+        if is_json(ctx):
+            echo_json(ctx, {"ok": False, "destination": destination, "details": result.error})
+        ctx.exit(EXIT_UNAVAILABLE)
 
 
 @siem_group.command("status")
-def siem_status():
+@click.pass_context
+def siem_status(ctx: click.Context):
     """Show per-destination dispatch counts."""
     try:
         from sqlalchemy import create_engine, func, select
@@ -61,15 +80,8 @@ def siem_status():
         engine = create_engine(f"sqlite:///{cfg.db_path}")
         init_schema(engine)
         sf = sessionmaker(engine)
-        table = Table(title="SIEM Dispatch Status")
-        table.add_column("Destination")
-        table.add_column("Pending", justify="right")
-        table.add_column("Sent", justify="right")
-        table.add_column("Failed", justify="right")
-        table.add_column("DLQ", justify="right")
+        rows = []
         with sf() as s:
-            for status in ["pending", "sent", "failed"]:
-                pass  # queried per-dest below
             dests_q = s.execute(
                 select(SiemDispatch.destination).distinct()
             ).scalars().all()
@@ -86,18 +98,36 @@ def siem_status():
                     select(func.count()).select_from(DeadLetter)
                     .where(DeadLetter.destination == dest)
                 ).scalar() or 0
-                table.add_row(dest, str(counts["pending"]), str(counts["sent"]),
-                              str(counts["failed"]), str(dlq_cnt))
+                rows.append({
+                    "destination": dest,
+                    "pending": counts["pending"],
+                    "sent": counts["sent"],
+                    "failed": counts["failed"],
+                    "dlq": dlq_cnt,
+                })
+        if is_json(ctx):
+            echo_json(ctx, rows)
+            return
+        table = Table(title="SIEM Dispatch Status")
+        table.add_column("Destination")
+        table.add_column("Pending", justify="right")
+        table.add_column("Sent", justify="right")
+        table.add_column("Failed", justify="right")
+        table.add_column("DLQ", justify="right")
+        for r in rows:
+            table.add_row(r["destination"], str(r["pending"]), str(r["sent"]),
+                          str(r["failed"]), str(r["dlq"]))
         console.print(table)
     except Exception as exc:
-        console.print(f"[red]Error: {exc}[/red]")
-        raise SystemExit(1)
+        echo_error(ctx, str(exc))
+        ctx.exit(EXIT_SOFTWARE)
 
 
 @siem_group.command("replay")
 @click.option("--dest", required=True, help="Destination name")
 @click.option("--limit", default=100, show_default=True, help="Max DLQ entries to replay")
-def siem_replay(dest: str, limit: int):
+@click.pass_context
+def siem_replay(ctx: click.Context, dest: str, limit: int):
     """Requeue DLQ entries for DEST as pending dispatch rows."""
     try:
         from sqlalchemy import create_engine
@@ -112,16 +142,20 @@ def siem_replay(dest: str, limit: int):
         sf = sessionmaker(engine)
         dlq = DeadLetterQueue(sf)
         count = dlq.replay(dest, limit=limit)
-        console.print(f"[green]Requeued {count} entries for '{dest}'[/green]")
+        if is_json(ctx):
+            echo_json(ctx, {"ok": True, "destination": dest, "requeued": count})
+        elif not is_quiet(ctx):
+            console.print(f"[green]Requeued {count} entries for '{dest}'[/green]")
     except Exception as exc:
-        console.print(f"[red]Error: {exc}[/red]")
-        raise SystemExit(1)
+        echo_error(ctx, str(exc))
+        ctx.exit(EXIT_SOFTWARE)
 
 
 @siem_group.command("purge")
 @click.option("--dest", required=True, help="Destination name")
 @click.option("--older-than", default=30, show_default=True, help="Purge entries older than N days")
-def siem_purge(dest: str, older_than: int):
+@click.pass_context
+def siem_purge(ctx: click.Context, dest: str, older_than: int):
     """Delete DLQ entries for DEST older than N days."""
     try:
         from sqlalchemy import create_engine
@@ -136,16 +170,20 @@ def siem_purge(dest: str, older_than: int):
         sf = sessionmaker(engine)
         dlq = DeadLetterQueue(sf)
         removed = dlq.purge(dest, older_than_days=older_than)
-        console.print(f"[green]Purged {removed} DLQ entries for '{dest}'[/green]")
+        if is_json(ctx):
+            echo_json(ctx, {"ok": True, "destination": dest, "removed": removed})
+        elif not is_quiet(ctx):
+            console.print(f"[green]Purged {removed} DLQ entries for '{dest}'[/green]")
     except Exception as exc:
-        console.print(f"[red]Error: {exc}[/red]")
-        raise SystemExit(1)
+        echo_error(ctx, str(exc))
+        ctx.exit(EXIT_SOFTWARE)
 
 
 @siem_group.command("dlq")
 @click.option("--dest", required=True, help="Destination name")
 @click.option("--limit", default=50, show_default=True, help="Max entries to show")
-def siem_dlq(dest: str, limit: int):
+@click.pass_context
+def siem_dlq(ctx: click.Context, dest: str, limit: int):
     """List DLQ entries for DEST."""
     try:
         from sqlalchemy import create_engine
@@ -161,7 +199,22 @@ def siem_dlq(dest: str, limit: int):
         dlq = DeadLetterQueue(sf)
         entries = dlq.list_entries(dest, limit=limit)
         if not entries:
-            console.print(f"[yellow]No DLQ entries for '{dest}'[/yellow]")
+            if not is_quiet(ctx):
+                console.print(f"[yellow]No DLQ entries for '{dest}'[/yellow]")
+            if is_json(ctx):
+                echo_json(ctx, [])
+            return
+        if is_json(ctx):
+            echo_json(ctx, [
+                {
+                    "id": e.id,
+                    "source_table": e.source_table,
+                    "retries": e.retries,
+                    "last_error": e.last_error,
+                    "quarantined_at": str(e.quarantined_at),
+                }
+                for e in entries
+            ])
             return
         table = Table(title=f"DLQ — {dest}")
         table.add_column("ID", justify="right")
@@ -174,5 +227,5 @@ def siem_dlq(dest: str, limit: int):
                           e.last_error[:60], str(e.quarantined_at)[:19])
         console.print(table)
     except Exception as exc:
-        console.print(f"[red]Error: {exc}[/red]")
-        raise SystemExit(1)
+        echo_error(ctx, str(exc))
+        ctx.exit(EXIT_SOFTWARE)

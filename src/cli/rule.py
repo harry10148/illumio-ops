@@ -5,6 +5,14 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from src.cli._output import (
+    echo_error,
+    echo_json,
+    is_json,
+    is_quiet,
+)
+from src.cli._exit_codes import EXIT_USAGE
+
 
 @click.group("rule")
 def rule_group() -> None:
@@ -19,7 +27,8 @@ def rule_group() -> None:
     help="Filter by rule type",
 )
 @click.option("--enabled-only", is_flag=True, default=False, help="Show only enabled rules")
-def list_rules(rule_type: str, enabled_only: bool) -> None:
+@click.pass_context
+def list_rules(ctx: click.Context, rule_type: str, enabled_only: bool) -> None:
     """List configured monitoring rules."""
     from src.config import ConfigManager
 
@@ -29,6 +38,24 @@ def list_rules(rule_type: str, enabled_only: bool) -> None:
         rules = [r for r in rules if r.get("type") == rule_type]
     if enabled_only:
         rules = [r for r in rules if r.get("enabled", True)]
+
+    if is_json(ctx):
+        echo_json(ctx, [
+            {
+                "index": i,
+                "type": r.get("type", ""),
+                "name": r.get("name", ""),
+                "enabled": r.get("enabled", True),
+                "threshold": r.get("threshold") if "threshold" in r else None,
+            }
+            for i, r in enumerate(rules, 1)
+        ])
+        return
+
+    if is_quiet(ctx):
+        for r in rules:
+            click.echo(r.get("name", ""))
+        return
 
     console = Console()
     table = Table(title=f"Monitoring Rules ({len(rules)})", show_header=True, header_style="cyan")
@@ -52,7 +79,8 @@ def list_rules(rule_type: str, enabled_only: bool) -> None:
 @rule_group.command("edit")
 @click.argument("rule_id", type=int)
 @click.option("--no-preview", is_flag=True, help="Skip the diff preview before save")
-def edit_rule(rule_id: int, no_preview: bool) -> None:
+@click.pass_context
+def edit_rule(ctx: click.Context, rule_id: int, no_preview: bool) -> None:
     """Interactively edit a rule by its 1-based index."""
     import json
     import questionary
@@ -62,7 +90,9 @@ def edit_rule(rule_id: int, no_preview: bool) -> None:
     cm = ConfigManager()
     rules = cm.config.get("rules", [])
     if rule_id < 1 or rule_id > len(rules):
-        raise click.ClickException(f"rule_id {rule_id} out of range (1..{len(rules)})")
+        echo_error(ctx, f"rule_id {rule_id} out of range (1..{len(rules)})")
+        ctx.exit(EXIT_USAGE)
+        return
 
     rule = rules[rule_id - 1]
     before = json.dumps(rule, indent=2, ensure_ascii=False)
@@ -84,7 +114,7 @@ def edit_rule(rule_id: int, no_preview: bool) -> None:
 
     after = json.dumps(rule, indent=2, ensure_ascii=False)
 
-    if not no_preview:
+    if not no_preview and not is_quiet(ctx):
         console = Console()
         console.print("[bold]Before:[/bold]")
         console.print(Syntax(before, "json", theme="monokai", line_numbers=False))

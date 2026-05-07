@@ -8,7 +8,15 @@ Phase 1 quick win for b4. Wrap raw exceptions / usage errors with:
 from __future__ import annotations
 
 import difflib
+import signal
 import sys
+
+from src.cli._exit_codes import (
+    EXIT_INTERRUPT,
+    EXIT_SOFTWARE,
+    EXIT_TERMINATED,
+    exit_for_exception,
+)
 
 
 def format_error(cause: str, recovery: str | None = None,
@@ -42,20 +50,32 @@ def print_error(cause: str, recovery: str | None = None,
 
 
 def install_top_level_handler(app_name: str = "illumio-ops") -> None:
-    """Wrap sys.excepthook so unhandled exceptions show structured error."""
-    def handler(exc_type, exc, tb):
+    """Wrap sys.excepthook + install SIGTERM handler.
+
+    On unhandled exception: structured error to stderr + typed exit code.
+    On SIGINT: exit 130. On SIGTERM: exit 143.
+    """
+    def excepthook(exc_type, exc, tb):
         if issubclass(exc_type, KeyboardInterrupt):
-            sys.exit(130)
+            sys.exit(EXIT_INTERRUPT)
         cause = str(exc) or exc_type.__name__
-        recovery = None
-        if 'ConnectionError' in exc_type.__name__ or 'ConnectTimeout' in exc_type.__name__:
-            recovery = f"Check network reachability and {app_name} config (PCE_HOST, PCE_PORT)."
-        elif 'PermissionError' in exc_type.__name__:
-            recovery = "Check file permissions for the path mentioned above."
-        elif 'FileNotFoundError' in exc_type.__name__:
-            recovery = "Verify the file path or run setup if this is the first run."
-        else:
-            recovery = "Re-run with --verbose for more detail."
+        recovery = _recovery_for(exc_type, app_name)
         print(format_error(cause, recovery), file=sys.stderr)
-        sys.exit(1)
-    sys.excepthook = handler
+        sys.exit(exit_for_exception(exc) or EXIT_SOFTWARE)
+
+    def sigterm_handler(signum, frame):
+        sys.exit(EXIT_TERMINATED)
+
+    sys.excepthook = excepthook
+    signal.signal(signal.SIGTERM, sigterm_handler)
+
+
+def _recovery_for(exc_type, app_name: str = "illumio-ops") -> str:
+    name = exc_type.__name__
+    if 'ConnectionError' in name or 'ConnectTimeout' in name:
+        return f"Check network reachability and {app_name} config (PCE_HOST, PCE_PORT)."
+    if 'PermissionError' in name:
+        return "Check file permissions for the path mentioned above."
+    if 'FileNotFoundError' in name:
+        return "Verify the file path or run setup if this is the first run."
+    return "Re-run with --verbose for more detail."
