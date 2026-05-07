@@ -635,6 +635,23 @@ class Reporter:
         )
 
     @staticmethod
+    def _render_runbook_link(runbook_url: str | None) -> str:
+        """Render an inline runbook link, or empty string if no URL provided.
+
+        Returns a small info-blue anchor styled to sit inline next to issue
+        summary text. URL is HTML-escaped (quote=True) to prevent injection.
+        """
+        if not runbook_url:
+            return ''
+        import html as _html
+        url_html = _html.escape(str(runbook_url), quote=True)
+        return (
+            f' <a href="{url_html}" '
+            f'style="color:#0077CC;text-decoration:underline;font-size:12px;'
+            f'font-family:Arial,sans-serif;">Runbook ↗</a>'
+        )
+
+    @staticmethod
     def _build_preheader_text(issues_list, max_chars=90):
         """Build a 50-90 char standalone preview shown in inbox.
 
@@ -1310,11 +1327,12 @@ class Reporter:
             rows = []
             for alert in self.health_alerts:
                 sev_badge = self._render_severity_badge(alert.get('severity', alert.get('status', 'info')))
+                runbook = self._render_runbook_link(alert.get('runbook_url'))
                 rows.append(
                     f"""
             <tr>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('time',''))}</td>
-              <td style="{td_style} font-weight:700; color:#BE122F;">{sev_badge}{esc(alert.get('status',''))}</td>
+              <td style="{td_style} font-weight:700; color:#BE122F;">{sev_badge}{esc(alert.get('status',''))}{runbook}</td>
               <td style="{td_style}">{fmt_multiline(alert.get('details',''))}</td>
             </tr>
 """
@@ -1348,10 +1366,11 @@ class Reporter:
             rows = []
             for alert in self.event_alerts:
                 sev_badge = self._render_severity_badge(alert.get('severity', 'info'))
+                runbook = self._render_runbook_link(alert.get('runbook_url'))
                 row_html = f"""
             <tr>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('time',''))}</td>
-              <td style="{td_style}"><strong>{esc(alert.get('rule',''))}</strong><br><small style="color:#6F7274;">{esc(alert.get('desc',''))}</small></td>
+              <td style="{td_style}"><strong>{esc(alert.get('rule',''))}</strong>{runbook}<br><small style="color:#6F7274;">{esc(alert.get('desc',''))}</small></td>
               <td style="{td_style} text-align:center;">{sev_badge}<small>({esc(alert.get('count',0))})</small></td>
               <td style="{td_style}">{esc(alert.get('source',''))}</td>
             </tr>
@@ -1390,10 +1409,11 @@ class Reporter:
             rows = []
             for alert in self.traffic_alerts:
                 sev_badge = self._render_severity_badge(alert.get('severity', 'warning'))
+                runbook = self._render_runbook_link(alert.get('runbook_url'))
                 rows.append(
                     f"""
             <tr>
-              <td style="{td_style} font-weight:700; color:#FF5500;">{sev_badge}{esc(alert.get('rule',''))}</td>
+              <td style="{td_style} font-weight:700; color:#FF5500;">{sev_badge}{esc(alert.get('rule',''))}{runbook}</td>
               <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(alert.get('count',0))}</td>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('criteria',''))}</td>
             </tr>
@@ -1434,10 +1454,11 @@ class Reporter:
             rows = []
             for alert in self.metric_alerts:
                 sev_badge = self._render_severity_badge(alert.get('severity', 'info'))
+                runbook = self._render_runbook_link(alert.get('runbook_url'))
                 rows.append(
                     f"""
             <tr>
-              <td style="{td_style} font-weight:700; color:#313638;">{sev_badge}{esc(alert.get('rule',''))}</td>
+              <td style="{td_style} font-weight:700; color:#313638;">{sev_badge}{esc(alert.get('rule',''))}{runbook}</td>
               <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(alert.get('count',0))}</td>
               <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('criteria',''))}</td>
             </tr>
