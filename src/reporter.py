@@ -1532,13 +1532,24 @@ class Reporter:
             )
             html_body = html_body.replace('</body></html>', warning_html + '</body></html>', 1)
 
-        msg = MIMEMultipart()
+        plain_body = self._build_line_message()
+
+        if attach_parts:
+            msg = MIMEMultipart('mixed')
+            body = MIMEMultipart('alternative')
+            body.attach(MIMEText(plain_body, 'plain', _charset='utf-8'))
+            body.attach(MIMEText(html_body, 'html', _charset='utf-8'))
+            msg.attach(body)
+            for part in attach_parts:
+                msg.attach(part)
+        else:
+            msg = MIMEMultipart('alternative')
+            msg.attach(MIMEText(plain_body, 'plain', _charset='utf-8'))
+            msg.attach(MIMEText(html_body, 'html', _charset='utf-8'))
+
         msg["Subject"] = subject
         msg["From"] = cfg["sender"]
         msg["To"] = ",".join(recipients)
-        msg.attach(MIMEText(html_body, "html"))
-        for part in attach_parts:
-            msg.attach(part)
 
         try:
             smtp_conf = self.cm.config.get("smtp", {})
@@ -1583,13 +1594,16 @@ class Reporter:
             logger.warning(t('no_recipients'))
             return False
 
-        msg = MIMEMultipart()
-        msg["Subject"] = subject
-        msg["From"] = cfg["sender"]
-        msg["To"] = ",".join(cfg["recipients"])
-        msg.attach(MIMEText(html_body, "html"))
+        import re as _re
+        plain_body = _re.sub(r'<[^>]+>', '', html_body)
+        plain_body = _re.sub(r'\s+', ' ', plain_body).strip()
 
         if attachment_path and os.path.exists(attachment_path):
+            msg = MIMEMultipart('mixed')
+            body = MIMEMultipart('alternative')
+            body.attach(MIMEText(plain_body, 'plain', _charset='utf-8'))
+            body.attach(MIMEText(html_body, 'html', _charset='utf-8'))
+            msg.attach(body)
             try:
                 with open(attachment_path, "rb") as f:
                     part = MIMEBase("application", "octet-stream")
@@ -1602,6 +1616,14 @@ class Reporter:
                 msg.attach(part)
             except (IOError, OSError) as e:
                 logger.warning(f"Warning: could not attach file {attachment_path}: {e}")
+        else:
+            msg = MIMEMultipart('alternative')
+            msg.attach(MIMEText(plain_body, 'plain', _charset='utf-8'))
+            msg.attach(MIMEText(html_body, 'html', _charset='utf-8'))
+
+        msg["Subject"] = subject
+        msg["From"] = cfg["sender"]
+        msg["To"] = ",".join(cfg["recipients"])
 
         try:
             smtp_conf = self.cm.config.get("smtp", {})
