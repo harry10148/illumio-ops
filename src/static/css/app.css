@@ -44,7 +44,7 @@
       --radius: 8px;
       --shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
       --header-font: 'Montserrat', system-ui, sans-serif;
-      --body-font:   'Montserrat', system-ui, sans-serif;
+      --body-font:   var(--font-body-2);
 
       /* Track A — new token layer (parallel; do not replace existing yet) */
       --font-heading-2: 'Space Grotesk', 'Montserrat', system-ui, sans-serif;
