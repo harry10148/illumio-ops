@@ -35,6 +35,8 @@ def _looks_like_click_invocation(argv: list[str]) -> bool:
 
 
 if __name__ == "__main__":
+    from src.cli._errors import install_top_level_handler
+    install_top_level_handler()
     try:
         if _COMPLETION_ENV or _looks_like_click_invocation(sys.argv):
             from src.cli.root import cli

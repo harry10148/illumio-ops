@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import click
 
+from src.cli._global_flags import inject_global_flags
 from src.cli.cache import cache_group
 from src.cli.config import config_group
 from src.cli.monitor import monitor_cmd
@@ -15,6 +16,7 @@ from src.cli.workload import workload_group
 
 @click.group(invoke_without_command=True,
              context_settings={"help_option_names": ["-h", "--help"]})
+@inject_global_flags
 @click.pass_context
 def cli(ctx: click.Context) -> None:
     """Illumio PCE Ops — monitoring, reporting, and policy management.

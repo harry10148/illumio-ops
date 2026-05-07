@@ -449,9 +449,14 @@ function validateTrafficFilterHints() {
   if (el) el.textContent = hints.join(' · ');
 }
 
+const _debouncedTrafficFilterHints = window.debounce(function(target) {
+  validateTrafficFilterHints();
+  setTimeout(() => target.classList.remove('input-loading'), 50);
+}, 300);
 document.addEventListener('input', function(e) {
   if (e.target && (e.target.id === 'tf-ips' || e.target.id === 'tf-ports')) {
-    validateTrafficFilterHints();
+    e.target.classList.add('input-loading');
+    _debouncedTrafficFilterHints(e.target);
   }
 });
 

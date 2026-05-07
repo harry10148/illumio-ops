@@ -25,11 +25,14 @@ class MailAlertPlugin(AlertOutputPlugin):
             return {"channel": "mail", "status": "skipped", "target": "", "error": "no recipients"}
 
         body = reporter._build_mail_html(subject)
-        msg = MIMEMultipart()
+        msg = MIMEMultipart('alternative')
         msg["Subject"] = subject
         msg["From"] = cfg["sender"]
         msg["To"] = ",".join(cfg["recipients"])
-        msg.attach(MIMEText(body, "html"))
+        # Plain text fallback FIRST (RFC 2046: client picks last that it can render)
+        plain_body = reporter._build_mail_plain(subject)
+        msg.attach(MIMEText(plain_body, "plain", _charset='utf-8'))
+        msg.attach(MIMEText(body, "html", _charset='utf-8'))
         try:
             smtp_conf = self.cm.config.get("smtp", {})
             host = smtp_conf.get("host", "localhost")

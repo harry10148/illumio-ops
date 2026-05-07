@@ -165,11 +165,16 @@ document.querySelectorAll('.modal-bg').forEach(bg => {
 });
 
 /* ─── Rules search/filter (W2.1) ─────────────────────────────────── */
-let _filterDebounce = null;
-function filterRules() {
-  clearTimeout(_filterDebounce);
-  _filterDebounce = setTimeout(_doFilterRules, 150);
-}
+const filterRules = window.debounce(function filterRules() {
+  const input = $('r-search');
+  if (input) {
+    input.classList.add('input-loading');
+    _doFilterRules();
+    setTimeout(() => input.classList.remove('input-loading'), 50);
+  } else {
+    _doFilterRules();
+  }
+}, 300);
 function _doFilterRules() {
   const q = ($('r-search').value || '').toLowerCase().trim();
   const rows = $('r-body')?.querySelectorAll('tr') || [];
@@ -199,9 +204,22 @@ function _clearHighlight(tr) {
 /* ─── Skeleton / Spinner helpers ─────────────────────────────────── */
 function showSkeleton(tbodyId, cols, rows = 4) {
   const el = $(tbodyId); if (!el) return;
-  el.innerHTML = Array.from({length: rows}, () =>
-    `<tr>${Array.from({length: cols}, () => '<td><span class="skeleton skel-text" style="display:inline-block;width:' + (40 + Math.random()*40) + '%;height:14px"></span></td>').join('')}</tr>`
-  ).join('');
+  // Uses createElement + replaceChildren — no innerHTML, no XSS surface.
+  const fragment = document.createDocumentFragment();
+  for (let r = 0; r < rows; r++) {
+    const tr = document.createElement('tr');
+    tr.className = 'skel-tr';
+    for (let c = 0; c < cols; c++) {
+      const td = document.createElement('td');
+      const span = document.createElement('span');
+      span.className = 'skeleton skel-text';
+      span.style.cssText = 'display:inline-block;width:' + (40 + Math.random() * 40) + '%;height:14px';
+      td.appendChild(span);
+      tr.appendChild(td);
+    }
+    fragment.appendChild(tr);
+  }
+  el.replaceChildren(fragment);
 }
 function showSpinner(containerId, label) {
   let ov = document.querySelector(`#${containerId} .spinner-overlay`);

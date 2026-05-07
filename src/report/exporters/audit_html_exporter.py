@@ -18,6 +18,8 @@ from .table_renderer import render_df_table
 from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from src.report.analysis.audit.audit_risk import RISK_BG, RISK_COLOR, get_risk
+from src.report.exporters._exec_summary import render_exec_summary_html
+from src.report.exporters._sidebar import render_sidebar_html
 
 _CSS = build_css("audit")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -205,8 +207,12 @@ class AuditHtmlExporter:
             )
             summary_pills = summary_pills.replace("</div>", data_source_pill + "</div>", 1)
 
+        exec_html = render_exec_summary_html(mod00, report_name='Audit Report', lang=self._lang)
+        sidebar_html = render_sidebar_html('audit')
         body = (
-            render_section_guidance("audit_mod00_executive", profile="security_risk", detail_level="full")
+            sidebar_html
+            + exec_html
+            + render_section_guidance("audit_mod00_executive", profile="security_risk", detail_level="full")
             + '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
             f'<div class="report-kicker">{_s("rpt_kicker_audit")}</div>'

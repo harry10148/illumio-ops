@@ -459,8 +459,14 @@ async function saveSettings() {
 /* ─── PCE Profile Management ──────────────────────────────────────── */
 async function addPceProfile() {
   const name = ($('s-pce-name') || {}).value?.trim();
-  const url  = ($('s-pce-url')  || {}).value?.trim();
+  const urlInput = $('s-pce-url');
+  const url  = (urlInput || {}).value?.trim();
   if (!name || !url) { toast(_t('gui_msg_name_required'), 'err'); return; }
+  if (urlInput && !/^https?:\/\//.test(url)) {
+    setFieldError(urlInput, _t('error_invalid_url') || 'URL must start with http:// or https://');
+    return;
+  }
+  if (urlInput) clearFieldError(urlInput);
   const data = {
     action: 'add', name, url,
     org_id:     ($('s-pce-org')    || {}).value?.trim() || '1',

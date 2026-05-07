@@ -430,3 +430,32 @@ function toast(msg, type) {
 function dlog(msg) { const l = $('d-log'); l.textContent += '\n[' + new Date().toLocaleTimeString() + '] ' + msg; l.scrollTop = l.scrollHeight }
 function slog(msg) { const l = $('s-log'); if (l) { l.textContent += '\n[' + new Date().toLocaleTimeString() + '] ' + msg; l.scrollTop = l.scrollHeight } }
 function alog(msg) { const l = $('a-log'); l.textContent += '\n' + msg; l.scrollTop = l.scrollHeight }
+
+// Phase 1 quick win for a2: debounce filter inputs
+window.debounce = function debounce(fn, wait = 300) {
+  let timer;
+  return function debounced(...args) {
+    clearTimeout(timer);
+    const ctx = this;
+    timer = setTimeout(() => fn.apply(ctx, args), wait);
+  };
+};
+
+// Phase 1 quick win for a2: inline form validation.
+// Uses textContent (not innerHTML) so i18n strings are never parsed as HTML.
+window.setFieldError = function setFieldError(input, message) {
+  input.setAttribute('aria-invalid', 'true');
+  let err = input.parentElement.querySelector('.field-error');
+  if (!err) {
+    err = document.createElement('span');
+    err.className = 'field-error';
+    err.setAttribute('role', 'alert');
+    input.insertAdjacentElement('afterend', err);
+  }
+  err.textContent = message;  // safe: text only, no HTML parsing
+};
+window.clearFieldError = function clearFieldError(input) {
+  input.removeAttribute('aria-invalid');
+  const err = input.parentElement.querySelector('.field-error');
+  if (err) err.remove();
+};

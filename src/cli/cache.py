@@ -1,9 +1,13 @@
 """illumio-ops cache subcommands — backfill, status, retention."""
 from __future__ import annotations
 
+import json as _json
+
 import click
 from rich.console import Console
 from rich.table import Table
+
+from src.cli._global_flags import get_global_flags
 
 console = Console()
 
@@ -87,16 +91,19 @@ def cache_backfill(source: str, since: str, until: str | None):
 
 
 @cache_group.command("status")
-def cache_status():
+@click.pass_context
+def cache_status(ctx: click.Context):
     """Show cache row counts and last-sync timestamps."""
+    flags = get_global_flags(ctx)
     sf = _get_db_session_factory()
     if sf is None:
-        console.print("[yellow]Cache database not configured.[/yellow]")
+        if not flags['quiet']:
+            console.print("[yellow]Cache database not configured.[/yellow]")
         return
     try:
         from sqlalchemy import func, select
         from src.pce_cache.models import PceEvent, PceTrafficFlowRaw, PceTrafficFlowAgg
-        table = Table("Source", "Rows", "Last ingested")
+        rows = []
         with sf() as s:
             for model, label, ts_col in [
                 (PceEvent, "events", PceEvent.ingested_at),
@@ -105,7 +112,17 @@ def cache_status():
             ]:
                 count = s.execute(select(func.count()).select_from(model)).scalar() or 0
                 last = s.execute(select(func.max(ts_col))).scalar()
-                table.add_row(label, str(count), str(last or "—"))
+                rows.append({"source": label, "rows": count, "last_ingested": str(last or "")})
+        if flags['json']:
+            click.echo(_json.dumps(rows, ensure_ascii=False))
+            return
+        if flags['quiet']:
+            for r in rows:
+                click.echo(r['source'])
+            return
+        table = Table("Source", "Rows", "Last ingested")
+        for r in rows:
+            table.add_row(r['source'], str(r['rows']), r['last_ingested'] or "—")
         console.print(table)
     except Exception as exc:
         console.print(f"[red]Status query failed: {exc}[/red]")

@@ -509,6 +509,83 @@ class Reporter:
             body += "\n"
         return body
 
+    @staticmethod
+    def _highest_severity(issues: list[dict]) -> str:
+        """Pick highest severity from a list of issue dicts; returns 'critical', 'warning', or 'info'."""
+        # Map raw severity values to canonical three-level labels used by mail_severity_* i18n keys
+        _rank = {'critical': 3, 'crit': 3, 'emerg': 3, 'alert': 2, 'err': 2, 'error': 2, 'warning': 2, 'warn': 2, 'info': 1}
+        _canonical = {'critical': 'critical', 'crit': 'critical', 'emerg': 'critical',
+                      'alert': 'warning', 'err': 'warning', 'error': 'warning', 'warning': 'warning', 'warn': 'warning',
+                      'info': 'info'}
+        cur = 0
+        out = 'info'
+        for issue in issues:
+            sev = (issue.get('severity') or 'info').lower()
+            rank = _rank.get(sev, 0)
+            if rank > cur:
+                cur = rank
+                out = _canonical.get(sev, 'info')
+        return out
+
+    def _gui_base_url(self) -> str:
+        """Return the PCE web console base URL for CTA deep links.
+
+        Strips /api/v2 (and v1) suffixes from the configured API URL so the
+        result points at the web GUI root.  Returns '' if no URL is configured
+        — callers must treat '' as "skip CTA".
+        """
+        raw = self._active_pce_url().rstrip("/")
+        if not raw:
+            return ""
+        for suffix in ("/api/v2", "/api/v1", "/api"):
+            if raw.endswith(suffix):
+                raw = raw[: -len(suffix)]
+                break
+        return raw
+
+    @staticmethod
+    def _render_cta(label: str, url: str) -> str:
+        """Render a bulletproof CTA button (Outlook-safe table-based).
+
+        Both label and url are HTML-escaped inside this helper.
+        Callers must urlencode any dynamic id values in url query strings
+        before passing url here.
+        """
+        import html as _html
+        label_html = _html.escape(label)
+        url_html = _html.escape(url, quote=True)
+        return (
+            f'<table role="presentation" border="0" cellpadding="0" cellspacing="0" '
+            f'style="margin:16px 0;">'
+            f'<tr><td bgcolor="#0077CC" style="border-radius:4px;">'
+            f'<a href="{url_html}" '
+            f'style="display:inline-block;padding:10px 20px;color:#FFFFFF;'
+            f'text-decoration:none;font-weight:600;">{label_html}</a>'
+            f'</td></tr></table>'
+        )
+
+    @staticmethod
+    def _build_preheader_text(issues_list, max_chars=90):
+        """Build a 50-90 char standalone preview shown in inbox.
+
+        Picks first 1-2 issues and joins their summaries; truncates with
+        ellipsis if over budget. HTML-escapes the result before returning
+        so it's safe to interpolate into the template via string.Template.
+        """
+        import html as _html
+        if not issues_list:
+            return ''
+        parts = []
+        for i in issues_list[:2]:
+            s = (i.get('summary') or i.get('action') or i.get('desc')
+                 or i.get('rule') or i.get('source') or '')
+            if s:
+                parts.append(str(s))
+        text = ' • '.join(parts)
+        if len(text) > max_chars:
+            text = text[:max_chars - 1].rsplit(' ', 1)[0] + '…'
+        return _html.escape(text)
+
     def send_alerts(self, force_test: bool = False, channels: list[str] | None = None) -> list[dict[str, Any]]:
         if (
             not any(
@@ -536,11 +613,28 @@ class Reporter:
             + len(self.traffic_alerts)
             + len(self.metric_alerts)
         )
-        subj = (
-            t("mail_subject_test")
-            if force_test
-            else t("mail_subject", count=total_issues)
-        )
+        if force_test:
+            subj = t("mail_subject_test")
+        elif total_issues > 0:
+            all_issues = (
+                self.health_alerts
+                + self.event_alerts
+                + self.traffic_alerts
+                + self.metric_alerts
+            )
+            sev = self._highest_severity(all_issues)
+            sev_label = t(f"mail_severity_{sev}")
+            primary = all_issues[0] if all_issues else {}
+            obj = (
+                primary.get("source")
+                or primary.get("resource_name")
+                or primary.get("rule")
+                or t("mail_object_default")
+            )
+            action = primary.get("action") or primary.get("desc") or t("mail_action_default")
+            subj = t("mail_subject_structured", severity=sev_label, object=obj, action=action)
+        else:
+            subj = t("mail_subject", count=total_issues)
         results = []
         registry = get_output_registry()
         ordered_channels = []
@@ -1085,6 +1179,14 @@ class Reporter:
 
     # ── Mail sender ──────────────────────────────────────────────────────────
 
+    def _build_mail_plain(self, subject: str) -> str:
+        """Render a plain-text version of the alert email.
+
+        Reuses _build_line_message which already renders line_digest.txt.tmpl
+        from the same alert lists, ensuring parity with LINE channel content.
+        """
+        return self._build_line_message(subject)
+
     def _build_mail_html(self, subj: str) -> str:
         def esc(text: Any) -> str:
             return html.escape(str(text), quote=True)
@@ -1129,6 +1231,10 @@ class Reporter:
         td_style = "padding:14px 14px; border-bottom:1px solid #F0ECE4; font-size:13px; color:#313638; vertical-align:top; word-break:break-word; font-family:'Montserrat',Arial,sans-serif; line-height:1.55;"
         section_note_style = "padding:0 20px 18px 20px; font-size:12px; line-height:1.6; color:#6F7274; background:#FFFFFF;"
 
+        gui_base = self._gui_base_url()
+        if not gui_base:
+            logger.debug("_build_mail_html: no gui_base_url resolved — CTAs suppressed")
+
         health_section_html = ""
         if self.health_alerts:
             rows = []
@@ -1142,6 +1248,10 @@ class Reporter:
             </tr>
 """
                 )
+            health_cta = (
+                self._render_cta(t('mail_cta_view_health'), f'{gui_base}/dashboard?tab=health')
+                if gui_base else ""
+            )
             health_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#BE122F; color:#FFFFFF;">{esc(t('health_alerts_header'))}</div>
@@ -1158,6 +1268,7 @@ class Reporter:
 {''.join(rows)}
           </tbody>
         </table>
+        {f'<div style="padding:0 20px 16px 20px;">{health_cta}</div>' if health_cta else ''}
       </div>
 """
 
@@ -1179,6 +1290,10 @@ class Reporter:
                     detail_html = self._render_vendor_event_detail_html(alert, esc)
                     row_html += f"<tr><td colspan='4' style='padding:14px 14px 16px; background:#FCFAF6; border-bottom:1px solid #E6E2D8;'>{detail_html}</td></tr>"
                 rows.append(row_html)
+            event_cta = (
+                self._render_cta(t('mail_cta_view_event'), f'{gui_base}/dashboard?tab=events')
+                if gui_base else ""
+            )
             event_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#1A2C32; color:#FFFFFF;">{esc(t('security_events_header'))}</div>
@@ -1196,6 +1311,7 @@ class Reporter:
 {''.join(rows)}
           </tbody>
         </table>
+        {f'<div style="padding:0 20px 16px 20px;">{event_cta}</div>' if event_cta else ''}
       </div>
 """
 
@@ -1218,6 +1334,10 @@ class Reporter:
             </tr>
 """
                 )
+            traffic_cta = (
+                self._render_cta(t('mail_cta_view_traffic'), f'{gui_base}/traffic')
+                if gui_base else ""
+            )
             traffic_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#FF5500; color:#FFFFFF;">{esc(t('traffic_alerts_header'))}</div>
@@ -1234,6 +1354,7 @@ class Reporter:
 {''.join(rows)}
           </tbody>
         </table>
+        {f'<div style="padding:0 20px 16px 20px;">{traffic_cta}</div>' if traffic_cta else ''}
       </div>
 """
 
@@ -1256,6 +1377,10 @@ class Reporter:
             </tr>
 """
                 )
+            metric_cta = (
+                self._render_cta(t('mail_cta_view_metric'), f'{gui_base}/dashboard?tab=metrics')
+                if gui_base else ""
+            )
             metric_section_html = f"""
       <div style="{section_style}">
         <div style="{header_style} background:#F97607; color:#FFFFFF;">{esc(t('metric_alerts_header'))}</div>
@@ -1272,18 +1397,43 @@ class Reporter:
 {''.join(rows)}
           </tbody>
         </table>
+        {f'<div style="padding:0 20px 16px 20px;">{metric_cta}</div>' if metric_cta else ''}
       </div>
+"""
+
+        all_issues = (
+            self.health_alerts
+            + self.event_alerts
+            + self.traffic_alerts
+            + self.metric_alerts
+        )
+        preheader = self._build_preheader_text(all_issues)
+
+        body_html = f"""
+<div style="margin-bottom:20px;">
+  <div style="background:#FF5500;color:#FFFFFF;display:inline-block;padding:6px 14px;border-radius:999px;font-weight:800;font-size:14px;letter-spacing:0.02em;margin-bottom:8px;">Illumio PCE Ops</div>
+  <div style="font-size:12px;color:#6F7274;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">{esc(t('alert_tpl_summary'))}</div>
+  <div style="font-size:12px;color:#8C8E8F;margin-bottom:8px;">{esc(t('alert_tpl_aggregated_blurb'))}</div>
+  <div style="font-size:12px;color:#6F7274;margin-bottom:4px;">{esc(t('alert_tpl_generated_at'))}: <strong>{esc(generated_at)}</strong></div>
+</div>
+{summary_html}
+{health_section_html}
+{event_section_html}
+{traffic_section_html}
+{metric_section_html}
+<div style="margin-top:32px;padding:20px 0 4px;border-top:1px solid #ECE7DD;text-align:center;">
+  <p style="color:#8C8E8F;font-size:11px;line-height:1.8;margin:0;">
+    {esc(t('alert_tpl_auto_generated'))}<br>
+    {esc(t('alert_tpl_act_per_runbook'))}
+  </p>
+</div>
 """
 
         return render_alert_template(
             "mail_wrapper.html.tmpl",
-            subject_html=esc(subj),
-            generated_at_html=esc(generated_at),
-            summary_html=summary_html,
-            health_section_html=health_section_html,
-            event_section_html=event_section_html,
-            traffic_section_html=traffic_section_html,
-            metric_section_html=metric_section_html,
+            title=esc(subj),
+            body_html=body_html,
+            preheader=preheader,
         )
 
     def _send_mail(self, subj: str) -> dict[str, Any]:

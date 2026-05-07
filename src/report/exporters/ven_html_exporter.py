@@ -16,8 +16,11 @@ from .table_renderer import render_df_table
 from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from .html_exporter import render_section_guidance
+from src.i18n import t
 from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
+from src.report.exporters._exec_summary import render_exec_summary_html
+from src.report.exporters._sidebar import render_sidebar_html
 
 _CSS = build_css("ven")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -62,6 +65,7 @@ class VenHtmlExporter:
 
         kpis = self._r.get("kpis", [])
         gen_at = self._r.get("generated_at", "")
+        _ven_mod00 = {"kpis": kpis}
         today_str = str(datetime.date.today())
 
         nav_html = (
@@ -104,7 +108,7 @@ class VenHtmlExporter:
                     "type": "pie",
                     "title": "VEN Status Distribution",
                     "data": {
-                        "labels": ["Online", "Offline", "Lost <24h", "Lost 24-48h"],
+                        "labels": [t("chart_ven_online"), t("chart_ven_offline"), t("chart_ven_lost_24h"), t("chart_ven_lost_48h")],
                         "values": [online_count, offline_count, today_count, yest_count],
                     },
                 }
@@ -123,8 +127,12 @@ class VenHtmlExporter:
             return render_df_table(df, col_i18n=_COL_I18N, no_data_key=no_data_key,
                                    render_cell=_render_cell, lang=_sl)
 
+        exec_html = render_exec_summary_html(_ven_mod00, report_name='VEN Status Report', lang=self._lang)
+        sidebar_html = render_sidebar_html('ven_status')
         body = (
-            '<section id="summary" class="card report-hero">'
+            sidebar_html
+            + exec_html
+            + '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
             f'<div class="report-kicker">{_s("rpt_kicker_ven")}</div>'
             f'<h1>{_s("rpt_ven_title")}</h1>'

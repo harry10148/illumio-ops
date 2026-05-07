@@ -282,7 +282,7 @@ class VenStatusGenerator:
                 "type": "pie",
                 "title": "VEN Agent Status",
                 "data": {
-                    "labels": ["Online", "Offline"],
+                    "labels": [t("chart_ven_online"), t("chart_ven_offline")],
                     "values": [len(df_online), len(df_offline)],
                 },
                 "i18n": {"lang": "en"},

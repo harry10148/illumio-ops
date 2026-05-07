@@ -1389,3 +1389,36 @@
         scroll-behavior: auto !important;
       }
     }
+
+/* ── Skeleton loader card variants (Phase 1 quick win for a1) ────── */
+.skeleton.skeleton-tall { height: 64px; }
+.skeleton.skeleton-card { height: 120px; }
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Phase 1 quick win for a2: input loading indicator */
+.input-loading {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='12' r='10' stroke='%23999' stroke-width='3' fill='none' stroke-dasharray='30 30'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0 12 12' to='360 12 12' dur='0.8s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
+  padding-right: 28px;
+}
+
+/* Phase 1 quick win for a2: inline field error */
+.field-error {
+  display: block;
+  color: var(--danger, #BE122F);
+  font-size: 0.85em;
+  margin-top: 4px;
+  line-height: 1.3;
+}
+input[aria-invalid="true"],
+textarea[aria-invalid="true"],
+select[aria-invalid="true"] {
+  border-color: var(--danger, #BE122F);
+  outline-color: var(--danger, #BE122F);
+}
