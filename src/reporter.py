@@ -553,7 +553,12 @@ class Reporter:
 
     @staticmethod
     def _render_cta(label: str, url: str, severity: str = 'info') -> str:
-        """Render a bulletproof CTA button (Outlook-safe table-based).
+        """Render a bulletproof CTA button (MSO/VML wrap + table fallback).
+
+        Outlook (Word HTML engine) receives a v:roundrect via the MSO
+        conditional comment; all other clients receive the table-based
+        fallback. Both branches use the same SIGNAL_HEX-derived background
+        color so severity coloring stays consistent.
 
         Both label and url are HTML-escaped inside this helper.
         Callers must urlencode any dynamic id values in url query strings
@@ -567,13 +572,29 @@ class Reporter:
         url_html = _html.escape(url, quote=True)
         bg = SIGNAL_HEX.get(severity, SIGNAL_HEX['info'])
         return (
+            # MSO (Outlook) — VML rounded rectangle
+            f'<!--[if mso]>'
+            f'<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" '
+            f'xmlns:w="urn:schemas-microsoft-com:office:word" '
+            f'href="{url_html}" '
+            f'style="height:40px;v-text-anchor:middle;width:200px;" '
+            f'arcsize="10%" stroke="f" fillcolor="{bg}">'
+            f'<w:anchorlock/>'
+            f'<center style="color:#FFFFFF;font-family:Arial,sans-serif;'
+            f'font-size:14px;font-weight:600;">{label_html}</center>'
+            f'</v:roundrect>'
+            f'<![endif]-->'
+            # Non-MSO fallback — table-based
+            f'<!--[if !mso]><!-- -->'
             f'<table role="presentation" border="0" cellpadding="0" cellspacing="0" '
             f'style="margin:16px 0;">'
-            f'<tr><td bgcolor="{bg}" style="border-radius:4px;">'
+            f'<tr><td bgcolor="{bg}" style="border-radius:4px;background:{bg};">'
             f'<a href="{url_html}" '
             f'style="display:inline-block;padding:10px 20px;color:#FFFFFF;'
-            f'text-decoration:none;font-weight:600;">{label_html}</a>'
+            f'text-decoration:none;font-weight:600;font-family:Arial,sans-serif;">'
+            f'{label_html}</a>'
             f'</td></tr></table>'
+            f'<!--<![endif]-->'
         )
 
     @staticmethod
