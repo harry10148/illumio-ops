@@ -51,3 +51,19 @@ def test_siem_purge_empty_db(runner, tmp_path, monkeypatch):
         result = runner.invoke(siem_group, ["purge", "--dest", "dest1"])
     assert result.exit_code == 0
     assert "0" in result.output or "Purged" in result.output
+
+
+def test_siem_test_bad_destination_exits_usage(runner):
+    """siem test with unknown destination exits EXIT_USAGE (64)."""
+    from src.cli.siem import siem_group
+    from unittest.mock import MagicMock, patch
+
+    mock_cm = MagicMock()
+    # Return an empty destinations list so any name misses
+    mock_cm.models.siem.destinations = []
+    with patch("src.config.ConfigManager", return_value=mock_cm):
+        result = runner.invoke(siem_group, ["test", "no_such_dest"])
+
+    from src.cli._exit_codes import EXIT_USAGE
+    assert result.exit_code == EXIT_USAGE
+    assert "not found or disabled" in result.output
