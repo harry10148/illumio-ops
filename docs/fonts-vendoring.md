@@ -7,7 +7,7 @@ All web fonts are self-hosted to satisfy C1 (offline bundle) and avoid CSP/CDN i
 | File | License | Source | Size | Used by |
 |---|---|---|---|---|
 | NotoSansCJKtc-Regular.otf | OFL | https://github.com/notofonts/noto-cjk | 15.7 MB | CJK fallback (PDF, GUI when CJK glyphs needed) |
-| Montserrat-latin.woff2 | OFL | https://github.com/JulietaUla/Montserrat | 37 KB | Legacy GUI/email — superseded by Space Grotesk + Inter (Track A migration in progress) |
+| Montserrat-latin.woff2 | OFL | https://github.com/JulietaUla/Montserrat | 37 KB | Legacy email/report inline styles (`reporter.py`, `report_generator.py`, `report_css.py`, `chart_renderer.py`) — removed from GUI CSS fallback chains (Track A Task 9); woff2 retained until report layer migrated |
 | SpaceGrotesk-VF.woff2 | OFL | https://github.com/floriankarsten/space-grotesk | 48 KB | GUI heading (post Track A) |
 | Inter-VF.woff2 | OFL | https://github.com/fontsource/font-files/tree/main/fonts/variable/inter (latin subset) | 48 KB | GUI body (post Track A); Report body |
 | JetBrainsMono-VF.woff2 | OFL | https://github.com/fontsource/font-files/tree/main/fonts/variable/jetbrains-mono (latin subset) | 40 KB | Code / table figures (tnum) |
