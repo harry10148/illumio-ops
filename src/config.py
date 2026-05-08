@@ -183,7 +183,38 @@ class ConfigManager:
         # Preserve post-load side effects
         lang = self.config.get("settings", {}).get("language", "en")
         set_language(lang)
+        if self._heal_stale_rule_i18n():
+            logger.info("Healed stale [MISSING:*] strings in rules[].desc/rec")
+            self.save()
         self._ensure_web_gui_secret()
+
+    def _heal_stale_rule_i18n(self) -> bool:
+        """Re-resolve `[MISSING:key]` strings in rules[].desc/rec via current i18n.
+
+        Older `apply_best_practices` runs persisted pre-rendered desc/rec into
+        rules[]. When the i18n key didn't exist yet (pre-`e0ac1fb`, 2026-05-03),
+        the stored value is `[MISSING:rule_*_desc]` and survives later i18n
+        fixes because it's frozen in config.json. This re-resolves any such
+        marker against the current i18n dictionary. Returns True iff any rule
+        was changed (caller decides whether to persist immediately).
+        """
+        rules = self.config.get("rules", [])
+        if not rules:
+            return False
+        healed = False
+        for rule in rules:
+            for field in ("desc", "rec"):
+                val = rule.get(field)
+                if not isinstance(val, str):
+                    continue
+                if not (val.startswith("[MISSING:") and val.endswith("]")):
+                    continue
+                key = val[len("[MISSING:"):-1]
+                resolved = t(key, default="")
+                if resolved and resolved != val:
+                    rule[field] = resolved
+                    healed = True
+        return healed
 
     def _ensure_web_gui_secret(self):
         import secrets as _secrets
