@@ -347,7 +347,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
             return exc
         req_id = str(_uuid.uuid4())[:8]
         logger.error(f"[GUI] Unhandled exception req={req_id}: {_traceback.format_exc()}")
-        return jsonify({"ok": False, "error": "Internal server error", "request_id": req_id}), 500
+        return jsonify({"ok": False, "error": t("gui_err_internal"), "request_id": req_id}), 500
 
     @app.before_request
     def security_check():

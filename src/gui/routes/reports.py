@@ -95,7 +95,7 @@ def make_reports_blueprint(
         d = request.json or {}
         filenames = d.get('filenames', [])
         if not filenames:
-            return jsonify({"ok": False, "error": "No filenames provided"}), 400
+            return jsonify({"ok": False, "error": t("gui_err_no_filenames")}), 400
 
         cm.load()
         reports_dir = _resolve_reports_dir(cm)
@@ -130,13 +130,13 @@ def make_reports_blueprint(
     @bp.route('/reports/<path:filename>', methods=['GET'])
     def api_serve_report(filename):
         if '..' in filename or filename.startswith('/'):
-            return jsonify({"ok": False, "error": "Invalid path"}), 403
+            return jsonify({"ok": False, "error": t("gui_err_invalid_path")}), 403
         cm.load()
         reports_dir = _resolve_reports_dir(cm)
         # Path traversal protection: ensure resolved path stays within reports_dir
         target = os.path.realpath(os.path.join(reports_dir, filename))
         if not target.startswith(os.path.realpath(reports_dir) + os.sep):
-            return jsonify({"ok": False, "error": "Invalid path"}), 403
+            return jsonify({"ok": False, "error": t("gui_err_invalid_path")}), 403
         as_download = request.args.get('download') == '1'
         return send_from_directory(reports_dir, filename, as_attachment=as_download)
 
@@ -191,7 +191,7 @@ def make_reports_blueprint(
                     'text/csv', 'application/vnd.ms-excel',
                     'text/plain', 'application/octet-stream',
                 }:
-                    return jsonify({"ok": False, "error": "Invalid file type"}), 415
+                    return jsonify({"ok": False, "error": t("gui_err_invalid_file_type")}), 415
 
                 import uuid as _uuid
                 safe_filename = secure_filename(csv_file.filename) or 'upload.csv'

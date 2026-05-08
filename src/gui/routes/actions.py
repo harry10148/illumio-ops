@@ -286,7 +286,7 @@ def make_actions_blueprint(
         buf = io.StringIO()
         with redirect_stdout(buf):
             ana.run_debug_mode(mins=mins, pd_sel=pd_sel, interactive=False)
-        return jsonify({"ok": True, "output": _strip_ansi(buf.getvalue()).strip() or "Debug mode execution completed."})
+        return jsonify({"ok": True, "output": _strip_ansi(buf.getvalue()).strip() or t("gui_action_debug_completed")})
 
     @bp.route('/api/actions/test-alert', methods=['POST'])
     def api_test_alert():
@@ -299,19 +299,19 @@ def make_actions_blueprint(
         channel = str(data.get("channel", "") or "").strip()
         channels = [channel] if channel else None
         if channel and channel not in PLUGIN_METADATA:
-            return _err(f"Unknown alert channel: {channel}", 400)
+            return _err(t("gui_err_unknown_alert_channel", channel=channel), 400)
 
         from src.reporter import Reporter
         results = Reporter(cm).send_alerts(force_test=True, channels=channels)
         if channel and not results:
-            return _err(f"Channel {channel} is not active or produced no result.", 400)
+            return _err(t("gui_err_channel_inactive", channel=channel), 400)
         status_text = ", ".join(
             f"{item.get('channel', 'channel')}={item.get('status', 'unknown')}"
             for item in results
-        ) or "no channels dispatched"
+        ) or t("gui_test_alert_no_dispatch")
         return jsonify({
             "ok": True,
-            "output": f"Test alerts sent: {status_text}",
+            "output": t("gui_test_alert_sent_summary", status_text=status_text),
             "results": results,
         })
 

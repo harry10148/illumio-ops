@@ -7,6 +7,7 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required
 from loguru import logger
 
+from src.i18n import t
 from src.siem.tester import send_test_event
 
 bp = Blueprint("siem", __name__, url_prefix="/api/siem")
@@ -65,7 +66,7 @@ def add_destination():
         SiemDestinationSettings(**data)  # validate first
         current = cm.models.siem.model_dump(mode="json")
         if any(d["name"] == data.get("name") for d in current.get("destinations", [])):
-            return jsonify({"ok": False, "error": "destination name already exists"}), 409
+            return jsonify({"ok": False, "error": t("gui_err_siem_dest_exists")}), 409
         current.setdefault("destinations", []).append(data)
         result = save_section(cm, "siem", current, SiemForwarderSettings)
         if result["ok"]:
@@ -89,7 +90,7 @@ def update_destination(name: str):
         dests = current.get("destinations", [])
         idx = next((i for i, d in enumerate(dests) if d["name"] == name), None)
         if idx is None:
-            return jsonify({"ok": False, "error": "destination not found"}), 404
+            return jsonify({"ok": False, "error": t("gui_err_siem_dest_not_found")}), 404
         dests[idx] = data
         result = save_section(cm, "siem", current, SiemForwarderSettings)
         if result["ok"]:
@@ -110,7 +111,7 @@ def delete_destination(name: str):
         before = len(current.get("destinations", []))
         current["destinations"] = [d for d in current.get("destinations", []) if d["name"] != name]
         if len(current["destinations"]) == before:
-            return jsonify({"ok": False, "error": "destination not found"}), 404
+            return jsonify({"ok": False, "error": t("gui_err_siem_dest_not_found")}), 404
         result = save_section(cm, "siem", current, SiemForwarderSettings)
         if result["ok"]:
             cm.load()
@@ -284,6 +285,6 @@ def test_destination(name: str):
     dest = next((d for d in cm.models.siem.destinations
                  if d.name == name), None)
     if dest is None:
-        return jsonify({"ok": False, "error": "destination not found"}), 404
+        return jsonify({"ok": False, "error": t("gui_err_siem_dest_not_found")}), 404
     r = send_test_event(dest)
     return jsonify({"ok": r.ok, "error": r.error, "latency_ms": r.latency_ms}), 200

@@ -149,7 +149,7 @@ def make_rule_scheduler_blueprint(
         except Exception as e:
             return _err(f"PCE API error: {e}", 502)
         if not rs:
-            return _err("Not found", 404)
+            return _err(t("gui_err_not_found"), 404)
 
         ut = rs.get('update_type')
         rs_row = {
@@ -245,14 +245,14 @@ def make_rule_scheduler_blueprint(
                 datetime.datetime.strptime(data['start'], "%H:%M")
                 datetime.datetime.strptime(data['end'], "%H:%M")
             except (ValueError, KeyError):
-                return _err("Invalid time format (use HH:MM)", 400)
+                return _err(t("gui_err_invalid_time_hhmm"), 400)
         elif data.get('type') == 'one_time':
             try:
                 ex = data['expire_at'].replace(' ', 'T')
                 datetime.datetime.fromisoformat(ex)
                 data['expire_at'] = ex
             except (ValueError, KeyError):
-                return _err("Invalid expiration format", 400)
+                return _err(t("gui_err_invalid_expire_fmt"), 400)
 
         db_entry = {
             "type": data.get('type', 'recurring'),
@@ -290,7 +290,7 @@ def make_rule_scheduler_blueprint(
         href = '/' + href if not href.startswith('/') else href
         conf = db.get(href)
         if not conf:
-            return _err("Not found", 404)
+            return _err(t("gui_err_not_found"), 404)
         entry = dict(conf)
         entry['href'] = href
         entry['id'] = _extract_id_href(href)

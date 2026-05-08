@@ -240,7 +240,7 @@ def make_config_blueprint(
             days = 30
         tls["auto_renew_days"] = max(1, min(days, 365))
         cm.save()
-        return jsonify({"ok": True, "message": "TLS settings saved. Restart the server to apply."})
+        return jsonify({"ok": True, "message": t("gui_tls_saved_restart_hint")})
 
     @bp.route('/api/tls/renew', methods=['POST'])
     @limiter.limit("10 per hour")
@@ -248,7 +248,7 @@ def make_config_blueprint(
         cm.load()
         tls_cfg = cm.config.get("web_gui", {}).get("tls", {})
         if not tls_cfg.get("self_signed"):
-            return jsonify({"ok": False, "error": "Renew is only available for self-signed certificates."}), 400
+            return jsonify({"ok": False, "error": t("gui_err_renew_self_signed_only")}), 400
         cert_dir = os.path.join(_ROOT_DIR, "config", "tls")
         try:
             cert_path, key_path = _generate_self_signed_cert(cert_dir, force=True)

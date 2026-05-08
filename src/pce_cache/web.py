@@ -7,6 +7,8 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required
 from loguru import logger
 
+from src.i18n import t
+
 bp = Blueprint("pce_cache", __name__, url_prefix="/api/cache")
 
 _SF_KEY = "_cache_Session"
@@ -53,7 +55,7 @@ def api_cache_backfill():
     since_str = data.get("since")
     until_str = data.get("until")
     if not since_str:
-        return jsonify({"error": "missing since"}), 400
+        return jsonify({"error": t("gui_err_cache_missing_since")}), 400
     try:
         since_dt = datetime.strptime(since_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         until_dt = datetime.strptime(until_str, "%Y-%m-%d").replace(tzinfo=timezone.utc) if until_str else datetime.now(timezone.utc)
@@ -62,7 +64,7 @@ def api_cache_backfill():
     try:
         sf = _get_sf()
     except Exception as e:
-        return jsonify({"error": f"cache not configured: {e}"}), 503
+        return jsonify({"error": t("gui_err_cache_not_configured", e=e)}), 503
     try:
         from src.pce_cache.backfill import BackfillRunner
         api = _get_api()
@@ -89,7 +91,7 @@ def api_cache_retention_run():
     try:
         sf = _get_sf()
     except Exception as e:
-        return jsonify({"error": f"cache not configured: {e}"}), 503
+        return jsonify({"error": t("gui_err_cache_not_configured", e=e)}), 503
     cfg = current_app.config["CM"].models.pce_cache
     try:
         from src.pce_cache.retention import RetentionWorker
@@ -111,7 +113,7 @@ def api_cache_status():
     try:
         sf = _get_sf()
     except Exception as e:
-        return jsonify({"error": f"cache not configured: {e}"}), 503
+        return jsonify({"error": t("gui_err_cache_not_configured", e=e)}), 503
     try:
         from sqlalchemy import func, select
         from src.pce_cache.models import PceEvent, PceTrafficFlowRaw, PceTrafficFlowAgg
