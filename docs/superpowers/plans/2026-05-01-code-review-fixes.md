@@ -10,9 +10,9 @@
 
 ---
 
-## Implementation Status (Updated 2026-05-08)
+## Implementation Status (Updated 2026-05-08, second pass)
 
-Branch `code-review-fixes` is 33 commits ahead of `main`. Detailed checkboxes below are kept as-is for posterity; this section is the source of truth for batch-level state.
+`code-review-fixes` was merged into `main` and the branch deleted. Detailed checkboxes below are kept as-is for posterity; this section is the source of truth for batch-level state.
 
 **Batch 1 — 安全急迫 — DONE (7/7)**
 - ✅ 1.1 H1 constant-time login → `b1c3d7a`
@@ -37,14 +37,35 @@ Branch `code-review-fixes` is 33 commits ahead of `main`. Detailed checkboxes be
 - ✅ 3.3 L5 i18n alert templates (line_digest, mail_wrapper) → `59a9625`
 - ✅ 3.4 M3 SSL context to BuiltinSSLAdapter at init → `28eadea`
 
-**Batch 5 — 測試與型別衛生 — NOT STARTED (0/7)**
-- ⬜ 5.1 M10 lift duplicated fixtures into `tests/conftest.py`
-- ⬜ 5.2 M9 split `test_gui_security.py` into 8 focused files
-- ⬜ 5.3 M11 type hints on Analyzer / ApiClient / Reporter public APIs
-- ⬜ 5.4 L8 `utils.py` reorg
-- ⬜ 5.5 L9 split `rules_engine.py` into per-rule modules
-- ⬜ 5.6 L10 unify daemon-startup path (argparse vs click)
-- ⬜ 5.7 L7 bundle CJK font for matplotlib
+**Batch 5 — 測試與型別衛生 — DONE (7/7, mostly absorbed into prior work)**
+
+The original "NOT STARTED 0/7" entry was wrong: most of Batch 5 was completed
+out-of-plan during Batch 4 (May 2 / May 7) and the Track A-D sprint. A second
+pass on 2026-05-08 confirmed each task and closed three small gaps.
+
+- ✅ 5.1 M10 lift duplicated fixtures into `tests/conftest.py` — fixture half
+  done in prior work (`temp_config_file` / `app_persistent` / `client` already
+  in conftest); helper-function half (`_csrf` redefined in 8 files) lifted into
+  `tests/_helpers.py` → `b206dfc` (2026-05-08)
+- ✅ 5.2 M9 split `test_gui_security.py` into 8 focused files → `d1a5ceb`
+  (2026-05-02). Original 1325 lines → 8 files (auth/event_viewer/quarantine/
+  ip_allowlist/alert_plugins/dashboard/rules/misc), 43 tests collected
+- ✅ 5.3 M11 type hints on Analyzer / ApiClient / Reporter — type hints + strict
+  mypy.ini already in place from prior work; the four lingering mypy errors
+  fixed → `fba5784` (2026-05-08). `mypy src/api_client.py src/analyzer.py
+  src/reporter.py` → 0 errors
+- ✅ 5.4 L8 `utils.py` reorg → done in prior work (`utils.py` now 62-line
+  thin shim re-exporting from `src/cli/_render.py` + `src/loguru_config.py`)
+- ✅ 5.5 L9 split `rules_engine.py` into per-rule modules → `7998c14`
+  (2026-05-02). 1076 → 904 lines, container only; rules at
+  `src/report/rules/r01_*.py` … `r05_*.py` (R01-R05 turned out to be the full
+  set; the original "8 rules" plan figure was an overcount)
+- ✅ 5.6 L10 unify daemon-startup path → `_runtime.py` extraction done in
+  prior work; missing `monitor-gui` click subcommand added → `7ab4135`
+  (2026-05-08). Closes the 2026-05-08 newcomer-review Tier-1 inconsistency
+- ✅ 5.7 L7 bundle CJK font for matplotlib → done in prior work
+  (`src/static/fonts/NotoSansCJKtc-Regular.otf` registered in
+  `chart_renderer.py`; `tests/test_html_report_cjk_font.py` asserts it)
 
 **Batch 4 — 巨型重構 — DONE (3/3, 2026-05-02)**
 - ✅ H4 `i18n.py` extraction → sub-plan `docs/superpowers/plans/2026-05-02-h4-i18n-data-extraction.md` → release `v3.22.0-h4-i18n` (`c9bacd4`)
@@ -60,12 +81,13 @@ Branch `code-review-fixes` is 33 commits ahead of `main`. Detailed checkboxes be
 - First-run UX: default admin password `illumio` with must-change banner + forced inline change (`0a12b54`, `88760d6`, `dd26054`)
 - New `POST /api/cache/retention/run` endpoint (in `e22dc5c`)
 
-**Final Acceptance — outstanding**
-- mypy on `src/api_client.py src/analyzer.py src/reporter.py` (gated by Task 5.3)
-- Manual UI smoke at `https://localhost:5001` under TLS
-- Self-signed cert renew flow manual test
-- CHANGELOG entry for Batches 1–5
-- Merge `code-review-fixes` → `main` and tag release
+**Final Acceptance — status**
+- ✅ mypy on `src/api_client.py src/analyzer.py src/reporter.py` → 0 errors (`fba5784`)
+- ⬜ Manual UI smoke at `https://localhost:5001` under TLS
+- ⬜ Self-signed cert renew flow manual test
+- ⬜ CHANGELOG entry for Batches 1–5
+- ✅ `code-review-fixes` was merged → `main` and the branch deleted (date unrecorded)
+- ⬜ i18n audit: 4 pre-existing findings ([B] ×3, [D] ×1) remain — out of Batch 5 scope, separate cleanup
 
 **Environment note (2026-05-02):** the venv at `venv/` was created when the repo lived at `/home/harry/dev/illumio-ops/`. Its script shebangs still point there, so invoke pytest as `venv/bin/python3 -m pytest` (not `venv/bin/pytest`). Either rebuild the venv or update the documented commands in this plan when convenient.
 
