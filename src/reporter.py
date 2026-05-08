@@ -132,6 +132,23 @@ class Reporter:
         "request.authentication_failed":            "alert_rec_request_authentication_failed",
         "request.authorization_failed":             "alert_rec_request_authorization_failed",
         "sec_policy.create":                        "alert_rec_sec_policy_create",
+        # Best-practice rules whose recommendation was previously falling back
+        # to alert_rec_default — see Telegram report 2026-05-08:
+        "lost_agent.found":                         "alert_rec_lost_agent_found",
+        "user.sign_in":                             "alert_rec_login_failed",
+        "user.login":                               "alert_rec_login_failed",
+        "agent.refresh_policy":                     "alert_rec_policy_fail",
+        "rule_set.create":                          "alert_rec_ruleset_change",
+        "rule_set.update":                          "alert_rec_ruleset_change",
+        "rule_set.delete":                          "alert_rec_ruleset_change",
+        "sec_rule.create":                          "alert_rec_sec_rule_change",
+        "sec_rule.update":                          "alert_rec_sec_rule_change",
+        "sec_rule.delete":                          "alert_rec_sec_rule_change",
+        "api_key.create":                           "alert_rec_api_key_change",
+        "api_key.delete":                           "alert_rec_api_key_change",
+        "workloads.unpair":                         "alert_rec_bulk_unpair",
+        "agents.unpair":                            "alert_rec_bulk_unpair",
+        "authentication_settings.update":           "alert_rec_auth_settings_change",
     }
 
     @classmethod
