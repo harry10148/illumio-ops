@@ -3,6 +3,7 @@ from __future__ import annotations
 import click
 from rich.console import Console
 from rich.table import Table
+from sqlalchemy.exc import OperationalError
 
 from src.cli._output import is_json, is_quiet, echo_error, echo_warning, echo_info, echo_json
 from src.cli._exit_codes import EXIT_OK, EXIT_DATAERR, EXIT_NOINPUT, EXIT_UNAVAILABLE, EXIT_SOFTWARE, EXIT_USAGE
@@ -118,6 +119,13 @@ def siem_status(ctx: click.Context):
             table.add_row(r["destination"], str(r["pending"]), str(r["sent"]),
                           str(r["failed"]), str(r["dlq"]))
         console.print(table)
+    except OperationalError:
+        # SIEM cache db not initialized — first-run / pre-collect path.
+        # Exit 0: nothing to report, not an error.
+        if is_json(ctx):
+            echo_json(ctx, [])
+        elif not is_quiet(ctx):
+            console.print("[dim]No SIEM dispatch records yet (cache db not initialized).[/dim]")
     except Exception as exc:
         echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
@@ -146,6 +154,10 @@ def siem_replay(ctx: click.Context, dest: str, limit: int):
             echo_json(ctx, {"ok": True, "destination": dest, "requeued": count})
         elif not is_quiet(ctx):
             console.print(f"[green]Requeued {count} entries for '{dest}'[/green]")
+    except OperationalError:
+        # SIEM cache db not initialized — replay needs existing dispatch records.
+        echo_error(ctx, f"No SIEM data to replay (cache db not initialized for '{dest}').")
+        ctx.exit(1)
     except Exception as exc:
         echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
