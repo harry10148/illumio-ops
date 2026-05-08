@@ -335,8 +335,8 @@ def _summarize_alert_channels(config: dict, dispatch_history: list) -> list[dict
         latest = next((item for item in reversed(dispatch_history or []) if item.get("channel") == name), None)
         summaries.append({
             "name": name,
-            "display_name": meta.display_name,
-            "description": meta.description,
+            "display_name": meta.resolved_display_name(),
+            "description": meta.resolved_description(),
             "enabled": name in active,
             "configured": len(required_missing) == 0,
             "missing_required": required_missing,

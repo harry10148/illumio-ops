@@ -111,13 +111,13 @@ def make_config_blueprint(
             "plugins": {
                 name: {
                     "name": meta.name,
-                    "display_name": meta.display_name,
-                    "description": meta.description,
+                    "display_name": meta.resolved_display_name(),
+                    "description": meta.resolved_description(),
                     "fields": [
                         {
                             "key": key,
-                            "label": field.label,
-                            "help": field.help,
+                            "label": field.resolved_label(),
+                            "help": field.resolved_help(),
                             "required": field.required,
                             "secret": field.secret,
                             "placeholder": field.placeholder,
