@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.table import Table
 
 from src.cli._global_flags import get_global_flags
+from src.i18n import t
 from src.cli._output import (
     echo_error,
     echo_info,
@@ -86,7 +87,7 @@ def cache_backfill(ctx: click.Context, source: str, since: str, until: str | Non
 
     sf = _get_db_session_factory()
     if sf is None:
-        echo_error(ctx, "Cannot connect to cache database. Is pce_cache.db_path configured?")
+        echo_error(ctx, t("cli_cache_err_no_db"))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     try:
@@ -126,7 +127,7 @@ def cache_status(ctx: click.Context):
     sf = _get_db_session_factory()
     if sf is None:
         if not flags['quiet']:
-            console.print("[yellow]Cache database not configured.[/yellow]")
+            console.print(f"[yellow]{t('cli_cache_db_not_configured')}[/yellow]")
         return
     try:
         from sqlalchemy import func, select
@@ -181,7 +182,7 @@ def cache_retention(ctx: click.Context, do_run: bool, json_output: bool):
 
     sf = _get_db_session_factory()
     if sf is None:
-        echo_error(ctx, "Cannot connect to cache database. Is pce_cache.db_path configured?")
+        echo_error(ctx, t("cli_cache_err_no_db"))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     try:
@@ -199,7 +200,7 @@ def cache_retention(ctx: click.Context, do_run: bool, json_output: bool):
             for key, count in result.items():
                 result_table.add_row(key, str(count))
             console.print(result_table)
-            console.print("[green]Retention purge complete.[/green]")
+            console.print(f"[green]{t('cli_cache_retention_done')}[/green]")
     except Exception as exc:
         echo_error(ctx, f"Retention failed: {exc}")
         ctx.exit(EXIT_SOFTWARE)

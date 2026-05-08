@@ -7,6 +7,7 @@ from sqlalchemy.exc import OperationalError
 
 from src.cli._output import is_json, is_quiet, echo_error, echo_warning, echo_info, echo_json
 from src.cli._exit_codes import EXIT_OK, EXIT_DATAERR, EXIT_NOINPUT, EXIT_UNAVAILABLE, EXIT_SOFTWARE, EXIT_USAGE
+from src.i18n import t
 
 console = Console()
 
@@ -37,12 +38,12 @@ def siem_test(ctx: click.Context, destination: str):
         siem_cfg = cm.models.siem
         dest_names = [d.name for d in siem_cfg.destinations if d.enabled]
     except Exception as exc:
-        echo_error(ctx, f"Test failed for '{destination}': {exc}")
+        echo_error(ctx, t("cli_siem_test_fail", dest=destination, error=exc))
         ctx.exit(EXIT_UNAVAILABLE)
         return
 
     if destination not in dest_names:
-        echo_error(ctx, f"Destination '{destination}' not found or disabled.")
+        echo_error(ctx, t("cli_siem_err_dest_not_found", destination=destination))
         ctx.exit(EXIT_USAGE)
         return
 
@@ -50,7 +51,7 @@ def siem_test(ctx: click.Context, destination: str):
         dest_cfg = next(d for d in siem_cfg.destinations if d.name == destination)
         result = send_test_event(dest_cfg)
     except Exception as exc:
-        echo_error(ctx, f"Test failed for '{destination}': {exc}")
+        echo_error(ctx, t("cli_siem_test_fail", dest=destination, error=exc))
         ctx.exit(EXIT_UNAVAILABLE)
         return
 
@@ -58,9 +59,9 @@ def siem_test(ctx: click.Context, destination: str):
         if is_json(ctx):
             echo_json(ctx, {"ok": True, "destination": destination, "latency_ms": result.latency_ms})
         elif not is_quiet(ctx):
-            console.print(f"[green]✓ Test event sent to '{destination}' ({result.latency_ms} ms)[/green]")
+            console.print(f"[green]{t('cli_siem_test_sent', destination=destination, latency=result.latency_ms)}[/green]")
     else:
-        echo_error(ctx, f"Test failed for '{destination}': {result.error}")
+        echo_error(ctx, t("cli_siem_test_fail", dest=destination, error=result.error))
         if is_json(ctx):
             echo_json(ctx, {"ok": False, "destination": destination, "details": result.error})
         ctx.exit(EXIT_UNAVAILABLE)
@@ -125,7 +126,7 @@ def siem_status(ctx: click.Context):
         if is_json(ctx):
             echo_json(ctx, [])
         elif not is_quiet(ctx):
-            console.print("[dim]No SIEM dispatch records yet (cache db not initialized).[/dim]")
+            console.print(f"[dim]{t('cli_siem_no_records')}[/dim]")
     except Exception as exc:
         echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
@@ -153,10 +154,10 @@ def siem_replay(ctx: click.Context, dest: str, limit: int):
         if is_json(ctx):
             echo_json(ctx, {"ok": True, "destination": dest, "requeued": count})
         elif not is_quiet(ctx):
-            console.print(f"[green]Requeued {count} entries for '{dest}'[/green]")
+            console.print(f"[green]{t('cli_siem_replayed', count=count, dest=dest)}[/green]")
     except OperationalError:
         # SIEM cache db not initialized — replay needs existing dispatch records.
-        echo_error(ctx, f"No SIEM data to replay (cache db not initialized for '{dest}').")
+        echo_error(ctx, t("cli_siem_err_no_replay_data", dest=dest))
         ctx.exit(1)
     except Exception as exc:
         echo_error(ctx, str(exc))
@@ -185,7 +186,7 @@ def siem_purge(ctx: click.Context, dest: str, older_than: int):
         if is_json(ctx):
             echo_json(ctx, {"ok": True, "destination": dest, "removed": removed})
         elif not is_quiet(ctx):
-            console.print(f"[green]Purged {removed} DLQ entries for '{dest}'[/green]")
+            console.print(f"[green]{t('cli_siem_purged', count=removed, dest=dest)}[/green]")
     except Exception as exc:
         echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
@@ -212,7 +213,7 @@ def siem_dlq(ctx: click.Context, dest: str, limit: int):
         entries = dlq.list_entries(dest, limit=limit)
         if not entries:
             if not is_quiet(ctx):
-                console.print(f"[yellow]No DLQ entries for '{dest}'[/yellow]")
+                console.print(f"[yellow]{t('cli_siem_no_dlq', dest=dest)}[/yellow]")
             if is_json(ctx):
                 echo_json(ctx, [])
             return

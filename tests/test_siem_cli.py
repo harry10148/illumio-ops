@@ -66,4 +66,5 @@ def test_siem_test_bad_destination_exits_usage(runner):
 
     from src.cli._exit_codes import EXIT_USAGE
     assert result.exit_code == EXIT_USAGE
-    assert "not found or disabled" in result.output
+    # i18n-aware: assert the destination name appears, not the surrounding text
+    assert "no_such_dest" in result.output

@@ -12,6 +12,7 @@ from src.cli._output import (
     is_quiet,
 )
 from src.cli._exit_codes import EXIT_USAGE
+from src.i18n import t
 
 
 @click.group("rule")
@@ -90,7 +91,7 @@ def edit_rule(ctx: click.Context, rule_id: int, no_preview: bool) -> None:
     cm = ConfigManager()
     rules = cm.config.get("rules", [])
     if rule_id < 1 or rule_id > len(rules):
-        echo_error(ctx, f"rule_id {rule_id} out of range (1..{len(rules)})")
+        echo_error(ctx, t("cli_rule_err_index_out_of_range", rule_id=rule_id, n=len(rules)))
         ctx.exit(EXIT_USAGE)
         return
 
@@ -121,7 +122,7 @@ def edit_rule(ctx: click.Context, rule_id: int, no_preview: bool) -> None:
         console.print("[bold]After:[/bold]")
         console.print(Syntax(after, "json", theme="monokai", line_numbers=False))
         if not questionary.confirm("Save changes?", default=True).unsafe_ask():
-            click.echo("Aborted.")
+            click.echo(t("cli_rule_aborted"))
             return
 
     cm.save()

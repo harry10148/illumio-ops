@@ -10,6 +10,7 @@ import pathlib
 import click
 
 from src.cli._output import echo_error
+from src.i18n import t
 from src.cli._exit_codes import EXIT_USAGE
 
 
@@ -48,11 +49,11 @@ def completion_install(ctx: click.Context, shell: str) -> None:
     """
     shell = shell.lower()
     if shell not in _FILES:
-        echo_error(ctx, f"Unsupported shell: {shell}")
+        echo_error(ctx, t("cli_completion_err_bad_shell", shell=shell))
         ctx.exit(EXIT_USAGE)
     path = _completions_dir() / _FILES[shell]
     if not path.exists():
-        echo_error(ctx, f"Completion file missing: {path}")
+        echo_error(ctx, t("cli_completion_err_file_missing", path=path))
         ctx.exit(EXIT_USAGE)
     if shell == "bash":
         click.echo("# Add this to ~/.bashrc:")

@@ -4,6 +4,7 @@ import click
 
 from src.cli._exit_codes import EXIT_INTERRUPT, EXIT_SOFTWARE, EXIT_UNAVAILABLE
 from src.cli._output import echo_error
+from src.i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -23,16 +24,16 @@ def monitor_gui_cmd(ctx: click.Context, interval: int, port: int, host: str) -> 
         ctx.exit(EXIT_INTERRUPT)
     except OSError as exc:
         if "address already in use" in str(exc).lower():
-            echo_error(ctx, f"Port {port} is already in use: {exc}")
+            echo_error(ctx, t("cli_err_port_in_use", port=port, exc=exc))
             ctx.exit(EXIT_UNAVAILABLE)
         else:
             log.exception("monitor-gui failed with OSError")
-            echo_error(ctx, f"OS error: {exc}")
+            echo_error(ctx, t("cli_err_os_error", exc=exc))
             ctx.exit(EXIT_SOFTWARE)
     except ConnectionError as exc:
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_err_connection_failed", exc=exc))
         ctx.exit(EXIT_UNAVAILABLE)
     except Exception as exc:
         log.exception("monitor-gui failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_err_unexpected", exc=exc))
         ctx.exit(EXIT_SOFTWARE)

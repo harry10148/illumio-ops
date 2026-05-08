@@ -4,6 +4,7 @@ import click
 
 from src.cli._exit_codes import EXIT_INTERRUPT, EXIT_SOFTWARE, EXIT_UNAVAILABLE
 from src.cli._output import echo_error
+from src.i18n import t
 
 log = logging.getLogger(__name__)
 
@@ -20,9 +21,9 @@ def monitor_cmd(ctx: click.Context, interval: int) -> None:
     except KeyboardInterrupt:
         ctx.exit(EXIT_INTERRUPT)
     except ConnectionError as exc:
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_err_connection_failed", exc=exc))
         ctx.exit(EXIT_UNAVAILABLE)
     except Exception as exc:
         log.exception("monitor daemon failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_err_unexpected", exc=exc))
         ctx.exit(EXIT_SOFTWARE)
