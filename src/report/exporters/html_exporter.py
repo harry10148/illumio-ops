@@ -637,7 +637,7 @@ class HtmlExporter:
         return (
             f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            '<title>Illumio Traffic Report</title>' + _CSS + _HIGHLIGHT_CSS + '</head>\n'
+            f"<title>{t('rpt_page_title_traffic')}</title>" + _CSS + _HIGHLIGHT_CSS + '</head>\n'
             '<body>' + nav_html + '<main>' + body + '</main>'
             + TABLE_JS + '</body></html>'
         )

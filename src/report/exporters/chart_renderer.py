@@ -199,10 +199,18 @@ def render_plotly_html(spec: dict[str, Any], *, include_js: bool = True) -> str:
         include_js: If True (default), embeds the full Plotly JS bundle (~3 MB) inline.
             Set to False for subsequent charts in the same document to avoid repeating
             the bundle — Plotly reuses the already-loaded runtime from the first chart.
+
+    Title and axis labels are resolved through `_resolve_chart_text` so that
+    chart_specs carrying `title_key` / `x_label_key` / `y_label_key` render
+    in the active language — matching the matplotlib renderer's behaviour.
     """
+    from src.i18n import get_language
+    _lang = get_language()
     chart_type = spec.get("type")
     data = spec.get("data", {})
-    title = spec.get("title", "")
+    title = _resolve_chart_text(spec, "title", lang=_lang)
+    x_label = _resolve_chart_text(spec, "x_label", lang=_lang)
+    y_label = _resolve_chart_text(spec, "y_label", lang=_lang)
 
     if chart_type == "bar":
         labels = data.get("labels", [])
@@ -214,7 +222,7 @@ def render_plotly_html(spec: dict[str, Any], *, include_js: bool = True) -> str:
             marker=dict(color=colors, line=dict(color="rgba(0,0,0,0.08)", width=1)),
             hovertemplate="%{x}<br><b>%{y:,}</b><extra></extra>",
         ))
-        _apply_base_layout(fig, title, spec.get("x_label", ""), spec.get("y_label", ""))
+        _apply_base_layout(fig, title, x_label, y_label)
         fig.update_layout(bargap=0.28)
     elif chart_type == "pie":
         labels = data.get("labels", [])
@@ -245,7 +253,7 @@ def render_plotly_html(spec: dict[str, Any], *, include_js: bool = True) -> str:
             marker=dict(size=7, color=_PALETTE[0], line=dict(color="#fff", width=1.5)),
             hovertemplate="%{x}<br><b>%{y:,}</b><extra></extra>",
         ))
-        _apply_base_layout(fig, title, spec.get("x_label", ""), spec.get("y_label", ""))
+        _apply_base_layout(fig, title, x_label, y_label)
     elif chart_type == "heatmap":
         fig = go.Figure(go.Heatmap(
             z=data.get("matrix", []),

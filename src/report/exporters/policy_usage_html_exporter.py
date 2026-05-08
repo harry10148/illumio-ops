@@ -16,6 +16,7 @@ from .table_renderer import render_df_table
 from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from .html_exporter import render_section_guidance
+from src.i18n import t
 from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 from src.report.exporters._exec_summary import render_exec_summary_html
@@ -232,7 +233,7 @@ class PolicyUsageHtmlExporter:
         return (
             f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            "<title>Illumio Policy Usage Report</title>"
+            f"<title>{t('rpt_page_title_policy_usage')}</title>"
             + _CSS + _HIGHLIGHT_CSS
             + "</head>\n<body>"
             + nav_html

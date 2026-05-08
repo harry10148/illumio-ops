@@ -9,6 +9,7 @@ import os
 import pandas as pd
 
 from .html_exporter import _trend_deltas_section, render_section_guidance
+from src.i18n import t
 from src.report.section_guidance import visible_in
 from .report_css import TABLE_JS, build_css
 from src.humanize_ext import human_number
@@ -244,7 +245,7 @@ class AuditHtmlExporter:
         return (
             f'<!DOCTYPE html><html lang="{"zh-TW" if self._lang == "zh_TW" else "en"}"><head>\n'
             "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
-            "<title>Illumio Audit Report</title>"
+            f"<title>{t('rpt_page_title_audit')}</title>"
             + _CSS + _HIGHLIGHT_CSS
             + "</head>\n"
             + "<body>"

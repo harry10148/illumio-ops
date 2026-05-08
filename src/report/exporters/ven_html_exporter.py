@@ -163,7 +163,7 @@ class VenHtmlExporter:
         return (
             f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            "<title>Illumio VEN Status Report</title>"
+            f"<title>{t('rpt_page_title_ven_status')}</title>"
             + _CSS + _HIGHLIGHT_CSS
             + "</head>\n<body>"
             + nav_html
