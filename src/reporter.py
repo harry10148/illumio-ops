@@ -657,7 +657,7 @@ class Reporter:
         )
 
     @staticmethod
-    def _build_preheader_text(issues_list, max_chars=90):
+    def _build_preheader_text(issues_list: list[dict[str, Any]], max_chars: int = 90) -> str:
         """Build a 50-90 char standalone preview shown in inbox.
 
         Picks first 1-2 issues and joins their summaries; truncates with
@@ -1618,7 +1618,7 @@ class Reporter:
             )
             html_body = html_body.replace('</body></html>', warning_html + '</body></html>', 1)
 
-        plain_body = self._build_line_message()
+        plain_body = self._build_line_message(subject)
 
         if attach_parts:
             msg = MIMEMultipart('mixed')

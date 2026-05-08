@@ -897,6 +897,11 @@ class Analyzer:
         """
         start_time = params.get("start_time")
         end_time = params.get("end_time")
+        if not isinstance(start_time, str) or not isinstance(end_time, str):
+            raise TypeError(
+                "query_flows: 'start_time' and 'end_time' must be ISO-format strings "
+                "(e.g. '2026-02-23T00:00:00Z')"
+            )
         pds = params.get("policy_decisions", ["blocked", "potentially_blocked", "allowed"])
         
         strict_pd: set[str] = set()
@@ -962,7 +967,7 @@ class Analyzer:
 
         now_dt = datetime.datetime.now(datetime.timezone.utc)
         try:
-            start_dt = datetime.datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)  # type: ignore[arg-type]
+            start_dt = datetime.datetime.strptime(start_time, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
         except (ValueError, TypeError):
             start_dt = now_dt - datetime.timedelta(minutes=30)
             
