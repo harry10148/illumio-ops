@@ -67,23 +67,41 @@ If you only need the PCE web console for occasional manual queries, you don't ne
 
 > Production deployments use the self-contained offline bundle (no system Python, no network on target). See **[Installation](docs/Installation.md#12-installation)** for the bundle workflow on Linux and Windows.
 
+### Prerequisites
+
+- **PCE admin access** to mint an API Key — in the PCE Web Console, top-right user menu → **My API Keys** → **Add**. Save the resulting `auth_username` (treat as `api.key`) and `secret`.
+- **Network reachability** from this host to PCE on HTTPS (typically port 8443).
+- **Python 3.10+** with `venv`. On Ubuntu 22.04+ / Debian 12+ a venv is required (PEP 668).
+- For lab PCEs using a **self-signed TLS certificate**, set `api.verify_ssl: false` in `config.json` after copying the example — otherwise the first connection fails with an SSL verification error.
+
+### Run
+
 ```bash
 git clone <repo-url>
 cd illumio-ops
-cp config/config.json.example config/config.json    # Edit with your PCE credentials
-pip install -r requirements.txt                     # Use a venv on Ubuntu 22.04+ / Debian 12+ (PEP 668)
+cp config/config.json.example config/config.json    # Then edit api.url / api.key / api.secret with the values from "My API Keys"
+python -m venv venv && source venv/bin/activate     # Required on Ubuntu 22.04+ / Debian 12+ (PEP 668)
+pip install -r requirements.txt
 
 # Most common: persistent daemon + Web GUI on https://127.0.0.1:5001
 python illumio-ops.py --monitor-gui --interval 5 --port 5001
 ```
 
-For air-gapped deployments, systemd / NSSM service registration, and the full dependency list, see **[Installation](docs/Installation.md)**.
+### Verify it worked
 
-For all execution modes (`--gui` / `--monitor` / interactive CLI), the full subcommand reference, and the operational walkthrough, see **[User Manual §1](docs/User_Manual.md)**.
+On first run you should see, in order:
 
-### First Login
+1. A `DEFAULT ADMIN LOGIN` banner on stderr printing `username: illumio` / `password: illumio` (the well-known default — the first login forces a change).
+2. `TLS: Using self-signed certificate (NNN days remaining)`.
+3. `Open in browser: https://127.0.0.1:5001` and (in non-daemon mode) the browser auto-opens.
 
-The default username is `illumio`. On first startup with an empty `web_gui.password`, an initial password is auto-generated and stored at `web_gui._initial_password` in `config.json`; the first login is forced to change it. Full flow: **[User Manual §3](docs/User_Manual.md#3-web-gui-security)**.
+In the browser: dismiss the self-signed-cert warning, log in as `illumio` / `illumio`, set a new password, then check the Dashboard — the **PCE Status** widget should report "connected". If it shows "auth failed", re-check `api.key` / `api.secret`.
+
+For air-gapped deployments, systemd / NSSM service registration, and the full dependency list, see **[Installation](docs/Installation.md)**. For all execution modes (`--gui` / `--monitor` / interactive CLI), the full subcommand reference, and the operational walkthrough, see **[User Manual §1](docs/User_Manual.md)**.
+
+### First Login (security)
+
+The default credentials `illumio` / `illumio` are seeded automatically on first startup; the GUI gates the session with `must_change_password=true` until the password is changed (see `src/config.py:200`). The plaintext default is also stored at `web_gui._initial_password` in `config.json` — it is wiped on the first successful password change. Full flow: **[User Manual §3](docs/User_Manual.md#3-web-gui-security)**.
 
 ### Logging
 
