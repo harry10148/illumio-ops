@@ -10,7 +10,7 @@
 
 ---
 
-## Implementation Status (Updated 2026-05-02)
+## Implementation Status (Updated 2026-05-08)
 
 Branch `code-review-fixes` is 33 commits ahead of `main`. Detailed checkboxes below are kept as-is for posterity; this section is the source of truth for batch-level state.
 
@@ -46,10 +46,10 @@ Branch `code-review-fixes` is 33 commits ahead of `main`. Detailed checkboxes be
 - ⬜ 5.6 L10 unify daemon-startup path (argparse vs click)
 - ⬜ 5.7 L7 bundle CJK font for matplotlib
 
-**Batch 4 — 巨型重構 — DEFERRED (sub-plans not yet authored)**
-- ⬜ H4 `i18n.py` extraction (~2300 lines moved) — sub-plan needed
-- ⬜ H5 `gui/__init__.py` Blueprint split (~3700 lines moved) — sub-plan needed
-- ⬜ H6 `settings.py` rename / CLI menus split (~2200 lines moved) — sub-plan needed
+**Batch 4 — 巨型重構 — DONE (3/3, 2026-05-02)**
+- ✅ H4 `i18n.py` extraction → sub-plan `docs/superpowers/plans/2026-05-02-h4-i18n-data-extraction.md` → release `v3.22.0-h4-i18n` (`c9bacd4`)
+- ✅ H5 `gui/__init__.py` Blueprint split → sub-plan `docs/superpowers/plans/2026-05-02-h5-gui-blueprint-split.md` → release `v3.23.0-h5-gui-blueprints` (`0738f57`)
+- ✅ H6 `settings.py` rename / CLI menus split → sub-plan `docs/superpowers/plans/2026-05-02-h6-settings-rename-reorg.md` → release `v3.24.0-h6-cli-menus (Batch 4 complete)` (`a9020ee`)
 
 **Out-of-plan items completed on `code-review-fixes`** (kept for traceability — not in original review report):
 - SIEM forwarder GA + inline-enqueue ingest path (`96d770c`, `f5b612d`)
