@@ -2,9 +2,7 @@
 from src.i18n import get_messages, set_language
 
 
-def _csrf(login_response) -> str:
-    """Extract CSRF token from login response JSON (new synchronizer token pattern)."""
-    return (login_response.get_json() or {}).get('csrf_token', '')
+from tests._helpers import _csrf
 
 
 def test_quarantine_apply_rejects_non_workload_href(client):

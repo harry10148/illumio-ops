@@ -3,9 +3,7 @@ import json
 import threading
 
 
-def _csrf(login_response) -> str:
-    """Extract CSRF token from login response JSON (new synchronizer token pattern)."""
-    return (login_response.get_json() or {}).get('csrf_token', '')
+from tests._helpers import _csrf
 
 
 def test_index_initial_translations_include_schedule_keys(client):

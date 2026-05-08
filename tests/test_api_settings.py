@@ -9,8 +9,7 @@ from src.config import ConfigManager, hash_password
 from src.gui import build_app as _create_app
 
 
-def _csrf(login_response) -> str:
-    return (login_response.get_json() or {}).get("csrf_token", "")
+from tests._helpers import _csrf
 
 
 @pytest.fixture

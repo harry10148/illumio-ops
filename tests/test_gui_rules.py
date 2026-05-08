@@ -7,9 +7,7 @@ from src.config import ConfigManager
 from src.gui import build_app as _create_app
 
 
-def _csrf(login_response) -> str:
-    """Extract CSRF token from login response JSON (new synchronizer token pattern)."""
-    return (login_response.get_json() or {}).get('csrf_token', '')
+from tests._helpers import _csrf
 
 
 def test_best_practices_append_mode_preserves_existing_rules(app_persistent):
