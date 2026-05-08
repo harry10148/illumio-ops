@@ -9,6 +9,7 @@ from src.cli._global_flags import inject_global_flags
 from src.cli.cache import cache_group
 from src.cli.config import config_group
 from src.cli.monitor import monitor_cmd
+from src.cli.monitor_gui_cmd import monitor_gui_cmd
 from src.cli.gui_cmd import gui_cmd
 from src.cli.report import report_group
 from src.cli.rule import rule_group
@@ -83,6 +84,7 @@ def shell(ctx: click.Context) -> None:
 cli.add_command(cache_group)
 cli.add_command(config_group)
 cli.add_command(monitor_cmd)
+cli.add_command(monitor_gui_cmd)
 cli.add_command(gui_cmd)
 cli.add_command(report_group)
 cli.add_command(rule_group)
