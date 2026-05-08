@@ -980,7 +980,7 @@ class HtmlExporter:
     def _mod11_html(self):
         m = self._r.get('mod11', {})
         if not m.get('bytes_data_available', False):
-            return f'<p class="note">{m.get("note","No byte data.")}</p>'
+            return f'<p class="note">{m.get("note", t("rpt_mod11_no_byte_data"))}</p>'
 
         max_bw = m.get('max_bandwidth_mbps')
         avg_bw = m.get('avg_bandwidth_mbps')

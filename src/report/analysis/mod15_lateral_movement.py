@@ -96,7 +96,7 @@ def _path_weight(path: list[str], edge_weights: dict[tuple[str, str], int]) -> i
 
 def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4) -> dict:
     if df.empty:
-        return {"error": "No data"}
+        return {"error": t("rpt_mod_err_no_data")}
 
     work = df.copy()
     work["port"] = pd.to_numeric(work.get("port", -1), errors="coerce").fillna(-1).astype(int)

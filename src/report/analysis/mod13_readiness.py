@@ -69,7 +69,7 @@ def _build_recommendations(attack_items: list[dict], top_n: int) -> pd.DataFrame
 
 def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n: int = 20) -> dict:
     if df.empty:
-        return {"error": "No data"}
+        return {"error": t("rpt_mod_err_no_data")}
 
     work = df.copy()
     work["src_key"] = _normalize_key_series(work, "src_app", "src_env")
@@ -223,7 +223,7 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
             )
 
     if not app_rows:
-        return {"error": "No app/env records derived from traffic"}
+        return {"error": t("rpt_mod13_err_no_app_env")}
 
     app_env_scores = pd.DataFrame(app_rows).sort_values(
         by=["readiness_score", "app_env_key"], ascending=[True, True]
