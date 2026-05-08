@@ -26,8 +26,12 @@ def web_gui_security_menu(cm: ConfigManager) -> None:
         has_auth = bool(gui_cfg.get("password"))
         allowed_ips = gui_cfg.get("allowed_ips", [])
 
-        auth_status = f"{Colors.GREEN}Configured{Colors.ENDC}" if has_auth else f"{Colors.WARNING}Default (illumio){Colors.ENDC}"
-        ips_list = ", ".join(allowed_ips) if allowed_ips else "All (No restriction)"
+        auth_status = (
+            f"{Colors.GREEN}{t('wgs_auth_configured')}{Colors.ENDC}"
+            if has_auth
+            else f"{Colors.WARNING}{t('wgs_auth_default_user')}{Colors.ENDC}"
+        )
+        ips_list = ", ".join(allowed_ips) if allowed_ips else t("wgs_ips_all")
 
         tls_cfg = gui_cfg.get("tls", {})
         tls_on = bool(tls_cfg.get("enabled"))
@@ -69,7 +73,7 @@ def web_gui_security_menu(cm: ConfigManager) -> None:
                 # the must-change gate at next web login.
                 cm.config["web_gui"].pop("_initial_password", None)
                 cm.config["web_gui"].pop("must_change_password", None)
-                print(f"\n{Colors.GREEN}Password updated.{Colors.ENDC}")
+                print(f"\n{Colors.GREEN}{t('wgs_pw_updated')}{Colors.ENDC}")
                 cm.save()
             input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")
 
@@ -79,7 +83,7 @@ def web_gui_security_menu(cm: ConfigManager) -> None:
                 curr_ips = cm.config.get("web_gui", {}).get("allowed_ips", [])
                 print(f"=== {t('wgs_manage_ips', default='Manage Allowed IPs')} ===")
                 if not curr_ips:
-                    print(f"  {Colors.WARNING}List is empty. All IPs are allowed.{Colors.ENDC}")
+                    print(f"  {Colors.WARNING}{t('wgs_ips_empty')}{Colors.ENDC}")
                 else:
                     for i, ip in enumerate(curr_ips):
                         print(f"  {i+1}. {ip}")
@@ -93,13 +97,13 @@ def web_gui_security_menu(cm: ConfigManager) -> None:
 
                 act = act.upper()
                 if act == "A":
-                    new_ip = safe_input("Enter IP or CIDR (e.g. 192.168.1.100 or 10.0.0.0/8): ", str, allow_cancel=True)
+                    new_ip = safe_input(t("wgs_prompt_add_ip"), str, allow_cancel=True)
                     if new_ip:
                         curr_ips.append(new_ip.strip())
                         cm.config.setdefault("web_gui", {})["allowed_ips"] = curr_ips
                         cm.save()
                 elif act == "D" and curr_ips:
-                    idx = safe_input("Enter number to delete: ", int, range(1, len(curr_ips) + 1))
+                    idx = safe_input(t("wgs_prompt_del_ip_index"), int, range(1, len(curr_ips) + 1))
                     if idx is not None:
                         curr_ips.pop(idx - 1)
                         cm.config["web_gui"]["allowed_ips"] = curr_ips
@@ -180,9 +184,9 @@ def _web_gui_tls_menu(cm: ConfigManager) -> None:
                 days_str = f"{days}" if isinstance(days, int) else "?"
                 expiry_hint = ""
                 if info.get("expired"):
-                    expiry_hint = f" {Colors.FAIL}EXPIRED{Colors.ENDC}"
+                    expiry_hint = f" {Colors.FAIL}{t('wgs_tls_expired')}{Colors.ENDC}"
                 elif info.get("expiring_soon"):
-                    expiry_hint = f" {Colors.WARNING}EXPIRING SOON{Colors.ENDC}"
+                    expiry_hint = f" {Colors.WARNING}{t('wgs_tls_expiring_soon')}{Colors.ENDC}"
                 print(f"  {t('wgs_tls_valid_until', default='Valid until')}: "
                       f"{info.get('not_after', '-')}{expiry_hint}")
                 print(f"  {t('wgs_tls_days_remaining', default='Days remaining')}: {days_str}")
@@ -212,8 +216,11 @@ def _web_gui_tls_menu(cm: ConfigManager) -> None:
         if sel == 1:
             tls["enabled"] = not enabled
             cm.save()
-            print(f"\n{Colors.GREEN}HTTPS {'enabled' if tls['enabled'] else 'disabled'}. "
-                  f"{t('wgs_tls_restart_hint', default='Restart the Web GUI to apply.')}{Colors.ENDC}")
+            print(
+                f"\n{Colors.GREEN}"
+                f"{t('wgs_tls_https_enabled_msg' if tls['enabled'] else 'wgs_tls_https_disabled_msg', restart_hint=t('wgs_tls_restart_hint', default='Restart the Web GUI to apply.'))}"
+                f"{Colors.ENDC}"
+            )
             input(f"{t('press_enter_to_continue')} ")
 
         elif sel == 2:
@@ -224,8 +231,12 @@ def _web_gui_tls_menu(cm: ConfigManager) -> None:
                 tls["cert_file"] = ""
                 tls["key_file"] = ""
             cm.save()
-            new_mode = "self-signed" if tls["self_signed"] else "custom cert"
-            print(f"\n{Colors.GREEN}Mode switched to {new_mode}.{Colors.ENDC}")
+            new_mode = (
+                t("wgs_tls_mode_self", default="Self-signed")
+                if tls["self_signed"]
+                else t("wgs_tls_mode_custom", default="Custom cert")
+            )
+            print(f"\n{Colors.GREEN}{t('wgs_tls_mode_switched', new_mode=new_mode)}{Colors.ENDC}")
             input(f"{t('press_enter_to_continue')} ")
 
         elif sel == 3:
@@ -247,8 +258,11 @@ def _web_gui_tls_menu(cm: ConfigManager) -> None:
         elif sel == 4:
             tls["auto_renew"] = not auto_renew
             cm.save()
-            print(f"\n{Colors.GREEN}Auto-renew {'enabled' if tls['auto_renew'] else 'disabled'}."
-                  f"{Colors.ENDC}")
+            print(
+                f"\n{Colors.GREEN}"
+                f"{t('wgs_tls_autorenew_enabled' if tls['auto_renew'] else 'wgs_tls_autorenew_disabled')}"
+                f"{Colors.ENDC}"
+            )
             input(f"{t('press_enter_to_continue')} ")
 
         elif sel == 5:
@@ -259,7 +273,7 @@ def _web_gui_tls_menu(cm: ConfigManager) -> None:
             if isinstance(val, int):
                 tls["auto_renew_days"] = val
                 cm.save()
-                print(f"\n{Colors.GREEN}Threshold set to {val} days.{Colors.ENDC}")
+                print(f"\n{Colors.GREEN}{t('wgs_tls_threshold_set', val=val)}{Colors.ENDC}")
                 input(f"{t('press_enter_to_continue')} ")
 
         elif sel == 6:
