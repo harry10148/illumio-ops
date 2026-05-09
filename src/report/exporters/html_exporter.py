@@ -1207,7 +1207,7 @@ class HtmlExporter:
             + f'<h4>{_s("rpt_tr_score_breakdown")}</h4>'
             + _factor_legend
             + _df_to_html(
-                factor_table.rename(columns={"Factor": "Factor", "Weight": "Weight", "Score": "Score", "Ratio %": "Ratio %"}) if factor_table is not None else factor_table,
+                factor_table,
                 lang=_lang,
             )
         )
@@ -1226,15 +1226,8 @@ class HtmlExporter:
             })
             html += f'<h4>{_s("rpt_tr_app_env_readiness")}</h4>' + _df_to_html(_aes, lang=_lang)
         if recommendations is not None and not recommendations.empty:
-            _rec = recommendations.rename(columns={
-                "Priority": "Priority",
-                "App (Env)": "App (Env)",
-                "Issue": "Issue",
-                "Action": "Action",
-                "Action Code": "Action Code",
-            })
             html += f'<h4>{_s("rpt_tr_remediation_rec")}</h4>' + _df_to_html(
-                _rec,
+                recommendations,
                 severity_col="Severity",
                 lang=_lang,
                 value_i18n_maps={"Severity": SEVERITY_VALUE_I18N},
