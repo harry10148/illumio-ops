@@ -142,3 +142,43 @@ def test_mod14_html_translates_tier_and_role_in_zh():
     # English originals must NOT leak when in zh_TW.
     assert "Tier-1 Critical" not in html
     assert "Identity Infrastructure" not in html
+
+
+def test_mod13_html_translates_severity_in_zh():
+    """mod13 recommendations table shows zh severity labels in zh_TW."""
+    import pandas as pd
+    from src.report.exporters.html_exporter import HtmlExporter
+    from src.report.exporters.report_i18n import STRINGS as _STRINGS
+
+    fake_report = {
+        "mod13": {
+            "total_score": 0,
+            "grade": "F",
+            "factor_table": pd.DataFrame(),
+            "app_env_scores": pd.DataFrame(),
+            "enforcement_mode_distribution": {},
+            "recommendations": pd.DataFrame([
+                {
+                    "Priority": "P1",
+                    "App (Env)": "alpha|prod",
+                    "App Env Key": "alpha|prod",
+                    "Issue": "Low Coverage",
+                    "Action": "Tighten enforcement",
+                    "Action Code": "ACT_001",
+                    "Severity": "CRITICAL",
+                },
+            ]),
+        },
+    }
+
+    exporter = HtmlExporter(fake_report, lang="zh_TW")
+    # `_mod13_html` reads `self._s`; mirror what `_build()` would set.
+    exporter._s = lambda k: _STRINGS[k].get("zh_TW") or _STRINGS[k]["en"]
+    html = exporter._mod13_html()
+
+    # Severity zh label present, English absent in cell content
+    assert "嚴重" in html, "SEVERITY 'CRITICAL' did not translate to zh_TW"
+    # Don't leak as visible cell value (header may still say Severity → 嚴重度)
+    assert ">CRITICAL<" not in html, "raw English CRITICAL leaked into cell text"
+    # Badge styling must still be keyed off the original English token.
+    assert "badge-CRITICAL" in html, "severity badge class lost after translation"

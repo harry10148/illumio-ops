@@ -343,8 +343,18 @@ def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
     sev_target = _norm_col(severity_col) if severity_col else None
 
     def _render_cell(col, val, _row):
-        if sev_target and _norm_col(col) == sev_target and str(val).upper() in _SEVERITY_TOKENS:
-            return f'<span class="badge badge-{str(val).upper()}">{val}</span>'
+        if sev_target and _norm_col(col) == sev_target:
+            # Style the badge from the ORIGINAL English row value so any
+            # render-layer translation of `val` (via value_i18n_maps) does
+            # not break the colour-class lookup; the displayed label is
+            # still the (possibly translated) `val`.
+            try:
+                _orig = _row.get(severity_col) if hasattr(_row, 'get') else _row[severity_col]
+            except (KeyError, TypeError, IndexError):
+                _orig = val
+            _orig_up = str(_orig).upper()
+            if _orig_up in _SEVERITY_TOKENS:
+                return f'<span class="badge badge-{_orig_up}">{val}</span>'
         if col in byte_cols:
             return _fmt_bytes(val)
         if col in bw_cols:
@@ -1221,7 +1231,12 @@ class HtmlExporter:
                 "Action": "Action",
                 "Action Code": "Action Code",
             })
-            html += f'<h4>{_s("rpt_tr_remediation_rec")}</h4>' + _df_to_html(_rec, lang=_lang)
+            html += f'<h4>{_s("rpt_tr_remediation_rec")}</h4>' + _df_to_html(
+                _rec,
+                severity_col="Severity",
+                lang=_lang,
+                value_i18n_maps={"Severity": SEVERITY_VALUE_I18N},
+            )
         return html
 
     def _mod14_html(self):
