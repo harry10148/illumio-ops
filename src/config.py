@@ -183,9 +183,7 @@ class ConfigManager:
         # Preserve post-load side effects
         lang = self.config.get("settings", {}).get("language", "en")
         set_language(lang)
-        if self._heal_stale_rule_i18n():
-            logger.info("Healed stale [MISSING:*] strings in rules[].desc/rec")
-            self.save()
+        self._resolve_rule_keys()
         self._ensure_web_gui_secret()
 
     def _heal_stale_rule_i18n(self) -> bool:
@@ -215,6 +213,36 @@ class ConfigManager:
                     rule[field] = resolved
                     healed = True
         return healed
+
+    def _resolve_rule_keys(self) -> None:
+        """Resolve desc/rec text for all rules at read time.
+
+        Two cases handled:
+        1. New-style rules: have desc_key/rec_key fields. Populate desc/rec via
+           t(key, lang=lang). Language-agnostic storage; resolved on each load.
+        2. Legacy stale markers: desc/rec contain "[MISSING:key]" left by older
+           apply_best_practices runs. Re-resolve against current i18n dictionary.
+
+        Legacy rules with neither keys nor MISSING markers are left unchanged.
+        """
+        lang = self.config.get("settings", {}).get("language", "en")
+        for rule in self.config.get("rules", []):
+            for field, key_field in (("desc", "desc_key"), ("rec", "rec_key")):
+                key = rule.get(key_field)
+                if key:
+                    rule[field] = t(key, lang=lang, default=rule.get(field, ""))
+                else:
+                    # Legacy: re-resolve stale [MISSING:key] markers if present
+                    val = rule.get(field)
+                    if (
+                        isinstance(val, str)
+                        and val.startswith("[MISSING:")
+                        and val.endswith("]")
+                    ):
+                        stale_key = val[len("[MISSING:"):-1]
+                        resolved = t(stale_key, lang=lang, default="")
+                        if resolved and resolved != val:
+                            rule[field] = resolved
 
     def _ensure_web_gui_secret(self):
         import secrets as _secrets
