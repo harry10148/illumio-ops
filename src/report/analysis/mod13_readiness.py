@@ -67,9 +67,9 @@ def _build_recommendations(attack_items: list[dict], top_n: int) -> pd.DataFrame
         )
     return pd.DataFrame(rows)
 
-def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n: int = 20) -> dict:
+def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n: int = 20, *, lang: str = "en") -> dict:
     if df.empty:
-        return {"error": t("rpt_mod_err_no_data")}
+        return {"error": t("rpt_mod_err_no_data", lang=lang)}
 
     work = df.copy()
     work["src_key"] = _normalize_key_series(work, "src_app", "src_env")
@@ -223,7 +223,7 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
             )
 
     if not app_rows:
-        return {"error": t("rpt_mod13_err_no_app_env")}
+        return {"error": t("rpt_mod13_err_no_app_env", lang=lang)}
 
     app_env_scores = pd.DataFrame(app_rows).sort_values(
         by=["readiness_score", "app_env_key"], ascending=[True, True]
@@ -246,11 +246,11 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
     total_score = round(sum(factor_scores.values()), 1)
     factor_table = pd.DataFrame(
         [
-            {"Factor": t("rpt_factor_policy_coverage", default="Policy Coverage"), "Weight": _WEIGHTS["policy_coverage"], "Score": factor_scores["policy_coverage"], "Ratio %": round(avg_policy * 100, 1)},
-            {"Factor": t("rpt_factor_ringfence_maturity", default="Ringfence Maturity"), "Weight": _WEIGHTS["ringfence_maturity"], "Score": factor_scores["ringfence_maturity"], "Ratio %": round(avg_ringfence * 100, 1)},
-            {"Factor": t("rpt_factor_enforcement_mode", default="Enforcement Mode"), "Weight": _WEIGHTS["enforcement_mode"], "Score": factor_scores["enforcement_mode"], "Ratio %": round(avg_enforce * 100, 1)},
-            {"Factor": t("rpt_factor_staged_readiness", default="Staged Readiness"), "Weight": _WEIGHTS["staged_readiness"], "Score": factor_scores["staged_readiness"], "Ratio %": round(avg_staged * 100, 1)},
-            {"Factor": t("rpt_factor_remote_app_coverage", default="Remote-App Coverage"), "Weight": _WEIGHTS["remote_app_coverage"], "Score": factor_scores["remote_app_coverage"], "Ratio %": round(avg_remote * 100, 1)},
+            {"Factor": t("rpt_factor_policy_coverage", default="Policy Coverage", lang=lang), "Weight": _WEIGHTS["policy_coverage"], "Score": factor_scores["policy_coverage"], "Ratio %": round(avg_policy * 100, 1)},
+            {"Factor": t("rpt_factor_ringfence_maturity", default="Ringfence Maturity", lang=lang), "Weight": _WEIGHTS["ringfence_maturity"], "Score": factor_scores["ringfence_maturity"], "Ratio %": round(avg_ringfence * 100, 1)},
+            {"Factor": t("rpt_factor_enforcement_mode", default="Enforcement Mode", lang=lang), "Weight": _WEIGHTS["enforcement_mode"], "Score": factor_scores["enforcement_mode"], "Ratio %": round(avg_enforce * 100, 1)},
+            {"Factor": t("rpt_factor_staged_readiness", default="Staged Readiness", lang=lang), "Weight": _WEIGHTS["staged_readiness"], "Score": factor_scores["staged_readiness"], "Ratio %": round(avg_staged * 100, 1)},
+            {"Factor": t("rpt_factor_remote_app_coverage", default="Remote-App Coverage", lang=lang), "Weight": _WEIGHTS["remote_app_coverage"], "Score": factor_scores["remote_app_coverage"], "Ratio %": round(avg_remote * 100, 1)},
         ]
     )
 
@@ -265,11 +265,11 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
     recommendations = _build_recommendations(ranked_items, top_n=top_n)
 
     factor_chart_labels = [
-        t("rpt_factor_policy_coverage", default="Policy Coverage"),
-        t("rpt_factor_ringfence_maturity", default="Ringfence Maturity"),
-        t("rpt_factor_enforcement_mode", default="Enforcement Mode"),
-        t("rpt_factor_staged_readiness", default="Staged Readiness"),
-        t("rpt_factor_remote_app_coverage", default="Remote-App Coverage"),
+        t("rpt_factor_policy_coverage", default="Policy Coverage", lang=lang),
+        t("rpt_factor_ringfence_maturity", default="Ringfence Maturity", lang=lang),
+        t("rpt_factor_enforcement_mode", default="Enforcement Mode", lang=lang),
+        t("rpt_factor_staged_readiness", default="Staged Readiness", lang=lang),
+        t("rpt_factor_remote_app_coverage", default="Remote-App Coverage", lang=lang),
     ]
     factor_chart_values = [
         factor_scores['policy_coverage'],
@@ -296,9 +296,9 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
             "type": "bar",
             "title": "Enforcement Readiness Factor Scores",
             "title_key": "rpt_chart_readiness_factor_scores",
-            "x_label": t("rpt_dimension", default="Factor"),
+            "x_label": t("rpt_dimension", default="Factor", lang=lang),
             "x_label_key": "rpt_chart_axis_factor",
-            "y_label": t("rpt_score", default="Score"),
+            "y_label": t("rpt_score", default="Score", lang=lang),
             "y_label_key": "rpt_chart_axis_score",
             "data": {"labels": factor_chart_labels, "values": factor_chart_values},
             "i18n": {"lang": get_language()},
@@ -313,10 +313,10 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
     return result
 
 
-def analyze(flows_df: pd.DataFrame, query_context: dict | None = None) -> dict:
+def analyze(flows_df: pd.DataFrame, query_context: dict | None = None, *, lang: str = "en") -> dict:
     """Public alias matching the standard module interface."""
     df = flows_df.copy()
     if "num_connections" not in df.columns:
         df["num_connections"] = 1
-    return enforcement_readiness(df)
+    return enforcement_readiness(df, lang=lang)
 

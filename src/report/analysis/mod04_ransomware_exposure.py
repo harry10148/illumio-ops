@@ -6,7 +6,7 @@ from src.i18n import t, get_language
 _RISK_COLORS = {'critical': 'CRITICAL', 'high': 'HIGH',
                 'medium': 'MEDIUM', 'low': 'LOW'}
 
-def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20) -> dict:
+def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20, *, lang: str = "en") -> dict:
     """
     Four-part ransomware exposure analysis based on Illumio Ransomware Protection
     port classification (20 high-risk ports across 4 levels).
@@ -123,13 +123,13 @@ def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20) 
         'type': 'bar',
         'title': 'Ransomware Exposure by Risk Level',
         'title_key': 'rpt_chart_ransomware_exposure',
-        'x_label': t('rpt_risk_level', default='Risk Level'),
+        'x_label': t('rpt_risk_level', default='Risk Level', lang=lang),
         'x_label_key': 'rpt_chart_axis_risk_level',
         'y_label': 'Flows',
         'y_label_key': 'rpt_chart_axis_flows',
         'data': {
             'labels': [
-                t(f'rpt_risk_{lvl}', default=lvl.capitalize())
+                t(f'rpt_risk_{lvl}', default=lvl.capitalize(), lang=lang)
                 for lvl in risk_levels if lvl in level_counts
             ],
             'values': [level_counts[lvl] for lvl in risk_levels if lvl in level_counts],

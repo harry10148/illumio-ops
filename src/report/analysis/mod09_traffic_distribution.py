@@ -5,7 +5,7 @@ from src.i18n import t, get_language
 
 LABEL_KEYS = ('env', 'app', 'role', 'loc')
 
-def traffic_distribution(df: pd.DataFrame, top_n: int = 20) -> dict:
+def traffic_distribution(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> dict:
     """
     Multi-dimensional traffic distribution:
     - Per label key (flows per value)
@@ -83,7 +83,7 @@ def traffic_distribution(df: pd.DataFrame, top_n: int = 20) -> dict:
         'type': 'bar',
         'title': 'Top 20 Ports by Flow Count',
         'title_key': 'rpt_chart_top_ports',
-        'x_label': t('rpt_port', default='Port'),
+        'x_label': t('rpt_port', default='Port', lang=lang),
         'x_label_key': 'rpt_chart_axis_port',
         'y_label': 'Connections',
         'y_label_key': 'rpt_chart_axis_connections',

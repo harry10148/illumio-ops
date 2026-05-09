@@ -172,21 +172,21 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
     enforcement_dist = _enforcement_mode_distribution(results)
 
     kpis = [
-        {"label": t("mod12_kpi_total_flows", default="Total Flows"), "value": _fmt(mod01.get("total_flows", 0))},
-        {"label": t("mod12_kpi_total_connections", default="Total Connections"), "value": _fmt(mod01.get("total_connections", 0))},
-        {"label": t("mod12_kpi_unique_src_ips", default="Unique Source IPs"), "value": _fmt(mod01.get("unique_src_ips", 0))},
-        {"label": t("mod12_kpi_unique_dst_ips", default="Unique Dest IPs"), "value": _fmt(mod01.get("unique_dst_ips", 0))},
-        {"label": t("mod12_kpi_enforced_coverage", default="Enforced Coverage"), "value": f"{enforced_cov}%"},
-        {"label": t("mod12_kpi_staged_coverage", default="Staged Coverage"), "value": f"{staged_cov}%"},
-        {"label": t("mod12_kpi_true_gap", default="True Gap"), "value": f"{true_gap}%"},
-        {"label": t("mod12_kpi_blocked_flows", default="Blocked Flows"), "value": _fmt(mod01.get("blocked_flows", 0))},
-        {"label": t("mod12_kpi_pb_uncovered", default="PB Uncovered Exposure"), "value": _fmt(
+        {"label": t("mod12_kpi_total_flows", default="Total Flows", lang=lang), "value": _fmt(mod01.get("total_flows", 0))},
+        {"label": t("mod12_kpi_total_connections", default="Total Connections", lang=lang), "value": _fmt(mod01.get("total_connections", 0))},
+        {"label": t("mod12_kpi_unique_src_ips", default="Unique Source IPs", lang=lang), "value": _fmt(mod01.get("unique_src_ips", 0))},
+        {"label": t("mod12_kpi_unique_dst_ips", default="Unique Dest IPs", lang=lang), "value": _fmt(mod01.get("unique_dst_ips", 0))},
+        {"label": t("mod12_kpi_enforced_coverage", default="Enforced Coverage", lang=lang), "value": f"{enforced_cov}%"},
+        {"label": t("mod12_kpi_staged_coverage", default="Staged Coverage", lang=lang), "value": f"{staged_cov}%"},
+        {"label": t("mod12_kpi_true_gap", default="True Gap", lang=lang), "value": f"{true_gap}%"},
+        {"label": t("mod12_kpi_blocked_flows", default="Blocked Flows", lang=lang), "value": _fmt(mod01.get("blocked_flows", 0))},
+        {"label": t("mod12_kpi_pb_uncovered", default="PB Uncovered Exposure", lang=lang), "value": _fmt(
             mod01.get("potentially_blocked_flows") or
             mod03.get("pb_uncovered_count", mod03.get("n_potentially_blocked", 0))
         )},
-        {"label": t("mod12_kpi_unmanaged_src_pct", default="Unmanaged Src %"), "value": f"{100 - mod01.get('src_managed_pct', 100):.1f}%"},
-        {"label": t("mod12_kpi_total_data_volume", default="Total Data Volume"), "value": f"{mod01.get('total_mb', 0):.1f} MB"},
-        {"label": t("mod12_kpi_date_range", default="Date Range"), "value": mod01.get("date_range", "N/A")},
+        {"label": t("mod12_kpi_unmanaged_src_pct", default="Unmanaged Src %", lang=lang), "value": f"{100 - mod01.get('src_managed_pct', 100):.1f}%"},
+        {"label": t("mod12_kpi_total_data_volume", default="Total Data Volume", lang=lang), "value": f"{mod01.get('total_mb', 0):.1f} MB"},
+        {"label": t("mod12_kpi_date_range", default="Date Range", lang=lang), "value": mod01.get("date_range", "N/A")},
     ]
 
     # Add enforcement mode distribution KPIs if available
@@ -194,8 +194,8 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
         for mode in ("full", "selective", "visibility_only", "idle"):
             count = enforcement_dist.get(mode, 0)
             if count > 0:
-                mode_label = t(f"mod12_kpi_enforce_mode_{mode}", default=mode.replace("_", " ").title())
-                kpis.append({"label": t("mod12_kpi_enforcement_prefix", default="Enforcement:") + f" {mode_label}", "value": _fmt(count)})
+                mode_label = t(f"mod12_kpi_enforce_mode_{mode}", default=mode.replace("_", " ").title(), lang=lang)
+                kpis.append({"label": t("mod12_kpi_enforcement_prefix", default="Enforcement:", lang=lang) + f" {mode_label}", "value": _fmt(count)})
 
     findings_summary: dict[str, int] = {}
     for f in findings:
@@ -280,9 +280,9 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
             "type": "bar",
             "title": "Microsegmentation Maturity Dimensions",
             "title_key": "rpt_chart_maturity_dimensions",
-            "x_label": t("rpt_dimension", default="Dimension"),
+            "x_label": t("rpt_dimension", default="Dimension", lang=lang),
             "x_label_key": "rpt_chart_axis_dimension",
-            "y_label": t("rpt_score", default="Score"),
+            "y_label": t("rpt_score", default="Score", lang=lang),
             "y_label_key": "rpt_chart_axis_score",
             "data": {"labels": dim_labels, "values": dim_values},
             "i18n": {"lang": get_language()},

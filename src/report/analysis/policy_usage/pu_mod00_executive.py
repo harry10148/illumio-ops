@@ -14,7 +14,7 @@ from src.report.analysis.attack_posture import (
 
 _HIGH_RISK_PORT_MARKERS = {"22/", "3389/", "445/", "5985/", "5986/", "135/"}
 
-def pu_executive_summary(results: dict, lookback_days: int) -> dict:
+def pu_executive_summary(results: dict, lookback_days: int, *, lang: str = "en") -> dict:
     """Aggregate KPIs, attention items, execution stats, and deterministic attack posture."""
     mod01 = results.get("mod01", {})
     mod03 = results.get("mod03", {})
@@ -33,14 +33,14 @@ def pu_executive_summary(results: dict, lookback_days: int) -> dict:
     top_port_label = top_hit_ports[0].get("port_proto", "N/A") if top_hit_ports else "N/A"
 
     kpis = [
-        {"label": t("rpt_pu_total_rules", default="Total Rules"), "value": str(total)},
-        {"label": t("rpt_pu_hit_rules", default="Hit Rules"), "value": str(hit)},
-        {"label": t("rpt_pu_unused_rules", default="Unused Rules"), "value": str(unused)},
-        {"label": t("rpt_pu_hit_rate", default="Hit Rate"), "value": f"{rate}%"},
-        {"label": t("rpt_pu_kpi_lookback", default="Lookback"), "value": f"{lookback_days} days"},
-        {"label": t("rpt_pu_kpi_cached_reuse", default="Cached Reuse"), "value": str(cached)},
-        {"label": t("rpt_pu_kpi_new_queries", default="New Queries"), "value": str(submitted)},
-        {"label": t("rpt_pu_kpi_top_hit_port", default="Top Hit Port"), "value": top_port_label},
+        {"label": t("rpt_pu_total_rules", default="Total Rules", lang=lang), "value": str(total)},
+        {"label": t("rpt_pu_hit_rules", default="Hit Rules", lang=lang), "value": str(hit)},
+        {"label": t("rpt_pu_unused_rules", default="Unused Rules", lang=lang), "value": str(unused)},
+        {"label": t("rpt_pu_hit_rate", default="Hit Rate", lang=lang), "value": f"{rate}%"},
+        {"label": t("rpt_pu_kpi_lookback", default="Lookback", lang=lang), "value": f"{lookback_days} days"},
+        {"label": t("rpt_pu_kpi_cached_reuse", default="Cached Reuse", lang=lang), "value": str(cached)},
+        {"label": t("rpt_pu_kpi_new_queries", default="New Queries", lang=lang), "value": str(submitted)},
+        {"label": t("rpt_pu_kpi_top_hit_port", default="Top Hit Port", lang=lang), "value": top_port_label},
     ]
 
     attention_items = []
@@ -52,19 +52,19 @@ def pu_executive_summary(results: dict, lookback_days: int) -> dict:
 
     execution_notes = []
     if cached:
-        execution_notes.append(t("rpt_pu_exec_note_cached", cached=cached, default=f"Reused {cached} completed async summaries."))
+        execution_notes.append(t("rpt_pu_exec_note_cached", cached=cached, default=f"Reused {cached} completed async summaries.", lang=lang))
     if submitted:
-        execution_notes.append(t("rpt_pu_exec_note_submitted", submitted=submitted, default=f"Submitted {submitted} new async queries."))
+        execution_notes.append(t("rpt_pu_exec_note_submitted", submitted=submitted, default=f"Submitted {submitted} new async queries.", lang=lang))
     if pending:
-        execution_notes.append(t("rpt_pu_exec_note_pending", pending=pending, default=f"{pending} async queries were still pending at timeout."))
+        execution_notes.append(t("rpt_pu_exec_note_pending", pending=pending, default=f"{pending} async queries were still pending at timeout.", lang=lang))
     if failed:
-        execution_notes.append(t("rpt_pu_exec_note_failed", failed=failed, default=f"{failed} async queries failed."))
+        execution_notes.append(t("rpt_pu_exec_note_failed", failed=failed, default=f"{failed} async queries failed.", lang=lang))
     if top_hit_ports:
         top_summary = ", ".join(
             f"{item.get('port_proto', '')} ({int(item.get('flow_count', 0) or 0)})"
             for item in top_hit_ports[:3]
         )
-        execution_notes.append(t("rpt_pu_exec_note_top_ports", top_summary=top_summary, default=f"Top observed hit ports: {top_summary}."))
+        execution_notes.append(t("rpt_pu_exec_note_top_ports", top_summary=top_summary, default=f"Top observed hit ports: {top_summary}.", lang=lang))
 
     attack_items = []
     if rate < 70:
@@ -140,7 +140,7 @@ def pu_executive_summary(results: dict, lookback_days: int) -> dict:
             )
 
     ranked_attack_items = rank_posture_items(attack_items)
-    attack_sections = summarize_attack_posture(ranked_attack_items, top_n=5)
+    attack_sections = summarize_attack_posture(ranked_attack_items, top_n=5, lang=lang)
 
     return {
         "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),

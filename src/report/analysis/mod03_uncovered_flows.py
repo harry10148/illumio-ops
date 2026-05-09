@@ -9,7 +9,7 @@ _REC_MAP = {
     'cross_app': "Cross-app flow: add a rule-set entry for this src_app → dst_app communication.",
 }
 
-def uncovered_flows(df: pd.DataFrame, top_n: int = 20) -> dict:
+def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> dict:
     """
     Three-tier coverage analysis:
       - Enforced Coverage: flows explicitly allowed by active policy rules.
@@ -65,9 +65,9 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20) -> dict:
                 'title_key': 'rpt_chart_policy_coverage_tiers',
                 'data': {
                     'labels': [
-                        t('rpt_enforced', default='Enforced'),
-                        t('rpt_staged', default='Staged'),
-                        t('rpt_gap', default='Gap'),
+                        t('rpt_enforced', default='Enforced', lang=lang),
+                        t('rpt_staged', default='Staged', lang=lang),
+                        t('rpt_gap', default='Gap', lang=lang),
                     ],
                     'values': [n_allowed, 0, 0],
                 },
@@ -148,9 +148,9 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20) -> dict:
             'title_key': 'rpt_chart_policy_coverage_tiers',
             'data': {
                 'labels': [
-                    t('rpt_enforced', default='Enforced'),
-                    t('rpt_staged', default='Staged'),
-                    t('rpt_gap', default='Gap'),
+                    t('rpt_enforced', default='Enforced', lang=lang),
+                    t('rpt_staged', default='Staged', lang=lang),
+                    t('rpt_gap', default='Gap', lang=lang),
                 ],
                 'values': [n_allowed, n_pb, n_blocked + n_unknown],
             },

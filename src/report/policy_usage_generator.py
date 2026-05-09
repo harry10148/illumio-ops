@@ -46,6 +46,7 @@ class PolicyUsageGenerator:
         self.cm = config_manager
         self.api = api_client
         self._config_dir = config_dir
+        self._lang = "en"  # overwritten by generate_from_api/generate when lang is known
 
     # ── Public interface ───────────────────────────────────────────────────────
 
@@ -544,11 +545,11 @@ class PolicyUsageGenerator:
         results = {}
         results['mod01'] = pu_overview(flat_rules, hit_hrefs)
         results['mod02'] = pu_hit_detail(flat_rules, ruleset_map, hit_counts, execution_stats or {}, self.api)
-        results['mod03'] = pu_unused_detail(flat_rules, ruleset_map, hit_hrefs, execution_stats or {}, self.api)
+        results['mod03'] = pu_unused_detail(flat_rules, ruleset_map, hit_hrefs, execution_stats or {}, self.api, lang=self._lang)
         results['mod04'] = pu_deny_effectiveness(flat_rules, hit_counts, ruleset_map)
         results['mod05'] = self._fetch_draft_pd_analysis(start_date, end_date)
         results['meta'] = {'execution_stats': execution_stats or {}}
-        results['mod00'] = pu_executive_summary(results, lookback_days)
+        results['mod00'] = pu_executive_summary(results, lookback_days, lang=self._lang)
 
         # Build flat DataFrame for CSV raw_rules sheet
         try:

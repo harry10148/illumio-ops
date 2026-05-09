@@ -23,6 +23,8 @@ def pu_unused_detail(
     hit_rule_hrefs: set,
     execution_stats: dict | None = None,
     api_client=None,
+    *,
+    lang: str = "en",
 ) -> dict:
     """Build the unused-rules detail table."""
     execution_stats = execution_stats or {}
@@ -60,7 +62,7 @@ def pu_unused_detail(
     return {
         "unused_df": unused_df,
         "record_count": len(rows),
-        "caveat": t("rpt_pu_unused_caveat", default=_CAVEAT_EN),
+        "caveat": t("rpt_pu_unused_caveat", default=_CAVEAT_EN, lang=lang),
     }
 
 def _build_unused_row(rule: dict, ruleset_map: dict, port_detail: dict, api_client) -> dict:

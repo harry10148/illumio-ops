@@ -61,7 +61,7 @@ def zh_tw_lang():
 def test_mod04_ransomware_exposure_labels_translate_to_zh_tw(zh_tw_lang):
     from src.report.analysis.mod04_ransomware_exposure import ransomware_exposure
 
-    out = ransomware_exposure(_make_traffic_df(), _RANSOMWARE_CONFIG)
+    out = ransomware_exposure(_make_traffic_df(), _RANSOMWARE_CONFIG, lang="zh_TW")
     labels = out["chart_spec"]["data"]["labels"]
 
     # All four risk levels are present in the test config + DataFrame, so

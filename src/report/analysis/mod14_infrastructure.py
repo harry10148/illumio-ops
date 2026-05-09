@@ -93,9 +93,9 @@ def _detect_critical_asset_keys(df: pd.DataFrame) -> dict[str, set[str]]:
 
     return result
 
-def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20) -> dict:
+def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> dict:
     if df.empty:
-        return {"error": t("rpt_mod_err_no_data")}
+        return {"error": t("rpt_mod_err_no_data", lang=lang)}
 
     work = df.copy()
     work["src_key"] = _normalize_key_series(work, "src_app", "src_env")
@@ -104,7 +104,7 @@ def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20) -> dict:
 
     app_flows = work[work["src_key"] != work["dst_key"]].copy()
     if app_flows.empty:
-        return {"error": t("rpt_mod14_err_no_edges")}
+        return {"error": t("rpt_mod14_err_no_edges", lang=lang)}
 
     edge_weights: dict[tuple[str, str], int] = defaultdict(int)
     adjacency: dict[str, set[str]] = defaultdict(set)
@@ -128,7 +128,7 @@ def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20) -> dict:
 
     all_nodes = sorted(set(in_degree) | set(out_degree))
     if not all_nodes:
-        return {"error": t("rpt_mod14_err_no_nodes")}
+        return {"error": t("rpt_mod14_err_no_nodes", lang=lang)}
 
     bc = _betweenness_centrality(all_nodes, adjacency)
     max_in_degree = max(in_degree.values(), default=1)
@@ -286,9 +286,9 @@ def infrastructure_scoring(df: pd.DataFrame, top_n: int = 20) -> dict:
             "type": "bar",
             "title": "Infrastructure Apps by Tier",
             "title_key": "rpt_chart_infrastructure_apps_by_tier",
-            "x_label": t("rpt_tier", default="Tier"),
+            "x_label": t("rpt_tier", default="Tier", lang=lang),
             "x_label_key": "rpt_chart_axis_tier",
-            "y_label": t("rpt_app_count", default="App Count"),
+            "y_label": t("rpt_app_count", default="App Count", lang=lang),
             "y_label_key": "rpt_chart_axis_app_count",
             "data": {"labels": tier_labels, "values": tier_values},
             "i18n": {"lang": get_language()},
