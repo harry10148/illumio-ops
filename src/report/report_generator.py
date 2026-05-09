@@ -231,7 +231,7 @@ class ReportGenerator:
             ).isoformat().replace("+00:00", "Z")
 
         logger.info("[ReportGenerator] Starting API-source report generation")
-        print(t("rpt_querying_traffic", start=start_date, end=end_date))
+        print(t("rpt_querying_traffic", start=start_date, end=end_date, lang=lang))
         policy_decisions = list((filters or {}).get("policy_decisions") or ["blocked", "potentially_blocked", "allowed"])
 
         start_dt = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
@@ -267,7 +267,7 @@ class ReportGenerator:
 
         if not records:
             logger.warning("[ReportGenerator] No records returned from API")
-            print(t("rpt_no_traffic_data"))
+            print(t("rpt_no_traffic_data", lang=lang))
             return ReportResult(
                 data_source=traffic["source"],
                 record_count=0,
@@ -280,7 +280,7 @@ class ReportGenerator:
                 },
             )
 
-        print(t("rpt_records_received", count=f"{len(records):,}"))
+        print(t("rpt_records_received", count=f"{len(records):,}", lang=lang))
         df = self._parse_api(records)
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
@@ -307,7 +307,7 @@ class ReportGenerator:
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
         logger.info(f"[ReportGenerator] Starting CSV-source report from: {csv_path}")
-        print(t("rpt_parsing_csv", path=csv_path))
+        print(t("rpt_parsing_csv", path=csv_path, lang=lang))
         df = self._parse_csv(csv_path)
         return self._run_pipeline(df, source='csv', traffic_report_profile=traffic_report_profile)
 
@@ -498,7 +498,7 @@ class ReportGenerator:
             html_path = next((p for p in paths if p.endswith('.html')), None)
             mod12 = result.module_results.get('mod12', {})
             subject = t("rpt_email_traffic_subject", lang=lang) + f" — {datetime.date.today()}"
-            html_body = self._build_email_body(mod12)
+            html_body = self._build_email_body(mod12, lang=lang)
             try:
                 reporter.send_report_email(subject, html_body, attachment_path=html_path)
                 print(t("rpt_email_sent", lang=lang))
@@ -619,7 +619,7 @@ class ReportGenerator:
             module_errors.append({'module': 'mod12', 'error': str(e)})
 
         results['_module_errors'] = module_errors
-        print(t("rpt_modules_complete") + "             ")
+        print(t("rpt_modules_complete", lang=lang) + "             ")
         return results
 
     # ── private — parsers ────────────────────────────────────────────────────
@@ -652,7 +652,7 @@ class ReportGenerator:
 
     # ── private — email body ─────────────────────────────────────────────────
 
-    def _build_email_body(self, mod12: dict) -> str:
+    def _build_email_body(self, mod12: dict, lang: str = "en") -> str:
         """Build a compact HTML email body from the executive summary."""
         kpis = mod12.get('kpis', [])
         findings = mod12.get('key_findings', [])
@@ -685,10 +685,10 @@ class ReportGenerator:
         )
         attack_rows = []
         for title, items in [
-            (t("rpt_email_boundary_breaches"), boundary_breaches),
-            (t("rpt_email_suspicious_pivot_behavior"), suspicious_pivot),
-            (t("rpt_email_blast_radius"), blast_radius),
-            (t("rpt_email_blind_spots"), blind_spots),
+            (t("rpt_email_boundary_breaches", lang=lang), boundary_breaches),
+            (t("rpt_email_suspicious_pivot_behavior", lang=lang), suspicious_pivot),
+            (t("rpt_email_blast_radius", lang=lang), blast_radius),
+            (t("rpt_email_blind_spots", lang=lang), blind_spots),
         ]:
             if items:
                 sample = items[0]
@@ -703,7 +703,7 @@ class ReportGenerator:
             top_action = action_matrix[0]
             attack_rows.append(
                 f'<tr>'
-                f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">{t("rpt_email_action_matrix")}</td>'
+                f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">{t("rpt_email_action_matrix", lang=lang)}</td>'
                 f'<td style="padding:4px 10px;color:#313638">{top_action.get("action","")}</td>'
                 f'<td style="padding:4px 10px;color:#989A9B"></td>'
                 f'</tr>'
@@ -715,25 +715,25 @@ class ReportGenerator:
 <div style="max-width:700px;margin:0 auto;padding:16px">
   <div style="border-radius:10px;overflow:hidden;border:1px solid #325158">
     <div style="background:#1A2C32;border-left:4px solid #FF5500;padding:18px 20px;color:#fff">
-      <div style="font-size:20px;font-weight:700;margin-bottom:4px">{t("rpt_email_traffic_subject")}</div>
+      <div style="font-size:20px;font-weight:700;margin-bottom:4px">{t("rpt_email_traffic_subject", lang=lang)}</div>
       <div style="font-size:12px;color:#989A9B">Generated: {mod12.get('generated_at','')}</div>
     </div>
     <div style="background:#fff;padding:20px">
-      <h3 style="color:#1A2C32;font-size:13px;font-weight:600;margin:0 0 8px;border-bottom:2px solid #FF5500;padding-bottom:5px">{t("rpt_email_key_metrics")}</h3>
+      <h3 style="color:#1A2C32;font-size:13px;font-weight:600;margin:0 0 8px;border-bottom:2px solid #FF5500;padding-bottom:5px">{t("rpt_email_key_metrics", lang=lang)}</h3>
       <table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;margin-bottom:20px">
         {kpi_rows}
       </table>
-      <h3 style="color:#1A2C32;font-size:13px;font-weight:600;margin:0 0 8px;border-bottom:2px solid #FF5500;padding-bottom:5px">{t("rpt_email_key_findings")}</h3>
+      <h3 style="color:#1A2C32;font-size:13px;font-weight:600;margin:0 0 8px;border-bottom:2px solid #FF5500;padding-bottom:5px">{t("rpt_email_key_findings", lang=lang)}</h3>
       <table border="0" cellpadding="0" cellspacing="3" style="border-collapse:separate;border-spacing:0 3px;width:100%">
-        {finding_rows or f'<tr><td colspan="3" style="padding:8px;color:#989A9B">{t("rpt_email_no_findings")}</td></tr>'}
+        {finding_rows or f'<tr><td colspan="3" style="padding:8px;color:#989A9B">{t("rpt_email_no_findings", lang=lang)}</td></tr>'}
       </table>
-      <h3 style="color:#1A2C32;font-size:13px;font-weight:600;margin:16px 0 8px;border-bottom:2px solid #FF5500;padding-bottom:5px">{t("rpt_email_attack_summary")}</h3>
+      <h3 style="color:#1A2C32;font-size:13px;font-weight:600;margin:16px 0 8px;border-bottom:2px solid #FF5500;padding-bottom:5px">{t("rpt_email_attack_summary", lang=lang)}</h3>
       <table border="0" cellpadding="0" cellspacing="3" style="border-collapse:separate;border-spacing:0 3px;width:100%">
-        {attack_rows_html or f'<tr><td colspan="3" style="padding:8px;color:#989A9B">{t("rpt_email_no_attack_findings")}</td></tr>'}
+        {attack_rows_html or f'<tr><td colspan="3" style="padding:8px;color:#989A9B">{t("rpt_email_no_attack_findings", lang=lang)}</td></tr>'}
       </table>
     </div>
     <div style="background:#F7F4EE;padding:12px 20px;border-top:1px solid #E3D8C5;text-align:center;color:#989A9B;font-size:11px">
-      {t("rpt_email_footer")}
+      {t("rpt_email_footer", lang=lang)}
     </div>
   </div>
 </div>
