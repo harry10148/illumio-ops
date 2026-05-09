@@ -63,10 +63,11 @@ def add_destination():
         from src.gui.settings_helpers import save_section
         cm = current_app.config['CM']
         data = request.get_json(force=True) or {}
+        lang = data.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         SiemDestinationSettings(**data)  # validate first
         current = cm.models.siem.model_dump(mode="json")
         if any(d["name"] == data.get("name") for d in current.get("destinations", [])):
-            return jsonify({"ok": False, "error": t("gui_err_siem_dest_exists")}), 409
+            return jsonify({"ok": False, "error": t("gui_err_siem_dest_exists", lang=lang)}), 409
         current.setdefault("destinations", []).append(data)
         result = save_section(cm, "siem", current, SiemForwarderSettings)
         if result["ok"]:
@@ -84,13 +85,14 @@ def update_destination(name: str):
         from src.gui.settings_helpers import save_section
         cm = current_app.config['CM']
         data = request.get_json(force=True) or {}
+        lang = data.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         data["name"] = name
         SiemDestinationSettings(**data)  # validate
         current = cm.models.siem.model_dump(mode="json")
         dests = current.get("destinations", [])
         idx = next((i for i, d in enumerate(dests) if d["name"] == name), None)
         if idx is None:
-            return jsonify({"ok": False, "error": t("gui_err_siem_dest_not_found")}), 404
+            return jsonify({"ok": False, "error": t("gui_err_siem_dest_not_found", lang=lang)}), 404
         dests[idx] = data
         result = save_section(cm, "siem", current, SiemForwarderSettings)
         if result["ok"]:
@@ -107,11 +109,12 @@ def delete_destination(name: str):
         from src.config_models import SiemForwarderSettings
         from src.gui.settings_helpers import save_section
         cm = current_app.config['CM']
+        lang = cm.config.get('settings', {}).get('language', 'en')
         current = cm.models.siem.model_dump(mode="json")
         before = len(current.get("destinations", []))
         current["destinations"] = [d for d in current.get("destinations", []) if d["name"] != name]
         if len(current["destinations"]) == before:
-            return jsonify({"ok": False, "error": t("gui_err_siem_dest_not_found")}), 404
+            return jsonify({"ok": False, "error": t("gui_err_siem_dest_not_found", lang=lang)}), 404
         result = save_section(cm, "siem", current, SiemForwarderSettings)
         if result["ok"]:
             cm.load()
@@ -282,9 +285,10 @@ def put_forwarder():
 @login_required
 def test_destination(name: str):
     cm = current_app.config['CM']
+    lang = cm.config.get('settings', {}).get('language', 'en')
     dest = next((d for d in cm.models.siem.destinations
                  if d.name == name), None)
     if dest is None:
-        return jsonify({"ok": False, "error": t("gui_err_siem_dest_not_found")}), 404
+        return jsonify({"ok": False, "error": t("gui_err_siem_dest_not_found", lang=lang)}), 404
     r = send_test_event(dest)
     return jsonify({"ok": r.ok, "error": r.error, "latency_ms": r.latency_ms}), 200

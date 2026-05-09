@@ -51,11 +51,12 @@ def api_cache_backfill():
     """Synchronous backfill endpoint. POST body: {source, since, until}."""
     from datetime import datetime, timezone
     data = request.get_json(silent=True) or {}
+    lang = data.get('lang') or current_app.config["CM"].config.get('settings', {}).get('language', 'en')
     source = data.get("source", "events")
     since_str = data.get("since")
     until_str = data.get("until")
     if not since_str:
-        return jsonify({"error": t("gui_err_cache_missing_since")}), 400
+        return jsonify({"error": t("gui_err_cache_missing_since", lang=lang)}), 400
     try:
         since_dt = datetime.strptime(since_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         until_dt = datetime.strptime(until_str, "%Y-%m-%d").replace(tzinfo=timezone.utc) if until_str else datetime.now(timezone.utc)
@@ -64,7 +65,7 @@ def api_cache_backfill():
     try:
         sf = _get_sf()
     except Exception as e:
-        return jsonify({"error": t("gui_err_cache_not_configured", e=e)}), 503
+        return jsonify({"error": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
     try:
         from src.pce_cache.backfill import BackfillRunner
         api = _get_api()
@@ -88,10 +89,11 @@ def api_cache_backfill():
 @login_required
 def api_cache_retention_run():
     """Run retention purge immediately using configured retention days."""
+    lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
     try:
         sf = _get_sf()
     except Exception as e:
-        return jsonify({"error": t("gui_err_cache_not_configured", e=e)}), 503
+        return jsonify({"error": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
     cfg = current_app.config["CM"].models.pce_cache
     try:
         from src.pce_cache.retention import RetentionWorker
@@ -110,10 +112,11 @@ def api_cache_retention_run():
 @login_required
 def api_cache_status():
     """Return cache row counts."""
+    lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
     try:
         sf = _get_sf()
     except Exception as e:
-        return jsonify({"error": t("gui_err_cache_not_configured", e=e)}), 503
+        return jsonify({"error": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
     try:
         from sqlalchemy import func, select
         from src.pce_cache.models import PceEvent, PceTrafficFlowRaw, PceTrafficFlowAgg
