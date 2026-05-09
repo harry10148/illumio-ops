@@ -201,3 +201,6 @@ t("possibly_missing_key", default="N/A", lang=lang)
 ```
 
 **`set_language(lang)`:** Process bootstrap only (CLI startup, ConfigManager.load). Do NOT call from request handlers, scheduler tasks, or anywhere with concurrency.
+
+**Known open items:**
+- ~90 pre-existing `zh_TW` values violate the glossary preserve-list (`Label→標籤`, `Offline→離線`, etc.). They were hidden until T8 externalized the glossary (commit ce94d9a). The `forbidden_zh_substitutes` list in `glossary.json` is the source of truth; remediation requires manual edits to `i18n_zh_TW.json`. Tracked by xfail in both `tests/test_i18n_glossary.py::test_zh_tw_values_preserve_glossary_terms` and `tests/test_i18n_audit.py::test_comprehensive_i18n_audit_is_clean`.
