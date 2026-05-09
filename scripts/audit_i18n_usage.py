@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import json as _json
 import re
 import sys
 from dataclasses import dataclass
@@ -151,33 +152,23 @@ def _term_re(core: str) -> re.Pattern:
     return re.compile(_ASCII_BOUNDARY_START + core + _ASCII_BOUNDARY_END)
 
 
-GLOSSARY = [
-    ("PCE",                _term_re(r"PCE")),
-    ("VEN",                _term_re(r"VENs?")),
-    ("Workload",           _term_re(r"Workloads?")),
-    ("Enforcement",        _term_re(r"Enforcement")),
-    ("Port",               _term_re(r"Ports?")),
-    ("Service",            _term_re(r"Services?")),
-    ("Policy",             _term_re(r"Polic(?:y|ies)")),
-    ("Allow",              _term_re(r"Allow")),
-    ("Deny",               _term_re(r"Deny")),
-    ("Blocked",            _term_re(r"Blocked")),
-    ("Potentially Blocked", _term_re(r"Potentially Blocked")),
-]
+def _load_glossary_substitutes() -> dict[str, list[str]]:
+    """Load forbidden_zh_substitutes from src/i18n/data/glossary.json."""
+    glossary_path = SRC / "i18n" / "data" / "glossary.json"
+    data = _json.loads(glossary_path.read_text(encoding="utf-8"))
+    return data["forbidden_zh_substitutes"]
 
-# Known Chinese localizations of glossary terms — presence in zh_TW is
-# a glossary violation even if the English term is also absent.
-GLOSSARY_ZH_LOCALIZATIONS = {
-    "Workload": ["工作負載"],
-    "Port": ["連接埠"],
-    "Service": ["服務"],
-    "Policy": ["策略"],
-    "Enforcement": ["強制執行", "強制"],
-    "Allow": ["允許"],
-    "Deny": ["拒絕"],
-    "Blocked": ["已封鎖", "封鎖"],
-    "Potentially Blocked": ["潛在封鎖", "可能封鎖"],
-}
+
+# GLOSSARY_ZH_LOCALIZATIONS is now the single source of truth loaded from
+# glossary.json; Cat E iterates this instead of a hardcoded dict.
+GLOSSARY_ZH_LOCALIZATIONS: dict[str, list[str]] = _load_glossary_substitutes()
+
+# Build GLOSSARY term list from glossary.json keys so Cat E stays in sync.
+# Each term gets a simple ASCII-boundary pattern matching the term verbatim.
+GLOSSARY: list[tuple[str, re.Pattern]] = [
+    (term, _term_re(re.escape(term)))
+    for term in GLOSSARY_ZH_LOCALIZATIONS
+]
 
 CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 

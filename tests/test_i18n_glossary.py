@@ -26,9 +26,10 @@ def test_glossary_loads_and_has_required_terms() -> None:
 
 @pytest.mark.xfail(
     reason=(
-        "Phase 2 cleanup: 128 pre-existing violations in i18n_zh_TW.json "
-        "(Label->標籤, Labels->標籤, Offline->離線, etc.). "
-        "Resolved in T11 precompute pass."
+        "Deferred: ~145 pre-existing zh_TW values use forbidden Chinese "
+        "substitutes (Label→標籤, Offline→離線, etc.). These were hidden "
+        "before the glossary was externalized in T8; require manual "
+        "remediation in i18n_zh_TW.json (T11 precompute only fills blanks)."
     ),
     strict=False,
 )
