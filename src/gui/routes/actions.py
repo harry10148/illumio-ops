@@ -273,7 +273,7 @@ def make_actions_blueprint(
         rep = Reporter(cm)
         ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
         ana.run_analysis()
-        rep.send_alerts()
+        rep.send_alerts(lang=lang)
         return jsonify({"ok": True, "output": t("gui_action_run_completed", lang=lang)})
 
     @bp.route('/api/actions/debug', methods=['POST'])

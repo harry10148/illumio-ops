@@ -20,11 +20,11 @@ class FieldMeta:
     label_key: str = ""
     help_key: str = ""
 
-    def resolved_label(self) -> str:
-        return t(self.label_key, default=self.label) if self.label_key else self.label
+    def resolved_label(self, lang: str = "en") -> str:
+        return t(self.label_key, lang=lang, default=self.label) if self.label_key else self.label
 
-    def resolved_help(self) -> str:
-        return t(self.help_key, default=self.help) if self.help_key else self.help
+    def resolved_help(self, lang: str = "en") -> str:
+        return t(self.help_key, lang=lang, default=self.help) if self.help_key else self.help
 
 
 @dataclass
@@ -36,14 +36,14 @@ class PluginMeta:
     display_name_key: str = ""
     description_key: str = ""
 
-    def resolved_display_name(self) -> str:
+    def resolved_display_name(self, lang: str = "en") -> str:
         if self.display_name_key:
-            return t(self.display_name_key, default=self.display_name)
+            return t(self.display_name_key, lang=lang, default=self.display_name)
         return self.display_name
 
-    def resolved_description(self) -> str:
+    def resolved_description(self, lang: str = "en") -> str:
         if self.description_key:
-            return t(self.description_key, default=self.description)
+            return t(self.description_key, lang=lang, default=self.description)
         return self.description
 
 def plugin_config_path(plugin_name: str, field_key: str) -> tuple[str, ...]:

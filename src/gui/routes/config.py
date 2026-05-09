@@ -108,17 +108,18 @@ def make_config_blueprint(
 
     @bp.route('/api/alert-plugins')
     def api_alert_plugins():
+        lang = (request.args.get('lang') or cm.config.get('settings', {}).get('language', 'en') or 'en')
         return jsonify({
             "plugins": {
                 name: {
                     "name": meta.name,
-                    "display_name": meta.resolved_display_name(),
-                    "description": meta.resolved_description(),
+                    "display_name": meta.resolved_display_name(lang=lang),
+                    "description": meta.resolved_description(lang=lang),
                     "fields": [
                         {
                             "key": key,
-                            "label": field.resolved_label(),
-                            "help": field.resolved_help(),
+                            "label": field.resolved_label(lang=lang),
+                            "help": field.resolved_help(lang=lang),
                             "required": field.required,
                             "secret": field.secret,
                             "placeholder": field.placeholder,

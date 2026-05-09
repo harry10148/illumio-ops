@@ -29,6 +29,7 @@ SIGNAL_HEX = {
 class Reporter:
     def __init__(self, config_manager: Any) -> None:
         self.cm = config_manager
+        self._lang: str = (config_manager.config.get("settings", {}).get("language", "en") or "en")
         self.health_alerts: list[dict[str, Any]] = []
         self.event_alerts: list[dict[str, Any]] = []
         self.traffic_alerts: list[dict[str, Any]] = []
@@ -695,7 +696,8 @@ class Reporter:
             text = text[:max_chars - 1].rsplit(' ', 1)[0] + '…'
         return _html.escape(text)
 
-    def send_alerts(self, force_test: bool = False, channels: list[str] | None = None) -> list[dict[str, Any]]:
+    def send_alerts(self, force_test: bool = False, channels: list[str] | None = None, *, lang: str | None = None) -> list[dict[str, Any]]:
+        _lang = lang or self._lang
         if (
             not any(
                 [
@@ -775,7 +777,7 @@ class Reporter:
                 })
                 continue
             try:
-                results.append(plugin.send(self, subj))
+                results.append(plugin.send(self, subj, lang=_lang))
             except Exception as exc:
                 logger.exception("Alert plugin {} failed during send", channel)
                 results.append({
@@ -920,17 +922,17 @@ class Reporter:
             metric_section="\n".join(metric_section_lines),
         ).strip()
 
-    def _send_line(self, subj: str) -> dict[str, Any]:
+    def _send_line(self, subj: str, *, lang: str | None = None) -> dict[str, Any]:
         plugin = self._get_output_plugin("line")
         if not plugin:
             return {"channel": "line", "status": "failed", "target": "", "error": "plugin unavailable"}
-        return plugin.send(self, subj)
+        return plugin.send(self, subj, lang=lang or self._lang)
 
-    def _send_webhook(self, subj: str) -> dict[str, Any]:
+    def _send_webhook(self, subj: str, *, lang: str | None = None) -> dict[str, Any]:
         plugin = self._get_output_plugin("webhook")
         if not plugin:
             return {"channel": "webhook", "status": "failed", "target": "", "error": "plugin unavailable"}
-        return plugin.send(self, subj)
+        return plugin.send(self, subj, lang=lang or self._lang)
 
     def _render_vendor_event_detail_html(self, alert: dict, esc: Callable[[Any], str]) -> str:
         payload = self._build_event_alert_payload(alert)
@@ -1551,11 +1553,11 @@ class Reporter:
             preheader=preheader,
         )
 
-    def _send_mail(self, subj: str) -> dict[str, Any]:
+    def _send_mail(self, subj: str, *, lang: str | None = None) -> dict[str, Any]:
         plugin = self._get_output_plugin("mail")
         if not plugin:
             return {"channel": "mail", "status": "failed", "target": "", "error": "plugin unavailable"}
-        return plugin.send(self, subj)
+        return plugin.send(self, subj, lang=lang or self._lang)
 
     def send_scheduled_report_email(self, subject: str, html_body: str, attachment_paths: list[str] | None = None,
                                      custom_recipients: list[str] | None = None) -> bool:

@@ -18,10 +18,10 @@ from .base import AlertOutputPlugin
 class MailAlertPlugin(AlertOutputPlugin):
     name = "mail"
 
-    def send(self, reporter, subject: str) -> dict:
+    def send(self, reporter, subject: str, *, lang: str = "en") -> dict:
         cfg = self.cm.config["email"]
         if not cfg["recipients"]:
-            print(f"{Colors.WARNING}{t('no_recipients')}{Colors.ENDC}")
+            print(f"{Colors.WARNING}{t('no_recipients', lang=lang)}{Colors.ENDC}")
             return {"channel": "mail", "status": "skipped", "target": "", "error": "no recipients"}
 
         body = reporter._build_mail_html(subject)
@@ -51,20 +51,20 @@ class MailAlertPlugin(AlertOutputPlugin):
 
             smtp.sendmail(cfg["sender"], cfg["recipients"], msg.as_string())
             smtp.quit()
-            print(f"{Colors.GREEN}{t('mail_sent', host=host, port=port)}{Colors.ENDC}")
+            print(f"{Colors.GREEN}{t('mail_sent', lang=lang, host=host, port=port)}{Colors.ENDC}")
             return {"channel": "mail", "status": "success", "target": ",".join(cfg["recipients"])}
         except Exception as exc:
-            print(f"{Colors.FAIL}{t('mail_failed', error=exc)}{Colors.ENDC}")
+            print(f"{Colors.FAIL}{t('mail_failed', lang=lang, error=exc)}{Colors.ENDC}")
             return {"channel": "mail", "status": "failed", "target": ",".join(cfg.get("recipients", [])), "error": str(exc)}
 
 class LineAlertPlugin(AlertOutputPlugin):
     name = "line"
 
-    def send(self, reporter, subject: str) -> dict:
+    def send(self, reporter, subject: str, *, lang: str = "en") -> dict:
         token = self.cm.config.get("alerts", {}).get("line_channel_access_token", "")
         target_id = self.cm.config.get("alerts", {}).get("line_target_id", "")
         if not token or not target_id:
-            print(f"{Colors.WARNING}{t('line_config_missing')}{Colors.ENDC}")
+            print(f"{Colors.WARNING}{t('line_config_missing', lang=lang)}{Colors.ENDC}")
             return {"channel": "line", "status": "skipped", "target": target_id or "", "error": "missing configuration"}
 
         message_text = reporter._build_line_message(subject)
@@ -87,25 +87,25 @@ class LineAlertPlugin(AlertOutputPlugin):
             )
             with urllib.request.urlopen(req) as response:
                 if response.status == 200:
-                    print(f"{Colors.GREEN}{t('line_alert_sent')}{Colors.ENDC}")
+                    print(f"{Colors.GREEN}{t('line_alert_sent', lang=lang)}{Colors.ENDC}")
                     return {"channel": "line", "status": "success", "target": target_id}
-                print(f"{Colors.FAIL}{t('line_alert_failed', error='', status=response.status)}{Colors.ENDC}")
+                print(f"{Colors.FAIL}{t('line_alert_failed', lang=lang, error='', status=response.status)}{Colors.ENDC}")
                 return {"channel": "line", "status": "failed", "target": target_id, "error": f"status={response.status}"}
         except urllib.error.HTTPError as exc:
             error_body = exc.read().decode("utf-8")
-            print(f"{Colors.FAIL}{t('line_alert_failed', error=f'{exc} - {error_body}', status=exc.code)}{Colors.ENDC}")
+            print(f"{Colors.FAIL}{t('line_alert_failed', lang=lang, error=f'{exc} - {error_body}', status=exc.code)}{Colors.ENDC}")
             return {"channel": "line", "status": "failed", "target": target_id, "error": f"{exc} - {error_body}"}
         except Exception as exc:
-            print(f"{Colors.FAIL}{t('line_alert_failed', error=exc, status='')}{Colors.ENDC}")
+            print(f"{Colors.FAIL}{t('line_alert_failed', lang=lang, error=exc, status='')}{Colors.ENDC}")
             return {"channel": "line", "status": "failed", "target": target_id, "error": str(exc)}
 
 class WebhookAlertPlugin(AlertOutputPlugin):
     name = "webhook"
 
-    def send(self, reporter, subject: str) -> dict:
+    def send(self, reporter, subject: str, *, lang: str = "en") -> dict:
         webhook_url = self.cm.config.get("alerts", {}).get("webhook_url", "")
         if not webhook_url:
-            print(f"{Colors.WARNING}{t('webhook_url_missing')}{Colors.ENDC}")
+            print(f"{Colors.WARNING}{t('webhook_url_missing', lang=lang)}{Colors.ENDC}")
             return {"channel": "webhook", "status": "skipped", "target": "", "error": "missing configuration"}
 
         payload = reporter._build_webhook_payload(subject)
@@ -116,20 +116,20 @@ class WebhookAlertPlugin(AlertOutputPlugin):
             req = urllib.request.Request(webhook_url, data=data, headers=headers, method="POST")
             with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status in [200, 201, 202, 204]:
-                    print(f"{Colors.GREEN}{t('webhook_alert_sent')}{Colors.ENDC}")
+                    print(f"{Colors.GREEN}{t('webhook_alert_sent', lang=lang)}{Colors.ENDC}")
                     return {"channel": "webhook", "status": "success", "target": webhook_url}
-                print(f"{Colors.FAIL}{t('webhook_alert_failed', error='', status=response.status)}{Colors.ENDC}")
+                print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error='', status=response.status)}{Colors.ENDC}")
                 return {"channel": "webhook", "status": "failed", "target": webhook_url, "error": f"status={response.status}"}
         except urllib.error.HTTPError as exc:
             try:
                 error_body = exc.read().decode("utf-8")
             except Exception:
                 error_body = "Could not read error body"
-            print(f"{Colors.FAIL}{t('webhook_alert_failed', error=f'{exc} - {error_body}', status=exc.code)}{Colors.ENDC}")
+            print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=f'{exc} - {error_body}', status=exc.code)}{Colors.ENDC}")
             return {"channel": "webhook", "status": "failed", "target": webhook_url, "error": f"{exc} - {error_body}"}
         except (urllib.error.URLError, TimeoutError) as exc:
-            print(f"{Colors.FAIL}{t('webhook_alert_failed', error=f'Connection Error/Timeout: {exc}', status='')}{Colors.ENDC}")
+            print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=f'Connection Error/Timeout: {exc}', status='')}{Colors.ENDC}")
             return {"channel": "webhook", "status": "failed", "target": webhook_url, "error": f"Connection Error/Timeout: {exc}"}
         except Exception as exc:
-            print(f"{Colors.FAIL}{t('webhook_alert_failed', error=exc, status='')}{Colors.ENDC}")
+            print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=exc, status='')}{Colors.ENDC}")
             return {"channel": "webhook", "status": "failed", "target": webhook_url, "error": str(exc)}

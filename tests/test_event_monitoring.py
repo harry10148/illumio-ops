@@ -123,7 +123,7 @@ def test_reporter_persists_dispatch_history(monkeypatch, tmp_path):
     reporter.add_event_alert({"rule": "auth", "time": "2026-04-08 12:00:00", "desc": "failed auth", "severity": "err", "count": 1})
 
     class DummyMailPlugin:
-        def send(self, reporter_obj, subj):
+        def send(self, reporter_obj, subj, *, lang: str = "en"):
             return {"channel": "mail", "status": "success", "target": "ops@example.com"}
 
     monkeypatch.setattr(reporter, "_get_output_plugin", lambda name: DummyMailPlugin() if name == "mail" else None)
@@ -284,7 +284,7 @@ def test_reporter_dispatches_registered_plugins_without_hardcoded_channel_names(
     class DummyPlugin(AlertOutputPlugin):
         name = "dummy_test_plugin"
 
-        def send(self, reporter, subject: str) -> dict:
+        def send(self, reporter, subject: str, *, lang: str = "en") -> dict:
             return {
                 "channel": self.name,
                 "status": "success",

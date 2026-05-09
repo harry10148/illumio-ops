@@ -82,12 +82,13 @@ def make_dashboard_blueprint(
             r.get("type") == "system" and r.get("filter_value") == "pce_health"
             for r in cm.config.get("rules", [])
         )
+        lang = cm.config.get('settings', {}).get('language', 'en') or 'en'
         return jsonify({
             "version": __version__,
             "api_url": _get_active_pce_url(cm),
             "rules_count": len(cm.config['rules']),
             "health_check": has_health_rule,
-            "language": cm.config.get('settings', {}).get('language', 'en'),
+            "language": lang,
             "theme": cm.config.get('settings', {}).get('theme', 'dark'),
             "timezone": cm.config.get('settings', {}).get('timezone', 'local'),
             "cooldowns": cooldowns,
@@ -99,7 +100,7 @@ def make_dashboard_blueprint(
             "pce_stats": state.get("pce_stats", {}),
             "throttle_state": state.get("throttle_state", {}),
             "dispatch_history": state.get("dispatch_history", []),
-            "alert_channels": _summarize_alert_channels(cm.config, state.get("dispatch_history", [])),
+            "alert_channels": _summarize_alert_channels(cm.config, state.get("dispatch_history", []), lang=lang),
             "event_timeline": state.get("event_timeline", []),
         })
 
