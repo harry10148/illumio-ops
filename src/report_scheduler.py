@@ -14,7 +14,7 @@ from loguru import logger
 import os
 import re
 
-from src.i18n import t, get_language
+from src.i18n import t
 from src.report.report_metadata import extract_attack_summary
 from src.state_store import load_state_file, update_state_file
 
@@ -179,6 +179,11 @@ class ReportScheduler:
         except Exception:
             pass  # intentional fallback: ModuleLog is optional; schedule execution must not fail if logging setup fails
 
+        lang = (
+            schedule.get("lang")
+            or self.cm.config.get("settings", {}).get("language", "en")
+        )
+
         name = schedule.get("name", "Unnamed")
         report_type = schedule.get("report_type", "traffic")
         lookback_days = int(schedule.get("lookback_days", 7))
@@ -209,14 +214,15 @@ class ReportScheduler:
 
             result, paths = self._generate_report(
                 report_type, api, fmt, output_dir, start_date, end_date, name,
-                filters=schedule_filters)
+                filters=schedule_filters, lang=lang)
 
             if result is None:
                 return False
 
             if send_email and paths:
                 self._send_report_email(schedule, result, paths, start_date, end_date,
-                                        custom_recipients, report_type=report_type)
+                                        custom_recipients, report_type=report_type,
+                                        lang=lang)
 
             logger.info(f"[Scheduler] '{name}': completed, files={[os.path.basename(p) for p in paths]}")
             try:
@@ -238,14 +244,14 @@ class ReportScheduler:
 
     # ── Report type dispatch ────────────────────────────────────────────────
 
-    def _generate_report(self, report_type, api, fmt, output_dir, start_date, end_date, name, filters=None):
+    def _generate_report(self, report_type, api, fmt, output_dir, start_date, end_date, name, filters=None, lang: str = "en"):
         """Dispatch to the appropriate generator. Returns (result, paths) or (None, [])."""
         from src.main import _make_cache_reader
         if report_type == "traffic":
             from src.report.report_generator import ReportGenerator
             gen = ReportGenerator(self.cm, api_client=api, config_dir=self._config_dir,
                                   cache_reader=_make_cache_reader(self.cm))
-            result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=filters)
+            result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=filters, lang=lang)
             if result.record_count == 0:
                 logger.warning(f"[Scheduler] '{name}': no traffic data — skipping export")
                 return None, []
@@ -257,7 +263,7 @@ class ReportScheduler:
             from src.report.audit_generator import AuditGenerator
             gen = AuditGenerator(self.cm, api_client=api, config_dir=self._config_dir,
                                  cache_reader=_make_cache_reader(self.cm))
-            result = gen.generate_from_api(start_date=start_date, end_date=end_date)
+            result = gen.generate_from_api(start_date=start_date, end_date=end_date, lang=lang)
             if result.record_count == 0:
                 logger.warning(f"[Scheduler] '{name}': no audit data — skipping export")
                 return None, []
@@ -267,7 +273,7 @@ class ReportScheduler:
         elif report_type == "ven_status":
             from src.report.ven_status_generator import VenStatusGenerator
             gen = VenStatusGenerator(self.cm, api_client=api)
-            result = gen.generate()
+            result = gen.generate(lang=lang)
             if result.record_count == 0:
                 logger.warning(f"[Scheduler] '{name}': no VEN data — skipping export")
                 return None, []
@@ -277,7 +283,7 @@ class ReportScheduler:
         elif report_type == "policy_usage":
             from src.report.policy_usage_generator import PolicyUsageGenerator
             gen = PolicyUsageGenerator(self.cm, api_client=api, config_dir=self._config_dir)
-            result = gen.generate_from_api(start_date=start_date, end_date=end_date)
+            result = gen.generate_from_api(start_date=start_date, end_date=end_date, lang=lang)
             if result.record_count == 0:
                 logger.warning(f"[Scheduler] '{name}': no active rules found — skipping export")
                 return None, []
@@ -290,7 +296,8 @@ class ReportScheduler:
 
     def _send_report_email(self, schedule: dict, result, paths: list,
                             start_date: str, end_date: str,
-                            custom_recipients: list, report_type: str):
+                            custom_recipients: list, report_type: str,
+                            lang: str = "en"):
         """Build and send the scheduled report email."""
         import html as _html
 
@@ -300,9 +307,9 @@ class ReportScheduler:
 
         # Build HTML body
         esc = lambda s: _html.escape(str(s), quote=True)
-        type_label = {"traffic": t("rpt_email_traffic_subject"), "audit": t("rpt_email_audit_subject"),
-                      "ven_status": t("rpt_email_ven_subject"),
-                      "policy_usage": t("rpt_email_pu_subject")}.get(report_type, "Report")
+        type_label = {"traffic": t("rpt_email_traffic_subject", lang=lang), "audit": t("rpt_email_audit_subject", lang=lang),
+                      "ven_status": t("rpt_email_ven_subject", lang=lang),
+                      "policy_usage": t("rpt_email_pu_subject", lang=lang)}.get(report_type, "Report")
         start_disp = start_date[:10] if start_date else "N/A"
         end_disp = end_date[:10] if end_date else "N/A"
 
@@ -313,14 +320,14 @@ class ReportScheduler:
         # Header
         body += "<div style='padding:18px 20px;background:#1A2C32;color:#fff;border-left:4px solid #FF5500;'>"
         body += f"<div style='font-size:20px;font-weight:700;margin-bottom:4px;'>{esc(type_label)}</div>"
-        body += f"<div style='font-size:12px;color:#989A9B;'>{esc(name)} — {t('rpt_email_scheduled_report')}</div>"
+        body += f"<div style='font-size:12px;color:#989A9B;'>{esc(name)} — {t('rpt_email_scheduled_report', lang=lang)}</div>"
         body += "</div>"
 
         # KPI bar
         body += "<div style='padding:14px 20px;border-bottom:1px solid #E3D8C5;background:#F7F4EE;display:flex;flex-wrap:wrap;gap:8px;'>"
-        body += f"<span style='background:#FF5500;color:#fff;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;'>{t('rpt_email_records', count=esc(result.record_count))}</span>"
-        body += f"<span style='background:#1A2C32;color:#D6D7D7;padding:4px 10px;border-radius:999px;font-size:12px;'>{t('rpt_email_period', start=esc(start_disp), end=esc(end_disp))}</span>"
-        body += f"<span style='background:#E3D8C5;color:#313638;padding:4px 10px;border-radius:999px;font-size:12px;'>{t('rpt_email_source_api')}</span>"
+        body += f"<span style='background:#FF5500;color:#fff;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;'>{t('rpt_email_records', lang=lang, count=esc(result.record_count))}</span>"
+        body += f"<span style='background:#1A2C32;color:#D6D7D7;padding:4px 10px;border-radius:999px;font-size:12px;'>{t('rpt_email_period', lang=lang, start=esc(start_disp), end=esc(end_disp))}</span>"
+        body += f"<span style='background:#E3D8C5;color:#313638;padding:4px 10px;border-radius:999px;font-size:12px;'>{t('rpt_email_source_api', lang=lang)}</span>"
         body += "</div>"
 
         body += "<div style='padding:16px 20px;'>"
@@ -334,7 +341,7 @@ class ReportScheduler:
 
         if kpis:
             body += "<div style='margin-bottom:16px;'>"
-            body += f"<div style='font-size:14px;font-weight:700;color:#1A2C32;margin-bottom:10px;border-bottom:2px solid #FF5500;padding-bottom:4px;'>{t('rpt_email_kpi_title')}</div>"
+            body += f"<div style='font-size:14px;font-weight:700;color:#1A2C32;margin-bottom:10px;border-bottom:2px solid #FF5500;padding-bottom:4px;'>{t('rpt_email_kpi_title', lang=lang)}</div>"
             body += "<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;'>"
             for kpi in kpis[:8]:
                 label = esc(kpi.get("label", ""))
@@ -350,7 +357,7 @@ class ReportScheduler:
         findings = getattr(result, "findings", []) or []
         if findings:
             body += "<div style='margin-bottom:16px;'>"
-            body += f"<div style='font-size:14px;font-weight:700;color:#1A2C32;margin-bottom:10px;border-bottom:2px solid #BE122F;padding-bottom:4px;'>{t('rpt_email_security_findings')}</div>"
+            body += f"<div style='font-size:14px;font-weight:700;color:#1A2C32;margin-bottom:10px;border-bottom:2px solid #BE122F;padding-bottom:4px;'>{t('rpt_email_security_findings', lang=lang)}</div>"
             body += "<table style='width:100%;border-collapse:collapse;font-size:12px;'>"
             body += "<tr style='background:#24393F;color:#D6D7D7;'>"
             body += "<th style='padding:8px;text-align:left;'>ID</th><th style='padding:8px;text-align:left;'>Finding</th><th style='padding:8px;text-align:left;'>Severity</th>"
@@ -379,21 +386,21 @@ class ReportScheduler:
 
         attack_summary = extract_attack_summary(getattr(result, "module_results", {}) or {}, top_n=3)
         section_labels = {
-            "boundary_breaches": t("rpt_email_boundary_breaches"),
-            "suspicious_pivot_behavior": t("rpt_email_suspicious_pivot_behavior"),
-            "blast_radius": t("rpt_email_blast_radius"),
-            "blind_spots": t("rpt_email_blind_spots"),
-            "action_matrix": t("rpt_email_action_matrix"),
+            "boundary_breaches": t("rpt_email_boundary_breaches", lang=lang),
+            "suspicious_pivot_behavior": t("rpt_email_suspicious_pivot_behavior", lang=lang),
+            "blast_radius": t("rpt_email_blast_radius", lang=lang),
+            "blind_spots": t("rpt_email_blind_spots", lang=lang),
+            "action_matrix": t("rpt_email_action_matrix", lang=lang),
         }
         has_attack = any(attack_summary.get(k) for k in section_labels.keys())
         if has_attack:
             body += "<div style='margin-bottom:16px;'>"
-            body += f"<div style='font-size:14px;font-weight:700;color:#1A2C32;margin-bottom:10px;border-bottom:2px solid #FF5500;padding-bottom:4px;'>{t('rpt_email_attack_summary')}</div>"
+            body += f"<div style='font-size:14px;font-weight:700;color:#1A2C32;margin-bottom:10px;border-bottom:2px solid #FF5500;padding-bottom:4px;'>{t('rpt_email_attack_summary', lang=lang)}</div>"
             body += "<table style='width:100%;border-collapse:collapse;font-size:12px;'>"
             body += "<tr style='background:#24393F;color:#D6D7D7;'>"
-            body += f"<th style='padding:8px;text-align:left;'>Section</th><th style='padding:8px;text-align:left;'>{t('rpt_email_finding')}</th><th style='padding:8px;text-align:left;'>{t('rpt_email_action')}</th>"
+            body += f"<th style='padding:8px;text-align:left;'>Section</th><th style='padding:8px;text-align:left;'>{t('rpt_email_finding', lang=lang)}</th><th style='padding:8px;text-align:left;'>{t('rpt_email_action', lang=lang)}</th>"
             body += "</tr>"
-            _zh = get_language() == "zh_TW"
+            _zh = lang == "zh_TW"
             row_index = 0
             for key, label in section_labels.items():
                 for item in (attack_summary.get(key) or [])[:2]:
@@ -427,7 +434,7 @@ class ReportScheduler:
         # Attachments note
         if paths:
             body += "<div style='background:#F7F4EE;border:1px solid #E3D8C5;border-radius:8px;padding:12px;margin-bottom:16px;'>"
-            body += f"<div style='font-size:13px;font-weight:700;color:#1A2C32;margin-bottom:6px;'>{t('rpt_email_attached_files')}</div>"
+            body += f"<div style='font-size:13px;font-weight:700;color:#1A2C32;margin-bottom:6px;'>{t('rpt_email_attached_files', lang=lang)}</div>"
             for p in paths:
                 body += f"<div style='font-size:12px;color:#313638;padding:2px 0;'>📎 {esc(os.path.basename(p))}</div>"
             body += "</div>"
@@ -441,7 +448,7 @@ class ReportScheduler:
             custom_recipients=custom_recipients,
         )
         if sent is False:
-            raise RuntimeError(t("rpt_email_failed", error=""))
+            raise RuntimeError(t("rpt_email_failed", lang=lang, error=""))
 
     # ─── Report retention ────────────────────────────────────────────────────
 
