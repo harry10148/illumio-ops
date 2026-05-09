@@ -23,7 +23,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional
 
-from src.i18n import t, set_language, get_language
+from src.i18n import t
 from src.report.rules_engine import ruleset_needs_draft_pd, DRAFT_PD_RULES
 from src.report.report_metadata import (
     attack_summary_counts,
@@ -335,7 +335,6 @@ class ReportGenerator:
         from src.report.exporters.html_exporter import HtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
 
-        set_language(lang)
         paths = []
         # Per-format errors surface to the GUI so the user can see why a format
         # produced no file (previously swallowed by silent except → empty paths).
@@ -352,7 +351,7 @@ class ReportGenerator:
             ).export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, self._build_report_metadata(result, file_format="html"))
-            print(t("rpt_html_saved", path=path))
+            print(t("rpt_html_saved", path=path, lang=lang))
 
         if fmt in ('pdf', 'all'):
             try:
@@ -373,7 +372,7 @@ class ReportGenerator:
                     lang=lang,
                 )
                 paths.append(pdf_path)
-                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
+                print(t("rpt_pdf_saved", path=pdf_path, lang=lang, default=f"PDF saved: {pdf_path}"))
             except Exception as exc:
                 logger.error('PDF export failed: {}', exc, exc_info=True)
                 self.last_export_errors['pdf'] = str(exc) or exc.__class__.__name__
@@ -404,7 +403,7 @@ class ReportGenerator:
                     xlsx_result['module_results'][mod_key] = sheet_data
                 export_xlsx(xlsx_result, xlsx_path)
                 paths.append(xlsx_path)
-                print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}"))
+                print(t("rpt_xlsx_saved", path=xlsx_path, lang=lang, default=f"XLSX saved: {xlsx_path}"))
             except Exception as exc:
                 logger.error('XLSX export failed: {}', exc, exc_info=True)
                 self.last_export_errors['xlsx'] = str(exc) or exc.__class__.__name__
@@ -416,7 +415,7 @@ class ReportGenerator:
             path = CsvExporter(export_data, report_label='Traffic').export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, self._build_report_metadata(result, file_format="csv"))
-            print(t("rpt_csv_saved", path=path))
+            print(t("rpt_csv_saved", path=path, lang=lang))
 
         if fmt in ('raw_csv', 'all_raw'):
             if result.data_source != 'api' or not result.query_context:
@@ -498,14 +497,14 @@ class ReportGenerator:
         if send_email and reporter is not None:
             html_path = next((p for p in paths if p.endswith('.html')), None)
             mod12 = result.module_results.get('mod12', {})
-            subject = t("rpt_email_traffic_subject") + f" — {datetime.date.today()}"
+            subject = t("rpt_email_traffic_subject", lang=lang) + f" — {datetime.date.today()}"
             html_body = self._build_email_body(mod12)
             try:
                 reporter.send_report_email(subject, html_body, attachment_path=html_path)
-                print(t("rpt_email_sent"))
+                print(t("rpt_email_sent", lang=lang))
             except Exception as e:
                 logger.error(f"[ReportGenerator] Email send failed: {e}")
-                print(t("rpt_email_failed", error=str(e)))
+                print(t("rpt_email_failed", error=str(e), lang=lang))
 
         return paths
 
@@ -522,55 +521,48 @@ class ReportGenerator:
             logger.warning("[ReportGenerator] Empty DataFrame, skipping analysis")
             return ReportResult(data_source=source, record_count=0)
 
-        # Apply per-report language so t() calls in the rules engine produce correct text
-        _prev_lang = get_language()
         lang = getattr(self, '_lang', 'en')
-        if lang != _prev_lang:
-            set_language(lang)
+
+        issues = validate(df)
+        if issues:
+            print(t("rpt_schema_warnings", count=len(issues), lang=lang))
+            df = coerce(df)
+
+        record_count = len(df)
+        print(t("rpt_running_analysis", count=f"{record_count:,}", lang=lang))
+
+        # Rules engine
+        engine = RulesEngine(self._report_cfg, config_dir=self._config_dir)
+        findings = engine.evaluate(df)
+        print(t("rpt_rules_findings", count=len(findings), lang=lang))
+
+        # 15 modules
+        results = self._run_modules(df, findings, traffic_report_profile=traffic_report_profile,
+                                    lang=lang)
+
+        # Override generated_at with configured timezone
+        tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
         try:
-            issues = validate(df)
-            if issues:
-                print(t("rpt_schema_warnings", count=len(issues)))
-                df = coerce(df)
+            tz = _parse_tz(tz_str)
+            results['mod12']['generated_at'] = _fmt_tz_now(tz)
+        except Exception:
+            pass  # intentional fallback: keep mod12's default generated_at if timezone parsing fails
 
-            record_count = len(df)
-            print(t("rpt_running_analysis", count=f"{record_count:,}"))
+        # Date range
+        first = df['first_detected'].min() if 'first_detected' in df.columns else pd.NaT
+        last = df['last_detected'].max() if 'last_detected' in df.columns else pd.NaT
+        date_range = (str(first.date()) if pd.notna(first) else '',
+                      str(last.date()) if pd.notna(last) else '')
 
-            # Rules engine
-            engine = RulesEngine(self._report_cfg, config_dir=self._config_dir)
-            findings = engine.evaluate(df)
-            print(t("rpt_rules_findings", count=len(findings)))
-
-            # 15 modules
-            results = self._run_modules(df, findings, traffic_report_profile=traffic_report_profile,
-                                        lang=lang)
-
-            # Override generated_at with configured timezone
-            tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
-            try:
-                tz = _parse_tz(tz_str)
-                results['mod12']['generated_at'] = _fmt_tz_now(tz)
-            except Exception:
-                pass  # intentional fallback: keep mod12's default generated_at if timezone parsing fails
-
-            # Date range
-            first = df['first_detected'].min() if 'first_detected' in df.columns else pd.NaT
-            last = df['last_detected'].max() if 'last_detected' in df.columns else pd.NaT
-            date_range = (str(first.date()) if pd.notna(first) else '',
-                          str(last.date()) if pd.notna(last) else '')
-
-            return ReportResult(
-                data_source=source,
-                record_count=record_count,
-                date_range=date_range,
-                module_results=results,
-                findings=findings,
-                dataframe=df,
-                query_context=dict(query_context or {}),
-            )
-        finally:
-            if lang != _prev_lang:
-                set_language(_prev_lang)
+        return ReportResult(
+            data_source=source,
+            record_count=record_count,
+            date_range=date_range,
+            module_results=results,
+            findings=findings,
+            dataframe=df,
+            query_context=dict(query_context or {}),
+        )
 
     @staticmethod
     def _write_report_metadata(report_path: str, payload: dict):
