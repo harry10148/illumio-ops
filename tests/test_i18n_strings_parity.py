@@ -84,3 +84,22 @@ def test_strings_overlay_takes_precedence_over_json() -> None:
         assert STRINGS[overlay_key]["en"] == "OVERLAY"
     finally:
         del STRINGS[overlay_key]
+
+
+def test_strings_strict_mode_passes_known_json_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Under STRICT, JSON-backed keys still resolve — only true unknowns raise."""
+    monkeypatch.setenv("ILLUMIO_OPS_I18N_STRICT", "1")
+    from src.report.exporters.report_i18n import STRINGS
+
+    # rpt_kicker_traffic exists in i18n_en.json (migrated in T3)
+    entry = STRINGS["rpt_kicker_traffic"]
+    assert entry["en"] == "Traffic Analytics Report"
+
+
+def test_strings_strict_mode_raises_for_unknown_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Under STRICT, a key not in overlay AND not in EN_MESSAGES raises KeyError."""
+    monkeypatch.setenv("ILLUMIO_OPS_I18N_STRICT", "1")
+    from src.report.exporters.report_i18n import STRINGS
+
+    with pytest.raises(KeyError, match="genuinely_nonexistent_key_xyz"):
+        STRINGS["genuinely_nonexistent_key_xyz"]

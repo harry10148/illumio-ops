@@ -48,13 +48,13 @@ class _StringsView:
         from src.i18n.engine import EN_MESSAGES
         return len(self._overlay) + sum(1 for k in EN_MESSAGES if k not in self._overlay)
 
-    def get(self, key: str, default: dict[str, str] | None = None) -> dict[str, str] | None:  # type: ignore[override]
+    def get(self, key: str, default: dict[str, str] | None = None) -> dict[str, str] | None:
         try:
             return self[key]
         except KeyError:
             return default
 
-    def keys(self) -> Iterator[str]:  # type: ignore[override]
+    def keys(self) -> Iterator[str]:
         from src.i18n.engine import EN_MESSAGES
         seen: set[str] = set()
         for k in self._overlay:
@@ -64,7 +64,7 @@ class _StringsView:
             if k not in seen:
                 yield k
 
-    def items(self) -> Iterator[tuple[str, dict[str, str]]]:  # type: ignore[override]
+    def items(self) -> Iterator[tuple[str, dict[str, str]]]:
         for k in self.keys():
             yield k, self[k]
 
