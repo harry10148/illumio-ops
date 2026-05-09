@@ -602,7 +602,7 @@ class ReportGenerator:
 
         for mod_id, fn, adapter in get_traffic_modules():
             try:
-                results[mod_id] = adapter(fn, df, self._report_cfg, top_n)
+                results[mod_id] = adapter(fn, df, self._report_cfg, top_n, lang)
                 print(f"[Report]   {mod_id} ✓", end='  \r', flush=True)
             except Exception as e:
                 logger.warning(f"[ReportGenerator] {mod_id} failed: {e}")

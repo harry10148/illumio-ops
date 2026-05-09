@@ -12,6 +12,7 @@ analysis modules without hardcoding imports.  To add a new module:
 from __future__ import annotations
 
 import importlib
+import inspect
 from loguru import logger
 from typing import Callable, Any
 
@@ -19,19 +20,34 @@ import pandas as pd
 
 # ── Module registry ──────────────────────────────────────────────────────────
 # Each tuple: (module_id, dotted_module_path, function_name, call_builder)
-#   call_builder: a callable (fn, df, report_cfg, top_n) -> result
+#   call_builder: a callable (fn, df, report_cfg, top_n, lang) -> result
 #   This adapter handles the varying signatures of each module function.
 
-def _call_df(fn, df, _cfg, _n):
+def _supports_lang(fn) -> bool:
+    """Check if a callable accepts a 'lang' kwarg."""
+    try:
+        return "lang" in inspect.signature(fn).parameters
+    except (ValueError, TypeError):
+        return False
+
+def _call_df(fn, df, _cfg, _n, lang):
+    if _supports_lang(fn):
+        return fn(df, lang=lang)
     return fn(df)
 
-def _call_df_n(fn, df, _cfg, n):
+def _call_df_n(fn, df, _cfg, n, lang):
+    if _supports_lang(fn):
+        return fn(df, n, lang=lang)
     return fn(df, n)
 
-def _call_df_cfg_n(fn, df, cfg, n):
+def _call_df_cfg_n(fn, df, cfg, n, lang):
+    if _supports_lang(fn):
+        return fn(df, cfg, n, lang=lang)
     return fn(df, cfg, n)
 
-def _call_readiness(fn, df, _cfg, n):
+def _call_readiness(fn, df, _cfg, n, lang):
+    if _supports_lang(fn):
+        return fn(df, workloads=None, top_n=n, lang=lang)
     return fn(df, workloads=None, top_n=n)
 
 TRAFFIC_MODULES: list[tuple[str, str, str, Callable]] = [
