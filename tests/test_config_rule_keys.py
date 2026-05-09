@@ -67,3 +67,52 @@ def test_rule_desc_key_overrides_stale_desc(tmp_path: Path) -> None:
     rules = cm.config.get("rules", [])
     assert rules, "rules list should be populated"
     assert "[MISSING:" not in rules[0]["desc"]
+
+
+def test_rule_save_strips_rendered_text_when_key_present(tmp_path: Path) -> None:
+    """save() must persist desc_key/rec_key without redundant rendered text."""
+    cfg_file = tmp_path / "config.json"
+    alerts_file = tmp_path / "alerts.json"
+    cfg_file.write_text(json.dumps({
+        "rules": [{
+            "id": "001",
+            "event_type": "sec_policy.create",
+            "desc_key": "rule_sec_policy.create_desc",
+            "rec_key": "alert_rec_sec_policy_create",
+        }],
+        "settings": {"language": "en"},
+    }), encoding="utf-8")
+
+    cm = ConfigManager(config_file=str(cfg_file), alerts_file=str(alerts_file))
+    cm.load()
+    cm.save()
+
+    saved = json.loads(alerts_file.read_text(encoding="utf-8"))
+    rule = saved["rules"][0]
+    # Keys remain (canonical)
+    assert rule["desc_key"] == "rule_sec_policy.create_desc"
+    assert rule["rec_key"] == "alert_rec_sec_policy_create"
+    # Rendered text removed (was populated by load)
+    assert "desc" not in rule, f"desc should be stripped: {rule}"
+    assert "rec" not in rule, f"rec should be stripped: {rule}"
+
+
+def test_rule_save_keeps_legacy_text_without_keys(tmp_path: Path) -> None:
+    """Legacy rules without desc_key/rec_key must retain their text on save."""
+    cfg_file = tmp_path / "config.json"
+    alerts_file = tmp_path / "alerts.json"
+    cfg_file.write_text(json.dumps({
+        "rules": [
+            {"id": "old_001", "desc": "Legacy desc", "rec": "Legacy rec"}
+        ],
+        "settings": {"language": "en"},
+    }), encoding="utf-8")
+
+    cm = ConfigManager(config_file=str(cfg_file), alerts_file=str(alerts_file))
+    cm.load()
+    cm.save()
+
+    saved = json.loads(alerts_file.read_text(encoding="utf-8"))
+    rule = saved["rules"][0]
+    assert rule.get("desc") == "Legacy desc"
+    assert rule.get("rec") == "Legacy rec"

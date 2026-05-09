@@ -323,8 +323,21 @@ class ConfigManager:
     def _write_alerts_file(self):
         """Atomically write ``{"rules": self.config['rules']}`` to alerts.json
         with mode 0o600. Channel credentials (line / webhook / active / smtp)
-        intentionally stay in config.json — see ALERTS_FILE comment."""
-        payload = {"rules": self.config.get("rules", [])}
+        intentionally stay in config.json — see ALERTS_FILE comment.
+
+        For rules with desc_key/rec_key, strip the rendered desc/rec text
+        before persisting so disk holds keys as the canonical source. The
+        rendered text is repopulated by load() via _resolve_rule_keys().
+        """
+        rules_for_disk = []
+        for rule in self.config.get("rules", []):
+            rule_copy = dict(rule)
+            if rule_copy.get("desc_key"):
+                rule_copy.pop("desc", None)
+            if rule_copy.get("rec_key"):
+                rule_copy.pop("rec", None)
+            rules_for_disk.append(rule_copy)
+        payload = {"rules": rules_for_disk}
         os.makedirs(os.path.dirname(self.alerts_file), exist_ok=True)
         tmp_file = self.alerts_file + ".tmp"
         with open(tmp_file, 'w', encoding='utf-8') as f:
