@@ -36,6 +36,7 @@ def render_df_table(
     col_i18n: dict[str, str],
     no_data_key: str = "rpt_no_data",
     render_cell: Callable | None = None,
+    value_i18n_maps: dict[str, dict[str, str]] | None = None,
     row_attrs: Callable | None = None,
     lang: str = "en",
 ) -> str:
@@ -96,7 +97,18 @@ def render_df_table(
             attr_str = row_attrs(row) or ""
         html_parts.append(f"<tr{attr_str}>")
         for col in columns:
-            cell_html = render_cell(col, row[col], row) if render_cell else _default_cell(row[col])
+            raw_value = row[col]
+            # Render-layer i18n: translate stable English value via map (if provided)
+            # before custom render_cell or default rendering. Pass-through on miss.
+            if value_i18n_maps and col in value_i18n_maps:
+                key = value_i18n_maps[col].get(str(raw_value))
+                if key:
+                    entry = _STRINGS.get(key)
+                    if entry:
+                        translated = entry.get(lang) or entry.get("en") or str(raw_value)
+                        if translated:
+                            raw_value = translated
+            cell_html = render_cell(col, raw_value, row) if render_cell else _default_cell(raw_value)
             html_parts.append(f"<td>{cell_html}</td>")
         html_parts.append("</tr>")
 
