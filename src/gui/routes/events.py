@@ -294,10 +294,10 @@ def make_events_blueprint(
     def api_event_catalog():
         from src.events.catalog import LOCAL_EXTENSION_EVENT_TYPES
         from src.settings import FULL_EVENT_CATALOG, ACTION_EVENTS, SEVERITY_FILTER_EVENTS, EVENT_DESCRIPTION_KEYS, EVENT_TIPS_KEYS
-        from src.i18n import set_language, t
+        from src.i18n import t
 
         cm.load()
-        set_language(cm.config.get("settings", {}).get("language", "en"))
+        lang = cm.config.get("settings", {}).get("language", "en")
 
         # Build prefix → [event_id, ...] map for related_events computation
         prefix_map: dict[str, list[str]] = {}
@@ -311,20 +311,20 @@ def make_events_blueprint(
         translated_catalog = {}
         categories = []
         for category, events in FULL_EVENT_CATALOG.items():
-            trans_cat = t('cat_' + category.replace(' ', '_').lower())
+            trans_cat = t('cat_' + category.replace(' ', '_').lower(), lang=lang)
             if category == "Agent Health Detail":
-                trans_cat = t('cat_agent_health', default="Agent Health")
+                trans_cat = t('cat_agent_health', default="Agent Health", lang=lang)
 
             if trans_cat not in translated_catalog:
                 translated_catalog[trans_cat] = {}
 
             event_items = []
             for event_id, translation_key in events.items():
-                label = t(translation_key)
+                label = t(translation_key, lang=lang)
                 desc_key = EVENT_DESCRIPTION_KEYS.get(event_id)
-                description = t(desc_key) if desc_key else ''
+                description = t(desc_key, lang=lang) if desc_key else ''
                 tips_key = EVENT_TIPS_KEYS.get(event_id)
-                tips = t(tips_key) if tips_key else ''
+                tips = t(tips_key, lang=lang) if tips_key else ''
                 supports_status = event_id in ACTION_EVENTS
                 supports_severity = event_id in SEVERITY_FILTER_EVENTS or event_id == "*"
                 prefix = event_id.split(".")[0] if event_id != "*" else None
