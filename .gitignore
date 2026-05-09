@@ -76,3 +76,7 @@ grep_out.txt
 
 # Raw NotebookLM material (not checked in)
 docs/_notebooklm_excerpts/
+
+# Per-deployment rule schedule state (written by GUI/scheduler at runtime —
+# same category as config.json / alerts.json which are also gitignored).
+config/rule_schedules.json
