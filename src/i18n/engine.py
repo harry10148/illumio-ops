@@ -59,19 +59,17 @@ def _load_zh_messages() -> dict[str, str]:
 EN_MESSAGES = _load_en_messages()
 ZH_MESSAGES = _load_zh_messages()
 _PLACEHOLDER_VALUE_RE = re.compile(r"^(?:Rpt|GUI|Gui|Sched)\b")
-_STRICT_PREFIXES = (
-    "gui_", "sched_", "rs_", "wgs_", "login_", "cli_", "main_",
-    "settings_", "rpt_", "menu_", "ven_", "pu_", "report_",
-    "error_", "alert_", "daemon_", "line_", "mail_", "webhook_",
-    "event_", "confirm_", "select_", "step_", "metric_", "pd_",
-    "filter_", "ex_", "rule_", "trigger_", "pill_",
-)
+def _load_strict_prefixes() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    path = Path(__file__).parent / "data" / "strict_prefixes.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return tuple(data["prefixes"]), tuple(data["exceptions"])
+
+
+_STRICT_PREFIXES, _STRICT_EXCEPTIONS = _load_strict_prefixes()
 
 
 def _is_strict_surface_key(key: str) -> bool:
-    # Event catalog labels/categories are generated from vendor event ids and
-    # rely on humanized fallback when explicit dictionary keys are absent.
-    if key.startswith("event_label_") or key.startswith("cat_"):
+    if any(key.startswith(exc) for exc in _STRICT_EXCEPTIONS):
         return False
     return key.startswith(_STRICT_PREFIXES)
 

@@ -1,0 +1,11 @@
+{
+  "_doc": "Key prefixes that short-circuit to [MISSING:key] instead of humanize fallback. Adding a domain? Append the prefix here. exceptions are keys that match a prefix but should still humanize.",
+  "prefixes": [
+    "gui_", "sched_", "rs_", "wgs_", "login_", "cli_", "main_",
+    "settings_", "rpt_", "menu_", "ven_", "pu_", "report_",
+    "error_", "alert_", "daemon_", "line_", "mail_", "webhook_",
+    "event_", "confirm_", "select_", "step_", "metric_", "pd_",
+    "filter_", "ex_", "rule_", "trigger_", "pill_"
+  ],
+  "exceptions": ["event_label_", "cat_"]
+}
