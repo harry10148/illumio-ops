@@ -8,10 +8,10 @@ class _StringMap(dict):
     def __missing__(self, key: str) -> dict[str, str]:
         if os.getenv("ILLUMIO_OPS_I18N_STRICT"):
             raise KeyError(f"Missing i18n key: {key}")
-        from src.i18n.engine import _build_messages
+        from src.i18n.engine import get_messages
         return {
-            "en": _build_messages("en").get(key, key),
-            "zh_TW": _build_messages("zh_TW").get(key, key),
+            "en": get_messages("en").get(key, key),
+            "zh_TW": get_messages("zh_TW").get(key, key),
         }
 
     def get(self, key: str, default=None):  # type: ignore[override]
