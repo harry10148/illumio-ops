@@ -94,11 +94,24 @@ Users on older config.json files: run
 `python scripts/migrate_rules_to_keys.py --config <path> --write` to
 upgrade rule storage. The script is idempotent.
 
+### R3 follow-up — Full lang= threading audit (TA1–TA4, TB1–TB3, TC1–TC3)
+
+A subsequent codebase-wide audit identified ~256 additional `t()` calls in
+non-CLI code paths that still relied on the process-global lang. All were
+migrated across 10 follow-up tasks (10 commits, 2026-05-10):
+
+- **GUI routes** (TA1–TA4, ~108 calls): `gui/routes/{reports,actions,rules,events,rule_scheduler,dashboard,config,admin,auth}.py`, `gui/_helpers.py`, `gui/__init__.py`, `pce_cache/web.py`, `siem/web.py`. Each handler now reads `lang` from the request (JSON body or session) and threads it explicitly. `gui/__init__.py` adds `_request_lang()` helper for `before_request` hooks.
+- **Schedulers + alerts** (TB1–TB3, ~75 calls): `report_scheduler.py` adds `lang` to schedule schema (backward-compatible); `RulesEngine` accepts `lang` in `__init__`; alert plugin `.send()` and `metadata.resolved_*()` accessors gain keyword-only `lang` parameters.
+- **Analysis modules** (TC1–TC3, ~114 calls): module adapter framework in `src/report/analysis/__init__.py` auto-detects `lang` support via `inspect.signature`; 10 traffic + policy_usage modules now accept `lang`; report generators (`html_exporter`, `ven_status_generator`, `policy_usage_generator`, `audit_generator`) thread `self._lang` through all internal `t()` calls.
+
+**Final state:** 0 unmigrated `t()` calls in non-CLI `src/`. CLI menus deliberately retain global lang (single-process deployment, lang set at bootstrap from config). Tests still 1027 passed; audit exit 0.
+
 ### Plan + Implementation Status
 
 - Plan: `docs/superpowers/plans/2026-05-09-i18n-architecture-refactor.md`
-- 22 plan tasks complete (T1–T22), plus 5 follow-ups (P1 glossary, P2
-  mypy, P3 perf, P4 docs, P5 push). All commits on `main`.
+- 22 plan tasks complete (T1–T22), plus 5 first-round follow-ups (P1 glossary,
+  P2 mypy, P3 perf, P4 docs, P5 push) and 10 audit-driven follow-ups
+  (TA1–TA4, TB1–TB3, TC1–TC3). All commits on `main`.
 
 ## [3.25.0-tracks-abcd] — 2026-05-07
 
