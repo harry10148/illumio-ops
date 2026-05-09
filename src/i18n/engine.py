@@ -35,7 +35,21 @@ _I18N_STATE = _I18nState("en")
 
 
 def set_language(lang: str) -> None:
-    """Set the active UI language (thread-safe). Public API."""
+    """Set the active UI language (process-global). PROCESS BOOTSTRAP ONLY.
+
+    For request-scoped or report-scoped translation, use `t(key, lang=...)`
+    instead. Calling set_language() from request handlers, scheduler tasks,
+    or anywhere with concurrency leaks language across calls.
+
+    Allowed callers (Phase 3 baseline):
+      - src/config.py:185, 268 — bootstrap from config.json
+      - CLI entrypoints — initial language at startup
+      - tests — explicit fixture setup
+
+    Adding a new caller? Pass lang= to t() instead, or extend the
+    ALLOWED_CALLERS allowlist in tests/test_i18n_set_language_callers.py
+    with justification.
+    """
     _I18N_STATE.set_language(lang)
 
 
