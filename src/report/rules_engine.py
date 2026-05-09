@@ -68,11 +68,12 @@ class RulesEngine:
         findings = engine.evaluate(df)
     """
 
-    def __init__(self, report_config: dict, config_dir: str = 'config'):
+    def __init__(self, report_config: dict, config_dir: str = 'config', lang: str = 'en'):
         self._cfg = report_config
         self._thresholds = report_config.get('thresholds', {})
         self._risk_ports = self._build_risk_port_map(report_config)
         self._lateral_ports = set(report_config.get('lateral_movement_ports', []))
+        self._lang = lang
 
     # ── public ───────────────────────────────────────────────────────────────
 
@@ -195,9 +196,9 @@ class RulesEngine:
                 "active lateral movement path between security domains."
             )
             if n_cross_env_allowed > 0:
-                recommendation = t("rule_b001_rec_critical_cross_env", named_ports=list(named_ports.keys()))
+                recommendation = t("rule_b001_rec_critical_cross_env", named_ports=list(named_ports.keys()), lang=self._lang)
             else:
-                recommendation = t("rule_b001_rec_pb_cross_env", named_ports=list(named_ports.keys()))
+                recommendation = t("rule_b001_rec_pb_cross_env", named_ports=list(named_ports.keys()), lang=self._lang)
         elif n_cross_subnet > 0 and n_allowed > 0:
             severity = 'HIGH'
             risk_summary = (
@@ -205,21 +206,21 @@ class RulesEngine:
                 f"Same-subnet flows: {n_same_subnet} (may be legitimate admin)."
             )
             recommendation = t("rule_b001_rec_cross_subnet_allowed",
-                               named_ports=list(named_ports.keys()), n_same_subnet=n_same_subnet)
+                               named_ports=list(named_ports.keys()), n_same_subnet=n_same_subnet, lang=self._lang)
         elif n_cross_subnet > 0 and n_pb == n_cross_subnet:
             severity = 'MEDIUM'
             risk_summary = (
                 f"{n_cross_subnet} cross-subnet flows have no allow rule (potentially_blocked) — "
                 "traffic flows because VEN is in test mode; enforce to activate default-deny."
             )
-            recommendation = t("rule_b001_rec_cross_subnet_pb")
+            recommendation = t("rule_b001_rec_cross_subnet_pb", lang=self._lang)
         elif n_same_subnet == n_total and n_pb == n_total:
             severity = 'INFO'
             risk_summary = (
                 f"All {n_total} flows are within the same /24 subnet and in test mode only. "
                 "Traffic is likely routine Windows admin; block is not active but risk is limited."
             )
-            recommendation = t("rule_b001_rec_same_subnet_pb")
+            recommendation = t("rule_b001_rec_same_subnet_pb", lang=self._lang)
         else:
             # Same-subnet, allowed — MEDIUM (legitimate admin but worth documenting)
             severity = 'MEDIUM'
@@ -228,7 +229,7 @@ class RulesEngine:
                 f"({n_allowed} allowed, {n_pb} test-mode). "
                 "Likely Windows administration traffic, but source scope should be verified."
             )
-            recommendation = t("rule_b001_rec_same_subnet_allowed")
+            recommendation = t("rule_b001_rec_same_subnet_allowed", lang=self._lang)
 
         # Top suspicious flows (cross-subnet or cross-env, allowed)
         suspicious = matched[
@@ -286,7 +287,7 @@ class RulesEngine:
                     f"operators (e.g., Conti, LockBit) who exploit exposed VNC/TeamViewer to gain GUI "
                     f"access without triggering endpoint alerts."
                 ),
-                recommendation=t("rule_b002_rec"),
+                recommendation=t("rule_b002_rec", lang=self._lang),
                 evidence={'matched_flows': len(matched), 'top_ports': str(top_ports),
                           'unique_sources': unique_src, 'unique_destinations': unique_dst},
             )
@@ -314,7 +315,7 @@ class RulesEngine:
                     f"While these flows would be blocked in enforced mode, they represent real "
                     f"network paths that ransomware could exploit if enforcement is delayed."
                 ),
-                recommendation=t("rule_b003_rec"),
+                recommendation=t("rule_b003_rec", lang=self._lang),
                 evidence={'matched_flows': len(matched), 'top_ports': str(top_ports)},
             )
         return None
@@ -337,7 +338,7 @@ class RulesEngine:
                     f"Unmanaged hosts bypass Illumio policy enforcement — any traffic they send "
                     f"cannot be micro-segmented, creating blind spots in your security posture."
                 ),
-                recommendation=t("rule_b004_rec"),
+                recommendation=t("rule_b004_rec", lang=self._lang),
                 evidence={'total_flows': total, 'top_src_ips': str(top_ips),
                           'unique_managed_destinations': unique_dst, 'top_ports': str(top_dst_ports)},
             )
@@ -363,7 +364,7 @@ class RulesEngine:
                     f"Low coverage means most traffic is flowing without explicit policy authorization, "
                     f"making it impossible to distinguish legitimate traffic from attacker movement."
                 ),
-                recommendation=t("rule_b005_rec", threshold=threshold),
+                recommendation=t("rule_b005_rec", threshold=threshold, lang=self._lang),
                 evidence={'coverage_pct': f'{coverage_pct:.1f}', 'allowed': allowed,
                           'blocked': blocked, 'potentially_blocked': pb, 'total': total},
             )
@@ -403,7 +404,7 @@ class RulesEngine:
                 f"Top offenders: {list(top.keys())[:3]}. "
                 f"This fan-out pattern is a strong indicator of host-hopping."
             ),
-            recommendation=t("rule_b006_rec_allowed" if high_src_allowed else "rule_b006_rec_pb"),
+            recommendation=t("rule_b006_rec_allowed" if high_src_allowed else "rule_b006_rec_pb", lang=self._lang),
             evidence={'high_src_count': len(high_src), 'top_sources': str(top),
                       'total_lateral_flows': total_lateral, 'allowed_flows': n_allowed_flows,
                       'pb_flows': n_pb_flows, 'top_ports': str(top_ports)},
@@ -430,7 +431,7 @@ class RulesEngine:
                     f"A single account reaching many destinations may indicate credential theft, "
                     f"automated scanning, or data exfiltration via compromised credentials."
                 ),
-                recommendation=t("rule_b007_rec"),
+                recommendation=t("rule_b007_rec", lang=self._lang),
                 evidence={'high_user_count': len(high_users), 'top_users': str(top),
                           'top_ports': str(top_ports)},
             )
@@ -459,7 +460,7 @@ class RulesEngine:
                     f"Abnormally large data transfers may indicate data exfiltration, "
                     f"unauthorized backups, or misconfigured replication jobs."
                 ),
-                recommendation=t("rule_b008_rec"),
+                recommendation=t("rule_b008_rec", lang=self._lang),
                 evidence={'anomaly_count': len(anomalies), 'percentile_threshold': _fmt_bytes(threshold_bytes),
                           'total_anomaly_bytes': _fmt_bytes(total_anomaly_bytes), 'top_flows': str(top),
                           'top_ports': str(top_ports)},
@@ -486,7 +487,7 @@ class RulesEngine:
                     f"but should be explicitly authorized. Uncontrolled cross-env flows break "
                     f"environment isolation and can enable pivot attacks from lower to higher environments."
                 ),
-                recommendation=t("rule_b009_rec"),
+                recommendation=t("rule_b009_rec", lang=self._lang),
                 evidence={'cross_env_flows': len(cross), 'top_pairs': str(top_pairs),
                           'environments': str(sorted(unique_envs)), 'top_ports': str(top_ports)},
             )
@@ -526,7 +527,7 @@ class RulesEngine:
                 f"(Telnet:{top_ports.get(23,0)}, FTP:{top_ports.get(21,0)+top_ports.get(20,0)}). "
                 f"{len(allowed)} of these are explicitly allowed."
             ),
-            recommendation=t("rule_l001_rec"),
+            recommendation=t("rule_l001_rec", lang=self._lang),
             evidence={'total_flows': len(matched), 'allowed_flows': len(allowed),
                       'top_ports': str(top_ports), 'top_source_apps': str(top_apps)},
         )
@@ -556,7 +557,7 @@ class RulesEngine:
                 f"{len(unblocked)} flows on broadcast/discovery protocols are not blocked: "
                 f"{named}. These protocols enable Responder-based NTLMv2 hash harvesting."
             ),
-            recommendation=t("rule_l002_rec"),
+            recommendation=t("rule_l002_rec", lang=self._lang),
             evidence={'unblocked_flows': len(unblocked), 'top_protocols': str(named)},
         )
 
@@ -594,7 +595,7 @@ class RulesEngine:
                 f"unique source applications: {named_ports}. "
                 f"{len(wide)} database endpoints are reachable from >{threshold} distinct app tiers."
             ),
-            recommendation=t("rule_l003_rec"),
+            recommendation=t("rule_l003_rec", lang=self._lang),
             evidence={'total_db_flows': len(db_flows),
                       'unique_src_apps': db_flows['src_app'].nunique(),
                       'top_databases': str(top_db), 'ports': str(named_ports)},
@@ -627,7 +628,7 @@ class RulesEngine:
                 f"Top pairs: " +
                 ', '.join(f"{r['src_env']}→{r['dst_env']}:{r['port']}({r['flows']})" for r in top_pairs[:3])
             ),
-            recommendation=t("rule_l004_rec"),
+            recommendation=t("rule_l004_rec", lang=self._lang),
             evidence={'cross_env_db_flows': len(cross), 'top_env_pairs': str(top_pairs)},
         )
 
@@ -666,7 +667,7 @@ class RulesEngine:
                 f"{unique_src_apps - unique_src_apps_allowed} potentially_blocked): {named}. "
                 f"Excessive LDAP/Kerberos reach enables domain enumeration and ticket attacks."
             ),
-            recommendation=t("rule_l005_rec_allowed" if unique_src_apps_allowed > threshold else "rule_l005_rec_pb"),
+            recommendation=t("rule_l005_rec_allowed" if unique_src_apps_allowed > threshold else "rule_l005_rec_pb", lang=self._lang),
             evidence={'unblocked_flows': len(id_flows), 'allowed_flows': len(id_allowed),
                       'unique_src_apps': unique_src_apps, 'unique_src_apps_allowed': unique_src_apps_allowed,
                       'top_ports': str(named), 'top_sources': str(top_srcs)},
@@ -733,7 +734,7 @@ class RulesEngine:
                 f"Top pivot points: " +
                 ', '.join(f"{r['app']}({r['reachable']} reachable)" for r in top5)
             ),
-            recommendation=t("rule_l006_rec"),
+            recommendation=t("rule_l006_rec", lang=self._lang),
             evidence={'high_risk_nodes': len(high_risk),
                       'blast_radius_threshold': threshold,
                       'top_pivot_apps': str(top5[:3])},
@@ -770,7 +771,7 @@ class RulesEngine:
                 f"targeting database/identity/management ports: {named_ports}. "
                 f"Top targets: {top_dst}."
             ),
-            recommendation=t("rule_l007_rec"),
+            recommendation=t("rule_l007_rec", lang=self._lang),
             evidence={'total_flows': len(matched),
                       'unique_unmanaged_src': matched['src_ip'].nunique(),
                       'top_src_ips': str(top_ips), 'top_ports': str(named_ports)},
@@ -806,7 +807,7 @@ class RulesEngine:
                 f"These paths are currently traversable because workloads are not fully enforced. "
                 f"Top ports: {top_ports}."
             ),
-            recommendation=t("rule_l008_rec", top_apps=top_apps),
+            recommendation=t("rule_l008_rec", top_apps=top_apps, lang=self._lang),
             evidence={'pb_lateral_flows': len(pb), 'unique_src': unique_src,
                       'unique_dst': unique_dst, 'top_ports': str(top_ports),
                       'top_dst_apps': str(top_apps)},
@@ -842,7 +843,7 @@ class RulesEngine:
                 f"to {exfil['dst_ip'].nunique()} unmanaged destinations. "
                 f"Top source apps: {top_apps_fmt}."
             ),
-            recommendation=t("rule_l009_rec", top_dst_fmt=top_dst_fmt),
+            recommendation=t("rule_l009_rec", top_dst_fmt=top_dst_fmt, lang=self._lang),
             evidence={'total_transferred': _fmt_bytes(total_bytes),
                       'unique_unmanaged_dst': exfil['dst_ip'].nunique(),
                       'top_dst_ips': str(top_dst_fmt), 'top_src_apps': str(top_apps_fmt)},
@@ -882,7 +883,7 @@ class RulesEngine:
                 f"Top environment pairs: " +
                 ', '.join(f"{r['src_env']}→{r['dst_env']}({r['flows']} flows)" for r in top_pairs[:3])
             ),
-            recommendation=t("rule_l010_rec"),
+            recommendation=t("rule_l010_rec", lang=self._lang),
             evidence={'cross_env_lateral_flows': len(cross), 'top_env_pairs': str(top_pairs[:3]),
                       'top_ports': str(top_ports)},
         )

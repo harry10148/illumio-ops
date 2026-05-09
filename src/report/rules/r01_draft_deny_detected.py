@@ -12,7 +12,7 @@ class R01DraftDenyDetected(_DraftPdRuleMixin):
 
     severity = "HIGH"
 
-    def evaluate(self, flows_df: pd.DataFrame, ctx: dict) -> list[Finding]:
+    def evaluate(self, flows_df: pd.DataFrame, ctx: dict, lang: str = "en") -> list[Finding]:
         if not self._has_draft(flows_df):
             return []
         _deny_values = {"blocked_by_boundary", "blocked_by_override_deny"}
@@ -24,11 +24,11 @@ class R01DraftDenyDetected(_DraftPdRuleMixin):
             return []
         return [Finding(
             rule_id="R01",
-            rule_name=t("rule_r01_name"),
+            rule_name=t("rule_r01_name", lang=lang),
             severity=self.severity,
             category="DraftPolicy",
-            description=t("rule_r01_desc"),
-            recommendation=t("rule_r01_rec"),
+            description=t("rule_r01_desc", lang=lang),
+            recommendation=t("rule_r01_rec", lang=lang),
             evidence={
                 "matching_flows": len(matched),
                 "draft_decisions": str(matched["draft_policy_decision"].value_counts().to_dict()),

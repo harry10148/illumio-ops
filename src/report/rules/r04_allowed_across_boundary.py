@@ -12,7 +12,7 @@ class R04AllowedAcrossBoundary(_DraftPdRuleMixin):
 
     severity = "LOW"
 
-    def evaluate(self, flows_df: pd.DataFrame, ctx: dict) -> list[Finding]:
+    def evaluate(self, flows_df: pd.DataFrame, ctx: dict, lang: str = "en") -> list[Finding]:
         if not self._has_draft(flows_df):
             return []
         matched = flows_df[
@@ -22,11 +22,11 @@ class R04AllowedAcrossBoundary(_DraftPdRuleMixin):
             return []
         return [Finding(
             rule_id="R04",
-            rule_name=t("rule_r04_name"),
+            rule_name=t("rule_r04_name", lang=lang),
             severity=self.severity,
             category="DraftPolicy",
-            description=t("rule_r04_desc"),
-            recommendation=t("rule_r04_rec"),
+            description=t("rule_r04_desc", lang=lang),
+            recommendation=t("rule_r04_rec", lang=lang),
             evidence={
                 "matching_flows": len(matched),
             },

@@ -532,7 +532,7 @@ class ReportGenerator:
         print(t("rpt_running_analysis", count=f"{record_count:,}", lang=lang))
 
         # Rules engine
-        engine = RulesEngine(self._report_cfg, config_dir=self._config_dir)
+        engine = RulesEngine(self._report_cfg, config_dir=self._config_dir, lang=lang)
         findings = engine.evaluate(df)
         print(t("rpt_rules_findings", count=len(findings), lang=lang))
 

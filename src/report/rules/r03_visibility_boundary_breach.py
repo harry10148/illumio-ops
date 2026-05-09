@@ -12,7 +12,7 @@ class R03VisibilityBoundaryBreach(_DraftPdRuleMixin):
 
     severity = "MEDIUM"
 
-    def evaluate(self, flows_df: pd.DataFrame, ctx: dict) -> list[Finding]:
+    def evaluate(self, flows_df: pd.DataFrame, ctx: dict, lang: str = "en") -> list[Finding]:
         if not self._has_draft(flows_df):
             return []
         matched = flows_df[
@@ -23,11 +23,11 @@ class R03VisibilityBoundaryBreach(_DraftPdRuleMixin):
             return []
         return [Finding(
             rule_id="R03",
-            rule_name=t("rule_r03_name"),
+            rule_name=t("rule_r03_name", lang=lang),
             severity=self.severity,
             category="DraftPolicy",
-            description=t("rule_r03_desc"),
-            recommendation=t("rule_r03_rec"),
+            description=t("rule_r03_desc", lang=lang),
+            recommendation=t("rule_r03_rec", lang=lang),
             evidence={
                 "matching_flows": len(matched),
             },
