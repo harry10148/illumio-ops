@@ -31,8 +31,9 @@ def make_admin_blueprint(
     @login_required
     def api_log_get(module_name):
         from src.module_log import ModuleLog, MODULES
+        lang = cm.config.get('settings', {}).get('language', 'en')
         if module_name not in MODULES:
-            return jsonify({"ok": False, "error": t("gui_err_unknown_module")}), 404
+            return jsonify({"ok": False, "error": t("gui_err_unknown_module", lang=lang)}), 404
         n = min(int(request.args.get("n", 200)), 500)
         ml = ModuleLog.get(module_name)
         return jsonify({"ok": True, "module": module_name, "entries": ml.get_recent(n)})
@@ -42,8 +43,9 @@ def make_admin_blueprint(
     @login_required
     def api_shutdown():
         import os as _os, threading as _threading, signal as _signal
+        lang = cm.config.get('settings', {}).get('language', 'en')
         if persistent_mode:
-            return jsonify({"ok": False, "error": t("gui_err_shutdown_persistent")}), 403
+            return jsonify({"ok": False, "error": t("gui_err_shutdown_persistent", lang=lang)}), 403
 
         def _delayed_exit():
             import time as _t

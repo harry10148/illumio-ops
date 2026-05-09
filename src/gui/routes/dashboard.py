@@ -171,21 +171,23 @@ def make_dashboard_blueprint(
     @bp.route('/api/dashboard/queries/<int:idx>', methods=['DELETE'])
     def api_delete_dashboard_query(idx):
         cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en')
         if 'settings' in cm.config and 'dashboard_queries' in cm.config['settings']:
             if 0 <= idx < len(cm.config['settings']['dashboard_queries']):
                 cm.config['settings']['dashboard_queries'].pop(idx)
                 cm.save()
                 return jsonify({"ok": True})
-        return _err(t("gui_not_found"), 404)
+        return _err(t("gui_not_found", lang=lang), 404)
 
     @bp.route('/api/dashboard/snapshot', methods=['GET'])
     def api_dashboard_snapshot():
         cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en')
         reports_dir = _resolve_reports_dir(cm)
 
         snapshot_path = os.path.join(reports_dir, 'latest_snapshot.json')
         if not os.path.exists(snapshot_path):
-            return jsonify({"ok": False, "error": t("gui_no_snapshot")})
+            return jsonify({"ok": False, "error": t("gui_no_snapshot", lang=lang)})
 
         try:
             import json
@@ -198,10 +200,11 @@ def make_dashboard_blueprint(
     @bp.route('/api/dashboard/audit_summary', methods=['GET'])
     def api_dashboard_audit_summary():
         cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en')
         reports_dir = _resolve_reports_dir(cm)
         summary_path = os.path.join(reports_dir, 'latest_audit_summary.json')
         if not os.path.exists(summary_path):
-            return jsonify({"ok": False, "error": t("gui_dashboard_no_audit_summary", default="No audit report summary found.")})
+            return jsonify({"ok": False, "error": t("gui_dashboard_no_audit_summary", default="No audit report summary found.", lang=lang)})
         try:
             with open(summary_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
@@ -212,10 +215,11 @@ def make_dashboard_blueprint(
     @bp.route('/api/dashboard/policy_usage_summary', methods=['GET'])
     def api_dashboard_policy_usage_summary():
         cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en')
         reports_dir = _resolve_reports_dir(cm)
         summary_path = os.path.join(reports_dir, 'latest_policy_usage_summary.json')
         if not os.path.exists(summary_path):
-            return jsonify({"ok": False, "error": t("gui_dashboard_no_policy_usage_summary", default="No policy usage report summary found.")})
+            return jsonify({"ok": False, "error": t("gui_dashboard_no_policy_usage_summary", default="No policy usage report summary found.", lang=lang)})
         try:
             with open(summary_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)

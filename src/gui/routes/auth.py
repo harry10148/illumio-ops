@@ -62,8 +62,9 @@ def make_auth_blueprint(
     def api_login():
         from pydantic import ValidationError as _ValidationError
         from src.auth_models import AdminUser, LoginForm
+        _body = request.get_json(silent=True) or {}
         try:
-            form = LoginForm.model_validate(request.get_json(silent=True) or {})
+            form = LoginForm.model_validate(_body)
         except _ValidationError as e:
             return jsonify({"ok": False, "error": "invalid_form", "detail": str(e)}), 400
 
@@ -71,6 +72,7 @@ def make_auth_blueprint(
         password = form.password
 
         cm.load()
+        lang = _body.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         gui_cfg = cm.config.get("web_gui", {})
 
         saved_username = gui_cfg.get("username", "illumio")
@@ -97,7 +99,7 @@ def make_auth_blueprint(
                 "must_change_password": bool(gui_cfg.get("must_change_password")),
             })
 
-        return jsonify({"ok": False, "error": t("gui_err_invalid_auth")}), 401
+        return jsonify({"ok": False, "error": t("gui_err_invalid_auth", lang=lang)}), 401
 
     @bp.route("/logout", methods=["POST"])
     def logout():

@@ -149,7 +149,8 @@ def make_rule_scheduler_blueprint(
         except Exception as e:
             return _err(f"PCE API error: {e}", 502)
         if not rs:
-            return _err(t("gui_err_not_found"), 404)
+            lang = cm.config.get('settings', {}).get('language', 'en')
+            return _err(t("gui_err_not_found", lang=lang), 404)
 
         ut = rs.get('update_type')
         rs_row = {
@@ -230,14 +231,15 @@ def make_rule_scheduler_blueprint(
     @bp.route('/api/rule_scheduler/schedules', methods=['POST'])
     def rs_schedule_create():
         db, api, _ = _get_rs_components()
-        data = request.get_json()
+        data = request.get_json() or {}
+        lang = data.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         href = data.get('href', '')
         if not href:
             return _err("href required", 400)
 
         # Block draft-only scheduling natively for GUI
         if api.has_draft_changes(href) or not api.is_provisioned(href):
-            return jsonify({"ok": False, "error": t("rs_sch_draft_block")}), 400
+            return jsonify({"ok": False, "error": t("rs_sch_draft_block", lang=lang)}), 400
 
         # Validate time format for recurring
         if data.get('type') == 'recurring':
@@ -245,14 +247,14 @@ def make_rule_scheduler_blueprint(
                 datetime.datetime.strptime(data['start'], "%H:%M")
                 datetime.datetime.strptime(data['end'], "%H:%M")
             except (ValueError, KeyError):
-                return _err(t("gui_err_invalid_time_hhmm"), 400)
+                return _err(t("gui_err_invalid_time_hhmm", lang=lang), 400)
         elif data.get('type') == 'one_time':
             try:
                 ex = data['expire_at'].replace(' ', 'T')
                 datetime.datetime.fromisoformat(ex)
                 data['expire_at'] = ex
             except (ValueError, KeyError):
-                return _err(t("gui_err_invalid_expire_fmt"), 400)
+                return _err(t("gui_err_invalid_expire_fmt", lang=lang), 400)
 
         db_entry = {
             "type": data.get('type', 'recurring'),
@@ -271,14 +273,14 @@ def make_rule_scheduler_blueprint(
             db_entry['start'] = data['start']
             db_entry['end'] = data['end']
             db_entry['timezone'] = data.get('timezone', 'local')
-            days_str = ",".join([d[:3] for d in db_entry['days']]) if len(db_entry['days']) < 7 else t('rs_action_everyday')
-            act_str = t('rs_action_enable_in_window') if db_entry['action'] == 'allow' else t('rs_action_disable_in_window')
+            days_str = ",".join([d[:3] for d in db_entry['days']]) if len(db_entry['days']) < 7 else t('rs_action_everyday', lang=lang)
+            act_str = t('rs_action_enable_in_window', lang=lang) if db_entry['action'] == 'allow' else t('rs_action_disable_in_window', lang=lang)
             tz_display = db_entry['timezone'] if db_entry['timezone'] != 'local' else 'Local'
-            note = f"[?? {t('rs_sch_tag_recurring')}: {days_str} {db_entry['start']}-{db_entry['end']} ({tz_display}) {act_str}]"
+            note = f"[?? {t('rs_sch_tag_recurring', lang=lang)}: {days_str} {db_entry['start']}-{db_entry['end']} ({tz_display}) {act_str}]"
         else:
             db_entry['expire_at'] = data['expire_at']
             db_entry['timezone'] = data.get('timezone', 'local')
-            note = f"[??{t('rs_sch_tag_expire')}: {data['expire_at'].replace('T', ' ')}]"
+            note = f"[??{t('rs_sch_tag_expire', lang=lang)}: {data['expire_at'].replace('T', ' ')}]"
 
         db.put(href, db_entry)
         api.update_rule_note(href, note)
@@ -287,10 +289,11 @@ def make_rule_scheduler_blueprint(
     @bp.route('/api/rule_scheduler/schedules/<path:href>')
     def rs_schedule_detail(href):
         db, _, _ = _get_rs_components()
+        lang = cm.config.get('settings', {}).get('language', 'en')
         href = '/' + href if not href.startswith('/') else href
         conf = db.get(href)
         if not conf:
-            return _err(t("gui_err_not_found"), 404)
+            return _err(t("gui_err_not_found", lang=lang), 404)
         entry = dict(conf)
         entry['href'] = href
         entry['id'] = _extract_id_href(href)

@@ -51,6 +51,7 @@ def make_config_blueprint(
     def api_security_post():
         d = request.json or {}
         cm.load()
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         gui_cfg = cm.config.setdefault("web_gui", {})
 
         # No old_password gate: an authenticated session is sufficient to
@@ -74,7 +75,7 @@ def make_config_blueprint(
             new_pw = d["new_password"]
             confirm_pw = d.get("confirm_password", new_pw)
             if not (8 <= len(new_pw) <= 512) or new_pw != confirm_pw:
-                return jsonify({"ok": False, "error": t("gui_err_invalid_password_form")}), 400
+                return jsonify({"ok": False, "error": t("gui_err_invalid_password_form", lang=lang)}), 400
             gui_cfg["password"] = hash_password(new_pw)
             gui_cfg.pop("_initial_password", None)
             gui_cfg.pop("must_change_password", None)
@@ -225,6 +226,7 @@ def make_config_blueprint(
     def api_tls_config():
         d = request.json or {}
         cm.load()
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         gui_cfg = cm.config.setdefault("web_gui", {})
         tls = gui_cfg.setdefault("tls", {})
         tls["enabled"] = bool(d.get("enabled", False))
@@ -240,15 +242,16 @@ def make_config_blueprint(
             days = 30
         tls["auto_renew_days"] = max(1, min(days, 365))
         cm.save()
-        return jsonify({"ok": True, "message": t("gui_tls_saved_restart_hint")})
+        return jsonify({"ok": True, "message": t("gui_tls_saved_restart_hint", lang=lang)})
 
     @bp.route('/api/tls/renew', methods=['POST'])
     @limiter.limit("10 per hour")
     def api_tls_renew():
         cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en')
         tls_cfg = cm.config.get("web_gui", {}).get("tls", {})
         if not tls_cfg.get("self_signed"):
-            return jsonify({"ok": False, "error": t("gui_err_renew_self_signed_only")}), 400
+            return jsonify({"ok": False, "error": t("gui_err_renew_self_signed_only", lang=lang)}), 400
         cert_dir = os.path.join(_ROOT_DIR, "config", "tls")
         try:
             cert_path, key_path = _generate_self_signed_cert(cert_dir, force=True)

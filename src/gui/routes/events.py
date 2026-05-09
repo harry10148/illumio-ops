@@ -23,13 +23,14 @@ def make_events_blueprint(
     @bp.route('/api/events/viewer')
     def api_events_viewer():
         cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en')
         try:
             from src.api_client import ApiClient, EventFetchError
             from src.events import event_identity, format_utc, normalize_event, parse_event_timestamp
             from src.settings import _event_category
         except Exception as exc:
             logger.error("Failed to load event viewer dependencies: {}", exc)
-            return _err(t("gui_err_service_unavailable"), 500)
+            return _err(t("gui_err_service_unavailable", lang=lang), 500)
 
         try:
             mins = max(5, min(int(request.args.get('mins', 60)), 10080))
@@ -64,10 +65,10 @@ def make_events_blueprint(
             )
         except EventFetchError as exc:
             logger.error("Event viewer fetch failed: {} - {}", exc.status, exc.message)
-            return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300]), 502)
+            return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300], lang=lang), 502)
         except Exception as exc:
             logger.error("Event viewer fetch failed: {}", exc, exc_info=True)
-            return _err(t("gui_err_pce_event_fetch", exc=exc), 502)
+            return _err(t("gui_err_pce_event_fetch", exc=exc, lang=lang), 502)
 
         items = []
         for raw_event in raw_events:
@@ -136,12 +137,13 @@ def make_events_blueprint(
     @bp.route('/api/events/shadow_compare')
     def api_events_shadow_compare():
         cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en')
         try:
             from src.api_client import ApiClient, EventFetchError
             from src.events import compare_event_rules, format_utc
         except Exception as exc:
             logger.error("Failed to load shadow compare dependencies: {}", exc)
-            return _err(t("gui_err_service_unavailable"), 500)
+            return _err(t("gui_err_service_unavailable", lang=lang), 500)
 
         try:
             mins = max(5, min(int(request.args.get('mins', 60)), 10080))
@@ -165,9 +167,9 @@ def make_events_blueprint(
                 max_results=limit,
             )
         except EventFetchError as exc:
-            return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300]), 502)
+            return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300], lang=lang), 502)
         except Exception as exc:
-            return _err(t("gui_err_pce_event_fetch", exc=exc), 502)
+            return _err(t("gui_err_pce_event_fetch", exc=exc, lang=lang), 502)
 
         event_rules = [rule for rule in cm.config.get("rules", []) if rule.get("type") == "event"]
         comparisons = compare_event_rules(event_rules, events)
@@ -188,6 +190,7 @@ def make_events_blueprint(
     @bp.route('/api/events/rule_test')
     def api_events_rule_test():
         cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en')
         try:
             from src.api_client import ApiClient, EventFetchError
             from src.events import (
@@ -200,7 +203,7 @@ def make_events_blueprint(
             )
         except Exception as exc:
             logger.error("Failed to load rule test dependencies: {}", exc)
-            return _err(t("gui_err_service_unavailable"), 500)
+            return _err(t("gui_err_service_unavailable", lang=lang), 500)
 
         try:
             idx = int(request.args.get('idx', '-1'))
@@ -235,9 +238,9 @@ def make_events_blueprint(
                 max_results=limit,
             )
         except EventFetchError as exc:
-            return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300]), 502)
+            return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300], lang=lang), 502)
         except Exception as exc:
-            return _err(t("gui_err_pce_event_fetch", exc=exc), 502)
+            return _err(t("gui_err_pce_event_fetch", exc=exc, lang=lang), 502)
 
         event_lookup = {event_identity(event): event for event in events}
         current_ids = {
