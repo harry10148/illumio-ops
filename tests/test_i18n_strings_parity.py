@@ -22,7 +22,6 @@ def _lookup_via_t(key: str, lang: str) -> str:
     return get_messages(lang).get(key, key)
 
 
-@pytest.mark.xfail(reason="Phase 1 migration in progress; removed in Task 7", strict=False)
 @pytest.mark.parametrize("lang", ["en", "zh_TW"])
 def test_strings_matches_t_for_all_shared_keys(lang: str) -> None:
     json_keys = set(EN_MESSAGES.keys())
