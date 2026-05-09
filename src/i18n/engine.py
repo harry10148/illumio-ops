@@ -302,19 +302,19 @@ def _build_messages(lang: str) -> dict[str, str]:
         return base
 
     zh_messages = _normalized_zh_messages()
-    base: dict[str, str] = {}
+    result: dict[str, str] = {}
     for key in en_messages:
         zh_text = zh_messages.get(key)
         if isinstance(zh_text, str) and zh_text.strip():
-            base[key] = zh_text
+            result[key] = zh_text
             continue
         if _is_strict_surface_key(key):
-            base[key] = _missing_marker(key)
+            result[key] = _missing_marker(key)
             continue
         # Non-strict gap — log once and return the raw key as visible signal.
         logger.warning(f"i18n: zh_TW gap for non-strict key '{key}'; returning raw key")
-        base[key] = key
-    return base
+        result[key] = key
+    return result
 
 def get_messages(lang: str | None = None) -> dict[str, str]:
     lang = lang or get_language()

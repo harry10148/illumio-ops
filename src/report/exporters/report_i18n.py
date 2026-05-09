@@ -140,7 +140,7 @@ for key, zh_text in {
 }.items():
     STRINGS[f"rpt_rule_{key}_how"] = _entry("Rule detail", zh_text)
 
-for suffix, pair in {
+for suffix, entry in {
     "hostname": ("Hostname", "主機名稱"),
     "ip": ("IP", "IP"),
     "labels": ("Labels", "Labels"),
@@ -288,7 +288,7 @@ for suffix, pair in {
     # draft PD section
     "draft_decision": ("Draft Decision", "草稿判定"),
 }.items():
-    STRINGS[f"rpt_col_{suffix}"] = _entry(*pair)
+    STRINGS[f"rpt_col_{suffix}"] = _entry(*entry)
 
 for rule_id, zh_name in {
     "B001": "勒索軟體風險 Port — 情境分析",
@@ -334,7 +334,7 @@ for rule_id, zh_name in {
     }.get(rule_id, rule_id)
     STRINGS[f"rpt_rule_{rule_id}_name"] = _entry(en_name, zh_name)
 
-for key, pair in {
+for key, entry in {
     "rpt_tr_attack_summary": ("Attack Summary", "攻擊摘要"),
     "rpt_tr_boundary_breaches": ("Boundary Breaches", "邊界突破"),
     "rpt_tr_suspicious_pivot_behavior": ("Suspicious Pivot Behavior", "可疑橫向樞紐行為"),
@@ -342,7 +342,7 @@ for key, pair in {
     "rpt_tr_blind_spots": ("Blind Spots", "盲點"),
     "rpt_tr_action_matrix": ("Action Matrix", "行動矩陣"),
 }.items():
-    STRINGS[key] = _entry(pair[0], pair[1])
+    STRINGS[key] = _entry(entry[0], entry[1])
 
 COL_I18N: dict[str, str] = {
     value.get("en", ""): key
