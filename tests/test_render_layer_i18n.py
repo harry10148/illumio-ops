@@ -69,3 +69,27 @@ def test_value_i18n_maps_optional_argument():
     df = pd.DataFrame({"x": [1]})
     html = render_df_table(df, col_i18n={}, lang="en")
     assert "<table" in html
+
+
+def test_value_i18n_constants_resolve_to_real_strings():
+    """Every map value must point to an existing STRINGS entry with non-empty en."""
+    from src.report.exporters.report_i18n import (
+        STRINGS,
+        TIER_VALUE_I18N,
+        ROLE_VALUE_I18N,
+        ASSET_TYPE_VALUE_I18N,
+        SEVERITY_VALUE_I18N,
+        MOD01_METRIC_VALUE_I18N,
+    )
+    for label, name in [
+        ("TIER", TIER_VALUE_I18N),
+        ("ROLE", ROLE_VALUE_I18N),
+        ("ASSET_TYPE", ASSET_TYPE_VALUE_I18N),
+        ("SEVERITY", SEVERITY_VALUE_I18N),
+        ("MOD01_METRIC", MOD01_METRIC_VALUE_I18N),
+    ]:
+        for stable_en, key in name.items():
+            entry = STRINGS.get(key)
+            assert entry is not None, f"{label} maps {stable_en!r} → missing key {key!r}"
+            assert entry.get("en"), f"{label}.{key} has empty en value"
+            assert entry.get("zh_TW"), f"{label}.{key} has empty zh_TW value"

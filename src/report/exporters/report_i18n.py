@@ -91,6 +91,32 @@ STRINGS: _StringMap = _StringMap({
     "rpt_col_staged_pct": _entry("Staged Readiness %", "Staged 就緒度 %"),
     "rpt_col_value": _entry("Value", "數值"),
     "rpt_col_weight": _entry("Weight", "權重"),
+    # Tier classification (mod14 _classify_tier returns these as DataFrame column values)
+    "rpt_tier_1_critical": _entry("Tier-1 Critical", "Tier-1 重大"),
+    "rpt_tier_2_important": _entry("Tier-2 Important", "Tier-2 重要"),
+    "rpt_tier_3_shared": _entry("Tier-3 Shared", "Tier-3 共用"),
+    "rpt_tier_4_peripheral": _entry("Tier-4 Peripheral", "Tier-4 邊緣"),
+    # Role labels (mod14 role column)
+    "rpt_role_identity": _entry("Identity", "身分"),
+    "rpt_role_database": _entry("Database", "資料庫"),
+    "rpt_role_provider": _entry("Provider", "提供者"),
+    "rpt_role_consumer": _entry("Consumer", "消費者"),
+    "rpt_role_bridge": _entry("Bridge", "橋接器"),
+    "rpt_role_peer": _entry("Peer", "對等"),
+    # Asset type labels (mod14 asset_type column — NOTE: empty-string is also a valid value)
+    "rpt_asset_type_identity_infra": _entry("Identity Infrastructure", "身分基礎架構"),
+    "rpt_asset_type_database": _entry("Database", "資料庫"),
+    # Severity labels (mod13 _severity returns; also priority lookup key)
+    "rpt_severity_critical": _entry("CRITICAL", "嚴重"),
+    "rpt_severity_high": _entry("HIGH", "高"),
+    "rpt_severity_medium": _entry("MEDIUM", "中"),
+    "rpt_severity_low": _entry("LOW", "低"),
+    "rpt_severity_info": _entry("INFO", "資訊"),
+    # mod01 metric/value rows (visible in HTML traffic report mod01 section)
+    "rpt_metric_policy_coverage": _entry("Policy Coverage", "Policy 覆蓋率"),
+    "rpt_metric_allowed_blocked_potential": _entry("Allowed / Blocked / Potentially Blocked", "Allowed / Blocked / Potentially Blocked"),
+    "rpt_metric_total_data": _entry("Total Data", "總資料量"),
+    "rpt_metric_date_range": _entry("Date Range", "日期範圍"),
     "rpt_tr_title": _entry("Illumio Traffic Flow Report", "Illumio 流量分析報表"),
     "rpt_tr_nav_summary": _entry("Executive Summary", "摘要"),
     "rpt_tr_nav_overview": _entry("Traffic Overview", "流量總覽"),
@@ -1077,6 +1103,46 @@ COL_I18N: dict[str, str] = {
     value.get("en", ""): key
     for key, value in STRINGS.items()
     if key.startswith("rpt_col_") and value.get("en")
+}
+
+# Render-layer value i18n maps. Pass these to render_df_table via
+# value_i18n_maps={col_name: <map>}. Stable English keys; values are
+# STRINGS lookup keys.
+
+TIER_VALUE_I18N: dict[str, str] = {
+    "Tier-1 Critical":   "rpt_tier_1_critical",
+    "Tier-2 Important":  "rpt_tier_2_important",
+    "Tier-3 Shared":     "rpt_tier_3_shared",
+    "Tier-4 Peripheral": "rpt_tier_4_peripheral",
+}
+
+ROLE_VALUE_I18N: dict[str, str] = {
+    "Identity": "rpt_role_identity",
+    "Database": "rpt_role_database",
+    "Provider": "rpt_role_provider",
+    "Consumer": "rpt_role_consumer",
+    "Bridge":   "rpt_role_bridge",
+    "Peer":     "rpt_role_peer",
+}
+
+ASSET_TYPE_VALUE_I18N: dict[str, str] = {
+    "Identity Infrastructure": "rpt_asset_type_identity_infra",
+    "Database":                "rpt_asset_type_database",
+}
+
+SEVERITY_VALUE_I18N: dict[str, str] = {
+    "CRITICAL": "rpt_severity_critical",
+    "HIGH":     "rpt_severity_high",
+    "MEDIUM":   "rpt_severity_medium",
+    "LOW":      "rpt_severity_low",
+    "INFO":     "rpt_severity_info",
+}
+
+MOD01_METRIC_VALUE_I18N: dict[str, str] = {
+    "Policy Coverage":                       "rpt_metric_policy_coverage",
+    "Allowed / Blocked / Potentially Blocked": "rpt_metric_allowed_blocked_potential",
+    "Total Data":                            "rpt_metric_total_data",
+    "Date Range":                            "rpt_metric_date_range",
 }
 
 def lang_btn_html() -> str:
