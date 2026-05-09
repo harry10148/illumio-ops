@@ -5,8 +5,6 @@ import json
 import re
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[1]
 GLOSSARY_PATH = ROOT / "src" / "i18n" / "data" / "glossary.json"
 
@@ -24,15 +22,6 @@ def test_glossary_loads_and_has_required_terms() -> None:
     assert not missing, f"glossary missing required terms: {missing}"
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Deferred: ~145 pre-existing zh_TW values use forbidden Chinese "
-        "substitutes (Label→標籤, Offline→離線, etc.). These were hidden "
-        "before the glossary was externalized in T8; require manual "
-        "remediation in i18n_zh_TW.json (T11 precompute only fills blanks)."
-    ),
-    strict=False,
-)
 def test_zh_tw_values_preserve_glossary_terms() -> None:
     """For every key whose en value contains a glossary term as a whole word,
     the zh_TW value must also contain it as-is (not a Chinese substitute)."""

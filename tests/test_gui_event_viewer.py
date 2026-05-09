@@ -201,7 +201,7 @@ def test_event_catalog_endpoint_returns_translated_labels_and_correct_categories
         # (user-configured terms to preserve in both locales).
         assert category_labels["Policy"] == "Policy"
         assert category_labels["Agent Operations"] == "Agent 操作"
-        assert category_labels["Containers & Workloads"] == "容器與 Workload"
+        assert category_labels["Containers & Workloads"] == "容器與 Workloads"
 
         all_events = {
             event["id"]: {**event, "category_id": category["id"]}

@@ -28,15 +28,6 @@ AUDIT_PATH = ROOT / "scripts" / "audit_i18n_usage.py"
 REPORT_PATH = ROOT / "scripts" / "audit_i18n_report.md"
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Cat E now reads forbidden substitutes from glossary.json (consistent "
-        "SoT with test_i18n_glossary.py). Surfaces ~90 pre-existing zh_TW "
-        "violations that were hidden by the previous hardcoded narrow list. "
-        "Manual remediation in i18n_zh_TW.json required (deferred zh-cleanup pass)."
-    ),
-    strict=False,
-)
 def test_comprehensive_i18n_audit_is_clean():
     """Fails if any of the nine audit categories reports findings.
 

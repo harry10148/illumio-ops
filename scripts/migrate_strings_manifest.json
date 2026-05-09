@@ -1,28 +1,7 @@
 {
-  "only_in_strings": 467,
-  "overlap": 195,
-  "overlap_changes": 141,
-  "samples": [
-    "rpt_col_rule_name",
-    "rpt_chart_policy_coverage_tiers",
-    "rpt_cat_lateralmovement_desc",
-    "rpt_col_last_heartbeat",
-    "rpt_col_decision_types",
-    "rpt_change_direction_unchanged",
-    "rpt_role_bridge",
-    "rpt_col_kpi",
-    "rpt_chart_axis_bytes",
-    "rpt_chart_ransomware_exposure",
-    "rpt_tr_overall_coverage",
-    "rpt_pu_footer",
-    "rpt_au_top_events",
-    "rpt_ven_title",
-    "rpt_tr_no_investigation",
-    "rpt_au_severity_dist",
-    "rpt_pu_caveat_body",
-    "rpt_au_total_health",
-    "rpt_tr_role_distribution",
-    "rpt_au_severity_breakdown"
-  ],
+  "only_in_strings": 0,
+  "overlap": 2767,
+  "overlap_changes": 0,
+  "samples": [],
   "prefer": "strings"
 }
