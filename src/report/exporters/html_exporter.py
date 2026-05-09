@@ -732,7 +732,7 @@ class HtmlExporter:
             [
                 {"Metric": "Policy Coverage", "Value": f"{mod01.get('policy_coverage_pct', 0)}%"},
                 {
-                    "Metric": "Allowed / Blocked / Potential",
+                    "Metric": "Allowed / Blocked / Potentially Blocked",
                     "Value": (
                         f"{mod01.get('allowed_flows', 0)} / "
                         f"{mod01.get('blocked_flows', 0)} / "
@@ -746,6 +746,8 @@ class HtmlExporter:
         return render_df_table(
             df,
             col_i18n={},
+            value_i18n_maps={"Metric": MOD01_METRIC_VALUE_I18N},
+            lang=self._lang,
         )
 
     def _side_by_side_tables(self, left_title: str, left_html: str, right_title: str, right_html: str) -> str:
