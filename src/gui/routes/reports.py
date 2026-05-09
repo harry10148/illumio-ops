@@ -73,14 +73,15 @@ def make_reports_blueprint(
 
     @bp.route('/api/reports/<path:filename>', methods=['DELETE'])
     def api_delete_report(filename):
+        lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
         cm.load()
         reports_dir = _resolve_reports_dir(cm)
         # Prevent path traversal
         target = os.path.realpath(os.path.join(reports_dir, filename))
         if not target.startswith(os.path.realpath(reports_dir) + os.sep):
-            return jsonify({"ok": False, "error": t("gui_invalid_filename")}), 400
+            return jsonify({"ok": False, "error": t("gui_invalid_filename", lang=lang)}), 400
         if not os.path.isfile(target):
-            return jsonify({"ok": False, "error": t("gui_file_not_found")}), 404
+            return jsonify({"ok": False, "error": t("gui_file_not_found", lang=lang)}), 404
         os.remove(target)
         metadata_path = target + ".metadata.json"
         if os.path.isfile(metadata_path):
@@ -93,9 +94,10 @@ def make_reports_blueprint(
     @bp.route('/api/reports/bulk-delete', methods=['POST'])
     def api_bulk_delete_reports():
         d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         filenames = d.get('filenames', [])
         if not filenames:
-            return jsonify({"ok": False, "error": t("gui_err_no_filenames")}), 400
+            return jsonify({"ok": False, "error": t("gui_err_no_filenames", lang=lang)}), 400
 
         cm.load()
         reports_dir = _resolve_reports_dir(cm)
@@ -109,10 +111,10 @@ def make_reports_blueprint(
             try:
                 target = os.path.realpath(os.path.join(reports_dir, filename))
                 if not target.startswith(resolved_reports_dir + os.sep):
-                    errors.append(f"{filename}: {t('gui_invalid_filename')}")
+                    errors.append(f"{filename}: {t('gui_invalid_filename', lang=lang)}")
                     continue
                 if not os.path.isfile(target):
-                    errors.append(f"{filename}: {t('gui_file_not_found')}")
+                    errors.append(f"{filename}: {t('gui_file_not_found', lang=lang)}")
                     continue
                 os.remove(target)
                 metadata_path = target + ".metadata.json"
@@ -129,14 +131,15 @@ def make_reports_blueprint(
 
     @bp.route('/reports/<path:filename>', methods=['GET'])
     def api_serve_report(filename):
+        lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
         if '..' in filename or filename.startswith('/'):
-            return jsonify({"ok": False, "error": t("gui_err_invalid_path")}), 403
+            return jsonify({"ok": False, "error": t("gui_err_invalid_path", lang=lang)}), 403
         cm.load()
         reports_dir = _resolve_reports_dir(cm)
         # Path traversal protection: ensure resolved path stays within reports_dir
         target = os.path.realpath(os.path.join(reports_dir, filename))
         if not target.startswith(os.path.realpath(reports_dir) + os.sep):
-            return jsonify({"ok": False, "error": t("gui_err_invalid_path")}), 403
+            return jsonify({"ok": False, "error": t("gui_err_invalid_path", lang=lang)}), 403
         as_download = request.args.get('download') == '1'
         return send_from_directory(reports_dir, filename, as_attachment=as_download)
 
@@ -183,15 +186,15 @@ def make_reports_blueprint(
 
             if source == 'csv':
                 if 'file' not in request.files:
-                    return jsonify({"ok": False, "error": t("gui_err_no_csv")})
+                    return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
                 csv_file = request.files['file']
                 if csv_file.filename == '':
-                    return jsonify({"ok": False, "error": t("gui_err_empty_csv")})
+                    return jsonify({"ok": False, "error": t("gui_err_empty_csv", lang=lang)})
                 if csv_file.mimetype not in {
                     'text/csv', 'application/vnd.ms-excel',
                     'text/plain', 'application/octet-stream',
                 }:
-                    return jsonify({"ok": False, "error": t("gui_err_invalid_file_type")}), 415
+                    return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
 
                 import uuid as _uuid
                 safe_filename = secure_filename(csv_file.filename) or 'upload.csv'
@@ -234,7 +237,7 @@ def make_reports_blueprint(
                 result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=report_filters, traffic_report_profile=traffic_report_profile, lang=lang, clip_to_cache=clip_to_cache)
 
             if result.record_count == 0:
-                return jsonify({"ok": False, "error": t("gui_no_traffic_data")})
+                return jsonify({"ok": False, "error": t("gui_no_traffic_data", lang=lang)})
 
             fmt = d.get('format', 'all')
             fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'all'
@@ -295,7 +298,7 @@ def make_reports_blueprint(
             result = gen.generate_from_api(start_date, end_date, lang=lang)
 
             if result.record_count == 0:
-                return jsonify({"ok": False, "error": t("gui_no_audit_data")})
+                return jsonify({"ok": False, "error": t("gui_no_audit_data", lang=lang)})
 
             output_dir = _resolve_reports_dir(cm)
             fmt = d.get('format', 'html')
@@ -343,7 +346,7 @@ def make_reports_blueprint(
             result = gen.generate(lang=lang)
 
             if result.record_count == 0:
-                return jsonify({"ok": False, "error": t("gui_no_ven_data")})
+                return jsonify({"ok": False, "error": t("gui_no_ven_data", lang=lang)})
 
             output_dir = _resolve_reports_dir(cm)
             fmt = d.get('format', 'html')
@@ -395,7 +398,7 @@ def make_reports_blueprint(
             result = gen.generate_from_api(start_date=start_date, end_date=end_date, lang=lang)
 
             if result.record_count == 0:
-                return jsonify({"ok": False, "error": t("gui_no_pu_data")})
+                return jsonify({"ok": False, "error": t("gui_no_pu_data", lang=lang)})
 
             output_dir = _resolve_reports_dir(cm)
             fmt = d.get('format', 'html')
@@ -472,34 +475,37 @@ def make_reports_blueprint(
     @bp.route('/api/report-schedules/<int:schedule_id>', methods=['PUT'])
     def api_update_report_schedule(schedule_id):
         d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             cm.load()
             ok = cm.update_report_schedule(schedule_id, d)
             if not ok:
-                return jsonify({"ok": False, "error": t("gui_schedule_not_found")}), 404
+                return jsonify({"ok": False, "error": t("gui_schedule_not_found", lang=lang)}), 404
             return jsonify({"ok": True})
         except Exception as e:
             return _err_with_log("report_schedule_update", e, 400)
 
     @bp.route('/api/report-schedules/<int:schedule_id>', methods=['DELETE'])
     def api_delete_report_schedule(schedule_id):
+        lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             cm.load()
             ok = cm.remove_report_schedule(schedule_id)
             if not ok:
-                return jsonify({"ok": False, "error": t("gui_schedule_not_found")}), 404
+                return jsonify({"ok": False, "error": t("gui_schedule_not_found", lang=lang)}), 404
             return jsonify({"ok": True})
         except Exception as e:
             return _err_with_log("report_schedule_delete", e, 400)
 
     @bp.route('/api/report-schedules/<int:schedule_id>/toggle', methods=['POST'])
     def api_toggle_report_schedule(schedule_id):
+        lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             cm.load()
             schedules = cm.get_report_schedules()
             sched = next((s for s in schedules if s.get("id") == schedule_id), None)
             if not sched:
-                return jsonify({"ok": False, "error": t("gui_schedule_not_found")}), 404
+                return jsonify({"ok": False, "error": t("gui_schedule_not_found", lang=lang)}), 404
             new_enabled = not sched.get("enabled", False)
             cm.update_report_schedule(schedule_id, {"enabled": new_enabled})
             return jsonify({"ok": True, "enabled": new_enabled})
@@ -508,12 +514,13 @@ def make_reports_blueprint(
 
     @bp.route('/api/report-schedules/<int:schedule_id>/run', methods=['POST'])
     def api_run_report_schedule(schedule_id):
+        lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             cm.load()
             schedules = cm.get_report_schedules()
             sched = next((s for s in schedules if s.get("id") == schedule_id), None)
             if not sched:
-                return jsonify({"ok": False, "error": t("gui_schedule_not_found")}), 404
+                return jsonify({"ok": False, "error": t("gui_schedule_not_found", lang=lang)}), 404
 
             from src.report_scheduler import ReportScheduler
             from src.reporter import Reporter
@@ -535,7 +542,7 @@ def make_reports_blueprint(
 
             t_thread = threading.Thread(target=_run, daemon=True)
             t_thread.start()
-            return jsonify({"ok": True, "message": t("gui_msg_sched_started")})
+            return jsonify({"ok": True, "message": t("gui_msg_sched_started", lang=lang)})
         except Exception as e:
             return _err_with_log("report_schedule_run", e, 400)
 

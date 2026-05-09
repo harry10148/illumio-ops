@@ -74,7 +74,8 @@ def make_rules_blueprint(
 
     @bp.route('/api/rules/event', methods=['POST'])
     def api_add_event_rule():
-        d = request.json
+        d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             throttle = _normalize_rule_throttle(d.get('throttle', ''))
             match_fields = _normalize_match_fields(d.get('match_fields'))
@@ -92,7 +93,7 @@ def make_rules_blueprint(
             "filter_status": d.get('filter_status', 'all'),
             "filter_severity": d.get('filter_severity', 'all'),
             "desc": d.get('name', ''),
-            "rec": t("gui_rule_default_rec_check_logs", default="Check Logs"),
+            "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
             "threshold_type": d.get('threshold_type', 'immediate'),
             "threshold_count": int(d.get('threshold_count', 1)),
             "threshold_window": int(d.get('threshold_window', 10)),
@@ -105,6 +106,7 @@ def make_rules_blueprint(
     @bp.route('/api/rules/system', methods=['POST'])
     def api_add_system_rule():
         d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             throttle = _normalize_rule_throttle(d.get('throttle', ''))
         except ValueError as exc:
@@ -115,10 +117,10 @@ def make_rules_blueprint(
         cm.add_or_update_rule({
             "id": int(datetime.datetime.now().timestamp()),
             "type": "system",
-            "name": d.get('name') or t('rule_pce_health'),
+            "name": d.get('name') or t('rule_pce_health', lang=lang),
             "filter_value": "pce_health",
-            "desc": t('rule_pce_health_desc', default='PCE health check failed.'),
-            "rec": t('rule_pce_health_rec', default='Check PCE service status and network connectivity.'),
+            "desc": t('rule_pce_health_desc', lang=lang, default='PCE health check failed.'),
+            "rec": t('rule_pce_health_rec', lang=lang, default='Check PCE service status and network connectivity.'),
             "threshold_type": "immediate",
             "threshold_count": 1,
             "threshold_window": 10,
@@ -130,7 +132,8 @@ def make_rules_blueprint(
 
     @bp.route('/api/rules/traffic', methods=['POST'])
     def api_add_traffic_rule():
-        d = request.json
+        d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             throttle = _normalize_rule_throttle(d.get('throttle', ''))
         except ValueError as exc:
@@ -167,7 +170,7 @@ def make_rules_blueprint(
             "ex_port": ex_port,
             "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
             "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip,
-            "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_policy", default="Check Policy"),
+            "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_policy", lang=lang, default="Check Policy"),
             "threshold_type": "count",
             "threshold_count": int(d.get('threshold_count', 10)),
             "threshold_window": int(d.get('threshold_window', 10)),
@@ -178,7 +181,8 @@ def make_rules_blueprint(
 
     @bp.route('/api/rules/bandwidth', methods=['POST'])
     def api_add_bw_rule():
-        d = request.json
+        d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             throttle = _normalize_rule_throttle(d.get('throttle', ''))
         except ValueError as exc:
@@ -211,7 +215,7 @@ def make_rules_blueprint(
             "ex_port": ex_port,
             "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
             "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip,
-            "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_logs", default="Check Logs"),
+            "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
             "threshold_type": "count",
             "threshold_count": float(d.get('threshold_count', 100)),
             "threshold_window": int(d.get('threshold_window', 10)),
@@ -222,14 +226,16 @@ def make_rules_blueprint(
 
     @bp.route('/api/rules/<int:idx>')
     def api_get_rule(idx):
+        lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
         cm.load()
         if 0 <= idx < len(cm.config['rules']):
             return jsonify({"index": idx, **cm.config['rules'][idx]})
-        return _err(t("gui_not_found"), 404)
+        return _err(t("gui_not_found", lang=lang), 404)
 
     @bp.route('/api/rules/<int:idx>', methods=['PUT'])
     def api_update_rule(idx):
-        d = request.json
+        d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         if 0 <= idx < len(cm.config['rules']):
             old = cm.config['rules'][idx]
             if 'throttle' in d:
@@ -264,7 +270,7 @@ def make_rules_blueprint(
                     except (ValueError, TypeError): pass  # intentional fallback: keep raw value if numeric cast fails
             cm.save()
             return jsonify({"ok": True})
-        return _err(t("gui_not_found"), 404)
+        return _err(t("gui_not_found", lang=lang), 404)
 
     @bp.route('/api/rules/<int:idx>', methods=['DELETE'])
     def api_delete_rule(idx):
@@ -275,10 +281,11 @@ def make_rules_blueprint(
     def api_rule_highlight(idx: int):
         import json as _json
         from src.report.exporters.code_highlighter import highlight_json
+        lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
         cm.load()
         rules = cm.config.get("rules", [])
         if idx < 0 or idx >= len(rules):
-            return _err(t("gui_not_found"), 404)
+            return _err(t("gui_not_found", lang=lang), 404)
         html = highlight_json(_json.dumps(rules[idx], indent=2, ensure_ascii=False))
         return jsonify({"html": html})
 

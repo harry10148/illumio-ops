@@ -177,11 +177,12 @@ def make_actions_blueprint(
     @bp.route('/api/quarantine/apply', methods=['POST'])
     def api_quarantine_apply():
         d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         href = d.get('href')
         level = d.get('level')  # Mild, Moderate, Severe
         try:
             if not _is_workload_href(href):
-                return jsonify({"ok": False, "error": t("gui_q_invalid_target")})
+                return jsonify({"ok": False, "error": t("gui_q_invalid_target", lang=lang)})
             from src.api_client import ApiClient
             api = ApiClient(cm)
 
@@ -189,12 +190,12 @@ def make_actions_blueprint(
             q_hrefs = api.check_and_create_quarantine_labels()
             target_label_href = q_hrefs.get(level)
             if not target_label_href:
-                return jsonify({"ok": False, "error": t("gui_label_fetch_failed", level=level)})
+                return jsonify({"ok": False, "error": t("gui_label_fetch_failed", lang=lang, level=level)})
 
             # 2. Fetch Workload's current labels
             wl = api.get_workload(href)
             if not wl:
-                return jsonify({"ok": False, "error": t("gui_workload_not_found")})
+                return jsonify({"ok": False, "error": t("gui_workload_not_found", lang=lang)})
 
             # 3. Filter out existing Quarantine labels and append the new one
             current_labels = wl.get("labels", [])
@@ -206,19 +207,20 @@ def make_actions_blueprint(
             if success:
                 return jsonify({"ok": True, "level": level})
             else:
-                return jsonify({"ok": False, "error": t("gui_api_update_failed")})
+                return jsonify({"ok": False, "error": t("gui_api_update_failed", lang=lang)})
         except Exception as e:
             return _err_with_log("quarantine_apply", e)
 
     @bp.route('/api/quarantine/bulk_apply', methods=['POST'])
     def api_quarantine_bulk_apply():
         d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         raw_hrefs = d.get('hrefs', [])
         hrefs = _normalize_quarantine_hrefs(raw_hrefs)
         level = d.get('level')
         try:
             if not hrefs:
-                return jsonify({"ok": False, "error": t("gui_q_no_targets")})
+                return jsonify({"ok": False, "error": t("gui_q_no_targets", lang=lang)})
             from src.api_client import ApiClient
             api = ApiClient(cm)
             q_hrefs = api.check_and_create_quarantine_labels()
@@ -255,6 +257,7 @@ def make_actions_blueprint(
 
     @bp.route('/api/actions/run', methods=['POST'])
     def api_run_once():
+        lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             from src.module_log import ModuleLog as _ML
             _ML.get("actions").info("Manually triggered monitoring analysis")
@@ -269,11 +272,12 @@ def make_actions_blueprint(
         ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
         ana.run_analysis()
         rep.send_alerts()
-        return jsonify({"ok": True, "output": t("gui_action_run_completed")})
+        return jsonify({"ok": True, "output": t("gui_action_run_completed", lang=lang)})
 
     @bp.route('/api/actions/debug', methods=['POST'])
     def api_debug():
         d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         mins = int(d.get('mins', 30))
         pd_sel = int(d.get('pd_sel', 3))
         from src.api_client import ApiClient
@@ -286,7 +290,7 @@ def make_actions_blueprint(
         buf = io.StringIO()
         with redirect_stdout(buf):
             ana.run_debug_mode(mins=mins, pd_sel=pd_sel, interactive=False)
-        return jsonify({"ok": True, "output": _strip_ansi(buf.getvalue()).strip() or t("gui_action_debug_completed")})
+        return jsonify({"ok": True, "output": _strip_ansi(buf.getvalue()).strip() or t("gui_action_debug_completed", lang=lang)})
 
     @bp.route('/api/actions/test-alert', methods=['POST'])
     def api_test_alert():
@@ -296,22 +300,23 @@ def make_actions_blueprint(
         except Exception:
             pass  # intentional: audit-log best-effort, must not block primary action
         data = request.json or {}
+        lang = data.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         channel = str(data.get("channel", "") or "").strip()
         channels = [channel] if channel else None
         if channel and channel not in PLUGIN_METADATA:
-            return _err(t("gui_err_unknown_alert_channel", channel=channel), 400)
+            return _err(t("gui_err_unknown_alert_channel", lang=lang, channel=channel), 400)
 
         from src.reporter import Reporter
         results = Reporter(cm).send_alerts(force_test=True, channels=channels)
         if channel and not results:
-            return _err(t("gui_err_channel_inactive", channel=channel), 400)
+            return _err(t("gui_err_channel_inactive", lang=lang, channel=channel), 400)
         status_text = ", ".join(
             f"{item.get('channel', 'channel')}={item.get('status', 'unknown')}"
             for item in results
-        ) or t("gui_test_alert_no_dispatch")
+        ) or t("gui_test_alert_no_dispatch", lang=lang)
         return jsonify({
             "ok": True,
-            "output": t("gui_test_alert_sent_summary", status_text=status_text),
+            "output": t("gui_test_alert_sent_summary", lang=lang, status_text=status_text),
             "results": results,
         })
 
@@ -323,10 +328,12 @@ def make_actions_blueprint(
         except Exception:
             pass  # intentional: audit-log best-effort, must not block primary action
         data = request.json or {}
+        lang = data.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         mode = str(data.get("mode", "append_missing") or "append_missing")
         result = cm.apply_best_practices(mode=mode)
         output = t(
             'best_practice_loaded_summary',
+            lang=lang,
             default='Best practices applied: mode={mode}, added={added}, replaced={replaced}, skipped={skipped}, total={total}.',
             mode=result["mode"],
             added=result["added_count"],
