@@ -93,3 +93,52 @@ def test_value_i18n_constants_resolve_to_real_strings():
             assert entry is not None, f"{label} maps {stable_en!r} → missing key {key!r}"
             assert entry.get("en"), f"{label}.{key} has empty en value"
             assert entry.get("zh_TW"), f"{label}.{key} has empty zh_TW value"
+
+
+def test_mod14_html_translates_tier_and_role_in_zh():
+    """End-to-end: mod14 HTML output contains zh tier/role/asset_type labels in zh_TW."""
+    import pandas as pd
+    from src.report.exporters.html_exporter import HtmlExporter
+    from src.report.exporters.report_i18n import STRINGS as _STRINGS
+
+    # Two scored apps exercising every value-i18n column at once.
+    scored = pd.DataFrame([
+        {
+            "app_env_key": "alpha|prod",
+            "tier": "Tier-1 Critical",
+            "role": "Identity",
+            "asset_type": "Identity Infrastructure",
+            "infrastructure_score": 90,
+        },
+        {
+            "app_env_key": "beta|dev",
+            "tier": "Tier-3 Shared",
+            "role": "Provider",
+            "asset_type": "",
+            "infrastructure_score": 40,
+        },
+    ])
+    role_summary = pd.DataFrame({"Tier": ["Tier-1 Critical"], "Count": [1]})
+    fake_report = {
+        "mod14": {
+            "total_apps": 2,
+            "total_edges": 0,
+            "role_summary": role_summary,
+            "hub_apps": scored,
+            "top_apps": scored,
+            "top_edges": pd.DataFrame(),
+        },
+    }
+
+    exporter = HtmlExporter(fake_report, lang="zh_TW")
+    # `_mod14_html` reads `self._s`; mirror what `_build()` would set.
+    exporter._s = lambda k: _STRINGS[k].get("zh_TW") or _STRINGS[k]["en"]
+    html = exporter._mod14_html()
+
+    # Every value-i18n column gets translated.
+    assert "Tier-1 重大" in html, "TIER value did not translate to zh_TW"
+    assert "身分" in html, "ROLE 'Identity' did not translate to zh_TW"
+    assert "身分基礎架構" in html, "ASSET_TYPE 'Identity Infrastructure' did not translate"
+    # English originals must NOT leak when in zh_TW.
+    assert "Tier-1 Critical" not in html
+    assert "Identity Infrastructure" not in html

@@ -17,7 +17,16 @@ import os
 from loguru import logger
 import pandas as pd
 
-from .report_i18n import STRINGS, lang_btn_html, COL_I18N as _COL_I18N
+from .report_i18n import (
+    STRINGS,
+    lang_btn_html,
+    COL_I18N as _COL_I18N,
+    TIER_VALUE_I18N,
+    ROLE_VALUE_I18N,
+    ASSET_TYPE_VALUE_I18N,
+    SEVERITY_VALUE_I18N,
+    MOD01_METRIC_VALUE_I18N,
+)
 from .report_css import build_css, TABLE_JS
 from src.report.exporters._exec_summary import render_exec_summary_html
 from src.report.exporters._sidebar import render_sidebar_html
@@ -314,7 +323,8 @@ def _fmt_int_cell(val) -> str:
     return f'{f:,.1f}'
 
 def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
-                no_data_key: str = "rpt_no_data", lang: str = "en") -> str:
+                no_data_key: str = "rpt_no_data", lang: str = "en",
+                value_i18n_maps: dict[str, dict[str, str]] | None = None) -> str:
     # Empty-case rendering is handled inside render_df_table() so the panel
     # chrome stays consistent across data-bearing and empty sections.
 
@@ -348,6 +358,7 @@ def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
         col_i18n=_COL_I18N,
         no_data_key=no_data_key,
         render_cell=_render_cell,
+        value_i18n_maps=value_i18n_maps,
         lang=lang,
     )
 
@@ -1223,15 +1234,30 @@ class HtmlExporter:
             f'<p>{_s("rpt_tr_apps_analysed")} <b>{m.get("total_apps", 0)}</b> · '
             f'{_s("rpt_tr_comm_edges")} <b>{m.get("total_edges", 0)}</b></p>'
         )
+        # Value-i18n maps: source DataFrames carry stable English values
+        # ("Tier-1 Critical", "Identity", ...) — translation happens here at the
+        # render boundary so mod14_infrastructure.py can stay locale-agnostic.
+        _scored_value_maps = {
+            "tier": TIER_VALUE_I18N,
+            "role": ROLE_VALUE_I18N,
+            "asset_type": ASSET_TYPE_VALUE_I18N,
+        }
         role_summary = m.get('role_summary')
         if role_summary is not None and not role_summary.empty:
-            html += f'<h4>{_s("rpt_tr_role_distribution")}</h4>' + _df_to_html(role_summary, lang=_lang)
+            html += f'<h4>{_s("rpt_tr_role_distribution")}</h4>' + _df_to_html(
+                role_summary, lang=_lang,
+                value_i18n_maps={"Tier": TIER_VALUE_I18N},
+            )
         hub_apps = m.get('hub_apps')
         if hub_apps is not None and not hub_apps.empty:
-            html += f'<h4>{_s("rpt_tr_hub_apps")}</h4>' + _df_to_html(hub_apps, lang=_lang)
+            html += f'<h4>{_s("rpt_tr_hub_apps")}</h4>' + _df_to_html(
+                hub_apps, lang=_lang, value_i18n_maps=_scored_value_maps,
+            )
         top_apps = m.get('top_apps')
         if top_apps is not None and not top_apps.empty:
-            html += f'<h4>{_s("rpt_tr_top_apps_infra")}</h4>' + _df_to_html(top_apps, lang=_lang)
+            html += f'<h4>{_s("rpt_tr_top_apps_infra")}</h4>' + _df_to_html(
+                top_apps, lang=_lang, value_i18n_maps=_scored_value_maps,
+            )
         top_edges = m.get('top_edges')
         if top_edges is not None and not top_edges.empty:
             html += f'<h4>{_s("rpt_tr_top_comm_paths")}</h4>' + _df_to_html(top_edges, lang=_lang)
