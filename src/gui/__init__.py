@@ -39,6 +39,20 @@ except ImportError:
 from src.config import ConfigManager
 from src.i18n import t, get_messages
 from src import __version__
+
+
+def _request_lang() -> str:
+    """Resolve lang for the current request: session > config default."""
+    from flask import session, has_request_context
+    if has_request_context():
+        s_lang = session.get("lang")
+        if s_lang:
+            return s_lang
+    try:
+        from src.config import cm
+        return cm.config.get("settings", {}).get("language", "en")
+    except Exception:
+        return "en"
 from src.alerts import PLUGIN_METADATA, plugin_config_value
 from src.report.dashboard_summaries import (
     build_audit_dashboard_summary,
@@ -196,7 +210,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
             return jsonify({
                 "ok": False,
                 "code": "csrf_error",
-                "error": t("gui_err_csrf_expired"),
+                "error": t("gui_err_csrf_expired", lang=_request_lang()),
                 "csrf_token": generate_csrf(),
             }), 400
         return redirect('/login')
@@ -347,7 +361,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
             return exc
         req_id = str(_uuid.uuid4())[:8]
         logger.error(f"[GUI] Unhandled exception req={req_id}: {_traceback.format_exc()}")
-        return jsonify({"ok": False, "error": t("gui_err_internal"), "request_id": req_id}), 500
+        return jsonify({"ok": False, "error": t("gui_err_internal", lang=_request_lang()), "request_id": req_id}), 500
 
     @app.before_request
     def security_check():
@@ -367,7 +381,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
             return
         if not current_user.is_authenticated:
             if request.path.startswith('/api/'):
-                return _err(t("gui_err_unauthorized"), 401)
+                return _err(t("gui_err_unauthorized", lang=_request_lang()), 401)
             return redirect('/login')
 
         # Force password change if flagged
@@ -425,7 +439,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
             _self._DAEMON_SCHEDULER = _self._DAEMON_RESTART_FN()
             return jsonify({"ok": True}), 200
         except Exception as exc:
-            return _err_with_log("daemon_restart", exc)
+            return _err_with_log("daemon_restart", exc, lang=_request_lang())
 
     return app
 

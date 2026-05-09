@@ -195,7 +195,7 @@ def make_dashboard_blueprint(
                 data = json.load(f)
             return jsonify({"ok": True, "snapshot": data})
         except Exception as e:
-            return _err_with_log("dashboard_snapshot", e)
+            return _err_with_log("dashboard_snapshot", e, lang=lang)
 
     @bp.route('/api/dashboard/audit_summary', methods=['GET'])
     def api_dashboard_audit_summary():
@@ -210,7 +210,7 @@ def make_dashboard_blueprint(
                 data = json.load(f)
             return jsonify({"ok": True, "summary": data})
         except Exception as e:
-            return _err_with_log("dashboard_audit_summary", e)
+            return _err_with_log("dashboard_audit_summary", e, lang=lang)
 
     @bp.route('/api/dashboard/policy_usage_summary', methods=['GET'])
     def api_dashboard_policy_usage_summary():
@@ -225,10 +225,12 @@ def make_dashboard_blueprint(
                 data = json.load(f)
             return jsonify({"ok": True, "summary": data})
         except Exception as e:
-            return _err_with_log("dashboard_policy_usage_summary", e)
+            return _err_with_log("dashboard_policy_usage_summary", e, lang=lang)
 
     @bp.route('/api/dashboard/chart/<chart_id>')
     def api_dashboard_chart(chart_id: str):
+        cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en')
         _builders = {
             "traffic_timeline": _build_traffic_timeline_spec,
             "policy_decisions": _build_policy_decisions_spec,
@@ -239,7 +241,7 @@ def make_dashboard_blueprint(
         if not builder:
             return _err(f"Unknown chart_id: {chart_id}", 404)
         try:
-            spec = builder(cm)
+            spec = builder(cm, lang=lang)
             fig = _spec_to_plotly_figure(spec)
             return jsonify(fig.to_plotly_json())
         except Exception as exc:
@@ -369,6 +371,7 @@ def make_dashboard_blueprint(
                 "source": getattr(base_ana, "last_query_source", "api"),
             })
         except Exception as e:
-            return _err_with_log("dashboard_top10", e)
+            lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            return _err_with_log("dashboard_top10", e, lang=lang)
 
     return bp

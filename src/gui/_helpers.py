@@ -368,7 +368,7 @@ def _safe_log(s: str, max_len: int = 200) -> str:
     """Strip CRLF and truncate for safe log output."""
     return str(s).replace('\r', '').replace('\n', '').replace('\t', ' ')[:max_len]
 
-def _err_with_log(category: str, exc: Exception, status: int = 500):
+def _err_with_log(category: str, exc: Exception, status: int = 500, *, lang: str = "en"):
     """H3: log full exception detail server-side, return generic error to client.
 
     Logs ``[GUI:{category}] req={req_id}: <traceback>`` via ``loguru.error`` and
@@ -382,7 +382,7 @@ def _err_with_log(category: str, exc: Exception, status: int = 500):
     logger.error(f"[GUI:{category}] req={req_id}: {_traceback.format_exc()}")
     return jsonify({
         "ok": False,
-        "error": t("gui_err_internal", default="Internal server error"),
+        "error": t("gui_err_internal", default="Internal server error", lang=lang),
         "request_id": req_id,
     }), status
 
@@ -464,8 +464,7 @@ def _load_state_for_charts() -> dict:
     return {}
 
 
-def _build_traffic_timeline_spec(cm_ref) -> dict:
-    from src.i18n import t, get_language
+def _build_traffic_timeline_spec(cm_ref, *, lang: str = "en") -> dict:
     from collections import Counter
     state = _load_state_for_charts()
     timeline = state.get("event_timeline", [])
@@ -477,16 +476,15 @@ def _build_traffic_timeline_spec(cm_ref) -> dict:
     sorted_days = sorted(counts.keys())[-14:]
     return {
         "type": "line",
-        "title": t("rpt_dash_traffic_title", default="Events Last 14 Days"),
-        "x_label": t("rpt_time", default="Date"),
-        "y_label": t("rpt_event_count", default="Events"),
+        "title": t("rpt_dash_traffic_title", default="Events Last 14 Days", lang=lang),
+        "x_label": t("rpt_time", default="Date", lang=lang),
+        "y_label": t("rpt_event_count", default="Events", lang=lang),
         "data": {"x": sorted_days, "y": [counts[d] for d in sorted_days]},
-        "i18n": {"lang": get_language()},
+        "i18n": {"lang": lang},
     }
 
 
-def _build_policy_decisions_spec(cm_ref) -> dict:
-    from src.i18n import t, get_language
+def _build_policy_decisions_spec(cm_ref, *, lang: str = "en") -> dict:
     reports_dir = _resolve_reports_dir(cm_ref)
     snapshot_path = os.path.join(reports_dir, "latest_snapshot.json")
     allowed = blocked = potential = 0
@@ -501,19 +499,18 @@ def _build_policy_decisions_spec(cm_ref) -> dict:
         logger.debug(f"[GUI:snapshot_parse] swallowed: {_e}")  # missing/corrupt snapshot → zero counts
     return {
         "type": "pie",
-        "title": t("rpt_dash_pd_title", default="Policy Decisions (Latest Report)"),
+        "title": t("rpt_dash_pd_title", default="Policy Decisions (Latest Report)", lang=lang),
         "data": {
-            "labels": [t("rpt_pd_allowed", default="Allowed"),
-                       t("rpt_pd_blocked", default="Blocked"),
-                       t("rpt_pd_potential", default="Potentially Blocked")],
+            "labels": [t("rpt_pd_allowed", default="Allowed", lang=lang),
+                       t("rpt_pd_blocked", default="Blocked", lang=lang),
+                       t("rpt_pd_potential", default="Potentially Blocked", lang=lang)],
             "values": [allowed, blocked, potential],
         },
-        "i18n": {"lang": get_language()},
+        "i18n": {"lang": lang},
     }
 
 
-def _build_ven_status_spec(cm_ref) -> dict:
-    from src.i18n import t, get_language
+def _build_ven_status_spec(cm_ref, *, lang: str = "en") -> dict:
     state = _load_state_for_charts()
     pce_stats = state.get("pce_stats", {})
     health = pce_stats.get("health_status", "unknown")
@@ -522,19 +519,18 @@ def _build_ven_status_spec(cm_ref) -> dict:
     unknown = 1 if health == "unknown" else 0
     return {
         "type": "pie",
-        "title": t("rpt_dash_ven_title", default="PCE Health Status"),
+        "title": t("rpt_dash_ven_title", default="PCE Health Status", lang=lang),
         "data": {
-            "labels": [t("rpt_status_ok", default="OK"),
-                       t("rpt_status_error", default="Error"),
-                       t("rpt_status_unknown", default="Unknown")],
+            "labels": [t("rpt_status_ok", default="OK", lang=lang),
+                       t("rpt_status_error", default="Error", lang=lang),
+                       t("rpt_status_unknown", default="Unknown", lang=lang)],
             "values": [ok, err, unknown],
         },
-        "i18n": {"lang": get_language()},
+        "i18n": {"lang": lang},
     }
 
 
-def _build_rule_hits_spec(cm_ref) -> dict:
-    from src.i18n import t, get_language
+def _build_rule_hits_spec(cm_ref, *, lang: str = "en") -> dict:
     from collections import Counter
     state = _load_state_for_charts()
     timeline = state.get("event_timeline", [])
@@ -546,14 +542,14 @@ def _build_rule_hits_spec(cm_ref) -> dict:
     top = rule_counts.most_common(10)
     return {
         "type": "bar",
-        "title": t("rpt_dash_rule_hits_title", default="Top Rule Triggers"),
-        "x_label": t("rpt_rule", default="Rule"),
-        "y_label": t("rpt_hit_count", default="Hits"),
+        "title": t("rpt_dash_rule_hits_title", default="Top Rule Triggers", lang=lang),
+        "x_label": t("rpt_rule", default="Rule", lang=lang),
+        "y_label": t("rpt_hit_count", default="Hits", lang=lang),
         "data": {
-            "labels": [r for r, _ in top] or [t("rpt_no_triggers", default="No triggers")],
+            "labels": [r for r, _ in top] or [t("rpt_no_triggers", default="No triggers", lang=lang)],
             "values": [c for _, c in top] or [0],
         },
-        "i18n": {"lang": get_language()},
+        "i18n": {"lang": lang},
     }
 
 

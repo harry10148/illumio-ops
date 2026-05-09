@@ -265,7 +265,7 @@ def make_reports_blueprint(
                     _rlog.error(f"Traffic report failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            return _err_with_log("report_traffic_generate", e)
+            return _err_with_log("report_traffic_generate", e, lang=lang)
 
     @bp.route('/api/audit_report/generate', methods=['POST'])
     def api_generate_audit_report():
@@ -318,7 +318,7 @@ def make_reports_blueprint(
                     _arlog.error(f"Audit report generation failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            return _err_with_log("report_audit_generate", e)
+            return _err_with_log("report_audit_generate", e, lang=lang)
 
     # ── API: VEN Status Report ────────────────────────────────────────────────
     @bp.route('/api/ven_status_report/generate', methods=['POST'])
@@ -366,7 +366,7 @@ def make_reports_blueprint(
                     _vrlog.error(f"VEN status report generation failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            return _err_with_log("report_ven_status_generate", e)
+            return _err_with_log("report_ven_status_generate", e, lang=lang)
 
     # ── API: Policy Usage Report ──────────────────────────────────────────────
     @bp.route('/api/policy_usage_report/generate', methods=['POST'])
@@ -428,7 +428,7 @@ def make_reports_blueprint(
                     _pulog.error(f"Policy usage report generation failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            return _err_with_log("report_policy_usage_generate", e)
+            return _err_with_log("report_policy_usage_generate", e, lang=lang)
 
     # ── API: Report Schedules ─────────────────────────────────────────────────
 
@@ -483,7 +483,7 @@ def make_reports_blueprint(
                 return jsonify({"ok": False, "error": t("gui_schedule_not_found", lang=lang)}), 404
             return jsonify({"ok": True})
         except Exception as e:
-            return _err_with_log("report_schedule_update", e, 400)
+            return _err_with_log("report_schedule_update", e, 400, lang=lang)
 
     @bp.route('/api/report-schedules/<int:schedule_id>', methods=['DELETE'])
     def api_delete_report_schedule(schedule_id):
@@ -495,7 +495,7 @@ def make_reports_blueprint(
                 return jsonify({"ok": False, "error": t("gui_schedule_not_found", lang=lang)}), 404
             return jsonify({"ok": True})
         except Exception as e:
-            return _err_with_log("report_schedule_delete", e, 400)
+            return _err_with_log("report_schedule_delete", e, 400, lang=lang)
 
     @bp.route('/api/report-schedules/<int:schedule_id>/toggle', methods=['POST'])
     def api_toggle_report_schedule(schedule_id):
@@ -510,7 +510,7 @@ def make_reports_blueprint(
             cm.update_report_schedule(schedule_id, {"enabled": new_enabled})
             return jsonify({"ok": True, "enabled": new_enabled})
         except Exception as e:
-            return _err_with_log("report_schedule_toggle", e, 400)
+            return _err_with_log("report_schedule_toggle", e, 400, lang=lang)
 
     @bp.route('/api/report-schedules/<int:schedule_id>/run', methods=['POST'])
     def api_run_report_schedule(schedule_id):
@@ -544,7 +544,7 @@ def make_reports_blueprint(
             t_thread.start()
             return jsonify({"ok": True, "message": t("gui_msg_sched_started", lang=lang)})
         except Exception as e:
-            return _err_with_log("report_schedule_run", e, 400)
+            return _err_with_log("report_schedule_run", e, 400, lang=lang)
 
     @bp.route('/api/report-schedules/<int:schedule_id>/history', methods=['GET'])
     def api_report_schedule_history(schedule_id):
@@ -557,6 +557,7 @@ def make_reports_blueprint(
             entry = states.get(str(schedule_id), {})
             return jsonify({"ok": True, "history": [entry] if entry else []})
         except Exception as e:
-            return _err_with_log("report_schedule_history", e, 400)
+            lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            return _err_with_log("report_schedule_history", e, 400, lang=lang)
 
     return bp

@@ -100,7 +100,8 @@ def make_actions_blueprint(
 
             return jsonify({"ok": True, "data": results})
         except Exception as e:
-            return _err_with_log("quarantine_search", e)
+            lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            return _err_with_log("quarantine_search", e, lang=lang)
 
     @bp.route('/api/workloads', methods=['GET', 'POST'])
     def api_search_workloads():
@@ -172,7 +173,8 @@ def make_actions_blueprint(
 
             return jsonify({"ok": True, "data": workloads})
         except Exception as e:
-            return _err_with_log("workloads_search", e)
+            lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            return _err_with_log("workloads_search", e, lang=lang)
 
     @bp.route('/api/quarantine/apply', methods=['POST'])
     def api_quarantine_apply():
@@ -209,7 +211,7 @@ def make_actions_blueprint(
             else:
                 return jsonify({"ok": False, "error": t("gui_api_update_failed", lang=lang)})
         except Exception as e:
-            return _err_with_log("quarantine_apply", e)
+            return _err_with_log("quarantine_apply", e, lang=lang)
 
     @bp.route('/api/quarantine/bulk_apply', methods=['POST'])
     def api_quarantine_bulk_apply():
@@ -253,7 +255,7 @@ def make_actions_blueprint(
 
             return jsonify({"ok": True, "results": results})
         except Exception as e:
-            return _err_with_log("quarantine_bulk_apply", e)
+            return _err_with_log("quarantine_bulk_apply", e, lang=lang)
 
     @bp.route('/api/actions/run', methods=['POST'])
     def api_run_once():
@@ -368,6 +370,7 @@ def make_actions_blueprint(
                 _ML.get("actions").error(f"Connection failed: {e}")
             except Exception:
                 pass  # intentional: audit-log best-effort, must not block primary action
-            return _err_with_log("pce_test_connection", e)
+            lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            return _err_with_log("pce_test_connection", e, lang=lang)
 
     return bp

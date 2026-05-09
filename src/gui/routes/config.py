@@ -262,7 +262,7 @@ def make_config_blueprint(
                 "cert_info": info,
             })
         except RuntimeError as e:
-            return _err_with_log("cert_renew", e)
+            return _err_with_log("cert_renew", e, lang=lang)
 
     # ── API: PCE Profiles ──────────────────────────────────────────────────────
 
