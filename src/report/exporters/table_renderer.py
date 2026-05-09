@@ -105,7 +105,7 @@ def render_df_table(
                 if key:
                     entry = _STRINGS.get(key)
                     if entry:
-                        translated = entry.get(lang) or entry.get("en") or str(raw_value)
+                        translated = entry.get(lang) or entry.get("en")
                         if translated:
                             raw_value = translated
             cell_html = render_cell(col, raw_value, row) if render_cell else _default_cell(raw_value)

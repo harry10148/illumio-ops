@@ -59,9 +59,9 @@ def test_value_i18n_maps_does_not_affect_other_columns():
         value_i18n_maps={"Role": {"Identity": "rpt_test_role_id"}},
         lang="zh_TW",
     )
-    # Role column localized; Other column passthrough
-    assert html.count("身分") == 1
-    assert html.count("Identity") == 1
+    # Role cell translated; Other cell stays English
+    assert "<td>身分</td>" in html
+    assert "<td>Identity</td>" in html
 
 
 def test_value_i18n_maps_optional_argument():
