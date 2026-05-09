@@ -151,7 +151,7 @@ illumio-ops/
 │   ├── gui/                    # Flask Web GUI package — shell + Blueprint routes (auth/admin/dashboard/events/reports/rules/rule_scheduler/actions/config) — ~70 routes total
 │   ├── config.py               # ConfigManager (Argon2id GUI password, atomic writes)
 │   ├── reporter.py             # Multi-channel alert dispatch (SMTP, LINE, Webhook)
-│   ├── i18n/                   # i18n engine (engine.py + JSON data) — EN/ZH_TW with ~2,200 string keys
+│   ├── i18n/                   # i18n engine (engine.py + JSON data) — EN/ZH_TW with ~2,800 string keys
 │   ├── events/                 # Event pipeline (catalog, normalize, dedup, throttle)
 │   ├── report/                 # Report engine (15 traffic modules + audit + policy usage + R3 intelligence add-ons)
 │   ├── scheduler/              # Report-schedule cron jobs
@@ -167,3 +167,37 @@ illumio-ops/
 ├── deploy/                     # systemd (Ubuntu/RHEL) + NSSM (Windows) service configs
 └── scripts/                    # Utility scripts (offline bundle build, install/uninstall, preflight)
 ```
+
+## Translations (i18n)
+
+**Single source of truth:** `src/i18n_en.json` and `src/i18n_zh_TW.json` (~2,767 keys each). Every key has an explicit value in both files; no runtime auto-translation.
+
+**Adding a key:**
+1. Add the key to **both** JSON files. Use a strict-prefix (`gui_`, `rpt_`, `rule_`, etc. — see `src/i18n/data/strict_prefixes.json`) so a missed translation surfaces as `[MISSING:key]` instead of leaking English.
+2. Reference via `t("your_key", lang=lang)`. For request-scoped contexts (web routes, report rendering), always pass `lang=`; never call `set_language()` from a handler — `tests/test_i18n_set_language_callers.py` enforces this.
+3. Run `python scripts/audit_i18n_usage.py` to verify glossary respect (Cat E) and parity (Cat I).
+
+**Glossary:** `src/i18n/data/glossary.json` lists English terms that must NOT translate to Chinese in `zh_TW` values. Includes Illumio terminology (Block/Allow/Manage/Unmanage, PCE/VEN, Workload, Service, Port, Policy, Ringfence) plus general dev jargon (SMTP, Online/Offline, App, Label, Ruleset, Enforcement). Adding a new glossary term: append to `preserve_in_zh_tw` and add forbidden Chinese substitutes to `forbidden_zh_substitutes`.
+
+**Reports:** Use `t(key, lang=lang)` directly. The legacy `STRINGS` dict in `src/report/exporters/report_i18n.py` is now a thin compatibility wrapper (`_StringsView`) over `t()` — for new code prefer `t()`.
+
+**Rules (config.json):** Persist `desc_key` and `rec_key`, never localized `desc`/`rec` text. The loader (`ConfigManager._resolve_rule_keys`) renders keys via `t()` at read time per the active language. The migration script `scripts/migrate_rules_to_keys.py` upgrades rules from older format.
+
+**`t()` API:**
+```python
+from src.i18n import t
+
+# Use process-global language (default)
+t("rpt_kicker_traffic")
+
+# Override per call (request-scoped, thread-safe)
+t("rpt_kicker_traffic", lang="zh_TW")
+
+# With format() substitution
+t("rpt_email_traffic_subject", count=42, lang=lang)
+
+# With explicit fallback
+t("possibly_missing_key", default="N/A", lang=lang)
+```
+
+**`set_language(lang)`:** Process bootstrap only (CLI startup, ConfigManager.load). Do NOT call from request handlers, scheduler tasks, or anywhere with concurrency.
