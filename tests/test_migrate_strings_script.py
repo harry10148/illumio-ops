@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -21,7 +22,7 @@ def test_dry_run_emits_manifest(tmp_path: Path) -> None:
         ],
         capture_output=True,
         text=True,
-        env={"PYTHONPATH": f"{ROOT}:{ROOT}/venv/lib/python3.12/site-packages"},
+        env={**os.environ, "PYTHONPATH": str(ROOT)},
     )
     assert result.returncode == 0, result.stderr
     data = json.loads(manifest.read_text(encoding="utf-8"))

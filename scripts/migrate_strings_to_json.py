@@ -21,7 +21,7 @@ def _load(path: Path) -> dict[str, str]:
 
 def _save(path: Path, data: dict[str, str]) -> None:
     path.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        json.dumps(data, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
 
@@ -34,6 +34,9 @@ def main() -> int:
     parser.add_argument("--prefer", choices=["strings", "json"], default="strings",
                         help="Canonical source for overlap keys (default: strings — newer)")
     args = parser.parse_args()
+
+    if args.write and args.dry_run:
+        parser.error("--write and --dry-run are mutually exclusive")
 
     en = _load(EN_PATH)
     zh = _load(ZH_PATH)
