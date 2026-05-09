@@ -271,22 +271,23 @@ def _discover_keys() -> set[str]:
 
 @lru_cache(maxsize=2)
 def _build_messages(lang: str) -> dict[str, str]:
+    """Phase 2 simplified: pure dictionary lookup. No regex, no humanize.
+
+    Pre-compute migration (Task 11) guarantees every key has an explicit zh_TW
+    value. Runtime gaps surface as [MISSING:key] (strict prefixes) or logged
+    warnings + raw key (non-strict).
+    """
     en_messages = _normalized_en_messages()
-    all_keys = set(en_messages) | _discover_keys()
     if lang == "en":
         base = dict(en_messages)
-        for key in all_keys:
-            if key in base and isinstance(base[key], str) and base[key].strip():
-                continue
-            if _is_strict_surface_key(key):
-                base[key] = _missing_marker(key)
-            else:
-                base[key] = _humanize_key_en(key)
+        for key in en_messages:
+            if not isinstance(base.get(key), str) or not base[key].strip():
+                base[key] = _missing_marker(key) if _is_strict_surface_key(key) else key
         return base
 
     zh_messages = _normalized_zh_messages()
     base: dict[str, str] = {}
-    for key in all_keys:
+    for key in en_messages:
         zh_text = zh_messages.get(key)
         if isinstance(zh_text, str) and zh_text.strip():
             base[key] = zh_text
@@ -294,16 +295,10 @@ def _build_messages(lang: str) -> dict[str, str]:
         if _is_strict_surface_key(key):
             base[key] = _missing_marker(key)
             continue
-        if key in _ZH_EXPLICIT:
-            base[key] = _ZH_EXPLICIT[key]
-            continue
-        en_text = en_messages.get(key)
-        if en_text:
-            translated = _translate_text(en_text)
-            if translated and translated != en_text:
-                base[key] = translated
-                continue
-        base[key] = _humanize_key_zh(key)
+        # Non-strict gap — log once and return the raw key as visible signal.
+        from loguru import logger
+        logger.warning(f"i18n: zh_TW gap for non-strict key '{key}'; returning raw key")
+        base[key] = key
     return base
 
 def get_messages(lang: str | None = None) -> dict[str, str]:

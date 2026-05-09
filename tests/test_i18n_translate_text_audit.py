@@ -4,13 +4,10 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[1]
 ENGINE = ROOT / "src" / "i18n" / "engine.py"
 
 
-@pytest.mark.xfail(reason="Removed in Task 12 (precompute then drop runtime path)", strict=True)
 def test_translate_text_not_called_from_build_messages() -> None:
     """Walk engine.py AST: _build_messages must NOT invoke _translate_text."""
     tree = ast.parse(ENGINE.read_text(encoding="utf-8"))
