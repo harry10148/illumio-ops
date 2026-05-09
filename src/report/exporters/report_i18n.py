@@ -1,32 +1,79 @@
 """
 Shared i18n helpers for HTML report exporters.
+
+After Phase 1 migration, STRINGS is a _StringsView that:
+  - Stores runtime overlay entries (dynamic writes from this module's bottom loops)
+  - Falls back to get_messages() for any key not in the overlay
+  - Preserves the dict-like API (subscript, .get, __setitem__, __delitem__,
+    __contains__, keys()) that 9 exporter files depend on.
 """
 from __future__ import annotations
-import os
 
-class _StringMap(dict):
-    def __missing__(self, key: str) -> dict[str, str]:
-        if os.getenv("ILLUMIO_OPS_I18N_STRICT"):
+import os
+from typing import Iterator
+
+
+class _StringsView:
+    """Compatibility layer over a runtime overlay + get_messages()-backed JSON."""
+
+    def __init__(self) -> None:
+        self._overlay: dict[str, dict[str, str]] = {}
+
+    def __getitem__(self, key: str) -> dict[str, str]:
+        if key in self._overlay:
+            return self._overlay[key]
+        from src.i18n.engine import EN_MESSAGES, get_messages
+        if os.getenv("ILLUMIO_OPS_I18N_STRICT") and key not in EN_MESSAGES:
             raise KeyError(f"Missing i18n key: {key}")
-        from src.i18n.engine import get_messages
         return {
             "en": get_messages("en").get(key, key),
             "zh_TW": get_messages("zh_TW").get(key, key),
         }
 
-    def get(self, key: str, default=None):  # type: ignore[override]
-        """Delegate to __missing__ so JSON-backed keys resolve via .get() too."""
-        if key in self:
-            return super().get(key)
+    def __setitem__(self, key: str, value: dict[str, str]) -> None:
+        self._overlay[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self._overlay[key]
+
+    def __contains__(self, key: object) -> bool:
+        if not isinstance(key, str):
+            return False
+        if key in self._overlay:
+            return True
+        from src.i18n.engine import EN_MESSAGES
+        return key in EN_MESSAGES
+
+    def __len__(self) -> int:
+        from src.i18n.engine import EN_MESSAGES
+        return len(self._overlay) + sum(1 for k in EN_MESSAGES if k not in self._overlay)
+
+    def get(self, key: str, default: dict[str, str] | None = None) -> dict[str, str] | None:  # type: ignore[override]
         try:
             return self[key]
         except KeyError:
             return default
 
+    def keys(self) -> Iterator[str]:  # type: ignore[override]
+        from src.i18n.engine import EN_MESSAGES
+        seen: set[str] = set()
+        for k in self._overlay:
+            seen.add(k)
+            yield k
+        for k in EN_MESSAGES:
+            if k not in seen:
+                yield k
+
+    def items(self) -> Iterator[tuple[str, dict[str, str]]]:  # type: ignore[override]
+        for k in self.keys():
+            yield k, self[k]
+
+
 def _entry(en: str, zh_tw: str | None = None) -> dict[str, str]:
     return {"en": en, "zh_TW": zh_tw or en}
 
-STRINGS: _StringMap = _StringMap()  # Static entries migrated to i18n_*.json (Phase 1, T3)
+
+STRINGS: _StringsView = _StringsView()
 
 for key, pair in {
     "ransomware": (
