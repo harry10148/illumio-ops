@@ -994,3 +994,21 @@ Stop and request review.
 **Backwards compatibility:** `value_i18n_maps` defaults to `None` (Task 1), so all 30+ existing `render_df_table` callers in the codebase keep working unchanged. Only the 4-5 callers in mod14/mod13/mod01 sections of html_exporter.py opt in.
 
 **Risk acknowledged:** Severity translation (`CRITICAL` → `嚴重`) is the most likely single revert point. The Task 3 commit message explicitly notes it as a single-edit revert if visual review prefers English. If the user prefers all-English severity badges, comment out / delete the `rpt_severity_*` STRINGS entries in Task 3 Step 1 — caller Task 5 stays unchanged because it uses the constant `SEVERITY_VALUE_I18N` which becomes a no-op when STRINGS entries are absent (zh value falls back to en, both being "CRITICAL").
+
+---
+
+## Implementation Status
+
+DONE 2026-05-09. All 8 tasks completed via subagent-driven-development:
+
+- T1 (082c6dc + fix at 43b996a): `render_df_table` + `value_i18n_maps`, 5 unit tests
+- T2 (f102824): 26 `rpt_col_*` STRINGS → COL_I18N derived
+- T3 (69e30c3): 21 value-level STRINGS + 5 reusable maps + consistency test
+- T4 (d1f6223): mod14 HTML — Tier/role/asset_type via `_df_to_html` wrapper
+- T5 (0cec6b1): mod13 HTML — Severity translated, badge callback uses original English for token check
+- T6 (1bd65f5): mod01 summary metric translated; row label aligned to glossary canonical "Allowed / Blocked / Potentially Blocked"
+- T7 (5cbf50c): 2 of 3 candidate renames identified as no-op and removed; 1 (app_env_scores) preserved as real snake_case→display rename
+
+Verification: pytest 982 passed / 1 skipped / 0 failed; mypy 三模組 0 errors; audit_i18n_usage.py 0 findings; visual smoke confirmed zh tier/role/severity/columns translate correctly.
+
+Glossary policy honoured throughout: App (Env), App Env Key, Flows, Enforcement Mode %, Ringfence, Allowed/Blocked/Potentially Blocked, Manage/Unmanage all kept English in zh_TW values.
