@@ -44,7 +44,7 @@ _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
 _REPORT_DETAIL_LEVEL = "full"
 
 
-def render_section_guidance(module_id: str, profile: str, detail_level: str) -> str:
+def render_section_guidance(module_id: str, profile: str, detail_level: str, lang: str = "en") -> str:
     """Return a small HTML card with the section's reader-guide.
     Empty string if module has no guidance, or section not visible at this
     (profile, detail_level)."""
@@ -53,25 +53,25 @@ def render_section_guidance(module_id: str, profile: str, detail_level: str) -> 
         return ""
     if not visible_in(module_id, profile, detail_level):
         return ""
-    purpose = t(g.purpose_key)
-    actions = t(g.recommended_actions_key)
-    signals = t(g.watch_signals_key)
-    how = t(g.how_to_read_key)
+    purpose = t(g.purpose_key, lang=lang)
+    actions = t(g.recommended_actions_key, lang=lang)
+    signals = t(g.watch_signals_key, lang=lang)
+    how = t(g.how_to_read_key, lang=lang)
     return (
         '<div class="section-guidance standard">'
-        f'<div><b>{t("rpt_guidance_purpose_label")}</b>: {purpose}</div>'
-        f'<div><b>{t("rpt_guidance_watch_signals_label")}</b>: {signals}</div>'
-        f'<div><b>{t("rpt_guidance_how_to_read_label")}</b>: {how}</div>'
-        f'<div><b>{t("rpt_guidance_recommended_actions_label")}</b>: {actions}</div>'
+        f'<div><b>{t("rpt_guidance_purpose_label", lang=lang)}</b>: {purpose}</div>'
+        f'<div><b>{t("rpt_guidance_watch_signals_label", lang=lang)}</b>: {signals}</div>'
+        f'<div><b>{t("rpt_guidance_how_to_read_label", lang=lang)}</b>: {how}</div>'
+        f'<div><b>{t("rpt_guidance_recommended_actions_label", lang=lang)}</b>: {actions}</div>'
         "</div>"
     )
 
 
-def render_appendix(title: str, body_html: str, *, detail_level: str) -> str:
+def render_appendix(title: str, body_html: str, *, detail_level: str, lang: str = "en") -> str:
     """Wrap body_html in an expanded appendix block."""
     return (
         f'<details open class="report-appendix">'
-        f'<summary><b>{t("rpt_appendix_label")}: {title}</b></summary>'
+        f'<summary><b>{t("rpt_appendix_label", lang=lang)}: {title}</b></summary>'
         f'{body_html}'
         f'</details>'
     )
@@ -251,7 +251,7 @@ _RULE_DESCRIPTIONS = {
     'B002': ('Ransomware High-Risk Remote Access Allowed',
              'Detects allowed flows on secondary remote-access ports (TeamViewer 5938, VNC 5900, NetBIOS 137-139). Ransomware operators and APT groups use these for C2 persistence and remote control after initial compromise.'),
     'B003': ('Ransomware Risk Port (Medium) — Uncovered',
-             t('rpt_rule_b003_desc')),
+             t('rpt_rule_b003_desc', lang="en")),
     # ── Policy & coverage gaps ─────────────────────────────────────────────────
     'B004': ('Unmanaged Source High Activity',
              'Counts flows from hosts not enrolled in the PCE. Unmanaged hosts have no VEN and therefore no micro-segmentation enforcement — they are outside the zero-trust boundary and represent uncontrolled attack surface.'),
@@ -287,7 +287,7 @@ _RULE_DESCRIPTIONS = {
              'Detects unmanaged (non-PCE) hosts communicating on database, identity (Kerberos/LDAP), or Windows management ports to managed workloads. Unmanaged hosts have no VEN enforcement — they are outside zero-trust. If they can reach critical services, they represent uncontrolled lateral movement entry points.'),
     # ── Lateral movement — enforcement gap ──────────────────────────────────────
     'L008': ('Lateral Ports in Test Mode (PB)',
-             t('rpt_rule_l008_desc')),
+             t('rpt_rule_l008_desc', lang="en")),
     # ── Lateral movement — exfiltration pattern ─────────────────────────────────
     'L009': ('Data Exfiltration Pattern — Outbound to Unmanaged',
              'Detects managed workloads transferring significant data volume to unmanaged (external/unknown) destinations. This is the post-lateral-movement exfiltration phase: attacker has pivoted to a high-value host and is now staging or exfiltrating data to an external C2 or drop server outside PCE visibility.'),
@@ -415,7 +415,7 @@ class HtmlExporter:
         _raw_kpis = mod12.get('kpis', [])
         if isinstance(_raw_kpis, dict):
             # New-style: dict of kpi_name -> numeric value (from _security_risk_kpis)
-            _kpi_items = [{"label": t(f"mod12_kpi_{k}", default=k.replace("_", " ").title()), "value": v}
+            _kpi_items = [{"label": t(f"mod12_kpi_{k}", default=k.replace("_", " ").title(), lang=self._lang), "value": v}
                           for k, v in _raw_kpis.items() if not isinstance(v, dict)]
         else:
             _kpi_items = list(_raw_kpis)
@@ -461,7 +461,7 @@ class HtmlExporter:
             summary_pills = summary_pills.replace('</div>', data_source_pill + '</div>', 1)
 
         if self._compute_draft:
-            draft_pill = f'<span class="report-draft-pill">{t("rpt_hdr_draft_enabled")}</span>'
+            draft_pill = f'<span class="report-draft-pill">{t("rpt_hdr_draft_enabled", lang=self._lang)}</span>'
             summary_pills = summary_pills.replace('</div>', draft_pill + '</div>', 1)
 
         # Maturity score gauge
@@ -658,7 +658,7 @@ class HtmlExporter:
         return (
             f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            f"<title>{t('rpt_page_title_traffic')}</title>" + _CSS + _HIGHLIGHT_CSS + '</head>\n'
+            f"<title>{t('rpt_page_title_traffic', lang=self._lang)}</title>" + _CSS + _HIGHLIGHT_CSS + '</head>\n'
             '<body>' + nav_html + '<main>' + body + '</main>'
             + TABLE_JS + '</body></html>'
         )
@@ -840,14 +840,14 @@ class HtmlExporter:
         stats = (
             '<div class="coverage-grid">'
             + _cov_stat(_s('rpt_tr_enforced_coverage'), str(enforced_cov) + '%')
-            + _cov_stat(t('rpt_pb_label'), str(staged_cov) + '%')
+            + _cov_stat(t('rpt_pb_label', lang=_lang), str(staged_cov) + '%')
             + _cov_stat(_s('rpt_tr_true_gap'), str(true_gap) + '%')
             + (_cov_stat(_s('rpt_tr_inbound_coverage'), str(inb_cov) + '%') if inb_cov is not None else '')
             + (_cov_stat(_s('rpt_tr_outbound_coverage'), str(outb_cov) + '%') if outb_cov is not None else '')
             + _cov_stat(_s('rpt_col_uncovered_flows'), str(m.get('total_uncovered', 0)))
             + '</div>'
             + bar_html
-            + (f'<p class="note">{t("rpt_pb_explainer")}</p>' if staged_cov > 0 else '')
+            + (f'<p class="note">{t("rpt_pb_explainer", lang=_lang)}</p>' if staged_cov > 0 else '')
         )
         out = (
             stats
@@ -1003,7 +1003,7 @@ class HtmlExporter:
     def _mod11_html(self):
         m = self._r.get('mod11', {})
         if not m.get('bytes_data_available', False):
-            return f'<p class="note">{m.get("note", t("rpt_mod11_no_byte_data"))}</p>'
+            return f'<p class="note">{m.get("note", t("rpt_mod11_no_byte_data", lang=self._lang))}</p>'
 
         max_bw = m.get('max_bandwidth_mbps')
         avg_bw = m.get('avg_bandwidth_mbps')
@@ -1351,7 +1351,7 @@ class HtmlExporter:
         previous = read_latest('traffic', profile=self._profile)
         impact = compare(current_kpis=current_kpis, previous=previous)
         if impact.get('skipped'):
-            return f'<p class="note">{t("rpt_change_impact_no_previous", default="No previous snapshot — change impact will appear on the next report run.")}</p>'
+            return f'<p class="note">{t("rpt_change_impact_no_previous", default="No previous snapshot — change impact will appear on the next report run.", lang=self._lang)}</p>'
         verdict = impact.get('overall_verdict', 'unchanged')
         verdict_color = {'improved': '#22C55E', 'regressed': '#EF4444', 'mixed': '#EAB308'}.get(verdict, '#6B7280')
         dir_label = {

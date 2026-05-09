@@ -53,17 +53,17 @@ class VenStatusGenerator:
 
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
-        print(t("rpt_ven_fetching"))
+        print(t("rpt_ven_fetching", lang=self._lang))
         workloads = self.api.fetch_managed_workloads()
 
         if not workloads:
-            print(t("rpt_ven_no_data"))
+            print(t("rpt_ven_no_data", lang=self._lang))
             return VenStatusResult(record_count=0)
 
-        print(t("rpt_ven_found", count=f"{len(workloads):,}"))
+        print(t("rpt_ven_found", count=f"{len(workloads):,}", lang=self._lang))
         df = self._build_dataframe(workloads)
         results = self._analyze(df)
-        print(t("rpt_ven_analysis_done"))
+        print(t("rpt_ven_analysis_done", lang=self._lang))
 
         return VenStatusResult(
             record_count=len(df),
@@ -80,7 +80,7 @@ class VenStatusGenerator:
         if fmt in ('html', 'all'):
             path = VenHtmlExporter(result.module_results, df=result.dataframe, lang=lang).export(output_dir)
             paths.append(path)
-            print(t("rpt_ven_html_saved", path=path))
+            print(t("rpt_ven_html_saved", path=path, lang=lang))
         if fmt in ('pdf', 'all'):
             try:
                 from src.report.exporters.pdf_exporter import export_report_pdf
@@ -97,7 +97,7 @@ class VenStatusGenerator:
                     },
                 )
                 paths.append(pdf_path)
-                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
+                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}", lang=lang))
             except Exception as exc:
                 logger.warning('PDF export failed: {}', exc)
 
@@ -118,14 +118,14 @@ class VenStatusGenerator:
                 }
                 export_xlsx(xlsx_result, xlsx_path)
                 paths.append(xlsx_path)
-                print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}"))
+                print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}", lang=lang))
             except Exception as exc:
                 logger.warning('XLSX export failed: {}', exc)
 
         if fmt in ('csv', 'all'):
             path = CsvExporter(result.module_results, report_label='VEN_Status').export(output_dir)
             paths.append(path)
-            print(t("rpt_ven_csv_saved", path=path))
+            print(t("rpt_ven_csv_saved", path=path, lang=lang))
         return paths
 
     # ── private ──────────────────────────────────────────────────────────────
@@ -282,7 +282,7 @@ class VenStatusGenerator:
                 "type": "pie",
                 "title": "VEN Agent Status",
                 "data": {
-                    "labels": [t("chart_ven_online"), t("chart_ven_offline")],
+                    "labels": [t("chart_ven_online", lang=self._lang), t("chart_ven_offline", lang=self._lang)],
                     "values": [len(df_online), len(df_offline)],
                 },
                 "i18n": {"lang": "en"},

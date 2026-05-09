@@ -13,7 +13,7 @@ from src.scheduler.jobs import (
     tick_rule_schedules,
 )
 from src.siem.preview import emit_preview_warning
-from src.i18n import t
+from src.i18n import t, get_language
 
 def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     """Factory for a BackgroundScheduler wired with illumio_ops jobs.
@@ -61,7 +61,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
 
     if _cache_enabled:
         monitor_trigger = IntervalTrigger(seconds=30)
-        logger.info(t("monitor_cache_enabled_hint"))
+        logger.info(t("monitor_cache_enabled_hint", lang=get_language()))
     else:
         monitor_trigger = IntervalTrigger(minutes=interval_minutes)
 

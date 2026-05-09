@@ -429,6 +429,7 @@ class AuditGenerator:
         self.api = api if api is not None else api_client
         self._config_dir = config_dir
         self._cache = cache_reader
+        self._lang = "en"  # overwritten by generate_from_api when lang is known
 
     def _fetch_events(self, start: datetime.datetime, end: datetime.datetime) -> tuple[list, str]:
         """Fetch events with cache-aware hybrid coverage.
@@ -486,17 +487,17 @@ class AuditGenerator:
 
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
-        print(t("rpt_audit_querying", start=start_date, end=end_date))
+        print(t("rpt_audit_querying", start=start_date, end=end_date, lang=self._lang))
         _start_dt = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
         _end_dt = datetime.datetime.fromisoformat(end_date.replace("Z", "+00:00"))
         events, source = self._fetch_events(_start_dt, _end_dt)
 
         if not events:
-            print(t("rpt_audit_no_events"))
+            print(t("rpt_audit_no_events", lang=self._lang))
             return AuditReportResult(record_count=0, source=source)
 
         df = self._build_dataframe(events)
-        print(t("rpt_audit_records", count=f"{len(df):,}"))
+        print(t("rpt_audit_records", count=f"{len(df):,}", lang=self._lang))
 
         return self._run_pipeline(df, start_date, end_date, source=source)
 
@@ -672,7 +673,7 @@ class AuditGenerator:
                 results[mod_id] = {'error': str(e)}
 
         results['mod00'] = audit_executive_summary(results, df)
-        print(t("rpt_audit_complete") + "             ")
+        print(t("rpt_audit_complete", lang=self._lang) + "             ")
 
         return AuditReportResult(
             record_count=len(df),
@@ -697,7 +698,7 @@ class AuditGenerator:
             ).export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, result, file_format='html')
-            print(t("rpt_audit_html_saved", path=path))
+            print(t("rpt_audit_html_saved", path=path, lang=lang))
         if fmt in ('pdf', 'all'):
             try:
                 from src.report.exporters.pdf_exporter import export_report_pdf
@@ -716,7 +717,7 @@ class AuditGenerator:
                     },
                 )
                 paths.append(pdf_path)
-                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
+                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}", lang=lang))
             except Exception as exc:
                 logger.warning('PDF export failed: {}', exc)
 
@@ -737,7 +738,7 @@ class AuditGenerator:
                 }
                 export_xlsx(xlsx_result, xlsx_path)
                 paths.append(xlsx_path)
-                print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}"))
+                print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}", lang=lang))
             except Exception as exc:
                 logger.warning('XLSX export failed: {}', exc)
 
@@ -749,7 +750,7 @@ class AuditGenerator:
             path = CsvExporter(export_data, report_label='Audit').export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, result, file_format='csv')
-            print(t("rpt_audit_csv_saved", path=path))
+            print(t("rpt_audit_csv_saved", path=path, lang=lang))
         try:
             write_audit_dashboard_summary(output_dir, result)
         except Exception as exc:

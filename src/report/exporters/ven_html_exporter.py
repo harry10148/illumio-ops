@@ -108,7 +108,7 @@ class VenHtmlExporter:
                     "type": "pie",
                     "title": "VEN Status Distribution",
                     "data": {
-                        "labels": [t("chart_ven_online"), t("chart_ven_offline"), t("chart_ven_lost_24h"), t("chart_ven_lost_48h")],
+                        "labels": [t("chart_ven_online", lang=self._lang), t("chart_ven_offline", lang=self._lang), t("chart_ven_lost_24h", lang=self._lang), t("chart_ven_lost_48h", lang=self._lang)],
                         "values": [online_count, offline_count, today_count, yest_count],
                     },
                 }
@@ -163,7 +163,7 @@ class VenHtmlExporter:
         return (
             f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            f"<title>{t('rpt_page_title_ven_status')}</title>"
+            f"<title>{t('rpt_page_title_ven_status', lang=self._lang)}</title>"
             + _CSS + _HIGHLIGHT_CSS
             + "</head>\n<body>"
             + nav_html

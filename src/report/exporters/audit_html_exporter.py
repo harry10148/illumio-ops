@@ -245,7 +245,7 @@ class AuditHtmlExporter:
         return (
             f'<!DOCTYPE html><html lang="{"zh-TW" if self._lang == "zh_TW" else "en"}"><head>\n'
             "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
-            f"<title>{t('rpt_page_title_audit')}</title>"
+            f"<title>{t('rpt_page_title_audit', lang=self._lang)}</title>"
             + _CSS + _HIGHLIGHT_CSS
             + "</head>\n"
             + "<body>"

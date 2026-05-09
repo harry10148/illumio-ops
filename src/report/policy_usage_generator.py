@@ -79,7 +79,7 @@ class PolicyUsageGenerator:
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
         # Step 1 — load label/service cache for actor resolution
-        print(t("rpt_pu_fetching_rulesets"))
+        print(t("rpt_pu_fetching_rulesets", lang=self._lang))
         try:
             self.api.update_label_cache(silent=True)
         except Exception as e:
@@ -92,15 +92,15 @@ class PolicyUsageGenerator:
             return PolicyUsageResult(record_count=0)
 
         flat_rules, ruleset_map = self._build_baseline(rulesets)
-        print(t("rpt_pu_rules_found", count=len(flat_rules)))
+        print(t("rpt_pu_rules_found", count=len(flat_rules), lang=self._lang))
 
         if not flat_rules:
             return PolicyUsageResult(record_count=0)
 
         # Step 3 — per-rule async traffic queries
-        print(t("rpt_pu_fetching_traffic", start=start_date[:10], end=end_date[:10]))
+        print(t("rpt_pu_fetching_traffic", start=start_date[:10], end=end_date[:10], lang=self._lang))
         hit_hrefs, hit_counts, execution_stats = self._extract_hit_data(flat_rules, start_date, end_date)
-        print(t("rpt_pu_flows_processed", hit=len(hit_hrefs)))
+        print(t("rpt_pu_flows_processed", hit=len(hit_hrefs), lang=self._lang))
 
         # Step 4 — run analysis pipeline
         result = self._run_pipeline(
@@ -113,7 +113,7 @@ class PolicyUsageGenerator:
             lookback_days=lookback_days,
             execution_stats=execution_stats,
         )
-        print(t("rpt_pu_complete"))
+        print(t("rpt_pu_complete", lang=self._lang))
         return result
 
     def generate_from_csv(self, csv_path: str, detail_level: str = _REPORT_DETAIL_LEVEL) -> PolicyUsageResult:
@@ -253,7 +253,7 @@ class PolicyUsageGenerator:
             ).export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, result, file_format='html')
-            print(t("rpt_pu_html_saved", path=path))
+            print(t("rpt_pu_html_saved", path=path, lang=lang))
 
         if fmt in ('pdf', 'all'):
             try:
@@ -273,7 +273,7 @@ class PolicyUsageGenerator:
                     },
                 )
                 paths.append(pdf_path)
-                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}"))
+                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}", lang=lang))
             except Exception as exc:
                 logger.warning('PDF export failed: {}', exc)
 
@@ -294,7 +294,7 @@ class PolicyUsageGenerator:
                 }
                 export_xlsx(xlsx_result, xlsx_path)
                 paths.append(xlsx_path)
-                print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}"))
+                print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}", lang=lang))
             except Exception as exc:
                 logger.warning('XLSX export failed: {}', exc)
 
@@ -326,7 +326,7 @@ class PolicyUsageGenerator:
                 path = CsvExporter(export_data, report_label='Policy_Usage').export(output_dir)
                 paths.append(path)
                 self._write_report_metadata(path, result, file_format='csv')
-                print(t("rpt_pu_csv_saved", path=path))
+                print(t("rpt_pu_csv_saved", path=path, lang=lang))
 
         try:
             write_policy_usage_dashboard_summary(output_dir, result)

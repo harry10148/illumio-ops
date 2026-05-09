@@ -233,7 +233,7 @@ class PolicyUsageHtmlExporter:
         return (
             f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
-            f"<title>{t('rpt_page_title_policy_usage')}</title>"
+            f"<title>{t('rpt_page_title_policy_usage', lang=self._lang)}</title>"
             + _CSS + _HIGHLIGHT_CSS
             + "</head>\n<body>"
             + nav_html
