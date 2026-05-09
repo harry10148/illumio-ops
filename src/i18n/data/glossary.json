@@ -1,0 +1,32 @@
+{
+  "_doc": "Glossary preserve-list. Terms here MUST remain English in zh_TW translations. forbidden_zh_substitutes lists Chinese strings that, if present, indicate a glossary violation.",
+  "preserve_in_zh_tw": [
+    "Block", "Blocked", "Blocking", "Allow", "Allowed", "Allowing",
+    "Potentially Blocked",
+    "Manage", "Managed", "Managing", "Unmanage", "Unmanaged",
+    "PCE", "VEN", "Workload", "Workloads",
+    "Service", "Services",
+    "Port", "Ports",
+    "Policy", "Policies",
+    "Ringfence",
+    "App", "Apps",
+    "Label", "Labels",
+    "SMTP",
+    "Online", "Offline",
+    "Enforcement",
+    "Ruleset", "Rulesets"
+  ],
+  "forbidden_zh_substitutes": {
+    "Block": ["封鎖", "阻擋"],
+    "Blocked": ["已封鎖", "已阻擋"],
+    "Allow": ["允許"],
+    "Allowed": ["已允許"],
+    "Manage": ["管理"],
+    "Managed": ["已管理", "受管"],
+    "Unmanaged": ["未管理"],
+    "Service": ["服務"],
+    "Workload": ["工作負載"],
+    "Port": ["連接埠", "埠口"],
+    "Policy": ["政策", "策略"]
+  }
+}
