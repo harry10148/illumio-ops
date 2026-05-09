@@ -6,6 +6,8 @@ import threading
 from functools import lru_cache
 from pathlib import Path
 
+from loguru import logger
+
 # engine.py lives at src/i18n/, but i18n_en.json / i18n_zh_TW.json sit at src/.
 _ROOT = Path(__file__).resolve().parent.parent
 _EN_MESSAGES_PATH = _ROOT / "i18n_en.json"
@@ -310,7 +312,6 @@ def _build_messages(lang: str) -> dict[str, str]:
             base[key] = _missing_marker(key)
             continue
         # Non-strict gap — log once and return the raw key as visible signal.
-        from loguru import logger
         logger.warning(f"i18n: zh_TW gap for non-strict key '{key}'; returning raw key")
         base[key] = key
     return base
