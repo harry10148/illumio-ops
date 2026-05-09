@@ -307,19 +307,30 @@ def get_messages(lang: str | None = None) -> dict[str, str]:
         lang = "en"
     return dict(_build_messages(lang))
 
-def t(key: str, **kwargs) -> str:
-    default_val = kwargs.pop("default", None)
-    _lang = get_language()
+def t(key: str, *, lang: str | None = None, default: str | None = None, **kwargs) -> str:
+    """Translate a key.
+
+    Args:
+        key: The translation key to look up.
+        lang: Explicit language code ('en' or 'zh_TW'). When None, uses the
+              process-global language. Invalid values fall back to global.
+        default: Fallback string when no translation is found and no strict
+                 prefix would emit a MISSING marker.
+        **kwargs: format() parameters applied to the resulting string.
+
+    Returns:
+        Translated string with format substitutions applied.
+    """
+    _lang = lang if lang in {"en", "zh_TW"} else get_language()
     text = get_messages(_lang).get(key)
     if text is None:
         text = _normalized_en_messages().get(key)
     if text is None and _is_strict_surface_key(key):
         text = _missing_marker(key)
     if text is None:
-        if default_val is not None:
-            text = default_val
-        else:
-            text = _humanize_key_zh(key) if _lang == "zh_TW" else _humanize_key_en(key)
+        text = default if default is not None else (
+            _humanize_key_zh(key) if _lang == "zh_TW" else _humanize_key_en(key)
+        )
     if kwargs:
         try:
             return text.format(**kwargs)
