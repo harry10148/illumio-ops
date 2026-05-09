@@ -100,7 +100,20 @@ def _load_json_data(filename: str) -> dict[str, str]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-_ZH_EXPLICIT: dict[str, str] = _load_json_data("zh_explicit.json")
+@lru_cache(maxsize=1)
+def _get_zh_explicit() -> dict[str, str]:
+    return _load_json_data("zh_explicit.json")
+
+
+def __getattr__(name: str):
+    """Lazy module attribute for _ZH_EXPLICIT — only loads on first access.
+
+    See PEP 562. Required because `from src.i18n.engine import _ZH_EXPLICIT`
+    is the existing import idiom in audit_i18n_usage.py and __init__.py.
+    """
+    if name == "_ZH_EXPLICIT":
+        return _get_zh_explicit()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 _SKIP_TOKENS = {
     "gui", "cli", "lbl", "opt", "th", "nav", "wiz", "menu", "main",
