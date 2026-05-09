@@ -6,6 +6,100 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to a `<major>.<minor>.<patch>-<topic-slug>` versioning
 scheme aligned with the git tag conventions.
 
+## [3.26.0-i18n-architecture] — 2026-05-09
+
+i18n architecture refactor — consolidated three parallel translation
+subsystems into one source of truth, retired the runtime regex auto-translator,
+parameterized language at the call site, and migrated rule storage from
+rendered text to keys. 35 commits, 22-task plan executed via
+subagent-driven-development.
+
+### R1 — Single Source of Truth
+
+- Absorbed 467 only-`STRINGS` keys + 141 overlap differences into
+  `src/i18n_*.json` (now ~2,767 keys per locale). `migrate_strings_to_json.py`
+  drives the migration and is idempotent.
+- Replaced 815-line static `_StringMap` literal with `_StringsView` thin
+  wrapper that delegates to `t()` for JSON-backed keys and keeps a small
+  runtime overlay (~198 dynamic-write keys for `rpt_cat_*` / `rpt_rule_*`).
+- 9 HTML exporter callsites unchanged — the wrapper preserves the
+  `STRINGS[k].get(lang)` shape they depend on.
+
+### R2 — Glossary + Strict Prefixes Externalized
+
+- New `src/i18n/data/glossary.json` is the single SoT for English terms
+  that must remain English in zh_TW (Block, Allow, Manage, Unmanage, PCE,
+  VEN, Workload, Service, Port, Policy, Ringfence, App, Label, SMTP,
+  Online, Offline, Ruleset, Enforcement). 16 entries with explicit
+  forbidden Chinese substitutes for programmatic detection.
+- `_STRICT_PREFIXES` (28-element tuple) and the 2 humanize exceptions
+  (`event_label_`, `cat_`) moved to `src/i18n/data/strict_prefixes.json`.
+- `_translate_text()` regex chain (46 substitutions) retired from the
+  `t()` runtime hot path — `_build_messages` is now a pure dictionary
+  lookup. The function stays callable for the precompute migration script.
+- AST-walking guard test asserts `_build_messages` no longer invokes
+  `_translate_text`.
+- Audit `Cat E` aligned with `glossary.json` SoT.
+
+### R3 — `t(key, lang=...)` Parameter
+
+- `t()` accepts an explicit, keyword-only `lang=` argument. Falls back to
+  the process-global language when omitted (backward-compatible).
+- `report_generator.py` and `gui/routes/events.py` no longer call
+  `set_language()` — both thread `lang=` through 17+ `t()` calls. Removes
+  the global-mutation race in concurrent rendering.
+- New `tests/test_i18n_set_language_callers.py` lint guard: `set_language`
+  is bootstrap-only (allowed in `src/config.py`, `src/i18n/`, and CLI
+  startup; banned everywhere else).
+
+### R4 — Rules Persist Keys, Not Text
+
+- Rules schema accepts `desc_key` / `rec_key` fields. `ConfigManager.load()`
+  resolves them via `t(key, lang=lang)` at read time; `save()` strips
+  rendered `desc` / `rec` when keys are present. Disk holds keys as the
+  canonical source.
+- `_heal_stale_rule_i18n()` self-heal removed — its logic absorbed into
+  the new `_resolve_rule_keys()` for backward compat with legacy
+  `[MISSING:*]` markers.
+- `migrate_rules_to_keys.py` upgrades older config.json rules in place;
+  idempotent.
+
+### Performance + Quality
+
+- 217 pre-existing zh_TW glossary violations remediated (Manage→管理 (38),
+  Allow→允許 (30), Block→封鎖 (21), Workload→工作負載 (19), Offline→離線
+  (19), Policy→政策 (16), Label/Labels→標籤 (30), Service→服務 (12), …).
+- Module-load cost on `report_i18n` dropped from ~86ms to ~9ms via
+  `_StringsView.overlay_items()` for COL_I18N construction.
+- `_ZH_EXPLICIT` (1,430 entries) lazy-loaded via PEP 562 `__getattr__`
+  instead of eager module-level import.
+- 4 pre-existing mypy errors on the i18n surface cleared (no `# type: ignore`
+  suppressions — proper renames).
+- `audit_i18n_usage.py` exits 0 across all 9 categories.
+
+### Tests
+
+- 1027 passing, 0 xfail (down from 1 xfail at the end of the 22-task
+  plan — glossary remediation closed it).
+- New tests: `test_i18n_strings_parity`, `test_i18n_lang_param`,
+  `test_i18n_glossary`, `test_i18n_strict_prefixes`,
+  `test_i18n_set_language_callers`, `test_i18n_translate_text_audit`,
+  `test_i18n_consumers_smoke`, `test_config_rule_keys`,
+  `test_report_generator_lang_param`, `test_gui_routes_lang_param`,
+  plus subprocess tests for the 3 migration scripts.
+
+### Migration
+
+Users on older config.json files: run
+`python scripts/migrate_rules_to_keys.py --config <path> --write` to
+upgrade rule storage. The script is idempotent.
+
+### Plan + Implementation Status
+
+- Plan: `docs/superpowers/plans/2026-05-09-i18n-architecture-refactor.md`
+- 22 plan tasks complete (T1–T22), plus 5 follow-ups (P1 glossary, P2
+  mypy, P3 perf, P4 docs, P5 push). All commits on `main`.
+
 ## [3.25.0-tracks-abcd] — 2026-05-07
 
 UX/CLI/Report/Email global-assessment sprint — Tracks A, B, C, D were
