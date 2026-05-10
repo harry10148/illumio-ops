@@ -545,6 +545,11 @@
         <use href="#icon-alert"></use>
       </svg> Apply Quarantine
     </button>
+    <button class="btn btn-secondary" data-action="openAccelerateModal" data-i18n="gui_accel_bulk_btn">
+      <svg class="icon">
+        <use href="#icon-activity"></use>
+      </svg> ⚡ Accelerate Selected
+    </button>
   </div>
 
   <!-- Rules -->
@@ -1494,6 +1499,34 @@
           Quarantine</button>
       </div>
     </div>
+  </div>
+
+  <!-- Accelerate Workloads -->
+  <div class="modal-bg" role="dialog" aria-modal="true" id="m-accelerate">
+    <div class="modal" style="max-width:500px">
+      <h3 data-i18n="gui_accel_modal_title">Accelerate Workloads</h3>
+      <p id="accel-summary" style="font-size:0.9rem;color:var(--dim);margin-bottom:12px;"></p>
+      <fieldset style="margin-bottom:12px;">
+        <legend data-i18n="gui_accel_duration">Duration</legend>
+        <label style="display:block;margin:4px 0;"><input type="radio" name="accel-dur" value="0" checked> <span data-i18n="gui_accel_single">Single shot</span></label>
+        <label style="display:block;margin:4px 0;"><input type="radio" name="accel-dur" value="30"> 30 min</label>
+        <label style="display:block;margin:4px 0;"><input type="radio" name="accel-dur" value="60"> 60 min</label>
+        <label style="display:block;margin:4px 0;"><input type="radio" name="accel-dur" value="120"> 120 min</label>
+      </fieldset>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" data-action="closeModal" data-args='["m-accelerate"]' data-i18n="gui_cancel">Cancel</button>
+        <button class="btn btn-primary" data-action="confirmAccelerate" data-i18n="gui_confirm">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="floating-action-bar" id="accel-countdown" style="display:none;">
+    <span style="color:var(--fg); font-size:0.95rem;">
+      🟢 <span data-i18n="gui_accel_running_label">Accelerating</span>
+      <strong id="accel-count">0</strong> —
+      <span id="accel-remaining" style="font-variant-numeric:tabular-nums;">--:--</span>
+    </span>
+    <button class="btn btn-sm btn-secondary" data-action="cancelAccelerate" data-i18n="gui_cancel">Cancel</button>
   </div>
 
   <!-- Cache Backfill -->
