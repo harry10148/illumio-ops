@@ -105,9 +105,9 @@ class ApiClient:
         self.label_cache: Any = TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
         self.ruleset_cache: list[dict[str, Any]] = []
         self.service_ports_cache: Any = TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
-        self._label_href_cache = TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
-        self._label_group_href_cache = TTLCache(maxsize=1000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
-        self._iplist_href_cache = TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
+        self._label_href_cache: Any = TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
+        self._label_group_href_cache: Any = TTLCache(maxsize=1000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
+        self._iplist_href_cache: Any = TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
 
         # Diagnostics (read via getter / written by domain classes)
         self.last_traffic_query_diagnostics: dict[str, Any] = {}
