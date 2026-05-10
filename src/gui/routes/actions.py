@@ -257,6 +257,46 @@ def make_actions_blueprint(
         except Exception as e:
             return _err_with_log("quarantine_bulk_apply", e, lang=lang)
 
+    @bp.route('/api/workloads/accelerate', methods=['POST'])
+    def api_workloads_accelerate():
+        """Increase traffic update rate for the given workload hrefs.
+
+        Backend is stateless: it issues exactly one PCE call per request.
+        Persistent mode (re-issue every 10 min) is handled by the frontend
+        via setInterval. Invalid hrefs are dropped and counted in
+        skipped_invalid.
+        """
+        d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+        raw_hrefs = d.get('hrefs', []) or []
+        duration = int(d.get('duration_minutes', 0) or 0)  # logged only
+        hrefs = [h for h in raw_hrefs if _is_workload_href(h)]
+        skipped_invalid = len(raw_hrefs) - len(hrefs)
+
+        if not hrefs:
+            return jsonify({"ok": False, "error": t("gui_accel_no_targets", lang=lang)})
+
+        try:
+            from src.api_client import ApiClient
+            api = ApiClient(cm)
+            success, fail = api.set_flow_reporting_frequency(hrefs)
+            try:
+                from src.module_log import ModuleLog as _ML
+                _ML.get("actions").info(
+                    f"Accelerate: success={success}, fail={fail}, "
+                    f"skipped_invalid={skipped_invalid}, duration_minutes={duration}"
+                )
+            except Exception:
+                pass  # audit-log best-effort, must not block primary action
+            return jsonify({
+                "ok": True,
+                "success": success,
+                "failed": fail,
+                "skipped_invalid": skipped_invalid,
+            })
+        except Exception as e:
+            return _err_with_log("workloads_accelerate", e, lang=lang)
+
     @bp.route('/api/actions/run', methods=['POST'])
     def api_run_once():
         lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
