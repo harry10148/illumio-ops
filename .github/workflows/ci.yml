@@ -52,11 +52,5 @@ jobs:
         # html_exporter, cli/_render, …), tracked separately.
         run: mypy --follow-imports=silent src/api_client.py src/analyzer.py src/reporter.py
 
-      - name: Lint (ruff)
-        # Soft gate — kept non-blocking until the codebase converges on a ruff config.
-        # Promote to hard gate once `ruff check src tests` passes cleanly.
-        continue-on-error: true
-        run: ruff check src tests scripts
-
       - name: Run tests
         run: pytest --tb=short
