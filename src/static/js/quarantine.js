@@ -581,11 +581,7 @@ testConn();
 
 async function accelerateOne(href, label) {
   try {
-    const r = await fetch('/api/workloads/accelerate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hrefs: [href], duration_minutes: 0 }),
-    }).then(res => res.json());
+    const r = await post('/api/workloads/accelerate', { hrefs: [href], duration_minutes: 0 });
     if (!r.ok) throw new Error(r.error || 'failed');
     if (typeof toast === 'function') {
       toast(_t('gui_accel_done') + ': ' + label);
@@ -629,11 +625,7 @@ function openAccelerateModal() {
 
 async function _fireAccelerate(durationMinutes) {
   try {
-    const r = await fetch('/api/workloads/accelerate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ hrefs: _accel_hrefs, duration_minutes: durationMinutes }),
-    }).then(res => res.json());
+    const r = await post('/api/workloads/accelerate', { hrefs: _accel_hrefs, duration_minutes: durationMinutes });
     if (!r.ok) throw new Error(r.error || 'failed');
     return r;
   } catch (e) {
@@ -653,13 +645,13 @@ async function confirmAccelerate() {
   closeModal('m-accelerate');
   if (_accel_hrefs.length === 0) return;
 
+  cancelAccelerate();   // unconditional: also cancels any prior persistent run when this submit is single-shot
   await _fireAccelerate(dur);
   if (typeof toast === 'function') {
     toast(_t('gui_accel_started').replace('{n}', _accel_hrefs.length));
   }
 
   if (dur > 0) {
-    cancelAccelerate();   // clear any prior run before starting a new one
     _accel_endTs = Date.now() + dur * 60_000;
     _accel_timer = setInterval(() => {
       if (Date.now() >= _accel_endTs) { cancelAccelerate(); return; }
