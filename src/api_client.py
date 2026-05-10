@@ -616,6 +616,37 @@ class ApiClient:
             logger.error(f"Search Workloads Error: {e}")
             return []
 
+    def set_flow_reporting_frequency(self, hrefs: list[str]) -> tuple[int, int]:
+        """Increase traffic update rate (a.k.a. flow reporting frequency) for
+        the given workload hrefs.
+
+        PCE caps each request at 50 workloads, so we auto-batch.
+        Returns (success_count, fail_count) by batch size.
+        Effect on PCE is temporary (~10 min); caller must re-issue to sustain.
+        """
+        if not hrefs:
+            return 0, 0
+        org = self.api_cfg["org_id"]
+        endpoint = f"/orgs/{org}/workloads/set_flow_reporting_frequency"
+        success = 0
+        fail = 0
+        for i in range(0, len(hrefs), 50):
+            batch = hrefs[i:i + 50]
+            payload = {"workloads": [{"href": h} for h in batch]}
+            try:
+                status, _ = self._api_post(endpoint, payload, timeout=15)
+                if status in (200, 201, 204):
+                    success += len(batch)
+                else:
+                    fail += len(batch)
+                    logger.error(
+                        f"set_flow_reporting_frequency batch failed: status={status}"
+                    )
+            except Exception as e:
+                fail += len(batch)
+                logger.error(f"set_flow_reporting_frequency batch error: {e}")
+        return success, fail
+
     # ═══════════════════════════════════════════════════════════════════════
     # Rule Scheduler Features: RuleSet/Rule management, provisioning, notes
     # ═══════════════════════════════════════════════════════════════════════
