@@ -1,5 +1,7 @@
 # Font Vendoring
 
+> [English](fonts-vendoring.md) | [繁體中文](fonts-vendoring_zh.md)
+
 All web fonts are self-hosted to satisfy C1 (offline bundle) and avoid CSP/CDN issues.
 
 ## Current fonts

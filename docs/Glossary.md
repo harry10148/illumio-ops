@@ -14,6 +14,9 @@
 | API Cookbook | [API_Cookbook.md](./API_Cookbook.md) | [API_Cookbook_zh.md](./API_Cookbook_zh.md) |
 | Glossary | [Glossary.md](./Glossary.md) | [Glossary_zh.md](./Glossary_zh.md) |
 | Troubleshooting | [Troubleshooting.md](./Troubleshooting.md) | [Troubleshooting_zh.md](./Troubleshooting_zh.md) |
+| Upgrade Guide | [UPGRADE.md](./UPGRADE.md) | [UPGRADE_zh.md](./UPGRADE_zh.md) |
+| CLI Command Map | [cli-command-map.md](./cli-command-map.md) | [cli-command-map_zh.md](./cli-command-map_zh.md) |
+| Font Vendoring | [fonts-vendoring.md](./fonts-vendoring.md) | [fonts-vendoring_zh.md](./fonts-vendoring_zh.md) |
 <!-- END:doc-map -->
 
 > [English](Glossary.md) | [繁體中文](Glossary_zh.md)

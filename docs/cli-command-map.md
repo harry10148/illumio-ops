@@ -1,5 +1,7 @@
 # CLI Command Map
 
+> [English](cli-command-map.md) | [繁體中文](cli-command-map_zh.md)
+
 This document maps every `illumio-ops` command to its entry point(s):
 
 - **CLI** — invokable via `illumio-ops <command>`
