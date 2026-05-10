@@ -45,9 +45,12 @@ jobs:
         run: python scripts/audit_i18n_usage.py
 
       - name: Type check (strict subset)
-        # Hard gate — promoted 2026-05-10 after Batch 5 Task 5.3 (M11) landed
-        # type hints on Analyzer / ApiClient / Reporter (mypy clean on all 3).
-        run: mypy src/api_client.py src/analyzer.py src/reporter.py
+        # Hard gate — checks ONLY the 3 entry files Batch 5 M11 typed.
+        # --follow-imports=silent uses imported modules for type inference
+        # but suppresses their (still ~118) errors; promoting the rest to
+        # hard would require typing the transitive surface (gui/_helpers,
+        # html_exporter, cli/_render, …), tracked separately.
+        run: mypy --follow-imports=silent src/api_client.py src/analyzer.py src/reporter.py
 
       - name: Lint (ruff)
         # Soft gate — kept non-blocking until the codebase converges on a ruff config.
