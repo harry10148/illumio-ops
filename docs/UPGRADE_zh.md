@@ -87,6 +87,22 @@ bash scripts/preflight.sh --install-root /opt/illumio-ops
 
 它會明確顯示 `UPGRADE` 警告(若偵測到既有安裝),並檢查磁碟空間、glibc 版本、Port 5001 可用性,以及 bundle 完整性。
 
+## 部署機器的一次性設定
+
+每台部署機器在初次 clone 之後跑一次:
+
+```bash
+bash scripts/setup-prod-git.sh
+```
+
+這會啟用 `merge.autoStash` 與 `rebase.autoStash`(只對本地 repo 生效)。
+沒設這個的話,只要 prod 上的 tracked 檔(例如 `deploy/install_service.ps1`、
+`scripts/install.sh`、`src/pce_cache/ingestor_events.py` 等)被現場編輯過,
+`git pull` 就會 abort。autoStash 會自動 stash → fast-forward → pop,改成
+不中斷,本地修改也不會遺失。
+
+只對本地生效,不影響上游 repo 或其他 clone。
+
 ## 相關文件
 
 - `CHANGELOG.md` — 各版本對使用者可見的變動

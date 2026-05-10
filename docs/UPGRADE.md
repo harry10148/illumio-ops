@@ -87,6 +87,21 @@ bash scripts/preflight.sh --install-root /opt/illumio-ops
 
 It reports an explicit `UPGRADE` warning when an existing install is detected, plus disk space, glibc version, port 5001 availability, and bundle integrity.
 
+## First-time setup on a deployment box
+
+Run once per deployment box, after the initial clone:
+
+```bash
+bash scripts/setup-prod-git.sh
+```
+
+This enables `merge.autoStash` and `rebase.autoStash` for the local repo.
+Without it, `git pull` aborts when a tracked file (`deploy/install_service.ps1`,
+`scripts/install.sh`, `src/pce_cache/ingestor_events.py`, etc.) has been
+edited in place — autoStash makes pull stash → fast-forward → pop instead.
+
+Local-only setting; it does not affect the upstream repo or other clones.
+
 ## See also
 
 - `CHANGELOG.md` — per-version user-visible changes
