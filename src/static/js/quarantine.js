@@ -600,3 +600,102 @@ async function accelerateOne(href, label) {
     }
   }
 }
+
+// --- Bulk Accelerate state (browser-tab-bound) ---
+let _accel_timer = null;       // 10-minute re-issue interval
+let _accel_tick = null;        // 1-second display tick
+let _accel_endTs = 0;          // epoch ms when persistent mode should stop
+let _accel_hrefs = [];         // managed hrefs to send each tick
+
+function openAccelerateModal() {
+  const checked = Array.from(document.querySelectorAll('.qw-chk:checked'));
+  const all = checked.map(c => ({
+    href: c.value,
+    managed: c.dataset.managed === '1',
+  }));
+  const managed = all.filter(x => x.managed);
+  const skipped = all.length - managed.length;
+
+  const summary = (_t('gui_accel_modal_summary') || '')
+    .replace('{total}', all.length)
+    .replace('{managed}', managed.length)
+    .replace('{skipped}', skipped);
+  const sumEl = document.getElementById('accel-summary');
+  if (sumEl) sumEl.textContent = summary;
+
+  _accel_hrefs = managed.map(x => x.href);
+  document.getElementById('m-accelerate').classList.add('show');
+}
+
+async function _fireAccelerate(durationMinutes) {
+  try {
+    const r = await fetch('/api/workloads/accelerate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hrefs: _accel_hrefs, duration_minutes: durationMinutes }),
+    }).then(res => res.json());
+    if (!r.ok) throw new Error(r.error || 'failed');
+    return r;
+  } catch (e) {
+    if (typeof toast === 'function') {
+      toast(_t('gui_rs_error_prefix') + ': ' + e.message, 'error');
+    } else {
+      console.error('[accelerate] failed:', e.message);
+    }
+    return { ok: false };
+  }
+}
+
+async function confirmAccelerate() {
+  const dur = parseInt(
+    document.querySelector('input[name="accel-dur"]:checked').value, 10
+  );
+  closeModal('m-accelerate');
+  if (_accel_hrefs.length === 0) return;
+
+  await _fireAccelerate(dur);
+  if (typeof toast === 'function') {
+    toast(_t('gui_accel_started').replace('{n}', _accel_hrefs.length));
+  }
+
+  if (dur > 0) {
+    cancelAccelerate();   // clear any prior run before starting a new one
+    _accel_endTs = Date.now() + dur * 60_000;
+    _accel_timer = setInterval(() => {
+      if (Date.now() >= _accel_endTs) { cancelAccelerate(); return; }
+      _fireAccelerate(dur);
+    }, 600_000);  // every 10 minutes
+    _showAccelCountdown();
+  }
+}
+
+function cancelAccelerate() {
+  if (_accel_timer) { clearInterval(_accel_timer); _accel_timer = null; }
+  if (_accel_tick) { clearInterval(_accel_tick); _accel_tick = null; }
+  _accel_endTs = 0;
+  const bar = document.getElementById('accel-countdown');
+  if (bar) bar.style.display = 'none';
+}
+
+function _showAccelCountdown() {
+  const bar = document.getElementById('accel-countdown');
+  const countEl = document.getElementById('accel-count');
+  const remEl = document.getElementById('accel-remaining');
+  if (!bar || !countEl || !remEl) return;
+
+  countEl.textContent = String(_accel_hrefs.length);
+  bar.style.display = 'flex';
+
+  const fmt = (ms) => {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    const m = Math.floor(total / 60);
+    const s = total % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+  remEl.textContent = fmt(_accel_endTs - Date.now());
+  _accel_tick = setInterval(() => {
+    const left = _accel_endTs - Date.now();
+    if (left <= 0) { cancelAccelerate(); return; }
+    remEl.textContent = fmt(left);
+  }, 1000);
+}
