@@ -500,6 +500,7 @@
   "gui_cache_ts_max_rows": "max_rows_per_batch",
   "gui_cache_ts_ratio": "sample_ratio_allowed",
   "gui_cancel": "Cancel",
+  "gui_confirm": "Confirm",
   "gui_card_event_poll": "Event Poll",
   "gui_card_health_rule": "Health Rule",
   "gui_card_last_dispatch": "Last Dispatch",
