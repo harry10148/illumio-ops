@@ -519,8 +519,14 @@ function renderQwPage() {
 
     const mgmtText = w.managed ? (_t('gui_management_managed')) : (_t('gui_management_unmanaged'));
 
+    const isManaged = w.managed === true;
+    const accelLabel = escapeHtml((w.hostname || w.name || href).replace(/'/g, "\\'"));
+    const accelBtn = isManaged
+      ? `<button class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="accelerateOne('${href}','${accelLabel}')">${_t('gui_btn_accelerate')}</button>`
+      : `<button class="btn btn-secondary btn-sm" style="margin-left:6px;" disabled title="${_t('gui_accel_unmanaged_tip')}">${_t('gui_btn_accelerate')}</button>`;
+
     html += `<tr>
-          <td style="text-align:center;"><input type="checkbox" class="qw-chk" value="${href}"></td>
+          <td style="text-align:center;"><input type="checkbox" class="qw-chk" value="${href}" data-managed="${isManaged ? '1' : '0'}"></td>
           <td>
             <div style="display:flex;align-items:center;">
               ${statusDot} <strong style="font-size:0.95rem;">${escapeHtml(w.name || w.hostname)}</strong>
@@ -532,6 +538,7 @@ function renderQwPage() {
           <td style="font-size:11px;">${labelsHtml || `<span style="color:var(--dim);font-size:10px;">${_t('gui_no_labels')}</span>`}</td>
           <td>
             <button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${href}')"><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>
+            ${accelBtn}
             ${hasQuarantine ? `<span style="font-size:10px;color:var(--danger);font-weight:bold;margin-left:8px;">${_t('gui_isolated')}</span>` : ''}
           </td>
         </tr>`;
@@ -569,3 +576,27 @@ setTimeout(() => {
 initUiPreferences();
 init();
 testConn();
+
+// --- Accelerate (Increase Traffic Update Rate) ---
+
+async function accelerateOne(href, label) {
+  try {
+    const r = await fetch('/api/workloads/accelerate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hrefs: [href], duration_minutes: 0 }),
+    }).then(res => res.json());
+    if (!r.ok) throw new Error(r.error || 'failed');
+    if (typeof toast === 'function') {
+      toast(_t('gui_accel_done') + ': ' + label);
+    } else {
+      console.info('[accelerate] done:', label);
+    }
+  } catch (e) {
+    if (typeof toast === 'function') {
+      toast(_t('gui_rs_error_prefix') + ': ' + e.message, 'error');
+    } else {
+      console.error('[accelerate] failed:', e.message);
+    }
+  }
+}
