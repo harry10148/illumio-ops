@@ -11,7 +11,7 @@ from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHas
 
 _SECRET_FIELD_TOKENS = {"key", "secret", "password", "secret_key", "token"}
 
-_PH = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=4)
+_PH = PasswordHasher(time_cost=4, memory_cost=131072, parallelism=4)
 
 
 def hash_password(plain: str) -> str:
@@ -88,6 +88,7 @@ _DEFAULT_CONFIG = {
         "password": "",
         "secret_key": "",
         "allowed_ips": [],
+        "session_lifetime_seconds": 28800,
         "tls": {
             "enabled": True,
             "cert_file": "",

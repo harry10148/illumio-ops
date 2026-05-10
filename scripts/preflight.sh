@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
 # Pre-install environment check for illumio_ops offline bundle.
 # Run BEFORE install.sh or setup.sh to validate the target host.
-# Usage: bash preflight.sh
+# Usage:
+#   bash preflight.sh                                  # default /opt/illumio-ops
+#   bash preflight.sh --install-root /opt/custom       # custom install path
 # Exit: 0 = all PASS/WARN, 1 = at least one FAIL
 set -euo pipefail
+
+INSTALL_ROOT="/opt/illumio-ops"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --install-root) INSTALL_ROOT="$2"; shift 2 ;;
+        -h|--help)
+            sed -n '2,7p' "$0"; exit 0 ;;
+        *) echo "Unknown argument: $1" >&2; exit 2 ;;
+    esac
+done
 
 BUNDLE_DIR="$(cd "$(dirname "$0")" && pwd)"
 RED='\033[0;31m'; YEL='\033[1;33m'; GRN='\033[0;32m'; NC='\033[0m'
@@ -35,13 +47,17 @@ fi
 if systemctl --version &>/dev/null; then pass "systemd: available"
 else fail "systemd: not found — required for service registration"; fi
 
-# 4. Disk space >= 2 GB at /opt
+# 4. Disk space >= 2 GB at install root (or its closest existing ancestor)
 # Bundle ~150 MB + extracted PBS runtime ~250 MB + site-packages ~415 MB +
 # logs/cache/reports headroom for 24/7 operation → 2 GB minimum.
-AVAIL_KB=$(df /opt 2>/dev/null | tail -1 | awk '{print $4}' || echo 0)
+_df_dir="$INSTALL_ROOT"
+while [ ! -d "$_df_dir" ] && [ "$_df_dir" != "/" ]; do
+    _df_dir=$(dirname "$_df_dir")
+done
+AVAIL_KB=$(df "$_df_dir" 2>/dev/null | tail -1 | awk '{print $4}' || echo 0)
 AVAIL_MB=$((AVAIL_KB / 1024))
-if [ "$AVAIL_MB" -ge 2048 ]; then pass "Disk at /opt: ${AVAIL_MB} MB (>= 2048 MB required)"
-else fail "Disk at /opt: ${AVAIL_MB} MB — need >= 2048 MB"; fi
+if [ "$AVAIL_MB" -ge 2048 ]; then pass "Disk at $_df_dir: ${AVAIL_MB} MB (>= 2048 MB required)"
+else fail "Disk at $_df_dir: ${AVAIL_MB} MB — need >= 2048 MB"; fi
 
 # 5. rsync (used by install.sh)
 if command -v rsync &>/dev/null; then pass "rsync: available"
@@ -65,7 +81,6 @@ if [ -x "$BUNDLED_PY" ]; then pass "Bundled Python: $("$BUNDLED_PY" --version 2>
 else fail "Bundled Python not executable: $BUNDLED_PY"; fi
 
 # 7. Upgrade detection (informational)
-INSTALL_ROOT="/opt/illumio-ops"
 if [ -f "$INSTALL_ROOT/config/config.json" ]; then
     warn "Existing installation at $INSTALL_ROOT — this is an UPGRADE"
     warn "config.json, alerts.json (rules), and rule_schedules.json will be preserved"

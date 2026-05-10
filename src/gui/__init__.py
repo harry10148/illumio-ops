@@ -141,13 +141,17 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
     app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # 25 MB
     app.config['CM'] = cm
-    app.config['SESSION_COOKIE_HTTPONLY'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
-    app.config['PERMANENT_SESSION_LIFETIME'] = 28800  # 8 hours
 
-    # Initialize session secret
+    # Load config first so session/CSRF lifetimes can read web_gui.session_lifetime_seconds
     cm.load()
     gui_cfg = cm.config.get("web_gui", {})
+    _session_lifetime = int(gui_cfg.get("session_lifetime_seconds", 28800))
+
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
+    app.config['PERMANENT_SESSION_LIFETIME'] = _session_lifetime
+
+    # Initialize session secret
     app.secret_key = gui_cfg.get("secret_key") or secrets.token_hex(32)
     # Always set Secure cookie flag (TLS is the default)
     tls_cfg = gui_cfg.get("tls", {})
@@ -195,7 +199,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     from flask_wtf.csrf import CSRFProtect, CSRFError, generate_csrf
 
     app.config["WTF_CSRF_ENABLED"] = True
-    app.config["WTF_CSRF_TIME_LIMIT"] = 28800  # match GUI session lifetime
+    app.config["WTF_CSRF_TIME_LIMIT"] = _session_lifetime  # match GUI session lifetime
     app.config["WTF_CSRF_CHECK_DEFAULT"] = True
     # Accept both X-CSRFToken (flask-wtf default) and X-CSRF-Token (legacy SPA header)
     app.config["WTF_CSRF_HEADERS"] = ["X-CSRFToken", "X-CSRF-Token"]
