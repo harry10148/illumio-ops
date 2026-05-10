@@ -12,6 +12,7 @@ WorkingDirectory=/opt/illumio-ops
 ExecStart=/opt/illumio-ops/python/bin/python3 /opt/illumio-ops/illumio-ops.py --monitor-gui --interval 10
 Restart=always
 RestartSec=10
+TimeoutStartSec=30
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=illumio-ops
@@ -20,6 +21,7 @@ SyslogIdentifier=illumio-ops
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
+PrivateTmp=true
 ReadWritePaths=/opt/illumio-ops
 
 [Install]

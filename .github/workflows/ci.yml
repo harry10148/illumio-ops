@@ -40,15 +40,13 @@ jobs:
         run: python scripts/check_doc_links.py
 
       - name: i18n audit
-        # Soft gate — surfaces 4 pre-existing findings (zh_TW placeholder leaks).
-        # Promote to hard gate after Batch 5 (M11) clears the residue.
-        continue-on-error: true
+        # Hard gate — promoted 2026-05-10 after the 3.26.0-i18n-architecture
+        # refactor cleared all residue (audit reports 0 findings).
         run: python scripts/audit_i18n_usage.py
 
       - name: Type check (strict subset)
-        # Soft gate — currently surfaces ~116 errors transitively in src/gui, src/cli, etc.
-        # Promote to hard gate after Batch 5 Task 5.3 lands type hints on Analyzer / ApiClient / Reporter.
-        continue-on-error: true
+        # Hard gate — promoted 2026-05-10 after Batch 5 Task 5.3 (M11) landed
+        # type hints on Analyzer / ApiClient / Reporter (mypy clean on all 3).
         run: mypy src/api_client.py src/analyzer.py src/reporter.py
 
       - name: Lint (ruff)
