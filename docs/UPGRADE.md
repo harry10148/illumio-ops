@@ -25,7 +25,7 @@ Preserved across upgrades:
 | `config/alerts.json` | Operator-owned alert/rules state |
 | `config/rule_schedules.json` | Per-deployment schedule state |
 | `logs/` | Operational history |
-| `cache/` | PCE cache database (rebuilt incrementally if absent) |
+| `data/pce_cache.sqlite` | PCE cache database (rebuilt incrementally if absent; path configurable via `pce_cache.db_path`) |
 
 Replaced on every upgrade:
 

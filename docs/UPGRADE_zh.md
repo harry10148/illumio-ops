@@ -25,7 +25,7 @@ sudo ./install.sh                          # Linux
 | `config/alerts.json` | Operator 設定的 alert / rules 狀態 |
 | `config/rule_schedules.json` | 每個部署獨有的排程狀態 |
 | `logs/` | 運行歷史 |
-| `cache/` | PCE cache 資料庫(若缺少會增量重建)|
+| `data/pce_cache.sqlite` | PCE cache 資料庫(若缺少會增量重建;路徑可由 `pce_cache.db_path` 設定覆寫)|
 
 每次升級**覆蓋**:
 
