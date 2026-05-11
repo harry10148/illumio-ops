@@ -273,14 +273,18 @@ def make_rule_scheduler_blueprint(
             db_entry['start'] = data['start']
             db_entry['end'] = data['end']
             db_entry['timezone'] = data.get('timezone', 'local')
-            days_str = ",".join([d[:3] for d in db_entry['days']]) if len(db_entry['days']) < 7 else t('rs_action_everyday', lang=lang)
-            act_str = t('rs_action_enable_in_window', lang=lang) if db_entry['action'] == 'allow' else t('rs_action_disable_in_window', lang=lang)
+            # Force English for PCE-stored annotation. The note ends up inside
+            # the PCE rule's description field, where it is opaque data that
+            # later report runs surface verbatim — embedding Chinese here would
+            # leak into EN-mode audit / policy-usage reports.
+            days_str = ",".join([d[:3] for d in db_entry['days']]) if len(db_entry['days']) < 7 else t('rs_action_everyday', lang='en')
+            act_str = t('rs_action_enable_in_window', lang='en') if db_entry['action'] == 'allow' else t('rs_action_disable_in_window', lang='en')
             tz_display = db_entry['timezone'] if db_entry['timezone'] != 'local' else 'Local'
-            note = f"[?? {t('rs_sch_tag_recurring', lang=lang)}: {days_str} {db_entry['start']}-{db_entry['end']} ({tz_display}) {act_str}]"
+            note = f"[📅 {t('rs_sch_tag_recurring', lang='en')}: {days_str} {db_entry['start']}-{db_entry['end']} ({tz_display}) {act_str}]"
         else:
             db_entry['expire_at'] = data['expire_at']
             db_entry['timezone'] = data.get('timezone', 'local')
-            note = f"[??{t('rs_sch_tag_expire', lang=lang)}: {data['expire_at'].replace('T', ' ')}]"
+            note = f"[⏰ {t('rs_sch_tag_expire', lang='en')}: {data['expire_at'].replace('T', ' ')}]"
 
         db.put(href, db_entry)
         api.update_rule_note(href, note)
