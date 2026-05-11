@@ -26,6 +26,34 @@ from src.gui._helpers import (
 from src.i18n import t
 
 
+def _retranslate_kpi_labels(data: dict, lang: str) -> None:
+    """Re-render KPI labels in `data` using the current language.
+
+    Each snapshot JSON has a `kpis` list of `{label, value, label_key?}` dicts.
+    The `label` field was written using the language active at report time
+    (so old snapshots show old-language labels). When `label_key` is present,
+    overwrite `label` with `t(label_key, lang=lang)` so the dashboard always
+    matches the user's current language preference.
+
+    Legacy snapshots without `label_key` are left as-is — they'll naturally
+    refresh next time the corresponding report is regenerated.
+    """
+    if not isinstance(data, dict):
+        return
+    kpis = data.get("kpis")
+    if not isinstance(kpis, list):
+        return
+    for kpi in kpis:
+        if not isinstance(kpi, dict):
+            continue
+        key = kpi.get("label_key")
+        if not key:
+            continue
+        rendered = t(key, lang=lang, default=kpi.get("label", ""))
+        if rendered and not rendered.startswith("[MISSING:"):
+            kpi["label"] = rendered
+
+
 def make_dashboard_blueprint(
     cm: ConfigManager,
     csrf,           # flask_wtf.csrf.CSRFProtect instance (unused here, kept for consistent signature)
@@ -194,6 +222,7 @@ def make_dashboard_blueprint(
             import json
             with open(snapshot_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+            _retranslate_kpi_labels(data, lang)
             return jsonify({"ok": True, "snapshot": data})
         except Exception as e:
             return _err_with_log("dashboard_snapshot", e, lang=lang)
@@ -209,6 +238,7 @@ def make_dashboard_blueprint(
         try:
             with open(summary_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+            _retranslate_kpi_labels(data, lang)
             return jsonify({"ok": True, "summary": data})
         except Exception as e:
             return _err_with_log("dashboard_audit_summary", e, lang=lang)
@@ -224,6 +254,7 @@ def make_dashboard_blueprint(
         try:
             with open(summary_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+            _retranslate_kpi_labels(data, lang)
             return jsonify({"ok": True, "summary": data})
         except Exception as e:
             return _err_with_log("dashboard_policy_usage_summary", e, lang=lang)

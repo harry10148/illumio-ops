@@ -33,14 +33,14 @@ def pu_executive_summary(results: dict, lookback_days: int, *, lang: str = "en")
     top_port_label = top_hit_ports[0].get("port_proto", "N/A") if top_hit_ports else "N/A"
 
     kpis = [
-        {"label": t("rpt_pu_total_rules", default="Total Rules", lang=lang), "value": str(total)},
-        {"label": t("rpt_pu_hit_rules", default="Hit Rules", lang=lang), "value": str(hit)},
-        {"label": t("rpt_pu_unused_rules", default="Unused Rules", lang=lang), "value": str(unused)},
-        {"label": t("rpt_pu_hit_rate", default="Hit Rate", lang=lang), "value": f"{rate}%"},
-        {"label": t("rpt_pu_kpi_lookback", default="Lookback", lang=lang), "value": f"{lookback_days} days"},
-        {"label": t("rpt_pu_kpi_cached_reuse", default="Cached Reuse", lang=lang), "value": str(cached)},
-        {"label": t("rpt_pu_kpi_new_queries", default="New Queries", lang=lang), "value": str(submitted)},
-        {"label": t("rpt_pu_kpi_top_hit_port", default="Top Hit Port", lang=lang), "value": top_port_label},
+        {"label_key": "rpt_pu_total_rules",      "label": t("rpt_pu_total_rules", default="Total Rules", lang=lang), "value": str(total)},
+        {"label_key": "rpt_pu_hit_rules",        "label": t("rpt_pu_hit_rules", default="Hit Rules", lang=lang), "value": str(hit)},
+        {"label_key": "rpt_pu_unused_rules",     "label": t("rpt_pu_unused_rules", default="Unused Rules", lang=lang), "value": str(unused)},
+        {"label_key": "rpt_pu_hit_rate",         "label": t("rpt_pu_hit_rate", default="Hit Rate", lang=lang), "value": f"{rate}%"},
+        {"label_key": "rpt_pu_kpi_lookback",     "label": t("rpt_pu_kpi_lookback", default="Lookback", lang=lang), "value": f"{lookback_days} days"},
+        {"label_key": "rpt_pu_kpi_cached_reuse", "label": t("rpt_pu_kpi_cached_reuse", default="Cached Reuse", lang=lang), "value": str(cached)},
+        {"label_key": "rpt_pu_kpi_new_queries",  "label": t("rpt_pu_kpi_new_queries", default="New Queries", lang=lang), "value": str(submitted)},
+        {"label_key": "rpt_pu_kpi_top_hit_port", "label": t("rpt_pu_kpi_top_hit_port", default="Top Hit Port", lang=lang), "value": top_port_label},
     ]
 
     attention_items = []
