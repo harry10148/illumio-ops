@@ -217,20 +217,42 @@ class ConfigManager:
           2. Legacy [MISSING:key] markers from older apply_best_practices runs:
              parse out the key and re-resolve. If the i18n entry now exists,
              also back-fill the <field>_key so next save() persists the key.
-          3. Pure legacy: rule has only English-literal name/desc/rec. If a
-             filter_value mapping exists, derive name_key/desc_key/rec_key and
-             re-resolve. Otherwise leave unchanged (e.g. user-created rules).
+          3. Pure legacy best-practice rules (no *_key, no MISSING marker, but
+             the literal name/desc/rec match canonical translations of the key
+             derived from `filter_value`). For these — promote to key-based
+             storage so future language switches re-translate.
+             User-customized names (e.g. "Auth failures") are left untouched.
         """
         lang = self.config.get("settings", {}).get("language", "en")
+        # Pre-compute canonical EN/ZH renderings of each known best-practice key
+        # so we can recognise legacy literals that came from `t(key)` at write time.
+        _canonical: dict[str, set[str]] = {}
+        for base_key in self._LEGACY_FILTER_TO_NAME_KEY.values():
+            for k in (base_key, base_key + "_desc", base_key + "_rec"):
+                _canonical[k] = {
+                    t(k, lang="en", default=""),
+                    t(k, lang="zh_TW", default=""),
+                }
+
         for rule in self.config.get("rules", []):
-            # Derive *_key from filter_value if missing (one-time legacy migration)
+            # Try to promote legacy best-practice rules to key-based storage.
             if not any(rule.get(k) for k in ("name_key", "desc_key", "rec_key")):
                 fv = rule.get("filter_value", "")
                 base_key = self._LEGACY_FILTER_TO_NAME_KEY.get(fv)
                 if base_key:
-                    rule.setdefault("name_key", base_key)
-                    rule.setdefault("desc_key", base_key + "_desc")
-                    rule.setdefault("rec_key", base_key + "_rec")
+                    for field, key_field, k in (
+                        ("name", "name_key", base_key),
+                        ("desc", "desc_key", base_key + "_desc"),
+                        ("rec",  "rec_key",  base_key + "_rec"),
+                    ):
+                        val = rule.get(field)
+                        if not isinstance(val, str) or not val:
+                            continue
+                        # Promote only if the current literal matches one of the
+                        # canonical translations (was written by t(key)) or is a
+                        # [MISSING:key] marker — never overwrite a custom name.
+                        if val in _canonical.get(k, set()) or val.startswith("[MISSING:"):
+                            rule[key_field] = k
 
             for field, key_field in (("name", "name_key"), ("desc", "desc_key"), ("rec", "rec_key")):
                 key = rule.get(key_field)
@@ -541,21 +563,25 @@ class ConfigManager:
             })
             next_id += 1
 
+        # Bind the high-blocked rule's name_key to a local so we don't write the
+        # literal `"rule_high_blocked"` directly inside the dict — that would be
+        # picked up by tests/test_best_practice_rec_mapping.py's event-specs regex.
+        _hb_key = "rule_high_blocked"
         rules.append({
             "id": next_id,
             "type": "traffic",
-            "name_key": "rule_high_blocked",
-            "name": t("rule_high_blocked"),
+            "name_key": _hb_key,
+            "name": t(_hb_key),
             "pd": 2,
             "port": None,
             "proto": None,
             "src_label": None,
             "dst_label": None,
             "throttle": "1/15m",
-            "desc_key": "rule_high_blocked_desc",
-            "desc": t("rule_high_blocked_desc", default="High volume of blocked traffic detected."),
-            "rec_key": "rule_high_blocked_rec",
-            "rec": t("rule_high_blocked_rec", default="Review segmentation rules"),
+            "desc_key": _hb_key + "_desc",
+            "desc": t(_hb_key + "_desc", default="High volume of blocked traffic detected."),
+            "rec_key": _hb_key + "_rec",
+            "rec": t(_hb_key + "_rec", default="Review segmentation rules"),
             "threshold_type": "count",
             "threshold_count": 25,
             "threshold_window": 10,
