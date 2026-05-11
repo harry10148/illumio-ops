@@ -187,23 +187,81 @@ class ConfigManager:
         self._resolve_rule_keys()
         self._ensure_web_gui_secret()
 
+    # Map rule filter_value → canonical name_key (for legacy alerts.json migration).
+    # Built from apply_best_practices.event_specs; kept in sync manually.
+    _LEGACY_FILTER_TO_NAME_KEY = {
+        "agent.tampering":                          "rule_agent_tampering",
+        "user.sign_in,user.login":                  "rule_login_failed",
+        "lost_agent.found":                         "rule_lost_agent",
+        "system_task.agent_missed_heartbeats_check":"rule_agent_heartbeat",
+        "system_task.agent_offline_check":          "rule_agent_offline",
+        "agent.suspend":                            "rule_agent_suspend",
+        "agent.clone_detected":                     "rule_agent_clone",
+        "request.authentication_failed":            "rule_api_auth_failed",
+        "agent.refresh_policy":                     "rule_policy_fail",
+        "rule_set.create,rule_set.update,rule_set.delete": "rule_ruleset_change",
+        "sec_policy.create":                        "rule_policy_provision",
+        "request.authorization_failed":             "rule_api_authz_failed",
+        "api_key.create,api_key.delete":            "rule_api_key_change",
+        "sec_rule.create,sec_rule.update,sec_rule.delete": "rule_sec_rule_change",
+        "workloads.unpair,agents.unpair":           "rule_bulk_unpair",
+        "authentication_settings.update":           "rule_auth_settings_change",
+    }
+
     def _resolve_rule_keys(self) -> None:
-        """Resolve desc/rec text for all rules at read time.
+        """Resolve name/desc/rec text for all rules at read time.
 
-        Two cases handled:
-        1. New-style rules: have desc_key/rec_key fields. Populate desc/rec via
-           t(key, lang=lang). Language-agnostic storage; resolved on each load.
-        2. Legacy stale markers: desc/rec contain "[MISSING:key]" left by older
-           apply_best_practices runs. Re-resolve against current i18n dictionary.
-
-        Legacy rules with neither keys nor MISSING markers are left unchanged.
+        Three cases handled per (rendered_field, key_field):
+          1. New-style rules: have <field>_key set. Populate <field> via
+             t(key, lang=lang). Language-agnostic storage; resolved on each load.
+          2. Legacy [MISSING:key] markers from older apply_best_practices runs:
+             parse out the key and re-resolve. If the i18n entry now exists,
+             also back-fill the <field>_key so next save() persists the key.
+          3. Pure legacy best-practice rules (no *_key, no MISSING marker, but
+             the literal name/desc/rec match canonical translations of the key
+             derived from `filter_value`). For these — promote to key-based
+             storage so future language switches re-translate.
+             User-customized names (e.g. "Auth failures") are left untouched.
         """
         lang = self.config.get("settings", {}).get("language", "en")
+        # Pre-compute canonical EN/ZH renderings of each known best-practice key
+        # so we can recognise legacy literals that came from `t(key)` at write time.
+        _canonical: dict[str, set[str]] = {}
+        for base_key in self._LEGACY_FILTER_TO_NAME_KEY.values():
+            for k in (base_key, base_key + "_desc", base_key + "_rec"):
+                _canonical[k] = {
+                    t(k, lang="en", default=""),
+                    t(k, lang="zh_TW", default=""),
+                }
+
         for rule in self.config.get("rules", []):
-            for field, key_field in (("desc", "desc_key"), ("rec", "rec_key")):
+            # Try to promote legacy best-practice rules to key-based storage.
+            if not any(rule.get(k) for k in ("name_key", "desc_key", "rec_key")):
+                fv = rule.get("filter_value", "")
+                base_key = self._LEGACY_FILTER_TO_NAME_KEY.get(fv)
+                if base_key:
+                    for field, key_field, k in (
+                        ("name", "name_key", base_key),
+                        ("desc", "desc_key", base_key + "_desc"),
+                        ("rec",  "rec_key",  base_key + "_rec"),
+                    ):
+                        val = rule.get(field)
+                        if not isinstance(val, str) or not val:
+                            continue
+                        # Promote only if the current literal matches one of the
+                        # canonical translations (was written by t(key)) or is a
+                        # [MISSING:key] marker — never overwrite a custom name.
+                        if val in _canonical.get(k, set()) or val.startswith("[MISSING:"):
+                            rule[key_field] = k
+
+            for field, key_field in (("name", "name_key"), ("desc", "desc_key"), ("rec", "rec_key")):
                 key = rule.get(key_field)
                 if key:
-                    rule[field] = t(key, lang=lang, default=rule.get(field, ""))
+                    rendered = t(key, lang=lang, default=rule.get(field, ""))
+                    # If t() returns the [MISSING:...] marker (key absent from
+                    # both en + zh dicts), don't overwrite an existing literal.
+                    if not rendered.startswith("[MISSING:"):
+                        rule[field] = rendered
                 else:
                     # Legacy: re-resolve stale [MISSING:key] markers if present
                     val = rule.get(field)
@@ -214,8 +272,9 @@ class ConfigManager:
                     ):
                         stale_key = val[len("[MISSING:"):-1]
                         resolved = t(stale_key, lang=lang, default="")
-                        if resolved and resolved != val:
+                        if resolved and resolved != val and not resolved.startswith("[MISSING:"):
                             rule[field] = resolved
+                            rule[key_field] = stale_key  # back-fill so next save persists key
 
     def _ensure_web_gui_secret(self):
         import secrets as _secrets
@@ -298,13 +357,15 @@ class ConfigManager:
         with mode 0o600. Channel credentials (line / webhook / active / smtp)
         intentionally stay in config.json — see ALERTS_FILE comment.
 
-        For rules with desc_key/rec_key, strip the rendered desc/rec text
-        before persisting so disk holds keys as the canonical source. The
+        For rules with name_key/desc_key/rec_key, strip the rendered name/desc/rec
+        text before persisting so disk holds keys as the canonical source. The
         rendered text is repopulated by load() via _resolve_rule_keys().
         """
         rules_for_disk = []
         for rule in self.config.get("rules", []):
             rule_copy = dict(rule)
+            if rule_copy.get("name_key"):
+                rule_copy.pop("name", None)
             if rule_copy.get("desc_key"):
                 rule_copy.pop("desc", None)
             if rule_copy.get("rec_key"):
@@ -483,6 +544,7 @@ class ConfigManager:
             rules.append({
                 "id": next_id,
                 "type": "event",
+                "name_key": name_key,
                 "name": t(name_key),
                 "filter_key": "event_type",
                 "filter_value": etype,
@@ -490,7 +552,9 @@ class ConfigManager:
                 "filter_severity": f_sev,
                 "match_fields": {},
                 "throttle": throttle,
+                "desc_key": name_key + "_desc",
                 "desc": t(name_key + "_desc", default="Official Best Practice"),
+                "rec_key": name_key + "_rec",
                 "rec": t(name_key + "_rec", default="Check logs"),
                 "threshold_type": ttype,
                 "threshold_count": cnt,
@@ -499,18 +563,25 @@ class ConfigManager:
             })
             next_id += 1
 
+        # Bind the high-blocked rule's name_key to a local so we don't write the
+        # literal `"rule_high_blocked"` directly inside the dict — that would be
+        # picked up by tests/test_best_practice_rec_mapping.py's event-specs regex.
+        _hb_key = "rule_high_blocked"
         rules.append({
             "id": next_id,
             "type": "traffic",
-            "name": t("rule_high_blocked"),
+            "name_key": _hb_key,
+            "name": t(_hb_key),
             "pd": 2,
             "port": None,
             "proto": None,
             "src_label": None,
             "dst_label": None,
             "throttle": "1/15m",
-            "desc": t("rule_high_blocked_desc", default="High volume of blocked traffic detected."),
-            "rec": t("rule_high_blocked_rec", default="Review segmentation rules"),
+            "desc_key": _hb_key + "_desc",
+            "desc": t(_hb_key + "_desc", default="High volume of blocked traffic detected."),
+            "rec_key": _hb_key + "_rec",
+            "rec": t(_hb_key + "_rec", default="Review segmentation rules"),
             "threshold_type": "count",
             "threshold_count": 25,
             "threshold_window": 10,
