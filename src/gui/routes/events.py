@@ -331,6 +331,23 @@ def make_events_blueprint(
                 supports_status = event_id in ACTION_EVENTS
                 supports_severity = event_id in SEVERITY_FILTER_EVENTS or event_id == "*"
                 prefix = event_id.split(".")[0] if event_id != "*" else None
+                # group_id mirrors src/static/js/events.js:_eventViewerGroupOf;
+                # group_label is server-side translated so zh_TW users no longer see
+                # English title-case fallbacks like "Login Proxy Ldap Config".
+                group_id = prefix if prefix else "*"
+                if event_id == "*":
+                    group_label = t("gui_ev_all_groups", lang=lang, default="All groups")
+                else:
+                    group_label_text = t(
+                        "event_group_" + group_id,
+                        lang=lang,
+                        default="",
+                    )
+                    if not group_label_text or group_label_text.startswith("[MISSING:"):
+                        # Snake_case → Title Case fallback, matching the previous
+                        # client-side humanizer so behaviour stays consistent.
+                        group_label_text = " ".join(p.capitalize() for p in group_id.split("_") if p)
+                    group_label = f"{group_label_text} ({group_id}.*)"
                 related = [e for e in prefix_map.get(prefix, []) if e != event_id] if prefix else []
                 translated_catalog[trans_cat][event_id] = label
                 event_items.append({
@@ -342,6 +359,8 @@ def make_events_blueprint(
                     'source': 'local_extension' if event_id in LOCAL_EXTENSION_EVENT_TYPES else 'vendor_baseline',
                     'supports_status': supports_status,
                     'supports_severity': supports_severity,
+                    'group_id': group_id,
+                    'group_label': group_label,
                 })
 
             categories.append({

@@ -95,12 +95,16 @@ async function ensureEventViewerCatalog() {
   const items = [];
   categories.forEach((category) => {
     (category.events || []).forEach((item) => {
+      // Prefer server-translated group_label (added so zh_TW shows Chinese
+      // group names). Fall back to local humanization for older API responses.
+      const groupId = item.group_id || _eventViewerGroupOf(item.id);
+      const groupLabel = item.group_label || _humanizeEventViewerGroup(groupId);
       items.push({
         ...item,
         category_id: category.id,
         category_label: category.label,
-        group_id: _eventViewerGroupOf(item.id),
-        group_label: _humanizeEventViewerGroup(_eventViewerGroupOf(item.id)),
+        group_id: groupId,
+        group_label: groupLabel,
       });
     });
   });
