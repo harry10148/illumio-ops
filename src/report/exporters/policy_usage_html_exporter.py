@@ -20,7 +20,6 @@ from src.i18n import t
 from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 from src.report.exporters._exec_summary import render_exec_summary_html
-from src.report.exporters._sidebar import render_sidebar_html
 
 _CSS = build_css("policy_usage")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -179,10 +178,8 @@ class PolicyUsageHtmlExporter:
         )
 
         exec_html = render_exec_summary_html(mod00, report_name='Policy Usage Report', lang=self._lang)
-        sidebar_html = render_sidebar_html('policy_usage')
         body = (
-            sidebar_html
-            + exec_html
+            exec_html
             + '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
             f'<div class="report-kicker">{_s("rpt_kicker_policy")}</div>'
@@ -193,7 +190,8 @@ class PolicyUsageHtmlExporter:
             + "</p></div>"
             + render_section_guidance("pu_mod00_executive",
                                       profile="security_risk",
-                                      detail_level="full")
+                                      detail_level="full",
+                                      lang=self._lang)
             + self._summary_pills(mod00)
             + self._kpi_html(mod00.get("kpis", []))
             + self._execution_html(mod00)
@@ -396,7 +394,8 @@ class PolicyUsageHtmlExporter:
         html_parts = []
         html_parts.append(render_section_guidance("pu_mod01_overview",
                                                   profile="security_risk",
-                                                  detail_level="full"))
+                                                  detail_level="full",
+                                                  lang=self._lang))
 
         mod01 = self._r.get("mod01", {})
         total = mod01.get("total_rules", 0)
@@ -437,7 +436,8 @@ class PolicyUsageHtmlExporter:
         html_parts = []
         html_parts.append(render_section_guidance("pu_mod02_hit_detail",
                                                   profile="security_risk",
-                                                  detail_level="full"))
+                                                  detail_level="full",
+                                                  lang=self._lang))
 
         mod02 = self._r.get("mod02", {})
         hit_df = mod02.get("hit_df")
@@ -462,7 +462,8 @@ class PolicyUsageHtmlExporter:
         html_parts = []
         html_parts.append(render_section_guidance("pu_mod03_unused_detail",
                                                   profile="security_risk",
-                                                  detail_level="full"))
+                                                  detail_level="full",
+                                                  lang=self._lang))
 
         mod03 = self._r.get("mod03", {})
         unused_df = mod03.get("unused_df")
@@ -492,7 +493,8 @@ class PolicyUsageHtmlExporter:
         html_parts = []
         html_parts.append(render_section_guidance("pu_mod04_deny_effectiveness",
                                                   profile="security_risk",
-                                                  detail_level="full"))
+                                                  detail_level="full",
+                                                  lang=self._lang))
 
         mod04 = self._r.get("mod04", {})
         total_deny = mod04.get("total_deny", 0)
@@ -521,7 +523,7 @@ class PolicyUsageHtmlExporter:
             stats += (
                 '<p class="note note-warn">'
                 f'<strong>{_s("rpt_pu_override_deny")}</strong> {override_count} '
-                '— these take highest priority and bypass all other rules. Review for correctness.</p>'
+                f'— {_s("rpt_pu_override_deny_note")}</p>'
             )
 
         summary_df = mod04.get("deny_summary_df")

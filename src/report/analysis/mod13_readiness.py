@@ -46,7 +46,7 @@ def _severity_from_ratio(ratio: float) -> str:
         return "HIGH"
     return "MEDIUM"
 
-def _build_recommendations(attack_items: list[dict], top_n: int) -> pd.DataFrame:
+def _build_recommendations(attack_items: list[dict], top_n: int, lang: str = "en") -> pd.DataFrame:
     if not attack_items:
         return pd.DataFrame(
             columns=["Priority", "App (Env)", "App Env Key", "Issue", "Action", "Action Code", "Severity"]
@@ -60,7 +60,7 @@ def _build_recommendations(attack_items: list[dict], top_n: int) -> pd.DataFrame
                 "App (Env)": item.get("app_display"),
                 "App Env Key": item.get("app_env_key"),
                 "Issue": item.get("finding_kind", "").replace("_", " ").title(),
-                "Action": resolve_recommendation(item.get("recommended_action_code", ""), "en"),
+                "Action": resolve_recommendation(item.get("recommended_action_code", ""), lang),
                 "Action Code": item.get("recommended_action_code", ""),
                 "Severity": item.get("severity", "INFO"),
             }
@@ -262,7 +262,7 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
             enforcement_mode_distribution[mode] = enforcement_mode_distribution.get(mode, 0) + 1
 
     ranked_items = rank_posture_items(attack_items)
-    recommendations = _build_recommendations(ranked_items, top_n=top_n)
+    recommendations = _build_recommendations(ranked_items, top_n=top_n, lang=lang)
 
     factor_chart_labels = [
         t("rpt_factor_policy_coverage", default="Policy Coverage", lang=lang),

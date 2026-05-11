@@ -20,7 +20,6 @@ from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from src.report.analysis.audit.audit_risk import RISK_BG, RISK_COLOR, get_risk
 from src.report.exporters._exec_summary import render_exec_summary_html
-from src.report.exporters._sidebar import render_sidebar_html
 
 _CSS = build_css("audit")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -132,8 +131,8 @@ class AuditHtmlExporter:
                 + '</div>'
                 + (
                     f'<div class="audit-attn-meta">'
-                    f'<strong>Target:</strong> {targets_str}'
-                    + (f' &nbsp;|&nbsp; <strong>Resource:</strong> {resources_str}' if resources_str else '')
+                    f'<strong>{_s("rpt_au_target")}</strong> {targets_str}'
+                    + (f' &nbsp;|&nbsp; <strong>{_s("rpt_au_resource")}</strong> {resources_str}' if resources_str else '')
                     + '</div>'
                     if targets_str or resources_str else ''
                 )
@@ -176,8 +175,15 @@ class AuditHtmlExporter:
             f'<a href="#correlation">{_s("rpt_au_nav_correlation")}</a>'
             "</nav>"
         )
+        def _kpi_label(k: dict) -> str:
+            lk = k.get("label_key")
+            if lk:
+                txt = t(lk, lang=self._lang)
+                if txt and not txt.startswith("[MISSING:"):
+                    return txt
+            return k.get("label", "")
         kpi_cards = "".join(
-            '<div class="kpi-card"><div class="kpi-label">' + k["label"] + "</div>"
+            '<div class="kpi-card"><div class="kpi-label">' + _kpi_label(k) + "</div>"
             '<div class="kpi-value">' + k["value"] + "</div></div>"
             for k in mod00.get("kpis", [])
         )
@@ -209,11 +215,9 @@ class AuditHtmlExporter:
             summary_pills = summary_pills.replace("</div>", data_source_pill + "</div>", 1)
 
         exec_html = render_exec_summary_html(mod00, report_name='Audit Report', lang=self._lang)
-        sidebar_html = render_sidebar_html('audit')
         body = (
-            sidebar_html
-            + exec_html
-            + render_section_guidance("audit_mod00_executive", profile="security_risk", detail_level="full")
+            exec_html
+            + render_section_guidance("audit_mod00_executive", profile="security_risk", detail_level="full", lang=self._lang)
             + '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
             f'<div class="report-kicker">{_s("rpt_kicker_audit")}</div>'
@@ -261,7 +265,7 @@ class AuditHtmlExporter:
         return f'<section id="{id_}" class="card"><h2>{self._s(i18n_key)}</h2>{content}</section>'
 
     def _trend_deltas_html(self) -> str:
-        return _trend_deltas_section(self._r.get("_trend_deltas"))
+        return _trend_deltas_section(self._r.get("_trend_deltas"), lang=self._lang)
 
     def _subnote(self, i18n_key: str, en_text: str = "") -> str:
         text = self._s(i18n_key) if i18n_key else en_text
@@ -330,7 +334,7 @@ class AuditHtmlExporter:
 
         _s = self._s
         _lang = self._lang
-        html_parts = [render_section_guidance("audit_mod01_health", profile="security_risk", detail_level="full")]
+        html_parts = [render_section_guidance("audit_mod01_health", profile="security_risk", detail_level="full", lang=_lang)]
 
         sec_count = m.get("security_concern_count", 0)
         conn_count = m.get("connectivity_event_count", 0)
@@ -372,7 +376,7 @@ class AuditHtmlExporter:
 
         _s = self._s
         _lang = self._lang
-        html_parts = [render_section_guidance("audit_mod02_users", profile="security_risk", detail_level="full")]
+        html_parts = [render_section_guidance("audit_mod02_users", profile="security_risk", detail_level="full", lang=_lang)]
 
         failed = m.get("failed_logins", 0)
         unique_ips = m.get("unique_src_ips", 0)
@@ -415,7 +419,7 @@ class AuditHtmlExporter:
 
         _s = self._s
         _lang = self._lang
-        html_parts = [render_section_guidance("audit_mod03_policy", profile="security_risk", detail_level="full")]
+        html_parts = [render_section_guidance("audit_mod03_policy", profile="security_risk", detail_level="full", lang=_lang)]
 
         prov_count = m.get("provision_count", 0)
         rule_count = m.get("rule_change_count", 0)
@@ -477,7 +481,7 @@ class AuditHtmlExporter:
 
         _s = self._s
         _lang = self._lang
-        html_parts = [render_section_guidance("audit_mod04_correlation", profile="security_risk", detail_level="full")]
+        html_parts = [render_section_guidance("audit_mod04_correlation", profile="security_risk", detail_level="full", lang=_lang)]
 
         total_corr = m.get("total_correlations", 0)
         total_bf = m.get("total_brute_force", 0)

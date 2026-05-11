@@ -116,7 +116,8 @@ class PolicyUsageGenerator:
         print(t("rpt_pu_complete", lang=self._lang))
         return result
 
-    def generate_from_csv(self, csv_path: str, detail_level: str = _REPORT_DETAIL_LEVEL) -> PolicyUsageResult:
+    def generate_from_csv(self, csv_path: str, detail_level: str = _REPORT_DETAIL_LEVEL,
+                          lang: str = "en") -> PolicyUsageResult:
         """Import workloader rule-usage CSV and generate the same report.
 
         Expected CSV columns: ruleset_name, rule_description, rule_href,
@@ -124,6 +125,7 @@ class PolicyUsageGenerator:
         rule_enabled, ruleset_enabled, ...
         """
         self._detail_level = _REPORT_DETAIL_LEVEL
+        self._lang = lang
         import pandas as pd
 
         if not os.path.isfile(csv_path):

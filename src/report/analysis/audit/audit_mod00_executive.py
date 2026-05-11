@@ -11,7 +11,8 @@ from src.report.analysis.attack_posture import (
     rank_posture_items,
     summarize_attack_posture,
 )
-from src.report.analysis.audit.audit_risk import AUDIT_RISK_MAP, RISK_ORDER
+from src.i18n import t
+from src.report.analysis.audit.audit_risk import AUDIT_RISK_MAP, RISK_ORDER, get_risk
 
 def _non_empty_values(df: pd.DataFrame, column: str, limit: int = 3) -> list[str]:
     if column not in df.columns:
@@ -27,40 +28,40 @@ def _non_empty_values(df: pd.DataFrame, column: str, limit: int = 3) -> list[str
     )
     return [str(value) for value in values[:limit]]
 
-def audit_executive_summary(results: dict, df: pd.DataFrame) -> dict:
+def audit_executive_summary(results: dict, df: pd.DataFrame, lang: str = "en") -> dict:
     mod01 = results.get("mod01", {})
     mod02 = results.get("mod02", {})
     mod03 = results.get("mod03", {})
 
     kpis = [
-        {"label": "Total Events", "value": f"{len(df):,}"},
-        {"label": "Health Events", "value": f"{mod01.get('total_health_events', 0):,}"},
-        {"label": "Security Concerns", "value": str(mod01.get("security_concern_count", 0))},
-        {"label": "Agent Connectivity", "value": str(mod01.get("connectivity_event_count", 0))},
-        {"label": "Failed Logins", "value": str(mod02.get("failed_logins", 0))},
-        {"label": "Policy Provisions", "value": str(mod03.get("provision_count", 0))},
-        {"label": "Draft Rule Changes", "value": str(mod03.get("rule_change_count", 0))},
-        {"label": "High-Risk Events", "value": str(mod03.get("high_risk_count", 0))},
+        {"label_key": "rpt_au_kpi_total_events", "label": "Total Events", "value": f"{len(df):,}"},
+        {"label_key": "rpt_au_kpi_health_events", "label": "Health Events", "value": f"{mod01.get('total_health_events', 0):,}"},
+        {"label_key": "rpt_au_kpi_security_concerns", "label": "Security Concerns", "value": str(mod01.get("security_concern_count", 0))},
+        {"label_key": "rpt_au_kpi_agent_connectivity", "label": "Agent Connectivity", "value": str(mod01.get("connectivity_event_count", 0))},
+        {"label_key": "rpt_au_kpi_failed_logins", "label": "Failed Logins", "value": str(mod02.get("failed_logins", 0))},
+        {"label_key": "rpt_au_kpi_policy_provisions", "label": "Policy Provisions", "value": str(mod03.get("provision_count", 0))},
+        {"label_key": "rpt_au_kpi_draft_rule_changes", "label": "Draft Rule Changes", "value": str(mod03.get("rule_change_count", 0))},
+        {"label_key": "rpt_au_kpi_high_risk_events", "label": "High-Risk Events", "value": str(mod03.get("high_risk_count", 0))},
     ]
 
     total_wa = mod03.get("total_workloads_affected", 0)
     if total_wa > 0:
-        kpis.append({"label": "Workloads Affected", "value": f"{total_wa:,}"})
+        kpis.append({"label_key": "rpt_au_kpi_workloads_affected", "label": "Workloads Affected", "value": f"{total_wa:,}"})
 
     if "src_ip" in df.columns:
         unique_ips = (
             df["src_ip"].astype(str).str.strip().replace("", pd.NA).dropna().nunique()
         )
         if unique_ips > 0:
-            kpis.append({"label": "Unique Source IPs", "value": str(int(unique_ips))})
+            kpis.append({"label_key": "rpt_au_kpi_unique_source_ips", "label": "Unique Source IPs", "value": str(int(unique_ips))})
 
     if "known_event_type" in df.columns:
         unknown_count = int((~df["known_event_type"].fillna(False)).sum())
-        kpis.append({"label": "Unknown Event Types", "value": str(unknown_count)})
+        kpis.append({"label_key": "rpt_au_kpi_unknown_event_types", "label": "Unknown Event Types", "value": str(unknown_count)})
 
     if "parser_note_count" in df.columns:
         parser_note_rows = int((pd.to_numeric(df["parser_note_count"], errors="coerce").fillna(0) > 0).sum())
-        kpis.append({"label": "Parser Notes", "value": str(parser_note_rows)})
+        kpis.append({"label_key": "rpt_au_kpi_parser_notes", "label": "Parser Notes", "value": str(parser_note_rows)})
 
     top_events = pd.DataFrame()
     if "event_type" in df.columns and not df.empty:
@@ -74,18 +75,20 @@ def audit_executive_summary(results: dict, df: pd.DataFrame) -> dict:
 
     attention_items = []
     if not df.empty and "event_type" in df.columns:
-        for event_type, (risk, desc, rec) in AUDIT_RISK_MAP.items():
+        for event_type, (risk, _desc_en, _rec_en) in AUDIT_RISK_MAP.items():
             if RISK_ORDER.get(risk, 99) > RISK_ORDER.get("MEDIUM", 2):
                 continue
             subset = df[df["event_type"] == event_type]
             if subset.empty:
                 continue
 
+            _, desc, rec = get_risk(event_type, lang=lang)
+
             extra = ""
             if event_type == "sec_policy.create" and "workloads_affected" in subset.columns:
                 total = int(pd.to_numeric(subset["workloads_affected"], errors="coerce").fillna(0).sum())
                 if total:
-                    extra = f" Total workloads affected: {total}."
+                    extra = t("rpt_au_workloads_affected_suffix", lang=lang, count=total)
 
             attention_items.append({
                 "risk": risk,
@@ -187,7 +190,7 @@ def audit_executive_summary(results: dict, df: pd.DataFrame) -> dict:
         )
 
     ranked_attack_items = rank_posture_items(attack_items)
-    attack_sections = summarize_attack_posture(ranked_attack_items, top_n=5)
+    attack_sections = summarize_attack_posture(ranked_attack_items, top_n=5, lang=lang)
 
     chart_spec = None
     if not top_events.empty and "Event Type" in top_events.columns and "Count" in top_events.columns:

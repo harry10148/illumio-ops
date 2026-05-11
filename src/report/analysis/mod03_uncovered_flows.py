@@ -3,11 +3,14 @@ from __future__ import annotations
 import pandas as pd
 from src.i18n import t, get_language
 
-_REC_MAP = {
-    'intra_app': "Intra-app flow: add an intra-scope rule to allow traffic within the same application.",
-    'unmanaged_source': "Unmanaged source host: onboard to PCE or apply explicit deny / allow rule.",
-    'cross_app': "Cross-app flow: add a rule-set entry for this src_app → dst_app communication.",
-}
+
+def _rec_map(lang: str) -> dict[str, str]:
+    """Return localized recommendation text per uncovered-flow category."""
+    return {
+        'intra_app': t('rpt_mod03_rec_intra_app', lang=lang),
+        'unmanaged_source': t('rpt_mod03_rec_unmanaged_source', lang=lang),
+        'cross_app': t('rpt_mod03_rec_cross_app', lang=lang),
+    }
 
 def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> dict:
     """
@@ -102,7 +105,8 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
         return 'cross_app'
 
     uncovered['recommendation_type'] = uncovered.apply(_classify, axis=1)
-    uncovered['recommendation'] = uncovered['recommendation_type'].map(_REC_MAP)
+    _rmap = _rec_map(lang)
+    uncovered['recommendation'] = uncovered['recommendation_type'].map(_rmap)
 
     top_flows = (uncovered.groupby(['flow_key', 'policy_decision', 'recommendation'])
                  .agg(connections=('num_connections', 'sum'),
@@ -116,7 +120,7 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
     by_rec = (uncovered.groupby('recommendation_type').size()
               .reset_index(name='Count')
               .rename(columns={'recommendation_type': 'Category'}))
-    by_rec['Recommendation'] = by_rec['Category'].map(_REC_MAP)
+    by_rec['Recommendation'] = by_rec['Category'].map(_rmap)
 
     # Per-port gap ranking: ports with most uncovered flows
     uncovered_ports = _port_gap_ranking(df, uncovered, top_n=top_n)
