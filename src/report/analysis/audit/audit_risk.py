@@ -2,6 +2,7 @@
 src/report/analysis/audit/audit_risk.py
 Audit event risk classification — maps event_type to risk level and metadata.
 """
+from __future__ import annotations
 
 from src.i18n import t
 
