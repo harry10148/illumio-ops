@@ -55,18 +55,30 @@ def test_install_replaces_excepthook(monkeypatch):
 
 @pytest.mark.skipif(sys.platform == 'win32', reason="POSIX signals only")
 def test_sigterm_returns_exit_143(tmp_path):
-    """End-to-end: send SIGTERM to a child running install_top_level_handler, expect exit 143."""
+    """End-to-end: send SIGTERM to a child running install_top_level_handler, expect exit 143.
+
+    Synchronises on a "READY" line written by the child after the handler is
+    installed — otherwise on slow hosts the SIGTERM lands before
+    ``signal.signal(SIGTERM, handler)`` has executed, and the OS kills the
+    process directly (returncode = -15) without going through our handler.
+    """
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     proc = subprocess.Popen(
-        [sys.executable, '-c',
+        [sys.executable, '-u', '-c',
          f"import sys; sys.path.insert(0, {repr(project_root)}); "
          "from src.cli._errors import install_top_level_handler; "
          "install_top_level_handler(); "
+         "sys.stdout.write('READY\\n'); sys.stdout.flush(); "
          "import time; \n"
          "while True: time.sleep(0.1)"],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
     )
-    time.sleep(0.4)  # let it install handler
+    # Block until the handler is installed (READY line written) or timeout.
+    ready_line = proc.stdout.readline()
+    if ready_line.strip() != b"READY":
+        proc.kill()
+        proc.wait()
+        pytest.fail(f"Child did not signal READY before timeout (got {ready_line!r})")
     proc.terminate()  # sends SIGTERM
     try:
         proc.wait(timeout=3)
@@ -74,4 +86,8 @@ def test_sigterm_returns_exit_143(tmp_path):
         proc.kill()
         proc.wait()
         pytest.fail("Process did not exit after SIGTERM")
-    assert proc.returncode == EXIT_TERMINATED  # 143
+    assert proc.returncode == EXIT_TERMINATED, (
+        f"Expected SIGTERM handler to call sys.exit({EXIT_TERMINATED}), "
+        f"got returncode={proc.returncode}. "
+        f"Negative codes mean the OS killed the process before the handler ran."
+    )
