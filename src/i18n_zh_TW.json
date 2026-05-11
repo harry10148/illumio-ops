@@ -1440,6 +1440,7 @@
   "mod12_kpi_high_risk_lateral_paths": "高風險橫向路徑",
   "mod12_kpi_known_dependency_coverage": "已知依賴關係覆蓋率",
   "mod12_kpi_label_completeness": "Label 完整性",
+  "mod12_kpi_maturity_score": "微分段成熟度",
   "mod12_kpi_microsegmentation_maturity": "微分段成熟度",
   "mod12_kpi_pb_uncovered": "PB 未覆蓋暴露",
   "mod12_kpi_pb_uncovered_exposure": "PB 未覆蓋暴露",

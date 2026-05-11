@@ -1440,6 +1440,7 @@
   "mod12_kpi_high_risk_lateral_paths": "High-Risk Lateral Paths",
   "mod12_kpi_known_dependency_coverage": "Known Dependency Coverage",
   "mod12_kpi_label_completeness": "Label Completeness",
+  "mod12_kpi_maturity_score": "Maturity Score",
   "mod12_kpi_microsegmentation_maturity": "Microsegmentation Maturity",
   "mod12_kpi_pb_uncovered": "PB Uncovered Exposure",
   "mod12_kpi_pb_uncovered_exposure": "PB Uncovered Exposure",

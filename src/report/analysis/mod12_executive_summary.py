@@ -172,21 +172,21 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
     enforcement_dist = _enforcement_mode_distribution(results)
 
     kpis = [
-        {"label": t("mod12_kpi_total_flows", default="Total Flows", lang=lang), "value": _fmt(mod01.get("total_flows", 0))},
-        {"label": t("mod12_kpi_total_connections", default="Total Connections", lang=lang), "value": _fmt(mod01.get("total_connections", 0))},
-        {"label": t("mod12_kpi_unique_src_ips", default="Unique Source IPs", lang=lang), "value": _fmt(mod01.get("unique_src_ips", 0))},
-        {"label": t("mod12_kpi_unique_dst_ips", default="Unique Dest IPs", lang=lang), "value": _fmt(mod01.get("unique_dst_ips", 0))},
-        {"label": t("mod12_kpi_enforced_coverage", default="Enforced Coverage", lang=lang), "value": f"{enforced_cov}%"},
-        {"label": t("mod12_kpi_staged_coverage", default="Staged Coverage", lang=lang), "value": f"{staged_cov}%"},
-        {"label": t("mod12_kpi_true_gap", default="True Gap", lang=lang), "value": f"{true_gap}%"},
-        {"label": t("mod12_kpi_blocked_flows", default="Blocked Flows", lang=lang), "value": _fmt(mod01.get("blocked_flows", 0))},
-        {"label": t("mod12_kpi_pb_uncovered", default="PB Uncovered Exposure", lang=lang), "value": _fmt(
+        {"label_key": "mod12_kpi_total_flows",       "label": t("mod12_kpi_total_flows", default="Total Flows", lang=lang), "value": _fmt(mod01.get("total_flows", 0))},
+        {"label_key": "mod12_kpi_total_connections", "label": t("mod12_kpi_total_connections", default="Total Connections", lang=lang), "value": _fmt(mod01.get("total_connections", 0))},
+        {"label_key": "mod12_kpi_unique_src_ips",    "label": t("mod12_kpi_unique_src_ips", default="Unique Source IPs", lang=lang), "value": _fmt(mod01.get("unique_src_ips", 0))},
+        {"label_key": "mod12_kpi_unique_dst_ips",    "label": t("mod12_kpi_unique_dst_ips", default="Unique Dest IPs", lang=lang), "value": _fmt(mod01.get("unique_dst_ips", 0))},
+        {"label_key": "mod12_kpi_enforced_coverage", "label": t("mod12_kpi_enforced_coverage", default="Enforced Coverage", lang=lang), "value": f"{enforced_cov}%"},
+        {"label_key": "mod12_kpi_staged_coverage",   "label": t("mod12_kpi_staged_coverage", default="Staged Coverage", lang=lang), "value": f"{staged_cov}%"},
+        {"label_key": "mod12_kpi_true_gap",          "label": t("mod12_kpi_true_gap", default="True Gap", lang=lang), "value": f"{true_gap}%"},
+        {"label_key": "mod12_kpi_blocked_flows",     "label": t("mod12_kpi_blocked_flows", default="Blocked Flows", lang=lang), "value": _fmt(mod01.get("blocked_flows", 0))},
+        {"label_key": "mod12_kpi_pb_uncovered",      "label": t("mod12_kpi_pb_uncovered", default="PB Uncovered Exposure", lang=lang), "value": _fmt(
             mod01.get("potentially_blocked_flows") or
             mod03.get("pb_uncovered_count", mod03.get("n_potentially_blocked", 0))
         )},
-        {"label": t("mod12_kpi_unmanaged_src_pct", default="Unmanaged Src %", lang=lang), "value": f"{100 - mod01.get('src_managed_pct', 100):.1f}%"},
-        {"label": t("mod12_kpi_total_data_volume", default="Total Data Volume", lang=lang), "value": f"{mod01.get('total_mb', 0):.1f} MB"},
-        {"label": t("mod12_kpi_date_range", default="Date Range", lang=lang), "value": mod01.get("date_range", "N/A")},
+        {"label_key": "mod12_kpi_unmanaged_src_pct", "label": t("mod12_kpi_unmanaged_src_pct", default="Unmanaged Src %", lang=lang), "value": f"{100 - mod01.get('src_managed_pct', 100):.1f}%"},
+        {"label_key": "mod12_kpi_total_data_volume", "label": t("mod12_kpi_total_data_volume", default="Total Data Volume", lang=lang), "value": f"{mod01.get('total_mb', 0):.1f} MB"},
+        {"label_key": "mod12_kpi_date_range",        "label": t("mod12_kpi_date_range", default="Date Range", lang=lang), "value": mod01.get("date_range", "N/A")},
     ]
 
     # Add enforcement mode distribution KPIs if available
@@ -244,7 +244,11 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
 
     # A3: Organization-level Microsegmentation Maturity Score
     maturity = _compute_maturity_score(results)
-    kpis.insert(0, {"label": "Maturity Score", "value": f"{maturity['maturity_score']}/100 ({maturity['maturity_grade']})"})
+    kpis.insert(0, {
+        "label_key": "mod12_kpi_maturity_score",
+        "label": t("mod12_kpi_maturity_score", default="Maturity Score", lang=lang),
+        "value": f"{maturity['maturity_score']}/100 ({maturity['maturity_grade']})",
+    })
 
     dim_labels = [
         'Enforcement Coverage',
