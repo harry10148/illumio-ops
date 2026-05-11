@@ -257,7 +257,8 @@ class _RuleSchedulerCLI:
             days = [d.strip() for d in raw_days.split(',')] if raw_days else [
                 "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
             ]
-            days_str = t('rs_action_everyday') if not raw_days else raw_days
+            # English-only — see note_msg comment below.
+            days_str = t('rs_action_everyday', lang='en') if not raw_days else raw_days
 
             default_start = existing.get('start', '') if existing and existing.get('type') == 'recurring' else ''
             default_end = existing.get('end', '') if existing and existing.get('type') == 'recurring' else ''
@@ -291,14 +292,18 @@ class _RuleSchedulerCLI:
                 print(f"{Colors.FAIL}[-] {t('rs_sch_time_invalid')}{Colors.ENDC}")
                 return None, None
 
-            act_str = t('rs_action_enable_in_window') if act == 'allow' else t('rs_action_disable_in_window')
+            # Force English for the annotation that gets pushed into PCE's rule
+            # description: it's stored data, not a UI label, and later report
+            # runs surface it verbatim — embedding the operator's current
+            # language would leak into other-language reports.
+            act_str = t('rs_action_enable_in_window', lang='en') if act == 'allow' else t('rs_action_disable_in_window', lang='en')
             db_entry = {
                 "type": "recurring", "name": target_name, "is_ruleset": is_rs,
                 "action": act, "days": days, "start": s_time, "end": e_time,
                 "detail_rs": meta_rs, "detail_src": meta_src, "detail_dst": meta_dst, "detail_svc": meta_svc,
                 "detail_name": target_name
             }
-            note_msg = f"[📅 {t('rs_sch_tag_recurring')}: {days_str} {s_time}-{e_time} {act_str}]"
+            note_msg = f"[📅 {t('rs_sch_tag_recurring', lang='en')}: {days_str} {s_time}-{e_time} {act_str}]"
             return db_entry, note_msg
 
         elif mode_sel == '2':
@@ -329,7 +334,7 @@ class _RuleSchedulerCLI:
                 "detail_rs": meta_rs, "detail_src": meta_src, "detail_dst": meta_dst, "detail_svc": meta_svc,
                 "detail_name": target_name
             }
-            note_msg = f"[⏳ {t('rs_sch_tag_expire')}: {raw_ex}]"
+            note_msg = f"[⏳ {t('rs_sch_tag_expire', lang='en')}: {raw_ex}]"
             return db_entry, note_msg
 
         return None, None
