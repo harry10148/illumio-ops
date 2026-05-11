@@ -190,10 +190,11 @@ class RulesEngine:
             cross_env_rows = matched[matched['_cross_env']]
             n_cross_env_allowed = int((cross_env_rows['policy_decision'] == 'allowed').sum())
             n_cross_env_pb = n_cross_env - n_cross_env_allowed
-            risk_summary = (
-                f"{n_cross_env} flows cross environment boundaries "
-                f"({n_cross_env_allowed} explicitly allowed, {n_cross_env_pb} potentially_blocked) — "
-                "active lateral movement path between security domains."
+            risk_summary = t(
+                "rpt_rule_B001_risk_cross_env", lang=self._lang,
+                n_cross_env=n_cross_env,
+                n_cross_env_allowed=n_cross_env_allowed,
+                n_cross_env_pb=n_cross_env_pb,
             )
             if n_cross_env_allowed > 0:
                 recommendation = t("rule_b001_rec_critical_cross_env", named_ports=list(named_ports.keys()), lang=self._lang)
@@ -201,33 +202,36 @@ class RulesEngine:
                 recommendation = t("rule_b001_rec_pb_cross_env", named_ports=list(named_ports.keys()), lang=self._lang)
         elif n_cross_subnet > 0 and n_allowed > 0:
             severity = 'HIGH'
-            risk_summary = (
-                f"{n_cross_subnet} flows are cross-subnet ({n_allowed} explicitly allowed). "
-                f"Same-subnet flows: {n_same_subnet} (may be legitimate admin)."
+            risk_summary = t(
+                "rpt_rule_B001_risk_cross_subnet_allowed", lang=self._lang,
+                n_cross_subnet=n_cross_subnet,
+                n_allowed=n_allowed,
+                n_same_subnet=n_same_subnet,
             )
             recommendation = t("rule_b001_rec_cross_subnet_allowed",
                                named_ports=list(named_ports.keys()), n_same_subnet=n_same_subnet, lang=self._lang)
         elif n_cross_subnet > 0 and n_pb == n_cross_subnet:
             severity = 'MEDIUM'
-            risk_summary = (
-                f"{n_cross_subnet} cross-subnet flows have no allow rule (potentially_blocked) — "
-                "traffic flows because VEN is in test mode; enforce to activate default-deny."
+            risk_summary = t(
+                "rpt_rule_B001_risk_cross_subnet_pb", lang=self._lang,
+                n_cross_subnet=n_cross_subnet,
             )
             recommendation = t("rule_b001_rec_cross_subnet_pb", lang=self._lang)
         elif n_same_subnet == n_total and n_pb == n_total:
             severity = 'INFO'
-            risk_summary = (
-                f"All {n_total} flows are within the same /24 subnet and in test mode only. "
-                "Traffic is likely routine Windows admin; block is not active but risk is limited."
+            risk_summary = t(
+                "rpt_rule_B001_risk_same_subnet_pb", lang=self._lang,
+                n_total=n_total,
             )
             recommendation = t("rule_b001_rec_same_subnet_pb", lang=self._lang)
         else:
             # Same-subnet, allowed — MEDIUM (legitimate admin but worth documenting)
             severity = 'MEDIUM'
-            risk_summary = (
-                f"All {n_total} flows are within the same /24 subnet "
-                f"({n_allowed} allowed, {n_pb} test-mode). "
-                "Likely Windows administration traffic, but source scope should be verified."
+            risk_summary = t(
+                "rpt_rule_B001_risk_same_subnet_allowed", lang=self._lang,
+                n_total=n_total,
+                n_allowed=n_allowed,
+                n_pb=n_pb,
             )
             recommendation = t("rule_b001_rec_same_subnet_allowed", lang=self._lang)
 
@@ -239,12 +243,16 @@ class RulesEngine:
         top_pairs = (suspicious[['src_ip', 'dst_ip', 'port', 'policy_decision']]
                      .head(5).to_dict('records')) if not suspicious.empty else []
 
-        description = (
-            f"{n_total} non-blocked flows on critical lateral movement ports: {named_ports}. "
-            f"{risk_summary} "
-            f"Flow breakdown — same-subnet: {n_same_subnet}, "
-            f"cross-subnet: {n_cross_subnet}, cross-env: {n_cross_env}, "
-            f"explicitly allowed: {n_allowed}, test-mode only: {n_pb}."
+        description = t(
+            "rpt_rule_B001_desc", lang=self._lang,
+            n_total=n_total,
+            named_ports=named_ports,
+            risk_summary=risk_summary,
+            n_same_subnet=n_same_subnet,
+            n_cross_subnet=n_cross_subnet,
+            n_cross_env=n_cross_env,
+            n_allowed=n_allowed,
+            n_pb=n_pb,
         )
 
         return Finding(
@@ -280,12 +288,12 @@ class RulesEngine:
             return Finding(
                 rule_id='B002', rule_name='Ransomware Risk Port (High)',
                 severity='HIGH', category='Ransomware',
-                description=(
-                    f"{len(matched)} flows on high-risk remote access ports are explicitly allowed: "
-                    f"{named}. These flows span {unique_src} unique source IPs → {unique_dst} unique "
-                    f"destinations. Remote access tools are the #1 initial access vector for ransomware "
-                    f"operators (e.g., Conti, LockBit) who exploit exposed VNC/TeamViewer to gain GUI "
-                    f"access without triggering endpoint alerts."
+                description=t(
+                    "rpt_rule_B002_desc", lang=self._lang,
+                    n_flows=len(matched),
+                    named=named,
+                    unique_src=unique_src,
+                    unique_dst=unique_dst,
                 ),
                 recommendation=t("rule_b002_rec", lang=self._lang),
                 evidence={'matched_flows': len(matched), 'top_ports': str(top_ports),
@@ -308,12 +316,11 @@ class RulesEngine:
             return Finding(
                 rule_id='B003', rule_name='Ransomware Risk Port (Medium) — Uncovered',
                 severity='MEDIUM', category='Ransomware',
-                description=(
-                    f"{len(matched)} flows on medium-risk ports are in 'potentially_blocked' state "
-                    f"(workloads still in test/visibility mode): {named}. "
-                    f"This affects approximately {unique_wl} workload IPs. "
-                    f"While these flows would be blocked in enforced mode, they represent real "
-                    f"network paths that ransomware could exploit if enforcement is delayed."
+                description=t(
+                    "rpt_rule_B003_desc", lang=self._lang,
+                    n_flows=len(matched),
+                    named=named,
+                    unique_wl=unique_wl,
                 ),
                 recommendation=t("rule_b003_rec", lang=self._lang),
                 evidence={'matched_flows': len(matched), 'top_ports': str(top_ports)},
@@ -331,12 +338,13 @@ class RulesEngine:
             return Finding(
                 rule_id='B004', rule_name='Unmanaged Source High Activity',
                 severity='MEDIUM', category='UnmanagedHost',
-                description=(
-                    f"{total} flows originated from unmanaged sources (threshold: {threshold}), "
-                    f"targeting {unique_dst} unique managed destinations on ports {list(top_dst_ports.keys())}. "
-                    f"Top unmanaged source IPs: {list(top_ips.keys())[:3]}. "
-                    f"Unmanaged hosts bypass Illumio policy enforcement — any traffic they send "
-                    f"cannot be micro-segmented, creating blind spots in your security posture."
+                description=t(
+                    "rpt_rule_B004_desc", lang=self._lang,
+                    total=total,
+                    threshold=threshold,
+                    unique_dst=unique_dst,
+                    top_ports_list=list(top_dst_ports.keys()),
+                    top_src_ips_list=list(top_ips.keys())[:3],
                 ),
                 recommendation=t("rule_b004_rec", lang=self._lang),
                 evidence={'total_flows': total, 'top_src_ips': str(top_ips),
@@ -357,12 +365,13 @@ class RulesEngine:
             return Finding(
                 rule_id='B005', rule_name='Low Policy Coverage',
                 severity='MEDIUM', category='Policy',
-                description=(
-                    f"Policy coverage is only {coverage_pct:.1f}% — out of {total:,} total flows, "
-                    f"only {allowed:,} are explicitly allowed by rules, while {blocked:,} are blocked "
-                    f"and {pb:,} are potentially blocked (test mode). "
-                    f"Low coverage means most traffic is flowing without explicit policy authorization, "
-                    f"making it impossible to distinguish legitimate traffic from attacker movement."
+                description=t(
+                    "rpt_rule_B005_desc", lang=self._lang,
+                    coverage_pct=f"{coverage_pct:.1f}",
+                    total=f"{total:,}",
+                    allowed=f"{allowed:,}",
+                    blocked=f"{blocked:,}",
+                    pb=f"{pb:,}",
                 ),
                 recommendation=t("rule_b005_rec", threshold=threshold, lang=self._lang),
                 evidence={'coverage_pct': f'{coverage_pct:.1f}', 'allowed': allowed,
@@ -397,12 +406,14 @@ class RulesEngine:
         return Finding(
             rule_id='B006', rule_name='High Lateral Movement',
             severity=severity, category='LateralMovement',
-            description=(
-                f"{len(high_src)} source IPs each connected to >{threshold} unique destinations "
-                f"via lateral movement ports, totalling {total_lateral:,} flows "
-                f"({n_allowed_flows} explicitly allowed, {n_pb_flows} potentially_blocked). "
-                f"Top offenders: {list(top.keys())[:3]}. "
-                f"This fan-out pattern is a strong indicator of host-hopping."
+            description=t(
+                "rpt_rule_B006_desc", lang=self._lang,
+                n_high_src=len(high_src),
+                threshold=threshold,
+                total_lateral=f"{total_lateral:,}",
+                n_allowed_flows=n_allowed_flows,
+                n_pb_flows=n_pb_flows,
+                top_offenders=list(top.keys())[:3],
             ),
             recommendation=t("rule_b006_rec_allowed" if high_src_allowed else "rule_b006_rec_pb", lang=self._lang),
             evidence={'high_src_count': len(high_src), 'top_sources': str(top),
@@ -423,13 +434,13 @@ class RulesEngine:
             return Finding(
                 rule_id='B007', rule_name='Single User High Destinations',
                 severity='HIGH', category='UserActivity',
-                description=(
-                    f"{len(high_users)} user accounts each reached >{threshold} unique destination IPs. "
-                    f"Top accounts: {list(top.keys())[:3]} (reaching {list(top.values())[:3]} destinations). "
-                    f"Ports used: {list(top_ports.keys())}. "
-                    f"Normal users typically access a small, predictable set of servers. "
-                    f"A single account reaching many destinations may indicate credential theft, "
-                    f"automated scanning, or data exfiltration via compromised credentials."
+                description=t(
+                    "rpt_rule_B007_desc", lang=self._lang,
+                    n_users=len(high_users),
+                    threshold=threshold,
+                    top_accounts=list(top.keys())[:3],
+                    top_counts=list(top.values())[:3],
+                    top_ports_list=list(top_ports.keys()),
                 ),
                 recommendation=t("rule_b007_rec", lang=self._lang),
                 evidence={'high_user_count': len(high_users), 'top_users': str(top),
@@ -452,13 +463,16 @@ class RulesEngine:
             return Finding(
                 rule_id='B008', rule_name='High Bandwidth Anomaly',
                 severity='MEDIUM', category='Bandwidth',
-                description=(
-                    f"{len(anomalies)} flows exceed the {percentile}th percentile threshold "
-                    f"({_fmt_bytes(threshold_bytes)}), transferring a combined {_fmt_bytes(total_anomaly_bytes)}. "
-                    f"Top flow: {top[0]['src_ip']} → {top[0]['dst_ip']} ({_fmt_bytes(top[0]['bytes_total'])}). "
-                    f"Ports involved: {list(top_ports.keys())}. "
-                    f"Abnormally large data transfers may indicate data exfiltration, "
-                    f"unauthorized backups, or misconfigured replication jobs."
+                description=t(
+                    "rpt_rule_B008_desc", lang=self._lang,
+                    n_anomalies=len(anomalies),
+                    percentile=percentile,
+                    threshold_bytes=_fmt_bytes(threshold_bytes),
+                    total_anomaly_bytes=_fmt_bytes(total_anomaly_bytes),
+                    top_src=top[0]['src_ip'],
+                    top_dst=top[0]['dst_ip'],
+                    top_bytes=_fmt_bytes(top[0]['bytes_total']),
+                    top_ports_list=list(top_ports.keys()),
                 ),
                 recommendation=t("rule_b008_rec", lang=self._lang),
                 evidence={'anomaly_count': len(anomalies), 'percentile_threshold': _fmt_bytes(threshold_bytes),
@@ -474,18 +488,17 @@ class RulesEngine:
             top_pairs = cross.groupby(['src_env', 'dst_env']).size().nlargest(5).to_dict()
             top_ports = cross['port'].value_counts().head(5).to_dict()
             unique_envs = set(cross['src_env'].unique()) | set(cross['dst_env'].unique())
+            top_pairs_str = ', '.join(f"{k[0]}→{k[1]} ({v})" for k, v in list(top_pairs.items())[:3])
             return Finding(
                 rule_id='B009', rule_name='Cross-Env Flow Volume',
                 severity='INFO', category='Policy',
-                description=(
-                    f"{len(cross):,} cross-environment flows detected across {len(unique_envs)} "
-                    f"environments (threshold: {threshold}). "
-                    f"Top environment pairs: " +
-                    ', '.join(f"{k[0]}→{k[1]} ({v})" for k, v in list(top_pairs.items())[:3]) +
-                    f". Ports: {list(top_ports.keys())}. "
-                    f"Cross-environment traffic is expected for some services (monitoring, DNS, NTP) "
-                    f"but should be explicitly authorized. Uncontrolled cross-env flows break "
-                    f"environment isolation and can enable pivot attacks from lower to higher environments."
+                description=t(
+                    "rpt_rule_B009_desc", lang=self._lang,
+                    n_cross=f"{len(cross):,}",
+                    n_envs=len(unique_envs),
+                    threshold=threshold,
+                    top_pairs_str=top_pairs_str,
+                    top_ports_list=list(top_ports.keys()),
                 ),
                 recommendation=t("rule_b009_rec", lang=self._lang),
                 evidence={'cross_env_flows': len(cross), 'top_pairs': str(top_pairs),
@@ -522,10 +535,12 @@ class RulesEngine:
         return Finding(
             rule_id='L001', rule_name='Cleartext Protocol in Use',
             severity=severity, category='LateralMovement',
-            description=(
-                f"{len(matched)} flows detected on cleartext protocols "
-                f"(Telnet:{top_ports.get(23,0)}, FTP:{top_ports.get(21,0)+top_ports.get(20,0)}). "
-                f"{len(allowed)} of these are explicitly allowed."
+            description=t(
+                "rpt_rule_L001_desc", lang=self._lang,
+                n_flows=len(matched),
+                telnet_count=top_ports.get(23, 0),
+                ftp_count=top_ports.get(21, 0) + top_ports.get(20, 0),
+                n_allowed=len(allowed),
             ),
             recommendation=t("rule_l001_rec", lang=self._lang),
             evidence={'total_flows': len(matched), 'allowed_flows': len(allowed),
@@ -553,9 +568,10 @@ class RulesEngine:
         return Finding(
             rule_id='L002', rule_name='Network Discovery Protocol Exposure',
             severity='MEDIUM', category='LateralMovement',
-            description=(
-                f"{len(unblocked)} flows on broadcast/discovery protocols are not blocked: "
-                f"{named}. These protocols enable Responder-based NTLMv2 hash harvesting."
+            description=t(
+                "rpt_rule_L002_desc", lang=self._lang,
+                n_flows=len(unblocked),
+                named=named,
             ),
             recommendation=t("rule_l002_rec", lang=self._lang),
             evidence={'unblocked_flows': len(unblocked), 'top_protocols': str(named)},
@@ -590,10 +606,12 @@ class RulesEngine:
         return Finding(
             rule_id='L003', rule_name='Database Port Wide Exposure',
             severity='HIGH', category='LateralMovement',
-            description=(
-                f"Database ports are reachable from {db_flows['src_app'].nunique()} "
-                f"unique source applications: {named_ports}. "
-                f"{len(wide)} database endpoints are reachable from >{threshold} distinct app tiers."
+            description=t(
+                "rpt_rule_L003_desc", lang=self._lang,
+                n_src_apps=db_flows['src_app'].nunique(),
+                named_ports=named_ports,
+                n_wide=len(wide),
+                threshold=threshold,
             ),
             recommendation=t("rule_l003_rec", lang=self._lang),
             evidence={'total_db_flows': len(db_flows),
@@ -620,13 +638,16 @@ class RulesEngine:
             return None
         top_pairs = (cross.groupby(['src_env', 'dst_env', 'port'])
                      .size().nlargest(5).reset_index(name='flows').to_dict('records'))
+        top_pairs_str = ', '.join(
+            f"{r['src_env']}→{r['dst_env']}:{r['port']}({r['flows']})" for r in top_pairs[:3]
+        )
         return Finding(
             rule_id='L004', rule_name='Cross-Environment Database Access',
             severity='HIGH', category='LateralMovement',
-            description=(
-                f"{len(cross)} allowed database flows cross environment boundaries. "
-                f"Top pairs: " +
-                ', '.join(f"{r['src_env']}→{r['dst_env']}:{r['port']}({r['flows']})" for r in top_pairs[:3])
+            description=t(
+                "rpt_rule_L004_desc", lang=self._lang,
+                n_flows=len(cross),
+                top_pairs_str=top_pairs_str,
             ),
             recommendation=t("rule_l004_rec", lang=self._lang),
             evidence={'cross_env_db_flows': len(cross), 'top_env_pairs': str(top_pairs)},
@@ -661,11 +682,12 @@ class RulesEngine:
         return Finding(
             rule_id='L005', rule_name='Identity Infrastructure Wide Exposure',
             severity=severity, category='LateralMovement',
-            description=(
-                f"Identity infrastructure ports (Kerberos/LDAP) are reachable from "
-                f"{unique_src_apps} distinct source apps ({unique_src_apps_allowed} via explicit allow rules, "
-                f"{unique_src_apps - unique_src_apps_allowed} potentially_blocked): {named}. "
-                f"Excessive LDAP/Kerberos reach enables domain enumeration and ticket attacks."
+            description=t(
+                "rpt_rule_L005_desc", lang=self._lang,
+                unique_src_apps=unique_src_apps,
+                unique_src_apps_allowed=unique_src_apps_allowed,
+                unique_src_apps_pb=unique_src_apps - unique_src_apps_allowed,
+                named=named,
             ),
             recommendation=t("rule_l005_rec_allowed" if unique_src_apps_allowed > threshold else "rule_l005_rec_pb", lang=self._lang),
             evidence={'unblocked_flows': len(id_flows), 'allowed_flows': len(id_allowed),
@@ -725,14 +747,15 @@ class RulesEngine:
 
         high_risk.sort(key=lambda x: -x['reachable'])
         top5 = high_risk[:5]
+        top_pivots_str = ', '.join(f"{r['app']}({r['reachable']} reachable)" for r in top5)
         return Finding(
             rule_id='L006', rule_name='High Blast-Radius Lateral Movement Path',
             severity='HIGH', category='LateralMovement',
-            description=(
-                f"{len(high_risk)} application nodes can reach ≥{threshold} other apps "
-                f"via allowed lateral-port connections (pivoting chains). "
-                f"Top pivot points: " +
-                ', '.join(f"{r['app']}({r['reachable']} reachable)" for r in top5)
+            description=t(
+                "rpt_rule_L006_desc", lang=self._lang,
+                n_high_risk=len(high_risk),
+                threshold=threshold,
+                top_pivots_str=top_pivots_str,
             ),
             recommendation=t("rule_l006_rec", lang=self._lang),
             evidence={'high_risk_nodes': len(high_risk),
@@ -766,10 +789,12 @@ class RulesEngine:
         return Finding(
             rule_id='L007', rule_name='Unmanaged Host Accessing Critical Services',
             severity='HIGH', category='LateralMovement',
-            description=(
-                f"{len(matched)} flows from {matched['src_ip'].nunique()} unmanaged hosts "
-                f"targeting database/identity/management ports: {named_ports}. "
-                f"Top targets: {top_dst}."
+            description=t(
+                "rpt_rule_L007_desc", lang=self._lang,
+                n_flows=len(matched),
+                unique_src=matched['src_ip'].nunique(),
+                named_ports=named_ports,
+                top_dst=top_dst,
             ),
             recommendation=t("rule_l007_rec", lang=self._lang),
             evidence={'total_flows': len(matched),
@@ -801,11 +826,12 @@ class RulesEngine:
         return Finding(
             rule_id='L008', rule_name='Lateral Ports in Test Mode (PB)',
             severity='HIGH', category='LateralMovement',
-            description=(
-                f"{len(pb)} flows on lateral/critical ports are 'potentially_blocked' "
-                f"({unique_src} sources → {unique_dst} destinations). "
-                f"These paths are currently traversable because workloads are not fully enforced. "
-                f"Top ports: {top_ports}."
+            description=t(
+                "rpt_rule_L008_desc", lang=self._lang,
+                n_flows=len(pb),
+                unique_src=unique_src,
+                unique_dst=unique_dst,
+                top_ports=top_ports,
             ),
             recommendation=t("rule_l008_rec", top_apps=top_apps, lang=self._lang),
             evidence={'pb_lateral_flows': len(pb), 'unique_src': unique_src,
@@ -838,10 +864,11 @@ class RulesEngine:
         return Finding(
             rule_id='L009', rule_name='Data Exfiltration Pattern (Outbound to Unmanaged)',
             severity='HIGH', category='LateralMovement',
-            description=(
-                f"Managed workloads transferred {_fmt_bytes(total_bytes)} "
-                f"to {exfil['dst_ip'].nunique()} unmanaged destinations. "
-                f"Top source apps: {top_apps_fmt}."
+            description=t(
+                "rpt_rule_L009_desc", lang=self._lang,
+                total_bytes=_fmt_bytes(total_bytes),
+                unique_dst=exfil['dst_ip'].nunique(),
+                top_apps_fmt=top_apps_fmt,
             ),
             recommendation=t("rule_l009_rec", top_dst_fmt=top_dst_fmt, lang=self._lang),
             evidence={'total_transferred': _fmt_bytes(total_bytes),
@@ -874,14 +901,16 @@ class RulesEngine:
                           ports=('port', lambda x: str(sorted(set(x))[:5])))
                      .reset_index().nlargest(5, 'flows').to_dict('records'))
         top_ports = cross['port'].value_counts().head(5).to_dict()
+        top_pairs_str = ', '.join(
+            f"{r['src_env']}→{r['dst_env']}({r['flows']} flows)" for r in top_pairs[:3]
+        )
         return Finding(
             rule_id='L010', rule_name='Cross-Environment Lateral Port Access',
             severity='CRITICAL', category='LateralMovement',
-            description=(
-                f"{len(cross)} allowed flows use lateral/management ports across environment "
-                f"boundaries. Environment isolation is broken. "
-                f"Top environment pairs: " +
-                ', '.join(f"{r['src_env']}→{r['dst_env']}({r['flows']} flows)" for r in top_pairs[:3])
+            description=t(
+                "rpt_rule_L010_desc", lang=self._lang,
+                n_flows=len(cross),
+                top_pairs_str=top_pairs_str,
             ),
             recommendation=t("rule_l010_rec", lang=self._lang),
             evidence={'cross_env_lateral_flows': len(cross), 'top_env_pairs': str(top_pairs[:3]),

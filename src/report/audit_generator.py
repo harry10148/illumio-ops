@@ -672,7 +672,7 @@ class AuditGenerator:
                 logger.warning(f"{mod_id} failed: {e}")
                 results[mod_id] = {'error': str(e)}
 
-        results['mod00'] = audit_executive_summary(results, df)
+        results['mod00'] = audit_executive_summary(results, df, lang=self._lang)
         print(t("rpt_audit_complete", lang=self._lang) + "             ")
 
         return AuditReportResult(

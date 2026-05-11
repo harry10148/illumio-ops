@@ -2,6 +2,9 @@
 src/report/analysis/audit/audit_risk.py
 Audit event risk classification — maps event_type to risk level and metadata.
 """
+from __future__ import annotations
+
+from src.i18n import t
 
 RISK_CRITICAL = 'CRITICAL'
 RISK_HIGH     = 'HIGH'
@@ -57,16 +60,35 @@ RISK_BG = {
     RISK_INFO:     '#F9FAFB',
 }
 
-def get_risk(event_type: str):
-    """Return (risk_level, description, recommendation) for an event_type."""
-    # Exact match first
+def get_risk(event_type: str, lang: str | None = None):
+    """Return (risk_level, description, recommendation) for an event_type.
+
+    English fallback strings live in AUDIT_RISK_MAP; when ``lang`` is provided
+    the description/recommendation are looked up in i18n under
+    ``rpt_au_event_<event_type_with_dots_to_underscores>_summary`` and
+    ``..._rec``. Missing translations fall back to the English literal so we
+    never display a raw i18n key.
+    """
     if event_type in AUDIT_RISK_MAP:
-        return AUDIT_RISK_MAP[event_type]
-    # Prefix match (e.g. 'rule_set.*' not explicitly listed)
-    for key, val in AUDIT_RISK_MAP.items():
-        if event_type.startswith(key.rstrip('*')):
-            return val
-    return (RISK_INFO, '', '')
+        entry = AUDIT_RISK_MAP[event_type]
+        match_type = event_type
+    else:
+        entry = None
+        match_type = None
+        for key, val in AUDIT_RISK_MAP.items():
+            if event_type.startswith(key.rstrip('*')):
+                entry = val
+                match_type = key
+                break
+    if entry is None:
+        return (RISK_INFO, '', '')
+    risk, desc, rec = entry
+    if lang and match_type:
+        safe = match_type.replace('.', '_')
+        desc_t = t(f"rpt_au_event_{safe}_summary", lang=lang, default=desc)
+        rec_t = t(f"rpt_au_event_{safe}_rec", lang=lang, default=rec)
+        return (risk, desc_t, rec_t)
+    return (risk, desc, rec)
 
 def classify_df(df):
     """Add 'risk_level' column to a DataFrame that has 'event_type' column.

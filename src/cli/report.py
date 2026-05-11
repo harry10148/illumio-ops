@@ -47,6 +47,12 @@ def _iso_date(value: str | None, *, end_of_day: bool) -> str | None:
     return parsed.strftime(f"%Y-%m-%dT{suffix}")
 
 
+def _resolve_lang(cm) -> str:
+    """Read settings.language from config; fall back to 'en'. Only en/zh_TW supported."""
+    raw = (cm.config.get("settings", {}) or {}).get("language", "en")
+    return raw if raw in {"en", "zh_TW"} else "en"
+
+
 _TRAFFIC_PROFILES = ["security_risk", "network_inventory"]
 
 
@@ -71,14 +77,15 @@ def generate_traffic_report(
     out = _resolve_output_dir(cm, output_dir)
 
     from src.main import _make_cache_reader
+    lang = _resolve_lang(cm)
     gen = ReportGenerator(cm, api_client=api, config_dir=config_dir,
                           cache_reader=_make_cache_reader(cm))
     if source == "csv":
         if not file_path:
             raise click.ClickException("--file is required when --source csv is used")
-        result = gen.generate_from_csv(file_path, traffic_report_profile=traffic_report_profile)
+        result = gen.generate_from_csv(file_path, traffic_report_profile=traffic_report_profile, lang=lang)
     else:
-        result = gen.generate_from_api(traffic_report_profile=traffic_report_profile)
+        result = gen.generate_from_api(traffic_report_profile=traffic_report_profile, lang=lang)
 
     if result.record_count == 0:
         raise click.ClickException("No data for report")
@@ -89,6 +96,7 @@ def generate_traffic_report(
         output_dir=out,
         send_email=email,
         reporter=reporter if email else None,
+        lang=lang,
     )
 
 
@@ -109,15 +117,17 @@ def generate_audit_report(
     out = _resolve_output_dir(cm, output_dir)
 
     from src.main import _make_cache_reader
+    lang = _resolve_lang(cm)
     gen = AuditGenerator(cm, api_client=api, config_dir=config_dir,
                          cache_reader=_make_cache_reader(cm))
     result = gen.generate_from_api(
         start_date=_iso_date(start_date, end_of_day=False),
         end_date=_iso_date(end_date, end_of_day=True),
+        lang=lang,
     )
     if result.record_count == 0:
         raise click.ClickException("No data for report")
-    return gen.export(result, fmt=fmt, output_dir=out)
+    return gen.export(result, fmt=fmt, output_dir=out, lang=lang)
 
 
 def generate_ven_status_report(
@@ -132,12 +142,13 @@ def generate_ven_status_report(
     cm = ConfigManager()
     api = ApiClient(cm)
     out = _resolve_output_dir(cm, output_dir)
+    lang = _resolve_lang(cm)
 
     gen = VenStatusGenerator(cm, api_client=api)
-    result = gen.generate()
+    result = gen.generate(lang=lang)
     if result.record_count == 0:
         raise click.ClickException("No data for report")
-    return gen.export(result, fmt=fmt, output_dir=out)
+    return gen.export(result, fmt=fmt, output_dir=out, lang=lang)
 
 
 def generate_policy_usage_report(
@@ -159,19 +170,21 @@ def generate_policy_usage_report(
     out = _resolve_output_dir(cm, output_dir)
 
     gen = PolicyUsageGenerator(cm, api_client=api, config_dir=config_dir)
+    lang = _resolve_lang(cm)
     if source == "csv":
         if not file_path:
             raise click.ClickException("--file is required when --source csv is used")
-        result = gen.generate_from_csv(file_path)
+        result = gen.generate_from_csv(file_path, lang=lang)
     else:
         result = gen.generate_from_api(
             start_date=_iso_date(start_date, end_of_day=False),
             end_date=_iso_date(end_date, end_of_day=True),
+            lang=lang,
         )
 
     if result.record_count == 0:
         raise click.ClickException("No data for report")
-    return gen.export(result, fmt=fmt, output_dir=out)
+    return gen.export(result, fmt=fmt, output_dir=out, lang=lang)
 
 
 def _emit_paths(ctx: click.Context, paths: list[str], fmt: str) -> None:
