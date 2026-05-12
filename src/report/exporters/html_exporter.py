@@ -1295,8 +1295,9 @@ class HtmlExporter:
                 + _aes_sub(["App (Env)", "Flows", "Connections", "Blocked/PB Flows"])
             )
         if recommendations is not None and not recommendations.empty:
+            _rec_cols = [c for c in recommendations.columns if c not in ("App Env Key", "Action Code")]
             html += f'<h4>{_s("rpt_tr_remediation_rec")}</h4>' + _df_to_html(
-                recommendations,
+                recommendations[_rec_cols],
                 severity_col="Severity",
                 lang=_lang,
                 value_i18n_maps={"Severity": SEVERITY_VALUE_I18N},
@@ -1329,8 +1330,18 @@ class HtmlExporter:
             )
         hub_apps = m.get('hub_apps')
         if hub_apps is not None and not hub_apps.empty:
-            html += f'<h4>{_s("rpt_tr_hub_apps")}</h4>' + _df_to_html(
-                hub_apps, lang=_lang, value_i18n_maps=_scored_value_maps,
+            def _ha_sub(cols):
+                sub = hub_apps[[c for c in cols if c in hub_apps.columns]]
+                return _df_to_html(sub, lang=_lang, value_i18n_maps=_scored_value_maps) if len(sub.columns) > 1 else ''
+
+            html += (
+                f'<h4>{_s("rpt_tr_hub_apps")}</h4>'
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_summary")}</h5>'
+                + _ha_sub(["app_env_key", "infrastructure_score", "tier", "role", "provider_score", "consumer_score"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_risk_factors")}</h5>'
+                + _ha_sub(["app_env_key", "betweenness_score", "mixed_traffic_ratio", "dampening_factor", "non_prod_penalty"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_connections")}</h5>'
+                + _ha_sub(["app_env_key", "in_degree", "out_degree", "connections_in", "connections_out"])
             )
         top_apps = m.get('top_apps')
         if top_apps is not None and not top_apps.empty:
