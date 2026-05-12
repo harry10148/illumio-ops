@@ -77,29 +77,10 @@ class VenStatusGenerator:
         from src.report.exporters.csv_exporter import CsvExporter
         os.makedirs(output_dir, exist_ok=True)
         paths = []
-        if fmt in ('html', 'all'):
+        if fmt in ('html', 'pdf', 'all'):
             path = VenHtmlExporter(result.module_results, df=result.dataframe, lang=lang).export(output_dir)
             paths.append(path)
             print(t("rpt_ven_html_saved", path=path, lang=lang))
-        if fmt in ('pdf', 'all'):
-            try:
-                from src.report.exporters.pdf_exporter import export_report_pdf
-                import datetime as _dt
-                ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
-                pdf_path = os.path.join(output_dir, f'Illumio_VEN_Report_{ts_str}.pdf')
-                export_report_pdf(
-                    title="VEN Status Report",
-                    output_path=pdf_path,
-                    module_results=result.module_results or {},
-                    metadata={
-                        "generated_at": result.generated_at.isoformat(),
-                        "record_count": result.record_count,
-                    },
-                )
-                paths.append(pdf_path)
-                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}", lang=lang))
-            except Exception as exc:
-                logger.warning('PDF export failed: {}', exc)
 
         if fmt in ('xlsx', 'all'):
             try:

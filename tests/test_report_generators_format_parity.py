@@ -81,14 +81,18 @@ def test_policy_usage_generator_export_accepts_format(tmp_path, fmt):
     assert isinstance(paths, list)
 
 
-def test_traffic_pdf_uses_structured_reportlab_exporter(tmp_path):
+def test_traffic_pdf_uses_html_exporter(tmp_path):
+    """fmt='pdf' now produces print-ready HTML via HtmlExporter (no ReportLab)."""
     from src.report.report_generator import ReportGenerator, ReportResult
     from unittest.mock import MagicMock, patch
 
     gen = ReportGenerator(_make_cm(), api_client=MagicMock())
     result = ReportResult(record_count=0, date_range=("2024-01-01", "2024-01-31"))
-    with patch("src.report.exporters.pdf_exporter.export_report_pdf") as pdf:
+    with patch("src.report.exporters.html_exporter.HtmlExporter.export", return_value=str(tmp_path / "r.html")) as html_exp, \
+         patch("src.report.exporters.html_exporter.HtmlExporter._build", return_value="<html></html>"), \
+         patch("src.report.report_generator.ReportGenerator._write_report_metadata"), \
+         patch("src.report.report_generator.ReportGenerator._build_report_metadata", return_value={}):
         paths = gen.export(result, fmt="pdf", output_dir=str(tmp_path))
     assert isinstance(paths, list)
-    pdf.assert_called_once()
-    assert pdf.call_args.kwargs["title"] == "Traffic Flow Report"
+    assert len(paths) == 1
+    html_exp.assert_called_once()
