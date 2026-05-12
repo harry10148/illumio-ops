@@ -311,9 +311,7 @@ BASE_CSS = """\
     .layout-b .section-top { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 12px; }
     .layout-b .section-top > .section-intro { flex: 1; margin: 0; }
     .layout-b .section-top > .chart-container { flex: 1; }
-    .layout-c .section-body { display: flex; gap: 16px; align-items: flex-start; }
-    .layout-c .section-body > .report-table-panel { flex: 1; }
-    .layout-c .section-body > .chart-container { flex: 1; }
+    .badge { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
   }
 """
 

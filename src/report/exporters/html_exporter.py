@@ -637,8 +637,7 @@ class HtmlExporter:
              if profile == 'network_inventory' else '') +
             (self._section('allowed', 'rpt_tr_sec_allowed', 'Allowed Traffic',
                            render_section_guidance('mod10', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod10_html(),
-                           'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.',
-                           layout='layout-c') + '\n'
+                           'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.') + '\n'
              if profile == 'security_risk' else '') +
             (self._section('bandwidth', 'rpt_tr_sec_bandwidth', 'Bandwidth &amp; Volume',
                            render_section_guidance('mod11', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod11_html(),
@@ -1406,10 +1405,14 @@ class HtmlExporter:
             html += f'<h4>{_s("rpt_mod15_bridge_nodes")}</h4>' + _df_to_html(bridge_nodes, lang=_lang)
         reachable_nodes = m.get('top_reachable_nodes')
         if reachable_nodes is not None and not reachable_nodes.empty:
-            html += f'<h4>{_s("rpt_mod15_top_reachable")}</h4>' + _df_to_html(reachable_nodes, lang=_lang)
+            _rn_drop = {"app_env_key", "Max Depth Used"}
+            _rn = reachable_nodes[[c for c in reachable_nodes.columns if c not in _rn_drop]]
+            html += f'<h4>{_s("rpt_mod15_top_reachable")}</h4>' + _df_to_html(_rn, lang=_lang)
         attack_paths = m.get('attack_paths')
         if attack_paths is not None and not attack_paths.empty:
-            html += f'<h4>{_s("rpt_mod15_attack_paths")}</h4>' + _df_to_html(attack_paths, lang=_lang)
+            _ap_drop = {"Source App Env Key", "Target App Env Key"}
+            _ap = attack_paths[[c for c in attack_paths.columns if c not in _ap_drop]]
+            html += f'<h4>{_s("rpt_mod15_attack_paths")}</h4>' + _df_to_html(_ap, lang=_lang)
         app_chains = m.get('app_chains')
         if app_chains is not None and not app_chains.empty:
             html += f'<h4>{_s("rpt_tr_app_chains")}</h4>' + _df_to_html(app_chains, lang=_lang)
