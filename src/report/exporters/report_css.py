@@ -126,6 +126,7 @@ BASE_CSS = """\
   .report-table thead th:last-child { border-right: none; }
   .report-table tbody td { padding: 8px 12px; vertical-align: top; border-bottom: 1px solid var(--slate-20); color: var(--slate); line-height: 1.5; font-variant-numeric: tabular-nums; }
   .report-table tbody td, .report-table tbody td * { color: var(--slate); }
+  .report-table tbody td .badge { color: #fff; }
   .report-table tbody td code { color: var(--cyan-120); background: rgba(26,44,50,.06); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; }
   .report-table tbody tr:nth-child(even) td { background: var(--tan); }
   .report-table tbody tr:hover td { background: var(--tan-120); transition: background .12s ease; }
