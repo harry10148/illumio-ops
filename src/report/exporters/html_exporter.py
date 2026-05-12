@@ -983,7 +983,7 @@ class HtmlExporter:
         _s = self._s
         _lang = self._lang
         m = self._r.get('mod07', {})
-        out = ''
+        out = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
         for key, data in m.get('matrices', {}).items():
             out += f'<h3>{_s("rpt_tr_label_key")} {key.upper()}</h3>'
             if 'note' in data:
@@ -992,7 +992,6 @@ class HtmlExporter:
                 kv = (f'{_s("rpt_tr_same_value")} {data.get("same_value_flows",0)} · '
                       f'{_s("rpt_tr_cross_value")} {data.get("cross_value_flows",0)}')
                 out += f'<p>{kv}</p>{_df_to_html(data.get("top_cross_pairs"), lang=_lang)}'
-        out += _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
         return out or f'<p class="note">{_s("rpt_no_matrix")}</p>'
 
     def _mod08_html(self):
@@ -1041,12 +1040,12 @@ class HtmlExporter:
         m = self._r.get('mod10', {})
         if m.get('note'):
             return f'<p class="note">{m["note"]}</p>'
-        table_html = self._subnote('rpt_tr_allowed_flows_subnote') + _df_to_html(m.get('top_app_flows'), lang=_lang)
         chart_html = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
         return (
             '<div class="section-body">'
-            + table_html
+            + self._subnote('rpt_tr_allowed_flows_subnote')
             + chart_html
+            + _df_to_html(m.get('top_app_flows'), lang=_lang)
             + '</div>'
             + self._subnote('rpt_tr_audit_flags_subnote')
             + f'<h3>{_s("rpt_tr_audit_flags")} ({m.get("audit_flag_count", 0)})</h3>'
@@ -1371,8 +1370,11 @@ class HtmlExporter:
         _lang = self._lang
         total = m.get('total_lateral_flows', 0)
         pct = m.get('lateral_pct', 0)
-        html = (self._subnote('rpt_tr_lateral_intro', 'Covers all lateral-movement analysis including IP-level host connection patterns and App(Env)-level graph risk scoring.') + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume()) + f'<p>{_s("rpt_tr_lateral_flows")} '
-                f'<b>{total:,}</b> ({pct}% {_s("rpt_tr_lateral_pct")})</p>')
+        html = (
+            self._subnote('rpt_tr_lateral_intro', 'Covers all lateral-movement analysis including IP-level host connection patterns and App(Env)-level graph risk scoring.')
+            + f'<p>{_s("rpt_tr_lateral_flows")} <b>{total:,}</b> ({pct}% {_s("rpt_tr_lateral_pct")})</p>'
+            + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+        )
         service_summary = m.get('service_summary')
         if service_summary is not None and not service_summary.empty:
             html += f'<h4>{_s("rpt_tr_lateral_by_service")}</h4>' + _df_to_html(service_summary, lang=_lang)
