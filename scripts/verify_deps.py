@@ -45,7 +45,6 @@ PRODUCTION = [
     Pkg("flask-login", "flask_login"),
     # Phase 5
     Pkg("openpyxl", "openpyxl"),
-    Pkg("reportlab", "reportlab"),
     Pkg("matplotlib", "matplotlib"),
     Pkg("plotly", "plotly"),
     Pkg("pygments", "pygments"),

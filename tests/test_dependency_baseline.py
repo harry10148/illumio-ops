@@ -54,15 +54,6 @@ def test_requirements_txt_has_no_unpinned_packages():
     assert not offenders, f"unpinned packages: {offenders}"
 
 
-def test_pdf_runtime_uses_reportlab_not_weasyprint():
-    req = (REPO_ROOT / "requirements.txt").read_text(encoding="utf-8").lower()
-    offline = (REPO_ROOT / "requirements-offline.txt").read_text(encoding="utf-8").lower()
-    assert "reportlab" in req
-    assert "reportlab" in offline
-    assert "weasyprint" not in req
-    assert "weasyprint" not in offline
-
-
 def test_offline_runtime_uses_cheroot_not_waitress():
     offline = (REPO_ROOT / "requirements-offline.txt").read_text(encoding="utf-8").lower()
     assert "cheroot" in offline
