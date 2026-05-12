@@ -254,7 +254,7 @@ BASE_CSS = """\
   @page {
     margin: 15mm 15mm 22mm;
   }
-  @page :not(:first) {
+  @page {
     @bottom-right {
       content: counter(page) " / " counter(pages);
       font-size: 8pt;
@@ -262,7 +262,7 @@ BASE_CSS = """\
       font-family: sans-serif;
     }
   }
-  .report-cover { background: linear-gradient(160deg, #1a3f4b 0%, #2a5b6b 60%, #1a3f4b 100%); color: #fff; padding: 40px 36px; display: flex; flex-direction: column; justify-content: space-between; min-height: 240mm; border: none !important; box-shadow: none !important; }
+  .report-cover { background: linear-gradient(160deg, #1a3f4b 0%, #2a5b6b 60%, #1a3f4b 100%); color: #fff; padding: 40px 36px; display: flex; flex-direction: column; justify-content: space-between; min-height: 230mm; border: none !important; box-shadow: none !important; }
   .cover-eyebrow { font-size: 10pt; letter-spacing: 2px; opacity: 0.6; text-transform: uppercase; margin-bottom: 8px; }
   .cover-title { font-size: 28pt; font-weight: 700; line-height: 1.2; margin-bottom: 8px; }
   .cover-rule { width: 40px; height: 3px; background: var(--orange); margin: 16px 0; }
