@@ -1783,7 +1783,7 @@
   "rpt_change_direction_unchanged": "不變",
   "rpt_change_impact_no_previous": "無先前快照 — 下次報告執行時將顯示變化影響。",
   "rpt_chart_allowed_traffic_timeline": "Allowed 流量時間軸",
-  "rpt_chart_top_allowed_ports": "Top Allowed Ports",
+  "rpt_chart_top_allowed_ports": "Top Allowed 連接埠",
   "rpt_chart_axis_app": "應用程式",
   "rpt_chart_axis_app_count": "App 數",
   "rpt_chart_axis_bytes": "Bytes",

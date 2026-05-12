@@ -28,3 +28,13 @@ def test_chart_data_uses_labels_values_keys(sample_df):
 def test_chart_title_key_is_top_allowed_ports(sample_df):
     result = allowed_traffic(sample_df, top_n=10)
     assert result['chart_spec']['title_key'] == 'rpt_chart_top_allowed_ports'
+
+def test_chart_data_sorted_by_connections_descending(sample_df):
+    result = allowed_traffic(sample_df, top_n=10)
+    data = result['chart_spec']['data']
+    # sample_df has: port 80→250 connections, 443→450 connections, 53→50 connections
+    # Expected order: 443 (450), 80 (250), 53 (50)
+    assert data['labels'][0] == '443'
+    assert data['labels'][1] == '80'
+    assert data['labels'][2] == '53'
+    assert data['values'][0] >= data['values'][1] >= data['values'][2]
