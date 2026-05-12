@@ -72,13 +72,15 @@ class VenStatusGenerator:
         )
 
     def export(self, result: VenStatusResult, fmt: str = 'html', output_dir: str = 'reports',
-               detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en") -> list:
+               detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en",
+               pce_url: str = "", org_name: str = "") -> list:
         from src.report.exporters.ven_html_exporter import VenHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
         os.makedirs(output_dir, exist_ok=True)
         paths = []
         if fmt in ('html', 'pdf', 'all'):
-            path = VenHtmlExporter(result.module_results, df=result.dataframe, lang=lang).export(output_dir)
+            path = VenHtmlExporter(result.module_results, df=result.dataframe, lang=lang,
+                                   pce_url=pce_url, org_name=org_name).export(output_dir)
             paths.append(path)
             print(t("rpt_ven_html_saved", path=path, lang=lang))
 

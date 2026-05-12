@@ -20,6 +20,7 @@ from src.i18n import t
 from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 from src.report.exporters._exec_summary import render_exec_summary_html
+from src.report.exporters.cover_page import build_cover_page as _build_cover_page
 
 _CSS = build_css("ven")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -37,12 +38,15 @@ def _policy_sync_badge(val: str) -> str:
 
 class VenHtmlExporter:
     def __init__(self, results: dict, df: pd.DataFrame = None,
-                 profile: str = "security_risk", detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en"):
+                 profile: str = "security_risk", detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en",
+                 pce_url: str = "", org_name: str = ""):
         self._r = results
         self._df = df
         self._profile = profile
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
+        self._pce_url = pce_url
+        self._org_name = org_name
 
     def export(self, output_dir: str = "reports") -> str:
         os.makedirs(output_dir, exist_ok=True)
@@ -156,13 +160,24 @@ class VenHtmlExporter:
             + "</footer>"
         )
 
+        _cover_title = _s("rpt_cover_type_ven")
+        cover_html = _build_cover_page(
+            title=_cover_title,
+            report_type=_cover_title,
+            date_range=("", ""),
+            pce_url=self._pce_url,
+            org_name=self._org_name,
+            lang=self._lang,
+        )
         html_lang = "zh-TW" if self._lang == "zh_TW" else "en"
         return (
             f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
             f"<title>{t('rpt_page_title_ven_status', lang=self._lang)}</title>"
             + _CSS + _HIGHLIGHT_CSS
-            + "</head>\n<body>"
+            + "</head>\n"
+            + f'<body data-report-title="{_cover_title}">'
+            + cover_html
             + nav_html
             + "<main>"
             + body
