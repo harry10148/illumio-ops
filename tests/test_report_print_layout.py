@@ -20,7 +20,9 @@ def test_tr_page_break_inside_avoid():
 
 
 def test_wide_table_font_size_in_print():
-    assert '.report-table-panel--wide .report-table { font-size: 7.5pt' in BASE_CSS
+    print_block = BASE_CSS.split('@media print')[1]
+    assert '.report-table-panel--wide .report-table {' in print_block
+    assert 'font-size: 7.5pt' in print_block
 
 
 def test_cover_page_css_present():

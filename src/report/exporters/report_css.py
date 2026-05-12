@@ -284,12 +284,13 @@ BASE_CSS = """\
     .card { box-shadow: none; border: 1px solid var(--slate-20); }
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
-    /* Override JS-set inline widths (autoFitColumns) and force tables to fit page */
-    .report-table { table-layout: fixed !important; width: 100% !important; min-width: 0 !important; word-break: break-word; }
+    /* Override JS-set inline widths; table-layout:auto lets browser shrink columns proportionally */
+    .report-table { width: 100% !important; min-width: 0 !important; word-break: break-word; }
     .report-table col { width: auto !important; min-width: 0 !important; }
     .report-table thead th { width: auto !important; min-width: 0 !important; white-space: normal; overflow-wrap: anywhere; }
     .report-table tbody td { overflow-wrap: anywhere; }
-    .report-table-panel--wide .report-table { font-size: 7.5pt; }
+    /* Wide tables: fixed layout for even column distribution + smaller font */
+    .report-table-panel--wide .report-table { table-layout: fixed !important; font-size: 7.5pt; }
     .report-table-panel { box-shadow: none; overflow: visible; width: 100%; max-width: 100%; }
     .report-table-wrap { overflow: visible; }
     .report-table-panel--wide::after { display: none; }
