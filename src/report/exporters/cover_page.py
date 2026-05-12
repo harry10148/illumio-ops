@@ -1,5 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
+from html import escape as _escape
 from src.report.exporters.report_i18n import STRINGS
 
 
@@ -18,6 +19,11 @@ def build_cover_page(
 ) -> str:
     date_str = " – ".join(d for d in date_range if d)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    title = _escape(title)
+    report_type = _escape(report_type)
+    pce_url = _escape(pce_url)
+    org_name = _escape(org_name)
+    date_str = _escape(date_str)
 
     date_line = (
         f'<div>📅 {_s("rpt_cover_date_range", lang)}: {date_str}</div>'

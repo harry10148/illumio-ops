@@ -1781,7 +1781,7 @@
   "rpt_change_impact_no_previous": "No previous snapshot — change impact will appear on the next report run.",
   "rpt_chart_allowed_traffic_timeline": "Allowed Traffic Timeline",
   "rpt_chart_top_allowed_ports": "Top Allowed Ports",
-  "rpt_cover_date_range": "Data Range",
+  "rpt_cover_date_range": "Date Range",
   "rpt_cover_pce": "PCE",
   "rpt_cover_generated": "Generated",
   "rpt_cover_type_security": "Security Risk Profile",
