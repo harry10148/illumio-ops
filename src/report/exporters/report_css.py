@@ -282,22 +282,26 @@ BASE_CSS = """\
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
     .report-table-panel--wide .report-table { font-size: 8pt; }
-    .report-table-panel { box-shadow: none; }
+    .report-table-panel { box-shadow: none; overflow: visible; width: 100%; max-width: 100%; }
+    .report-table-wrap { overflow: visible; }
     .report-table-panel--wide::after { display: none; }
     .report-table-panel--wide .report-table thead th:first-child,
     .report-table-panel--wide .report-table tbody td:first-child { position: static; box-shadow: none; }
     section { page-break-before: always; }
     section#summary { page-break-before: avoid; }
     section.report-cover { page-break-before: avoid !important; page-break-after: always; }
-    .chart-container { page-break-inside: avoid; max-height: 185px; overflow: hidden; }
+    .report-cover { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    /* Scale Plotly charts proportionally instead of clipping them */
+    .chart-container { page-break-inside: avoid; overflow: visible; }
+    .chart-container > div { zoom: 0.65; }
     .finding-card { page-break-inside: avoid; }
     footer { page-break-before: avoid; }
     .layout-b .section-top { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 12px; }
     .layout-b .section-top > .section-intro { flex: 1; margin: 0; }
-    .layout-b .section-top > .chart-container { flex: 1; max-height: 185px; overflow: hidden; }
+    .layout-b .section-top > .chart-container { flex: 1; }
     .layout-c .section-body { display: flex; gap: 16px; align-items: flex-start; }
     .layout-c .section-body > .report-table-panel { flex: 1; }
-    .layout-c .section-body > .chart-container { flex: 1; max-height: none; }
+    .layout-c .section-body > .chart-container { flex: 1; }
   }
 """
 
