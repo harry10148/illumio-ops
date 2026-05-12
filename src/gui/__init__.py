@@ -66,6 +66,9 @@ from src.href_utils import extract_id as _extract_id_href
 _GUI_OWNS_DAEMON: bool = False
 _DAEMON_SCHEDULER = None
 _DAEMON_RESTART_FN = None
+# Active cheroot server reference — set by _run_http/_run_https so the
+# SIGTERM watcher in _runtime.py can call .stop() to unblock the main thread.
+_active_server = None
 
 # ── Shared helpers (moved to _helpers.py; re-exported here for backwards compat) ─
 from src.gui._helpers import (  # noqa: F401
@@ -462,9 +465,11 @@ def _run_server(app, host: str, port: int, ssl_context,
 
 
 def _run_http(app, host: str, port: int) -> None:
+    import src.gui as _self
     from cheroot import wsgi as _cheroot_wsgi
     logger.info("Starting HTTP server via cheroot on {}:{}", host, port)
     server = _cheroot_wsgi.Server((host, port), app, numthreads=10)
+    _self._active_server = server
     try:
         server.start()
     except OSError as e:
@@ -510,6 +515,8 @@ def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None
 
     logger.info("Starting HTTPS server via cheroot on {}:{}", host, port)
     server = _cheroot_wsgi.Server((host, port), app, numthreads=10)
+    import src.gui as _self
+    _self._active_server = server
 
     _orig_error_log = server.error_log
 

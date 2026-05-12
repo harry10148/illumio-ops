@@ -129,4 +129,16 @@ def run_daemon_with_gui(cm, interval: int = 10, port: int = 5001, host: str = "0
     _gui._GUI_OWNS_DAEMON = True
     _gui._DAEMON_RESTART_FN = _restart
 
+    # Stop the cheroot server when SIGTERM fires so the main thread unblocks
+    # instead of waiting for systemd's 90-second TimeoutStopSec to expire.
+    def _gui_stopper():
+        _shutdown_event.wait()
+        try:
+            if _gui._active_server is not None:
+                _gui._active_server.stop()
+        except Exception:
+            pass
+
+    threading.Thread(target=_gui_stopper, daemon=True).start()
+
     launch_gui(cm, port=port, persistent_mode=True)
