@@ -1,4 +1,8 @@
+import pandas as pd
+
 from src.report.exporters.report_css import BASE_CSS
+from src.report.exporters.cover_page import build_cover_page
+from src.report.exporters.html_exporter import HtmlExporter
 
 
 def test_card_no_longer_has_page_break_inside_avoid():
@@ -25,9 +29,6 @@ def test_cover_page_css_present():
 
 def test_page_counter_present():
     assert 'counter(page)' in BASE_CSS
-
-
-from src.report.exporters.cover_page import build_cover_page
 
 
 def test_cover_page_contains_title():
@@ -71,11 +72,6 @@ def test_cover_page_empty_optional_fields():
     assert "🖥" not in html
 
 
-from unittest.mock import patch
-import pandas as pd
-from src.report.exporters.html_exporter import HtmlExporter
-
-
 def _minimal_results() -> dict:
     return {k: {} for k in [
         "mod01", "mod02", "mod03", "mod04", "mod05", "mod06",
@@ -99,4 +95,5 @@ def test_html_exporter_cover_page():
 def test_html_exporter_data_report_title():
     exp = HtmlExporter(_minimal_results(), lang="en")
     html = exp.build()
-    assert 'data-report-title=' in html
+    assert 'data-report-title="' in html
+    assert 'data-report-title=""' not in html
