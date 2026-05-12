@@ -57,7 +57,7 @@ def allowed_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
     if 'Proto' in top_ports.columns and top_ports['Proto'].astype(str).str.strip().eq('').all():
         top_ports = top_ports.drop(columns=['Proto'])
 
-    # Phase 5: chart_spec — line chart of top allowed ports by connection count
+    # Phase 5: chart_spec — bar chart of top allowed ports by connection count
     if not top_ports.empty:
         port_labels = list(top_ports['Port'].head(10).astype(str))
         port_values = list(top_ports['Connections'].head(10))
@@ -71,16 +71,16 @@ def allowed_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
         'audit_flag_count': len(audit_flags),
         'top_allowed_ports': top_ports,
         'chart_spec': {
-            'type': 'line',
-            'title': 'Allowed Traffic Timeline',
-            'title_key': 'rpt_chart_allowed_traffic_timeline',
+            'type': 'bar',
+            'title': 'Top Allowed Ports',
+            'title_key': 'rpt_chart_top_allowed_ports',
             'x_label': 'Port',
             'x_label_key': 'rpt_chart_axis_port',
             'y_label': 'Connections',
             'y_label_key': 'rpt_chart_axis_connections',
             'data': {
-                'x': port_labels,
-                'y': port_values,
+                'labels': port_labels,
+                'values': port_values,
             },
             'i18n': {'lang': get_language()},
         },
