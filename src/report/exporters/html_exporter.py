@@ -1265,7 +1265,13 @@ class HtmlExporter:
                 "connection_count": "Connections",
                 "grade": "Grade",
             })
-            html += f'<h4>{_s("rpt_tr_app_env_readiness")}</h4>' + _df_to_html(_aes, lang=_lang)
+            _print_cols = ["App (Env)", "Grade", "Readiness Score", "Policy Coverage %", "Enforcement Mode %"]
+            _aes_print = _aes[[c for c in _print_cols if c in _aes.columns]]
+            html += (
+                f'<h4>{_s("rpt_tr_app_env_readiness")}</h4>'
+                + f'<div class="screen-only">{_df_to_html(_aes, lang=_lang)}</div>'
+                + f'<div class="print-only">{_df_to_html(_aes_print, lang=_lang)}</div>'
+            )
         if recommendations is not None and not recommendations.empty:
             html += f'<h4>{_s("rpt_tr_remediation_rec")}</h4>' + _df_to_html(
                 recommendations,

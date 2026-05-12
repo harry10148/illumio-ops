@@ -272,7 +272,10 @@ BASE_CSS = """\
   .cover-org { font-size: 14pt; font-weight: 600; }
   .cover-generated { font-size: 10pt; opacity: 0.7; text-align: right; }
 
+  .print-only { display: none; }
   @media print {
+    .screen-only { display: none; }
+    .print-only { display: block; }
     nav { display: none; }
     .print-btn { display: none; }
     main { margin-left: 0; padding: 12px; }
