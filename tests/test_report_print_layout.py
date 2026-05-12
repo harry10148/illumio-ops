@@ -69,3 +69,34 @@ def test_cover_page_empty_optional_fields():
     )
     assert "📅" not in html
     assert "🖥" not in html
+
+
+from unittest.mock import patch
+import pandas as pd
+from src.report.exporters.html_exporter import HtmlExporter
+
+
+def _minimal_results() -> dict:
+    return {k: {} for k in [
+        "mod01", "mod02", "mod03", "mod04", "mod05", "mod06",
+        "mod07", "mod08", "mod09", "mod10", "mod11", "mod12",
+        "mod13", "mod14", "mod15",
+    ]}
+
+
+def test_html_exporter_cover_page():
+    exp = HtmlExporter(
+        _minimal_results(),
+        pce_url="pce.test", org_name="TestOrg",
+        date_range=("2026-01-01", "2026-05-01"), lang="en",
+    )
+    html = exp.build()
+    assert 'class="report-cover' in html
+    assert "pce.test" in html
+    assert "TestOrg" in html
+
+
+def test_html_exporter_data_report_title():
+    exp = HtmlExporter(_minimal_results(), lang="en")
+    html = exp.build()
+    assert 'data-report-title=' in html

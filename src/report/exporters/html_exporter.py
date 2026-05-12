@@ -35,6 +35,7 @@ from .code_highlighter import get_highlight_css
 from src.humanize_ext import human_number
 from src.report.section_guidance import get_guidance, visible_in
 from src.i18n import t, get_language
+from src.report.exporters.cover_page import build_cover_page as _build_cover_page
 
 _CSS = build_css('traffic')
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -386,13 +387,22 @@ class HtmlExporter:
 
     def __init__(self, results: dict, data_source: str = "",
                  profile: str = "security_risk", detail_level: str = _REPORT_DETAIL_LEVEL,
-                 compute_draft: bool = False, lang: str = "en"):
+                 compute_draft: bool = False, lang: str = "en",
+                 date_range: tuple[str, str] = ("", ""),
+                 pce_url: str = "", org_name: str = ""):
         self._r = results
         self._data_source = data_source
         self._profile = profile
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._compute_draft = compute_draft
         self._lang = lang
+        self._date_range = date_range
+        self._pce_url = pce_url
+        self._org_name = org_name
+
+    def build(self) -> str:
+        """Public alias for _build(); returns the full HTML string."""
+        return self._build()
 
     def export(self, output_dir: str = 'reports') -> str:
         """Write HTML file and return full path."""
@@ -603,7 +613,7 @@ class HtmlExporter:
                           'rpt_tr_sec_overview_intro', 'Start from overall traffic scale, Policy coverage, and top Ports to set a baseline for reading the rest of the report.') + '\n' +
             (self._section('policy', 'rpt_tr_sec_policy', 'Policy Decisions',
                            render_section_guidance('mod02', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod02_html(),
-                           'rpt_tr_sec_policy_intro', 'Break down the ratios and details of Allowed, Blocked, and Potentially Blocked to gauge how Policy is actually landing.') + '\n'
+                           layout='layout-b') + '\n'
              if visible_in('mod02_policy_decisions', profile, detail_level) else '') +
             (self._section('uncovered', 'rpt_tr_sec_uncovered', 'Uncovered Flows',
                            render_section_guidance('mod03', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod03_html(),
@@ -627,7 +637,8 @@ class HtmlExporter:
              if profile == 'network_inventory' else '') +
             (self._section('allowed', 'rpt_tr_sec_allowed', 'Allowed Traffic',
                            render_section_guidance('mod10', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod10_html(),
-                           'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.') + '\n'
+                           'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.',
+                           layout='layout-c') + '\n'
              if profile == 'security_risk' else '') +
             (self._section('bandwidth', 'rpt_tr_sec_bandwidth', 'Bandwidth &amp; Volume',
                            render_section_guidance('mod11', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod11_html(),
@@ -661,12 +672,21 @@ class HtmlExporter:
             ) if profile == 'security_risk' else '') +
             f'<footer>{_s("rpt_tr_footer")} &middot; {today_str}</footer>'
         )
+        _report_title = t("rpt_cover_type_security", lang=self._lang)
+        cover_html = _build_cover_page(
+            title=_report_title,
+            report_type=_report_title,
+            date_range=self._date_range,
+            pce_url=self._pce_url,
+            org_name=self._org_name,
+            lang=self._lang,
+        )
         html_lang = "zh-TW" if self._lang == "zh_TW" else "en"
         return (
             f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
             f"<title>{t('rpt_page_title_traffic', lang=self._lang)}</title>" + _CSS + _HIGHLIGHT_CSS + '</head>\n'
-            '<body>' + nav_html + '<main>' + body + '</main>'
+            f'<body data-report-title="{_report_title}">' + cover_html + nav_html + '<main>' + body + '</main>'
             + TABLE_JS + '</body></html>'
         )
 
@@ -678,6 +698,7 @@ class HtmlExporter:
         content: str,
         intro_key: str = '',
         intro_en: str = '',
+        layout: str = '',
     ) -> str:
         h2_text = self._s(i18n_key)
         if h2_text == i18n_key:
@@ -688,8 +709,9 @@ class HtmlExporter:
             if intro_text == intro_key:
                 intro_text = intro_en
             intro_html = f'<p class="section-intro">{intro_text}</p>'
+        card_class = f'card {layout}'.strip() if layout else 'card'
         return (
-            f'<section id="{id_}" class="card">'
+            f'<section id="{id_}" class="{card_class}">'
             f'<h2>{h2_text}</h2>'
             f'{intro_html}{content}</section>'
         )
@@ -795,10 +817,13 @@ class HtmlExporter:
         _s = self._s
         _lang = self._lang
         m = self._r.get('mod02', {})
-        out = self._subnote('rpt_tr_mod02_intro') + _df_to_html(m.get('summary'), lang=_lang) + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+        intro_text = t('rpt_tr_sec_policy_intro', lang=_lang,
+                       default='Break down the ratios and details of Allowed, Blocked, and Potentially Blocked to gauge how Policy is actually landing.')
+        chart_html = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+        table_html = self._subnote('rpt_tr_mod02_intro') + _df_to_html(m.get('summary'), lang=_lang)
         pc = m.get('port_coverage')
         if pc is not None and hasattr(pc, 'empty') and not pc.empty:
-            out += self._subnote('rpt_tr_port_coverage_subnote') + f'<h3>{_s("rpt_tr_port_coverage")}</h3>' + _df_to_html(pc, lang=_lang)
+            table_html += self._subnote('rpt_tr_port_coverage_subnote') + f'<h3>{_s("rpt_tr_port_coverage")}</h3>' + _df_to_html(pc, lang=_lang)
         for d in ('allowed', 'blocked', 'potentially_blocked'):
             dm = m.get(d, {})
             if not isinstance(dm, dict) or dm.get('count', 0) == 0:
@@ -811,11 +836,11 @@ class HtmlExporter:
                 'blocked': 'BLOCKED',
                 'potentially_blocked': 'POTENTIAL',
             }.get(d, d.upper())
-            out += (
+            table_html += (
                 '<h3>' + d.replace('_', ' ').upper() + f' ({pct}% of total)'
                 f' &nbsp;·&nbsp; ↓ Inbound: {inb} &nbsp;·&nbsp; ↑ Outbound: {outb}</h3>'
             )
-            out += self._three_col_tables(
+            table_html += self._three_col_tables(
                 f'<h4>{_s("rpt_tr_top_app_flows")}</h4>',
                 _df_to_html(dm.get('top_app_flows'), lang=_lang),
                 f'<h4>{_s("rpt_mod02_top_inbound_ports")} ({status})</h4>',
@@ -823,7 +848,13 @@ class HtmlExporter:
                 f'<h4>{_s("rpt_mod02_top_outbound_ports")} ({status})</h4>',
                 _df_to_html(dm.get('top_outbound_ports'), lang=_lang),
             )
-        return out
+        return (
+            '<div class="section-top">'
+            + f'<p class="section-intro">{intro_text}</p>'
+            + chart_html
+            + '</div>'
+            + '<div class="section-bottom">' + table_html + '</div>'
+        )
 
     def _mod03_html(self):
         m = self._r.get('mod03', {})
@@ -998,10 +1029,13 @@ class HtmlExporter:
         m = self._r.get('mod10', {})
         if m.get('note'):
             return f'<p class="note">{m["note"]}</p>'
+        table_html = self._subnote('rpt_tr_allowed_flows_subnote') + _df_to_html(m.get('top_app_flows'), lang=_lang)
+        chart_html = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
         return (
-            self._subnote('rpt_tr_allowed_flows_subnote')
-            + _df_to_html(m.get('top_app_flows'), lang=_lang)
-            + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+            '<div class="section-body">'
+            + table_html
+            + chart_html
+            + '</div>'
             + self._subnote('rpt_tr_audit_flags_subnote')
             + f'<h3>{_s("rpt_tr_audit_flags")} ({m.get("audit_flag_count", 0)})</h3>'
             + _df_to_html(m.get('audit_flags'), lang=_lang)
