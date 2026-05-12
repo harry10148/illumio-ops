@@ -284,9 +284,10 @@ BASE_CSS = """\
     .card { box-shadow: none; border: 1px solid var(--slate-20); }
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
-    /* Force all tables to fit page width via fixed layout + word-wrap */
-    .report-table { table-layout: fixed; word-break: break-word; }
-    .report-table thead th { white-space: normal; overflow-wrap: anywhere; }
+    /* Override JS-set inline widths (autoFitColumns) and force tables to fit page */
+    .report-table { table-layout: fixed !important; width: 100% !important; min-width: 0 !important; word-break: break-word; }
+    .report-table col { width: auto !important; min-width: 0 !important; }
+    .report-table thead th { width: auto !important; min-width: 0 !important; white-space: normal; overflow-wrap: anywhere; }
     .report-table tbody td { overflow-wrap: anywhere; }
     .report-table-panel--wide .report-table { font-size: 7.5pt; }
     .report-table-panel { box-shadow: none; overflow: visible; width: 100%; max-width: 100%; }
