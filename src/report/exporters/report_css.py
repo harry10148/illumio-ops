@@ -278,13 +278,17 @@ BASE_CSS = """\
     .print-only { display: block; }
     nav { display: none; }
     .print-btn { display: none; }
-    main { margin-left: 0; padding: 12px; }
+    main { margin-left: 0; padding: 0; }
     body { font-size: 10pt; }
     * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     .card { box-shadow: none; border: 1px solid var(--slate-20); }
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
-    .report-table-panel--wide .report-table { font-size: 8pt; }
+    /* Force all tables to fit page width via fixed layout + word-wrap */
+    .report-table { table-layout: fixed; word-break: break-word; }
+    .report-table thead th { white-space: normal; overflow-wrap: anywhere; }
+    .report-table tbody td { overflow-wrap: anywhere; }
+    .report-table-panel--wide .report-table { font-size: 7.5pt; }
     .report-table-panel { box-shadow: none; overflow: visible; width: 100%; max-width: 100%; }
     .report-table-wrap { overflow: visible; }
     .report-table-panel--wide::after { display: none; }
@@ -293,9 +297,10 @@ BASE_CSS = """\
     section { page-break-before: always; }
     section#summary { page-break-before: avoid; }
     section.report-cover { page-break-before: avoid !important; page-break-after: always; }
-    .report-cover { display: flex; min-height: 260mm; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    /* Scale Plotly charts proportionally instead of clipping them */
-    .chart-container { page-break-inside: avoid; overflow: visible; }
+    /* Cover: fills full A4 page. Explicit flex props since display:none in base CSS. */
+    .report-cover { display: flex !important; flex-direction: column !important; justify-content: space-between !important; min-height: 100vh !important; padding: 40px 36px !important; margin: 0 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    /* Clip Plotly chart containers to prevent legend/axis overflow into adjacent content */
+    .chart-container { page-break-inside: avoid; overflow: hidden; }
     .chart-container > div { zoom: 0.65; }
     .finding-card { page-break-inside: avoid; }
     footer { page-break-before: avoid; }

@@ -20,7 +20,7 @@ def test_tr_page_break_inside_avoid():
 
 
 def test_wide_table_font_size_in_print():
-    assert '.report-table-panel--wide .report-table { font-size: 8pt' in BASE_CSS
+    assert '.report-table-panel--wide .report-table { font-size: 7.5pt' in BASE_CSS
 
 
 def test_cover_page_css_present():
@@ -34,10 +34,23 @@ def test_cover_hidden_in_screen():
 
 
 def test_cover_visible_in_print():
-    # Cover page must reappear in print mode with flex layout and full A4 height.
+    # Cover page must reappear in print mode with flex layout and 100vh height.
     print_block = BASE_CSS.split('@media print')[1]
     assert 'display: flex' in print_block
-    assert '260mm' in print_block
+    assert '100vh' in print_block
+
+
+def test_print_table_layout_fixed():
+    # All tables must use fixed layout in print to prevent columns overflowing the page.
+    print_block = BASE_CSS.split('@media print')[1]
+    assert 'table-layout: fixed' in print_block
+    assert 'word-break: break-word' in print_block
+
+
+def test_chart_container_overflow_hidden_in_print():
+    # Chart containers must clip overflow to prevent legend/axis bleeding into adjacent content.
+    print_block = BASE_CSS.split('@media print')[1]
+    assert '.chart-container { page-break-inside: avoid; overflow: hidden' in print_block
 
 
 def test_page_counter_present():
