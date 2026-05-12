@@ -306,7 +306,7 @@ BASE_CSS = """\
     .chart-container { page-break-inside: avoid; overflow: hidden; }
     .chart-container > div { zoom: 0.65; }
     .finding-card { page-break-inside: avoid; }
-    footer { page-break-before: avoid; }
+    footer { display: none; }
     .layout-b .section-top { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 12px; }
     .layout-b .section-top > .section-intro { flex: 1; margin: 0; }
     .layout-b .section-top > .chart-container { flex: 1; }
