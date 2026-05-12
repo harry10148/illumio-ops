@@ -929,11 +929,23 @@ class HtmlExporter:
                 '</div>'
             )
 
+        _ppb = m.get('part_b_per_port')
+        if _ppb is not None and hasattr(_ppb, 'empty') and not _ppb.empty:
+            _g1 = ["Port", "Service", "Risk Level", "Control", "Total Flows", "Allowed", "Blocked", "Potentially Blocked"]
+            _g2 = ["Port", "Unique Src IPs", "Unique Dst IPs"]
+            _ppb_html = (
+                f'<h5 class="subtable-label">{_s("rpt_tr_per_port_traffic_policy")}</h5>'
+                + _df_to_html(_ppb[[c for c in _g1 if c in _ppb.columns]], 'Risk Level', lang=_lang)
+                + f'<h5 class="subtable-label">{_s("rpt_tr_per_port_src_dst")}</h5>'
+                + _df_to_html(_ppb[[c for c in _g2 if c in _ppb.columns]], lang=_lang)
+            )
+        else:
+            _ppb_html = _df_to_html(None, lang=_lang)
         out += (
             f'<h3>{_s("rpt_tr_risk_summary")}</h3>'
             + _df_to_html(m.get('part_a_summary'), 'Risk Level', lang=_lang) +
             f'<h3>{_s("rpt_tr_per_port")}</h3>'
-            + _df_to_html(m.get('part_b_per_port'), 'Risk Level', lang=_lang) +
+            + _ppb_html +
             f'<h3>{_s("rpt_tr_host_exposure")}</h3>'
             + f'<p class="note" style="font-size:11px">{_s("rpt_tr_host_exposure_note")}</p>'
             + _df_to_html(m.get('part_d_host_exposure'), lang=_lang)
@@ -1261,16 +1273,26 @@ class HtmlExporter:
                 "enforcement_mode_ratio": "Enforcement Mode %",
                 "staged_readiness_ratio": "Staged Readiness %",
                 "remote_app_coverage_ratio": "Remote-App Coverage %",
+                "potentially_blocked_ratio": "PB Ratio %",
+                "pb_uncovered_count": "PB Uncovered",
                 "flow_count": "Flows",
                 "connection_count": "Connections",
+                "blocked_or_pb_flow_count": "Blocked/PB Flows",
                 "grade": "Grade",
             })
-            _print_cols = ["App (Env)", "Grade", "Readiness Score", "Policy Coverage %", "Enforcement Mode %"]
-            _aes_print = _aes[[c for c in _print_cols if c in _aes.columns]]
+
+            def _aes_sub(cols):
+                sub = _aes[[c for c in cols if c in _aes.columns]]
+                return _df_to_html(sub, lang=_lang) if len(sub.columns) > 1 else ''
+
             html += (
                 f'<h4>{_s("rpt_tr_app_env_readiness")}</h4>'
-                + f'<div class="screen-only">{_df_to_html(_aes, lang=_lang)}</div>'
-                + f'<div class="print-only">{_df_to_html(_aes_print, lang=_lang)}</div>'
+                + f'<h5 class="subtable-label">{_s("rpt_tr_app_env_scores_summary")}</h5>'
+                + _aes_sub(["App (Env)", "Grade", "Readiness Score", "Policy Coverage %", "Enforcement Mode %", "Ringfence Maturity %"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_app_env_coverage")}</h5>'
+                + _aes_sub(["App (Env)", "Remote-App Coverage %", "Staged Readiness %", "PB Ratio %", "PB Uncovered"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_app_env_flows")}</h5>'
+                + _aes_sub(["App (Env)", "Flows", "Connections", "Blocked/PB Flows"])
             )
         if recommendations is not None and not recommendations.empty:
             html += f'<h4>{_s("rpt_tr_remediation_rec")}</h4>' + _df_to_html(
@@ -1312,8 +1334,18 @@ class HtmlExporter:
             )
         top_apps = m.get('top_apps')
         if top_apps is not None and not top_apps.empty:
-            html += f'<h4>{_s("rpt_tr_top_apps_infra")}</h4>' + _df_to_html(
-                top_apps, lang=_lang, value_i18n_maps=_scored_value_maps,
+            def _ta_sub(cols):
+                sub = top_apps[[c for c in cols if c in top_apps.columns]]
+                return _df_to_html(sub, lang=_lang, value_i18n_maps=_scored_value_maps) if len(sub.columns) > 1 else ''
+
+            html += (
+                f'<h4>{_s("rpt_tr_top_apps_infra")}</h4>'
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_summary")}</h5>'
+                + _ta_sub(["app_env_key", "infrastructure_score", "tier", "role", "provider_score", "consumer_score"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_risk_factors")}</h5>'
+                + _ta_sub(["app_env_key", "betweenness_score", "mixed_traffic_ratio", "dampening_factor", "non_prod_penalty"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_connections")}</h5>'
+                + _ta_sub(["app_env_key", "in_degree", "out_degree", "connections_in", "connections_out"])
             )
         top_edges = m.get('top_edges')
         if top_edges is not None and not top_edges.empty:

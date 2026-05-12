@@ -69,6 +69,7 @@ BASE_CSS = """\
   h2 { color: var(--cyan-120); font-size: 16px; font-weight: 600; margin: 24px 0 10px; border-bottom: 2px solid var(--orange); padding-bottom: 6px; }
   h3 { color: var(--slate); font-size: 13px; font-weight: 600; margin: 16px 0 8px; }
   h4 { color: var(--slate-50); font-size: 12px; font-weight: 600; margin: 12px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .subtable-label { color: var(--slate-50); font-size: 11px; font-weight: 600; margin: 10px 0 3px; padding-left: 8px; border-left: 3px solid var(--orange); text-transform: uppercase; letter-spacing: .04em; }
 
   .card { background: #fff; border-radius: 8px; padding: 24px 28px; box-shadow: var(--shadow-card); margin-bottom: 24px; color: var(--slate); container-type: inline-size; }
   .note { background: var(--tan); border-left: 4px solid var(--orange); padding: 12px 14px; border-radius: 4px; color: var(--cyan-120); font-size: 13px; margin: 12px 0; line-height: 1.6; }
