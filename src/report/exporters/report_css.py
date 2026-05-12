@@ -62,6 +62,8 @@ BASE_CSS = """\
   nav { position: fixed; top: 0; left: 0; width: 210px; height: 100vh; background: var(--cyan-120); overflow-y: auto; padding: 60px 0 20px; z-index: 100; }
   nav a { display: block; color: var(--slate-20); text-decoration: none; padding: 7px 16px; font-size: 12px; border-left: 3px solid transparent; }
   nav a:hover, nav a.active { background: var(--cyan-100); border-left-color: var(--orange); color: #fff; }
+  .print-btn { display: block; margin: 12px 16px 0; padding: 7px 16px; background: var(--orange); color: #fff; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; text-align: center; width: calc(100% - 32px); }
+  .print-btn:hover { background: var(--orange-dark, #cc4400); }
   main { margin-left: 210px; padding: 24px; container-type: inline-size; container-name: main; }
   h1 { color: var(--orange); font-size: 22px; font-weight: 700; margin-bottom: 4px; }
   h2 { color: var(--cyan-120); font-size: 16px; font-weight: 600; margin: 24px 0 10px; border-bottom: 2px solid var(--orange); padding-bottom: 6px; }
@@ -251,12 +253,20 @@ BASE_CSS = """\
 
   @media print {
     nav { display: none; }
+    .print-btn { display: none; }
     main { margin-left: 0; padding: 12px; }
+    body { font-size: 10pt; }
+    * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     .card { box-shadow: none; border: 1px solid var(--slate-20); page-break-inside: avoid; }
     .report-table-panel { box-shadow: none; }
     .report-table-panel--wide::after { display: none; }
     .report-table-panel--wide .report-table thead th:first-child,
     .report-table-panel--wide .report-table tbody td:first-child { position: static; box-shadow: none; }
+    section { page-break-before: always; }
+    section#summary { page-break-before: avoid; }
+    .chart-container { page-break-inside: avoid; }
+    .finding-card { page-break-inside: avoid; }
+    footer { page-break-before: avoid; }
   }
 """
 

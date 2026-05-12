@@ -574,7 +574,7 @@ class HtmlExporter:
                 (_nav_link('change_impact', 'rpt_tr_nav_change_impact', 'Change Impact')
                  if visible_in('mod_change_impact', profile, detail_level) else ''),
             ]
-        nav_html = '<nav>' + ''.join(_nav_links) + '</nav>'
+        nav_html = '<nav>' + ''.join(_nav_links) + '<button class="print-btn" onclick="window.print()">🖨 Print / PDF</button></nav>'
 
         exec_html = render_exec_summary_html(_traffic_mod00, report_name='Traffic Report', lang=self._lang)
         body = (
