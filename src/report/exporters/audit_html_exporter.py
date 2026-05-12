@@ -20,6 +20,7 @@ from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from src.report.analysis.audit.audit_risk import RISK_BG, RISK_COLOR, get_risk
 from src.report.exporters._exec_summary import render_exec_summary_html
+from src.report.exporters.cover_page import build_cover_page as _build_cover_page
 
 _CSS = build_css("audit")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -83,7 +84,8 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False, l
 
 class AuditHtmlExporter:
     def __init__(self, results: dict, df: pd.DataFrame = None, date_range: tuple = ("", ""), data_source: str = "",
-                 profile: str = "security_risk", detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en"):
+                 profile: str = "security_risk", detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en",
+                 pce_url: str = "", org_name: str = ""):
         self._r = results
         self._df = df
         self._date_range = date_range
@@ -91,6 +93,8 @@ class AuditHtmlExporter:
         self._profile = profile
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
+        self._pce_url = pce_url
+        self._org_name = org_name
 
     @staticmethod
     def _risk_badge(risk_level: str) -> str:
@@ -246,13 +250,23 @@ class AuditHtmlExporter:
                if visible_in('audit_mod04_correlation', profile, detail_level) else '')
             + f'<footer>{_s("rpt_au_footer")} &middot; {today_str}</footer>'
         )
+        _cover_title = _s("rpt_cover_type_audit")
+        cover_html = _build_cover_page(
+            title=_cover_title,
+            report_type=_cover_title,
+            date_range=self._date_range,
+            pce_url=self._pce_url,
+            org_name=self._org_name,
+            lang=self._lang,
+        )
         return (
             f'<!DOCTYPE html><html lang="{"zh-TW" if self._lang == "zh_TW" else "en"}"><head>\n'
             "<meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
             f"<title>{t('rpt_page_title_audit', lang=self._lang)}</title>"
             + _CSS + _HIGHLIGHT_CSS
             + "</head>\n"
-            + "<body>"
+            + f'<body data-report-title="{_cover_title}">'
+            + cover_html
             + nav_html
             + "<main>"
             + body
