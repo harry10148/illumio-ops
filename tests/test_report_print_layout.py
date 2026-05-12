@@ -27,6 +27,19 @@ def test_cover_page_css_present():
     assert '.report-cover {' in BASE_CSS
 
 
+def test_cover_hidden_in_screen():
+    # Cover page must be hidden in browser (display: none in base CSS)
+    # so it doesn't show as a dark block when viewing the HTML report.
+    assert 'display: none' in BASE_CSS.split('@media print')[0].split('.report-cover')[1]
+
+
+def test_cover_visible_in_print():
+    # Cover page must reappear in print mode with flex layout and full A4 height.
+    print_block = BASE_CSS.split('@media print')[1]
+    assert 'display: flex' in print_block
+    assert '260mm' in print_block
+
+
 def test_page_counter_present():
     assert 'counter(page)' in BASE_CSS
 

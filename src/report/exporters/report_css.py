@@ -262,7 +262,7 @@ BASE_CSS = """\
       font-family: sans-serif;
     }
   }
-  .report-cover { background: linear-gradient(160deg, #1a3f4b 0%, #2a5b6b 60%, #1a3f4b 100%); color: #fff; padding: 40px 36px; display: flex; flex-direction: column; justify-content: space-between; min-height: 230mm; border: none !important; box-shadow: none !important; }
+  .report-cover { background: linear-gradient(160deg, #1a3f4b 0%, #2a5b6b 60%, #1a3f4b 100%); color: #fff; padding: 40px 36px; display: none; flex-direction: column; justify-content: space-between; min-height: 230mm; border: none !important; box-shadow: none !important; }
   .cover-eyebrow { font-size: 10pt; letter-spacing: 2px; opacity: 0.6; text-transform: uppercase; margin-bottom: 8px; }
   .cover-title { font-size: 28pt; font-weight: 700; line-height: 1.2; margin-bottom: 8px; }
   .cover-rule { width: 40px; height: 3px; background: var(--orange); margin: 16px 0; }
@@ -293,7 +293,7 @@ BASE_CSS = """\
     section { page-break-before: always; }
     section#summary { page-break-before: avoid; }
     section.report-cover { page-break-before: avoid !important; page-break-after: always; }
-    .report-cover { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .report-cover { display: flex; min-height: 260mm; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     /* Scale Plotly charts proportionally instead of clipping them */
     .chart-container { page-break-inside: avoid; overflow: visible; }
     .chart-container > div { zoom: 0.65; }
