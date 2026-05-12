@@ -289,8 +289,8 @@ BASE_CSS = """\
     .report-table col { width: auto !important; min-width: 0 !important; }
     .report-table thead th { width: auto !important; min-width: 0 !important; white-space: normal; overflow-wrap: anywhere; }
     .report-table tbody td { overflow-wrap: anywhere; }
-    /* Wide tables: fixed layout for even column distribution + smaller font */
-    .report-table-panel--wide .report-table { table-layout: fixed !important; font-size: 7.5pt; }
+    /* Wide tables: smaller font; auto layout lets browser allocate proportional column widths */
+    .report-table-panel--wide .report-table { font-size: 7.5pt; }
     .report-table-panel { box-shadow: none; overflow: visible; width: 100%; max-width: 100%; }
     .report-table-wrap { overflow: visible; }
     .report-table-panel--wide::after { display: none; }

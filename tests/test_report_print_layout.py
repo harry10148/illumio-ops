@@ -42,10 +42,9 @@ def test_cover_visible_in_print():
     assert '100vh' in print_block
 
 
-def test_print_table_layout_fixed():
-    # All tables must use fixed layout in print to prevent columns overflowing the page.
+def test_print_table_word_break():
+    # Tables must allow word breaking to prevent long strings overflowing column width.
     print_block = BASE_CSS.split('@media print')[1]
-    assert 'table-layout: fixed' in print_block
     assert 'word-break: break-word' in print_block
 
 
