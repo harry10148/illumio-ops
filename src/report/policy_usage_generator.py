@@ -252,6 +252,8 @@ class PolicyUsageGenerator:
                 lookback_days=result.lookback_days,
                 detail_level=_REPORT_DETAIL_LEVEL,
                 lang=lang,
+                pce_url=getattr(self, '_pce_url', '') or getattr(self, 'pce_url', ''),
+                org_name=getattr(self, '_org_name', '') or getattr(self, 'org_name', ''),
             ).export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, result, file_format='html')
