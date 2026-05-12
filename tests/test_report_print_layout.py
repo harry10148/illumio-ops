@@ -42,10 +42,11 @@ def test_cover_visible_in_print():
     assert '100vh' in print_block
 
 
-def test_print_table_word_break():
-    # Tables must allow word breaking to prevent long strings overflowing column width.
+def test_print_table_overflow_wrap():
+    # Tables must use overflow-wrap:break-word (not anywhere) to preserve min-content-width for
+    # proportional column distribution while still breaking long unbreakable strings.
     print_block = BASE_CSS.split('@media print')[1]
-    assert 'word-break: break-word' in print_block
+    assert 'overflow-wrap: break-word' in print_block
 
 
 def test_chart_container_overflow_hidden_in_print():
