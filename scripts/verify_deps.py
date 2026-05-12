@@ -134,7 +134,7 @@ def main() -> int:
     parser.add_argument(
         "--offline-bundle",
         action="store_true",
-        help="Verify offline bundle: same production package set (ReportLab ships pure-Python).",
+        help="Verify offline bundle: same production package set.",
     )
     args = parser.parse_args()
 
