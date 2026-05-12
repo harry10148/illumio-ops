@@ -284,8 +284,9 @@ BASE_CSS = """\
     .card { box-shadow: none; border: 1px solid var(--slate-20); }
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
-    /* Override JS-set inline widths; preserve natural min-content-width for proportional auto layout */
-    .report-table { width: 100% !important; min-width: 0 !important; overflow-wrap: break-word; }
+    /* Override JS auto-fit: data-auto-fitted=true triggers table-layout:fixed in base CSS.
+       !important overrides the higher-specificity attribute selector. */
+    .report-table { width: 100% !important; min-width: 0 !important; overflow-wrap: break-word; table-layout: auto !important; }
     .report-table col { width: auto !important; min-width: 0 !important; }
     .report-table thead th { width: auto !important; min-width: 0 !important; white-space: normal; }
     .report-table tbody td { overflow-wrap: break-word; }
