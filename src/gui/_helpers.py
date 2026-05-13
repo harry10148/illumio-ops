@@ -296,7 +296,7 @@ def _ui_translation_dict(lang: str) -> dict:
     return {
         k: v
         for k, v in get_messages(lang).items()
-        if k.startswith(("gui_", "sched_", "status_", "error_"))
+        if k.startswith(("gui_", "sched_", "status_", "error_", "pd_"))
         or k in _UI_EXTRA_KEYS
     }
 
