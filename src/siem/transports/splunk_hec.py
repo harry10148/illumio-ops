@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -37,7 +38,11 @@ class SplunkHECTransport(Transport):
         return s
 
     def send(self, payload: str) -> None:
-        body = {"event": payload, "sourcetype": self._sourcetype}
+        try:
+            event_data = json.loads(payload)
+        except (ValueError, TypeError):
+            event_data = payload  # CEF and other non-JSON formats stay as string
+        body = {"event": event_data, "sourcetype": self._sourcetype}
         resp = self._session.post(
             self._endpoint,
             json=body,

@@ -39,15 +39,15 @@ def _synthetic_event() -> dict:
 
 def _build_formatter(fmt: str):
     from src.siem.formatters.cef import CEFFormatter
-    from src.siem.formatters.json_line import JSONLineFormatter
+    from src.siem.formatters.normalized_json import NormalizedJSONFormatter
     from src.siem.formatters.syslog_wrapped import SyslogWrappedFormatter
     if fmt == "cef":
         return CEFFormatter()
     if fmt == "syslog_cef":
         return SyslogWrappedFormatter(CEFFormatter())
     if fmt == "syslog_json":
-        return SyslogWrappedFormatter(JSONLineFormatter())
-    return JSONLineFormatter()  # json and anything else
+        return SyslogWrappedFormatter(NormalizedJSONFormatter())
+    return NormalizedJSONFormatter()  # json and anything else
 
 
 def _build_transport(dest_cfg: SiemDestinationSettings):
