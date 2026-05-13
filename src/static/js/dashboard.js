@@ -1763,6 +1763,9 @@ async function loadDashboardCharts() {
       const el = document.getElementById(`chart-${id.replace(/_/g, '-')}`);
       if (el && typeof Plotly !== 'undefined') {
         Plotly.react(el, fig.data, fig.layout, { responsive: true });
+        el.style.display = '';
+        const parent = el.closest('.dashboard-charts');
+        if (parent) parent.style.display = 'grid';
       }
     } catch (_) {}
   }
