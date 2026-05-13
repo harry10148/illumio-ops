@@ -148,7 +148,15 @@ def _formatter_for(dest_cfg):
     """Build formatter from SiemDestinationSettings."""
     from src.siem.formatters.cef import CEFFormatter
     from src.siem.formatters.json_line import JSONLineFormatter
-    return CEFFormatter() if dest_cfg.format.startswith("cef") else JSONLineFormatter()
+    from src.siem.formatters.syslog_wrapped import SyslogWrappedFormatter
+    fmt = dest_cfg.format
+    if fmt == "cef":
+        return CEFFormatter()
+    if fmt == "syslog_cef":
+        return SyslogWrappedFormatter(CEFFormatter())
+    if fmt == "syslog_json":
+        return SyslogWrappedFormatter(JSONLineFormatter())
+    return JSONLineFormatter()
 
 
 def _transport_for(dest_cfg):
