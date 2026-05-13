@@ -567,7 +567,8 @@ function buildSiemDestinationsSection() {
     + '<th data-i18n="gui_siem_th_name">Name</th>'
     + '<th data-i18n="gui_siem_th_transport">Transport</th>'
     + '<th data-i18n="gui_siem_th_format">Format</th>'
-    + '<th data-i18n="gui_siem_th_endpoint">Endpoint</th>'
+    + '<th data-i18n="gui_siem_th_host">Host</th>'
+    + '<th data-i18n="gui_siem_th_port">Port</th>'
     + '<th data-i18n="gui_siem_th_status">Status</th>'
     + '<th data-i18n="gui_siem_th_actions">Actions</th>'
     + '</tr></thead>'
@@ -586,7 +587,8 @@ function buildSiemRow(d, st) {
     + '<td><b>' + escapeAttr(d.name) + '</b>' + dim + '</td>'
     + '<td><code>' + escapeAttr(d.transport) + '</code></td>'
     + '<td><code>' + escapeAttr(d.format) + '</code></td>'
-    + '<td title="' + escapeAttr(d.endpoint) + '">' + escapeAttr(d.endpoint) + '</td>'
+    + '<td>' + escapeAttr(d.host || '') + '</td>'
+    + '<td>' + (d.port || 514) + '</td>'
     + '<td>' + _siemStatusBadge(d, st) + '</td>'
     + '<td style="white-space:nowrap;">'
     + '<button class="btn btn-sm" onclick="siemTestDest(\'' + nameEnc + '\')" data-i18n="gui_siem_test">Test</button> '
@@ -629,7 +631,7 @@ async function siemOpenDestModal(nameEnc) {
   var name = nameEnc ? decodeURIComponent(nameEnc) : null;
   var dest = {
     name: '', enabled: true, transport: 'udp', format: 'cef',
-    endpoint: '', tls_verify: true, tls_ca_bundle: '', hec_token: '',
+    host: '', port: 514, tls_verify: true, tls_ca_bundle: '', hec_token: '',
     batch_size: 100, source_types: ['audit', 'traffic'], max_retries: 10
   };
   if (name) {
@@ -648,9 +650,12 @@ async function siemOpenDestModal(nameEnc) {
   if (typeof window.i18nApply === 'function') window.i18nApply();
 }
 
+var _SIEM_DEFAULT_PORTS = { udp: 514, tcp: 514, tls: 6514, hec: 8088 };
+
 function buildDestModal(dest, editName) {
   var nameVal = escapeAttr(dest.name);
-  var endpoint = escapeAttr(dest.endpoint);
+  var host = escapeAttr(dest.host || '');
+  var port = Number(dest.port) || 514;
   var caBundle = escapeAttr(dest.tls_ca_bundle || '');
   var hecToken = escapeAttr(dest.hec_token || '');
   var readonly = editName ? ' readonly' : '';
@@ -668,34 +673,60 @@ function buildDestModal(dest, editName) {
   return '<div class="modal-backdrop" onclick="siemCloseModal(event)">'
     + '<div class="modal" onclick="event.stopPropagation()">'
     + '<h2 data-i18n="' + titleKey + '">' + titleText + ' destination</h2>'
+
     + '<h3 data-i18n="gui_siem_sec_basic">Basic</h3>'
-    + '<label>name: <input id="md-name" value="' + nameVal + '"' + readonly + '></label>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label data-i18n="gui_siem_name">Name</label>'
+    + '<input id="md-name" value="' + nameVal + '"' + readonly + '></div>'
+    + '<div class="form-group" style="flex:0 0 auto;align-self:flex-end;padding-bottom:4px">'
     + '<label><input type="checkbox" id="md-enabled"' + (dest.enabled ? ' checked' : '') + '>'
-    + ' <span data-i18n="gui_siem_enabled">Enabled</span></label>'
-    + '<div>source_types:'
-    + ' <label><input type="checkbox" name="md-st" value="audit"' + (sourceTypes.indexOf('audit') >= 0 ? ' checked' : '') + '> audit</label>'
-    + ' <label><input type="checkbox" name="md-st" value="traffic"' + (sourceTypes.indexOf('traffic') >= 0 ? ' checked' : '') + '> traffic</label>'
+    + ' <span data-i18n="gui_siem_enabled">Enabled</span></label></div>'
     + '</div>'
+    + '<div class="form-group"><label data-i18n="gui_siem_source_types">Forwarding Content</label>'
+    + '<div style="display:flex;gap:16px;margin-top:4px">'
+    + '<label><input type="checkbox" name="md-st" value="audit"' + (sourceTypes.indexOf('audit') >= 0 ? ' checked' : '') + '> Audit Events</label>'
+    + '<label><input type="checkbox" name="md-st" value="traffic"' + (sourceTypes.indexOf('traffic') >= 0 ? ' checked' : '') + '> Traffic Flows</label>'
+    + '</div></div>'
+
     + '<h3 data-i18n="gui_siem_sec_transport">Transport</h3>'
-    + '<label>transport: <select id="md-transport" onchange="siemToggleCondFields()">'
-    + mkOpts(['udp', 'tcp', 'tls', 'hec'], dest.transport)
-    + '</select></label>'
-    + '<label>format: <select id="md-format">'
-    + mkOpts(['cef', 'json', 'syslog_cef', 'syslog_json'], dest.format)
-    + '</select></label>'
-    + '<label>endpoint: <input id="md-endpoint" value="' + endpoint + '"></label>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label data-i18n="gui_siem_transport">Transport</label>'
+    + '<select id="md-transport" onchange="siemToggleCondFields()">' + mkOpts(['udp', 'tcp', 'tls', 'hec'], dest.transport) + '</select></div>'
+    + '<div class="form-group"><label data-i18n="gui_siem_format">Format</label>'
+    + '<select id="md-format">' + mkOpts(['cef', 'json', 'syslog_cef', 'syslog_json'], dest.format) + '</select></div>'
+    + '</div>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label data-i18n="gui_siem_host">Server Address</label>'
+    + '<input id="md-host" value="' + host + '" placeholder="192.168.1.10"></div>'
+    + '<div class="form-group" style="flex:0 0 100px"><label data-i18n="gui_siem_port">Port</label>'
+    + '<input type="number" id="md-port" min="1" max="65535" value="' + port + '"></div>'
+    + '</div>'
+
     + '<div id="md-tls-section">'
     + '<h3 data-i18n="gui_siem_sec_tls">TLS</h3>'
-    + '<label><input type="checkbox" id="md-tls-verify"' + (dest.tls_verify ? ' checked' : '') + '> tls_verify</label>'
-    + '<label>tls_ca_bundle: <input id="md-tls-ca" value="' + caBundle + '"></label>'
+    + '<label><input type="checkbox" id="md-tls-verify"' + (dest.tls_verify ? ' checked' : '') + '>'
+    + ' <span data-i18n="gui_siem_tls_verify">Verify TLS Certificate</span></label>'
+    + '<div class="form-group" style="margin-top:8px"><label data-i18n="gui_siem_ca_bundle">CA Bundle Path</label>'
+    + '<input id="md-tls-ca" value="' + caBundle + '" placeholder="/etc/ssl/certs/ca-bundle.crt"></div>'
     + '</div>'
+
     + '<div id="md-hec-section">'
     + '<h3 data-i18n="gui_siem_sec_hec">HEC</h3>'
-    + '<label>hec_token: <input type="password" id="md-hec-token" value="' + hecToken + '"></label>'
+    + '<div class="form-group"><label data-i18n="gui_siem_hec_token">HEC Token</label>'
+    + '<input type="password" id="md-hec-token" value="' + hecToken + '"></div>'
     + '</div>'
-    + '<h3 data-i18n="gui_siem_sec_batch">Batch</h3>'
-    + '<label>batch_size (1-10000): <input type="number" id="md-batch" min="1" max="10000" value="' + Number(dest.batch_size) + '"></label>'
-    + '<label>max_retries (&gt;=0): <input type="number" id="md-retries" min="0" value="' + Number(dest.max_retries) + '"></label>'
+
+    + '<details style="margin-top:14px">'
+    + '<summary style="cursor:pointer;font-weight:600;padding:4px 0" data-i18n="gui_siem_sec_advanced">Advanced</summary>'
+    + '<div style="margin-top:10px">'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label data-i18n="gui_siem_batch_size">Batch Size</label>'
+    + '<input type="number" id="md-batch" min="1" max="10000" value="' + Number(dest.batch_size) + '"></div>'
+    + '<div class="form-group"><label data-i18n="gui_siem_max_retries">Max Retries</label>'
+    + '<input type="number" id="md-retries" min="0" value="' + Number(dest.max_retries) + '"></div>'
+    + '</div></div>'
+    + '</details>'
+
     + '<div id="md-banner" style="margin-top:10px;color:var(--danger);"></div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">'
     + '<button class="btn" onclick="siemCloseModal(event)" data-i18n="gui_cancel">Cancel</button>'
@@ -714,6 +745,15 @@ function siemToggleCondFields() {
   var hecEl = document.getElementById('md-hec-section');
   if (tlsEl) tlsEl.style.display = (t === 'tls' || t === 'hec') ? '' : 'none';
   if (hecEl) hecEl.style.display = (t === 'hec') ? '' : 'none';
+  // Auto-fill default port only if port field is still at a known default value
+  var portEl = document.getElementById('md-port');
+  if (portEl) {
+    var cur = Number(portEl.value);
+    var defaults = Object.values(_SIEM_DEFAULT_PORTS);
+    if (defaults.indexOf(cur) >= 0 || cur === 514) {
+      portEl.value = _SIEM_DEFAULT_PORTS[t] || 514;
+    }
+  }
 }
 
 function siemCloseModal() {
@@ -730,7 +770,8 @@ async function siemSaveDest(editNameEnc) {
     enabled: document.getElementById('md-enabled').checked,
     transport: document.getElementById('md-transport').value,
     format: document.getElementById('md-format').value,
-    endpoint: document.getElementById('md-endpoint').value.trim(),
+    host: document.getElementById('md-host').value.trim(),
+    port: Number(document.getElementById('md-port').value),
     tls_verify: document.getElementById('md-tls-verify').checked,
     tls_ca_bundle: document.getElementById('md-tls-ca').value.trim() || null,
     hec_token: document.getElementById('md-hec-token').value || null,
