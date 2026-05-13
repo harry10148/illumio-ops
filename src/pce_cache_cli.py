@@ -85,6 +85,20 @@ def _edit_traffic_filter(cm):
 
 
 def _edit_traffic_sampling(cm):
+    print()
+    print("  Traffic Sampling")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print("  sample_ratio_allowed")
+    print("    1 = keep every Allowed flow (no sampling).")
+    print("    N = keep 1 in every N Allowed flows (e.g. 10 = 10% sample).")
+    print("    Blocked / Potentially Blocked flows are always kept in full.")
+    print("    Sampling is deterministic — the same flow is always in or out.")
+    print()
+    print("  max_rows_per_batch")
+    print("    Max traffic flow records fetched from the PCE per ingest cycle.")
+    print("    Reduce if the PCE API times out or memory usage is too high.")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print()
     c = cm.models.pce_cache.model_dump(mode="json")
     ts = c.setdefault("traffic_sampling", {})
     ts["sample_ratio_allowed"] = _prompt("sample_ratio_allowed", ts.get("sample_ratio_allowed", 1), int)
