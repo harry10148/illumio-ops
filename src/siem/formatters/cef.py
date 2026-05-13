@@ -175,12 +175,43 @@ class CEFFormatter(Formatter):
             ext.append(f"network={_cef_escape(net_name)}")
 
         # ICMP
-        icmp_type = flow.get("type") or svc.get("icmp_type")
-        icmp_code = flow.get("code") or svc.get("icmp_code")
+        icmp_type = flow.get("type") if flow.get("type") is not None else svc.get("icmp_type")
+        icmp_code = flow.get("code") if flow.get("code") is not None else svc.get("icmp_code")
         if icmp_type is not None:
             ext.append(f"type={icmp_type}")
         if icmp_code is not None:
             ext.append(f"code={icmp_code}")
+
+        # class: transmission type U=Unicast M=Multicast B=Broadcast
+        cls = flow.get("class") or ""
+        if cls:
+            ext.append(f"class={_cef_escape(cls)}")
+
+        # dst_tbi / dst_tbo: total bytes (separate from delta)
+        dst_tbi = flow.get("dst_tbi")
+        dst_tbo = flow.get("dst_tbo")
+        if dst_tbi is not None:
+            ext.append(f"dst_tbi={dst_tbi}")
+        if dst_tbo is not None:
+            ext.append(f"dst_tbo={dst_tbo}")
+
+        # interval_sec: sampling interval
+        interval_sec = flow.get("interval_sec")
+        if interval_sec is not None:
+            ext.append(f"interval_sec={interval_sec}")
+
+        # ddms / tdms: delta and total flow duration in ms
+        ddms = flow.get("ddms")
+        tdms = flow.get("tdms")
+        if ddms is not None:
+            ext.append(f"ddms={ddms}")
+        if tdms is not None:
+            ext.append(f"tdms={tdms}")
+
+        # pd_qualifier: policy decision qualifier (0-3)
+        pd_q = flow.get("pd_qualifier")
+        if pd_q is not None:
+            ext.append(f"pd_qualifier={pd_q}")
 
         # pce_fqdn
         pce_fqdn = flow.get("pce_fqdn") or ""
