@@ -16,6 +16,16 @@ _SEVERITY_MAP = {
 }
 _PCE_VERSION = "3.11"
 
+_PROTO_MAP = {6: "tcp", 17: "udp", 1: "icmp"}
+
+
+def _proto_to_str(proto) -> str:
+    if proto is None:
+        return ""
+    if isinstance(proto, str):
+        return proto
+    return _PROTO_MAP.get(int(proto), str(proto))
+
 
 def _cef_escape(value: str) -> str:
     """Escape CEF extension field values: backslash, pipe, equals, newline."""
@@ -58,21 +68,25 @@ class CEFFormatter(Formatter):
         return header + "|" + " ".join(ext_parts)
 
     def format_flow(self, flow: dict) -> str:
-        action = _cef_escape(str(flow.get("action", "unknown")))
-        header = (
-            f"CEF:0|Illumio|PCE|{_PCE_VERSION}"
-            f"|traffic.flow|traffic.flow|3"
-        )
+        # Handle both normalized form and raw PCE API form
+        svc = flow.get("service") or {}
+        src_ip = flow.get("src_ip") or (flow.get("src") or {}).get("ip", "")
+        dst_ip = flow.get("dst_ip") or (flow.get("dst") or {}).get("ip", "")
+        port = flow.get("port") or svc.get("port") or 0
+        proto_raw = flow.get("protocol") or svc.get("proto")
+        proto = _proto_to_str(proto_raw)
+        action = flow.get("action") or flow.get("policy_decision") or "unknown"
+        ts = flow.get("first_detected") or (flow.get("timestamp_range") or {}).get("first_detected", "")
 
-        ts = flow.get("first_detected", "")
+        header = f"CEF:0|Illumio|PCE|{_PCE_VERSION}|traffic.flow|traffic.flow|3"
         ext_parts = []
         if ts:
             ext_parts.append(f"rt={_ts_to_epoch_ms(ts)}")
-        ext_parts.append(f"src={_cef_escape(str(flow.get('src_ip', '')))}")
-        ext_parts.append(f"dst={_cef_escape(str(flow.get('dst_ip', '')))}")
-        ext_parts.append(f"dpt={flow.get('port', 0)}")
-        ext_parts.append(f"proto={_cef_escape(str(flow.get('protocol', '')))}")
-        ext_parts.append(f"act={action}")
+        ext_parts.append(f"src={_cef_escape(str(src_ip))}")
+        ext_parts.append(f"dst={_cef_escape(str(dst_ip))}")
+        ext_parts.append(f"dpt={port}")
+        ext_parts.append(f"proto={_cef_escape(proto)}")
+        ext_parts.append(f"act={_cef_escape(str(action))}")
         ext_parts.append(f"dvchost={_cef_escape(str(flow.get('pce_fqdn', '')))}")
 
         return header + "|" + " ".join(ext_parts)
