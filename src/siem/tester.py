@@ -51,19 +51,15 @@ def _build_transport(dest_cfg: SiemDestinationSettings):
     from src.siem.transports.splunk_hec import SplunkHECTransport
 
     t = dest_cfg.transport.lower()
+    host = dest_cfg.host
+    port = dest_cfg.port
     if t == "hec":
+        url = f"https://{host}:{port}/services/collector"
         return SplunkHECTransport(
-            dest_cfg.endpoint,
+            url,
             token=dest_cfg.hec_token or "",
             verify_tls=dest_cfg.tls_verify,
         )
-
-    # For syslog transports, parse host:port from endpoint
-    host, _, port_str = dest_cfg.endpoint.rpartition(":")
-    port = int(port_str) if port_str.isdigit() else 514
-    if not host:
-        host = dest_cfg.endpoint
-
     if t == "udp":
         return SyslogUDPTransport(host, port)
     if t == "tcp":

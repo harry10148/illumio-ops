@@ -561,7 +561,7 @@ function buildSiemDestinationsSection() {
     + '<div class="table-container">'
     + '<table class="rule-table">'
     + '<colgroup>'
-    + '<col style="width:18%"><col style="width:10%"><col style="width:13%"><col style="width:25%"><col style="width:16%"><col>'
+    + '<col style="width:18%"><col style="width:10%"><col style="width:12%"><col style="width:20%"><col style="width:7%"><col style="width:14%"><col>'
     + '</colgroup>'
     + '<thead><tr>'
     + '<th data-i18n="gui_siem_th_name">Name</th>'
