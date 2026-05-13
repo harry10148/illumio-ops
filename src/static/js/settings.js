@@ -462,6 +462,8 @@ async function generateCsr() {
     if (pem) pem.value = r.csr_pem;
     const result = $('s-csr-result');
     if (result) result.style.display = 'block';
+    const importPanel = $('s-tls-import-panel');
+    if (importPanel) importPanel.setAttribute('open', '');
     toast(_t('gui_tls_csr_generated'));
   } catch (e) {
     toast(e.message, 'err');
