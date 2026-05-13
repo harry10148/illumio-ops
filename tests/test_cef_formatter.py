@@ -15,6 +15,87 @@ def test_cef_audit_event_has_required_header():
     assert "outcome=success" in line
 
 
+def test_cef_audit_event_full_fields():
+    """Full PCE API audit event with created_by, action, resource_changes."""
+    from src.siem.formatters.cef import CEFFormatter
+    ev = {
+        "href": "/orgs/1/events/evt-1",
+        "uuid": "evt-uuid-1",
+        "timestamp": "2026-04-08T12:00:00Z",
+        "event_type": "sec_policy.create",
+        "severity": "warning",
+        "status": "success",
+        "pce_fqdn": "pce.example.com",
+        "created_by": {"user": {"username": "admin@example.com"}},
+        "action": {
+            "api_method": "POST",
+            "api_endpoint": "/api/v2/orgs/1/sec_policy",
+            "src_ip": "10.0.0.5",
+            "http_status_code": 201,
+        },
+        "resource_changes": [{
+            "change_type": "create",
+            "resource": {"sec_policy": {"name": "policy-1", "href": "/orgs/1/sec_policy/1"}},
+        }],
+    }
+    line = CEFFormatter().format_event(ev)
+
+    assert "CEF:0|Illumio|PCE|" in line
+    assert "|sec_policy.create|sec_policy.create|6|" in line   # warning → 6
+    assert "externalId=evt-uuid-1" in line
+    assert "outcome=success" in line
+    assert "suser=admin@example.com" in line
+    assert "src=10.0.0.5" in line
+    assert "requestMethod=POST" in line
+    assert r"request=/api/v2/orgs/1/sec_policy" in line
+    assert "cn1=201" in line
+    assert "cn1Label=httpStatusCode" in line
+    assert "msg=create:sec_policy:policy-1" in line
+
+
+def test_cef_audit_event_system_actor():
+    from src.siem.formatters.cef import CEFFormatter
+    ev = {
+        "uuid": "sys-1",
+        "timestamp": "2026-04-08T12:00:00Z",
+        "event_type": "agent.heartbeat",
+        "severity": "info",
+        "status": "success",
+        "created_by": {"system": True},
+    }
+    line = CEFFormatter().format_event(ev)
+    assert "suser=system" in line
+
+
+def test_cef_audit_event_service_account_actor():
+    from src.siem.formatters.cef import CEFFormatter
+    ev = {
+        "uuid": "sa-1",
+        "timestamp": "2026-04-08T12:00:00Z",
+        "event_type": "policy.update",
+        "severity": "info",
+        "status": "success",
+        "created_by": {"service_account": {"name": "ci-bot"}},
+    }
+    line = CEFFormatter().format_event(ev)
+    assert "suser=ci-bot" in line
+
+
+def test_cef_audit_event_uuid_fallback():
+    """When pce_event_id absent, fall back to uuid then href."""
+    from src.siem.formatters.cef import CEFFormatter
+    ev = {
+        "href": "/orgs/1/events/fallback",
+        "uuid": "raw-uuid",
+        "timestamp": "2026-04-08T12:00:00Z",
+        "event_type": "user.login",
+        "severity": "info",
+        "status": "success",
+    }
+    line = CEFFormatter().format_event(ev)
+    assert "externalId=raw-uuid" in line
+
+
 def test_cef_traffic_flow_normalized_form():
     """Flat/normalized form (pre-extracted fields) still works."""
     from src.siem.formatters.cef import CEFFormatter

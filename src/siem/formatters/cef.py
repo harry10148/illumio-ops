@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 
 from src.siem.formatters.base import Formatter
@@ -58,14 +57,49 @@ class CEFFormatter(Formatter):
         )
 
         ts = event.get("timestamp", "")
-        ext_parts = []
+        ext = []
         if ts:
-            ext_parts.append(f"rt={_ts_to_epoch_ms(ts)}")
-        ext_parts.append(f"dvchost={_cef_escape(str(event.get('pce_fqdn', '')))}")
-        ext_parts.append(f"externalId={_cef_escape(str(event.get('pce_event_id', '')))}")
-        ext_parts.append(f"outcome={_cef_escape(str(event.get('status', '')))}")
+            ext.append(f"rt={_ts_to_epoch_ms(ts)}")
 
-        return header + "|" + " ".join(ext_parts)
+        # device / event identity
+        pce_fqdn = event.get("pce_fqdn") or ""
+        if pce_fqdn:
+            ext.append(f"dvchost={_cef_escape(pce_fqdn)}")
+        event_id = (event.get("pce_event_id")
+                    or event.get("uuid")
+                    or event.get("href") or "")
+        ext.append(f"externalId={_cef_escape(str(event_id))}")
+        ext.append(f"outcome={_cef_escape(str(event.get('status', '')))}")
+
+        # who acted — created_by can be user / service_account / system
+        actor = _extract_actor(event.get("created_by") or {})
+        if actor:
+            ext.append(f"suser={_cef_escape(actor)}")
+
+        # action details
+        action = event.get("action") or {}
+        src_ip = action.get("src_ip") or ""
+        if src_ip:
+            ext.append(f"src={_cef_escape(src_ip)}")
+        method = action.get("api_method") or ""
+        if method:
+            ext.append(f"requestMethod={_cef_escape(method)}")
+        endpoint = action.get("api_endpoint") or ""
+        if endpoint:
+            ext.append(f"request={_cef_escape(endpoint)}")
+        http_code = action.get("http_status_code")
+        if http_code is not None:
+            ext.append(f"cn1={http_code}")
+            ext.append("cn1Label=httpStatusCode")
+
+        # resource changes summary
+        rc = event.get("resource_changes") or []
+        if rc:
+            msg = _format_resource_changes(rc)
+            if msg:
+                ext.append(f"msg={_cef_escape(msg)}")
+
+        return header + "|" + " ".join(ext)
 
     def format_flow(self, flow: dict) -> str:
         """Format a PCE traffic flow as CEF.
@@ -219,6 +253,34 @@ class CEFFormatter(Formatter):
             ext.append(f"pce_fqdn={_cef_escape(pce_fqdn)}")
 
         return header + "|" + " ".join(ext)
+
+
+def _extract_actor(created_by: dict) -> str:
+    """Resolve created_by dict to a display string."""
+    if created_by.get("system"):
+        return "system"
+    user = created_by.get("user") or {}
+    if user.get("username"):
+        return user["username"]
+    if user.get("name"):
+        return user["name"]
+    sa = created_by.get("service_account") or {}
+    if sa.get("name"):
+        return sa["name"]
+    return ""
+
+
+def _format_resource_changes(rc: list) -> str:
+    """Summarise resource_changes as 'change_type:resource_type:name ...'."""
+    parts = []
+    for change in rc[:5]:
+        change_type = change.get("change_type", "")
+        resource = change.get("resource") or {}
+        for res_type, res_val in resource.items():
+            name = res_val.get("name", "") if isinstance(res_val, dict) else ""
+            parts.append(f"{change_type}:{res_type}:{name}" if name else f"{change_type}:{res_type}")
+            break
+    return " ".join(parts)
 
 
 def _format_labels(labels) -> str:
