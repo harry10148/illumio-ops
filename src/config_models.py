@@ -14,7 +14,7 @@ from __future__ import annotations
 import ipaddress
 from typing import Literal, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
 
 class _Base(BaseModel):
     """Base class that rejects unknown keys (catches typos in config.json)."""
@@ -218,13 +218,38 @@ class SiemDestinationSettings(_Base):
     enabled: bool = True
     transport: str = "udp"  # udp|tcp|tls|hec
     format: str = "cef"    # cef|json|syslog_cef|syslog_json
-    endpoint: str = ""
+    host: str = ""
+    port: int = Field(default=514, ge=1, le=65535)
     tls_verify: bool = True
     tls_ca_bundle: Optional[str] = None
     hec_token: Optional[str] = None
     batch_size: int = Field(default=100, ge=1, le=10000)
     source_types: list[str] = Field(default_factory=lambda: ["audit", "traffic"])
     max_retries: int = Field(default=10, ge=0)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_endpoint(cls, values: dict) -> dict:
+        """Migrate legacy endpoint: "host:port" or HEC URL → host + port."""
+        if not isinstance(values, dict):
+            return values
+        endpoint = values.get("endpoint", "")
+        if not endpoint or values.get("host"):
+            return values
+        transport = values.get("transport", "udp")
+        if transport == "hec":
+            from urllib.parse import urlparse
+            parsed = urlparse(endpoint)
+            values["host"] = parsed.hostname or endpoint
+            values["port"] = parsed.port or 8088
+        else:
+            host, _, port_str = endpoint.rpartition(":")
+            if host and port_str.isdigit():
+                values["host"] = host
+                values["port"] = int(port_str)
+            else:
+                values["host"] = endpoint
+        return values
 
 
 class SiemForwarderSettings(_Base):
