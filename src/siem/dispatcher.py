@@ -167,7 +167,7 @@ def _transport_for(dest_cfg):
         return SyslogTLSTransport(host, port, tls_verify=dest_cfg.tls_verify)
     elif transport_type == "hec":
         from src.siem.transports.splunk_hec import SplunkHECTransport
-        url = f"https://{host}:{port}/services/collector"
+        url = f"https://{host}:{port}"
         return SplunkHECTransport(url, token=dest_cfg.hec_token or "")
     raise ValueError(f"Unknown transport: {transport_type}")
 
