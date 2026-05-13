@@ -77,6 +77,16 @@ def _view_status(cm):
 
 
 def _edit_forwarder(cm):
+    print()
+    print("  SIEM Forwarder Settings")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print("  enabled              : Enable/disable all SIEM forwarding.")
+    print("  dispatch_tick_seconds: How often (seconds) to send pending records.")
+    print("                         Lower = less latency, slightly higher CPU use.")
+    print("  dlq_max_per_dest     : Max dead-letter entries kept per destination.")
+    print("                         Records that exceed max_retries are moved here.")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print()
     c = cm.models.siem.model_dump(mode="json")
     c["enabled"] = _prompt("enabled", c["enabled"], bool)
     c["dispatch_tick_seconds"] = _prompt("dispatch_tick_seconds", c["dispatch_tick_seconds"], int)
@@ -101,6 +111,22 @@ def _list_destinations(cm):
 
 
 def _prompt_destination(existing=None):
+    print()
+    print("  Destination Configuration")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print("  transport : udp | tcp | tls | hec")
+    print("              udp = simple, no delivery guarantee.")
+    print("              tcp = reliable ordered delivery.")
+    print("              tls = encrypted TCP (recommended for production).")
+    print("              hec = Splunk HTTP Event Collector (HTTPS).")
+    print("  format    : cef         = raw CEF line (most syslog servers).")
+    print("              json        = flat JSON (HEC / Elastic).")
+    print("              syslog_cef  = RFC5424 header + CEF.")
+    print("              syslog_json = RFC5424 header + flat JSON.")
+    print("  batch_size  : Records sent per dispatch cycle. Default 100.")
+    print("  max_retries : Retries before record moves to dead-letter queue.")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print()
     existing = existing or {}
     name = _prompt("name", existing.get("name", ""))
     enabled = _prompt("enabled", existing.get("enabled", True), bool)

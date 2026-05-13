@@ -218,8 +218,8 @@ async function loadSettings() {
   ${activePceId ? `<p style="margin-top:8px;color:var(--dim);font-size:0.85em">⚡ <span data-i18n="gui_pce_active">Active PCE</span>: <strong>${escapeHtml((profiles.find(p=>p.id===activePceId)||{}).name||'')}</strong> — <span data-i18n="gui_pce_save_profile" style="font-style:italic">Saving settings will update this profile.</span></p>` : ''}
 </fieldset>
 <fieldset><legend data-i18n="gui_api_conn">API Connection</legend>
-  <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${a.url || ''}"></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${a.org_id || ''}"></div></div>
-  <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${a.key || ''}"></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${a.secret || ''}"></div></div>
+  <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${a.url || ''}"><small class="form-text text-muted" data-i18n="gui_url_help"></small></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${a.org_id || ''}"><small class="form-text text-muted" data-i18n="gui_org_id_help"></small></div></div>
+  <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${a.key || ''}"><small class="form-text text-muted" data-i18n="gui_api_key_help"></small></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${a.secret || ''}"><small class="form-text text-muted" data-i18n="gui_api_secret_help"></small></div></div>
   <div class="chk"><label><input type="checkbox" id="s-ssl" ${a.verify_ssl ? 'checked' : ''}> <span data-i18n="gui_verify_ssl">Verify SSL</span></label></div>
 </fieldset>
 <fieldset><legend data-i18n="gui_alert_channels">Alert Channels</legend>
@@ -299,8 +299,8 @@ async function loadSettings() {
     <div class="chk" style="margin-bottom:10px"><label><input type="checkbox" id="s-tls-selfsigned" ${_tlsStatus.self_signed ? 'checked' : ''} onchange="toggleTlsMode()"> <span data-i18n="gui_tls_self_signed">Use self-signed certificate</span></label></div>
     <div id="s-tls-custom" style="display:${_tlsStatus.self_signed ? 'none' : 'block'}">
       <div class="form-row">
-        <div class="form-group"><label data-i18n="gui_tls_cert_file">Certificate File Path</label><input id="s-tls-cert" value="${escapeHtml(_tlsStatus.cert_file || '')}" placeholder="/path/to/cert.pem"></div>
-        <div class="form-group"><label data-i18n="gui_tls_key_file">Private Key File Path</label><input id="s-tls-key" value="${escapeHtml(_tlsStatus.key_file || '')}" placeholder="/path/to/key.pem"></div>
+        <div class="form-group"><label data-i18n="gui_tls_cert_file">Certificate File Path</label><input id="s-tls-cert" value="${escapeHtml(_tlsStatus.cert_file || '')}" placeholder="/path/to/cert.pem"><small class="form-text text-muted" data-i18n="gui_tls_cert_file_help"></small></div>
+        <div class="form-group"><label data-i18n="gui_tls_key_file">Private Key File Path</label><input id="s-tls-key" value="${escapeHtml(_tlsStatus.key_file || '')}" placeholder="/path/to/key.pem"><small class="form-text text-muted" data-i18n="gui_tls_key_file_help"></small></div>
       </div>
       <details id="s-tls-csr-panel" style="margin-top:12px;border:1px solid var(--border);border-radius:6px;padding:0">
         <summary style="cursor:pointer;padding:10px 14px;font-weight:600;user-select:none" data-i18n="gui_tls_csr_title">Generate CSR (Certificate Signing Request)</summary>
