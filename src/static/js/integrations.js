@@ -588,7 +588,7 @@ function buildSiemRow(d, st) {
     + '<td><code>' + escapeAttr(d.transport) + '</code></td>'
     + '<td><code>' + escapeAttr(d.format) + '</code></td>'
     + '<td>' + escapeAttr(d.host || '') + '</td>'
-    + '<td>' + (d.port || 514) + '</td>'
+    + '<td>' + Number(d.port || 514) + '</td>'
     + '<td>' + _siemStatusBadge(d, st) + '</td>'
     + '<td style="white-space:nowrap;">'
     + '<button class="btn btn-sm" onclick="siemTestDest(\'' + nameEnc + '\')" data-i18n="gui_siem_test">Test</button> '
@@ -639,7 +639,11 @@ async function siemOpenDestModal(nameEnc) {
       var body = await fetch('/api/siem/destinations').then(function(r) { return r.json(); });
       var all = body.destinations || body || [];
       var found = all.filter(function(d) { return d.name === name; })[0];
-      if (found) dest = Object.assign(dest, found);
+      if (!found) {
+        console.warn('Destination not found:', name);
+        return;
+      }
+      dest = Object.assign(dest, found);
     } catch (err) {
       // If fetch fails, proceed with default values
       console.warn('Could not load destination data:', err);
