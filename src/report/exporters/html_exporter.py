@@ -936,6 +936,7 @@ class HtmlExporter:
                 f'<h5 class="subtable-label">{_s("rpt_tr_per_port_traffic_policy")}</h5>'
                 + _df_to_html(_ppb[[c for c in _g1 if c in _ppb.columns]], 'Risk Level', lang=_lang)
                 + f'<h5 class="subtable-label">{_s("rpt_tr_per_port_src_dst")}</h5>'
+                + f'<p class="note" style="font-size:11px">{_s("rpt_tr_per_port_src_dst_note")}</p>'
                 + _df_to_html(_ppb[[c for c in _g2 if c in _ppb.columns]], lang=_lang)
             )
         else:

@@ -743,6 +743,100 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Failed to generate self-signed certificate: {e.stderr.decode()}")
 
+def _generate_csr(cert_dir: str, cn: str, o: str = '', ou: str = '', c: str = '',
+                  san_dns: list | None = None, san_ip: list | None = None,
+                  key_algorithm: str = 'rsa-2048') -> tuple[str, str]:
+    """Generate a private key and CSR for CA signing.
+
+    The private key is stored at {cert_dir}/csr_key.pem (mode 0o600).
+    Returns (csr_pem_text, key_path).
+    """
+    os.makedirs(cert_dir, exist_ok=True)
+    key_path = os.path.join(cert_dir, "csr_key.pem")
+
+    from cryptography import x509 as _x509
+    from cryptography.x509.oid import NameOID as _NameOID
+    from cryptography.hazmat.primitives import hashes as _hashes, serialization as _serial
+    from cryptography.hazmat.primitives.asymmetric import ec as _ec, rsa as _rsa
+    import ipaddress as _ipaddress
+
+    if key_algorithm == 'ecdsa-p256':
+        private_key = _ec.generate_private_key(_ec.SECP256R1())
+    else:
+        private_key = _rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    name_attrs = [_x509.NameAttribute(_NameOID.COMMON_NAME, cn or 'localhost')]
+    if o:
+        name_attrs.append(_x509.NameAttribute(_NameOID.ORGANIZATION_NAME, o))
+    if ou:
+        name_attrs.append(_x509.NameAttribute(_NameOID.ORGANIZATIONAL_UNIT_NAME, ou))
+    if c:
+        name_attrs.append(_x509.NameAttribute(_NameOID.COUNTRY_NAME, c))
+
+    san_entries = []
+    for dns in (san_dns or []):
+        if dns.strip():
+            san_entries.append(_x509.DNSName(dns.strip()))
+    for ip_str in (san_ip or []):
+        if ip_str.strip():
+            try:
+                san_entries.append(_x509.IPAddress(_ipaddress.ip_address(ip_str.strip())))
+            except ValueError:
+                pass
+
+    csr_builder = _x509.CertificateSigningRequestBuilder().subject_name(_x509.Name(name_attrs))
+    if san_entries:
+        csr_builder = csr_builder.add_extension(
+            _x509.SubjectAlternativeName(san_entries), critical=False)
+
+    csr = csr_builder.sign(private_key, _hashes.SHA256())
+
+    with open(key_path, 'wb') as fk:
+        fk.write(private_key.private_bytes(
+            encoding=_serial.Encoding.PEM,
+            format=_serial.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=_serial.NoEncryption(),
+        ))
+    os.chmod(key_path, 0o600)
+
+    return csr.public_bytes(_serial.Encoding.PEM).decode(), key_path
+
+
+def _import_signed_cert(cert_dir: str, cert_pem: str) -> dict:
+    """Validate and store a CA-signed certificate against the stored CSR key.
+
+    Raises ValueError if the cert does not match or is invalid.
+    Returns cert_info dict on success.
+    """
+    from cryptography import x509 as _x509
+    from cryptography.hazmat.primitives import serialization as _serial
+
+    key_path = os.path.join(cert_dir, "csr_key.pem")
+    if not os.path.exists(key_path):
+        raise ValueError("No CSR key found — generate a CSR first.")
+
+    try:
+        cert = _x509.load_pem_x509_certificate(cert_pem.encode())
+    except Exception as e:
+        raise ValueError(f"Invalid certificate PEM: {e}") from e
+
+    with open(key_path, 'rb') as fk:
+        private_key = _serial.load_pem_private_key(fk.read(), password=None)
+
+    cert_pub = cert.public_key().public_bytes(
+        _serial.Encoding.PEM, _serial.PublicFormat.SubjectPublicKeyInfo)
+    key_pub = private_key.public_key().public_bytes(
+        _serial.Encoding.PEM, _serial.PublicFormat.SubjectPublicKeyInfo)
+    if cert_pub != key_pub:
+        raise ValueError("Certificate public key does not match the stored CSR private key.")
+
+    cert_path = os.path.join(cert_dir, "ca_signed.pem")
+    with open(cert_path, 'w') as fc:
+        fc.write(cert_pem)
+
+    return _get_cert_info(cert_path)
+
+
 def _cert_days_remaining(cert_path: str) -> int | None:
     """Return the number of days until the cert expires, or None if unknown.
 
