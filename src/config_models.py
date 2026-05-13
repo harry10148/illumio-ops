@@ -247,6 +247,8 @@ class SiemDestinationSettings(_Base):
             if host and port_str.isdigit():
                 values["host"] = host
                 values["port"] = int(port_str)
+            elif host:
+                values["host"] = host
             else:
                 values["host"] = endpoint
         return values
