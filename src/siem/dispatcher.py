@@ -154,10 +154,8 @@ def _formatter_for(dest_cfg):
 def _transport_for(dest_cfg):
     """Build transport from SiemDestinationSettings."""
     transport_type = dest_cfg.transport.lower()
-    host, _, port_str = dest_cfg.endpoint.rpartition(":")
-    port = int(port_str) if port_str.isdigit() else 514
-    if not host:
-        host = dest_cfg.endpoint
+    host = dest_cfg.host
+    port = dest_cfg.port
     if transport_type == "udp":
         from src.siem.transports.syslog_udp import SyslogUDPTransport
         return SyslogUDPTransport(host, port)
@@ -169,7 +167,8 @@ def _transport_for(dest_cfg):
         return SyslogTLSTransport(host, port, tls_verify=dest_cfg.tls_verify)
     elif transport_type == "hec":
         from src.siem.transports.splunk_hec import SplunkHECTransport
-        return SplunkHECTransport(dest_cfg.endpoint, token=dest_cfg.hec_token or "")
+        url = f"https://{host}:{port}/services/collector"
+        return SplunkHECTransport(url, token=dest_cfg.hec_token or "")
     raise ValueError(f"Unknown transport: {transport_type}")
 
 

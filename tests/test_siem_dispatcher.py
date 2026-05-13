@@ -114,3 +114,23 @@ def test_dispatcher_quarantines_after_max_retries(sf):
     assert dispatch_row.status == "failed"
     assert len(dlq_rows) == 1
     assert "simulated failure" in dlq_rows[0].last_error
+
+
+def test_transport_for_udp_uses_host_port():
+    from src.siem.dispatcher import _transport_for
+    from src.config_models import SiemDestinationSettings
+    cfg = SiemDestinationSettings(name="t", transport="udp", host="10.0.0.5", port=1514)
+    t = _transport_for(cfg)
+    from src.siem.transports.syslog_udp import SyslogUDPTransport
+    assert isinstance(t, SyslogUDPTransport)
+    assert t._host == "10.0.0.5"
+    assert t._port == 1514
+
+
+def test_transport_for_hec_constructs_url():
+    from src.siem.dispatcher import _transport_for
+    from src.config_models import SiemDestinationSettings
+    cfg = SiemDestinationSettings(name="h", transport="hec", host="splunk.corp", port=8088, hec_token="tok")
+    t = _transport_for(cfg)
+    from src.siem.transports.splunk_hec import SplunkHECTransport
+    assert isinstance(t, SplunkHECTransport)
