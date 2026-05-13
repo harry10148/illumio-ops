@@ -80,6 +80,80 @@ def test_cef_traffic_flow_missing_port_defaults_zero():
     assert "proto=icmp" in line
 
 
+def test_cef_traffic_flow_official_fields():
+    """format_flow emits all official Illumio log format fields when available."""
+    from src.siem.formatters.cef import CEFFormatter
+    fl = {
+        "src": {
+            "ip": "192.168.1.10",
+            "workload": {
+                "hostname": "win10-jd",
+                "labels": [{"key": "app", "value": "Jumpdesk"}, {"key": "env", "value": "Prod"}],
+            },
+        },
+        "dst": {"ip": "52.1.2.3", "fqdn": "ctldl.windowsupdate.com"},
+        "service": {"port": 443, "proto": 6, "process_name": "svchost.exe", "user_name": "rdpagentuser"},
+        "network": {"name": "Corporate"},
+        "num_connections": 7,
+        "policy_decision": "potentially_blocked",
+        "state": "active",
+        "flow_direction": "outbound",
+        "dst_bi": 3536,
+        "dst_bo": 13562,
+        "timestamp_range": {"first_detected": "2026-05-13T10:00:00Z"},
+    }
+    line = CEFFormatter().format_flow(fl)
+    assert "shost=win10-jd" in line
+    assert "cs1Label=srcLabels" in line
+    assert "app:Jumpdesk" in line
+    assert "destinationDnsDomain=ctldl.windowsupdate.com" in line
+    assert "cs3Label=process" in line and "svchost.exe" in line
+    assert "suser=rdpagentuser" in line
+    assert "cnt=7" in line
+    assert "in=3536" in line
+    assert "out=13562" in line
+    assert "deviceDirection=1" in line
+    assert "cs4Label=state" in line and "active" in line
+    assert "cs5Label=network" in line and "Corporate" in line
+
+
+def test_cef_traffic_flow_icmp_fields():
+    """ICMP flows include icmpType and icmpCode."""
+    from src.siem.formatters.cef import CEFFormatter
+    fl = {
+        "src": {"ip": "1.2.3.4"}, "dst": {"ip": "5.6.7.8"},
+        "service": {"proto": 1, "icmp_type": 8, "icmp_code": 0},
+        "policy_decision": "allowed",
+        "first_detected": "2026-05-13T10:00:00Z",
+    }
+    line = CEFFormatter().format_flow(fl)
+    assert "proto=icmp" in line
+    assert "icmpType=8" in line
+    assert "icmpCode=0" in line
+
+
+def test_cef_traffic_flow_dst_workload_labels():
+    """Destination workload labels appear as cs2."""
+    from src.siem.formatters.cef import CEFFormatter
+    fl = {
+        "src": {"ip": "1.2.3.4"},
+        "dst": {
+            "ip": "10.0.0.1",
+            "workload": {
+                "hostname": "db-server",
+                "labels": [{"key": "app", "value": "App3"}, {"key": "role", "value": "DB"}],
+            },
+        },
+        "service": {"port": 3389, "proto": 6},
+        "policy_decision": "allowed",
+        "first_detected": "2026-05-13T10:00:00Z",
+    }
+    line = CEFFormatter().format_flow(fl)
+    assert "dhost=db-server" in line
+    assert "cs2Label=dstLabels" in line
+    assert "app:App3" in line
+
+
 def test_cef_escapes_special_characters():
     from src.siem.formatters.cef import _cef_escape
     assert _cef_escape("a=b") == r"a\=b"
