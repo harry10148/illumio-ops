@@ -1461,7 +1461,7 @@
 /* Phase 1 quick win for a2: inline field error */
 .field-error {
   display: block;
-  color: var(--danger, #BE122F);
+  color: var(--color-danger);
   font-size: 0.85em;
   margin-top: 4px;
   line-height: 1.3;
@@ -1469,6 +1469,6 @@
 input[aria-invalid="true"],
 textarea[aria-invalid="true"],
 select[aria-invalid="true"] {
-  border-color: var(--danger, #BE122F);
-  outline-color: var(--danger, #BE122F);
+  border-color: var(--color-danger);
+  outline-color: var(--color-danger);
 }
