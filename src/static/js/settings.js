@@ -3,6 +3,23 @@ let _settings = {};
 let _security = {};
 let _alertPlugins = {};
 
+// Format day count as humanized "N days (about Yy Mm)" / "N days (about M months)".
+// Negative / null returns empty string. Falls back to short form for short ranges.
+function humanizeDays(n) {
+  if (n == null || n < 0) return '';
+  if (n < 60) {
+    const months = Math.max(1, Math.round(n / 30));
+    const label = _t('gui_tls_days_label_months').replace('{m}', months);
+    return _t('gui_tls_days_humanized').replace('{n}', n).replace('{label}', label);
+  }
+  const years = Math.floor(n / 365);
+  const months = Math.round((n % 365) / 30);
+  const label = years >= 1
+    ? _t('gui_tls_days_label_years').replace('{y}', years).replace('{m}', months)
+    : _t('gui_tls_days_label_months').replace('{m}', months);
+  return _t('gui_tls_days_humanized').replace('{n}', n).replace('{label}', label);
+}
+
 function _pluginInputId(pluginName, key) {
   return `s-plugin-${pluginName}-${String(key).replace(/[^a-zA-Z0-9]+/g, '-')}`;
 }
@@ -412,7 +429,7 @@ function _renderTlsCertInfo() {
   // Show days-remaining row when openssl was able to read expiry; omit
   // otherwise so we don't show a misleading "0" for missing info.
   const daysRow = (typeof days === 'number')
-    ? `<div><strong data-i18n="gui_tls_days_remaining">Days Remaining</strong>: ${days}</div>`
+    ? `<div><strong data-i18n="gui_tls_days_remaining">Days Remaining</strong>: ${humanizeDays(days)}</div>`
     : '';
   const renewBtn = _tlsStatus.self_signed
     ? `<button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="renewTlsCert()" data-i18n="gui_tls_renew">Renew Now</button>`
