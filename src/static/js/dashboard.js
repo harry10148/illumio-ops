@@ -181,13 +181,19 @@ function ensureDashboardLayout() {
     const label = cards[1].querySelector('.label');
     const value = cards[1].querySelector('.value');
     if (label) label.textContent = _t('gui_dashboard_cooldown');
-    if (value) value.id = 'd-cooldown';
+    if (value) {
+      value.id = 'd-cooldown';
+      cards[1].querySelector('.value').classList.add('ok');
+    }
   }
   if (cards[2]) {
     const label = cards[2].querySelector('.label');
     const value = cards[2].querySelector('.value');
     if (label) label.textContent = _t('gui_dashboard_pce_health');
-    if (value) value.id = 'd-pce-health';
+    if (value) {
+      value.id = 'd-pce-health';
+      cards[2].querySelector('.value').classList.add('ok');
+    }
   }
   cards.forEach((card, idx) => {
     if (idx > 2) card.style.display = 'none';

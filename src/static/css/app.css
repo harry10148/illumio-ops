@@ -484,11 +484,11 @@
     }
 
     .card .value.ok {
-      color: var(--success);
+      color: var(--color-success);
     }
 
     .card .value.err {
-      color: var(--danger);
+      color: var(--color-danger);
     }
 
     /* Buttons */
