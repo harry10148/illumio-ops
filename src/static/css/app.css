@@ -1362,9 +1362,9 @@
     }
 
     /* Card left-border colour variants */
-    .card.card-ok      { border-left: 4px solid var(--success); }
-    .card.card-warn    { border-left: 4px solid var(--warn); }
-    .card.card-err     { border-left: 4px solid var(--danger); }
+    .card.card-ok      { border-left: 4px solid var(--color-success); }
+    .card.card-warn    { border-left: 4px solid var(--color-warning); }
+    .card.card-err     { border-left: 4px solid var(--color-danger); }
     .card.card-neutral { border-left: 4px solid var(--dim); opacity: .85; }
 
     /* Status badge pill */
