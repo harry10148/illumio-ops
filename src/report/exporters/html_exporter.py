@@ -37,6 +37,23 @@ from src.report.section_guidance import get_guidance, visible_in
 from src.i18n import t, get_language
 from src.report.exporters.cover_page import build_cover_page as _build_cover_page
 
+# Grade → semantic color mapping. Mirrors --color-success / --color-warning /
+# --color-danger from the WebUI CSS token system (Improvement_Plan §A 1.3).
+# A/B = green (success), C = orange (warning), D/F = red (danger).
+_GRADE_COLORS = {
+    "A": "#16A34A",
+    "B": "#16A34A",
+    "C": "#F59E0B",
+    "D": "#BE122F",
+    "F": "#BE122F",
+}
+
+
+def _grade_to_color(grade: str) -> str:
+    """Return the semantic hex color for a maturity / readiness grade letter."""
+    return _GRADE_COLORS.get((grade or "").upper(), "#6B7280")
+
+
 _CSS = build_css('traffic')
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
 
@@ -487,7 +504,7 @@ class HtmlExporter:
         m_score = mod12.get('maturity_score', 0)
         m_grade = mod12.get('maturity_grade', '?')
         m_dims = mod12.get('maturity_dimensions', {})
-        m_grade_color = {'A': '#22C55E', 'B': '#84CC16', 'C': '#EAB308', 'D': '#F97316', 'F': '#EF4444'}.get(m_grade, '#6B7280')
+        m_grade_color = _grade_to_color(m_grade)
         m_dim_labels = {
             'enforcement_coverage': 'Enforcement Coverage',
             'policy_coverage': 'Policy Coverage',
@@ -1176,8 +1193,7 @@ class HtmlExporter:
             return f'<p class="note">{m["error"]}</p>'
         score = m.get('total_score', 0)
         grade = m.get('grade', '?')
-        grade_color = {'A': '#22C55E', 'B': '#84CC16', 'C': '#EAB308',
-                       'D': '#F97316', 'F': '#EF4444'}.get(grade, '#6B7280')
+        grade_color = _grade_to_color(grade)
         factor_table = m.get('factor_table')
         recommendations = m.get('recommendations')
         app_env_scores = m.get('app_env_scores')
