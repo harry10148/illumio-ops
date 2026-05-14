@@ -362,6 +362,7 @@ async function loadSettings() {
   <p style="color:var(--dim); font-size:0.85em; margin-bottom:12px;" data-i18n="gui_leave_blank_pass">Leave password blank to keep current password.</p>
   <div class="form-row">
     <div class="form-group"><label data-i18n="gui_new_password">New Password</label><input id="s-sec-newpass" type="password"></div>
+    <div class="form-group"><label data-i18n="gui_new_password_confirm">Confirm New Password</label><input id="s-sec-newpass-confirm" type="password"></div>
   </div>
 </fieldset>`;
   // Auto-detect browser timezone and pre-select if currently set to 'local'
@@ -510,6 +511,13 @@ async function importSignedCert() {
 }
 
 async function saveSettings() {
+  // Client-side guard: confirm new password matches before submitting
+  const _newPw = document.getElementById('s-sec-newpass')?.value || '';
+  const _newPwConfirm = document.getElementById('s-sec-newpass-confirm')?.value || '';
+  if (_newPw && _newPw !== _newPwConfirm) {
+    toast(_t('gui_password_mismatch'), 'err');
+    return;
+  }
   const pluginConfig = _collectAlertPluginConfig();
   const theme = rv('s-theme');
   const lang = rv('s-lang');
@@ -549,8 +557,10 @@ async function saveSettings() {
     auto_renew_days: autoRenewDays,
   });
 
-  // Clear password field after save
+  // Clear password fields after save
   $('s-sec-newpass').value = '';
+  const _confirmEl = $('s-sec-newpass-confirm');
+  if (_confirmEl) _confirmEl.value = '';
   await loadTranslations();
   if (typeof renderQtPage === 'function') renderQtPage();
   if (typeof renderQwPage === 'function') renderQwPage();
