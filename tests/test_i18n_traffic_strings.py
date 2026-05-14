@@ -46,3 +46,13 @@ def test_index_html_uses_data_i18n_on_traffic_empty_state():
     assert 'data-i18n="gui_traffic_run_query_empty"' in html, (
         "Traffic empty-state <td> should have data-i18n=\"gui_traffic_run_query_empty\""
     )
+
+
+def test_zh_explicit_matches_zh_tw_for_traffic_keys():
+    """zh_explicit.json is the source of truth for precompute_zh_translations.py.
+    Any zh_TW value we set must also exist in zh_explicit.json to avoid silent revert."""
+    import json
+    from pathlib import Path
+    explicit = json.loads(Path("/home/harry/rd/illumio-ops/src/i18n/data/zh_explicit.json").read_text(encoding="utf-8"))
+    assert explicit.get("rpt_filter_toggle") == "流量篩選條件（選填）"
+    assert explicit.get("gui_traffic_run_query_empty") == "執行查詢以檢視即時流量異常。"
