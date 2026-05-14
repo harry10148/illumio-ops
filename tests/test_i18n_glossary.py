@@ -13,7 +13,9 @@ def test_glossary_loads_and_has_required_terms() -> None:
     data = json.loads(GLOSSARY_PATH.read_text(encoding="utf-8"))
     preserve = set(data["preserve_in_zh_tw"])
     required = {
-        "Block", "Blocked", "Allow", "Allowed", "Manage", "Managed",
+        # Verbs like "Manage" intentionally excluded — they translate naturally
+        # to Chinese (管理) in menu CTAs. Noun forms (Managed/Unmanaged) stay English.
+        "Block", "Blocked", "Allow", "Allowed", "Managed",
         "Unmanage", "Unmanaged", "PCE", "VEN", "Workload", "Service",
         "Port", "Policy", "Ringfence", "App", "Label", "SMTP",
         "Online", "Offline", "Potentially Blocked",
