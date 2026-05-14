@@ -108,8 +108,8 @@ function buildCacheStatusCards(status, s) {
   var trafficAgg = Number(status.traffic_agg || 0);
   var stateClass = s.enabled ? 'ok' : 'err';
   var stateText  = s.enabled
-    ? '<span style="color:var(--success)">✓ ' + escapeAttr(_t('gui_cache_enabled')) + '</span>'
-    : '<span style="color:var(--danger)">✗ ' + escapeAttr(_t('gui_cache_disabled')) + '</span>';
+    ? '<span style="color:var(--color-success)">✓ ' + escapeAttr(_t('gui_cache_enabled')) + '</span>'
+    : '<span style="color:var(--color-danger)">✗ ' + escapeAttr(_t('gui_cache_disabled')) + '</span>';
   return '<div class="cards" style="margin-bottom:16px;">'
     + '<div class="card card-' + stateClass + '">'
     + '<div class="label" data-i18n="gui_cache_status">Cache Status</div>'
@@ -316,7 +316,7 @@ async function submitCacheBackfill() {
   if (!start || !end) {
     if (result) {
       result.style.display = 'block';
-      result.style.color = 'var(--danger)';
+      result.style.color = 'var(--color-danger)';
       result.textContent = (typeof _t === 'function' ? _t('gui_cb_dates_required') : 'Start and end dates are required.');
     }
     return;
@@ -336,7 +336,7 @@ async function submitCacheBackfill() {
     var body = await r.json().catch(function() { return {}; });
     if (!r.ok) {
       if (result) {
-        result.style.color = 'var(--danger)';
+        result.style.color = 'var(--color-danger)';
         result.textContent = 'Backfill failed: ' + (body.error || r.status);
       }
       return;
@@ -414,7 +414,7 @@ function renderTrafficFilter(s) {
     + '<div class="form-group"><label data-i18n="gui_cache_tf_exclude_ips">Exclude src IPs</label>'
     + '<input id="tf-ips" value="' + ipVals + '" placeholder="10.0.0.1,...">'
     + '<small class="form-text text-muted" data-i18n="gui_cache_exclude_src_ips_help"></small></div>'
-    + '<div id="tf-validation-hints" style="color:var(--danger);font-size:.8rem;"></div>'
+    + '<div id="tf-validation-hints" style="color:var(--color-danger);font-size:.8rem;"></div>'
     + '</fieldset>';
 
   var extra = document.getElementById('cache-form-extra');
@@ -752,7 +752,7 @@ function buildDestModal(dest, editName) {
     + '</div></div>'
     + '</details>'
 
-    + '<div id="md-banner" style="margin-top:10px;color:var(--danger);"></div>'
+    + '<div id="md-banner" style="margin-top:10px;color:var(--color-danger);"></div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">'
     + '<button class="btn" onclick="siemCloseModal(event)" data-i18n="gui_cancel">Cancel</button>'
     + '<button class="btn" onclick="siemTestDestInline()" data-i18n="gui_siem_test_inline">Test Connection</button>'
@@ -873,7 +873,7 @@ async function siemTestDestInline() {
     banner.style.color = 'var(--ok, green)';
     banner.textContent = '✓ ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)';
   } else {
-    banner.style.color = 'var(--danger)';
+    banner.style.color = 'var(--color-danger)';
     banner.textContent = '✗ ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
   }
 }
@@ -1199,12 +1199,12 @@ function _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, 
   var dlqClass  = totalDlq  > 0 ? 'card-warn' : 'card-ok';
   var cacheEvents  = Number(cache.events      || 0);
   var cacheTraffic = Number(cache.traffic_raw || 0) + Number(cache.traffic_agg || 0);
-  var failedColor  = totalFailed > 0 ? 'var(--danger)' : 'var(--dim)';
+  var failedColor  = totalFailed > 0 ? 'var(--color-danger)' : 'var(--dim)';
   var queueInner = '<div style="display:flex;gap:16px;margin-top:6px;">'
     + '<div><div style="font-size:.7rem;color:var(--dim);" data-i18n="gui_ov_pending">pending</div>'
     + '<div style="font-size:1.3rem;color:var(--accent2);font-weight:700;">' + totalPending + '</div></div>'
-    + '<div><div style="font-size:.7rem;color:var(--success);" data-i18n="gui_ov_sent">sent</div>'
-    + '<div style="font-size:1.3rem;color:var(--success);font-weight:700;">' + totalSent + '</div></div>'
+    + '<div><div style="font-size:.7rem;color:var(--color-success);" data-i18n="gui_ov_sent">sent</div>'
+    + '<div style="font-size:1.3rem;color:var(--color-success);font-weight:700;">' + totalSent + '</div></div>'
     + '<div><div style="font-size:.7rem;color:' + failedColor + ';" data-i18n="gui_ov_failed">failed</div>'
     + '<div style="font-size:1.3rem;color:' + failedColor + ';font-weight:700;">' + totalFailed + '</div></div>'
     + '</div>';
@@ -1238,11 +1238,11 @@ function _buildOvRecentTable(siemStatus) {
     rows = '<tr><td colspan="5" style="color:var(--dim);padding:16px 10px;" data-i18n="gui_ov_no_events">(no recent events)</td></tr>';
   } else {
     siemStatus.forEach(function(d) {
-      var failStyle = Number(d.failed || 0) > 0 ? ' style="color:var(--danger)"' : '';
+      var failStyle = Number(d.failed || 0) > 0 ? ' style="color:var(--color-danger)"' : '';
       rows += '<tr>'
         + '<td><code>' + escapeAttr(d.destination || '') + '</code></td>'
         + '<td>' + Number(d.pending || 0) + '</td>'
-        + '<td style="color:var(--success)">' + Number(d.sent || 0) + '</td>'
+        + '<td style="color:var(--color-success)">' + Number(d.sent || 0) + '</td>'
         + '<td' + failStyle + '>' + Number(d.failed || 0) + '</td>'
         + '<td>' + Number(d.dlq || 0) + '</td>'
         + '</tr>';

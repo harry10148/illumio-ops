@@ -58,6 +58,18 @@
       --color-signal-danger:  #D93025;
       --color-signal-info:    #0077CC;
 
+      /* Semantic color tokens — UX_Review §2.2 / Improvement_Plan §A 1.3.
+         Use these for *meaning* (success/warning/danger/info) instead of
+         the brand-flavoured --accent/--warn/--success which are visual tokens. */
+      --color-success:    #16A34A;
+      --color-success-bg: #DCFCE7;
+      --color-warning:    #F59E0B;
+      --color-warning-bg: #FEF3C7;
+      --color-danger:     #BE122F;
+      --color-danger-bg:  #FEE2E2;
+      --color-info:       #2563EB;
+      --color-info-bg:    #DBEAFE;
+
       --space-header-y: 12px;
       --space-header-x: 20px;
       --space-panel: 18px;
@@ -102,6 +114,10 @@
       --warn:    #F97607; /* Circuit Gold 110 */
       --danger:  #BE122F; /* Risk Red 100 */
       --border:  #D6D7D7; /* Server Slate 20 */
+      --color-success:    #16A34A;
+      --color-success-bg: #DCFCE7;
+      --color-danger:     #BE122F;
+      --color-danger-bg:  #FEE2E2;
       --shadow: 0 4px 16px rgba(49, 54, 56, 0.08);
     }
 
@@ -468,11 +484,11 @@
     }
 
     .card .value.ok {
-      color: var(--success);
+      color: var(--color-success);
     }
 
     .card .value.err {
-      color: var(--danger);
+      color: var(--color-danger);
     }
 
     /* Buttons */
@@ -1346,9 +1362,9 @@
     }
 
     /* Card left-border colour variants */
-    .card.card-ok      { border-left: 4px solid var(--success); }
-    .card.card-warn    { border-left: 4px solid var(--warn); }
-    .card.card-err     { border-left: 4px solid var(--danger); }
+    .card.card-ok      { border-left: 4px solid var(--color-success); }
+    .card.card-warn    { border-left: 4px solid var(--color-warning); }
+    .card.card-err     { border-left: 4px solid var(--color-danger); }
     .card.card-neutral { border-left: 4px solid var(--dim); opacity: .85; }
 
     /* Status badge pill */
@@ -1445,7 +1461,7 @@
 /* Phase 1 quick win for a2: inline field error */
 .field-error {
   display: block;
-  color: var(--danger, #BE122F);
+  color: var(--color-danger);
   font-size: 0.85em;
   margin-top: 4px;
   line-height: 1.3;
@@ -1453,6 +1469,6 @@
 input[aria-invalid="true"],
 textarea[aria-invalid="true"],
 select[aria-invalid="true"] {
-  border-color: var(--danger, #BE122F);
-  outline-color: var(--danger, #BE122F);
+  border-color: var(--color-danger);
+  outline-color: var(--color-danger);
 }
