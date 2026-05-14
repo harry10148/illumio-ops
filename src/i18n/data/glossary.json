@@ -1,9 +1,9 @@
 {
-  "_doc": "Glossary preserve-list. Terms here MUST remain English in zh_TW translations. forbidden_zh_substitutes lists Chinese strings that, if present, indicate a glossary violation.",
+  "_doc": "Glossary preserve-list. Terms here MUST remain English in zh_TW translations. forbidden_zh_substitutes lists Chinese strings that, if present, indicate a glossary violation. Note: the verb 'Manage' (used in CTAs like 'Manage PCE Cache') is intentionally NOT listed — it naturally renders as 管理 in Traditional Chinese menus/buttons. The product nouns 'Managed' and 'Unmanaged' (e.g. 'Managed Workload') remain whitelisted because they are Illumio product states.",
   "preserve_in_zh_tw": [
     "Block", "Blocked", "Blocking", "Allow", "Allowed", "Allowing",
     "Potentially Blocked",
-    "Manage", "Managed", "Managing", "Unmanage", "Unmanaged",
+    "Managed", "Managing", "Unmanage", "Unmanaged",
     "PCE", "VEN", "Workload", "Workloads",
     "Service", "Services",
     "Port", "Ports",
@@ -24,7 +24,6 @@
     "Enforcement": ["執行模式"],
     "Label": ["標籤"],
     "Labels": ["標籤"],
-    "Manage": ["管理"],
     "Managed": ["已管理", "受管"],
     "Offline": ["離線"],
     "Online": ["線上", "在線"],
