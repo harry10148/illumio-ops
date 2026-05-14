@@ -25,6 +25,10 @@ import os as _os
 # Known click subcommand names; anything else falls back to argparse.
 _CLICK_SUBCOMMANDS = {"cache", "monitor", "monitor-gui", "gui", "report", "rule", "siem", "workload", "config", "status", "version", "shell", "completion", "-h", "--help"}
 
+# Click root-level global flags. If argv starts with one of these, dispatcher
+# should still route to click (rather than falling through to legacy argparse).
+_CLICK_GLOBAL_FLAGS = {"--json", "--quiet", "-q", "--verbose", "-v"}
+
 # Route to click for shell completion generation
 _COMPLETION_ENV = _os.environ.get("_ILLUMIO_OPS_COMPLETE", "")
 
@@ -32,16 +36,19 @@ _COMPLETION_ENV = _os.environ.get("_ILLUMIO_OPS_COMPLETE", "")
 def _looks_like_click_invocation(argv: list[str]) -> bool:
     """True when argv looks like a click subcommand attempt.
 
-    Heuristic: route to click when argv[1] does NOT start with '-'
-    (legacy argparse flags all begin with '-' / '--'). Unknown subcommand
-    names go to click too, so click's did-you-mean can suggest a fix
-    instead of argparse's unhelpful 'unrecognized arguments' error.
-    Explicit help flags also route to click.
+    Routes to click when:
+      - argv[1] is a help flag (`-h` / `--help`), or
+      - argv[1] is a click global flag (`--json` / `--quiet` / `-v` / ...), or
+      - argv[1] does NOT start with '-' (i.e. positional subcommand).
+
+    Otherwise falls through to legacy argparse for `--monitor`, `--gui`, etc.
     """
     if len(argv) < 2:
         return False
     first = argv[1]
     if first in ("-h", "--help"):
+        return True
+    if first in _CLICK_GLOBAL_FLAGS:
         return True
     return not first.startswith("-")
 
