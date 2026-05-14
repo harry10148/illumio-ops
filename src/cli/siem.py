@@ -131,16 +131,11 @@ def siem_status(ctx: click.Context):
         if is_json(ctx):
             echo_json(ctx, rows)
             return
-        table = Table(title="SIEM Dispatch Status")
-        table.add_column("Destination")
-        table.add_column("Pending", justify="right")
-        table.add_column("Sent", justify="right")
-        table.add_column("Failed", justify="right")
-        table.add_column("DLQ", justify="right")
-        for r in rows:
-            table.add_row(r["destination"], str(r["pending"]), str(r["sent"]),
-                          str(r["failed"]), str(r["dlq"]))
-        console.print(table)
+        if not rows:
+            if not is_quiet(ctx):
+                console.print(f"[dim]{t('cli_siem_no_records')}[/dim]")
+            return
+        _render_status_table(rows)
     except OperationalError:
         # SIEM cache db not initialized — first-run / pre-collect path.
         # Still surface configured destinations with zero counts so the CLI
@@ -162,19 +157,29 @@ def siem_status(ctx: click.Context):
             if not is_quiet(ctx):
                 console.print(f"[dim]{t('cli_siem_no_records')}[/dim]")
             return
-        table = Table(title="SIEM Dispatch Status")
-        table.add_column("Destination")
-        table.add_column("Pending", justify="right")
-        table.add_column("Sent", justify="right")
-        table.add_column("Failed", justify="right")
-        table.add_column("DLQ", justify="right")
-        for r in rows:
-            table.add_row(r["destination"], str(r["pending"]), str(r["sent"]),
-                          str(r["failed"]), str(r["dlq"]))
-        console.print(table)
+        _render_status_table(rows)
     except Exception as exc:
         echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
+
+
+def _render_status_table(rows: list[dict]) -> None:
+    """Render the SIEM dispatch-status table for ``rows`` to the console.
+
+    Shared by the success branch and the OperationalError fallback so the two
+    paths cannot drift apart (e.g. dropping the empty-state hint as fixed in
+    follow-up to d217646).
+    """
+    table = Table(title="SIEM Dispatch Status")
+    table.add_column("Destination")
+    table.add_column("Pending", justify="right")
+    table.add_column("Sent", justify="right")
+    table.add_column("Failed", justify="right")
+    table.add_column("DLQ", justify="right")
+    for r in rows:
+        table.add_row(r["destination"], str(r["pending"]), str(r["sent"]),
+                      str(r["failed"]), str(r["dlq"]))
+    console.print(table)
 
 
 @siem_group.command("replay")

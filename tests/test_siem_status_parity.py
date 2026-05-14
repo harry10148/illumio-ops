@@ -94,3 +94,28 @@ def test_cli_siem_status_json_includes_configured_destination(runner, tmp_path):
     assert garylog_row["sent"] == 0
     assert garylog_row["failed"] == 0
     assert garylog_row["dlq"] == 0
+
+
+def test_siem_status_empty_shows_no_records_hint(runner, tmp_path):
+    """When config and DB are both empty, CLI must show cli_siem_no_records hint.
+
+    Regression guard: a previous refactor (follow-up to d217646) dropped the
+    empty-state hint in the success branch — users saw an empty Rich table
+    instead of the dim "No SIEM dispatch records yet" message. Both the
+    success branch and the OperationalError fallback must show the hint when
+    there is nothing to render.
+    """
+    from src.cli.siem import siem_group
+
+    # No configured destinations + fresh empty DB → both code paths should
+    # produce an empty `rows` list and surface the hint instead of a bare table.
+    mock_cm = _make_mock_cm(tmp_path, dest_names=[])
+    with patch("src.config.ConfigManager", return_value=mock_cm):
+        result = runner.invoke(siem_group, ["status"])
+
+    assert result.exit_code == 0, f"siem status failed:\n{result.output}"
+    # The exact i18n value from src/i18n_en.json: cli_siem_no_records.
+    assert "No SIEM dispatch records yet" in result.output, (
+        "CLI `siem status` dropped the empty-state hint; user now sees a bare "
+        "Rich table border instead. Output was:\n" + result.output
+    )
