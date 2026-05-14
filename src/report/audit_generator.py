@@ -690,36 +690,17 @@ class AuditGenerator:
         from src.report.exporters.audit_html_exporter import AuditHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
         paths = []
-        if fmt in ('html', 'all'):
+        if fmt in ('html', 'pdf', 'all'):
             path = AuditHtmlExporter(
                 result.module_results, df=result.dataframe,
                 date_range=result.date_range, data_source=result.source,
                 detail_level=_REPORT_DETAIL_LEVEL, lang=lang,
+                pce_url=getattr(self, '_pce_url', '') or getattr(self, 'pce_url', ''),
+                org_name=getattr(self, '_org_name', '') or getattr(self, 'org_name', ''),
             ).export(output_dir)
             paths.append(path)
             self._write_report_metadata(path, result, file_format='html')
             print(t("rpt_audit_html_saved", path=path, lang=lang))
-        if fmt in ('pdf', 'all'):
-            try:
-                from src.report.exporters.pdf_exporter import export_report_pdf
-                import datetime as _dt
-                ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
-                pdf_path = os.path.join(output_dir, f'Illumio_Audit_Report_{ts_str}.pdf')
-                export_report_pdf(
-                    title="Audit Report",
-                    output_path=pdf_path,
-                    module_results=result.module_results or {},
-                    metadata={
-                        "generated_at": result.generated_at.isoformat(),
-                        "record_count": result.record_count,
-                        "start_date": result.date_range[0] if result.date_range else "",
-                        "end_date": result.date_range[1] if len(result.date_range) > 1 else "",
-                    },
-                )
-                paths.append(pdf_path)
-                print(t("rpt_pdf_saved", path=pdf_path, default=f"PDF saved: {pdf_path}", lang=lang))
-            except Exception as exc:
-                logger.warning('PDF export failed: {}', exc)
 
         if fmt in ('xlsx', 'all'):
             try:

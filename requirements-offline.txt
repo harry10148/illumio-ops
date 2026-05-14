@@ -1,6 +1,5 @@
 # illumio_ops offline bundle dependencies.
-# Derived from requirements.txt; ReportLab PDF export included (pure-Python, no native deps).
-# HTML/XLSX/CSV/charts work on both online and offline builds.
+# Derived from requirements.txt; HTML/XLSX/CSV/charts work on both online and offline builds.
 #
 # Build command (Linux/WSL):
 #   pip download -r requirements-offline.txt \
@@ -42,9 +41,8 @@ flask-login>=0.6,<0.7
 argon2-cffi>=23.1,<25.0
 cryptography>=42.0,<46.0     # Phase 2: ECDSA cert generation (TLS)
 
-# ── Phase 5: Reports (Excel + PDF + interactive charts) ──────────────────────
+# ── Phase 5: Reports (Excel + interactive charts) ────────────────────────────
 openpyxl>=3.1,<4.0
-reportlab>=4.0,<5.0
 matplotlib>=3.8,<4.0
 plotly>=5.20,<7.0
 pygments>=2.17,<3.0

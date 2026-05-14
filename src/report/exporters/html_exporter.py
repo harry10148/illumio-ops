@@ -35,6 +35,7 @@ from .code_highlighter import get_highlight_css
 from src.humanize_ext import human_number
 from src.report.section_guidance import get_guidance, visible_in
 from src.i18n import t, get_language
+from src.report.exporters.cover_page import build_cover_page as _build_cover_page
 
 _CSS = build_css('traffic')
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -386,13 +387,22 @@ class HtmlExporter:
 
     def __init__(self, results: dict, data_source: str = "",
                  profile: str = "security_risk", detail_level: str = _REPORT_DETAIL_LEVEL,
-                 compute_draft: bool = False, lang: str = "en"):
+                 compute_draft: bool = False, lang: str = "en",
+                 date_range: tuple[str, str] = ("", ""),
+                 pce_url: str = "", org_name: str = ""):
         self._r = results
         self._data_source = data_source
         self._profile = profile
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._compute_draft = compute_draft
         self._lang = lang
+        self._date_range = date_range
+        self._pce_url = pce_url
+        self._org_name = org_name
+
+    def build(self) -> str:
+        """Public alias for _build(); returns the full HTML string."""
+        return self._build()
 
     def export(self, output_dir: str = 'reports') -> str:
         """Write HTML file and return full path."""
@@ -574,7 +584,7 @@ class HtmlExporter:
                 (_nav_link('change_impact', 'rpt_tr_nav_change_impact', 'Change Impact')
                  if visible_in('mod_change_impact', profile, detail_level) else ''),
             ]
-        nav_html = '<nav>' + ''.join(_nav_links) + '</nav>'
+        nav_html = '<nav>' + ''.join(_nav_links) + '<button class="print-btn" onclick="window.print()">🖨 Print / PDF</button></nav>'
 
         exec_html = render_exec_summary_html(_traffic_mod00, report_name='Traffic Report', lang=self._lang)
         body = (
@@ -603,7 +613,7 @@ class HtmlExporter:
                           'rpt_tr_sec_overview_intro', 'Start from overall traffic scale, Policy coverage, and top Ports to set a baseline for reading the rest of the report.') + '\n' +
             (self._section('policy', 'rpt_tr_sec_policy', 'Policy Decisions',
                            render_section_guidance('mod02', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod02_html(),
-                           'rpt_tr_sec_policy_intro', 'Break down the ratios and details of Allowed, Blocked, and Potentially Blocked to gauge how Policy is actually landing.') + '\n'
+                           layout='layout-b') + '\n'
              if visible_in('mod02_policy_decisions', profile, detail_level) else '') +
             (self._section('uncovered', 'rpt_tr_sec_uncovered', 'Uncovered Flows',
                            render_section_guidance('mod03', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod03_html(),
@@ -661,12 +671,21 @@ class HtmlExporter:
             ) if profile == 'security_risk' else '') +
             f'<footer>{_s("rpt_tr_footer")} &middot; {today_str}</footer>'
         )
+        _report_title = t("rpt_cover_type_security", lang=self._lang)
+        cover_html = _build_cover_page(
+            title=_report_title,
+            report_type=_report_title,
+            date_range=self._date_range,
+            pce_url=self._pce_url,
+            org_name=self._org_name,
+            lang=self._lang,
+        )
         html_lang = "zh-TW" if self._lang == "zh_TW" else "en"
         return (
             f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
             f"<title>{t('rpt_page_title_traffic', lang=self._lang)}</title>" + _CSS + _HIGHLIGHT_CSS + '</head>\n'
-            '<body>' + nav_html + '<main>' + body + '</main>'
+            f'<body data-report-title="{_report_title}">' + cover_html + nav_html + '<main>' + body + '</main>'
             + TABLE_JS + '</body></html>'
         )
 
@@ -678,6 +697,7 @@ class HtmlExporter:
         content: str,
         intro_key: str = '',
         intro_en: str = '',
+        layout: str = '',
     ) -> str:
         h2_text = self._s(i18n_key)
         if h2_text == i18n_key:
@@ -688,8 +708,9 @@ class HtmlExporter:
             if intro_text == intro_key:
                 intro_text = intro_en
             intro_html = f'<p class="section-intro">{intro_text}</p>'
+        card_class = f'card {layout}'.strip() if layout else 'card'
         return (
-            f'<section id="{id_}" class="card">'
+            f'<section id="{id_}" class="{card_class}">'
             f'<h2>{h2_text}</h2>'
             f'{intro_html}{content}</section>'
         )
@@ -795,10 +816,13 @@ class HtmlExporter:
         _s = self._s
         _lang = self._lang
         m = self._r.get('mod02', {})
-        out = self._subnote('rpt_tr_mod02_intro') + _df_to_html(m.get('summary'), lang=_lang) + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+        intro_text = t('rpt_tr_sec_policy_intro', lang=_lang,
+                       default='Break down the ratios and details of Allowed, Blocked, and Potentially Blocked to gauge how Policy is actually landing.')
+        chart_html = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+        table_html = self._subnote('rpt_tr_mod02_intro') + _df_to_html(m.get('summary'), lang=_lang)
         pc = m.get('port_coverage')
         if pc is not None and hasattr(pc, 'empty') and not pc.empty:
-            out += self._subnote('rpt_tr_port_coverage_subnote') + f'<h3>{_s("rpt_tr_port_coverage")}</h3>' + _df_to_html(pc, lang=_lang)
+            table_html += self._subnote('rpt_tr_port_coverage_subnote') + f'<h3>{_s("rpt_tr_port_coverage")}</h3>' + _df_to_html(pc, lang=_lang)
         for d in ('allowed', 'blocked', 'potentially_blocked'):
             dm = m.get(d, {})
             if not isinstance(dm, dict) or dm.get('count', 0) == 0:
@@ -811,11 +835,11 @@ class HtmlExporter:
                 'blocked': 'BLOCKED',
                 'potentially_blocked': 'POTENTIAL',
             }.get(d, d.upper())
-            out += (
+            table_html += (
                 '<h3>' + d.replace('_', ' ').upper() + f' ({pct}% of total)'
                 f' &nbsp;·&nbsp; ↓ Inbound: {inb} &nbsp;·&nbsp; ↑ Outbound: {outb}</h3>'
             )
-            out += self._three_col_tables(
+            table_html += self._three_col_tables(
                 f'<h4>{_s("rpt_tr_top_app_flows")}</h4>',
                 _df_to_html(dm.get('top_app_flows'), lang=_lang),
                 f'<h4>{_s("rpt_mod02_top_inbound_ports")} ({status})</h4>',
@@ -823,7 +847,13 @@ class HtmlExporter:
                 f'<h4>{_s("rpt_mod02_top_outbound_ports")} ({status})</h4>',
                 _df_to_html(dm.get('top_outbound_ports'), lang=_lang),
             )
-        return out
+        return (
+            '<div class="section-top">'
+            + f'<p class="section-intro">{intro_text}</p>'
+            + chart_html
+            + '</div>'
+            + '<div class="section-bottom">' + table_html + '</div>'
+        )
 
     def _mod03_html(self):
         m = self._r.get('mod03', {})
@@ -898,11 +928,24 @@ class HtmlExporter:
                 '</div>'
             )
 
+        _ppb = m.get('part_b_per_port')
+        if _ppb is not None and hasattr(_ppb, 'empty') and not _ppb.empty:
+            _g1 = ["Port", "Service", "Risk Level", "Control", "Total Flows", "Allowed", "Blocked", "Potentially Blocked"]
+            _g2 = ["Port", "Unique Src IPs", "Unique Dst IPs"]
+            _ppb_html = (
+                f'<h5 class="subtable-label">{_s("rpt_tr_per_port_traffic_policy")}</h5>'
+                + _df_to_html(_ppb[[c for c in _g1 if c in _ppb.columns]], 'Risk Level', lang=_lang)
+                + f'<h5 class="subtable-label">{_s("rpt_tr_per_port_src_dst")}</h5>'
+                + f'<p class="note" style="font-size:11px">{_s("rpt_tr_per_port_src_dst_note")}</p>'
+                + _df_to_html(_ppb[[c for c in _g2 if c in _ppb.columns]], lang=_lang)
+            )
+        else:
+            _ppb_html = _df_to_html(None, lang=_lang)
         out += (
             f'<h3>{_s("rpt_tr_risk_summary")}</h3>'
             + _df_to_html(m.get('part_a_summary'), 'Risk Level', lang=_lang) +
             f'<h3>{_s("rpt_tr_per_port")}</h3>'
-            + _df_to_html(m.get('part_b_per_port'), 'Risk Level', lang=_lang) +
+            + _ppb_html +
             f'<h3>{_s("rpt_tr_host_exposure")}</h3>'
             + f'<p class="note" style="font-size:11px">{_s("rpt_tr_host_exposure_note")}</p>'
             + _df_to_html(m.get('part_d_host_exposure'), lang=_lang)
@@ -940,7 +983,7 @@ class HtmlExporter:
         _s = self._s
         _lang = self._lang
         m = self._r.get('mod07', {})
-        out = ''
+        out = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
         for key, data in m.get('matrices', {}).items():
             out += f'<h3>{_s("rpt_tr_label_key")} {key.upper()}</h3>'
             if 'note' in data:
@@ -949,7 +992,6 @@ class HtmlExporter:
                 kv = (f'{_s("rpt_tr_same_value")} {data.get("same_value_flows",0)} · '
                       f'{_s("rpt_tr_cross_value")} {data.get("cross_value_flows",0)}')
                 out += f'<p>{kv}</p>{_df_to_html(data.get("top_cross_pairs"), lang=_lang)}'
-        out += _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
         return out or f'<p class="note">{_s("rpt_no_matrix")}</p>'
 
     def _mod08_html(self):
@@ -998,10 +1040,13 @@ class HtmlExporter:
         m = self._r.get('mod10', {})
         if m.get('note'):
             return f'<p class="note">{m["note"]}</p>'
+        chart_html = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
         return (
-            self._subnote('rpt_tr_allowed_flows_subnote')
+            '<div class="section-body">'
+            + self._subnote('rpt_tr_allowed_flows_subnote')
+            + chart_html
             + _df_to_html(m.get('top_app_flows'), lang=_lang)
-            + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+            + '</div>'
             + self._subnote('rpt_tr_audit_flags_subnote')
             + f'<h3>{_s("rpt_tr_audit_flags")} ({m.get("audit_flag_count", 0)})</h3>'
             + _df_to_html(m.get('audit_flags'), lang=_lang)
@@ -1227,14 +1272,31 @@ class HtmlExporter:
                 "enforcement_mode_ratio": "Enforcement Mode %",
                 "staged_readiness_ratio": "Staged Readiness %",
                 "remote_app_coverage_ratio": "Remote-App Coverage %",
+                "potentially_blocked_ratio": "PB Ratio %",
+                "pb_uncovered_count": "PB Uncovered",
                 "flow_count": "Flows",
                 "connection_count": "Connections",
+                "blocked_or_pb_flow_count": "Blocked/PB Flows",
                 "grade": "Grade",
             })
-            html += f'<h4>{_s("rpt_tr_app_env_readiness")}</h4>' + _df_to_html(_aes, lang=_lang)
+
+            def _aes_sub(cols):
+                sub = _aes[[c for c in cols if c in _aes.columns]]
+                return _df_to_html(sub, lang=_lang) if len(sub.columns) > 1 else ''
+
+            html += (
+                f'<h4>{_s("rpt_tr_app_env_readiness")}</h4>'
+                + f'<h5 class="subtable-label">{_s("rpt_tr_app_env_scores_summary")}</h5>'
+                + _aes_sub(["App (Env)", "Grade", "Readiness Score", "Policy Coverage %", "Enforcement Mode %", "Ringfence Maturity %"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_app_env_coverage")}</h5>'
+                + _aes_sub(["App (Env)", "Remote-App Coverage %", "Staged Readiness %", "PB Ratio %", "PB Uncovered"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_app_env_flows")}</h5>'
+                + _aes_sub(["App (Env)", "Flows", "Connections", "Blocked/PB Flows"])
+            )
         if recommendations is not None and not recommendations.empty:
+            _rec_cols = [c for c in recommendations.columns if c not in ("App Env Key", "Action Code")]
             html += f'<h4>{_s("rpt_tr_remediation_rec")}</h4>' + _df_to_html(
-                recommendations,
+                recommendations[_rec_cols],
                 severity_col="Severity",
                 lang=_lang,
                 value_i18n_maps={"Severity": SEVERITY_VALUE_I18N},
@@ -1267,13 +1329,33 @@ class HtmlExporter:
             )
         hub_apps = m.get('hub_apps')
         if hub_apps is not None and not hub_apps.empty:
-            html += f'<h4>{_s("rpt_tr_hub_apps")}</h4>' + _df_to_html(
-                hub_apps, lang=_lang, value_i18n_maps=_scored_value_maps,
+            def _ha_sub(cols):
+                sub = hub_apps[[c for c in cols if c in hub_apps.columns]]
+                return _df_to_html(sub, lang=_lang, value_i18n_maps=_scored_value_maps) if len(sub.columns) > 1 else ''
+
+            html += (
+                f'<h4>{_s("rpt_tr_hub_apps")}</h4>'
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_summary")}</h5>'
+                + _ha_sub(["app_env_key", "infrastructure_score", "tier", "role", "provider_score", "consumer_score"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_risk_factors")}</h5>'
+                + _ha_sub(["app_env_key", "betweenness_score", "mixed_traffic_ratio", "dampening_factor", "non_prod_penalty"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_connections")}</h5>'
+                + _ha_sub(["app_env_key", "in_degree", "out_degree", "connections_in", "connections_out"])
             )
         top_apps = m.get('top_apps')
         if top_apps is not None and not top_apps.empty:
-            html += f'<h4>{_s("rpt_tr_top_apps_infra")}</h4>' + _df_to_html(
-                top_apps, lang=_lang, value_i18n_maps=_scored_value_maps,
+            def _ta_sub(cols):
+                sub = top_apps[[c for c in cols if c in top_apps.columns]]
+                return _df_to_html(sub, lang=_lang, value_i18n_maps=_scored_value_maps) if len(sub.columns) > 1 else ''
+
+            html += (
+                f'<h4>{_s("rpt_tr_top_apps_infra")}</h4>'
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_summary")}</h5>'
+                + _ta_sub(["app_env_key", "infrastructure_score", "tier", "role", "provider_score", "consumer_score"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_risk_factors")}</h5>'
+                + _ta_sub(["app_env_key", "betweenness_score", "mixed_traffic_ratio", "dampening_factor", "non_prod_penalty"])
+                + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_connections")}</h5>'
+                + _ta_sub(["app_env_key", "in_degree", "out_degree", "connections_in", "connections_out"])
             )
         top_edges = m.get('top_edges')
         if top_edges is not None and not top_edges.empty:
@@ -1288,8 +1370,11 @@ class HtmlExporter:
         _lang = self._lang
         total = m.get('total_lateral_flows', 0)
         pct = m.get('lateral_pct', 0)
-        html = (self._subnote('rpt_tr_lateral_intro', 'Covers all lateral-movement analysis including IP-level host connection patterns and App(Env)-level graph risk scoring.') + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume()) + f'<p>{_s("rpt_tr_lateral_flows")} '
-                f'<b>{total:,}</b> ({pct}% {_s("rpt_tr_lateral_pct")})</p>')
+        html = (
+            self._subnote('rpt_tr_lateral_intro', 'Covers all lateral-movement analysis including IP-level host connection patterns and App(Env)-level graph risk scoring.')
+            + f'<p>{_s("rpt_tr_lateral_flows")} <b>{total:,}</b> ({pct}% {_s("rpt_tr_lateral_pct")})</p>'
+            + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+        )
         service_summary = m.get('service_summary')
         if service_summary is not None and not service_summary.empty:
             html += f'<h4>{_s("rpt_tr_lateral_by_service")}</h4>' + _df_to_html(service_summary, lang=_lang)
@@ -1321,10 +1406,14 @@ class HtmlExporter:
             html += f'<h4>{_s("rpt_mod15_bridge_nodes")}</h4>' + _df_to_html(bridge_nodes, lang=_lang)
         reachable_nodes = m.get('top_reachable_nodes')
         if reachable_nodes is not None and not reachable_nodes.empty:
-            html += f'<h4>{_s("rpt_mod15_top_reachable")}</h4>' + _df_to_html(reachable_nodes, lang=_lang)
+            _rn_drop = {"app_env_key", "Max Depth Used"}
+            _rn = reachable_nodes[[c for c in reachable_nodes.columns if c not in _rn_drop]]
+            html += f'<h4>{_s("rpt_mod15_top_reachable")}</h4>' + _df_to_html(_rn, lang=_lang)
         attack_paths = m.get('attack_paths')
         if attack_paths is not None and not attack_paths.empty:
-            html += f'<h4>{_s("rpt_mod15_attack_paths")}</h4>' + _df_to_html(attack_paths, lang=_lang)
+            _ap_drop = {"Source App Env Key", "Target App Env Key"}
+            _ap = attack_paths[[c for c in attack_paths.columns if c not in _ap_drop]]
+            html += f'<h4>{_s("rpt_mod15_attack_paths")}</h4>' + _df_to_html(_ap, lang=_lang)
         app_chains = m.get('app_chains')
         if app_chains is not None and not app_chains.empty:
             html += f'<h4>{_s("rpt_tr_app_chains")}</h4>' + _df_to_html(app_chains, lang=_lang)

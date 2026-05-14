@@ -146,35 +146,43 @@ function buildCacheForm(s) {
     + '<div class="form-group">'
     + '<label data-i18n="gui_cache_db_path">DB path</label>'
     + '<input name="db_path" value="' + dbPath + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_db_path_help"></small>'
     + '</div>'
     + '</fieldset>'
     + '<fieldset>'
     + '<legend data-i18n="gui_cache_sec_retention">Retention (days)</legend>'
     + '<div class="form-row-3">'
     + '<div class="form-group"><label data-i18n="gui_ov_events">events</label>'
-    + '<input type="number" name="events_retention_days" min="1" value="' + Number(s.events_retention_days || 90) + '"></div>'
+    + '<input type="number" name="events_retention_days" min="1" value="' + Number(s.events_retention_days || 90) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_events_retention_days_help"></small></div>'
     + '<div class="form-group"><label data-i18n="gui_cache_card_traffic_raw">Traffic Raw</label>'
-    + '<input type="number" name="traffic_raw_retention_days" min="1" value="' + Number(s.traffic_raw_retention_days || 30) + '"></div>'
+    + '<input type="number" name="traffic_raw_retention_days" min="1" value="' + Number(s.traffic_raw_retention_days || 30) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_traffic_raw_retention_days_help"></small></div>'
     + '<div class="form-group"><label data-i18n="gui_cache_card_traffic_agg">Traffic Agg</label>'
-    + '<input type="number" name="traffic_agg_retention_days" min="1" value="' + Number(s.traffic_agg_retention_days || 30) + '"></div>'
+    + '<input type="number" name="traffic_agg_retention_days" min="1" value="' + Number(s.traffic_agg_retention_days || 30) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_traffic_agg_retention_days_help"></small></div>'
     + '</div>'
     + '</fieldset>'
     + '<fieldset>'
     + '<legend data-i18n="gui_cache_sec_polling">Polling (seconds)</legend>'
     + '<div class="form-row">'
     + '<div class="form-group"><label>events_poll_interval_seconds</label>'
-    + '<input type="number" name="events_poll_interval_seconds" min="30" value="' + Number(s.events_poll_interval_seconds || 30) + '"></div>'
+    + '<input type="number" name="events_poll_interval_seconds" min="30" value="' + Number(s.events_poll_interval_seconds || 30) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_events_poll_interval_seconds_help"></small></div>'
     + '<div class="form-group"><label>traffic_poll_interval_seconds</label>'
-    + '<input type="number" name="traffic_poll_interval_seconds" min="60" value="' + Number(s.traffic_poll_interval_seconds || 60) + '"></div>'
+    + '<input type="number" name="traffic_poll_interval_seconds" min="60" value="' + Number(s.traffic_poll_interval_seconds || 60) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_traffic_poll_interval_seconds_help"></small></div>'
     + '</div>'
     + '</fieldset>'
     + '<fieldset>'
     + '<legend data-i18n="gui_cache_sec_throughput">Throughput</legend>'
     + '<div class="form-row">'
     + '<div class="form-group"><label>rate_limit_per_minute</label>'
-    + '<input type="number" name="rate_limit_per_minute" min="10" max="500" value="' + Number(s.rate_limit_per_minute || 100) + '"></div>'
+    + '<input type="number" name="rate_limit_per_minute" min="10" max="500" value="' + Number(s.rate_limit_per_minute || 100) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_rate_limit_per_minute_help"></small></div>'
     + '<div class="form-group"><label>async_threshold_events</label>'
-    + '<input type="number" name="async_threshold_events" min="1" max="10000" value="' + Number(s.async_threshold_events || 1000) + '"></div>'
+    + '<input type="number" name="async_threshold_events" min="1" max="10000" value="' + Number(s.async_threshold_events || 1000) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_async_threshold_events_help"></small></div>'
     + '</div>'
     + '</fieldset>'
     + '<div id="cache-form-extra"></div>'
@@ -397,12 +405,15 @@ function renderTrafficFilter(s) {
     + '</div></div>'
     + '<div class="form-row">'
     + '<div class="form-group"><label data-i18n="gui_cache_tf_workload_env">Workload label env</label>'
-    + '<input id="tf-env" value="' + envVals + '" placeholder="prod,staging"></div>'
+    + '<input id="tf-env" value="' + envVals + '" placeholder="prod,staging">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_workload_label_env_help"></small></div>'
     + '<div class="form-group"><label data-i18n="gui_cache_tf_ports">Ports</label>'
-    + '<input id="tf-ports" value="' + portVals + '" placeholder="22,443,..."></div>'
+    + '<input id="tf-ports" value="' + portVals + '" placeholder="22,443,...">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_ports_help"></small></div>'
     + '</div>'
     + '<div class="form-group"><label data-i18n="gui_cache_tf_exclude_ips">Exclude src IPs</label>'
-    + '<input id="tf-ips" value="' + ipVals + '" placeholder="10.0.0.1,..."></div>'
+    + '<input id="tf-ips" value="' + ipVals + '" placeholder="10.0.0.1,...">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_exclude_src_ips_help"></small></div>'
     + '<div id="tf-validation-hints" style="color:var(--danger);font-size:.8rem;"></div>'
     + '</fieldset>';
 
@@ -468,10 +479,16 @@ function renderTrafficSampling(s) {
   var html = '<fieldset>'
     + '<legend data-i18n="gui_cache_sec_traffic_sampling">Traffic Sampling</legend>'
     + '<div class="form-row">'
-    + '<div class="form-group"><label data-i18n="gui_cache_ts_ratio">sample_ratio_allowed</label>'
-    + '<input type="number" id="ts-ratio" min="1" value="' + ratio + '"></div>'
-    + '<div class="form-group"><label data-i18n="gui_cache_ts_max_rows">max_rows_per_batch</label>'
-    + '<input type="number" id="ts-max" min="1" max="200000" value="' + maxRows + '"></div>'
+    + '<div class="form-group">'
+    +   '<label data-i18n="gui_cache_ts_ratio">Sampling ratio (Allowed traffic)</label>'
+    +   '<input type="number" id="ts-ratio" min="1" value="' + ratio + '">'
+    +   '<small class="form-text text-muted" data-i18n="gui_cache_ts_ratio_help"></small>'
+    + '</div>'
+    + '<div class="form-group">'
+    +   '<label data-i18n="gui_cache_ts_max_rows">Max rows per batch</label>'
+    +   '<input type="number" id="ts-max" min="1" max="200000" value="' + maxRows + '">'
+    +   '<small class="form-text text-muted" data-i18n="gui_cache_ts_max_rows_help"></small>'
+    + '</div>'
     + '</div>'
     + '</fieldset>';
   var extra = document.getElementById('cache-form-extra');
@@ -536,10 +553,12 @@ function buildSiemForwarderForm(fw) {
     + '<div class="form-group">'
     + '<label data-i18n="gui_siem_dispatch_tick">dispatch_tick_seconds</label>'
     + '<input type="number" id="siem-tick" min="1" value="' + Number(fw.dispatch_tick_seconds || 10) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_siem_dispatch_tick_help"></small>'
     + '</div>'
     + '<div class="form-group">'
     + '<label data-i18n="gui_siem_dlq_max">dlq_max_per_dest</label>'
     + '<input type="number" id="siem-dlq-max" min="100" value="' + Number(fw.dlq_max_per_dest || 500) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_siem_dlq_max_help"></small>'
     + '</div>'
     + '</div>'
     + '<div class="chk" style="margin-bottom:14px;">'
@@ -561,13 +580,14 @@ function buildSiemDestinationsSection() {
     + '<div class="table-container">'
     + '<table class="rule-table">'
     + '<colgroup>'
-    + '<col style="width:18%"><col style="width:10%"><col style="width:13%"><col style="width:25%"><col style="width:16%"><col>'
+    + '<col style="width:18%"><col style="width:10%"><col style="width:12%"><col style="width:20%"><col style="width:7%"><col style="width:14%"><col>'
     + '</colgroup>'
     + '<thead><tr>'
     + '<th data-i18n="gui_siem_th_name">Name</th>'
     + '<th data-i18n="gui_siem_th_transport">Transport</th>'
     + '<th data-i18n="gui_siem_th_format">Format</th>'
-    + '<th data-i18n="gui_siem_th_endpoint">Endpoint</th>'
+    + '<th data-i18n="gui_siem_th_host">Host</th>'
+    + '<th data-i18n="gui_siem_th_port">Port</th>'
     + '<th data-i18n="gui_siem_th_status">Status</th>'
     + '<th data-i18n="gui_siem_th_actions">Actions</th>'
     + '</tr></thead>'
@@ -586,7 +606,8 @@ function buildSiemRow(d, st) {
     + '<td><b>' + escapeAttr(d.name) + '</b>' + dim + '</td>'
     + '<td><code>' + escapeAttr(d.transport) + '</code></td>'
     + '<td><code>' + escapeAttr(d.format) + '</code></td>'
-    + '<td title="' + escapeAttr(d.endpoint) + '">' + escapeAttr(d.endpoint) + '</td>'
+    + '<td>' + escapeAttr(d.host || '') + '</td>'
+    + '<td>' + Number(d.port || 514) + '</td>'
     + '<td>' + _siemStatusBadge(d, st) + '</td>'
     + '<td style="white-space:nowrap;">'
     + '<button class="btn btn-sm" onclick="siemTestDest(\'' + nameEnc + '\')" data-i18n="gui_siem_test">Test</button> '
@@ -629,7 +650,7 @@ async function siemOpenDestModal(nameEnc) {
   var name = nameEnc ? decodeURIComponent(nameEnc) : null;
   var dest = {
     name: '', enabled: true, transport: 'udp', format: 'cef',
-    endpoint: '', tls_verify: true, tls_ca_bundle: '', hec_token: '',
+    host: '', port: 514, tls_verify: true, tls_ca_bundle: '', hec_token: '',
     batch_size: 100, source_types: ['audit', 'traffic'], max_retries: 10
   };
   if (name) {
@@ -637,7 +658,11 @@ async function siemOpenDestModal(nameEnc) {
       var body = await fetch('/api/siem/destinations').then(function(r) { return r.json(); });
       var all = body.destinations || body || [];
       var found = all.filter(function(d) { return d.name === name; })[0];
-      if (found) dest = Object.assign(dest, found);
+      if (!found) {
+        console.warn('Destination not found:', name);
+        return;
+      }
+      dest = Object.assign(dest, found);
     } catch (err) {
       // If fetch fails, proceed with default values
       console.warn('Could not load destination data:', err);
@@ -648,9 +673,12 @@ async function siemOpenDestModal(nameEnc) {
   if (typeof window.i18nApply === 'function') window.i18nApply();
 }
 
+var _SIEM_DEFAULT_PORTS = { udp: 514, tcp: 514, tls: 6514, hec: 8088 };
+
 function buildDestModal(dest, editName) {
   var nameVal = escapeAttr(dest.name);
-  var endpoint = escapeAttr(dest.endpoint);
+  var host = escapeAttr(dest.host || '');
+  var port = Number(dest.port) || 514;
   var caBundle = escapeAttr(dest.tls_ca_bundle || '');
   var hecToken = escapeAttr(dest.hec_token || '');
   var readonly = editName ? ' readonly' : '';
@@ -668,34 +696,62 @@ function buildDestModal(dest, editName) {
   return '<div class="modal-backdrop" onclick="siemCloseModal(event)">'
     + '<div class="modal" onclick="event.stopPropagation()">'
     + '<h2 data-i18n="' + titleKey + '">' + titleText + ' destination</h2>'
+
     + '<h3 data-i18n="gui_siem_sec_basic">Basic</h3>'
-    + '<label>name: <input id="md-name" value="' + nameVal + '"' + readonly + '></label>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label data-i18n="gui_siem_name">Name</label>'
+    + '<input id="md-name" value="' + nameVal + '"' + readonly + '></div>'
+    + '<div class="form-group" style="flex:0 0 auto;align-self:flex-end;padding-bottom:4px">'
     + '<label><input type="checkbox" id="md-enabled"' + (dest.enabled ? ' checked' : '') + '>'
-    + ' <span data-i18n="gui_siem_enabled">Enabled</span></label>'
-    + '<div>source_types:'
-    + ' <label><input type="checkbox" name="md-st" value="audit"' + (sourceTypes.indexOf('audit') >= 0 ? ' checked' : '') + '> audit</label>'
-    + ' <label><input type="checkbox" name="md-st" value="traffic"' + (sourceTypes.indexOf('traffic') >= 0 ? ' checked' : '') + '> traffic</label>'
+    + ' <span data-i18n="gui_siem_enabled">Enabled</span></label></div>'
     + '</div>'
+    + '<div class="form-group"><label data-i18n="gui_siem_source_types">Forwarding Content</label>'
+    + '<div style="display:flex;gap:16px;margin-top:4px">'
+    + '<label><input type="checkbox" name="md-st" value="audit"' + (sourceTypes.indexOf('audit') >= 0 ? ' checked' : '') + '> Audit Events</label>'
+    + '<label><input type="checkbox" name="md-st" value="traffic"' + (sourceTypes.indexOf('traffic') >= 0 ? ' checked' : '') + '> Traffic Flows</label>'
+    + '</div></div>'
+
     + '<h3 data-i18n="gui_siem_sec_transport">Transport</h3>'
-    + '<label>transport: <select id="md-transport" onchange="siemToggleCondFields()">'
-    + mkOpts(['udp', 'tcp', 'tls', 'hec'], dest.transport)
-    + '</select></label>'
-    + '<label>format: <select id="md-format">'
-    + mkOpts(['cef', 'json', 'syslog_cef', 'syslog_json'], dest.format)
-    + '</select></label>'
-    + '<label>endpoint: <input id="md-endpoint" value="' + endpoint + '"></label>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label data-i18n="gui_siem_transport">Transport</label>'
+    + '<select id="md-transport" onchange="siemToggleCondFields()">' + mkOpts(['udp', 'tcp', 'tls', 'hec'], dest.transport) + '</select>'
+    + '<small class="form-text text-muted" data-i18n="gui_siem_transport_help"></small></div>'
+    + '<div class="form-group"><label data-i18n="gui_siem_format">Format</label>'
+    + '<select id="md-format">' + mkOpts(['cef', 'json', 'syslog_cef', 'syslog_json'], dest.format) + '</select>'
+    + '<small class="form-text text-muted" data-i18n="gui_siem_format_help"></small></div>'
+    + '</div>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label data-i18n="gui_siem_host">Server Address</label>'
+    + '<input id="md-host" value="' + host + '" placeholder="192.168.1.10"></div>'
+    + '<div class="form-group" style="flex:0 0 100px"><label data-i18n="gui_siem_port">Port</label>'
+    + '<input type="number" id="md-port" min="1" max="65535" value="' + port + '"></div>'
+    + '</div>'
+
     + '<div id="md-tls-section">'
     + '<h3 data-i18n="gui_siem_sec_tls">TLS</h3>'
-    + '<label><input type="checkbox" id="md-tls-verify"' + (dest.tls_verify ? ' checked' : '') + '> tls_verify</label>'
-    + '<label>tls_ca_bundle: <input id="md-tls-ca" value="' + caBundle + '"></label>'
+    + '<label><input type="checkbox" id="md-tls-verify"' + (dest.tls_verify ? ' checked' : '') + '>'
+    + ' <span data-i18n="gui_siem_tls_verify">Verify TLS Certificate</span></label>'
+    + '<div class="form-group" style="margin-top:8px"><label data-i18n="gui_siem_ca_bundle">CA Bundle Path</label>'
+    + '<input id="md-tls-ca" value="' + caBundle + '" placeholder="/etc/ssl/certs/ca-bundle.crt"></div>'
     + '</div>'
+
     + '<div id="md-hec-section">'
     + '<h3 data-i18n="gui_siem_sec_hec">HEC</h3>'
-    + '<label>hec_token: <input type="password" id="md-hec-token" value="' + hecToken + '"></label>'
+    + '<div class="form-group"><label data-i18n="gui_siem_hec_token">HEC Token</label>'
+    + '<input type="password" id="md-hec-token" value="' + hecToken + '"></div>'
     + '</div>'
-    + '<h3 data-i18n="gui_siem_sec_batch">Batch</h3>'
-    + '<label>batch_size (1-10000): <input type="number" id="md-batch" min="1" max="10000" value="' + Number(dest.batch_size) + '"></label>'
-    + '<label>max_retries (&gt;=0): <input type="number" id="md-retries" min="0" value="' + Number(dest.max_retries) + '"></label>'
+
+    + '<details style="margin-top:14px">'
+    + '<summary style="cursor:pointer;font-weight:600;padding:4px 0" data-i18n="gui_siem_sec_advanced">Advanced</summary>'
+    + '<div style="margin-top:10px">'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label data-i18n="gui_siem_batch_size">Batch Size</label>'
+    + '<input type="number" id="md-batch" min="1" max="10000" value="' + Number(dest.batch_size) + '"></div>'
+    + '<div class="form-group"><label data-i18n="gui_siem_max_retries">Max Retries</label>'
+    + '<input type="number" id="md-retries" min="0" value="' + Number(dest.max_retries) + '"></div>'
+    + '</div></div>'
+    + '</details>'
+
     + '<div id="md-banner" style="margin-top:10px;color:var(--danger);"></div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">'
     + '<button class="btn" onclick="siemCloseModal(event)" data-i18n="gui_cancel">Cancel</button>'
@@ -714,6 +770,15 @@ function siemToggleCondFields() {
   var hecEl = document.getElementById('md-hec-section');
   if (tlsEl) tlsEl.style.display = (t === 'tls' || t === 'hec') ? '' : 'none';
   if (hecEl) hecEl.style.display = (t === 'hec') ? '' : 'none';
+  // Auto-fill default port only if port field is still at a known default value
+  var portEl = document.getElementById('md-port');
+  if (portEl) {
+    var cur = Number(portEl.value);
+    var defaults = Object.values(_SIEM_DEFAULT_PORTS);
+    if (defaults.indexOf(cur) >= 0 || cur === 514) {
+      portEl.value = _SIEM_DEFAULT_PORTS[t] || 514;
+    }
+  }
 }
 
 function siemCloseModal() {
@@ -730,7 +795,8 @@ async function siemSaveDest(editNameEnc) {
     enabled: document.getElementById('md-enabled').checked,
     transport: document.getElementById('md-transport').value,
     format: document.getElementById('md-format').value,
-    endpoint: document.getElementById('md-endpoint').value.trim(),
+    host: document.getElementById('md-host').value.trim(),
+    port: Number(document.getElementById('md-port').value),
     tls_verify: document.getElementById('md-tls-verify').checked,
     tls_ca_bundle: document.getElementById('md-tls-ca').value.trim() || null,
     hec_token: document.getElementById('md-hec-token').value || null,

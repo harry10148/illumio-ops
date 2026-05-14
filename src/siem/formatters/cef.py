@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from datetime import datetime, timezone
 
 from src.siem.formatters.base import Formatter
@@ -15,6 +14,16 @@ _SEVERITY_MAP = {
     "crit": 10,
 }
 _PCE_VERSION = "3.11"
+
+_PROTO_MAP = {6: "tcp", 17: "udp", 1: "icmp"}
+
+
+def _proto_to_str(proto) -> str:
+    if proto is None:
+        return ""
+    if isinstance(proto, str):
+        return proto
+    return _PROTO_MAP.get(int(proto), str(proto))
 
 
 def _cef_escape(value: str) -> str:
@@ -48,31 +57,240 @@ class CEFFormatter(Formatter):
         )
 
         ts = event.get("timestamp", "")
-        ext_parts = []
+        ext = []
         if ts:
-            ext_parts.append(f"rt={_ts_to_epoch_ms(ts)}")
-        ext_parts.append(f"dvchost={_cef_escape(str(event.get('pce_fqdn', '')))}")
-        ext_parts.append(f"externalId={_cef_escape(str(event.get('pce_event_id', '')))}")
-        ext_parts.append(f"outcome={_cef_escape(str(event.get('status', '')))}")
+            ext.append(f"rt={_ts_to_epoch_ms(ts)}")
 
-        return header + "|" + " ".join(ext_parts)
+        # device / event identity
+        pce_fqdn = event.get("pce_fqdn") or ""
+        if pce_fqdn:
+            ext.append(f"dvchost={_cef_escape(pce_fqdn)}")
+        event_id = (event.get("pce_event_id")
+                    or event.get("uuid")
+                    or event.get("href") or "")
+        ext.append(f"externalId={_cef_escape(str(event_id))}")
+        ext.append(f"outcome={_cef_escape(str(event.get('status', '')))}")
+
+        # who acted — created_by can be user / service_account / system
+        actor = _extract_actor(event.get("created_by") or {})
+        if actor:
+            ext.append(f"suser={_cef_escape(actor)}")
+
+        # action details
+        action = event.get("action") or {}
+        src_ip = action.get("src_ip") or ""
+        if src_ip:
+            ext.append(f"src={_cef_escape(src_ip)}")
+        method = action.get("api_method") or ""
+        if method:
+            ext.append(f"requestMethod={_cef_escape(method)}")
+        endpoint = action.get("api_endpoint") or ""
+        if endpoint:
+            ext.append(f"request={_cef_escape(endpoint)}")
+        http_code = action.get("http_status_code")
+        if http_code is not None:
+            ext.append(f"cn1={http_code}")
+            ext.append("cn1Label=httpStatusCode")
+
+        # resource changes summary
+        rc = event.get("resource_changes") or []
+        if rc:
+            msg = _format_resource_changes(rc)
+            if msg:
+                ext.append(f"msg={_cef_escape(msg)}")
+
+        return header + "|" + " ".join(ext)
 
     def format_flow(self, flow: dict) -> str:
-        action = _cef_escape(str(flow.get("action", "unknown")))
-        header = (
-            f"CEF:0|Illumio|PCE|{_PCE_VERSION}"
-            f"|traffic.flow|traffic.flow|3"
-        )
+        """Format a PCE traffic flow as CEF.
 
-        ts = flow.get("first_detected", "")
-        ext_parts = []
+        Accepts both raw PCE API format (nested src/dst/service) and
+        the flat official log format. CEF standard fields carry the
+        network 5-tuple; all other keys use the official Illumio field
+        names so existing SIEM parsers work without remapping.
+        """
+        svc    = flow.get("service") or {}
+        src    = flow.get("src") or {}
+        dst    = flow.get("dst") or {}
+        src_wl = src.get("workload") or {}
+        dst_wl = dst.get("workload") or {}
+
+        # ── Normalise from raw PCE API or flat form ──────────────────────────
+        src_ip = flow.get("src_ip") or src.get("ip", "")
+        dst_ip = flow.get("dst_ip") or dst.get("ip", "")
+        port   = flow.get("dst_port") or flow.get("port") or svc.get("port") or 0
+        proto_raw = flow.get("proto") or flow.get("protocol") or svc.get("proto")
+        proto  = _proto_to_str(proto_raw)
+        pd     = flow.get("pd") or flow.get("policy_decision") or "unknown"
+        ts     = (flow.get("timestamp")
+                  or flow.get("first_detected")
+                  or (flow.get("timestamp_range") or {}).get("first_detected", ""))
+
+        header = f"CEF:0|Illumio|PCE|{_PCE_VERSION}|traffic.flow|traffic.flow|3"
+        ext = []
+
+        # ── CEF standard: timing + network 5-tuple ───────────────────────────
         if ts:
-            ext_parts.append(f"rt={_ts_to_epoch_ms(ts)}")
-        ext_parts.append(f"src={_cef_escape(str(flow.get('src_ip', '')))}")
-        ext_parts.append(f"dst={_cef_escape(str(flow.get('dst_ip', '')))}")
-        ext_parts.append(f"dpt={flow.get('port', 0)}")
-        ext_parts.append(f"proto={_cef_escape(str(flow.get('protocol', '')))}")
-        ext_parts.append(f"act={action}")
-        ext_parts.append(f"dvchost={_cef_escape(str(flow.get('pce_fqdn', '')))}")
+            ext.append(f"rt={_ts_to_epoch_ms(ts)}")
+        ext.append(f"src={_cef_escape(str(src_ip))}")
+        ext.append(f"dst={_cef_escape(str(dst_ip))}")
+        ext.append(f"dpt={port}")
+        ext.append(f"proto={_cef_escape(proto)}")
 
-        return header + "|" + " ".join(ext_parts)
+        # ── Illumio original field names ─────────────────────────────────────
+
+        # pd: policy decision
+        ext.append(f"pd={_cef_escape(str(pd))}")
+
+        # src workload
+        src_hostname = (flow.get("src_hostname")
+                        or src_wl.get("hostname") or src_wl.get("name") or "")
+        if src_hostname:
+            ext.append(f"src_hostname={_cef_escape(src_hostname)}")
+        src_href = flow.get("src_href") or src_wl.get("href") or ""
+        if src_href:
+            ext.append(f"src_href={_cef_escape(src_href)}")
+        src_labels = _format_labels(flow.get("src_labels") or src_wl.get("labels") or [])
+        if src_labels:
+            ext.append(f"src_labels={_cef_escape(src_labels)}")
+
+        # dst workload
+        dst_hostname = (flow.get("dst_hostname")
+                        or dst_wl.get("hostname") or dst_wl.get("name") or "")
+        if dst_hostname:
+            ext.append(f"dst_hostname={_cef_escape(dst_hostname)}")
+        dst_href = flow.get("dst_href") or dst_wl.get("href") or ""
+        if dst_href:
+            ext.append(f"dst_href={_cef_escape(dst_href)}")
+        dst_labels = _format_labels(flow.get("dst_labels") or dst_wl.get("labels") or [])
+        if dst_labels:
+            ext.append(f"dst_labels={_cef_escape(dst_labels)}")
+
+        # fqdn (destination)
+        fqdn = flow.get("fqdn") or dst.get("fqdn") or ""
+        if fqdn:
+            ext.append(f"fqdn={_cef_escape(fqdn)}")
+
+        # pn (process name), un (user name)
+        pn = svc.get("process_name") or flow.get("pn") or ""
+        if pn:
+            ext.append(f"pn={_cef_escape(pn)}")
+        un = svc.get("user_name") or flow.get("un") or ""
+        if un:
+            ext.append(f"un={_cef_escape(un)}")
+
+        # count, bytes
+        count = flow.get("count") or flow.get("num_connections") or flow.get("flow_count")
+        if count is not None:
+            ext.append(f"count={count}")
+        dst_dbi = flow.get("dst_dbi") or flow.get("dst_bi")
+        dst_dbo = flow.get("dst_dbo") or flow.get("dst_bo")
+        if dst_dbi is not None:
+            ext.append(f"dst_dbi={dst_dbi}")
+        if dst_dbo is not None:
+            ext.append(f"dst_dbo={dst_dbo}")
+
+        # dir: I=inbound O=outbound
+        dir_raw = flow.get("dir") or flow.get("flow_direction") or ""
+        if dir_raw:
+            dir_val = "O" if dir_raw in ("O", "outbound") else "I"
+            ext.append(f"dir={dir_val}")
+
+        # state
+        state = flow.get("state") or ""
+        if state:
+            ext.append(f"state={_cef_escape(state)}")
+
+        # network profile
+        net_name = (flow.get("network")
+                    if isinstance(flow.get("network"), str)
+                    else (flow.get("network") or {}).get("name") or "")
+        if net_name:
+            ext.append(f"network={_cef_escape(net_name)}")
+
+        # ICMP
+        icmp_type = flow.get("type") if flow.get("type") is not None else svc.get("icmp_type")
+        icmp_code = flow.get("code") if flow.get("code") is not None else svc.get("icmp_code")
+        if icmp_type is not None:
+            ext.append(f"type={icmp_type}")
+        if icmp_code is not None:
+            ext.append(f"code={icmp_code}")
+
+        # class: transmission type U=Unicast M=Multicast B=Broadcast
+        cls = flow.get("class") or ""
+        if cls:
+            ext.append(f"class={_cef_escape(cls)}")
+
+        # dst_tbi / dst_tbo: total bytes (separate from delta)
+        dst_tbi = flow.get("dst_tbi")
+        dst_tbo = flow.get("dst_tbo")
+        if dst_tbi is not None:
+            ext.append(f"dst_tbi={dst_tbi}")
+        if dst_tbo is not None:
+            ext.append(f"dst_tbo={dst_tbo}")
+
+        # interval_sec: sampling interval
+        interval_sec = flow.get("interval_sec")
+        if interval_sec is not None:
+            ext.append(f"interval_sec={interval_sec}")
+
+        # ddms / tdms: delta and total flow duration in ms
+        ddms = flow.get("ddms")
+        tdms = flow.get("tdms")
+        if ddms is not None:
+            ext.append(f"ddms={ddms}")
+        if tdms is not None:
+            ext.append(f"tdms={tdms}")
+
+        # pd_qualifier: policy decision qualifier (0-3)
+        pd_q = flow.get("pd_qualifier")
+        if pd_q is not None:
+            ext.append(f"pd_qualifier={pd_q}")
+
+        # pce_fqdn
+        pce_fqdn = flow.get("pce_fqdn") or ""
+        if pce_fqdn:
+            ext.append(f"pce_fqdn={_cef_escape(pce_fqdn)}")
+
+        return header + "|" + " ".join(ext)
+
+
+def _extract_actor(created_by: dict) -> str:
+    """Resolve created_by dict to a display string."""
+    if created_by.get("system"):
+        return "system"
+    user = created_by.get("user") or {}
+    if user.get("username"):
+        return user["username"]
+    if user.get("name"):
+        return user["name"]
+    sa = created_by.get("service_account") or {}
+    if sa.get("name"):
+        return sa["name"]
+    return ""
+
+
+def _format_resource_changes(rc: list) -> str:
+    """Summarise resource_changes as 'change_type:resource_type:name ...'."""
+    parts = []
+    for change in rc[:5]:
+        change_type = change.get("change_type", "")
+        resource = change.get("resource") or {}
+        for res_type, res_val in resource.items():
+            name = res_val.get("name", "") if isinstance(res_val, dict) else ""
+            parts.append(f"{change_type}:{res_type}:{name}" if name else f"{change_type}:{res_type}")
+            break
+    return " ".join(parts)
+
+
+def _format_labels(labels) -> str:
+    """Format PCE label list [{"key":k,"value":v}] or dict {k:v} as 'k:v k:v'."""
+    if isinstance(labels, dict):
+        return " ".join(f"{k}:{v}" for k, v in labels.items() if k and v)
+    parts = []
+    for lbl in labels:
+        k = lbl.get("key", "")
+        v = lbl.get("value", "")
+        if k and v:
+            parts.append(f"{k}:{v}")
+    return " ".join(parts)

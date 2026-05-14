@@ -62,11 +62,14 @@ BASE_CSS = """\
   nav { position: fixed; top: 0; left: 0; width: 210px; height: 100vh; background: var(--cyan-120); overflow-y: auto; padding: 60px 0 20px; z-index: 100; }
   nav a { display: block; color: var(--slate-20); text-decoration: none; padding: 7px 16px; font-size: 12px; border-left: 3px solid transparent; }
   nav a:hover, nav a.active { background: var(--cyan-100); border-left-color: var(--orange); color: #fff; }
+  .print-btn { display: block; margin: 12px 16px 0; padding: 7px 16px; background: var(--orange); color: #fff; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; text-align: center; width: calc(100% - 32px); }
+  .print-btn:hover { background: var(--orange-dark, #cc4400); }
   main { margin-left: 210px; padding: 24px; container-type: inline-size; container-name: main; }
   h1 { color: var(--orange); font-size: 22px; font-weight: 700; margin-bottom: 4px; }
   h2 { color: var(--cyan-120); font-size: 16px; font-weight: 600; margin: 24px 0 10px; border-bottom: 2px solid var(--orange); padding-bottom: 6px; }
   h3 { color: var(--slate); font-size: 13px; font-weight: 600; margin: 16px 0 8px; }
   h4 { color: var(--slate-50); font-size: 12px; font-weight: 600; margin: 12px 0 6px; text-transform: uppercase; letter-spacing: .04em; }
+  .subtable-label { color: var(--slate-50); font-size: 11px; font-weight: 600; margin: 10px 0 3px; padding-left: 8px; border-left: 3px solid var(--orange); text-transform: uppercase; letter-spacing: .04em; }
 
   .card { background: #fff; border-radius: 8px; padding: 24px 28px; box-shadow: var(--shadow-card); margin-bottom: 24px; color: var(--slate); container-type: inline-size; }
   .note { background: var(--tan); border-left: 4px solid var(--orange); padding: 12px 14px; border-radius: 4px; color: var(--cyan-120); font-size: 13px; margin: 12px 0; line-height: 1.6; }
@@ -123,6 +126,7 @@ BASE_CSS = """\
   .report-table thead th:last-child { border-right: none; }
   .report-table tbody td { padding: 8px 12px; vertical-align: top; border-bottom: 1px solid var(--slate-20); color: var(--slate); line-height: 1.5; font-variant-numeric: tabular-nums; }
   .report-table tbody td, .report-table tbody td * { color: var(--slate); }
+  .report-table tbody td .badge { color: #fff; }
   .report-table tbody td code { color: var(--cyan-120); background: rgba(26,44,50,.06); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; }
   .report-table tbody tr:nth-child(even) td { background: var(--tan); }
   .report-table tbody tr:hover td { background: var(--tan-120); transition: background .12s ease; }
@@ -249,14 +253,66 @@ BASE_CSS = """\
   .chart-container > div { width: 100% !important; }
   .chart-img { width: 100%; height: auto; display: block; }
 
+  @page {
+    margin: 15mm 15mm 22mm;
+  }
+  @page {
+    @bottom-right {
+      content: counter(page) " / " counter(pages);
+      font-size: 8pt;
+      color: #888;
+      font-family: sans-serif;
+    }
+  }
+  .report-cover { background: linear-gradient(160deg, #1a3f4b 0%, #2a5b6b 60%, #1a3f4b 100%); color: #fff; padding: 40px 36px; display: none; flex-direction: column; justify-content: space-between; min-height: 230mm; border: none !important; box-shadow: none !important; }
+  .cover-eyebrow { font-size: 10pt; letter-spacing: 2px; opacity: 0.6; text-transform: uppercase; margin-bottom: 8px; }
+  .cover-title { font-size: 28pt; font-weight: 700; line-height: 1.2; margin-bottom: 8px; }
+  .cover-rule { width: 40px; height: 3px; background: var(--orange); margin: 16px 0; }
+  .cover-type { display: inline-block; background: rgba(255,255,255,0.15); font-size: 10pt; padding: 4px 12px; border-radius: 12px; margin-bottom: 20px; }
+  .cover-meta { font-size: 10pt; opacity: 0.8; line-height: 2; }
+  .cover-footer { border-top: 1px solid rgba(255,255,255,0.2); padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-end; margin-top: 24px; }
+  .cover-org { font-size: 14pt; font-weight: 600; }
+  .cover-generated { font-size: 10pt; opacity: 0.7; text-align: right; }
+
+  .print-only { display: none; }
   @media print {
+    .screen-only { display: none; }
+    .print-only { display: block; }
     nav { display: none; }
-    main { margin-left: 0; padding: 12px; }
-    .card { box-shadow: none; border: 1px solid var(--slate-20); page-break-inside: avoid; }
-    .report-table-panel { box-shadow: none; }
+    .print-btn { display: none; }
+    main { margin-left: 0; padding: 0; }
+    body { font-size: 10pt; }
+    * { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    .card { box-shadow: none; border: 1px solid var(--slate-20); }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; }
+    /* Override JS auto-fit: data-auto-fitted=true triggers table-layout:fixed in base CSS.
+       !important overrides the higher-specificity attribute selector. */
+    .report-table { width: 100% !important; min-width: 0 !important; overflow-wrap: break-word; table-layout: auto !important; }
+    .report-table col { width: auto !important; min-width: 0 !important; }
+    .report-table thead th { width: auto !important; min-width: 0 !important; white-space: normal; }
+    .report-table tbody td { overflow-wrap: break-word; }
+    /* Wide tables: smaller font; auto layout lets browser allocate proportional column widths */
+    .report-table-panel--wide .report-table { font-size: 7.5pt; }
+    .report-table-panel { box-shadow: none; overflow: visible; width: 100%; max-width: 100%; }
+    .report-table-wrap { overflow: visible; }
     .report-table-panel--wide::after { display: none; }
     .report-table-panel--wide .report-table thead th:first-child,
     .report-table-panel--wide .report-table tbody td:first-child { position: static; box-shadow: none; }
+    section { page-break-before: always; }
+    section#summary { page-break-before: avoid; }
+    section.report-cover { page-break-before: avoid !important; page-break-after: always; }
+    /* Cover: fills full A4 page. Explicit flex props since display:none in base CSS. */
+    .report-cover { display: flex !important; flex-direction: column !important; justify-content: space-between !important; min-height: 100vh !important; padding: 40px 36px !important; margin: 0 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    /* Clip Plotly chart containers to prevent legend/axis overflow into adjacent content */
+    .chart-container { page-break-inside: avoid; overflow: hidden; }
+    .chart-container > div { zoom: 0.65; }
+    .finding-card { page-break-inside: avoid; }
+    footer { display: none; }
+    .layout-b .section-top { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 12px; }
+    .layout-b .section-top > .section-intro { flex: 1; margin: 0; }
+    .layout-b .section-top > .chart-container { flex: 1; }
+    .badge { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
   }
 """
 

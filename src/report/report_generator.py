@@ -340,7 +340,7 @@ class ReportGenerator:
         # produced no file (previously swallowed by silent except → empty paths).
         self.last_export_errors: dict[str, str] = {}
 
-        if fmt in ('html', 'all', 'all_raw'):
+        if fmt in ('html', 'pdf', 'all', 'all_raw'):
             path = HtmlExporter(
                 result.module_results,
                 data_source=result.data_source,
@@ -352,30 +352,6 @@ class ReportGenerator:
             paths.append(path)
             self._write_report_metadata(path, self._build_report_metadata(result, file_format="html"))
             print(t("rpt_html_saved", path=path, lang=lang))
-
-        if fmt in ('pdf', 'all'):
-            try:
-                from src.report.exporters.pdf_exporter import export_report_pdf
-                import datetime as _dt
-                ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
-                pdf_path = os.path.join(output_dir, f'Illumio_Traffic_Report_{ts_str}.pdf')
-                export_report_pdf(
-                    title="Traffic Flow Report",
-                    output_path=pdf_path,
-                    module_results=result.module_results or {},
-                    metadata={
-                        "generated_at": result.generated_at.isoformat(),
-                        "record_count": result.record_count,
-                        "start_date": result.date_range[0] if result.date_range else "",
-                        "end_date": result.date_range[1] if len(result.date_range) > 1 else "",
-                    },
-                    lang=lang,
-                )
-                paths.append(pdf_path)
-                print(t("rpt_pdf_saved", path=pdf_path, lang=lang, default=f"PDF saved: {pdf_path}"))
-            except Exception as exc:
-                logger.error('PDF export failed: {}', exc, exc_info=True)
-                self.last_export_errors['pdf'] = str(exc) or exc.__class__.__name__
 
         if fmt in ('xlsx', 'all'):
             try:

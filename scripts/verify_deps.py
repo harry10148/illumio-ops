@@ -45,7 +45,6 @@ PRODUCTION = [
     Pkg("flask-login", "flask_login"),
     # Phase 5
     Pkg("openpyxl", "openpyxl"),
-    Pkg("reportlab", "reportlab"),
     Pkg("matplotlib", "matplotlib"),
     Pkg("plotly", "plotly"),
     Pkg("pygments", "pygments"),
@@ -135,7 +134,7 @@ def main() -> int:
     parser.add_argument(
         "--offline-bundle",
         action="store_true",
-        help="Verify offline bundle: same production package set (ReportLab ships pure-Python).",
+        help="Verify offline bundle: same production package set.",
     )
     args = parser.parse_args()
 

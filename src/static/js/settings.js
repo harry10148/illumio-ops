@@ -3,6 +3,23 @@ let _settings = {};
 let _security = {};
 let _alertPlugins = {};
 
+// Format day count as humanized "N days (about Yy Mm)" / "N days (about M months)".
+// Negative / null returns empty string. Falls back to short form for short ranges.
+function humanizeDays(n) {
+  if (n == null || n < 0) return '';
+  if (n < 60) {
+    const months = Math.max(1, Math.round(n / 30));
+    const label = _t('gui_tls_days_label_months').replace('{m}', months);
+    return _t('gui_tls_days_humanized').replace('{n}', n).replace('{label}', label);
+  }
+  const years = Math.floor(n / 365);
+  const months = Math.round((n % 365) / 30);
+  const label = years >= 1
+    ? _t('gui_tls_days_label_years').replace('{y}', years).replace('{m}', months)
+    : _t('gui_tls_days_label_months').replace('{m}', months);
+  return _t('gui_tls_days_humanized').replace('{n}', n).replace('{label}', label);
+}
+
 function _pluginInputId(pluginName, key) {
   return `s-plugin-${pluginName}-${String(key).replace(/[^a-zA-Z0-9]+/g, '-')}`;
 }
@@ -218,8 +235,8 @@ async function loadSettings() {
   ${activePceId ? `<p style="margin-top:8px;color:var(--dim);font-size:0.85em">⚡ <span data-i18n="gui_pce_active">Active PCE</span>: <strong>${escapeHtml((profiles.find(p=>p.id===activePceId)||{}).name||'')}</strong> — <span data-i18n="gui_pce_save_profile" style="font-style:italic">Saving settings will update this profile.</span></p>` : ''}
 </fieldset>
 <fieldset><legend data-i18n="gui_api_conn">API Connection</legend>
-  <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${a.url || ''}"></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${a.org_id || ''}"></div></div>
-  <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${a.key || ''}"></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${a.secret || ''}"></div></div>
+  <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${a.url || ''}"><small class="form-text text-muted" data-i18n="gui_url_help"></small></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${a.org_id || ''}"><small class="form-text text-muted" data-i18n="gui_org_id_help"></small></div></div>
+  <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${a.key || ''}"><small class="form-text text-muted" data-i18n="gui_api_key_help"></small></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${a.secret || ''}"><small class="form-text text-muted" data-i18n="gui_api_secret_help"></small></div></div>
   <div class="chk"><label><input type="checkbox" id="s-ssl" ${a.verify_ssl ? 'checked' : ''}> <span data-i18n="gui_verify_ssl">Verify SSL</span></label></div>
 </fieldset>
 <fieldset><legend data-i18n="gui_alert_channels">Alert Channels</legend>
@@ -299,9 +316,47 @@ async function loadSettings() {
     <div class="chk" style="margin-bottom:10px"><label><input type="checkbox" id="s-tls-selfsigned" ${_tlsStatus.self_signed ? 'checked' : ''} onchange="toggleTlsMode()"> <span data-i18n="gui_tls_self_signed">Use self-signed certificate</span></label></div>
     <div id="s-tls-custom" style="display:${_tlsStatus.self_signed ? 'none' : 'block'}">
       <div class="form-row">
-        <div class="form-group"><label data-i18n="gui_tls_cert_file">Certificate File Path</label><input id="s-tls-cert" value="${escapeHtml(_tlsStatus.cert_file || '')}" placeholder="/path/to/cert.pem"></div>
-        <div class="form-group"><label data-i18n="gui_tls_key_file">Private Key File Path</label><input id="s-tls-key" value="${escapeHtml(_tlsStatus.key_file || '')}" placeholder="/path/to/key.pem"></div>
+        <div class="form-group"><label data-i18n="gui_tls_cert_file">Certificate File Path</label><input id="s-tls-cert" value="${escapeHtml(_tlsStatus.cert_file || '')}" placeholder="/path/to/cert.pem"><small class="form-text text-muted" data-i18n="gui_tls_cert_file_help"></small></div>
+        <div class="form-group"><label data-i18n="gui_tls_key_file">Private Key File Path</label><input id="s-tls-key" value="${escapeHtml(_tlsStatus.key_file || '')}" placeholder="/path/to/key.pem"><small class="form-text text-muted" data-i18n="gui_tls_key_file_help"></small></div>
       </div>
+      <details id="s-tls-csr-panel" style="margin-top:12px;border:1px solid var(--border);border-radius:6px;padding:0">
+        <summary style="cursor:pointer;padding:10px 14px;font-weight:600;user-select:none" data-i18n="gui_tls_csr_title">Generate CSR (Certificate Signing Request)</summary>
+        <div style="padding:12px 14px 14px">
+          <p style="font-size:0.85em;color:var(--dim);margin:0 0 10px" data-i18n="gui_tls_csr_hint">Generate a private key and CSR. Send the CSR to your CA; then import the signed certificate below.</p>
+          <div class="form-row">
+            <div class="form-group"><label data-i18n="gui_tls_csr_cn">Common Name (CN) *</label><input id="s-csr-cn" placeholder="pce.example.com"></div>
+            <div class="form-group"><label data-i18n="gui_tls_csr_o">Organization (O)</label><input id="s-csr-o" placeholder="Example Corp"></div>
+            <div class="form-group" style="flex:0 0 80px"><label data-i18n="gui_tls_csr_c">Country (C)</label><input id="s-csr-c" placeholder="TW" maxlength="2"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label data-i18n="gui_tls_csr_san_dns">SAN DNS (comma-separated)</label><input id="s-csr-san-dns" placeholder="pce.example.com, pce2.example.com"></div>
+            <div class="form-group"><label data-i18n="gui_tls_csr_san_ip">SAN IP (comma-separated)</label><input id="s-csr-san-ip" placeholder="192.168.1.10, 10.0.0.5"></div>
+          </div>
+          <div class="form-row" style="align-items:flex-end;gap:8px">
+            <div class="form-group" style="flex:0 0 auto">
+              <label data-i18n="gui_tls_csr_key_alg">Key Algorithm</label>
+              <select id="s-csr-alg"><option value="rsa-2048">RSA-2048</option><option value="ecdsa-p256">ECDSA P-256</option></select>
+            </div>
+            <button class="btn btn-primary" style="margin-bottom:4px" onclick="generateCsr()" data-i18n="gui_tls_csr_generate">Generate CSR</button>
+          </div>
+          <div id="s-csr-result" style="display:none;margin-top:10px">
+            <label style="font-weight:600;font-size:0.88em" data-i18n="gui_tls_csr_pem_label">CSR (send to your CA)</label>
+            <textarea id="s-csr-pem" readonly rows="8" style="font-family:monospace;font-size:0.78em;width:100%;margin-top:4px;resize:vertical"></textarea>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <button class="btn btn-sm" onclick="copyCsr()" data-i18n="gui_tls_csr_copy">Copy</button>
+              <button class="btn btn-sm" onclick="downloadCsr()" data-i18n="gui_tls_csr_download">Download .csr</button>
+            </div>
+          </div>
+        </div>
+      </details>
+      <details id="s-tls-import-panel" style="margin-top:8px;border:1px solid var(--border);border-radius:6px;padding:0">
+        <summary style="cursor:pointer;padding:10px 14px;font-weight:600;user-select:none" data-i18n="gui_tls_import_title">Import CA-signed Certificate</summary>
+        <div style="padding:12px 14px 14px">
+          <p style="font-size:0.85em;color:var(--dim);margin:0 0 10px" data-i18n="gui_tls_import_hint">Paste the PEM certificate signed by your CA. The configuration will be updated automatically.</p>
+          <textarea id="s-import-cert-pem" rows="8" style="font-family:monospace;font-size:0.78em;width:100%;resize:vertical" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"></textarea>
+          <button class="btn btn-primary" style="margin-top:8px" onclick="importSignedCert()" data-i18n="gui_tls_import_btn">Import Certificate</button>
+        </div>
+      </details>
     </div>
     <div id="s-tls-auto-renew-row" style="display:${_tlsStatus.self_signed ? 'block' : 'none'};margin-top:6px;">
       <div class="chk" style="margin-bottom:6px"><label><input type="checkbox" id="s-tls-auto-renew" ${_tlsStatus.auto_renew !== false ? 'checked' : ''}> <span data-i18n="gui_tls_auto_renew">Auto-renew on startup before expiry</span></label></div>
@@ -324,6 +379,7 @@ async function loadSettings() {
   <p style="color:var(--dim); font-size:0.85em; margin-bottom:12px;" data-i18n="gui_leave_blank_pass">Leave password blank to keep current password.</p>
   <div class="form-row">
     <div class="form-group"><label data-i18n="gui_new_password">New Password</label><input id="s-sec-newpass" type="password"></div>
+    <div class="form-group"><label data-i18n="gui_new_password_confirm">Confirm New Password</label><input id="s-sec-newpass-confirm" type="password"></div>
   </div>
 </fieldset>`;
   // Auto-detect browser timezone and pre-select if currently set to 'local'
@@ -373,7 +429,7 @@ function _renderTlsCertInfo() {
   // Show days-remaining row when openssl was able to read expiry; omit
   // otherwise so we don't show a misleading "0" for missing info.
   const daysRow = (typeof days === 'number')
-    ? `<div><strong data-i18n="gui_tls_days_remaining">Days Remaining</strong>: ${days}</div>`
+    ? `<div><strong data-i18n="gui_tls_days_remaining">Days Remaining</strong>: ${humanizeDays(days)}</div>`
     : '';
   const renewBtn = _tlsStatus.self_signed
     ? `<button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="renewTlsCert()" data-i18n="gui_tls_renew">Renew Now</button>`
@@ -407,7 +463,78 @@ async function renewTlsCert() {
   }
 }
 
+async function generateCsr() {
+  const cn = $('s-csr-cn')?.value.trim();
+  if (!cn) { toast(_t('gui_tls_csr_cn_required'), 'err'); return; }
+  try {
+    const r = await post('/api/tls/generate-csr', {
+      cn,
+      o: $('s-csr-o')?.value.trim() || '',
+      c: $('s-csr-c')?.value.trim() || '',
+      san_dns: $('s-csr-san-dns')?.value.trim() || '',
+      san_ip: $('s-csr-san-ip')?.value.trim() || '',
+      key_algorithm: $('s-csr-alg')?.value || 'rsa-2048',
+    });
+    if (!r?.ok) { toast(r?.error || _t('gui_err_generic'), 'err'); return; }
+    const pem = $('s-csr-pem');
+    if (pem) pem.value = r.csr_pem;
+    const result = $('s-csr-result');
+    if (result) result.style.display = 'block';
+    const importPanel = $('s-tls-import-panel');
+    if (importPanel) importPanel.setAttribute('open', '');
+    toast(_t('gui_tls_csr_generated'));
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+function copyCsr() {
+  const pem = $('s-csr-pem');
+  if (!pem?.value) return;
+  navigator.clipboard.writeText(pem.value).then(() => toast(_t('gui_tls_csr_copied')));
+}
+
+function downloadCsr() {
+  const pem = $('s-csr-pem');
+  if (!pem?.value) return;
+  const cn = ($('s-csr-cn')?.value.trim() || 'server').replace(/[^a-zA-Z0-9._-]/g, '_');
+  const blob = new Blob([pem.value], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${cn}.csr`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function importSignedCert() {
+  const certPem = $('s-import-cert-pem')?.value.trim();
+  if (!certPem) { toast(_t('gui_tls_import_pem_required'), 'err'); return; }
+  try {
+    const r = await post('/api/tls/import-cert', { cert_pem: certPem });
+    if (!r?.ok) { toast(r?.error || _t('gui_err_generic'), 'err'); return; }
+    toast(r.message || _t('gui_tls_import_ok'));
+    if (r.cert_file && $('s-tls-cert')) $('s-tls-cert').value = r.cert_file;
+    if (r.key_file && $('s-tls-key')) $('s-tls-key').value = r.key_file;
+    if (r.cert_info) {
+      _tlsStatus.cert_info = r.cert_info;
+      _tlsStatus.self_signed = false;
+      _renderTlsCertInfo();
+    }
+    $('s-import-cert-pem').value = '';
+    $('s-tls-import-panel').removeAttribute('open');
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
 async function saveSettings() {
+  // Client-side guard: confirm new password matches before submitting
+  const _newPw = document.getElementById('s-sec-newpass')?.value || '';
+  const _newPwConfirm = document.getElementById('s-sec-newpass-confirm')?.value || '';
+  if (_newPw && _newPw !== _newPwConfirm) {
+    toast(_t('gui_password_mismatch'), 'err');
+    return;
+  }
   const pluginConfig = _collectAlertPluginConfig();
   const theme = rv('s-theme');
   const lang = rv('s-lang');
@@ -447,8 +574,10 @@ async function saveSettings() {
     auto_renew_days: autoRenewDays,
   });
 
-  // Clear password field after save
+  // Clear password fields after save
   $('s-sec-newpass').value = '';
+  const _confirmEl = $('s-sec-newpass-confirm');
+  if (_confirmEl) _confirmEl.value = '';
   await loadTranslations();
   if (typeof renderQtPage === 'function') renderQtPage();
   if (typeof renderQwPage === 'function') renderQwPage();

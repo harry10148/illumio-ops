@@ -21,6 +21,8 @@ from src.gui._helpers import (
     _ROOT_DIR,
     _SELF_SIGNED_VALIDITY_DAYS,
     _generate_self_signed_cert,
+    _generate_csr,
+    _import_signed_cert,
     _get_cert_info,
     _cert_days_remaining,
 )
@@ -264,6 +266,65 @@ def make_config_blueprint(
             })
         except RuntimeError as e:
             return _err_with_log("cert_renew", e, lang=lang)
+
+    @bp.route('/api/tls/generate-csr', methods=['POST'])
+    @limiter.limit("20 per hour")
+    @login_required
+    def api_tls_generate_csr():
+        cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en')
+        d = request.json or {}
+        cn = str(d.get('cn', '')).strip()
+        if not cn:
+            return jsonify({"ok": False, "error": "CN (Common Name) is required"}), 400
+        cert_dir = os.path.join(_ROOT_DIR, "config", "tls")
+        san_dns = [s.strip() for s in str(d.get('san_dns', '')).split(',') if s.strip()]
+        san_ip = [s.strip() for s in str(d.get('san_ip', '')).split(',') if s.strip()]
+        try:
+            csr_pem, key_path = _generate_csr(
+                cert_dir,
+                cn=cn,
+                o=str(d.get('o', '')).strip(),
+                ou=str(d.get('ou', '')).strip(),
+                c=str(d.get('c', '')).strip(),
+                san_dns=san_dns,
+                san_ip=san_ip,
+                key_algorithm=str(d.get('key_algorithm', 'rsa-2048')),
+            )
+            return jsonify({"ok": True, "csr_pem": csr_pem, "key_path": key_path})
+        except Exception as e:
+            return _err_with_log("csr_generate", e, lang=lang)
+
+    @bp.route('/api/tls/import-cert', methods=['POST'])
+    @limiter.limit("20 per hour")
+    @login_required
+    def api_tls_import_cert():
+        cm.load()
+        lang = cm.config.get('settings', {}).get('language', 'en')
+        d = request.json or {}
+        cert_pem = str(d.get('cert_pem', '')).strip()
+        if not cert_pem:
+            return jsonify({"ok": False, "error": "cert_pem is required"}), 400
+        cert_dir = os.path.join(_ROOT_DIR, "config", "tls")
+        try:
+            cert_info = _import_signed_cert(cert_dir, cert_pem)
+            gui_cfg = cm.config.setdefault("web_gui", {})
+            tls = gui_cfg.setdefault("tls", {})
+            tls["self_signed"] = False
+            tls["cert_file"] = os.path.join(cert_dir, "ca_signed.pem")
+            tls["key_file"] = os.path.join(cert_dir, "csr_key.pem")
+            cm.save()
+            return jsonify({
+                "ok": True,
+                "cert_info": cert_info,
+                "cert_file": tls["cert_file"],
+                "key_file": tls["key_file"],
+                "message": t("gui_tls_saved_restart_hint", lang=lang),
+            })
+        except ValueError as e:
+            return jsonify({"ok": False, "error": str(e)}), 400
+        except Exception as e:
+            return _err_with_log("cert_import", e, lang=lang)
 
     # ── API: PCE Profiles ──────────────────────────────────────────────────────
 

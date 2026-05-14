@@ -53,6 +53,28 @@ def _prompt(name, current, cast=str):
 
 
 def _edit_core_settings(cm):
+    print()
+    print("  Cache Settings")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print("  enabled         : Enable/disable all PCE data ingestion.")
+    print("  db_path         : SQLite database file path. Change requires restart.")
+    print()
+    print("  Retention (days)")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print("  events_retention_days        : Audit event records kept locally.")
+    print("  traffic_raw_retention_days   : Per-flow traffic records (SIEM source).")
+    print("  traffic_agg_retention_days   : Daily aggregated traffic (reports/charts).")
+    print()
+    print("  Polling Intervals (seconds)")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print("  events_poll_interval_seconds  : How often to fetch new audit events.")
+    print("                                  Lower = faster alerts, higher PCE load.")
+    print("  traffic_poll_interval_seconds : How often to fetch new traffic flows.")
+    print("  rate_limit_per_minute         : Max PCE API calls/min. Recommended: 60-120.")
+    print("  async_threshold_events        : Auto-switch to async bulk export above")
+    print("                                  this many events per poll.")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print()
     c = cm.models.pce_cache.model_dump(mode="json")
     c["enabled"] = _prompt("enabled", c["enabled"], bool)
     c["db_path"] = _prompt("db_path", c["db_path"])
@@ -67,6 +89,18 @@ def _edit_core_settings(cm):
 
 
 def _edit_traffic_filter(cm):
+    print()
+    print("  Traffic Filter")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print("  actions           : Flow policy decisions to ingest (allowed/blocked/")
+    print("                      potentially_blocked). Comma-separated.")
+    print("  protocols         : Protocols to ingest (tcp/udp/icmp or numbers).")
+    print("  workload_label_env: Only ingest flows where src/dst Workload has this")
+    print("                      environment Label. Leave blank for all.")
+    print("  exclude_src_ips   : Source IPs/CIDRs to exclude. Comma-separated.")
+    print("  ports             : Destination ports to ingest. Leave blank for all.")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print()
     c = cm.models.pce_cache.model_dump(mode="json")
     tf = c.setdefault("traffic_filter", {})
     for key in ("actions", "protocols", "workload_label_env", "exclude_src_ips"):
@@ -85,6 +119,20 @@ def _edit_traffic_filter(cm):
 
 
 def _edit_traffic_sampling(cm):
+    print()
+    print("  Traffic Sampling")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print("  sample_ratio_allowed")
+    print("    1 = keep every Allowed flow (no sampling).")
+    print("    N = keep 1 in every N Allowed flows (e.g. 10 = 10% sample).")
+    print("    Blocked / Potentially Blocked flows are always kept in full.")
+    print("    Sampling is deterministic — the same flow is always in or out.")
+    print()
+    print("  max_rows_per_batch")
+    print("    Max traffic flow records fetched from the PCE per ingest cycle.")
+    print("    Reduce if the PCE API times out or memory usage is too high.")
+    print("  ─────────────────────────────────────────────────────────────────")
+    print()
     c = cm.models.pce_cache.model_dump(mode="json")
     ts = c.setdefault("traffic_sampling", {})
     ts["sample_ratio_allowed"] = _prompt("sample_ratio_allowed", ts.get("sample_ratio_allowed", 1), int)

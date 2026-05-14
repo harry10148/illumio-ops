@@ -221,12 +221,6 @@ def report_group() -> None:
 @click.pass_context
 def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool, traffic_report_profile: str) -> None:
     """Generate Traffic Flow Report."""
-    if ctx.info_name in ("traffic", "audit", "ven-status", "policy-usage"):
-        from src.cli._output import echo_warning
-        echo_warning(
-            ctx,
-            f"'report {ctx.info_name}' is deprecated; use 'report generate-{ctx.info_name}' instead. Both forms work today.",
-        )
     try:
         paths = generate_traffic_report(
             source=source,
@@ -266,12 +260,6 @@ def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_
 @click.pass_context
 def report_audit(ctx: click.Context, start_date: str | None, end_date: str | None, fmt: str, output_dir) -> None:
     """Generate Audit Report."""
-    if ctx.info_name in ("traffic", "audit", "ven-status", "policy-usage"):
-        from src.cli._output import echo_warning
-        echo_warning(
-            ctx,
-            f"'report {ctx.info_name}' is deprecated; use 'report generate-{ctx.info_name}' instead. Both forms work today.",
-        )
     try:
         paths = generate_audit_report(
             start_date=start_date,
@@ -307,12 +295,6 @@ def report_audit(ctx: click.Context, start_date: str | None, end_date: str | Non
 @click.pass_context
 def report_ven_status(ctx: click.Context, fmt: str, output_dir) -> None:
     """Generate VEN Status Report."""
-    if ctx.info_name in ("traffic", "audit", "ven-status", "policy-usage"):
-        from src.cli._output import echo_warning
-        echo_warning(
-            ctx,
-            f"'report {ctx.info_name}' is deprecated; use 'report generate-{ctx.info_name}' instead. Both forms work today.",
-        )
     try:
         paths = generate_ven_status_report(fmt=fmt, output_dir=output_dir)
     except click.ClickException as exc:
@@ -355,12 +337,6 @@ def report_policy_usage(
     output_dir,
 ) -> None:
     """Generate Policy Usage Report."""
-    if ctx.info_name in ("traffic", "audit", "ven-status", "policy-usage"):
-        from src.cli._output import echo_warning
-        echo_warning(
-            ctx,
-            f"'report {ctx.info_name}' is deprecated; use 'report generate-{ctx.info_name}' instead. Both forms work today.",
-        )
     try:
         paths = generate_policy_usage_report(
             source=source,
@@ -392,8 +368,22 @@ def report_policy_usage(
     _emit_paths(ctx, paths, fmt)
 
 
-# Verb-prefixed aliases (Track C b2). Both bare-noun and verb forms work.
-report_group.add_command(report_traffic, name="generate-traffic")
-report_group.add_command(report_audit, name="generate-audit")
-report_group.add_command(report_ven_status, name="generate-ven-status")
-report_group.add_command(report_policy_usage, name="generate-policy-usage")
+# Verb-prefixed aliases (Track C b2). Canonical names are the short forms
+# (traffic / audit / ven-status / policy-usage); generate-* are aliases kept
+# for backwards compatibility. The alias short_help is annotated so
+# `report --help` makes the relationship visible.
+import copy as _copy
+
+
+def _alias(cmd, canonical_name):
+    """Return a shallow copy of cmd whose short_help is annotated as an alias."""
+    alias_cmd = _copy.copy(cmd)
+    base_short = (cmd.short_help or cmd.help or '').splitlines()[0].strip()
+    alias_cmd.short_help = f"(alias of {canonical_name}) {base_short}"
+    return alias_cmd
+
+
+report_group.add_command(_alias(report_traffic,      "traffic"),      name="generate-traffic")
+report_group.add_command(_alias(report_audit,        "audit"),        name="generate-audit")
+report_group.add_command(_alias(report_ven_status,   "ven-status"),   name="generate-ven-status")
+report_group.add_command(_alias(report_policy_usage, "policy-usage"), name="generate-policy-usage")

@@ -39,8 +39,15 @@ def _synthetic_event() -> dict:
 
 def _build_formatter(fmt: str):
     from src.siem.formatters.cef import CEFFormatter
-    from src.siem.formatters.json_line import JSONLineFormatter
-    return CEFFormatter() if fmt.startswith("cef") else JSONLineFormatter()
+    from src.siem.formatters.normalized_json import NormalizedJSONFormatter
+    from src.siem.formatters.syslog_wrapped import SyslogWrappedFormatter
+    if fmt == "cef":
+        return CEFFormatter()
+    if fmt == "syslog_cef":
+        return SyslogWrappedFormatter(CEFFormatter())
+    if fmt == "syslog_json":
+        return SyslogWrappedFormatter(NormalizedJSONFormatter())
+    return NormalizedJSONFormatter()  # json and anything else
 
 
 def _build_transport(dest_cfg: SiemDestinationSettings):
@@ -51,19 +58,15 @@ def _build_transport(dest_cfg: SiemDestinationSettings):
     from src.siem.transports.splunk_hec import SplunkHECTransport
 
     t = dest_cfg.transport.lower()
+    host = dest_cfg.host
+    port = dest_cfg.port
     if t == "hec":
+        url = f"https://{host}:{port}"
         return SplunkHECTransport(
-            dest_cfg.endpoint,
+            url,
             token=dest_cfg.hec_token or "",
             verify_tls=dest_cfg.tls_verify,
         )
-
-    # For syslog transports, parse host:port from endpoint
-    host, _, port_str = dest_cfg.endpoint.rpartition(":")
-    port = int(port_str) if port_str.isdigit() else 514
-    if not host:
-        host = dest_cfg.endpoint
-
     if t == "udp":
         return SyslogUDPTransport(host, port)
     if t == "tcp":

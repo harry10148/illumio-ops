@@ -522,7 +522,7 @@ function renderQwPage() {
     const isManaged = w.managed === true;
     const accelLabel = escapeHtml((w.hostname || w.name || href).replace(/'/g, "\\'"));
     const accelBtn = isManaged
-      ? `<button class="btn btn-secondary btn-sm" style="margin-left:6px;" onclick="accelerateOne('${href}','${accelLabel}')">${_t('gui_btn_accelerate')}</button>`
+      ? `<button class="btn btn-secondary btn-sm" style="margin-left:6px;" title="${_t('gui_btn_accelerate_tip')}" onclick="accelerateOne('${href}','${accelLabel}')">${_t('gui_btn_accelerate')}</button>`
       : `<button class="btn btn-secondary btn-sm" style="margin-left:6px;" disabled title="${_t('gui_accel_unmanaged_tip')}">${_t('gui_btn_accelerate')}</button>`;
 
     html += `<tr>

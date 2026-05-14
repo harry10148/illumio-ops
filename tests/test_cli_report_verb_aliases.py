@@ -31,17 +31,16 @@ def test_generate_policy_usage_alias_exists():
     assert result.exit_code == 0
 
 
-def test_bare_noun_emits_deprecation_warning():
-    """Calling 'report traffic' should emit a deprecation hint to stderr.
+def test_bare_noun_does_not_emit_deprecation():
+    """Calling 'report traffic' (canonical form) should NOT emit a deprecation hint.
 
-    We mock generate_traffic_report so the command body returns immediately;
-    we only care that the deprecation hook fires before the body runs.
-    CliRunner mixes stderr into output by default, so result.output contains both.
+    The short forms (traffic / audit / ven-status / policy-usage) are the
+    canonical names matching the WebUI button labels; generate-* are aliases.
     """
     runner = CliRunner()
     with patch("src.cli.report.generate_traffic_report", return_value=[]):
         result = runner.invoke(report_group, ['traffic'])
-    assert 'deprecated' in result.output.lower() or 'generate-traffic' in result.output.lower()
+    assert 'deprecated' not in result.output.lower()
 
 
 def test_verb_form_does_not_emit_deprecation():

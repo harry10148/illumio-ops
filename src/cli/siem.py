@@ -70,7 +70,14 @@ def siem_test(ctx: click.Context, destination: str):
 @siem_group.command("status")
 @click.pass_context
 def siem_status(ctx: click.Context):
-    """Show per-destination dispatch counts."""
+    """Show per-destination dispatch counts.
+
+    The destination set is the union of (a) configured destinations from
+    ``cm.models.siem.destinations`` and (b) destinations observed in the
+    ``SiemDispatch`` table. This matches what the WebUI integrations tab
+    shows, which merges ``/api/siem/destinations`` with ``/api/siem/status``
+    on the client side — see UX_Review §11.2.
+    """
     try:
         from sqlalchemy import create_engine, func, select
         from sqlalchemy.orm import sessionmaker
@@ -79,15 +86,29 @@ def siem_status(ctx: click.Context):
         from src.pce_cache.schema import init_schema
         cm = ConfigManager()
         cfg = cm.models.pce_cache
+        # Seed with configured destinations so they appear even with zero
+        # dispatch rows, mirroring the WebUI's merged view.
+        try:
+            configured_names = [d.name for d in cm.models.siem.destinations]
+        except Exception:
+            configured_names = []
         engine = create_engine(f"sqlite:///{cfg.db_path}")
         init_schema(engine)
         sf = sessionmaker(engine)
         rows = []
         with sf() as s:
-            dests_q = s.execute(
+            db_dests = s.execute(
                 select(SiemDispatch.destination).distinct()
             ).scalars().all()
-            for dest in dests_q:
+            # Preserve config order, then append any DB-only destinations.
+            seen = set()
+            merged: list[str] = []
+            for name in list(configured_names) + list(db_dests):
+                if name in seen:
+                    continue
+                seen.add(name)
+                merged.append(name)
+            for dest in merged:
                 counts = {}
                 for st in ["pending", "sent", "failed"]:
                     cnt = s.execute(
@@ -110,26 +131,55 @@ def siem_status(ctx: click.Context):
         if is_json(ctx):
             echo_json(ctx, rows)
             return
-        table = Table(title="SIEM Dispatch Status")
-        table.add_column("Destination")
-        table.add_column("Pending", justify="right")
-        table.add_column("Sent", justify="right")
-        table.add_column("Failed", justify="right")
-        table.add_column("DLQ", justify="right")
-        for r in rows:
-            table.add_row(r["destination"], str(r["pending"]), str(r["sent"]),
-                          str(r["failed"]), str(r["dlq"]))
-        console.print(table)
+        if not rows:
+            if not is_quiet(ctx):
+                console.print(f"[dim]{t('cli_siem_no_records')}[/dim]")
+            return
+        _render_status_table(rows)
     except OperationalError:
         # SIEM cache db not initialized — first-run / pre-collect path.
-        # Exit 0: nothing to report, not an error.
+        # Still surface configured destinations with zero counts so the CLI
+        # agrees with the WebUI's configured-destinations view.
+        try:
+            from src.config import ConfigManager
+            cm = ConfigManager()
+            configured_names = [d.name for d in cm.models.siem.destinations]
+        except Exception:
+            configured_names = []
+        rows = [
+            {"destination": n, "pending": 0, "sent": 0, "failed": 0, "dlq": 0}
+            for n in configured_names
+        ]
         if is_json(ctx):
-            echo_json(ctx, [])
-        elif not is_quiet(ctx):
-            console.print(f"[dim]{t('cli_siem_no_records')}[/dim]")
+            echo_json(ctx, rows)
+            return
+        if not rows:
+            if not is_quiet(ctx):
+                console.print(f"[dim]{t('cli_siem_no_records')}[/dim]")
+            return
+        _render_status_table(rows)
     except Exception as exc:
         echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
+
+
+def _render_status_table(rows: list[dict]) -> None:
+    """Render the SIEM dispatch-status table for ``rows`` to the console.
+
+    Shared by the success branch and the OperationalError fallback so the two
+    paths cannot drift apart (e.g. dropping the empty-state hint as fixed in
+    follow-up to d217646).
+    """
+    table = Table(title="SIEM Dispatch Status")
+    table.add_column("Destination")
+    table.add_column("Pending", justify="right")
+    table.add_column("Sent", justify="right")
+    table.add_column("Failed", justify="right")
+    table.add_column("DLQ", justify="right")
+    for r in rows:
+        table.add_row(r["destination"], str(r["pending"]), str(r["sent"]),
+                      str(r["failed"]), str(r["dlq"]))
+    console.print(table)
 
 
 @siem_group.command("replay")

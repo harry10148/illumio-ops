@@ -700,6 +700,15 @@ function _hideGenProgress(success, msg) {
 /* ─── Report Generation Modal ──────────────────────────────────────── */
 let _genReportType = null;
 
+// Set the m-gen-lang <select> to the current UI language.
+function syncReportLangToUi() {
+  const el = document.getElementById('m-gen-lang');
+  if (!el) return;
+  // window._uiLang is set in dashboard.js from /api/status; fallback to 'en'.
+  const uiLang = window._uiLang === 'zh_TW' ? 'zh_TW' : 'en';
+  el.value = uiLang;
+}
+
 function openReportGenModal(type) {
   _genReportType = type;
   const meta = {
@@ -745,6 +754,7 @@ function openReportGenModal(type) {
     if (!$('m-gen-end').value)   $('m-gen-end').value   = fmt(now);
   }
   $('m-gen-report').classList.add('show');
+  syncReportLangToUi();
 }
 
 function toggleTrafficSource() {
@@ -1137,6 +1147,7 @@ async function loadDashboard() {
   try {
     const d = await api('/api/status');
     if (d) {
+      window._uiLang = (d.language === 'zh_TW') ? 'zh_TW' : 'en';
       const _urlEl = $('hdr-meta-url');
       if (_urlEl && d.api_url) _urlEl.textContent = d.api_url;
       const _badge = $('hdr-meta');
@@ -1763,6 +1774,9 @@ async function loadDashboardCharts() {
       const el = document.getElementById(`chart-${id.replace(/_/g, '-')}`);
       if (el && typeof Plotly !== 'undefined') {
         Plotly.react(el, fig.data, fig.layout, { responsive: true });
+        el.style.display = '';
+        const parent = el.closest('.dashboard-charts');
+        if (parent) parent.style.display = 'grid';
       }
     } catch (_) {}
   }
