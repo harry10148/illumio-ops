@@ -1011,6 +1011,27 @@
   </div>
 
   <div class="panel" id="p-settings">
+    <!-- Sub-tab navigation (Phase 1.1) — mirrors .sub-nav-btn pattern from #p-traffic-workload -->
+    <div class="sub-nav" role="tablist" aria-label="Settings sections">
+      <button class="sub-nav-btn active" data-action="switchSettingsTab" data-args='["pce"]' id="sbtn-pce" role="tab" aria-selected="true" aria-controls="s-panel-pce">
+        <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+        <span data-i18n="gui_settings_tab_pce">PCE Connection</span>
+      </button>
+      <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["channels"]' id="sbtn-channels" role="tab" aria-selected="false" aria-controls="s-panel-channels">
+        <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+        <span data-i18n="gui_settings_tab_channels">Notification Channels</span>
+      </button>
+      <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["display"]' id="sbtn-display" role="tab" aria-selected="false" aria-controls="s-panel-display">
+        <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+        <span data-i18n="gui_settings_tab_display">Interface &amp; Reports</span>
+      </button>
+      <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["security"]' id="sbtn-security" role="tab" aria-selected="false" aria-controls="s-panel-security">
+        <svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg>
+        <span data-i18n="gui_settings_tab_security">Security</span>
+      </button>
+    </div>
+
+    <!-- API Status card stays globally visible above the sub-panels (used by all tabs) -->
     <div class="cards" style="margin-bottom:14px;">
       <div class="card">
         <div class="label" data-i18n="gui_api_status">API Status</div>
@@ -1021,9 +1042,19 @@
       <button class="btn btn-primary" data-action="testConn" data-i18n="gui_test_conn"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg> Test Connection</button>
     </div>
     <div class="log-box" id="s-log" style="height:80px;margin-bottom:14px;font-size:0.85rem;">[Ready]</div>
-    <div id="s-form"></div>
+
+    <!-- One container per sub-tab. settings.js renders into each. -->
+    <div id="settings-pce"      class="s-subpanel active"><div id="s-panel-pce"></div></div>
+    <div id="settings-channels" class="s-subpanel"><div id="s-panel-channels"></div></div>
+    <div id="settings-display"  class="s-subpanel"><div id="s-panel-display"></div></div>
+    <div id="settings-security" class="s-subpanel"><div id="s-panel-security"></div></div>
+
+    <!-- Sticky save bar — label is updated dynamically by _updateSaveButtonLabel() -->
     <div style="text-align:right;margin-top:16px;">
-      <button class="btn btn-success" data-action="saveSettings" data-i18n="gui_save_all"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Save All Settings</button>
+      <button class="btn btn-success" data-action="saveSettings">
+        <svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+        <span id="s-save-label" data-i18n="gui_save_all">Save All Settings</span>
+      </button>
     </div>
   </div>
 
