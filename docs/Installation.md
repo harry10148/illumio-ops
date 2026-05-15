@@ -22,9 +22,8 @@
 - **Source/development runtime: Python 3.10+** (3.12 recommended). If you run `python illumio-ops.py` directly from source, the active interpreter must meet this requirement.
 - **Network Access** to Illumio PCE (HTTPS, default port `8443`)
 - **Production deployment:** use `scripts/build_offline_bundle.sh` to produce a self-contained tarball with a bundled CPython 3.12 interpreter and all wheels pre-built; see [§1.2](#12-installation) for the full Linux + Windows bundle workflow. Production hosts do not use the system Python.
-- **Dependencies (pinned in `requirements.txt`):** Flask + security middleware (`flask-wtf`, `flask-limiter`, `flask-talisman`, `flask-login`, `argon2-cffi`, `cryptography`), reports + charts (`pandas`, `pyyaml`, `openpyxl`, `reportlab`, `matplotlib`, `plotly`, `pygments`), HTTP client (`requests`, `orjson`, `cachetools`), config validation (`pydantic`), scheduler + cache (`APScheduler`, `SQLAlchemy`), structured logging (`loguru`), CLI UX (`rich`, `questionary`, `click`, `humanize`), production WSGI server (`cheroot`). The offline bundle pre-builds wheels for all of these.
+- **Dependencies (pinned in `requirements.txt`):** Flask + security middleware (`flask-wtf`, `flask-limiter`, `flask-talisman`, `flask-login`, `argon2-cffi`, `cryptography`), reports + charts (`pandas`, `pyyaml`, `openpyxl`, `matplotlib`, `plotly`, `pygments`), HTTP client (`requests`, `orjson`, `cachetools`), config validation (`pydantic`), scheduler + cache (`APScheduler`, `SQLAlchemy`), structured logging (`loguru`), CLI UX (`rich`, `questionary`, `click`, `humanize`), production WSGI server (`cheroot`). The offline bundle pre-builds wheels for all of these.
 - **Development from source:** `pip install -r requirements.txt` (use a venv on Ubuntu 22.04+ / Debian 12+ due to PEP 668).
-- **PDF export:** `reportlab` is included by default (pure Python; no WeasyPrint / Pango / Cairo / GTK / GDK-PixBuf required). PDF output is a static English summary; HTML and XLSX are the recommended formats for full localized content.
 
 ## 1.2 Installation
 
@@ -33,8 +32,8 @@
 Use this method when the target host has no internet access and cannot reach PyPI
 or any package mirror. The bundle includes a portable CPython 3.12 interpreter and
 all pre-built Python wheels — no `dnf`, no `python3`, no network required on the
-target host. All report formats (HTML, XLSX, CSV, PDF) work; PDF uses pure-Python
-ReportLab and ships in the bundle.
+target host. All report formats (HTML, XLSX, CSV) work; for PDF, print the
+HTML report from a browser (the print CSS is optimized for that).
 
 ##### Build the bundle (on any internet-connected Linux or WSL machine)
 
@@ -115,7 +114,7 @@ sudo systemctl status illumio-ops
 
 NSSM (Non-Sucking Service Manager) is bundled at `deploy\nssm.exe`; the
 service installer picks it up automatically. All report formats (HTML, XLSX,
-CSV, PDF) work; PDF uses pure-Python ReportLab and ships in the bundle.
+CSV) work; for PDF, print the HTML report from a browser.
 
 ##### Build the bundle (on any internet-connected Linux or WSL machine)
 

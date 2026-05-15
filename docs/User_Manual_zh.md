@@ -152,7 +152,7 @@ python illumio-ops.py [OPTIONS]
 | `--report-type TYPE` | `traffic` | 報表類型：`traffic`、`audit`、`ven_status`、`policy_usage` |
 | `--source api\|csv` | `api` | 報表資料來源 |
 | `--file PATH` | — | CSV 檔案路徑（搭配 `--source csv` 使用） |
-| `--format html\|csv\|pdf\|xlsx\|all` | `html` | 報表輸出格式 |
+| `--format html\|csv\|xlsx\|all` | `html` | 報表輸出格式 |
 | `--email` | — | 產生報表後透過 Email 寄送 |
 | `--output-dir PATH` | `reports/` | 報表輸出目錄 |
 
@@ -312,7 +312,7 @@ illumio-ops config show --section web_gui
                         └─ 頻寬規則 ──────► metric_alerts ────► Reporter
    健康檢查        ──────► health_alerts ────────────────────► Reporter
 
-   快取 ──► 報表引擎 ──► HTML / CSV / PDF / XLSX（15 traffic + 4 audit + Policy Usage + VEN Status）
+   快取 ──► 報表引擎 ──► HTML / CSV / XLSX（15 traffic + 4 audit + Policy Usage + VEN Status）
    快取 ──► SIEM 派送器 ──► CEF / JSON / HEC out
 ```
 
@@ -578,8 +578,8 @@ sudo systemctl enable --now illumio-ops
 
 當目標主機沒有網際網路、無法存取 PyPI 或任何套件鏡像時請使用此方法。Bundle
 內建可攜式 CPython 3.12 直譯器與所有預先建置的 Python wheel — 目標主機完全
-不需要 `dnf`、`python3` 或網路。所有報表格式（HTML、XLSX、CSV、PDF）皆可使用；
-PDF 採用純 Python 的 ReportLab，已內含於 bundle。
+不需要 `dnf`、`python3` 或網路。所有報表格式（HTML、XLSX、CSV）皆可使用；
+若需 PDF，請於瀏覽器列印 HTML 報表（print CSS 已最佳化）。
 
 ##### 建置 Bundle(在任何具網路的 Linux 或 WSL 機器上)
 
@@ -657,7 +657,7 @@ sudo systemctl status illumio-ops
 #### Windows — 離線 Bundle(air-gapped 安裝)
 
 NSSM(Non-Sucking Service Manager)已內含於 `deploy\nssm.exe`,服務安裝程式會自動採用。
-所有報表格式（HTML、XLSX、CSV、PDF）皆可使用;PDF 採用純 Python 的 ReportLab,已內含於 bundle。
+所有報表格式（HTML、XLSX、CSV）皆可使用;若需 PDF,請於瀏覽器列印 HTML 報表。
 
 ##### 建置 Bundle(在任何具網路的 Linux 或 WSL 機器上)
 

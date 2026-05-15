@@ -67,7 +67,6 @@ This page is the single hub for common operational issues. Per-feature docs (Use
 | Report shows all VENs as online | Cached state is stale or PCE response missing `hours_since_last_heartbeat` | Confirm your PCE version returns `hours_since_last_heartbeat`; check the raw PCE API response for `agent.status` fields. |
 | Policy Usage report shows 0 hits | Only active (provisioned) rules are queried | Provision draft rules in the PCE Console; draft-only rules are intentionally excluded. |
 | `mod_change_impact` shows `skipped: no_previous_snapshot` | First report run, or the prior snapshot was pruned by retention | Generate a second report after the first. Snapshots persist for `report.snapshot_retention_days` days. |
-| PDF rendering: missing CJK glyphs / boxes | `reportlab` cannot find a CJK font on the host | Install a CJK font (e.g. `fonts-noto-cjk` on Debian/Ubuntu, `google-noto-cjk-fonts` on RHEL). PDFs are static English summaries by design — prefer `--format html` / `--format xlsx` for full localized content. |
 | Email not sent | SMTP `enable_auth: false` but the server requires auth, or wrong credentials | Toggle `smtp.enable_auth: true`, set `smtp.user` and either `smtp.password` or the `ILLUMIO_SMTP_PASSWORD` environment variable. Verify with **CLI Menu 1. Alert Rules → 6. Send Test Alert**. |
 | `Destination not found` on `siem test` | Destination name typo, or `enabled: false` on the destination | Confirm `siem.destinations[].name` exactly matches the CLI argument; ensure `enabled: true` on that destination. |
 

@@ -22,15 +22,14 @@
 - **原始碼/開發執行環境：Python 3.10+**（建議 3.12）。若直接以 `python illumio-ops.py` 從原始碼執行，作用中的直譯器必須符合此要求。
 - **網路存取：** 可透過 HTTPS 連線至 Illumio PCE（預設埠 `8443`）
 - **正式部署：** 使用 `scripts/build_offline_bundle.sh` 建立自包含 tarball，內建 CPython 3.12 直譯器與所有預建 wheel；完整 Linux + Windows bundle 流程請見 [§1.2](#12-安裝)。正式主機不使用系統 Python。
-- **相依套件（鎖定於 `requirements.txt`）：** Flask + 安全中介層（`flask-wtf`、`flask-limiter`、`flask-talisman`、`flask-login`、`argon2-cffi`、`cryptography`）、報表 + 圖表（`pandas`、`pyyaml`、`openpyxl`、`reportlab`、`matplotlib`、`plotly`、`pygments`）、HTTP 客戶端（`requests`、`orjson`、`cachetools`）、設定驗證（`pydantic`）、排程 + 快取（`APScheduler`、`SQLAlchemy`）、結構化日誌（`loguru`）、CLI UX（`rich`、`questionary`、`click`、`humanize`）、生產級 WSGI server（`cheroot`）。離線 bundle 已為以上全部預建 wheel。
+- **相依套件（鎖定於 `requirements.txt`）：** Flask + 安全中介層（`flask-wtf`、`flask-limiter`、`flask-talisman`、`flask-login`、`argon2-cffi`、`cryptography`）、報表 + 圖表（`pandas`、`pyyaml`、`openpyxl`、`matplotlib`、`plotly`、`pygments`）、HTTP 客戶端（`requests`、`orjson`、`cachetools`）、設定驗證（`pydantic`）、排程 + 快取（`APScheduler`、`SQLAlchemy`）、結構化日誌（`loguru`）、CLI UX（`rich`、`questionary`、`click`、`humanize`）、生產級 WSGI server（`cheroot`）。離線 bundle 已為以上全部預建 wheel。
 - **從原始碼開發：** `pip install -r requirements.txt`（Ubuntu 22.04+ / Debian 12+ 因 PEP 668 需改用 venv）。
-- **PDF 匯出：** `reportlab` 預設包含（純 Python；不需 WeasyPrint / Pango / Cairo / GTK / GDK-PixBuf）。PDF 內容為靜態英文摘要；HTML 與 XLSX 是完整本地化內容的建議格式。
 
 ## 1.2 安裝
 
 ### Linux — 離線 Bundle（air-gapped 安裝）
 
-當目標主機無法連線網際網路且無法存取 PyPI 或任何套件鏡像時，請使用此方式。Bundle 包含可攜式 CPython 3.12 直譯器及所有預建的 Python wheel — 目標主機上無需 `dnf`、`python3` 或網路連線。所有報表格式（HTML、XLSX、CSV、PDF）皆可使用；PDF 採用純 Python 的 ReportLab，已內含於 bundle。
+當目標主機無法連線網際網路且無法存取 PyPI 或任何套件鏡像時，請使用此方式。Bundle 包含可攜式 CPython 3.12 直譯器及所有預建的 Python wheel — 目標主機上無需 `dnf`、`python3` 或網路連線。所有報表格式（HTML、XLSX、CSV）皆可使用；若需 PDF，請於瀏覽器列印 HTML 報表（print CSS 已最佳化）。
 
 ##### 建置 bundle（在任何可連線網際網路的 Linux 或 WSL 機器上執行）
 
@@ -107,7 +106,7 @@ sudo systemctl status illumio-ops
 
 ### Windows — 離線 Bundle（air-gapped 安裝）
 
-NSSM（Non-Sucking Service Manager）已內含於 `deploy\nssm.exe`，服務安裝程式會自動採用。所有報表格式（HTML、XLSX、CSV、PDF）皆可使用；PDF 採用純 Python 的 ReportLab，已內含於 bundle。
+NSSM（Non-Sucking Service Manager）已內含於 `deploy\nssm.exe`，服務安裝程式會自動採用。所有報表格式（HTML、XLSX、CSV）皆可使用；若需 PDF，請於瀏覽器列印 HTML 報表。
 
 ##### 建置 bundle（在任何可連線網際網路的 Linux 或 WSL 機器上執行）
 

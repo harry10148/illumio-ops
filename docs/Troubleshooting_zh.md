@@ -67,7 +67,6 @@
 | 報表顯示所有 VEN 均為線上 | 快取狀態過時或 PCE 回應缺少 `hours_since_last_heartbeat` | 確認您的 PCE 版本有回傳 `hours_since_last_heartbeat`；檢查 PCE API 原始回應中的 `agent.status` 欄位。 |
 | Policy Usage 報表顯示 0 命中 | 僅查詢 active（已佈建）的規則 | 在 PCE Console 佈建 draft 規則；僅為 draft 的規則會被刻意排除。 |
 | `mod_change_impact` 顯示 `skipped: no_previous_snapshot` | 首次報表執行，或先前快照已被保留策略清除 | 在首次報表後再產生一次。快照保留 `report.snapshot_retention_days` 天。 |
-| PDF 渲染：缺少 CJK 字符 / 出現方塊 | `reportlab` 在主機上找不到 CJK 字型 | 安裝 CJK 字型（Debian/Ubuntu 為 `fonts-noto-cjk`，RHEL 為 `google-noto-cjk-fonts`）。PDF 設計上即為靜態英文摘要——若需完整本地化內容請優先使用 `--format html` / `--format xlsx`。 |
 | 未寄出郵件 | SMTP 設定 `enable_auth: false` 但伺服器要求驗證，或憑證錯誤 | 切換 `smtp.enable_auth: true`，設定 `smtp.user` 並使用 `smtp.password` 或 `ILLUMIO_SMTP_PASSWORD` 環境變數。以 **CLI Menu 1. Alert Rules → 6. Send Test Alert** 驗證。 |
 | `siem test` 顯示 `Destination not found` | 目的地名稱錯誤,或目的地 `enabled: false` | 確認 `siem.destinations[].name` 與 CLI 引數完全相符;確保該目的地 `enabled: true`。 |
 

@@ -152,7 +152,7 @@ python illumio-ops.py [OPTIONS]
 | `--report-type TYPE` | `traffic` | Report type: `traffic`, `audit`, `ven_status`, `policy_usage` |
 | `--source api\|csv` | `api` | Report data source |
 | `--file PATH` | — | CSV file path (used with `--source csv`) |
-| `--format html\|csv\|pdf\|xlsx\|all` | `html` | Report output format |
+| `--format html\|csv\|xlsx\|all` | `html` | Report output format |
 | `--email` | — | Send report by email after generation |
 | `--output-dir PATH` | `reports/` | Output directory for report files |
 
@@ -312,7 +312,7 @@ Three runtime flows share the same data sources but produce different outputs:
                         └─ bandwidth rules ──► metric_alerts ─► Reporter
    Health checks   ──────► health_alerts ─────────────────────► Reporter
 
-   Cache ──► Report Engine ──► HTML / CSV / PDF / XLSX (15 traffic + 4 audit + Policy Usage + VEN Status)
+   Cache ──► Report Engine ──► HTML / CSV / XLSX (15 traffic + 4 audit + Policy Usage + VEN Status)
    Cache ──► SIEM Dispatcher ──► CEF / JSON / HEC out
 ```
 
@@ -579,8 +579,8 @@ sudo systemctl enable --now illumio-ops
 Use this method when the target host has no internet access and cannot reach
 PyPI or any package mirror. The bundle includes a portable CPython 3.12
 interpreter and all pre-built Python wheels — no `dnf`, no `python3`, no
-network required on the target host. All report formats (HTML, XLSX, CSV,
-PDF) work; PDF uses pure-Python ReportLab and ships in the bundle.
+network required on the target host. All report formats (HTML, XLSX, CSV)
+work; for PDF, print the HTML report from a browser.
 
 ##### Build the bundle (on any internet-connected Linux or WSL machine)
 
@@ -661,7 +661,7 @@ sudo systemctl status illumio-ops
 
 NSSM (Non-Sucking Service Manager) is bundled at `deploy\nssm.exe`; the
 service installer picks it up automatically. All report formats (HTML, XLSX,
-CSV, PDF) work; PDF uses pure-Python ReportLab and ships in the bundle.
+CSV) work; for PDF, print the HTML report from a browser.
 
 ##### Build the bundle (on any internet-connected Linux or WSL machine)
 
