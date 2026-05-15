@@ -98,26 +98,12 @@ function ensureDashboardLayout() {
   const dashboard = $('p-dashboard');
   if (!dashboard || dashboard.dataset.layoutReady === '1') return;
 
-  const cards = dashboard.querySelectorAll('.cards .card');
-  if (cards[0]) {
-    const label = cards[0].querySelector('.label');
-    if (label) label.textContent = _t('gui_dashboard_rules');
-  }
-  if (cards[1]) {
-    const label = cards[1].querySelector('.label');
-    const value = cards[1].querySelector('.value');
-    if (label) label.textContent = _t('gui_dashboard_cooldown');
-    if (value) value.id = 'd-cooldown';
-  }
-  if (cards[2]) {
-    const label = cards[2].querySelector('.label');
-    const value = cards[2].querySelector('.value');
-    if (label) label.textContent = _t('gui_dashboard_pce_health');
-    if (value) value.id = 'd-pce-health';
-  }
-  cards.forEach((card, idx) => {
-    if (idx > 2) card.style.display = 'none';
-  });
+  // Phase 3.1 story-card redesign moved all card labels + IDs into index.html
+  // as authoritative server-rendered markup. Do NOT mutate `.cards .card`
+  // label/id pairs at runtime — that was the legacy v1 behaviour and broke
+  // story-cards by re-assigning `d-cooldown` / `d-pce-health` to the wrong
+  // stats. The remaining responsibility here is just injecting the audit
+  // summary fieldset (a sibling container that's not in the template).
 
   const cdField = $('cd-field');
   if (cdField) cdField.style.display = 'none';
@@ -143,34 +129,51 @@ async function loadDashboard() {
   try {
     const d = await api('/api/status');
     if (d) {
-      const urlEl = $('hdr-meta-url');
-      if (urlEl && d.api_url) urlEl.textContent = d.api_url;
-      const badge = $('hdr-meta');
-      if (badge) badge.title = `PCE: ${d.api_url || urlEl?.textContent}  |  v${d.version}`;
+      window._uiLang = (d.language === 'zh_TW') ? 'zh_TW' : 'en';
+      const hostEl = $('hdr-chip-host');
+      if (hostEl && d.api_url) hostEl.textContent = d.api_url;
+      const chip = $('hdr-chip');
+      if (chip) chip.title = `PCE: ${d.api_url || hostEl?.textContent}  |  v${d.version}`;
+      const dot = $('hdr-chip-dot');
+      if (dot) {
+        const polled = String((d.pce_stats || {}).event_poll_status || 'unknown').toLowerCase();
+        let status = 'unknown';
+        if (polled === 'ok') status = 'ok';
+        else if (polled === 'warn' || polled === 'degraded') status = 'warn';
+        else if (polled && polled !== 'unknown') status = 'err';
+        dot.setAttribute('data-status', status);
+      }
       const pceStats = d.pce_stats || {};
       if (d.timezone) _timezone = d.timezone;
       applyThemeMode(getStoredThemeMode());
 
-      const activeCooldowns = Array.isArray(d.cooldowns)
-        ? d.cooldowns.filter((item) => (parseInt(item.remaining_mins, 10) || 0) > 0).length
-        : 0;
+      const dispatchHistory = Array.isArray(d.dispatch_history) ? d.dispatch_history : [];
+      const latestDispatch = dispatchHistory.length ? dispatchHistory[dispatchHistory.length - 1] : null;
+      const unknownTotal = Object.values(d.unknown_events || {}).reduce((total, entry) => {
+        if (entry && typeof entry === 'object') return total + (parseInt(entry.count, 10) || 0);
+        return total + (parseInt(entry, 10) || 0);
+      }, 0);
+      const suppressedTotal = Object.values(d.throttle_state || {}).reduce((total, entry) => {
+        const cooldown = parseInt(entry.cooldown_suppressed, 10) || 0;
+        const throttle = parseInt(entry.throttle_suppressed, 10) || 0;
+        return total + cooldown + throttle;
+      }, 0);
 
-      let healthText = d.health_check ? _t('gui_state_on') : _t('gui_state_off');
-      let healthTone = d.health_check ? '' : 'warn';
-      const healthStatus = String(pceStats.health_status || '').toLowerCase();
-      if (d.health_check) {
-        if (healthStatus === 'ok') {
-          healthText = 'OK';
-          healthTone = 'ok';
-        } else if (healthStatus === 'error') {
-          healthText = 'FAIL';
-          healthTone = 'warn';
-        }
-      }
+      const eventPollStatus = String(pceStats.event_poll_status || 'unknown').toUpperCase();
+      const dispatchStatus = latestDispatch
+        ? `${String(latestDispatch.channel || 'dispatch').toUpperCase()} ${String(latestDispatch.status || 'unknown').toUpperCase()}`
+        : _t('gui_state_none');
 
+      // Phase 3.1 story-card stats — populate the 6 sub-KPI rows.
       _dashboardSetCard('d-rules', String(d.rules_count ?? 0));
-      _dashboardSetCard('d-cooldown', String(activeCooldowns), activeCooldowns > 0 ? 'warn' : 'ok');
-      _dashboardSetCard('d-pce-health', healthText, healthTone);
+      _dashboardSetCard('d-health', d.health_check ? _t('gui_state_on') : _t('gui_state_off'),
+                        d.health_check ? 'ok' : 'warn');
+      _dashboardSetCard('d-event-poll', eventPollStatus,
+                        (pceStats.event_poll_status || '').toLowerCase() === 'ok' ? 'ok' : '');
+      _dashboardSetCard('d-dispatch', dispatchStatus,
+                        latestDispatch && latestDispatch.status === 'success' ? 'ok' : '');
+      _dashboardSetCard('d-unknown', String(unknownTotal), unknownTotal > 0 ? 'warn' : 'ok');
+      _dashboardSetCard('d-suppressed', String(suppressedTotal), suppressedTotal > 0 ? 'warn' : 'ok');
     }
   } catch (e) {
     console.warn('[loadDashboard] status failed:', e);
