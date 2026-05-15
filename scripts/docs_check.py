@@ -11,7 +11,6 @@ Modes (compose freely):
                         unless --freshness is also given)
   --exclude GLOB        path-relative glob to skip (repeatable)
   --root PATH           docs root (default: ./docs)
-  --files FILE [FILE]   only check these files
   --json                emit JSON instead of human text
 
 Exit 0 on clean, non-zero on issues found.
@@ -154,7 +153,6 @@ def main(argv: list[str]) -> int:
         help="path-relative glob to skip (repeatable). Example: --exclude superpowers/** --exclude ux-review-*/**",
     )
     p.add_argument("--root", default="docs")
-    p.add_argument("--files", nargs="*", default=None)
     p.add_argument("--json", action="store_true")
     args = p.parse_args(argv)
 
