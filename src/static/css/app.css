@@ -250,7 +250,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: var(--space-3);
       flex-wrap: wrap;
       border-bottom: 1px solid var(--border);
     }
@@ -269,7 +269,7 @@
     .pce-badge {
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: var(--space-2);
       background: var(--bg3, rgba(45,69,76,.35));
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -293,7 +293,7 @@
     .event-viewer-layout {
       display: grid;
       grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr);
-      gap: 18px;
+      gap: var(--space-5);
       align-items: start;
     }
 
@@ -305,7 +305,7 @@
     .event-detail-panels {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 16px;
+      gap: var(--space-4);
     }
 
     .code-panel {
@@ -369,14 +369,14 @@
     .header-right {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: var(--space-3);
       flex-wrap: wrap;
     }
 
     .ui-pref {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: var(--space-2);
       background: var(--bg3);
       border: 1px solid var(--border);
       border-radius: 999px;
@@ -410,7 +410,7 @@
     /* Tabs */
     .tabs {
       display: flex;
-      gap: 4px;
+      gap: var(--space-1);
       background: var(--bg2);
       padding: 8px var(--space-header-x) 0;
       border-bottom: 1px solid var(--border);
@@ -430,7 +430,7 @@
       border-bottom: none;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: var(--space-2);
       font-family: var(--body-font);
     }
 
@@ -525,7 +525,7 @@
     .btn {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: var(--space-2);
       padding: var(--btn-pad-y) var(--btn-pad-x);
       border: none;
       border-radius: var(--radius);
@@ -679,13 +679,13 @@
     .form-row {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 24px;
+      gap: var(--space-6);
     }
 
     .form-row-3 {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
-      gap: 24px;
+      gap: var(--space-6);
     }
 
     /* Fieldset */
@@ -804,7 +804,7 @@
     .action-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 16px;
+      gap: var(--space-4);
       margin-bottom: var(--space-6);
     }
 
@@ -815,7 +815,7 @@
       padding: var(--space-6);
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: var(--space-3);
       transition: transform 0.2s, box-shadow 0.2s;
     }
 
@@ -831,7 +831,7 @@
       margin-bottom: var(--space-1);
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: var(--space-2);
     }
 
     .action-card h3 svg {
@@ -878,7 +878,7 @@
       list-style-type: none;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: var(--space-2);
     }
 
     .cell-popover ul li {
@@ -950,7 +950,7 @@
       margin-bottom: var(--space-5);
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: var(--space-2);
     }
 
     .modal h2 svg {
@@ -960,7 +960,7 @@
 
     .modal-actions {
       display: flex;
-      gap: 12px;
+      gap: var(--space-3);
       justify-content: flex-end;
       margin-top: var(--space-6);
       padding-top: var(--space-5);
@@ -992,7 +992,7 @@
     /* Radio group */
     .radio-group {
       display: flex;
-      gap: 16px;
+      gap: var(--space-4);
       flex-wrap: wrap;
       padding: 4px 0;
     }
@@ -1000,7 +1000,7 @@
     .radio-group label {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: var(--space-2);
       color: var(--fg);
       font-size: .9rem;
       cursor: pointer;
@@ -1017,7 +1017,7 @@
     .chk label {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: var(--space-2);
       color: var(--fg);
       font-size: .9rem;
       cursor: pointer;
@@ -1049,7 +1049,7 @@
       box-shadow: var(--shadow);
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: var(--space-3);
       max-width: 420px;
     }
 
@@ -1080,7 +1080,7 @@
     /* Quarantine Feature - SubNav & Floating Bar */
     .sub-nav {
       display: flex;
-      gap: 8px;
+      gap: var(--space-2);
       margin-bottom: var(--space-5);
       background: var(--bg2);
       padding: var(--space-1);
@@ -1101,7 +1101,7 @@
       transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: var(--space-2);
     }
 
     .sub-nav-btn:hover {
@@ -1141,7 +1141,7 @@
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
       display: flex;
       align-items: center;
-      gap: 20px;
+      gap: var(--space-5);
       z-index: 50;
       transition: bottom 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
       pointer-events: none;
@@ -1289,7 +1289,7 @@
       align-items: center;
       justify-content: center;
       flex-direction: column;
-      gap: 12px;
+      gap: var(--space-3);
       border-radius: var(--radius);
     }
     .spinner-overlay.active { display: flex; }
@@ -1307,7 +1307,7 @@
     .rules-search {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: var(--space-2);
       margin-left: var(--space-2);
       position: relative;
     }
@@ -1345,7 +1345,7 @@
     }
 
     #p-rules .toolbar {
-      gap: 12px 10px;
+      gap: var(--space-3) var(--space-3);
       margin-bottom: var(--space-4);
       padding: 4px 0 2px;
       align-items: center;
@@ -1399,7 +1399,7 @@
 
     /* Status badge pill */
     .status-badge {
-      display: inline-flex; align-items: center; gap: 4px;
+      display: inline-flex; align-items: center; gap: var(--space-1);
       font-size: .73rem; padding: 2px 8px; border-radius: 99px; font-weight: 600;
     }
     .status-badge.ok   { background: rgba(41,155,101,.15); color: var(--success); border: 1px solid rgba(41,155,101,.3); }
@@ -1417,7 +1417,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: var(--space-2);
       padding: 40px 20px;
       color: var(--dim);
       text-align: center;
