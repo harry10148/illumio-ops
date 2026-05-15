@@ -92,3 +92,60 @@ def test_exclude_skips_matching_paths(tmp_path: Path) -> None:
         "--bilingual", "--exclude", "superpowers/**", "--root", str(docs)
     )
     assert rc == 0, out
+
+
+def test_frontmatter_rejects_empty_verified_against(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    # verified_against present but value is an empty list (key only, no items)
+    body = (
+        "---\n"
+        "title: Alpha\n"
+        "last_verified: 2026-05-15\n"
+        "verified_against:\n"
+        "---\n"
+        "# Alpha\n"
+    )
+    (docs / "alpha.md").write_text(body)
+    (docs / "alpha_zh.md").write_text(body)
+    rc, out, _ = run_check("--frontmatter", "--root", str(docs))
+    assert rc != 0
+    assert "verified_against" in out and "empty" in out
+
+
+def test_frontmatter_accepts_list_verified_against(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    body = (
+        "---\n"
+        "title: Alpha\n"
+        "last_verified: 2026-05-15\n"
+        "verified_against:\n"
+        "  - src/alpha.py\n"
+        "  - src/beta.py\n"
+        "---\n"
+        "# Alpha\n"
+    )
+    (docs / "alpha.md").write_text(body)
+    (docs / "alpha_zh.md").write_text(body)
+    rc, out, _ = run_check("--frontmatter", "--root", str(docs))
+    assert rc == 0, out
+
+
+def test_links_accepts_target_in_excluded_path(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    (docs / "superpowers").mkdir(parents=True)
+    (docs / "user-guide").mkdir(parents=True)
+    # Audited source links into the excluded subtree
+    (docs / "user-guide" / "doc.md").write_text(
+        "# Doc\n\nSee [spec](../superpowers/spec.md).\n"
+    )
+    (docs / "user-guide" / "doc_zh.md").write_text("# Doc\n")
+    # Target exists on disk but is excluded from auditing
+    (docs / "superpowers" / "spec.md").write_text("# Spec\n")
+    rc, out, _ = run_check(
+        "--links", "--exclude", "superpowers/**", "--root", str(docs)
+    )
+    # Link is valid (target file exists); --exclude only suppresses auditing
+    # of the target file, not its existence as a link destination.
+    assert rc == 0, out
