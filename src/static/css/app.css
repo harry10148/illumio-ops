@@ -1604,6 +1604,17 @@
     .empty-state svg { width: 48px; height: 48px; opacity: .4; }
     .empty-state h3 { font-size: var(--text-md); font-weight: 600; color: var(--fg); opacity: .7; }
     .empty-state p { font-size: var(--text-sm); max-width: 320px; }
+    .empty-state .empty-state-action {
+      margin-top: 14px;
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    /* Variant for inline use inside <td colspan> rows */
+    td .empty-state {
+      padding: 28px 16px;
+    }
 
     @media (max-width: 960px) {
       .header h1 {

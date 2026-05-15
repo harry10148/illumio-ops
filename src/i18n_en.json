@@ -704,6 +704,8 @@
   "gui_edit_system_health_rule": "Edit System Health Rule",
   "gui_edit_traffic_rule": "Edit Connection Count Rule",
   "gui_email_smtp": "Email & SMTP",
+  "gui_empty_state_default_title": "Nothing here yet",
+  "gui_empty_state_no_data_title": "No data available",
   "gui_enable_hc": "Enable PCE Health Check",
   "gui_err_cache_missing_since": "missing since",
   "gui_err_cache_not_configured": "cache not configured: {e}",

@@ -23,7 +23,7 @@ BASELINES: dict[str, int] = {
     "kpi_cards": 0,           # all migrated to .kpi-card (Task 1)
     "status_pills": 3,        # 2 of 5 migrated in Task 2; 3 remain (uncovered/bandwidth tables)
     "filter_bar_buttons": 0,  # all 4 migrated in Task 3 (traffic + workload toolbars)
-    "empty_states": 44,       # colspan + inline style across index.html + js (measured)
+    "empty_states": 41,       # 3 of 44 migrated in Task 4 (traffic + workload + events)
     "fieldset_sections": 5,   # fieldsets with style= attribute in index.html
     "styled_tables": 15,      # <table class="rule-table" style="..."> (measured)
 }

@@ -704,6 +704,8 @@
   "gui_edit_system_health_rule": "編輯系統健康規則",
   "gui_edit_traffic_rule": "編輯連線次數規則",
   "gui_email_smtp": "Email 與 SMTP",
+  "gui_empty_state_default_title": "目前沒有資料",
+  "gui_empty_state_no_data_title": "無可用資料",
   "gui_enable_hc": "啟用 PCE 健康檢查",
   "gui_err_cache_missing_since": "缺少 since 參數",
   "gui_err_cache_not_configured": "快取尚未設定：{e}",
