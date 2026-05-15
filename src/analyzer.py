@@ -141,6 +141,16 @@ class Analyzer:
                 self.state["event_overflow"] = {}
             if not isinstance(self.state.get("unknown_events"), dict):
                 self.state["unknown_events"] = {}
+            # Startup-time purge: drop entries whose event_type is now in
+            # KNOWN_EVENT_TYPES (i.e. a previous build saw it as unknown but
+            # a catalog update has since covered it). Prevents stale findings
+            # from accumulating forever on long-running deployments.
+            unk = self.state["unknown_events"]
+            stale = [et for et in unk if is_known_event_type(et)]
+            if stale:
+                logger.info(f"Purging {len(stale)} stale unknown_events entries now covered by catalog: {stale[:5]}{'…' if len(stale) > 5 else ''}")
+                for et in stale:
+                    unk.pop(et, None)
             if not isinstance(self.state.get("event_parser_stats"), dict):
                 self.state["event_parser_stats"] = {}
             if not isinstance(self.state.get("event_parser_samples"), list):
