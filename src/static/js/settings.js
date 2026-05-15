@@ -190,14 +190,55 @@ async function loadSettings() {
   try { _alertPlugins = (await api('/api/alert-plugins')).plugins || {}; } catch (e) { _alertPlugins = {}; }
   try { _tlsStatus = await api('/api/tls/status'); } catch (e) { _tlsStatus = {}; }
 
-  const s = _settings, a = s.api || {}, e = s.email || {}, sm = s.smtp || {}, al = s.alerts || {}, st = s.settings || {}, rpt = s.report || {};
+  const s = _settings, a = s.api || {}, al = s.alerts || {}, st = s.settings || {}, rpt = s.report || {};
   const sec = _security || {};
   const active = al.active || [];
   const profiles = s.pce_profiles || [];
   const activePceId = s.active_pce_id || null;
-  const profileOptions = profiles.map(p =>
-    `<option value="${p.id}" ${p.id === activePceId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
-  ).join('');
+
+  // Render into the 4 sub-panel targets created in index.html.
+  // (Each helper returns an HTML string assembled from escapeHtml-protected
+  //  values — same XSS-surface as the pre-refactor single-string approach.)
+  const pcePanel  = $('s-panel-pce');
+  const chPanel   = $('s-panel-channels');
+  const dispPanel = $('s-panel-display');
+  const secPanel  = $('s-panel-security');
+  if (pcePanel)  pcePanel.innerHTML  = _renderPceSection(a, profiles, activePceId);
+  if (chPanel)   chPanel.innerHTML   = _renderChannelsSection(active, s);
+  if (dispPanel) dispPanel.innerHTML = _renderDisplaySection(st, rpt);
+  if (secPanel)  secPanel.innerHTML  = _renderSecuritySection(sec, _tlsStatus);
+
+  // Auto-detect browser timezone and pre-select if currently set to 'local'
+  const tzSel = $('s-timezone');
+  if (tzSel && (tzSel.value === 'local' || !tzSel.value)) {
+    const detected = _detectBrowserTimezone();
+    const opt = Array.from(tzSel.options).find(o => o.value === detected);
+    if (opt) tzSel.value = detected;
+  }
+  await loadTranslations();
+
+  // TLS toggle logic (element lives in #s-panel-security after refactor)
+  const tlsEn = $('s-tls-enabled');
+  if (tlsEn) tlsEn.addEventListener('change', () => {
+    const opts = $('s-tls-options');
+    if (opts) opts.style.display = tlsEn.checked ? 'block' : 'none';
+  });
+
+  // Render cert info if available
+  _renderTlsCertInfo();
+
+  // Mark all sub-tabs clean and wire dirty-tracking (Task 5 defines these helpers).
+  if (typeof _resetSettingsDirty === 'function') _resetSettingsDirty();
+  if (typeof _wireSettingsDirtyTracking === 'function') _wireSettingsDirtyTracking();
+}
+
+// ── Sub-tab render helpers (Phase 1.1) ─────────────────────────────
+// Each returns an HTML string. Caller (loadSettings) writes the string to
+// the matching #s-panel-* container. IMPORTANT: input ids must match what
+// saveSettings() reads — see tests/test_gui_settings_subtab_render.py for
+// the canonical list. All user-supplied values are escaped via escapeHtml().
+
+function _renderPceSection(a, profiles, activePceId) {
   const profileRows = profiles.map(p => `
     <tr>
       <td>${escapeHtml(p.name)}</td>
@@ -208,8 +249,7 @@ async function loadSettings() {
         <button class="btn btn-sm" style="margin-left:4px" onclick="deletePceProfile(${p.id})" data-i18n="gui_pce_delete_profile">Delete</button>
       </td>
     </tr>`).join('');
-
-  $('s-form').innerHTML = `
+  return `
 <fieldset><legend data-i18n="gui_pce_profiles">PCE Profiles</legend>
   ${profiles.length > 0 ? `
   <div style="overflow-x:auto;margin-bottom:12px">
@@ -238,10 +278,18 @@ async function loadSettings() {
   <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${a.url || ''}"><small class="form-text text-muted" data-i18n="gui_url_help"></small></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${a.org_id || ''}"><small class="form-text text-muted" data-i18n="gui_org_id_help"></small></div></div>
   <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${a.key || ''}"><small class="form-text text-muted" data-i18n="gui_api_key_help"></small></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${a.secret || ''}"><small class="form-text text-muted" data-i18n="gui_api_secret_help"></small></div></div>
   <div class="chk"><label><input type="checkbox" id="s-ssl" ${a.verify_ssl ? 'checked' : ''}> <span data-i18n="gui_verify_ssl">Verify SSL</span></label></div>
-</fieldset>
+</fieldset>`;
+}
+
+function _renderChannelsSection(active, s) {
+  return `
 <fieldset><legend data-i18n="gui_alert_channels">Alert Channels</legend>
   ${_renderAlertPluginCards(active, s)}
-</fieldset>
+</fieldset>`;
+}
+
+function _renderDisplaySection(st, rpt) {
+  return `
 <fieldset><legend data-i18n="gui_lang_settings">Display & General</legend>
   <div class="form-row">
     <div class="form-group">
@@ -309,7 +357,11 @@ async function loadSettings() {
       <small style="color:var(--dim)" data-i18n="gui_retention_hint">0 = keep forever</small>
     </div>
   </div>
-</fieldset>
+</fieldset>`;
+}
+
+function _renderSecuritySection(sec, _tlsStatus) {
+  return `
 <fieldset><legend data-i18n="gui_tls_title">TLS / HTTPS</legend>
   <div class="chk" style="margin-bottom:10px"><label><input type="checkbox" id="s-tls-enabled" ${_tlsStatus.enabled ? 'checked' : ''}> <span data-i18n="gui_tls_enable">Enable HTTPS</span></label></div>
   <div id="s-tls-options" style="display:${_tlsStatus.enabled ? 'block' : 'none'}">
@@ -382,24 +434,6 @@ async function loadSettings() {
     <div class="form-group"><label data-i18n="gui_new_password_confirm">Confirm New Password</label><input id="s-sec-newpass-confirm" type="password"></div>
   </div>
 </fieldset>`;
-  // Auto-detect browser timezone and pre-select if currently set to 'local'
-  const tzSel = $('s-timezone');
-  if (tzSel && (tzSel.value === 'local' || !tzSel.value)) {
-    const detected = _detectBrowserTimezone();
-    const opt = Array.from(tzSel.options).find(o => o.value === detected);
-    if (opt) tzSel.value = detected;
-  }
-  await loadTranslations();
-
-  // TLS toggle logic
-  const tlsEn = $('s-tls-enabled');
-  if (tlsEn) tlsEn.addEventListener('change', () => {
-    const opts = $('s-tls-options');
-    if (opts) opts.style.display = tlsEn.checked ? 'block' : 'none';
-  });
-
-  // Render cert info if available
-  _renderTlsCertInfo();
 }
 
 function toggleTlsMode() {
