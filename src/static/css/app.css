@@ -326,7 +326,7 @@
 
     .code-panel pre {
       margin: 0;
-      padding: 12px;
+      padding: var(--space-3);
       white-space: pre-wrap;
       word-break: break-word;
       max-height: 420px;
@@ -500,7 +500,7 @@
     .card .label {
       color: var(--dim);
       font-size: .85rem;
-      margin-bottom: 8px;
+      margin-bottom: var(--space-2);
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -597,7 +597,7 @@
       border-radius: 50%;
       background: currentColor;
       display: inline-block;
-      margin-right: 8px;
+      margin-right: var(--space-2);
       animation: pulseDot 1s ease-in-out infinite;
       vertical-align: middle;
     }
@@ -636,7 +636,7 @@
     }
     /* Forms */
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: var(--space-5);
     }
 
     .form-group label {
@@ -646,7 +646,7 @@
       font-size: .8rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      margin-bottom: 8px;
+      margin-bottom: var(--space-2);
       font-weight: 700;
     }
 
@@ -712,7 +712,7 @@
       background: var(--bg2);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      margin-top: 12px;
+      margin-top: var(--space-3);
     }
 
     .rule-table {
@@ -788,7 +788,7 @@
       background: #000;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 16px;
+      padding: var(--space-4);
       font-family: var(--mono-font);
       font-size: .85rem;
       color: #A3E635;
@@ -805,14 +805,14 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
       gap: 16px;
-      margin-bottom: 24px;
+      margin-bottom: var(--space-6);
     }
 
     .action-card {
       background: var(--bg2);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 24px;
+      padding: var(--space-6);
       display: flex;
       flex-direction: column;
       gap: 12px;
@@ -828,7 +828,7 @@
     .action-card h3 {
       font-size: 1.1rem;
       color: var(--accent2);
-      margin-bottom: 4px;
+      margin-bottom: var(--space-1);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -852,7 +852,7 @@
       background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 16px;
+      padding: var(--space-4);
       box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
       z-index: 9999;
       min-width: 200px;
@@ -869,7 +869,7 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
       border-bottom: 1px solid var(--border);
-      padding-bottom: 8px;
+      padding-bottom: var(--space-2);
     }
 
     .cell-popover ul {
@@ -926,7 +926,7 @@
       background: var(--bg);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 28px;
+      padding: var(--space-6);
       width: 600px;
       max-width: 95vw;
       max-height: 85vh;
@@ -947,7 +947,7 @@
     .modal h2 {
       font-size: 1.3rem;
       color: var(--accent2);
-      margin-bottom: 20px;
+      margin-bottom: var(--space-5);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -962,8 +962,8 @@
       display: flex;
       gap: 12px;
       justify-content: flex-end;
-      margin-top: 24px;
-      padding-top: 20px;
+      margin-top: var(--space-6);
+      padding-top: var(--space-5);
       border-top: 1px solid var(--border);
     }
 
@@ -1081,9 +1081,9 @@
     .sub-nav {
       display: flex;
       gap: 8px;
-      margin-bottom: 20px;
+      margin-bottom: var(--space-5);
       background: var(--bg2);
-      padding: 4px;
+      padding: var(--space-1);
       border-radius: var(--radius);
       border: 1px solid var(--border);
       width: fit-content;
@@ -1166,10 +1166,10 @@
       padding: 2px 6px;
       border-radius: 4px;
       font-size: 10px;
-      margin-right: 4px;
+      margin-right: var(--space-1);
       display: inline-block;
       white-space: nowrap;
-      margin-top: 4px;
+      margin-top: var(--space-1);
       border: 1px solid var(--border);
       font-family: monospace;
     }
@@ -1213,7 +1213,7 @@
     .skel-text {
       height: 14px;
       width: 60%;
-      margin-bottom: 8px;
+      margin-bottom: var(--space-2);
     }
 
     .skel-text.short {
@@ -1221,7 +1221,7 @@
     }
 
     .skel-tr td {
-      padding: 16px;
+      padding: var(--space-4);
     }
 
     /* SVG Icons Helper Classes */
@@ -1236,7 +1236,7 @@
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--fg);
-      padding: 12px;
+      padding: var(--space-3);
       border-radius: 8px;
       width: 100%;
       font-size: 1rem;
@@ -1308,7 +1308,7 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-left: 8px;
+      margin-left: var(--space-2);
       position: relative;
     }
     .rules-search input {
@@ -1346,7 +1346,7 @@
 
     #p-rules .toolbar {
       gap: 12px 10px;
-      margin-bottom: 16px;
+      margin-bottom: var(--space-4);
       padding: 4px 0 2px;
       align-items: center;
     }
@@ -1374,7 +1374,7 @@
     }
 
     #p-rules .rule-table {
-      margin-top: 4px;
+      margin-top: var(--space-1);
     }
 
     #p-rules .rule-table th,
@@ -1493,7 +1493,7 @@
   display: block;
   color: var(--color-danger);
   font-size: 0.85em;
-  margin-top: 4px;
+  margin-top: var(--space-1);
   line-height: 1.3;
 }
 input[aria-invalid="true"],
