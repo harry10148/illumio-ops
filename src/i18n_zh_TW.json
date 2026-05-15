@@ -673,6 +673,7 @@
   "gui_density": "密度",
   "gui_dest": "目的端（Label/IP）",
   "gui_destination_identity": "目的端識別",
+  "gui_detailed_kpis_label": "詳細指標（12 KPI）",
   "gui_dismiss": "關閉",
   "gui_dlq_confirm_purge_all": "輸入目的地名稱確認清除全部",
   "gui_dlq_empty": "（無項目）",

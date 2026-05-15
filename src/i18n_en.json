@@ -673,6 +673,7 @@
   "gui_density": "Density",
   "gui_dest": "Destination (Label/IP)",
   "gui_destination_identity": "Destination Identity",
+  "gui_detailed_kpis_label": "Detailed metrics (12 KPIs)",
   "gui_dismiss": "Dismiss",
   "gui_dlq_confirm_purge_all": "Type the destination name to confirm Purge ALL",
   "gui_dlq_empty": "(no DLQ entries)",

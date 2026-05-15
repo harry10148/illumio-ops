@@ -485,8 +485,11 @@
             <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_date_range">Date Range:</span> <span id="snap-date-range">??/span></span>
           </div>
 
-          <!-- KPI Cards -->
-          <div id="snap-kpi-grid" class="kpi-grid"></div>
+          <!-- KPI Cards (Phase 3.1 Task 5 — collapsed by default) -->
+          <details id="d-detailed-kpis" style="margin-bottom:16px;">
+            <summary style="cursor:pointer;font-weight:600;color:var(--dim);" data-i18n="gui_detailed_kpis_label">Detailed metrics (12 KPIs)</summary>
+            <div id="snap-kpi-grid" class="kpi-grid" style="margin:10px 0 0;"></div>
+          </details>
 
           <!-- Top Actions (Phase 3.1 Task 4) -->
           <div id="d-top-actions" style="margin-bottom:16px;">
