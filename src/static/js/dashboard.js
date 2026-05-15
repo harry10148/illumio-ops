@@ -13,6 +13,20 @@ function humanTimeAgo(isoStr) {
   return _t('gui_time_days_ago').replace('{count}', day);
 }
 
+/* ─── Status pill mapping (severity / policy decision) ─────────────── */
+const SEVERITY_TO_STATUS = {
+  'CRITICAL': 'danger',
+  'HIGH':     'danger',
+  'MEDIUM':   'warning',
+  'LOW':      'info',
+  'INFO':     'info',
+};
+const DECISION_TO_STATUS = {
+  'allowed':              'success',
+  'blocked':              'danger',
+  'potentially_blocked':  'warning',
+};
+
 /* ─── Dashboard ───────────────────────────────────────────────────── */
 function _dashboardCardTone(el, tone = '') {
   if (!el) return;
@@ -49,7 +63,7 @@ function _buildAuditSummaryFieldset() {
         <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_generated">Generated:</span> <span id="audit-generated-at">-</span></span>
         <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_date_range">Date Range:</span> <span id="audit-date-range">-</span></span>
       </div>
-      <div id="audit-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px;"></div>
+      <div id="audit-kpi-grid" class="kpi-grid"></div>
       <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:14px;">
         <div>
           <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_dashboard_audit_attention">Attention Required</div>
@@ -100,7 +114,7 @@ function _buildPolicyUsageSummaryFieldset() {
         <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_generated">Generated:</span> <span id="policy-usage-generated-at">-</span></span>
         <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_date_range">Date Range:</span> <span id="policy-usage-date-range">-</span></span>
       </div>
-      <div id="policy-usage-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px;"></div>
+      <div id="policy-usage-kpi-grid" class="kpi-grid"></div>
       <div style="margin-bottom:16px;">
         <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_pu_top_hit_ports">Top Hit Ports</div>
         <table class="rule-table" style="font-size:0.8rem;">
@@ -1254,12 +1268,18 @@ async function loadDashboardSnapshot() {
 
     // KPI cards
     const kpiGrid = $('snap-kpi-grid');
-    kpiGrid.innerHTML = '';
+    kpiGrid.textContent = '';
     (s.kpis || []).forEach(k => {
       const card = document.createElement('div');
-      card.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;';
-      card.innerHTML = `<div style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;">${escapeHtml(k.label)}</div>`
-                     + `<div style="font-size:1.1rem;font-weight:700;margin-top:4px;color:var(--fg);">${escapeHtml(k.value)}</div>`;
+      card.className = 'kpi-card';
+      const labelEl = document.createElement('div');
+      labelEl.className = 'kpi-label';
+      labelEl.textContent = k.label;
+      const valueEl = document.createElement('div');
+      valueEl.className = 'kpi-value';
+      valueEl.textContent = k.value;
+      card.appendChild(labelEl);
+      card.appendChild(valueEl);
       kpiGrid.appendChild(card);
     });
 
@@ -1272,13 +1292,9 @@ async function loadDashboardSnapshot() {
     if (findings.length) {
       fb.innerHTML = findings.map(f => {
         const sev = f.severity || '';
-        let sevColor = 'var(--dim)';
-        if (sev === 'CRITICAL') sevColor = '#c0392b';
-        else if (sev === 'HIGH') sevColor = 'var(--danger)';
-        else if (sev === 'MEDIUM') sevColor = 'var(--warn)';
-        else if (sev === 'INFO') sevColor = 'var(--success)';
+        const sevStatus = SEVERITY_TO_STATUS[sev] || 'neutral';
         return `<tr>
-          <td><span style="background:${sevColor};color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:700;">${escapeHtml(sev)}</span></td>
+          <td><span class="status-pill" data-status="${sevStatus}">${escapeHtml(sev)}</span></td>
           <td>${escapeHtml(f.finding || '')}</td>
           <td style="color:var(--dim);font-style:italic;">${escapeHtml(f.action || '')}</td>
         </tr>`;
@@ -1293,11 +1309,8 @@ async function loadDashboardSnapshot() {
     if (psum.length) {
       pb.innerHTML = psum.map(row => {
         const dec = row['Decision'] || '';
-        let dColor = 'var(--fg)';
-        if (dec === 'allowed') dColor = 'var(--success)';
-        else if (dec === 'blocked') dColor = 'var(--danger)';
-        else if (dec === 'potentially_blocked') dColor = 'var(--warn)';
-        return `<tr><td style="color:${dColor};font-weight:600;">${escapeHtml(dec)}</td><td>${escapeHtml(String(row['Flows'] ?? ''))}</td></tr>`;
+        const decStatus = DECISION_TO_STATUS[dec] || 'neutral';
+        return `<tr><td><span class="status-pill" data-status="${decStatus}">${escapeHtml(dec)}</span></td><td>${escapeHtml(String(row['Flows'] ?? ''))}</td></tr>`;
       }).join('');
     } else {
       pb.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--dim);">—</td></tr>';
@@ -1389,12 +1402,20 @@ async function loadDashboardPolicyUsageSummary() {
     ];
     const grid = $('policy-usage-kpi-grid');
     if (grid) {
-      grid.innerHTML = cards.map(([label, value]) =>
-        `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;">
-          <div style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;">${escapeHtml(String(label))}</div>
-          <div style="font-size:1.1rem;font-weight:700;margin-top:4px;color:var(--fg);">${escapeHtml(String(value))}</div>
-        </div>`
-      ).join('');
+      grid.textContent = '';
+      cards.forEach(([label, value]) => {
+        const card = document.createElement('div');
+        card.className = 'kpi-card';
+        const labelEl = document.createElement('div');
+        labelEl.className = 'kpi-label';
+        labelEl.textContent = String(label);
+        const valueEl = document.createElement('div');
+        valueEl.className = 'kpi-value';
+        valueEl.textContent = String(value);
+        card.appendChild(labelEl);
+        card.appendChild(valueEl);
+        grid.appendChild(card);
+      });
     }
 
     const renderRows = (bodyId, rows) => {

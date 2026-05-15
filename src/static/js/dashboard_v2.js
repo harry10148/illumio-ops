@@ -33,7 +33,7 @@ function _buildAuditSummaryFieldset() {
         <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_generated">Generated:</span> <span id="audit-generated-at">-</span></span>
         <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_date_range">Date Range:</span> <span id="audit-date-range">-</span></span>
       </div>
-      <div id="audit-kpi-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px;"></div>
+      <div id="audit-kpi-grid" class="kpi-grid"></div>
       <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:14px;">
         <div>
           <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_dashboard_audit_attention">Attention Required</div>
@@ -199,12 +199,18 @@ async function loadDashboardSnapshot() {
 
     const kpiGrid = $('snap-kpi-grid');
     if (kpiGrid) {
-      kpiGrid.innerHTML = '';
+      kpiGrid.textContent = '';
       (s.kpis || []).forEach((k) => {
         const card = document.createElement('div');
-        card.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;';
-        card.innerHTML = `<div style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;">${escapeHtml(k.label)}</div>`
-          + `<div style="font-size:1.1rem;font-weight:700;margin-top:4px;color:var(--fg);">${escapeHtml(k.value)}</div>`;
+        card.className = 'kpi-card';
+        const labelEl = document.createElement('div');
+        labelEl.className = 'kpi-label';
+        labelEl.textContent = k.label;
+        const valueEl = document.createElement('div');
+        valueEl.className = 'kpi-value';
+        valueEl.textContent = k.value;
+        card.appendChild(labelEl);
+        card.appendChild(valueEl);
         kpiGrid.appendChild(card);
       });
     }
@@ -316,12 +322,18 @@ async function loadDashboardAuditSummary() {
 
     const kpiGrid = $('audit-kpi-grid');
     if (kpiGrid) {
-      kpiGrid.innerHTML = '';
+      kpiGrid.textContent = '';
       (s.kpis || []).slice(0, 8).forEach((k) => {
         const card = document.createElement('div');
-        card.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;';
-        card.innerHTML = `<div style="font-size:0.72rem;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;">${escapeHtml(k.label)}</div>`
-          + `<div style="font-size:1.1rem;font-weight:700;margin-top:4px;color:var(--fg);">${escapeHtml(k.value)}</div>`;
+        card.className = 'kpi-card';
+        const labelEl = document.createElement('div');
+        labelEl.className = 'kpi-label';
+        labelEl.textContent = k.label;
+        const valueEl = document.createElement('div');
+        valueEl.className = 'kpi-value';
+        valueEl.textContent = k.value;
+        card.appendChild(labelEl);
+        card.appendChild(valueEl);
         kpiGrid.appendChild(card);
       });
     }
