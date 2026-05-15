@@ -443,7 +443,13 @@ class Analyzer:
             # known deny_rule resource), record the event type but tag it
             # with category so downstream can distinguish "uncatalogued
             # action on known resource" from "truly novel resource".
-            category = classify_unknown_event_type(event_type)
+            # Third fallback: when event_type is malformed but the payload
+            # carries resource_changes[0].resource, use that resource_type
+            # hint (preserved by normalizer in event['resource_type']).
+            payload_resource_type = event.get("resource_type") or None
+            category = classify_unknown_event_type(
+                event_type, resource_type=payload_resource_type
+            )
             lenient_known = category != "unclassified"
             entry = unknown_events.get(event_type, {
                 "count": 0,

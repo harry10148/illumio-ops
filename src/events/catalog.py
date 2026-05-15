@@ -348,36 +348,58 @@ def _split_event_type(event_type: str) -> tuple[str, str]:
     return resource, action
 
 
-def is_known_event_type(event_type: str, lenient: bool = False) -> bool:
+def is_known_event_type(
+    event_type: str,
+    lenient: bool = False,
+    *,
+    resource_type: str | None = None,
+) -> bool:
     """Return True if event_type is in the explicit catalog.
 
-    When `lenient=True`, also return True if the resource prefix
-    (`<resource>.<action>` → `<resource>`) is in KNOWN_RESOURCE_PREFIXES.
-    Use lenient mode to dampen 'unknown event' churn against PCE versions
-    that introduce new actions on existing resources, while still recording
-    the exact event_type for catalog maintenance.
+    When `lenient=True`, also return True if EITHER:
+      (a) the event_type resource prefix (`<resource>.<action>` → `<resource>`)
+          is in KNOWN_RESOURCE_PREFIXES; OR
+      (b) the optional `resource_type` hint (typically extracted by the
+          normalizer from `resource_changes[0].resource` first key in the
+          PCE payload) is in KNOWN_RESOURCE_PREFIXES.
+
+    The (b) path is the third fallback: it salvages events whose event_type
+    is malformed (e.g. missing the dot) or whose action prefix doesn't
+    match an event_type pattern but whose payload structure clearly
+    identifies the resource family.
     """
     if event_type in KNOWN_EVENT_TYPES:
         return True
     if lenient:
         resource, action = _split_event_type(event_type)
-        return bool(resource and action and resource in KNOWN_RESOURCE_PREFIXES)
+        if resource and action and resource in KNOWN_RESOURCE_PREFIXES:
+            return True
+        if resource_type and resource_type in KNOWN_RESOURCE_PREFIXES:
+            return True
     return False
 
 
-def classify_unknown_event_type(event_type: str) -> str:
+def classify_unknown_event_type(
+    event_type: str,
+    *,
+    resource_type: str | None = None,
+) -> str:
     """Best-effort category for an event_type not in KNOWN_EVENT_TYPES.
 
-    Returns the resource prefix when it matches a known resource family
-    (so downstream can route, e.g. all `deny_rule.*` → 'Security Policy'),
-    or 'unclassified' for genuinely novel event_types whose resource isn't
-    recognized either.
+    Resolution order:
+      1. event_type resource prefix matches KNOWN_RESOURCE_PREFIXES
+      2. explicit `resource_type` hint (from payload) matches KNOWN_RESOURCE_PREFIXES
+      3. 'unclassified' for genuinely novel resource families
+
+    The `resource_type` hint should come from the normalizer's
+    `resource_changes[0].resource` first-key extraction (see
+    `src/events/normalizer.py::_resource_from_changes`).
     """
     resource, action = _split_event_type(event_type)
-    if not resource or not action:
-        return "unclassified"
-    if resource in KNOWN_RESOURCE_PREFIXES:
+    if resource and action and resource in KNOWN_RESOURCE_PREFIXES:
         return resource
+    if resource_type and resource_type in KNOWN_RESOURCE_PREFIXES:
+        return resource_type
     return "unclassified"
 
 

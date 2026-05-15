@@ -31,6 +31,7 @@ class DestinationDispatcher:
         transport: Transport,
         max_retries: int = 10,
         batch_size: int = 100,
+        mask_pii: bool = False,
     ):
         self._name = name
         self._sf = session_factory
@@ -38,6 +39,7 @@ class DestinationDispatcher:
         self._transport = transport
         self._max_retries = max_retries
         self._batch_size = batch_size
+        self._mask_pii = mask_pii
         self._lock = threading.Lock()
 
     def tick(self) -> dict[str, int]:
@@ -114,12 +116,18 @@ class DestinationDispatcher:
                     if src is None:
                         return None
                     data = orjson.loads(src.raw_json)
+                    if self._mask_pii:
+                        from src.siem.mask import mask_event
+                        data = mask_event(data, mask_pii=True)
                     return self._formatter.format_event(data)
                 elif row.source_table == "pce_traffic_flows_raw":
                     src = s.get(PceTrafficFlowRaw, row.source_id)
                     if src is None:
                         return None
                     data = orjson.loads(src.raw_json)
+                    if self._mask_pii:
+                        from src.siem.mask import mask_flow
+                        data = mask_flow(data, mask_pii=True)
                     return self._formatter.format_flow(data)
         except Exception as exc:
             logger.exception("Failed to build payload for dispatch row {}: {}", row.id, exc)
@@ -189,6 +197,7 @@ def build_dispatcher(dest_cfg, session_factory) -> "DestinationDispatcher":
         transport=_transport_for(dest_cfg),
         max_retries=dest_cfg.max_retries,
         batch_size=dest_cfg.batch_size,
+        mask_pii=bool(getattr(dest_cfg, "mask_pii", False)),
     )
 
 

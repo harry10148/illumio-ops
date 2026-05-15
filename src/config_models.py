@@ -226,6 +226,15 @@ class SiemDestinationSettings(_Base):
     batch_size: int = Field(default=100, ge=1, le=10000)
     source_types: list[str] = Field(default_factory=lambda: ["audit", "traffic"])
     max_retries: int = Field(default=10, ge=0)
+    mask_pii: bool = Field(
+        default=False,
+        description="When True, redact PII before formatting: created_by.user.username "
+                    "(admin emails), action.src_ip (admin source IPs), and "
+                    "resource_changes[].changes before/after (label / description text "
+                    "that may carry internal project names). Per-destination opt-in "
+                    "so external SaaS SIEMs can receive masked data while an internal "
+                    "SOC destination gets the full payload.",
+    )
 
     @model_validator(mode="before")
     @classmethod

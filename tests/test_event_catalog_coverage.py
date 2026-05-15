@@ -95,3 +95,34 @@ def test_backward_compat_no_kwargs_call():
     (used by analyzer.py, normalizer.py)."""
     assert is_known_event_type("agent.activate") is True
     assert is_known_event_type("nope.nada") is False
+
+
+# ----- 3rd fallback: payload resource_type hint -----
+
+def test_lenient_uses_resource_type_hint_when_event_type_malformed():
+    """If event_type is missing the dot but payload carries resource_type
+    (extracted from resource_changes[0].resource), lenient mode accepts it."""
+    assert is_known_event_type("malformed_no_dot", lenient=True,
+                               resource_type="deny_rule") is True
+    assert is_known_event_type("", lenient=True,
+                               resource_type="agent") is True
+
+
+def test_lenient_rejects_when_neither_event_prefix_nor_resource_type_known():
+    assert is_known_event_type("compliance_policy.create", lenient=True,
+                               resource_type="compliance_policy") is False
+    assert is_known_event_type("garbage", lenient=True,
+                               resource_type=None) is False
+
+
+def test_classify_uses_resource_type_when_prefix_unhelpful():
+    # event_type prefix says nothing useful; resource_type hint saves it
+    assert classify_unknown_event_type("ev_42", resource_type="deny_rule") == "deny_rule"
+    assert classify_unknown_event_type("", resource_type="agent") == "agent"
+
+
+def test_classify_prefers_event_type_prefix_over_resource_type():
+    """When both are usable, event_type prefix wins (more specific)."""
+    # Both deny_rule and agent are known — event_type prefix path returns first
+    assert classify_unknown_event_type("deny_rule.foo",
+                                       resource_type="agent") == "deny_rule"
