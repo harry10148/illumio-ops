@@ -32,6 +32,7 @@ KNOWN_EVENT_TYPES = {
     "agent.update_interactive_users",
     "agent.update_iptables_href",
     "agent.update_running_containers",
+    "agent.upgrade_successful",
     "agent.upload_existing_ip_table_rules",
     "agent.upload_support_report",
     "agent_support_report_request.create",
@@ -51,6 +52,8 @@ KNOWN_EVENT_TYPES = {
     "container_workload.update",
     "container_cluster.create",
     "container_cluster.delete",
+    "container_cluster.kubernetes_workloads_bulk_create",
+    "container_cluster.kubernetes_workloads_bulk_update",
     "container_cluster.update",
     "container_cluster.update_label_map",
     "container_cluster.update_services",
@@ -59,6 +62,9 @@ KNOWN_EVENT_TYPES = {
     "container_workload_profile.update",
     "database.temp_table_autocleanup_started",
     "database.temp_table_autocleanup_completed",
+    "deny_rule.create",
+    "deny_rule.delete",
+    "deny_rule.update",
     "domain.create",
     "domain.delete",
     "domain.update",
@@ -80,9 +86,15 @@ KNOWN_EVENT_TYPES = {
     "label.create",
     "label.delete",
     "label.update",
+    "label_dimension.create",
+    "label_dimension.delete",
+    "label_dimension.update",
     "label_group.create",
     "label_group.delete",
     "label_group.update",
+    "label_mapping_rule.create",
+    "label_mapping_rule.delete",
+    "label_mapping_rule.update",
     "labels.delete",
     "ldap_config.create",
     "ldap_config.delete",
@@ -293,8 +305,80 @@ LOCAL_EXTENSION_EVENT_TYPES = {
 
 KNOWN_EVENT_TYPES |= LOCAL_EXTENSION_EVENT_TYPES
 
-def is_known_event_type(event_type: str) -> bool:
-    return event_type in KNOWN_EVENT_TYPES
+
+# Resource-prefix → category mapping for events whose exact event_type is
+# unknown but whose `resource.action` shape matches a known resource family.
+# This is the second line of defence after KNOWN_EVENT_TYPES: when PCE 25.x+
+# introduces new actions on existing resources (e.g. deny_rule.bulk_delete,
+# agent.upgrade_failed), the analyzer can still classify them rather than
+# bucket them into "unknown". The exact event_type IS still recorded in
+# unknown_events for catalog maintenance, but the analyzer can choose to
+# treat lenient-known events differently (e.g. not alert noise).
+KNOWN_RESOURCE_PREFIXES: frozenset[str] = frozenset({
+    "access_restriction", "agent", "agent_support_report_request", "agents",
+    "api_key", "auth_security_principal", "authentication_settings",
+    "cluster", "container_cluster", "container_workload",
+    "container_workload_profile", "database", "deny_rule", "domain",
+    "enforcement_boundary", "event_settings", "firewall_settings",
+    "group", "ip_list", "ip_lists", "ip_tables_rule", "job",
+    "label", "label_dimension", "label_group", "label_mapping_rule",
+    "labels", "ldap_config", "license",
+    "network", "network_enforcement_node",
+    "org", "organization", "pairing_profile", "permission",
+    "policy_object_selector", "policy_settings", "policy_update",
+    "ps_event", "ps_event_export",
+    "request", "request_log", "rule_set", "sec_policy",
+    "sec_policy_pending", "sec_policy_restore", "sec_rule",
+    "secure_connect_gateway", "service", "service_binding",
+    "service_provisioner", "session", "settings",
+    "support_bundle_request", "syslog_destination", "system_task",
+    "trusted_proxy_ips", "user", "user_login", "users",
+    "vens", "virtual_server", "virtual_service",
+    "vulnerability", "vulnerability_report", "workload",
+    "workload_interface_scan", "workload_settings", "workloads",
+})
+
+
+def _split_event_type(event_type: str) -> tuple[str, str]:
+    """Split 'resource.action' into (resource, action). Returns ('', '') if
+    event_type is malformed (no '.' separator, empty, etc.)."""
+    if not event_type or "." not in event_type:
+        return "", ""
+    resource, _, action = event_type.partition(".")
+    return resource, action
+
+
+def is_known_event_type(event_type: str, lenient: bool = False) -> bool:
+    """Return True if event_type is in the explicit catalog.
+
+    When `lenient=True`, also return True if the resource prefix
+    (`<resource>.<action>` → `<resource>`) is in KNOWN_RESOURCE_PREFIXES.
+    Use lenient mode to dampen 'unknown event' churn against PCE versions
+    that introduce new actions on existing resources, while still recording
+    the exact event_type for catalog maintenance.
+    """
+    if event_type in KNOWN_EVENT_TYPES:
+        return True
+    if lenient:
+        resource, action = _split_event_type(event_type)
+        return bool(resource and action and resource in KNOWN_RESOURCE_PREFIXES)
+    return False
+
+
+def classify_unknown_event_type(event_type: str) -> str:
+    """Best-effort category for an event_type not in KNOWN_EVENT_TYPES.
+
+    Returns the resource prefix when it matches a known resource family
+    (so downstream can route, e.g. all `deny_rule.*` → 'Security Policy'),
+    or 'unclassified' for genuinely novel event_types whose resource isn't
+    recognized either.
+    """
+    resource, action = _split_event_type(event_type)
+    if not resource or not action:
+        return "unclassified"
+    if resource in KNOWN_RESOURCE_PREFIXES:
+        return resource
+    return "unclassified"
 
 
 # ---------------------------------------------------------------------------

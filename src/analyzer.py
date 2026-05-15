@@ -20,6 +20,7 @@ from src.events import (
     normalize_event,
     parse_event_timestamp,
 )
+from src.events.catalog import classify_unknown_event_type
 from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
 from src.state_store import load_state_file, update_state_file
@@ -427,14 +428,25 @@ class Analyzer:
             event_type = event.get("event_type") or "(missing)"
             if is_known_event_type(event_type):
                 continue
+            # Resource-family lenient classification: if the resource prefix
+            # matches a known family (e.g. deny_rule.bulk_delete on the
+            # known deny_rule resource), record the event type but tag it
+            # with category so downstream can distinguish "uncatalogued
+            # action on known resource" from "truly novel resource".
+            category = classify_unknown_event_type(event_type)
+            lenient_known = category != "unclassified"
             entry = unknown_events.get(event_type, {
                 "count": 0,
                 "first_seen": event.get("timestamp"),
                 "last_seen": event.get("timestamp"),
                 "sample": {},
+                "category": category,
+                "lenient_known": lenient_known,
             })
             entry["count"] += 1
             entry["last_seen"] = event.get("timestamp") or entry.get("last_seen")
+            entry["category"] = category
+            entry["lenient_known"] = lenient_known
             entry["sample"] = {
                 "actor": event.get("actor"),
                 "source_ip": event.get("source_ip"),
