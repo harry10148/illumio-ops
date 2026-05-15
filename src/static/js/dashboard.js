@@ -1241,11 +1241,101 @@ async function loadDashboard() {
   await loadDashboardPolicyUsageSummary();
 }
 
+/* ─── Story-mode hero (Phase 3.1) ─────────────────────────────────── */
+function renderHero(hero) {
+  const wrap = document.getElementById('d-hero');
+  const sentenceEl = document.getElementById('d-hero-sentence');
+  const ctaEl = document.getElementById('d-hero-cta');
+  if (!wrap || !sentenceEl) return;
+  if (!hero || typeof hero !== 'object') { wrap.style.display = 'none'; return; }
+  const key = hero.sentence_key || 'gui_hero_no_data';
+  let tmpl = _t(key) || '';
+  const params = hero.sentence_params || {};
+  Object.keys(params).forEach(k => {
+    tmpl = tmpl.split('{' + k + '}').join(String(params[k]));
+  });
+  sentenceEl.textContent = tmpl;
+  wrap.style.display = 'block';
+  if (ctaEl) ctaEl.style.display = (hero.high_risk_count || 0) > 0 ? 'inline-block' : 'none';
+}
+
+function renderHeroEmpty() {
+  const wrap = document.getElementById('d-hero');
+  const sentenceEl = document.getElementById('d-hero-sentence');
+  const ctaEl = document.getElementById('d-hero-cta');
+  if (wrap && sentenceEl) {
+    wrap.style.display = 'block';
+    sentenceEl.textContent = _t('gui_hero_no_data');
+    if (ctaEl) ctaEl.style.display = 'none';
+  }
+  const matWrap = document.getElementById('d-maturity');
+  if (matWrap) matWrap.style.display = 'none';
+  const riskCnt = document.getElementById('card-hi-risk-count');
+  if (riskCnt) riskCnt.style.display = 'none';
+}
+
+function scrollToFindings() {
+  const el = document.getElementById('snap-findings-wrap');
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderStoryGroups(hero) {
+  if (!hero) return;
+  const cnt = hero.high_risk_count || 0;
+  const wrap = document.getElementById('card-hi-risk-count');
+  if (wrap) wrap.style.display = cnt > 0 ? 'flex' : 'none';
+  const v = document.getElementById('d-hi-risk-count');
+  if (v) v.textContent = String(cnt);
+}
+
+/* renderMaturity placeholder — body filled in Task 3 */
+function renderMaturity(snap) {
+  const wrap = document.getElementById('d-maturity');
+  if (!wrap) return;
+  if (!snap || !snap.maturity_dimensions || !Object.keys(snap.maturity_dimensions).length) {
+    wrap.style.display = 'none';
+    return;
+  }
+  const dims = snap.maturity_dimensions || {};
+  const score = snap.maturity_score || 0;
+  const grade = snap.maturity_grade || '?';
+  const gradeEl = document.getElementById('d-maturity-grade');
+  const scoreEl = document.getElementById('d-maturity-score');
+  const bars = document.getElementById('d-maturity-bars');
+  const COLOR = { A: '#22C55E', B: '#84CC16', C: '#EAB308', D: '#EF4444', F: '#EF4444' };
+  if (gradeEl) { gradeEl.textContent = String(grade); gradeEl.style.color = COLOR[grade] || 'var(--dim)'; }
+  if (scoreEl) scoreEl.textContent = String(Math.round(score));
+  if (bars) {
+    const order = ['enforcement_coverage', 'policy_coverage', 'lateral_movement_control', 'managed_asset_ratio', 'risk_port_control'];
+    const rows = order.map(k => {
+      const d = dims[k] || {};
+      const sv = Number(d.score || 0);
+      const wt = Number(d.weight || 1) || 1;
+      const pct = Math.max(0, Math.min(100, Math.round((sv / wt) * 100)));
+      const color = pct >= 70 ? '#22C55E' : pct >= 40 ? '#EAB308' : '#EF4444';
+      const label = _t('gui_maturity_dim_' + k) || k;
+      const labelHtml = document.createElement('div');
+      labelHtml.textContent = label;
+      const safeLabel = labelHtml.textContent;
+      return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0;font-size:.85rem;">`
+        + `<div style="flex:0 0 180px;color:var(--dim);">${escapeHtml(safeLabel)}</div>`
+        + `<div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;">`
+        + `<div style="width:${pct}%;height:100%;background:${color};"></div></div>`
+        + `<div style="flex:0 0 40px;text-align:right;font-weight:600;">${pct}%</div></div>`;
+    }).join('');
+    bars.innerHTML = rows;
+  }
+  wrap.style.display = 'block';
+}
+
 async function loadDashboardSnapshot() {
   try {
     const r = await api('/api/dashboard/snapshot');
-    if (!r || !r.ok || !r.snapshot) return;
+    if (!r || !r.ok || !r.snapshot) { renderHeroEmpty(); return; }
     const s = r.snapshot;
+    renderHero(s.hero);
+    renderStoryGroups(s.hero);
+    renderMaturity(s);
 
     // ── Legacy header cards ───────────────────────────────────────────
     const kpis = s.kpis || [];

@@ -231,6 +231,15 @@
   <!-- Traffic & Quarantine (Dashboard Tab) -->
   <div class="panel active" id="p-dashboard">
 
+    <!-- Story-mode hero (one-sentence health summary + CTA) -->
+    <div id="d-hero" class="dashboard-hero" style="margin-bottom:20px;display:none;">
+      <div class="dashboard-hero-sentence" id="d-hero-sentence" style="font-size:1.15rem;font-weight:600;line-height:1.5;"></div>
+      <button class="btn btn-primary" id="d-hero-cta" data-action="scrollToFindings"
+              data-i18n="gui_hero_view_high_risk" style="display:none;margin-top:10px;">
+        View high-risk findings
+      </button>
+    </div>
+
     <!-- Top level stats -->
     <div class="cards">
       <div class="card">
