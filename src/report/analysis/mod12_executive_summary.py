@@ -110,6 +110,8 @@ def _compute_maturity_score(results: dict[str, Any]) -> dict[str, Any]:
         },
     }
 
+# Coverage / enforcement gap callouts (not part of the Action Matrix —
+# these surface only when coverage < 50%; kept inline for now).
 _KF = {
     "staged_enforcement": {
         "en": ("Only {cov:.0f}% of flows are enforced, but {staged:.0f}% are staged (rules ready, pending enforcement).",
@@ -123,35 +125,27 @@ _KF = {
         "zh_TW": ("僅 {cov:.0f}% 的流量有允許政策覆蓋 — 實際缺口為 {gap:.0f}%。",
                   "為最大宗的未覆蓋流量建立分段規則。"),
     },
-    "ransomware": {
-        "en": ("{n} flows on ransomware-associated ports detected.",
-               "Review ransomware-port exposure and remove non-essential paths."),
-        "zh_TW": ("偵測到 {n} 筆流量使用勒索軟體相關通訊埠。",
-                  "檢查勒索軟體相關通訊埠的曝露情況，移除非必要路徑。"),
-    },
-    "lateral": {
-        "en": ("{n} remote access / lateral movement flows found.",
-               "Apply micro-segmentation controls for RDP/SSH/SMB lateral paths."),
-        "zh_TW": ("發現 {n} 筆遠端存取 / 橫向移動流量。",
-                  "對 RDP/SSH/SMB 橫向路徑套用微分段控制。"),
-    },
-    "unmanaged": {
-        "en": ("{n} unique unmanaged source hosts.",
-               "Onboard unmanaged hosts or isolate their access paths."),
-        "zh_TW": ("{n} 個唯一的未受管理來源主機。",
-                  "將未受管理的主機納管，或隔離其存取路徑。"),
-    },
-    "data_volume": {
-        "en": ("Total data volume: {mb:.0f} MB across the analysis period.",
-               "Review high-volume flows for data exfiltration patterns."),
-        "zh_TW": ("分析期間總資料量：{mb:.0f} MB。",
-                  "檢查高流量是否存在資料外洩模式。"),
-    },
 }
+
+# Action Matrix recommendations — sourced from i18n table (rpt_actmtx_*).
+# Maps logical id → (msg_key, reco_key). Locale dispatch happens inside t().
+_ACTMTX_KEYS: dict[str, tuple[str, str]] = {
+    "ransomware":  ("rpt_actmtx_ransomware_msg",  "rpt_actmtx_ransomware_reco"),
+    "lateral":     ("rpt_actmtx_lateral_msg",     "rpt_actmtx_lateral_reco"),
+    "unmanaged":   ("rpt_actmtx_unmanaged_msg",   "rpt_actmtx_unmanaged_reco"),
+    "data_volume": ("rpt_actmtx_data_volume_msg", "rpt_actmtx_data_volume_reco"),
+}
+
 
 def _kf(key: str, lang: str, **kwargs) -> tuple[str, str]:
     tmpl = _KF[key].get(lang) or _KF[key]["en"]
     return tmpl[0].format(**kwargs), tmpl[1].format(**kwargs)
+
+
+def _actmtx(key: str, lang: str, **kwargs) -> tuple[str, str]:
+    """Resolve an Action Matrix (msg, reco) pair via i18n.t() for the given lang."""
+    msg_key, reco_key = _ACTMTX_KEYS[key]
+    return t(msg_key, lang=lang, **kwargs), t(reco_key, lang=lang, **kwargs)
 
 
 def executive_summary(results: dict[str, Any], profile: str = "security_risk", lang: str = "en") -> dict:
@@ -213,7 +207,7 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
 
     ransomware_total = mod04.get("risk_flows_total", 0)
     if ransomware_total > 0:
-        f, a = _kf("ransomware", lang, n=_fmt(ransomware_total))
+        f, a = _actmtx("ransomware", lang, n=_fmt(ransomware_total))
         key_findings.append({
             "severity": "CRITICAL" if findings_summary.get("CRITICAL", 0) > 0 else "HIGH",
             "finding": f, "action": a,
@@ -221,18 +215,18 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
 
     lateral_total = mod15.get("total_lateral_flows", 0) if isinstance(mod15, dict) else 0
     if lateral_total > 0:
-        f, a = _kf("lateral", lang, n=_fmt(lateral_total))
+        f, a = _actmtx("lateral", lang, n=_fmt(lateral_total))
         key_findings.append({"severity": "HIGH", "finding": f, "action": a})
 
     unmanaged_count = mod08.get("unique_unmanaged_src", 0) if isinstance(mod08, dict) else 0
     if unmanaged_count > 10:
-        f, a = _kf("unmanaged", lang, n=_fmt(unmanaged_count))
+        f, a = _actmtx("unmanaged", lang, n=_fmt(unmanaged_count))
         key_findings.append({"severity": "MEDIUM", "finding": f, "action": a})
 
     if mod11.get("bytes_data_available"):
         total_mb = mod11.get("total_mb", 0)
         if total_mb > 1000:
-            f, a = _kf("data_volume", lang, mb=total_mb)
+            f, a = _actmtx("data_volume", lang, mb=total_mb)
             key_findings.append({"severity": "INFO", "finding": f, "action": a})
 
     rank = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3, "INFO": 4}

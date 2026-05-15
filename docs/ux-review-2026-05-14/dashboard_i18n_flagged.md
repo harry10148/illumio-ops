@@ -1,14 +1,12 @@
 # Dashboard i18n Audit
 
-**Scope keys:** 218
-**Findings:** 85
+**Scope keys:** 210
+**Findings:** 82
 
-## Rule: mixed_language (28)
+## Rule: mixed_language (26)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
-| `actmtx_data_volume_msg` | Total data volume: {mb:.0f} MB across the analysis period. | 分析期間總資料量：{mb:.0f} MB。 | non-glossary Latin tokens: ['MB'] |
-| `actmtx_lateral_reco` | Apply micro-segmentation controls for RDP/SSH/SMB lateral paths. | 對 RDP/SSH/SMB 橫向路徑套用微分段控制。 | non-glossary Latin tokens: ['RDP', 'SSH', 'SMB'] |
 | `actmtx_staged_enforcement_reco` | Move workloads from test/visibility to selective or full enforcement. | 將 workload 從 test/visibility 模式移至 selective 或 full enforcement。 | non-glossary Latin tokens: ['workload', 'test', 'visibility', 'selective', 'full', 'enforcement'] |
 | `gui_attack_summary_title` | Attack Summary | 攻擊摘要（Boundary/Pivot/Blast Radius/Blind Spots/行動） | non-glossary Latin tokens: ['Boundary', 'Pivot', 'Blast', 'Radius', 'Blind', 'Spots'] |
 | `gui_card_ransomware_exp` | Ransomware Exp | Ransomware 暴露面 | non-glossary Latin tokens: ['Ransomware'] |
@@ -60,11 +58,10 @@
 | `pd_potentially_blocked_by_boundary` | Potentially Blocked by Boundary | Potentially Blocked by Boundary（潛在邊界 Block） | han_ratio=0.11 |
 | `pd_potentially_blocked_by_override_deny` | Potentially Blocked by Override Deny | Potentially Blocked by Override Deny（潛在強制拒絕 Block） | han_ratio=0.14 |
 
-## Rule: too_short_vs_english (32)
+## Rule: too_short_vs_english (31)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
-| `actmtx_data_volume_reco` | Review high-volume flows for data exfiltration patterns. | 檢查高流量是否存在資料外洩模式。 | en_len=56 zh_len=16 |
 | `gui_btn_download` | Download | 下載 | en_len=8 zh_len=2 |
 | `gui_cooldown_title` | Rules in Cooldown | 冷卻中規則 | en_len=17 zh_len=5 |
 | `gui_delete_partial` | Some items failed to delete | 部分項目刪除失敗 | en_len=27 zh_len=8 |
