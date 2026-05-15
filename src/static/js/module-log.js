@@ -2,6 +2,7 @@
 let _mlCurrentModule = null;
 
 function mlOpen(moduleName) {
+  hdrMenuClose();
   _mlCurrentModule = moduleName || null;
   const modal = $('ml-modal');
   if (!modal) return;

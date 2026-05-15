@@ -310,6 +310,57 @@
     .pce-chip .chip-sep, .pce-chip .chip-dot { opacity: .55; }
     .pce-chip .chip-kpi strong { font-weight: 600; }
 
+    .hdr-menu {
+      position: absolute;
+      right: var(--space-header-x);
+      top: calc(var(--header-h, 56px) + 4px);
+      min-width: 240px;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-2);
+      padding: var(--space-2);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+    }
+    .hdr-menu[hidden] { display: none; }
+    .hdr-menu .menu-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-2) var(--space-3);
+    }
+    .hdr-menu .menu-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      background: transparent;
+      border: 0;
+      font: inherit;
+      color: var(--fg);
+      text-align: left;
+    }
+    .hdr-menu .menu-item:hover,
+    .hdr-menu .menu-item:focus-visible {
+      background: var(--bg3);
+      outline: none;
+    }
+    .hdr-menu .menu-item.danger { color: var(--color-danger); }
+    .hdr-menu .menu-item.danger:hover {
+      background: var(--color-danger-bg);
+    }
+    .hdr-menu .menu-divider {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: var(--space-1) 0;
+    }
+
     .event-viewer-layout {
       display: grid;
       grid-template-columns: minmax(0, 1.8fr) minmax(280px, 0.9fr);

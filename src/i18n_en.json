@@ -824,6 +824,8 @@
   "gui_gen_traffic_title": "Generate Traffic Report",
   "gui_gen_ven_title": "Generate VEN Status Report",
   "gui_hdr_chip_aria": "PCE connection status, {rules} rules, {schedules} schedules, loaded {loaded}",
+  "gui_hdr_menu_close": "Close menu",
+  "gui_hdr_operations": "Operations",
   "gui_hdr_status_err": "Disconnected",
   "gui_hdr_status_ok": "Connected",
   "gui_hdr_status_warn": "Degraded",
