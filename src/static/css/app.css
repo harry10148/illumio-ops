@@ -303,9 +303,9 @@
       background: var(--dim);
       flex-shrink: 0;
     }
-    .pce-chip .status-dot[data-status="ok"]   { background: var(--success, #16A34A); box-shadow: 0 0 0 3px rgba(22,163,74,.18); }
-    .pce-chip .status-dot[data-status="warn"] { background: var(--warn, #F59E0B);    box-shadow: 0 0 0 3px rgba(245,158,11,.18); }
-    .pce-chip .status-dot[data-status="err"]  { background: var(--danger, #BE122F);  box-shadow: 0 0 0 3px rgba(190,18,47,.18); }
+    .pce-chip .status-dot[data-status="ok"]   { background: var(--color-success); box-shadow: 0 0 0 3px rgba(22,163,74,.18); }
+    .pce-chip .status-dot[data-status="warn"] { background: var(--color-warning); box-shadow: 0 0 0 3px rgba(245,158,11,.18); }
+    .pce-chip .status-dot[data-status="err"]  { background: var(--color-danger);  box-shadow: 0 0 0 3px rgba(190,18,47,.18); }
     .pce-chip .pce-host { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
     .pce-chip .chip-sep, .pce-chip .chip-dot { opacity: .55; }
     .pce-chip .chip-kpi strong { font-weight: 600; }
