@@ -43,13 +43,44 @@ def _norm_col(name) -> str:
     """Tolerant column-name match: case-insensitive, whitespace/dash collapsed."""
     return str(name).strip().lower().replace(" ", "_").replace("-", "_")
 
+_LONG_TEXT_TRUNCATE_AT = 150
+
+
+def _wbr_at_dots(text: str) -> str:
+    """Insert <wbr> at each dot so `agent.update_request` can wrap cleanly."""
+    import html as _html
+    if text is None:
+        return ""
+    s = _html.escape(str(text))
+    return s.replace(".", ".<wbr>").replace("_", "_<wbr>")
+
+
+def _truncate_long_cell(text: str, limit: int = _LONG_TEXT_TRUNCATE_AT) -> str:
+    """Wrap long cell content in <details> so the row stays narrow when printed."""
+    import html as _html
+    if text is None:
+        return ""
+    s = str(text)
+    if len(s) <= limit:
+        return _html.escape(s)
+    head = _html.escape(s[:limit].rstrip()) + "…"
+    full = _html.escape(s)
+    return (
+        f'<details class="cell-long"><summary>{head}</summary>'
+        f'<pre class="cell-long-full">{full}</pre></details>'
+    )
+
+
 def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False, lang: str = "en") -> str:
     event_type_col = None
-    if show_risk and df is not None and not (hasattr(df, "empty") and df.empty):
+    long_text_cols: set[str] = set()
+    if df is not None and not (hasattr(df, "empty") and df.empty):
         for c in df.columns:
-            if _norm_col(c) == "event_type":
+            norm = _norm_col(c)
+            if norm == "event_type" and show_risk:
                 event_type_col = c
-                break
+            if norm in ("change_detail", "notification_detail"):
+                long_text_cols.add(c)
 
     def _row_attrs(row):
         if not event_type_col:
@@ -70,7 +101,12 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False, l
                 f"<span class='risk-badge' style='background:{bg};color:{color};border-color:{color}'>"
                 f"{risk_level}</span>"
             )
-            return f"{badge}{row[col]}"
+            return f"{badge}{_wbr_at_dots(row[col])}"
+        norm = _norm_col(col)
+        if col in long_text_cols:
+            return _truncate_long_cell(row[col])
+        if norm in ("event_type", "action"):
+            return _wbr_at_dots(row[col])
         return "" if row[col] is None else str(row[col])
 
     return render_df_table(

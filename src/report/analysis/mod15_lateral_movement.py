@@ -295,7 +295,7 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4,
                     "Target App (Env)": build_app_display(tgt_app, tgt_env),
                     "Target App Env Key": target,
                     "Path Depth": len(path) - 1,
-                    "Path": " -> ".join(build_app_display(*hop.split("|", 1)) for hop in path),
+                    "Path": " → ".join(build_app_display(*hop.split("|", 1)) for hop in path),
                     "Path Connection Weight": _path_weight(path, edge_weights),
                 }
             )

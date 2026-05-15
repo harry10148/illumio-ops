@@ -127,17 +127,30 @@ class VenStatusGenerator:
             ]
             ip_str = ', '.join(ips) or w.get('public_ip', '')
 
-            # Flatten labels
-            labels_str = '; '.join(
-                f"{lbl.get('key', '?')}:{lbl.get('value', '?')}"
-                for lbl in w.get('labels', [])
-                if isinstance(lbl, dict) and lbl.get('key') and lbl.get('value')
-            )
+            # Split labels by standard Illumio keys (role / app / env / loc).
+            # Custom keys roll into 'labels_other' to keep print rows narrow.
+            label_cols = {'role': '', 'app': '', 'env': '', 'loc': ''}
+            other_pairs = []
+            for lbl in w.get('labels', []):
+                if not isinstance(lbl, dict):
+                    continue
+                k = (lbl.get('key') or '').lower()
+                v = lbl.get('value') or ''
+                if not k or not v:
+                    continue
+                if k in label_cols:
+                    label_cols[k] = v
+                else:
+                    other_pairs.append(f"{k}:{v}")
 
             rows.append({
                 'hostname':                   w.get('hostname', w.get('name', '')),
                 'ip':                         ip_str,
-                'labels':                     labels_str,
+                'role':                       label_cols['role'],
+                'app':                        label_cols['app'],
+                'env':                        label_cols['env'],
+                'loc':                        label_cols['loc'],
+                'labels_other':               '; '.join(other_pairs),
                 # Internal fields used for online/offline determination (not displayed)
                 'ven_status':                 st.get('status', ''),
                 'hours_since_last_heartbeat': st.get('hours_since_last_heartbeat', None),
@@ -150,7 +163,7 @@ class VenStatusGenerator:
             })
 
         return pd.DataFrame(rows) if rows else pd.DataFrame(
-            columns=['hostname', 'ip', 'labels',
+            columns=['hostname', 'ip', 'role', 'app', 'env', 'loc', 'labels_other',
                      'ven_status', 'hours_since_last_heartbeat',
                      'policy_sync', 'last_heartbeat', 'policy_received',
                      'paired_at', 'ven_version']
@@ -166,12 +179,16 @@ class VenStatusGenerator:
         cutoff_48h = now - datetime.timedelta(hours=48)
 
         # Columns included in the final display tables (internal-only fields excluded)
-        _DISPLAY_COLS = ['hostname', 'ip', 'labels', 'policy_sync',
-                         'last_heartbeat', 'policy_received', 'paired_at', 'ven_version']
+        _DISPLAY_COLS = ['hostname', 'ip', 'role', 'app', 'env', 'loc',
+                         'policy_sync', 'last_heartbeat', 'policy_received',
+                         'paired_at', 'ven_version']
         _COL_RENAME = {
             'hostname':        'Hostname',
             'ip':              'IP',
-            'labels':          'Labels',
+            'role':            'Role',
+            'app':             'App',
+            'env':             'Env',
+            'loc':             'Loc',
             'policy_sync':     'Policy Sync',
             'last_heartbeat':  'Last Heartbeat',
             'policy_received': 'Policy Received',

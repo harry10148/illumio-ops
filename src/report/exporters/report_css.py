@@ -132,6 +132,13 @@ BASE_CSS = """\
   .report-table tbody tr:nth-child(even) td { background: var(--tan); }
   .report-table tbody tr:hover td { background: var(--tan-120); transition: background .12s ease; }
 
+  /* Long cell content (e.g., change_detail JSON): collapse to summary by
+     default; expand on click. In print, the expanded body is hidden via
+     the main print-media block so the row width stays sane. */
+  .cell-long summary { cursor: pointer; list-style: none; }
+  .cell-long summary::-webkit-details-marker { display: none; }
+  .cell-long > .cell-long-full { margin: 4px 0 0; padding: 6px 8px; background: rgba(26,44,50,.04); border-left: 2px solid var(--slate-30); border-radius: 4px; white-space: pre-wrap; word-break: break-word; font-family: var(--font-mono); font-size: 11px; max-height: 280px; overflow: auto; }
+
   /* .th-label sits inside th's content-box. The 28px right-padding on th
      already reserves room for the absolutely-positioned .sort-indicator — no
      additional padding needed here, or the label double-pads and truncates. */
@@ -307,6 +314,8 @@ BASE_CSS = """\
     .report-cover { display: flex !important; flex-direction: column !important; justify-content: space-between !important; min-height: 100vh !important; padding: 40px 36px !important; margin: 0 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
     /* Clip Plotly chart containers to prevent legend/axis overflow into adjacent content */
     .chart-container { page-break-inside: avoid; overflow: hidden; }
+    /* Hide expanded long-text body in print; only the summary (truncated text) shows */
+    .cell-long > .cell-long-full { display: none; }
     .chart-container > div { zoom: 0.65; }
     .finding-card { page-break-inside: avoid; }
     footer { display: none; }

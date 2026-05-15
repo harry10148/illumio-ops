@@ -5,15 +5,32 @@ from typing import Callable
 
 from .report_i18n import STRINGS as _STRINGS
 
-# Tables with this many columns or more get the wide-panel treatment
-# (sticky first column + right-edge scroll-affordance gradient).
-WIDE_COL_THRESHOLD = 10
+# Tables qualify as "wide" (smaller print font + sticky first col + right-edge
+# scroll gradient) when EITHER column count crosses the threshold OR the
+# estimated row width exceeds the character budget.
+WIDE_COL_THRESHOLD = 8
+WIDE_CHARS_THRESHOLD = 120
 
 def _is_empty(value) -> bool:
     if value is None:
         return True
     text = str(value)
     return text in ("None", "nan", "NaT")
+
+
+def _estimate_row_max_chars(df, columns) -> int:
+    """Sum of per-column max-cell-length, capped — proxies A4 print width."""
+    if df is None or (hasattr(df, "empty") and df.empty):
+        return 0
+    total = 0
+    for col in columns:
+        try:
+            series = df[col].astype(str)
+            col_max = max(len(str(col)), int(series.str.len().max() or 0))
+        except Exception:
+            col_max = len(str(col))
+        total += min(col_max, 60)  # cap a single mega-col so total stays meaningful
+    return total
 
 def _default_cell(value) -> str:
     if _is_empty(value):
@@ -47,7 +64,10 @@ def render_df_table(
     n_cols = len(columns)
     interactive = n_cols >= 2
     compact = n_cols <= 3
-    wide = n_cols >= WIDE_COL_THRESHOLD
+    wide = (
+        n_cols >= WIDE_COL_THRESHOLD
+        or _estimate_row_max_chars(df, columns) > WIDE_CHARS_THRESHOLD
+    )
 
     table_cls_parts = ["report-table"]
     if interactive:

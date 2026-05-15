@@ -153,7 +153,10 @@ for key, zh_text in {
 for suffix, entry in {
     "hostname": ("Hostname", "主機名稱"),
     "ip": ("IP", "IP"),
-    "labels": ("Labels", "Labels"),
+    "role": ("Role", "Role"),
+    "app": ("App", "App"),
+    "env": ("Env", "Env"),
+    "loc": ("Loc", "Loc"),
     "policy_sync": ("Policy Sync", "Policy 同步"),
     "last_heartbeat": ("Last Heartbeat", "最後 Heartbeat"),
     "policy_received": ("Policy Received", "收到 Policy"),
