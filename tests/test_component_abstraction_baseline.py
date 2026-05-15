@@ -21,7 +21,7 @@ from tests._inline_scanner import (
 # Adjust the right-hand limit downward in each Task N.B step.
 BASELINES: dict[str, int] = {
     "kpi_cards": 0,           # all migrated to .kpi-card (Task 1)
-    "status_pills": 5,        # severity + policy-decision pills (measured 2026-05-15)
+    "status_pills": 3,        # 2 of 5 migrated in Task 2; 3 remain (uncovered/bandwidth tables)
     "filter_bar_buttons": 8,  # `height: 42px; align-self:flex-end;` repetitions
     "empty_states": 44,       # colspan + inline style across index.html + js (measured)
     "fieldset_sections": 5,   # fieldsets with style= attribute in index.html
