@@ -619,9 +619,7 @@ class HtmlExporter:
             + summary_pills +
             f'<h2>{_s("rpt_tr_maturity_heading")}</h2>'
             + maturity_html +
-            f'<h2>{_s("rpt_key_metrics")}</h2>'
-            '<div class="kpi-grid">' + kpi_cards + '</div>'
-            + trend_html +
+            trend_html +
             f'<h2>{_s("rpt_key_findings")}</h2>' + key_findings_html +
             attack_summary_html +
             '</section>\n' +

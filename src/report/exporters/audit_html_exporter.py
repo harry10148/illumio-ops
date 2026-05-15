@@ -230,8 +230,6 @@ class AuditHtmlExporter:
             + mod00.get("generated_at", "") + period_part + "</p></div>"
             + summary_pills
             + self._attention_section(mod00.get("attention_items", []))
-            + f'<h2>{_s("rpt_key_metrics")}</h2>'
-            + '<div class="kpi-grid">' + kpi_cards + "</div>"
             + self._trend_deltas_html()
             + self._severity_dist_html(mod00)
             + f'<h2>{_s("rpt_au_top_events")}</h2>'

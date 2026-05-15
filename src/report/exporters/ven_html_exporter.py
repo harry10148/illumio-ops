@@ -141,7 +141,6 @@ class VenHtmlExporter:
             + gen_at
             + "</p></div>"
             + self._summary_pills(online_count, offline_count, today_count, yest_count)
-            + f'<div class="kpi-grid">{kpi_cards}</div>'
             + status_chart_html
             + "</section>\n"
             + self._section("online", "rpt_ven_sec_online_title", online_count, _df_to_html(df_online), "rpt_ven_sec_online_intro", "online", "ven_online_inventory")

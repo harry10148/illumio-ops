@@ -198,7 +198,6 @@ class PolicyUsageHtmlExporter:
                                       detail_level="full",
                                       lang=self._lang)
             + self._summary_pills(mod00)
-            + self._kpi_html(mod00.get("kpis", []))
             + self._execution_html(mod00)
             + self._attention_html(mod00.get("attention_items", []))
             + "</section>\n"
