@@ -232,6 +232,11 @@ Get-Service IllumioOps
 升級後保留的檔案：`config/config.json`、`config/alerts.json`、
 `config/rule_schedules.json`、`logs/`、`data/pce_cache.sqlite`。
 
+**各版本遷移腳本** — 部分版本會附帶 `scripts/migrate_*.py` 一次性腳本，
+用來改寫操作人員擁有的狀態檔（例如 v3.26.0 將 alerts.json 鍵值化）。
+請在升級安裝器執行完畢後執行；腳本具備冪等性。完整指令請參閱
+[發佈流程 — 各版本遷移腳本](contributing/release-process.md)。
+
 ## 驗證安裝成功
 
 在瀏覽器開啟儀表板：

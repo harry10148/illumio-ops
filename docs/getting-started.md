@@ -236,6 +236,13 @@ Get-Service IllumioOps
 Files preserved across upgrades: `config/config.json`, `config/alerts.json`,
 `config/rule_schedules.json`, `logs/`, `data/pce_cache.sqlite`.
 
+**Per-version migration scripts** — some releases ship a one-shot script under
+`scripts/migrate_*.py` that rewrites operator-owned state (e.g. alerts.json
+keys in v3.26.0). Run after the upgrade installer finishes; the scripts are
+idempotent. See
+[Release Process — Per-version migration scripts](contributing/release-process.md)
+for exact invocations.
+
 ## Verify it worked
 
 Open the dashboard in a browser:

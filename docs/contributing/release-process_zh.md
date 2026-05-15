@@ -124,8 +124,56 @@ sudo systemctl restart illumio-ops.service
 關於完整的操作人員升級 SOP（包含 Windows / NSSM 及 config 保存細節），
 請參閱[入門指南 — 升級章節](../getting-started.md)。
 
-> **TODO：** `scripts/install.sh` 穩定後，對照確認確切的 `pip install` 指令
-> — 以上內容依據 UPGRADE.md 模式撰寫。
+**離線安裝包安裝器（`scripts/install.sh`）**：透過檢查 `<INSTALL_ROOT>/config/config.json`
+是否存在來判斷升級情境，並設定 `IS_UPGRADE=true`。其內部執行的 pip 指令為：
+
+```bash
+"$INSTALL_ROOT/python/bin/python3" -m pip install \
+    --no-index --find-links "$SRC/wheels" \
+    -r requirements-offline.txt
+```
+
+相依套件更新完成後，**僅在** `IS_UPGRADE=true` 時自動重啟 `illumio-ops.service`；
+全新安裝則保持服務停止，讓操作人員先確認設定。
+
+---
+
+## 各版本遷移腳本
+
+部分版本會附帶一次性遷移腳本，用於改寫操作人員擁有的狀態檔
+（`config/alerts.json`、`config/rule_schedules.json` 等）。腳本位於
+`scripts/migrate_*.py`，且**具備冪等性** — 重複執行為無作用。
+
+請在升級安裝器執行完畢後、正式仰賴新結構前執行。
+
+### v3.26.0 — alerts.json 鍵值化
+
+3.26.0 將規則的描述/建議文字搬到 `desc_key` / `rec_key`，使語言切換瞬時生效。
+既有未鍵值化的規則仍可運作（loader 會以 `[MISSING:*]` 標記回退至文字直到遷移）。
+執行一次：
+
+```bash
+# Linux（離線安裝包安裝）
+sudo -u illumio-ops /opt/illumio-ops/python/bin/python3 \
+    /opt/illumio-ops/scripts/migrate_rules_to_keys.py \
+    --config /opt/illumio-ops/config/config.json --write
+
+# 原始碼 / 開發環境
+python3 scripts/migrate_rules_to_keys.py --config config/config.json --write
+```
+
+```powershell
+# Windows (NSSM 安裝)
+& C:\illumio-ops\python\python.exe `
+    C:\illumio-ops\scripts\migrate_rules_to_keys.py `
+    --config C:\illumio-ops\config\config.json -Write
+```
+
+所有規則皆完成轉換後，再執行一次為無作用。
+
+### 其他版本
+
+目前無強制遷移。
 
 ---
 

@@ -124,8 +124,59 @@ sudo systemctl restart illumio-ops.service
 For the full operator-facing upgrade SOP (including Windows / NSSM and config
 preservation details) see [Getting Started — Upgrade section](../getting-started.md).
 
-> **TODO:** Confirm exact `pip install` invocation against `scripts/install.sh`
-> once that script is stable — the above reflects the UPGRADE.md pattern.
+**Offline-bundle installer (`scripts/install.sh`)**: detects an existing install
+by checking for `<INSTALL_ROOT>/config/config.json` and sets `IS_UPGRADE=true`.
+The internal pip invocation it runs is:
+
+```bash
+"$INSTALL_ROOT/python/bin/python3" -m pip install \
+    --no-index --find-links "$SRC/wheels" \
+    -r requirements-offline.txt
+```
+
+After the dependency refresh, the installer restarts `illumio-ops.service` only
+when `IS_UPGRADE=true` — fresh installs leave the service stopped so the
+operator can review settings first.
+
+---
+
+## Per-version migration scripts
+
+Some releases ship a one-shot migration that rewrites operator-owned state
+(`config/alerts.json`, `config/rule_schedules.json`, etc.). Scripts live in
+`scripts/migrate_*.py` and are **idempotent** — safe to re-run.
+
+Run AFTER the upgrade installer completes, but BEFORE relying on the new
+schema in production.
+
+### v3.26.0 — alerts.json keys
+
+3.26.0 moved rule description/recommendation text into `desc_key` / `rec_key`
+so language switching is instant. Existing rules without keys keep working
+(loader falls back to a `[MISSING:*]` marker until migrated). Run once:
+
+```bash
+# Linux (offline-bundle install)
+sudo -u illumio-ops /opt/illumio-ops/python/bin/python3 \
+    /opt/illumio-ops/scripts/migrate_rules_to_keys.py \
+    --config /opt/illumio-ops/config/config.json --write
+
+# Source / development install
+python3 scripts/migrate_rules_to_keys.py --config config/config.json --write
+```
+
+```powershell
+# Windows (NSSM install)
+& C:\illumio-ops\python\python.exe `
+    C:\illumio-ops\scripts\migrate_rules_to_keys.py `
+    --config C:\illumio-ops\config\config.json -Write
+```
+
+Re-running once all rules are converted is a no-op.
+
+### Other versions
+
+No mandatory migrations.
 
 ---
 
