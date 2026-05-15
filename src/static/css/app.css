@@ -1093,6 +1093,30 @@
       flex: 1;
     }
 
+    /* Filter Bar - wraps form-groups + action buttons in a single horizontal row.
+       Solves the repeated `height: 42px; align-self: flex-end;` inline hack used
+       across panel toolbars. Apply as `<div class="toolbar filter-bar">`.        */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--toolbar-gap);
+      align-items: flex-end;
+      margin-bottom: var(--toolbar-gap);
+    }
+    .filter-bar .form-group {
+      margin-bottom: 0;
+      min-width: 120px;
+    }
+    .filter-bar .btn {
+      align-self: flex-end;
+      height: 42px;
+    }
+    .filter-bar .spacer { flex: 1; }
+    .filter-bar > input,
+    .filter-bar > select {
+      align-self: flex-end;
+    }
+
     .badge {
       background: var(--accent);
       color: #fff;

@@ -297,7 +297,7 @@
     <div id="q-panel-traffic" class="q-panel active">
       <fieldset>
         <legend data-i18n="gui_ta_query">Traffic Analysis Query</legend>
-        <div class="toolbar">
+        <div class="toolbar filter-bar">
           <div class="form-group" style="margin-bottom:0;">
             <label data-i18n="gui_window">Window</label>
             <select id="qt-mins" style="width:120px;">
@@ -323,19 +323,19 @@
           </div>
 
           <div class="spacer"></div>
-          <button class="btn btn-secondary" data-action="openQtFiltersModal" style="height: 42px; align-self:flex-end;"
+          <button class="btn btn-secondary" data-action="openQtFiltersModal"
             title="Advanced Filters" data-i18n-title="gui_adv_filters_tooltip">
             <svg class="icon">
               <use href="#icon-settings"></use>
             </svg> <span data-i18n="gui_filter_settings">Filter Settings</span>
           </button>
-          <button class="btn btn-secondary" data-action="openQtGuideModal" style="height: 42px; align-self:flex-end;"
+          <button class="btn btn-secondary" data-action="openQtGuideModal"
             title="Parameter Guide" data-i18n-title="gui_param_guide">
             <svg class="icon">
               <use href="#icon-help-circle"></use>
             </svg> <span data-i18n="gui_param_guide">Guide</span>
           </button>
-          <button id="btn-run-traffic-query" class="btn btn-primary" data-action="runTrafficAnalyzer" style="height: 42px; align-self:flex-end;">
+          <button id="btn-run-traffic-query" class="btn btn-primary" data-action="runTrafficAnalyzer">
             <svg class="icon">
               <use href="#icon-search"></use>
             </svg> <span data-i18n="gui_query_flow">Query Flow</span>
@@ -387,7 +387,7 @@
     <div id="q-panel-workloads" class="q-panel">
       <fieldset>
         <legend data-i18n="gui_ws_search">Advanced Workload Search</legend>
-        <div class="toolbar">
+        <div class="toolbar filter-bar">
           <div class="form-group" style="margin-bottom:0; flex:1;">
             <label data-i18n="gui_workload_name">Workload Name</label>
             <input id="qw-name" name="workload-name" autocomplete="workload-name" spellcheck="false"
@@ -403,7 +403,7 @@
             <input id="qw-host" name="workload-hostname" autocomplete="workload-hostname" spellcheck="false"
               placeholder="Hostname match" data-i18n-placeholder="gui_ws_hostname_placeholder">
           </div>
-          <button id="btn-run-workload-search" class="btn btn-primary" data-action="runWorkloadSearch" style="height: 42px; align-self:flex-end;">
+          <button id="btn-run-workload-search" class="btn btn-primary" data-action="runWorkloadSearch">
             <svg class="icon">
               <use href="#icon-search"></use>
             </svg> <span data-i18n="gui_find">Find</span>
