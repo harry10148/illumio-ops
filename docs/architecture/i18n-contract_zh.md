@@ -275,7 +275,7 @@ JSON 物件（快照 KPI、FieldMeta、圖表規格）中的 `label_key` 欄位
 
 ## 新增鍵值的步驟
 
-> 完整步驟說明：請參閱 [i18n Workflow](../contributing/i18n-workflow.md) *(B3 deliverable — TODO: B3 合併後連結才會生效)*。
+> 完整步驟說明：請參閱 [i18n Workflow](../contributing/i18n-workflow.md)。
 
 簡短版本：
 

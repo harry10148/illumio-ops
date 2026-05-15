@@ -60,9 +60,9 @@ related_docs:
 |---|---|---|
 | `rule_high_blocked` | 大量封鎖流量 | 10 分鐘內 ≥ 25 筆封鎖流量 |
 
-> [!TODO] @harry: 確認 `rule_pce_health`（`"type": "system"`）是否出現在預設安裝的
-> `alerts.json` 中，或僅可透過自訂新增 — `src/config.py` 在 i18n 中有定義，但未列在
-> `_best_practice_rules` 中。
+> [!NOTE] **2026-05-15 已稽核**：`rule_pce_health` **目前未註冊**。`src/config.py` 中保留了
+> i18n 鍵供未來使用，但該規則既未列在 `_best_practice_rules`，也未出現在任何預設
+> `alerts.json` 中。視為「規劃中但尚未實作」的警示，目前不會觸發。
 
 ---
 

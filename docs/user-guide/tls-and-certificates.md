@@ -229,11 +229,12 @@ Each PCE profile in `config.json` has a `verify_ssl` boolean:
 
 ### Custom CA bundle
 
-> TODO: verify whether a per-profile `ca_bundle` / `tls_ca_bundle` path is exposed
-> in the current config model.  The data model (`src/config/`) contains a
-> `tls_ca_bundle: Optional[str]` field on the SIEM config, but its applicability to
-> PCE profiles is not confirmed from current code.  Check `src/config/models.py` and
-> the PCE API client before documenting.
+> [!NOTE] **Audited 2026-05-15**: PCE profiles have **no** custom-CA-bundle field today.
+> `tls_ca_bundle` exists in `src/config_models.py:224` but is **SIEM-only** (used by
+> `src/siem/transports/syslog_tls.py` for syslog-TLS destinations). For PCE-side TLS, the
+> only available controls are `verify_ssl: true|false` plus the system trust store.
+> If you need a custom CA for a private PCE, install it into the system trust store on the
+> illumio-ops host (e.g. `/etc/pki/ca-trust/source/anchors/` on RHEL).
 
 ### Lab / self-signed PCE
 

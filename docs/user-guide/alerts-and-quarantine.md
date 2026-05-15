@@ -60,9 +60,10 @@ Each row maps a `name_key` to the PCE event type(s) it watches.
 |---|---|---|
 | `rule_high_blocked` | High Blocked Traffic volume | ≥ 25 blocked flows in 10 min window |
 
-> [!TODO] @harry: confirm whether `rule_pce_health` (`"type": "system"`) appears in a default
-> `alerts.json` install or only via custom addition — `src/config.py` defines it in i18n but it
-> is not listed in `_best_practice_rules`.
+> [!NOTE] **Audited 2026-05-15**: `rule_pce_health` is **not currently registered**. The i18n
+> key is reserved in `src/config.py` for the future, but the rule does not appear in
+> `_best_practice_rules` nor in any default `alerts.json`. Treat as a planned-but-unimplemented
+> alert; it has no effect today.
 
 ---
 

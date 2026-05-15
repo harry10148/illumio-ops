@@ -335,7 +335,7 @@ GUI 啟動路徑中設定。
 ```
 logs/
 ├── illumio_ops.log     # 主要應用程式日誌（JSON 結構化行）
-├── modules/            # 每模組日誌檔案（TODO：驗證執行期是否實際填充）
+├── modules/            # 預留目錄；目前未實際寫入
 └── state.json          # 最後已知操作狀態（最後輪詢時間戳記等）
 ```
 
@@ -343,8 +343,9 @@ logs/
 JSON 結構化行可由 filebeat 或 rsyslog 擷取 — 參見 `deploy/filebeat.illumio_ops.yml`
 和 `deploy/rsyslog.illumio_ops.conf` 的參考設定。
 
-驗證時 `logs/modules/` 目錄存在但為空；每模組檔案日誌可能依日誌等級設定而有條件啟用。
-**TODO：** 驗證 `logs/modules/` 在生產環境中是否實際填充。
+**2026-05-15 已稽核**：`logs/modules/` 存在於磁碟上，但目前 `src/` 程式碼**沒有任何
+路徑寫入此目錄**；每模組檔案日誌**尚未實作**。在未來引入 per-module sink 之前，
+此目錄視為遺留物。
 
 ---
 

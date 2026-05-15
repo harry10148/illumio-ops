@@ -296,7 +296,7 @@ gaps on the surface that end users see.
 
 ## How to add a new key
 
-> Full step-by-step workflow: see [i18n Workflow](../contributing/i18n-workflow.md) *(B3 deliverable — TODO: link will resolve after B3 is merged)*.
+> Full step-by-step workflow: see [i18n Workflow](../contributing/i18n-workflow.md).
 
 Short version:
 

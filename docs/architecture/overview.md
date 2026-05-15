@@ -347,7 +347,7 @@ the GUI startup path.
 ```
 logs/
 ├── illumio_ops.log     # main application log (JSON-structured lines)
-├── modules/            # per-module log files (TODO: verify if populated at runtime)
+├── modules/            # placeholder directory; not currently written to
 └── state.json          # last-known operational state (last poll timestamp, etc.)
 ```
 
@@ -356,9 +356,9 @@ parameters in the startup config block. JSON-structured lines allow ingestion
 by filebeat or rsyslog — see `deploy/filebeat.illumio_ops.yml` and
 `deploy/rsyslog.illumio_ops.conf` for reference configurations.
 
-The `logs/modules/` directory was present in the worktree at verification time
-but empty; per-module file logging may be conditional on log-level config.
-**TODO:** verify whether `logs/modules/` is actively populated in production.
+**Audited 2026-05-15**: `logs/modules/` exists on disk but no current `src/`
+code writes to it; per-module file logging is **not currently wired**. Treat
+the directory as a vestige until/unless per-module sinks are introduced.
 
 ---
 

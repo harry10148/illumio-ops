@@ -235,9 +235,9 @@ A4 輸出的分頁、邊距與表格版面。
 
 目前程式碼中**不使用**任何伺服器端 PDF 函式庫（WeasyPrint、pdfkit、wkhtmltopdf）。
 
-> **TODO：** 確認 commit `92143a6` 之後是否新增了無頭瀏覽器 PDF 路徑
-> （Playwright / Chromium headless）。目前程式碼僅顯示 `html_exporter.py`
-> 中的 `window.print()`。
+> [!NOTE] **2026-05-15 已稽核**：尚未新增無頭瀏覽器 PDF 路徑。`src/report/exporters/`
+> 並未匯入 playwright、chromium、weasyprint 或 pdfkit。PDF 輸出仍是「以 HTML 渲染
+> 再透過 `window.print()` 列印」；`'pdf'` 格式選項實質上是 `'html'` 的別名。
 
 每次 HTML 和 XLSX 輸出旁都會由 `_write_report_metadata()` 寫入
 `.metadata.json` 附帶檔案。

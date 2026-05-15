@@ -238,9 +238,10 @@ layout for A4 output.
 No server-side PDF library (WeasyPrint, pdfkit, wkhtmltopdf) is used in the
 current codebase.
 
-> **TODO:** Confirm whether a headless-browser PDF path (Playwright / Chromium
-> headless) was added after commit `92143a6`. The current code only shows
-> `window.print()` in `html_exporter.py`.
+> [!NOTE] **Audited 2026-05-15**: no headless-browser PDF path has been added.
+> `src/report/exporters/` imports neither playwright, chromium, weasyprint nor
+> pdfkit. PDF output remains "HTML rendered and printed via `window.print()`";
+> the `'pdf'` format selector is functionally an alias for `'html'`.
 
 A `.metadata.json` sidecar is written alongside every HTML and XLSX output by
 `_write_report_metadata()`.

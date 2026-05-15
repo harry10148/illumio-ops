@@ -220,10 +220,11 @@ TLS 憑證的任何異動（自簽憑證更新或 CA 憑證匯入）都必須在
 
 ### 自訂 CA Bundle
 
-> TODO：確認目前的 config model 是否在 PCE profile 層級公開
-> `ca_bundle` / `tls_ca_bundle` 路徑設定。資料模型（`src/config/`）在 SIEM 設定上
-> 有 `tls_ca_bundle: Optional[str]` 欄位，但其是否適用於 PCE profile 尚未從目前
-> 程式碼確認。請在正式記錄前查閱 `src/config/models.py` 及 PCE API 用戶端。
+> [!NOTE] **2026-05-15 已稽核**：PCE profile 目前**沒有**自訂 CA bundle 欄位。
+> `tls_ca_bundle` 存在於 `src/config_models.py:224`，但**僅限 SIEM 端**（由
+> `src/siem/transports/syslog_tls.py` 用於 syslog-TLS 目的地）。PCE 端 TLS 僅能透過
+> `verify_ssl: true|false` + 系統信任儲存區控制。若需為私有 PCE 使用自訂 CA，請將其
+> 安裝至 illumio-ops 主機的系統信任儲存區（如 RHEL 上的 `/etc/pki/ca-trust/source/anchors/`）。
 
 ### 實驗室 / 自簽 PCE
 
