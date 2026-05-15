@@ -1,4 +1,4 @@
-"""Phase 10 parity: all 4 generators must accept html/csv/pdf/xlsx/all without crashing."""
+"""Parity: all 4 generators must accept html/csv/xlsx/all without crashing."""
 import pytest
 from unittest.mock import MagicMock, patch
 from dataclasses import dataclass, field
@@ -13,7 +13,7 @@ def _make_cm():
     return cm
 
 
-@pytest.mark.parametrize("fmt", ["html", "csv", "pdf", "xlsx", "all"])
+@pytest.mark.parametrize("fmt", ["html", "csv", "xlsx", "all"])
 def test_report_generator_export_accepts_format(tmp_path, fmt):
     from src.report.report_generator import ReportGenerator, ReportResult
     gen = ReportGenerator(_make_cm(), api_client=MagicMock())
@@ -28,7 +28,7 @@ def test_report_generator_export_accepts_format(tmp_path, fmt):
     assert isinstance(paths, list)
 
 
-@pytest.mark.parametrize("fmt", ["html", "csv", "pdf", "xlsx", "all"])
+@pytest.mark.parametrize("fmt", ["html", "csv", "xlsx", "all"])
 def test_audit_generator_export_accepts_format(tmp_path, fmt):
     from src.report.audit_generator import AuditGenerator, AuditReportResult
     import pandas as pd
@@ -47,7 +47,7 @@ def test_audit_generator_export_accepts_format(tmp_path, fmt):
     assert isinstance(paths, list)
 
 
-@pytest.mark.parametrize("fmt", ["html", "csv", "pdf", "xlsx", "all"])
+@pytest.mark.parametrize("fmt", ["html", "csv", "xlsx", "all"])
 def test_ven_generator_export_accepts_format(tmp_path, fmt):
     from src.report.ven_status_generator import VenStatusGenerator, VenStatusResult
     import pandas as pd
@@ -61,7 +61,7 @@ def test_ven_generator_export_accepts_format(tmp_path, fmt):
     assert isinstance(paths, list)
 
 
-@pytest.mark.parametrize("fmt", ["html", "csv", "pdf", "xlsx", "all"])
+@pytest.mark.parametrize("fmt", ["html", "csv", "xlsx", "all"])
 def test_policy_usage_generator_export_accepts_format(tmp_path, fmt):
     from src.report.policy_usage_generator import PolicyUsageGenerator, PolicyUsageResult
     import pandas as pd
@@ -77,18 +77,11 @@ def test_policy_usage_generator_export_accepts_format(tmp_path, fmt):
     assert isinstance(paths, list)
 
 
-def test_traffic_pdf_uses_html_exporter(tmp_path):
-    """fmt='pdf' now produces print-ready HTML via HtmlExporter (no ReportLab)."""
-    from src.report.report_generator import ReportGenerator, ReportResult
-    from unittest.mock import MagicMock, patch
-
-    gen = ReportGenerator(_make_cm(), api_client=MagicMock())
-    result = ReportResult(record_count=0, date_range=("2024-01-01", "2024-01-31"))
-    with patch("src.report.exporters.html_exporter.HtmlExporter.export", return_value=str(tmp_path / "r.html")) as html_exp, \
-         patch("src.report.exporters.html_exporter.HtmlExporter._build", return_value="<html></html>"), \
-         patch("src.report.report_generator.ReportGenerator._write_report_metadata"), \
-         patch("src.report.report_generator.ReportGenerator._build_report_metadata", return_value={}):
-        paths = gen.export(result, fmt="pdf", output_dir=str(tmp_path))
-    assert isinstance(paths, list)
-    assert len(paths) == 1
-    html_exp.assert_called_once()
+def test_traffic_pdf_rejected_after_removal():
+    """fmt='pdf' has been removed from the allowed format list; CLI/argparse should reject it."""
+    import re
+    import pathlib
+    src = pathlib.Path("src/main.py").read_text(encoding="utf-8")
+    m = re.search(r'choices=\[([^\]]+)\]', src)
+    assert m, "argparse choices not found in src/main.py"
+    assert '"pdf"' not in m.group(1), "pdf must not be a --format choice"

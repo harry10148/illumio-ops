@@ -69,7 +69,7 @@ def cross_label_flow_matrix(df: pd.DataFrame, top_n: int = 20) -> dict:
                 col_labels = list(mat_df.columns[1:].astype(str))
                 matrix_values = mat_df.iloc[:, 1:].values.tolist()
                 # Note: title literal carries the dynamic '(<key>)' suffix; the
-                # title_key resolves only the static base, so the localized PDF
+                # title_key resolves only the static base, so the localized chart
                 # title omits the suffix. The label key (env/app/...) is still
                 # visible via the heatmap's row/column labels.
                 chart_spec = {

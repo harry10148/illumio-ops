@@ -520,7 +520,7 @@ async function saveSchedule() {
   if (!name) { toast(_t('gui_msg_name_required'), true); return; }
 
   const fmt_val = $('sched-format').value;
-  const fmt = fmt_val === 'all' ? ['html', 'csv', 'pdf', 'xlsx'] : [fmt_val];
+  const fmt = fmt_val === 'all' ? ['html', 'csv', 'xlsx'] : [fmt_val];
   const recipsRaw = $('sched-recipients').value.trim();
   const recipients = recipsRaw ? recipsRaw.split('\n').map(r => r.trim()).filter(Boolean) : [];
 

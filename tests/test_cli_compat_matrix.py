@@ -60,12 +60,12 @@ def test_entrypoint_click_detection_matrix(argv, expected):
     ("args", "target_name", "expected_kwargs"),
     [
         (
-            ["--report", "--report-type", "traffic", "--source", "csv", "--file", "flows.csv", "--format", "pdf", "--email", "--output-dir", "out"],
+            ["--report", "--report-type", "traffic", "--source", "csv", "--file", "flows.csv", "--format", "xlsx", "--email", "--output-dir", "out"],
             "generate_traffic_report",
             {
                 "source": "csv",
                 "file_path": "flows.csv",
-                "fmt": "pdf",
+                "fmt": "xlsx",
                 "output_dir": "out",
                 "email": True,
                 "traffic_report_profile": "security_risk",
@@ -214,14 +214,14 @@ def test_legacy_gui_dispatches_launch_gui_with_port(monkeypatch):
             },
         ),
         (
-            ["report", "policy-usage", "--source", "csv", "--file", "workloader.csv", "--start-date", "2026-04-01", "--end-date", "2026-04-30", "--format", "pdf", "--output-dir", "out"],
+            ["report", "policy-usage", "--source", "csv", "--file", "workloader.csv", "--start-date", "2026-04-01", "--end-date", "2026-04-30", "--format", "xlsx", "--output-dir", "out"],
             "generate_policy_usage_report",
             {
                 "source": "csv",
                 "file_path": "workloader.csv",
                 "start_date": "2026-04-01",
                 "end_date": "2026-04-30",
-                "fmt": "pdf",
+                "fmt": "xlsx",
                 "output_dir": "out",
             },
         ),

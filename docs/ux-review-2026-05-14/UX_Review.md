@@ -213,7 +213,7 @@
 | 報表 | 大小 | 觀察 |
 |---|---|---|
 | VEN Status (`raw_ven.png`) | 4.9 MB | ✅ 結構清楚（KPI / 環形圖 / Online / Offline / Lost），TOC sidebar 良好 |
-| Traffic SecurityRisk (`rep_traffic_*.png`) | 5.0 MB | ✅ 12+ 區塊 + Print/PDF sticky；🟠 KPI 區段「Executive Summary」與下方「Key Metrics」5 個指標完全重複；🟠 數值 `6062571061.6` 應顯示為「6.06 GB」 |
+| Traffic SecurityRisk (`rep_traffic_*.png`) | 5.0 MB | ✅ 12+ 區塊 + print sticky（瀏覽器列印 PDF 用）；🟠 KPI 區段「Executive Summary」與下方「Key Metrics」5 個指標完全重複；🟠 數值 `6062571061.6` 應顯示為「6.06 GB」 |
 | Audit Report (`rep_audit_*.png`) | 5.1 MB | ✅ 6 個 KPI cards 簡潔；attention required events list 易讀 |
 | Policy Usage (`rep_pu_*.png`) | 4.9 MB | 🟠 P1 重複 KPI 兩次（exec summary banner + 標題下 mini KPI），且「Submitted N new async queries」也重複出現兩次 |
 
@@ -377,7 +377,7 @@ ven-status             Generate VEN Status Report.
 ```
 --source [api|csv]              <- 無描述
 --file PATH                     <- 何時必填？格式？
---format [html|csv|pdf|xlsx|all]<- 無描述
+--format [html|csv|pdf|xlsx|all]<- 無描述（注意：`pdf` 已 deprecated，與 `html` 同路徑只產 HTML，使用者自行於瀏覽器列印為 PDF；應從 CLI choices 移除）
 --output-dir PATH               <- 無描述
 --email                          <- 是 flag 還是 takes value？
 --profile [security_risk|...]   <- 唯一一個有 description

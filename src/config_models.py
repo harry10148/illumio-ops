@@ -89,7 +89,7 @@ class ReportSettings(_Base):
                          "friday", "saturday", "sunday"] = "monday"
     hour: int = Field(default=8, ge=0, le=23)
     source: Literal["api", "csv"] = "api"
-    format: list[Literal["html", "csv", "pdf", "xlsx", "all"]] = Field(default_factory=lambda: ["html"])
+    format: list[Literal["html", "csv", "xlsx", "all"]] = Field(default_factory=lambda: ["html"])
     email_report: bool = False
     output_dir: str = "reports/"
     retention_days: int = Field(default=30, ge=1)

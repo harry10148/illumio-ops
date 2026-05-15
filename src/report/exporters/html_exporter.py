@@ -86,7 +86,7 @@ def render_appendix(title: str, body_html: str, *, detail_level: str, lang: str 
 
 
 def _render_chart_for_html(chart_spec: dict | None, include_js: bool = True) -> str:
-    """Emit plotly interactive div. Matplotlib PNG is PDF-only; never shown in HTML."""
+    """Emit plotly interactive div. Matplotlib PNG is Excel-only; never shown in HTML."""
     if not chart_spec:
         return ''
     try:

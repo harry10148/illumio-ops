@@ -344,7 +344,7 @@ class ReportGenerator:
         # produced no file (previously swallowed by silent except → empty paths).
         self.last_export_errors: dict[str, str] = {}
 
-        if fmt in ('html', 'pdf', 'all', 'all_raw'):
+        if fmt in ('html', 'all', 'all_raw'):
             path = HtmlExporter(
                 result.module_results,
                 data_source=result.data_source,

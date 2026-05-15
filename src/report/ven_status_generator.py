@@ -78,7 +78,7 @@ class VenStatusGenerator:
         from src.report.exporters.csv_exporter import CsvExporter
         os.makedirs(output_dir, exist_ok=True)
         paths = []
-        if fmt in ('html', 'pdf', 'all'):
+        if fmt in ('html', 'all'):
             path = VenHtmlExporter(result.module_results, df=result.dataframe, lang=lang,
                                    pce_url=pce_url, org_name=org_name).export(output_dir)
             paths.append(path)

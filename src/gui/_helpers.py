@@ -272,7 +272,7 @@ _ROOT_DIR = os.path.dirname(_PKG_DIR)                  # project root
 # Report / config / state path helpers
 # ---------------------------------------------------------------------------
 
-_ALLOWED_REPORT_FORMATS = frozenset({'html', 'csv', 'pdf', 'xlsx', 'all'})
+_ALLOWED_REPORT_FORMATS = frozenset({'html', 'csv', 'xlsx', 'all'})
 
 def _resolve_reports_dir(cm_ref: ConfigManager) -> str:
     """Return absolute path to the report output directory."""

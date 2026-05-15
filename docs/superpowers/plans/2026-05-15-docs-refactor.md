@@ -643,7 +643,7 @@ INDEX is the linchpin all later docs link back to in their breadcrumb.
 **Source-of-truth references:**
 - `src/report/` (71 files — biggest module)
 - `src/report/rules/` (security rules definitions)
-- `src/report/exporters/` (HTML / PDF / CSV exporters)
+- `src/report/exporters/` (HTML / CSV / XLSX exporters；PDF 由使用者於瀏覽器列印 HTML 產生，無獨立 exporter)
 - `src/report/parsers/` (data ingestion)
 - `src/report/analysis/` (business logic)
 - Existing `docs/Report_Modules.md`, `docs/Security_Rules_Reference.md` (treat as **stale reference**)
@@ -1292,7 +1292,7 @@ related_docs:
 3. `## Parsers` — `src/report/parsers/`
 4. `## Analysis modules` — `src/report/analysis/`
 5. `## Rules engine` — `src/report/rules/`
-6. `## Exporters` — HTML, PDF (HTML+CSS via WeasyPrint or similar; ReportLab removed), CSV, XLSX
+6. `## Exporters` — HTML（含 print CSS，使用者於瀏覽器列印成 PDF；ReportLab / WeasyPrint 已移除）、CSV、XLSX
 7. `## Print layout & wide-table handling` (per recent fixes)
 8. `## Caching of intermediate results`
 9. `## How to add a new report module`

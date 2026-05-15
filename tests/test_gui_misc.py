@@ -13,9 +13,9 @@ def test_allowed_report_formats_constant_exists():
     )
     assert 'html' in gui._ALLOWED_REPORT_FORMATS
     assert 'csv' in gui._ALLOWED_REPORT_FORMATS
-    assert 'pdf' in gui._ALLOWED_REPORT_FORMATS
     assert 'xlsx' in gui._ALLOWED_REPORT_FORMATS
     assert 'all' in gui._ALLOWED_REPORT_FORMATS
+    assert 'pdf' not in gui._ALLOWED_REPORT_FORMATS
 
 
 def test_save_settings_preserves_secret_when_value_is_redaction_placeholder(client, temp_config_file):

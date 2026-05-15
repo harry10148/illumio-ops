@@ -690,7 +690,7 @@ class AuditGenerator:
         from src.report.exporters.audit_html_exporter import AuditHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
         paths = []
-        if fmt in ('html', 'pdf', 'all'):
+        if fmt in ('html', 'all'):
             path = AuditHtmlExporter(
                 result.module_results, df=result.dataframe,
                 date_range=result.date_range, data_source=result.source,

@@ -1,4 +1,4 @@
-"""pygments wrapper for syntax highlighting in HTML/PDF reports."""
+"""pygments wrapper for syntax highlighting in HTML reports."""
 from __future__ import annotations
 
 from pygments import highlight

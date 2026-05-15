@@ -59,21 +59,20 @@ def _redact_log_record(record):
 
 _NOISY_LIBS = frozenset({
     "fontTools", "fonttools",
-    "weasyprint", "pydyf", "cssselect2", "tinycss2",
-    "brotli", "PIL", "matplotlib",
+    "PIL", "matplotlib",
 })
 
 
 class _StdLibInterceptHandler(logging.Handler):
     """Route stdlib logging calls (from 3rd-party libs) into loguru.
 
-    Noisy font/PDF libs are hard-filtered below WARNING at the handler
+    Noisy font/chart libs are hard-filtered below WARNING at the handler
     level — setLevel() alone is unreliable because submodule loggers
     (e.g. fontTools.subset) may be created before the parent level is set.
     """
 
     def emit(self, record: logging.LogRecord) -> None:
-        # Hard-suppress verbose INFO/DEBUG from font & PDF rendering libs
+        # Hard-suppress verbose INFO/DEBUG from font & chart rendering libs
         if record.levelno < logging.WARNING:
             top = record.name.split(".")[0]
             if top in _NOISY_LIBS:
@@ -141,8 +140,8 @@ def setup_loguru(
 
     logging.basicConfig(handlers=[_StdLibInterceptHandler()], level=0, force=True)
 
-    # Suppress verbose INFO/DEBUG noise from PDF/font rendering libraries
-    for _lib in ("fontTools", "weasyprint", "pydyf", "cssselect2", "tinycss2", "brotli"):
+    # Suppress verbose INFO/DEBUG noise from font/chart rendering libraries
+    for _lib in ("fontTools",):
         logging.getLogger(_lib).setLevel(logging.WARNING)
 
 

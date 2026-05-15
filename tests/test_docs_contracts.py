@@ -115,8 +115,8 @@ def test_report_format_and_click_examples_match_cli_contracts():
         for fragment in stale_fragments:
             assert fragment not in text, f"{path} contains stale fragment: {fragment}"
 
-    assert 'choices=["html", "csv", "pdf", "xlsx", "all"]' in _read("src/main.py")
-    assert '_REPORT_FORMATS = ["html", "csv", "pdf", "xlsx", "all"]' in _read("src/cli/report.py")
+    assert 'choices=["html", "csv", "xlsx", "all"]' in _read("src/main.py")
+    assert '_REPORT_FORMATS = ["html", "csv", "xlsx", "all"]' in _read("src/cli/report.py")
     assert "illumio-ops report traffic --format html" in docs["docs/User_Manual.md"]
     assert "illumio-ops report traffic --format html" in docs["docs/User_Manual_zh.md"]
 

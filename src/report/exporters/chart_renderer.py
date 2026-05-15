@@ -2,7 +2,7 @@
 
 Single chart_spec dict feeds both engines:
   - render_plotly_html(spec) -> str (HTML div, fully self-contained for offline use)
-  - render_matplotlib_png(spec) -> bytes (PNG for PDF/Excel embedding)
+  - render_matplotlib_png(spec) -> bytes (PNG for Excel embedding)
 
 chart_spec shape:
   {
@@ -110,7 +110,7 @@ def _resolve_chart_text(spec: dict[str, Any], field: str, *, lang: str = "en") -
     NOTE on silent failure: when the key IS set but the entry is missing
     from STRINGS (typo or stale key), we log a WARNING and fall back to
     the literal. This catches translation gaps in CI/dev logs that would
-    otherwise pass unnoticed (a zh_TW PDF showing English for one chart
+    otherwise pass unnoticed (a zh_TW report showing English for one chart
     is hard to spot in visual review).
     """
     key = spec.get(f"{field}_key")
@@ -316,7 +316,7 @@ def render_plotly_html(spec: dict[str, Any], *, include_js: bool = True) -> str:
     )
 
 def render_matplotlib_png(spec: dict[str, Any], *, lang: str = "en") -> bytes:
-    """Render chart spec as a PNG byte string (for PDF/Excel embedding).
+    """Render chart spec as a PNG byte string (for Excel embedding).
 
     Title and axis labels are resolved through `_resolve_chart_text` so that
     chart_specs carrying `title_key` / `x_label_key` / `y_label_key` render in

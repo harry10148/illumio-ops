@@ -244,7 +244,7 @@ class PolicyUsageGenerator:
         os.makedirs(output_dir, exist_ok=True)
         paths = []
 
-        if fmt in ('html', 'pdf', 'all'):
+        if fmt in ('html', 'all'):
             path = PolicyUsageHtmlExporter(
                 result.module_results,
                 df=result.dataframe,
