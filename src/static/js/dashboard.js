@@ -1154,10 +1154,24 @@ async function loadDashboard() {
     const d = await api('/api/status');
     if (d) {
       window._uiLang = (d.language === 'zh_TW') ? 'zh_TW' : 'en';
-      const _urlEl = $('hdr-meta-url');
-      if (_urlEl && d.api_url) _urlEl.textContent = d.api_url;
-      const _badge = $('hdr-meta');
-      if (_badge) _badge.title = `PCE: ${d.api_url || _urlEl?.textContent}  |  v${d.version}`;
+      const _hostEl = $('hdr-chip-host');
+      if (_hostEl && d.api_url) _hostEl.textContent = d.api_url;
+      const _chip = $('hdr-chip');
+      if (_chip) _chip.title = `PCE: ${d.api_url || _hostEl?.textContent}  |  v${d.version}`;
+      const _dot = $('hdr-chip-dot');
+      if (_dot) {
+        // pce_stats.event_poll_status: 'ok' | 'warn' | 'error' | 'unknown'
+        const polled = String((d.pce_stats || {}).event_poll_status || 'unknown').toLowerCase();
+        let status = 'unknown';
+        if (polled === 'ok') status = 'ok';
+        else if (polled === 'warn' || polled === 'degraded') status = 'warn';
+        else if (polled && polled !== 'unknown') status = 'err';
+        _dot.setAttribute('data-status', status);
+        const tooltipKey = status === 'ok' ? 'gui_hdr_status_ok'
+                        : status === 'warn' ? 'gui_hdr_status_warn'
+                        : status === 'err' ? 'gui_hdr_status_err' : '';
+        if (tooltipKey) _dot.setAttribute('title', _t(tooltipKey));
+      }
       const pceStats = d.pce_stats || {};
       const dispatchHistory = Array.isArray(d.dispatch_history) ? d.dispatch_history : [];
       const latestDispatch = dispatchHistory.length ? dispatchHistory[dispatchHistory.length - 1] : null;

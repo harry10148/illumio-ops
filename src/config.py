@@ -127,7 +127,13 @@ class ConfigManager:
                 alerts_file = os.path.join(os.path.dirname(os.path.abspath(config_file)), "alerts.json")
         self.alerts_file = alerts_file
         self.config = json.loads(json.dumps(_DEFAULT_CONFIG))  # deep copy
+        self._last_loaded_at: float | None = None
         self.load()
+
+    @property
+    def last_loaded_at(self) -> float | None:
+        """Unix-timestamp seconds of last successful load(); None before first load."""
+        return self._last_loaded_at
 
     def load(self):
         """Load and validate config.json via pydantic ConfigSchema."""
@@ -186,6 +192,10 @@ class ConfigManager:
         set_language(lang)
         self._resolve_rule_keys()
         self._ensure_web_gui_secret()
+        # Record success timestamp for header "Loaded" display.
+        # Set only on the success path (after side effects complete); reading
+        # config file errors above fall through to defaults but still finish here.
+        self._last_loaded_at = time.time()
 
     # Map rule filter_value → canonical name_key (for legacy alerts.json migration).
     # Built from apply_best_practices.event_specs; kept in sync manually.

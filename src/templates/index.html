@@ -124,40 +124,62 @@
       </svg>
       Illumio PCE Ops
     </h1>
-    <div id="hdr-meta" class="pce-badge" title="{{ t('gui_connected_pce', url=(pce_url or '—')) }}">
-      <svg class="icon" style="width:14px;height:14px;flex-shrink:0;color:var(--accent2);" aria-hidden="true">
-        <use href="#icon-shield"></use>
-      </svg>
-      <span id="hdr-meta-url">{{ pce_url or '—' }}</span>
-    </div>
-    <div id="hdr-stats" style="display:flex;gap:12px;align-items:center;font-size:0.75rem;color:var(--dim);"
-         title="{{ t('gui_config_loaded_title', when=(config_loaded_at | human_time_ago)) }}">
-      <span><span data-i18n="gui_rules_count">Rules</span>: <strong>{{ rules_count | human_number }}</strong></span>
-      <span><span data-i18n="gui_schedules_count">Schedules</span>: <strong>{{ schedules_count | human_number }}</strong></span>
-      <span title="{{ config_loaded_at }}"><span data-i18n="gui_config_loaded">Loaded</span>: {{ config_loaded_at | human_time_ago }}</span>
+    <div id="hdr-chip" class="pce-chip" role="status"
+         aria-label="{{ t('gui_hdr_chip_aria', rules=rules_count, schedules=schedules_count, loaded=(config_loaded_at | human_time_ago)) }}"
+         title="{{ t('gui_connected_pce', url=(pce_url or '—')) }}">
+      <span id="hdr-chip-dot" class="status-dot" data-status="unknown" aria-hidden="true"></span>
+      <span id="hdr-chip-host" class="pce-host">{{ (pce_url or '—') }}</span>
+      <span class="chip-sep" aria-hidden="true">|</span>
+      <span class="chip-kpi"><span data-i18n="gui_rules_count">Rules</span> <strong>{{ rules_count | human_number }}</strong></span>
+      <span class="chip-dot" aria-hidden="true">·</span>
+      <span class="chip-kpi"><span data-i18n="gui_schedules_count">Schedules</span> <strong>{{ schedules_count | human_number }}</strong></span>
+      <span class="chip-dot" aria-hidden="true">·</span>
+      <span class="chip-kpi" title="{{ config_loaded_at }}"><span data-i18n="gui_config_loaded">Loaded</span> {{ config_loaded_at | human_time_ago }}</span>
     </div>
     <div class="header-right">
-      <div class="ui-pref" aria-label="Theme mode selector">
-        <label for="ui-theme-mode" data-i18n="gui_theme">Theme</label>
-        <select id="ui-theme-mode" data-on-change="onUiThemeModeChange" data-arg-source="value">
-          <option value="auto" data-i18n="gui_auto">Auto</option>
-          <option value="dark" data-i18n="gui_dark">Dark</option>
-          <option value="light" data-i18n="gui_light">Light</option>
-        </select>
-      </div>
-      <div class="ui-pref" aria-label="Density selector">
-        <label for="ui-density" data-i18n="gui_density">Density</label>
-        <select id="ui-density" data-on-change="onUiDensityChange" data-arg-source="value">
-          <option value="compact" data-i18n="gui_compact">Compact</option>
-          <option value="comfortable" data-i18n="gui_comfortable">Comfortable</option>
-        </select>
-      </div>
-      <button class="btn btn-sm" data-action="mlOpen" data-i18n="gui_ml_logs_btn" style="padding:3px 10px;">Logs</button>
-      <button class="btn btn-secondary btn-sm" data-action="stopGui" title="{{ t('gui_stop_web_gui') }}" data-i18n="gui_stop">
-        <svg class="icon" aria-hidden="true" focusable="false">
-          <use href="#icon-stop"></use>
-        </svg> Stop
+      <button id="hdr-menu-btn" type="button"
+              class="btn btn-secondary btn-sm"
+              data-action="hdrMenuToggle"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="hdr-menu-panel"
+              data-i18n="gui_hdr_operations">
+        Operations
+        <svg class="icon" aria-hidden="true" style="margin-left:4px;">
+          <use href="#icon-settings"></use>
+        </svg>
       </button>
+      <div id="hdr-menu-panel" class="hdr-menu" role="menu"
+           aria-labelledby="hdr-menu-btn" hidden>
+        <div class="menu-row" role="none">
+          <label for="ui-theme-mode" data-i18n="gui_theme">Theme</label>
+          <select id="ui-theme-mode" data-on-change="onUiThemeModeChange" data-arg-source="value">
+            <option value="auto" data-i18n="gui_auto">Auto</option>
+            <option value="dark" data-i18n="gui_dark">Dark</option>
+            <option value="light" data-i18n="gui_light">Light</option>
+          </select>
+        </div>
+        <div class="menu-row" role="none">
+          <label for="ui-density" data-i18n="gui_density">Density</label>
+          <select id="ui-density" data-on-change="onUiDensityChange" data-arg-source="value">
+            <option value="compact" data-i18n="gui_compact">Compact</option>
+            <option value="comfortable" data-i18n="gui_comfortable">Comfortable</option>
+          </select>
+        </div>
+        <hr class="menu-divider">
+        <button class="menu-item" role="menuitem" type="button"
+                data-action="mlOpen" data-i18n="gui_ml_logs_btn">
+          <svg class="icon" aria-hidden="true"><use href="#icon-cpu"></use></svg>
+          Logs
+        </button>
+        <button class="menu-item danger" role="menuitem" type="button"
+                data-action="stopGui"
+                title="{{ t('gui_stop_web_gui') }}"
+                data-i18n="gui_stop">
+          <svg class="icon" aria-hidden="true"><use href="#icon-stop"></use></svg>
+          Stop
+        </button>
+      </div>
     </div>
   </div>
 
