@@ -1,0 +1,19 @@
+{
+  "_description": "Locked-down zh_TW translations for dashboard-scope keys. Han-ratio >= 0.8 enforced. Update with care; the change must also update tests/test_dashboard_kpi_translations.py APPROVED_ZH dict.",
+  "keys": {
+    "gui_dashboard_rules":      "規則數",
+    "gui_card_health_rule":     "健康檢查規則",
+    "gui_card_event_poll":      "事件輪詢",
+    "gui_card_last_dispatch":   "最後派送",
+    "gui_card_unknown_types":   "未知事件類型",
+    "gui_card_suppressed":      "已抑制",
+    "gui_card_ransomware_exp":  "Ransomware 暴露面",
+    "gui_attack_summary_title": "攻擊摘要（Boundary/Pivot/Blast Radius/Blind Spots/行動）",
+    "gui_cooldown_title":       "冷卻中規則"
+  },
+  "han_ratio_min": 0.8,
+  "han_ratio_exceptions": [
+    "gui_card_ransomware_exp",
+    "gui_attack_summary_title"
+  ]
+}

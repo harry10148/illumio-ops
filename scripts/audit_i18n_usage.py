@@ -657,6 +657,77 @@ def audit_zh_parity_against_en() -> list[Finding]:
 
 
 # ---------------------------------------------------------------------------
+# Category J — Dashboard approved zh_TW translations + Han-ratio gate
+
+DASHBOARD_APPROVED_PATH = ROOT / "src" / "i18n" / "data" / "dashboard_approved.json"
+_HAN_RE_J = re.compile(r"[一-鿿]")
+_PLACEHOLDER_RE_J = re.compile(r"\{[^{}]*\}")
+
+
+def _han_ratio_j(value: str) -> float:
+    """Return Han-character density over alphanumeric/CJK characters.
+
+    Placeholders like ``{count}`` are stripped first, then punctuation,
+    whitespace, and underscores are dropped. The remaining characters are
+    the population over which Han density is measured.
+    """
+    cleaned = _PLACEHOLDER_RE_J.sub("", value)
+    stripped = re.sub(r"[0-9\s\W_]+", "", cleaned, flags=re.UNICODE)
+    if not stripped:
+        return 1.0
+    han = sum(1 for ch in stripped if _HAN_RE_J.match(ch))
+    return han / len(stripped)
+
+
+def audit_dashboard_approved_translations() -> list[Finding]:
+    """Enforce locked-down zh_TW translations for dashboard mini-KPI keys.
+
+    Source of truth: ``src/i18n/data/dashboard_approved.json``. Each listed
+    key must match its approved zh_TW value exactly, and (unless in the
+    Han-ratio exception list) the value must score Han-ratio >= han_ratio_min.
+    """
+    findings: list[Finding] = []
+    if not DASHBOARD_APPROVED_PATH.exists():
+        return findings
+
+    data = _json.loads(DASHBOARD_APPROVED_PATH.read_text(encoding="utf-8"))
+    approved: dict[str, str] = data.get("keys", {})
+    ratio_min = float(data.get("han_ratio_min", 0.8))
+    exceptions = set(data.get("han_ratio_exceptions", []))
+
+    zh_rel = "src/i18n_zh_TW.json"
+    for key, want in approved.items():
+        got = ZH_MESSAGES.get(key)
+        if got != want:
+            findings.append(Finding(
+                category="J",
+                file=zh_rel,
+                line=None,
+                key=key,
+                detail=(
+                    f"dashboard approved value drift: expected {want!r}, "
+                    f"got {got!r}"
+                ),
+            ))
+            continue
+        if key in exceptions:
+            continue
+        ratio = _han_ratio_j(got)
+        if ratio < ratio_min:
+            findings.append(Finding(
+                category="J",
+                file=zh_rel,
+                line=None,
+                key=key,
+                detail=(
+                    f"Han-ratio {ratio:.2f} < {ratio_min:.2f} for value "
+                    f"{got!r} (add to han_ratio_exceptions if intentional)"
+                ),
+            ))
+    return findings
+
+
+# ---------------------------------------------------------------------------
 # Reporting
 
 CATEGORY_TITLES = {
@@ -669,6 +740,7 @@ CATEGORY_TITLES = {
     "G": "Keys referenced in code but missing from i18n_en.json",
     "H": "JS/HTML fallback literals (`_translations[key] || 'English text'`)",
     "I": "Tracked EN keys missing/empty in i18n_zh_TW.json",
+    "J": "Dashboard approved zh_TW translations + Han-ratio >= 0.8 gate",
 }
 
 
@@ -682,11 +754,11 @@ def write_markdown_report(groups: dict[str, list[Finding]]) -> None:
     lines.append("")
     lines.append("| Category | Description | Count |")
     lines.append("|---|---|---|")
-    for cat in "ABCDEFGHI":
+    for cat in "ABCDEFGHIJ":
         lines.append(f"| {cat} | {CATEGORY_TITLES[cat]} | {len(groups.get(cat, []))} |")
     lines.append("")
 
-    for cat in "ABCDEFGHI":
+    for cat in "ABCDEFGHIJ":
         findings = groups.get(cat, [])
         lines.append(f"## [{cat}] {CATEGORY_TITLES[cat]}")
         lines.append("")
@@ -714,7 +786,7 @@ def print_summary(groups: dict[str, list[Finding]]) -> None:
     print("=" * 70)
     print("i18n audit summary")
     print("=" * 70)
-    for cat in "ABCDEFGHI":
+    for cat in "ABCDEFGHIJ":
         count = len(groups.get(cat, []))
         marker = "FAIL" if count else " ok "
         print(f"  [{cat}] {marker} {count:4d}  {CATEGORY_TITLES[cat]}")
@@ -728,13 +800,13 @@ def print_summary(groups: dict[str, list[Finding]]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Comprehensive i18n audit")
-    parser.add_argument("--only", choices=list("ABCDEFGHI"), help="Only run one category")
+    parser.add_argument("--only", choices=list("ABCDEFGHIJ"), help="Only run one category")
     args = parser.parse_args()
 
     refs = collect_referenced_keys()
     groups: dict[str, list[Finding]] = {}
 
-    wanted = args.only or "ABCDEFGHI"
+    wanted = args.only or "ABCDEFGHIJ"
 
     if "A" in wanted or "B" in wanted:
         a, b = audit_placeholder_leaks(refs)
@@ -756,6 +828,8 @@ def main() -> int:
         groups["H"] = audit_js_translation_fallback_literals()
     if "I" in wanted:
         groups["I"] = audit_zh_parity_against_en()
+    if "J" in wanted:
+        groups["J"] = audit_dashboard_approved_translations()
 
     write_markdown_report(groups)
     print_summary(groups)

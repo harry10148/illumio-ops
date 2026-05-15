@@ -64,7 +64,7 @@ def test_non_glossary_categories_clean() -> None:
 
     env = {**os.environ, "PYTHONPATH": str(ROOT)}
     failures: list[str] = []
-    for cat in ("A", "B", "C", "D", "F", "G", "H", "I"):
+    for cat in ("A", "B", "C", "D", "F", "G", "H", "I", "J"):
         result = subprocess.run(
             [sys.executable, str(AUDIT_PATH), "--only", cat],
             cwd=str(ROOT),
@@ -78,4 +78,4 @@ def test_non_glossary_categories_clean() -> None:
             summary = result.stdout.strip()[-500:] or result.stderr.strip()[-500:]
             failures.append(f"Cat {cat}: exit {result.returncode}\n{summary}")
 
-    assert not failures, "Audit categories A-D, F-I must be clean:\n" + "\n".join(failures)
+    assert not failures, "Audit categories A-D, F-J must be clean:\n" + "\n".join(failures)
