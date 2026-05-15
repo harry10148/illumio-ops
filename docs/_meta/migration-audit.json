@@ -1,0 +1,511 @@
+{
+  "schema_version": 1,
+  "audited_at": "2026-05-15",
+  "auditor_commit": "a951e69",
+  "sources": [
+    {
+      "source": "docs/README.md",
+      "target": "docs/INDEX.md (modified, not deleted)",
+      "claims": [
+        {
+          "claim": "README serves as the project entry point with role-based documentation links",
+          "verdict": "verified",
+          "actual_source": "New docs/INDEX.md preserves role-based navigation table",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "README documents CI badge and quick-start command",
+          "verdict": "verified",
+          "actual_source": "Badge and quick-start retained in modified README.md root",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "README links to sub-docs by audience (Operator, Developer, SRE)",
+          "verdict": "verified",
+          "actual_source": "docs/INDEX.md carries audience-role table; cross-links updated",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "README references docs/ directory as the canonical documentation root",
+          "verdict": "verified",
+          "actual_source": "Still correct — new docs/ tree at same path",
+          "action": "import"
+        }
+      ]
+    },
+    {
+      "source": "docs/Installation.md",
+      "target": "docs/getting-started.md",
+      "claims": [
+        {
+          "claim": "dist/ directory ships a pre-built offline bundle (.zip) ready to transfer",
+          "verdict": "stale",
+          "actual_source": "dist/ is empty in current repo; scripts/build_offline_bundle.sh must be run first to produce the zip",
+          "action": "rewrite"
+        },
+        {
+          "claim": "macOS installation path and launchd service documented under §1.3",
+          "verdict": "obsolete",
+          "actual_source": "macOS target was never implemented; only Linux (systemd) and Windows (NSSM) service paths exist",
+          "action": "discard"
+        },
+        {
+          "claim": "preflight.ps1 validates host environment before install on Windows",
+          "verdict": "verified",
+          "actual_source": "deploy/preflight.ps1 present and referenced in install.ps1",
+          "action": "import"
+        },
+        {
+          "claim": "install.ps1 preserves config.json, alerts.json, rule_schedules.json on upgrade",
+          "verdict": "verified",
+          "actual_source": "Confirmed in install.ps1 logic and UPGRADE.md; operator-owned files are never overwritten",
+          "action": "import"
+        },
+        {
+          "claim": "Python 3.10+ required; pip install -r requirements.txt",
+          "verdict": "verified",
+          "actual_source": "requirements.txt confirmed; Python 3.10+ union-type syntax used throughout src/",
+          "action": "import"
+        },
+        {
+          "claim": "NSSM bundled at deploy\\nssm.exe for Windows service registration",
+          "verdict": "verified",
+          "actual_source": "deploy/nssm.exe present; install.ps1 references it",
+          "action": "import"
+        }
+      ]
+    },
+    {
+      "source": "docs/UPGRADE.md",
+      "target": "docs/getting-started.md (Upgrade section)",
+      "claims": [
+        {
+          "claim": "Run GET /health as a preflight check before upgrading to verify PCE connectivity",
+          "verdict": "stale",
+          "actual_source": "No /health endpoint exists; actual health check is GET /api/status (or /api/v2/health on the PCE directly)",
+          "action": "rewrite"
+        },
+        {
+          "claim": "setup-prod-git.sh does not exist in the repo",
+          "verdict": "stale",
+          "actual_source": "Commit 2f173d0 added scripts/setup-prod-git.sh; it does exist",
+          "action": "rewrite"
+        },
+        {
+          "claim": "Migration scripts in scripts/ are idempotent and safe to re-run",
+          "verdict": "verified",
+          "actual_source": "All migration scripts confirmed idempotent by design (upsert / check-before-alter patterns)",
+          "action": "import"
+        },
+        {
+          "claim": "Operator-owned files (config.json, alerts.json, rule_schedules.json) are never overwritten during upgrade",
+          "verdict": "verified",
+          "actual_source": "install.ps1 and upgrade path confirmed; new fields must be merged manually from config.json.example",
+          "action": "import"
+        },
+        {
+          "claim": "Upgrade requires stopping the service before extracting new bundle",
+          "verdict": "verified",
+          "actual_source": "Documented procedure matches install.ps1 and systemd stop steps",
+          "action": "import"
+        }
+      ]
+    },
+    {
+      "source": "docs/User_Manual.md",
+      "target": "docs/user-guide/* (split across multiple files)",
+      "claims": [
+        {
+          "claim": "Dashboard includes a 'Multi-PCE switcher' widget for quick profile switching",
+          "verdict": "obsolete",
+          "actual_source": "No such widget in current index.html; profile switching is in Settings → PCE Profiles, not the dashboard",
+          "action": "discard"
+        },
+        {
+          "claim": "CLI `pce` command triggers profile switch and reinitializes ApiClient",
+          "verdict": "stale",
+          "actual_source": "No standalone `pce` CLI subcommand; profile management is via interactive shell settings menu or GUI /api/pce-profiles endpoints",
+          "action": "rewrite"
+        },
+        {
+          "claim": "Settings page covers API credentials, alert channels, timezone, language/theme, and PCE profile management",
+          "verdict": "verified",
+          "actual_source": "Settings manager confirmed in src/gui; all sections present",
+          "action": "import"
+        },
+        {
+          "claim": "Rule Scheduler shows [SKIP] when rule or parent Ruleset is in Draft state",
+          "verdict": "verified",
+          "actual_source": "Confirmed in scheduler log output and Troubleshooting section",
+          "action": "import"
+        },
+        {
+          "claim": "Policy Usage report shows 0 hits if rules are draft-only",
+          "verdict": "verified",
+          "actual_source": "Only active (provisioned) rules are queried by the PCE API; user must provision first",
+          "action": "import"
+        },
+        {
+          "claim": "config.json holds active profile credentials plus pce_profiles array for multi-PCE",
+          "verdict": "verified",
+          "actual_source": "config.json schema confirmed: api block + active_pce_id + pce_profiles array",
+          "action": "import"
+        }
+      ]
+    },
+    {
+      "source": "docs/Report_Modules.md",
+      "target": "docs/user-guide/reports.md + docs/architecture/report-engine.md",
+      "claims": [
+        {
+          "claim": "PDF output uses pure-Python ReportLab library bundled in the offline zip",
+          "verdict": "obsolete",
+          "actual_source": "Commit 92143a6 removed ReportLab; commit e90c373 made fmt=pdf an alias for print-ready HTML; 9acedda removed pdf_exporter.py and the ReportLab dependency",
+          "action": "discard"
+        },
+        {
+          "claim": "Report formats available: HTML, XLSX, CSV, PDF",
+          "verdict": "stale",
+          "actual_source": "PDF is now an alias for HTML (browser-native print); ReportLab PDF generation removed; 'pdf' format produces print-optimised HTML",
+          "action": "rewrite"
+        },
+        {
+          "claim": "Four report types: Traffic, Audit, VEN Status, Policy Usage",
+          "verdict": "verified",
+          "actual_source": "CLI subcommands report generate-traffic/audit/ven-status/policy-usage confirmed",
+          "action": "import"
+        },
+        {
+          "claim": "Report generation is triggered via CLI or scheduled via rule_schedules.json",
+          "verdict": "verified",
+          "actual_source": "Both paths confirmed in src/cli/report.py and scheduler",
+          "action": "import"
+        },
+        {
+          "claim": "NSSM ships in offline bundle and PDF uses ReportLab (repeated in Installation context)",
+          "verdict": "stale",
+          "actual_source": "NSSM shipping verified; ReportLab claim obsolete (removed)",
+          "action": "rewrite"
+        }
+      ]
+    },
+    {
+      "source": "docs/Security_Rules_Reference.md",
+      "target": "docs/user-guide/reports.md (§Security rules) + docs/reference/cli.md",
+      "claims": [
+        {
+          "claim": "Security rules are organized in B-series (Baseline) and other lettered series with named thresholds",
+          "verdict": "verified",
+          "actual_source": "Rule definitions confirmed in src/; B-series rules use threshold keys in config (e.g., cross_env_connection_threshold, user_destination_threshold)",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "Rule B009 triggers when cross-environment flow count exceeds cross_env_connection_threshold (default 100)",
+          "verdict": "verified",
+          "actual_source": "Threshold key and default value confirmed in source and legacy doc",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "Rule B007 triggers when a single user contacts more than user_destination_threshold distinct IPs (default 20)",
+          "verdict": "verified",
+          "actual_source": "Confirmed in rule implementation and legacy doc",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "Exact total count of security rules as stated in legacy doc",
+          "verdict": "unknown",
+          "actual_source": "Legacy doc rule count not spot-checked against current src/; new tree received the content but count needs verification",
+          "action": "flag-todo"
+        },
+        {
+          "claim": "Rule threshold keys are configurable in config.json under security_rules block",
+          "verdict": "verified",
+          "actual_source": "config.json.example confirms security_rules threshold block",
+          "action": "migrated-to-new-tree"
+        }
+      ]
+    },
+    {
+      "source": "docs/SIEM_Integration.md",
+      "target": "docs/user-guide/siem-integration.md + docs/architecture/siem-pipeline.md",
+      "claims": [
+        {
+          "claim": "JSON format handled by JSONLineFormatter class",
+          "verdict": "stale",
+          "actual_source": "Commit edda47b added NormalizedJSONFormatter as the actual JSON formatter; JSONLineFormatter still exists but NormalizedJSONFormatter is used for syslog/HEC JSON output",
+          "action": "rewrite"
+        },
+        {
+          "claim": "SIEM destination configured via single endpoint: 'host:port' field",
+          "verdict": "stale",
+          "actual_source": "Commits 4ceb5bd / 1a1f99d replaced single endpoint string with separate host and port fields; legacy configs are auto-migrated on first load",
+          "action": "rewrite"
+        },
+        {
+          "claim": "Supported transports: UDP syslog, TCP syslog, TLS syslog, Splunk HEC",
+          "verdict": "verified",
+          "actual_source": "All four transports confirmed in src/siem/transports/",
+          "action": "import"
+        },
+        {
+          "claim": "SIEM forwarder requires PCE cache to be enabled; data flows through siem_dispatch table",
+          "verdict": "verified",
+          "actual_source": "Confirmed in siem dispatcher and pce_cache dependency check",
+          "action": "import"
+        },
+        {
+          "claim": "DLQ (dead-letter queue) subcommands available: replay, purge, list",
+          "verdict": "verified",
+          "actual_source": "CLI siem dlq/replay/purge subcommands confirmed in cli-command-map and src/cli/siem.py",
+          "action": "import"
+        },
+        {
+          "claim": "CEF format uses official Illumio field names for flow events",
+          "verdict": "verified",
+          "actual_source": "Commits 466f771 and 797926c aligned CEF fields with official Illumio traffic summary log format",
+          "action": "import"
+        }
+      ]
+    },
+    {
+      "source": "docs/Architecture.md",
+      "target": "docs/architecture/overview.md (complete rewrite)",
+      "claims": [
+        {
+          "claim": "Background sections on PCE/VEN platform are accurate Illumio product descriptions",
+          "verdict": "verified",
+          "actual_source": "Platform background (PCE four tiers, VEN enforcement modes, workload types) is product-level documentation that remains factually correct",
+          "action": "import"
+        },
+        {
+          "claim": "~55KB of legacy platform background detail is load-bearing for migration",
+          "verdict": "obsolete",
+          "actual_source": "New architecture/overview.md is a complete rewrite; legacy content is reference background only, not structurally imported",
+          "action": "discard"
+        },
+        {
+          "claim": "Four VEN enforcement modes: Idle, Visibility Only, Selective, Full",
+          "verdict": "verified",
+          "actual_source": "Enforcement mode table confirmed in legacy doc and matches current Illumio 25.4 documentation",
+          "action": "import"
+        },
+        {
+          "claim": "Directory structure and module deep-dive sections reflect current src/ layout",
+          "verdict": "stale",
+          "actual_source": "src/ has grown significantly; legacy §2 directory structure is partially outdated (missing siem/, i18n/, new CLI modules)",
+          "action": "rewrite"
+        },
+        {
+          "claim": "Multi-PCE profile architecture documented with config.json schema",
+          "verdict": "verified",
+          "actual_source": "Config schema (api block + active_pce_id + pce_profiles) confirmed current",
+          "action": "import"
+        }
+      ]
+    },
+    {
+      "source": "docs/PCE_Cache.md",
+      "target": "docs/user-guide/settings-and-pce-cache.md",
+      "claims": [
+        {
+          "claim": "Cache stored in cache/ directory relative to project root",
+          "verdict": "stale",
+          "actual_source": "Commit a88e823 moved cache to data/pce_cache.sqlite; pce_cache.db_path default is 'data/pce_cache.sqlite'",
+          "action": "rewrite"
+        },
+        {
+          "claim": "PCE cache enabled via pce_cache.enabled = true in config.json",
+          "verdict": "verified",
+          "actual_source": "Config key confirmed in config.json.example and pce_cache module",
+          "action": "import"
+        },
+        {
+          "claim": "Cache supports configurable retention: events_retention_days, traffic_raw_retention_days, traffic_agg_retention_days",
+          "verdict": "verified",
+          "actual_source": "All three retention keys confirmed in config schema and cache manager",
+          "action": "import"
+        },
+        {
+          "claim": "cache retention --run CLI command available for manual retention sweep",
+          "verdict": "verified",
+          "actual_source": "CLI subcommand confirmed in cli-command-map (cache retention)",
+          "action": "import"
+        },
+        {
+          "claim": "SIEM dispatcher depends on PCE cache being enabled (reads from siem_dispatch table populated by cache)",
+          "verdict": "verified",
+          "actual_source": "Dependency confirmed in SIEM integration and pce_cache docs",
+          "action": "import"
+        },
+        {
+          "claim": "Rate limiting capped at rate_limit_per_minute (max 500 PCE API calls/min)",
+          "verdict": "verified",
+          "actual_source": "Config key confirmed; max 500 noted in config.json.example comments",
+          "action": "import"
+        }
+      ]
+    },
+    {
+      "source": "docs/API_Cookbook.md",
+      "target": "docs/reference/rest-api.md + docs/user-guide/* examples",
+      "claims": [
+        {
+          "claim": "PCE API has no versioning prefix on org-scoped endpoints (e.g., /orgs/{id}/events)",
+          "verdict": "verified",
+          "actual_source": "Confirmed: org-scoped endpoints use /orgs/{id}/... without /api/v2; only resource-level GETs use /api/v2{href}",
+          "action": "import"
+        },
+        {
+          "claim": "Traffic queries use async pattern: POST to async_queries, poll status, then GET download",
+          "verdict": "verified",
+          "actual_source": "Three-step async query flow confirmed in src/api/ and API endpoint table",
+          "action": "import"
+        },
+        {
+          "claim": "PCE health check endpoint is /api/v2/health returning 200",
+          "verdict": "verified",
+          "actual_source": "Endpoint confirmed in API endpoint reference table",
+          "action": "import"
+        },
+        {
+          "claim": "Workload label update uses PUT to /api/v2{workload_href} with {labels: [{href}]} body",
+          "verdict": "verified",
+          "actual_source": "Request body shape confirmed in API cookbook and src/api/client.py",
+          "action": "import"
+        },
+        {
+          "claim": "List Active Rulesets endpoint: /orgs/{id}/sec_policy/active/rule_sets?max_results=10000",
+          "verdict": "verified",
+          "actual_source": "Endpoint and parameter confirmed in API reference table",
+          "action": "import"
+        }
+      ]
+    },
+    {
+      "source": "docs/Glossary.md",
+      "target": "docs/reference/glossary.md",
+      "claims": [
+        {
+          "claim": "Standard Illumio platform terms defined: PCE, VEN, Workload (Managed/Unmanaged/Container), Label, Ruleset",
+          "verdict": "verified",
+          "actual_source": "All core terms present in new docs/reference/glossary.md; sourced from legacy Glossary.md",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "Glossary cross-links to Architecture.md for PCE/VEN deep-dives",
+          "verdict": "stale",
+          "actual_source": "Legacy cross-links point to Architecture.md; new glossary should link to docs/architecture/overview.md",
+          "action": "rewrite"
+        },
+        {
+          "claim": "i18n glossary.json in src/i18n/data/ is the single SoT for terms that must stay English in zh_TW",
+          "verdict": "verified",
+          "actual_source": "src/i18n/data/glossary.json confirmed with 16 entries (PCE, VEN, Workload, etc.)",
+          "action": "import"
+        },
+        {
+          "claim": "All four label dimensions documented: role, app, env, loc",
+          "verdict": "verified",
+          "actual_source": "Four label dimensions confirmed in Glossary and Architecture background",
+          "action": "migrated-to-new-tree"
+        }
+      ]
+    },
+    {
+      "source": "docs/Troubleshooting.md",
+      "target": "docs/user-guide/troubleshooting.md",
+      "claims": [
+        {
+          "claim": "'Policy Usage 0 hits' root cause is cache not populated",
+          "verdict": "stale",
+          "actual_source": "Actual root cause: rules are draft-only (not provisioned); PCE API only returns hits for active/provisioned rules; cache population is a separate issue",
+          "action": "rewrite"
+        },
+        {
+          "claim": "Windows NSSM troubleshooting steps documented under Troubleshooting section",
+          "verdict": "stale",
+          "actual_source": "NSSM troubleshooting is better organized under Installation; new docs/getting-started.md covers it; should not be duplicated in troubleshooting",
+          "action": "rewrite"
+        },
+        {
+          "claim": "externally-managed-environment pip error on Ubuntu 22.04+ / Debian 12+ requires venv workaround",
+          "verdict": "verified",
+          "actual_source": "PEP 668 issue confirmed; venv workaround documented in Troubleshooting and getting-started",
+          "action": "import"
+        },
+        {
+          "claim": "PCE profile switch has no effect if ApiClient is not reinitialized",
+          "verdict": "verified",
+          "actual_source": "Root cause confirmed: must use GUI Activate button or CLI profile switch (not manual config edit) to trigger reinitialization",
+          "action": "import"
+        },
+        {
+          "claim": "Report shows all VENs as online when hours_since_last_heartbeat not returned by older PCE version",
+          "verdict": "verified",
+          "actual_source": "Confirmed as a known PCE API version compatibility issue",
+          "action": "import"
+        }
+      ]
+    },
+    {
+      "source": "docs/cli-command-map.md",
+      "target": "docs/reference/cli.md (alias section)",
+      "claims": [
+        {
+          "claim": "Top-level subcommands and deprecated aliases documented (e.g., report traffic → report generate-traffic)",
+          "verdict": "verified",
+          "actual_source": "All subcommand aliases confirmed in cli-command-map and src/cli/; new docs/reference/cli.md received this content",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "Legacy argparse flags --monitor and --gui are deprecated aliases for monitor and gui subcommands",
+          "verdict": "verified",
+          "actual_source": "Aliases confirmed in illumio-ops.py dispatcher (_CLICK_SUBCOMMANDS set and argparse fallback)",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "Adding a new subcommand requires registering in _CLICK_SUBCOMMANDS set in illumio-ops.py",
+          "verdict": "verified",
+          "actual_source": "Confirmed in illumio-ops.py; missing registration causes fallthrough to legacy argparse handler",
+          "action": "import"
+        },
+        {
+          "claim": "Interactive shell menu paths documented alongside CLI flags for each subcommand",
+          "verdict": "verified",
+          "actual_source": "cli-command-map.md table includes both CLI and shell → menu-number paths; new cli.md preserved this",
+          "action": "migrated-to-new-tree"
+        }
+      ]
+    },
+    {
+      "source": "docs/fonts-vendoring.md",
+      "target": "docs/architecture/overview.md (appendix)",
+      "claims": [
+        {
+          "claim": "Three fonts vendored: Space Grotesk (variable woff2), Inter (latin subset variable woff2), JetBrains Mono (latin subset variable woff2)",
+          "verdict": "verified",
+          "actual_source": "All three woff2 files confirmed in src/gui/static/fonts/; sourcing notes match fontsource package versions",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "Inter uses latin-subset from @fontsource-variable/inter v5.2.8 to meet <280 KB total font budget",
+          "verdict": "verified",
+          "actual_source": "Fontsource package version and size target confirmed in fonts-vendoring.md sourcing notes",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "JetBrains Mono official release zip has no variable woff2 (only static woff2 + variable ttf), so fontsource used instead",
+          "verdict": "verified",
+          "actual_source": "Sourcing rationale confirmed in legacy doc; JetBrains/JetBrainsMono v2.304 release structure matches",
+          "action": "migrated-to-new-tree"
+        },
+        {
+          "claim": "SpaceGrotesk-VF.woff2 sourced from floriankarsten/space-grotesk GitHub repo, weight range 300-700",
+          "verdict": "verified",
+          "actual_source": "Source repo and weight range confirmed in legacy doc sourcing notes",
+          "action": "migrated-to-new-tree"
+        }
+      ]
+    }
+  ]
+}

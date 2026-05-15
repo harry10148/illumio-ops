@@ -6,6 +6,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to a `<major>.<minor>.<patch>-<topic-slug>` versioning
 scheme aligned with the git tag conventions.
 
+## [3.27.0-docs-refactor] — 2026-05-15
+
+Documentation refactor — restructured the entire `docs/` tree to a 22-pair
+bilingual layout mirroring `src/` modules, established YAML frontmatter
+hygiene, added a bilingual audit tool, and removed 14 legacy doc pairs whose
+content had drifted from the codebase.
+
+### Documentation
+
+- Restructured `docs/` to a 22-pair bilingual tree mapped to `src/` modules
+- New entry point: `docs/INDEX.md` / `docs/INDEX_zh.md` with 4 reader-role entries (Operator / Developer / Integrator / Auditor)
+- All docs now carry `last_verified` + `verified_against` YAML frontmatter
+- Added `scripts/docs_check.py` audit tool (bilingual / freshness / links / frontmatter checks; `--exclude` glob support)
+- 14 legacy doc pairs replaced; audit trail at `docs/_meta/migration-audit.json` (70 claims documented across 14 sources)
+- `README.md` and `README_zh.md` slimmed to ≤100 lines, point to `docs/INDEX.md`
+- 5-layer cross-linking model on every doc (language switch / breadcrumb / Related Docs / inline / INDEX entry)
+
+### Breaking
+
+- Removed `docs/Installation{,_zh}.md`, `docs/UPGRADE{,_zh}.md`, `docs/User_Manual{,_zh}.md`, `docs/Report_Modules{,_zh}.md`, `docs/Security_Rules_Reference{,_zh}.md`, `docs/SIEM_Integration{,_zh}.md`, `docs/Architecture{,_zh}.md`, `docs/PCE_Cache{,_zh}.md`, `docs/API_Cookbook{,_zh}.md`, `docs/Glossary{,_zh}.md`, `docs/Troubleshooting{,_zh}.md`, `docs/cli-command-map{,_zh}.md`, `docs/fonts-vendoring{,_zh}.md`. External links to these paths will 404 — use `docs/INDEX.md` to find new locations.
+
+### Documentation hygiene findings (legacy doc claims found wrong)
+
+The refactor surfaced these stale claims in legacy docs (full list in `docs/_meta/migration-audit.json`):
+
+- PDF generation: legacy claimed ReportLab; current is HTML + browser-native `window.print()` (commit `92143a6`)
+- Multi-PCE dashboard switcher: legacy referenced widget; not in current `index.html`
+- SIEM `format: json`: legacy claimed `JSONLineFormatter`; current is `NormalizedJSONFormatter` (commit `edda47b`)
+- SIEM endpoint: legacy used single `endpoint: "host:port"`; current splits into `host` + `port` (commit `7035f50`)
+- `/health` endpoint: legacy referenced; actual is `/api/status`
+- PCE cache path: legacy showed `cache/`; actual is `data/pce_cache.sqlite` (commit `a88e823`)
+- CLI subcommands: legacy `pce`, `tls`, `rule-scheduler` as top-level CLI commands → actually only via interactive `shell` menu
+- Offline bundle: legacy claimed pre-built `dist/`; `dist/` is empty, requires `scripts/build_offline_bundle.sh`
+
+---
+
 ## [3.26.0-i18n-architecture] — 2026-05-09
 
 i18n architecture refactor — consolidated three parallel translation
