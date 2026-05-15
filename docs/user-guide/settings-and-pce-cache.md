@@ -9,7 +9,7 @@ verified_against:
   - python illumio-ops.py cache --help
   - commit 2437209
 related_docs:
-  - getting-started.md
+  - ../getting-started.md
   - multi-pce.md
   - ../architecture/overview.md
   - troubleshooting.md
@@ -292,7 +292,7 @@ The parent directory is created automatically (`os.makedirs(..., exist_ok=True)`
 
 ## Related Docs
 
-- [Getting Started](getting-started.md) — initial settings setup
+- [Getting Started](../getting-started.md) — initial settings setup
 - [Multi-PCE](multi-pce.md) — per-PCE settings scope
 - [Architecture Overview](../architecture/overview.md) — internal data model (B2)
 - [Troubleshooting](troubleshooting.md) — cache corruption / stale data

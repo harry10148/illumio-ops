@@ -10,7 +10,7 @@ verified_against:
   - commit d9b8389
 related_docs:
   - dev-setup.md
-  - ../user-guide/getting-started.md
+  - ../getting-started.md
   - i18n-workflow.md
   - ../user-guide/tls-and-certificates.md
 ---
@@ -122,7 +122,7 @@ sudo systemctl restart illumio-ops.service
 ```
 
 For the full operator-facing upgrade SOP (including Windows / NSSM and config
-preservation details) see [Getting Started — Upgrade section](../user-guide/getting-started.md).
+preservation details) see [Getting Started — Upgrade section](../getting-started.md).
 
 > **TODO:** Confirm exact `pip install` invocation against `scripts/install.sh`
 > once that script is stable — the above reflects the UPGRADE.md pattern.
@@ -214,6 +214,6 @@ After the service restarts, verify the deployment is healthy:
 ## Related Docs
 
 - [Dev Setup](dev-setup.md) — local environment before tagging
-- [Getting Started (operator upgrade)](../user-guide/getting-started.md) — what end-users do
+- [Getting Started (operator upgrade)](../getting-started.md) — what end-users do
 - [i18n Workflow](i18n-workflow.md) — pre-release i18n audit
 - [TLS & Certificates](../user-guide/tls-and-certificates.md) — cert rotation on release

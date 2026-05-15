@@ -10,7 +10,7 @@ verified_against:
   - commit d9b8389
 related_docs:
   - dev-setup.md
-  - ../user-guide/getting-started.md
+  - ../getting-started.md
   - i18n-workflow.md
   - ../user-guide/tls-and-certificates.md
 ---
@@ -122,7 +122,7 @@ sudo systemctl restart illumio-ops.service
 ```
 
 關於完整的操作人員升級 SOP（包含 Windows / NSSM 及 config 保存細節），
-請參閱[入門指南 — 升級章節](../user-guide/getting-started.md)。
+請參閱[入門指南 — 升級章節](../getting-started.md)。
 
 > **TODO：** `scripts/install.sh` 穩定後，對照確認確切的 `pip install` 指令
 > — 以上內容依據 UPGRADE.md 模式撰寫。
@@ -211,6 +211,6 @@ sudo systemctl start illumio-ops.service
 ## 相關文件
 
 - [開發環境設定](dev-setup.md) — 打標籤前的本地環境
-- [入門指南（操作人員升級）](../user-guide/getting-started.md) — 使用者端操作
+- [入門指南（操作人員升級）](../getting-started.md) — 使用者端操作
 - [i18n 工作流程](i18n-workflow.md) — 發佈前 i18n 審計
 - [TLS 與憑證](../user-guide/tls-and-certificates.md) — 發佈時的憑證輪換

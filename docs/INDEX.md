@@ -4,7 +4,7 @@ audience: [operator, developer, api, security]
 last_verified: 2026-05-15
 verified_against:
   - docs/superpowers/specs/2026-05-15-docs-refactor-design.md
-  - commit 05196a2
+  - commit dbd95a7
 related_docs:
   - getting-started.md
   - reference/glossary.md
@@ -63,6 +63,10 @@ related_docs:
 | Architecture | Report Engine | [architecture/report-engine.md](architecture/report-engine.md) | [architecture/report-engine_zh.md](architecture/report-engine_zh.md) |
 | Architecture | SIEM Pipeline | [architecture/siem-pipeline.md](architecture/siem-pipeline.md) | [architecture/siem-pipeline_zh.md](architecture/siem-pipeline_zh.md) |
 | Architecture | i18n Contract | [architecture/i18n-contract.md](architecture/i18n-contract.md) | [architecture/i18n-contract_zh.md](architecture/i18n-contract_zh.md) |
+| Contributing | Dev Setup | [contributing/dev-setup.md](contributing/dev-setup.md) | [contributing/dev-setup_zh.md](contributing/dev-setup_zh.md) |
+| Contributing | i18n Workflow | [contributing/i18n-workflow.md](contributing/i18n-workflow.md) | [contributing/i18n-workflow_zh.md](contributing/i18n-workflow_zh.md) |
+| Contributing | Release Process | [contributing/release-process.md](contributing/release-process.md) | [contributing/release-process_zh.md](contributing/release-process_zh.md) |
+| Project | README (entry) | [../README.md](../README.md) | [../README_zh.md](../README_zh.md) |
 <!-- END:doc-map -->
 
 > _Additional rows are appended at the end of each batch (B1 → B2 → B3)._

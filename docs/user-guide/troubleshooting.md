@@ -8,7 +8,7 @@ verified_against:
   - scripts/setup-prod-git.sh
   - commit 8dd14b7
 related_docs:
-  - getting-started.md
+  - ../getting-started.md
   - tls-and-certificates.md
   - siem-integration.md
   - reports.md
@@ -434,7 +434,7 @@ systemctl status illumio-ops --no-pager -l | head -20
 
 ## Related Docs
 
-- [Getting Started](getting-started.md) — initial setup issues
+- [Getting Started](../getting-started.md) — initial setup issues
 - [TLS & Certificates](tls-and-certificates.md) — cert error specifics
 - [SIEM Integration](siem-integration.md) — destination delivery issues
 - [Reports](reports.md) — report generation failures

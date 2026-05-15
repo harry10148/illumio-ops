@@ -9,7 +9,7 @@ verified_against:
   - python illumio-ops.py cache --help
   - commit 2437209
 related_docs:
-  - getting-started.md
+  - ../getting-started.md
   - multi-pce.md
   - ../architecture/overview.md
   - troubleshooting.md
@@ -254,7 +254,7 @@ systemctl start illumio-ops
 
 ## 相關文件
 
-- [快速開始](getting-started.md) — 初始設定流程
+- [快速開始](../getting-started.md) — 初始設定流程
 - [多 PCE](multi-pce.md) — 各 PCE 的設定範圍
 - [架構總覽](../architecture/overview.md) — 內部資料模型（B2）
 - [疑難排解](troubleshooting.md) — 快取損毀 / 過期資料
