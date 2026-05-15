@@ -24,7 +24,7 @@ BASELINES: dict[str, int] = {
     "status_pills": 3,        # 2 of 5 migrated in Task 2; 3 remain (uncovered/bandwidth tables)
     "filter_bar_buttons": 0,  # all 4 migrated in Task 3 (traffic + workload toolbars)
     "empty_states": 41,       # 3 of 44 migrated in Task 4 (traffic + workload + events)
-    "fieldset_sections": 5,   # fieldsets with style= attribute in index.html
+    "fieldset_sections": 2,   # 2 of 4 migrated in Task 5 (snap + ranking summary)
     "styled_tables": 15,      # <table class="rule-table" style="..."> (measured)
 }
 
