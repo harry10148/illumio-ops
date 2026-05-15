@@ -47,3 +47,48 @@ def test_freshness_check_flags_stale(tmp_path: Path) -> None:
     rc, out, _ = run_check("--freshness", "30", "--root", str(docs))
     assert rc != 0
     assert "alpha.md" in out
+
+
+def test_frontmatter_check_passes_on_clean(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    body = (
+        "---\n"
+        "title: Alpha\n"
+        "last_verified: 2026-05-15\n"
+        "verified_against: src/alpha.py\n"
+        "---\n"
+        "# Alpha\n"
+    )
+    (docs / "alpha.md").write_text(body)
+    (docs / "alpha_zh.md").write_text(body)
+    rc, out, _ = run_check("--frontmatter", "--root", str(docs))
+    assert rc == 0, out
+
+
+def test_links_check_passes_on_clean_and_anchors(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    (docs / "alpha.md").write_text(
+        "# Alpha\n\nSee [beta](beta.md) and [self](#top) and [ext](https://example.com).\n"
+    )
+    (docs / "alpha_zh.md").write_text("# Alpha\n")
+    (docs / "beta.md").write_text("# Beta\n")
+    (docs / "beta_zh.md").write_text("# Beta\n")
+    rc, out, _ = run_check("--links", "--root", str(docs))
+    assert rc == 0, out
+
+
+def test_exclude_skips_matching_paths(tmp_path: Path) -> None:
+    docs = tmp_path / "docs"
+    (docs / "superpowers" / "plans").mkdir(parents=True)
+    (docs / "user-guide").mkdir(parents=True)
+    # Orphan inside superpowers/ — should be skipped
+    (docs / "superpowers" / "plans" / "plan.md").write_text("# Plan\n")
+    # Paired in user-guide — should be unaffected
+    (docs / "user-guide" / "doc.md").write_text("# Doc\n")
+    (docs / "user-guide" / "doc_zh.md").write_text("# Doc\n")
+    rc, out, _ = run_check(
+        "--bilingual", "--exclude", "superpowers/**", "--root", str(docs)
+    )
+    assert rc == 0, out
