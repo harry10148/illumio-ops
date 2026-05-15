@@ -6,6 +6,57 @@ let _alertPlugins = {};
 // ── Settings sub-tab state (Phase 1.1) ─────────────────────────────
 let _activeSettingsTab = 'pce';
 
+// ── Dirty-tracking (Phase 1.1) ─────────────────────────────────────
+// _settingsDirty is a Set of sub-tab keys ('pce' | 'channels' | 'display' | 'security')
+// representing which panels the user has modified since last save.
+const _settingsDirty = new Set();
+
+function _markSettingsDirty(which) {
+  _settingsDirty.add(which);
+  _updateSaveButtonLabel();
+}
+
+function _resetSettingsDirty() {
+  _settingsDirty.clear();
+  _updateSaveButtonLabel();
+}
+
+function _updateSaveButtonLabel() {
+  const label = document.getElementById('s-save-label');
+  if (!label) return;
+  const dirty = Array.from(_settingsDirty);
+  if (dirty.length === 0) {
+    label.textContent = _t('gui_save_all');
+    return;
+  }
+  if (dirty.length === 1) {
+    const which = dirty[0];
+    const sectionName = _t('gui_settings_section_' + which);
+    label.textContent = _t('gui_settings_save_one').replace('{section}', sectionName);
+    return;
+  }
+  label.textContent = _t('gui_settings_save_many').replace('{n}', dirty.length);
+}
+
+function _wireSettingsDirtyTracking() {
+  // Each sub-panel container's 'input' and 'change' bubbling marks that tab dirty.
+  const mapping = {
+    'pce':      's-panel-pce',
+    'channels': 's-panel-channels',
+    'display':  's-panel-display',
+    'security': 's-panel-security',
+  };
+  Object.entries(mapping).forEach(([which, panelId]) => {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    // Idempotent: dataset flag prevents double-binding when loadSettings re-runs.
+    if (panel.dataset.dirtyBound === '1') return;
+    panel.dataset.dirtyBound = '1';
+    panel.addEventListener('input',  () => _markSettingsDirty(which));
+    panel.addEventListener('change', () => _markSettingsDirty(which));
+  });
+}
+
 // CSP-friendly handler bound from index.html via data-action.
 // Mirrors switchQTab() in quarantine.js:4-11 but scoped to #p-settings.
 function switchSettingsTab(which, updateUrl = true) {
@@ -649,6 +700,7 @@ async function saveSettings() {
   if (typeof renderQtPage === 'function') renderQtPage();
   if (typeof renderQwPage === 'function') renderQwPage();
   if (typeof renderDashboardQueries === 'function') renderDashboardQueries();
+  _resetSettingsDirty();
   toast(_t('gui_msg_settings_saved'));
 }
 
