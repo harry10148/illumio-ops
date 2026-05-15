@@ -488,15 +488,23 @@
           <!-- KPI Cards -->
           <div id="snap-kpi-grid" class="kpi-grid"></div>
 
-          <!-- Key Findings -->
+          <!-- Top Actions (Phase 3.1 Task 4) -->
+          <div id="d-top-actions" style="margin-bottom:16px;">
+            <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--accent2);" data-i18n="gui_top_actions_heading">Top Actions</div>
+            <div id="d-top-actions-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;"></div>
+          </div>
+
+          <!-- Key Findings (collapsed full table) -->
           <div id="snap-findings-wrap" style="margin-bottom:16px;">
-            <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_snap_key_findings">Key Findings</div>
-            <table class="data-table" data-density="compact">
-              <thead><tr><th style="width:90px" data-i18n="gui_snap_col_severity">Severity</th><th data-i18n="gui_snap_col_finding">Finding</th><th data-i18n="gui_snap_col_action">Action</th></tr></thead>
-              <tbody id="snap-findings-body">
-                <tr><td colspan="3" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_snap_no_findings">No findings.</td></tr>
-              </tbody>
-            </table>
+            <details>
+              <summary style="cursor:pointer;font-weight:600;color:var(--dim);" data-i18n="gui_findings_details_label">All findings</summary>
+              <table class="data-table" data-density="compact" style="margin-top:8px;">
+                <thead><tr><th style="width:90px" data-i18n="gui_snap_col_severity">Severity</th><th data-i18n="gui_snap_col_finding">Finding</th><th data-i18n="gui_snap_col_action">Action</th></tr></thead>
+                <tbody id="snap-findings-body">
+                  <tr><td colspan="3" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_snap_no_findings">No findings.</td></tr>
+                </tbody>
+              </table>
+            </details>
           </div>
 
           <!-- Two-column: Policy Breakdown + Top Ports -->

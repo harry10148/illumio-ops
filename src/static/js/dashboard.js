@@ -1288,6 +1288,48 @@ function renderStoryGroups(hero) {
   if (v) v.textContent = String(cnt);
 }
 
+const _SEV_RANK = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4 };
+const _SEV_BORDER = { CRITICAL: '#c0392b', HIGH: 'var(--danger)', MEDIUM: 'var(--warn)', LOW: 'var(--dim)', INFO: 'var(--success)' };
+
+function renderTopActions(findings) {
+  const grid = document.getElementById('d-top-actions-grid');
+  if (!grid) return;
+  if (!findings || !findings.length) {
+    grid.textContent = '';
+    const empty = document.createElement('div');
+    empty.style.color = 'var(--dim)';
+    empty.style.fontSize = '.85rem';
+    empty.textContent = _t('gui_snap_no_findings') || 'No findings.';
+    grid.appendChild(empty);
+    return;
+  }
+  const top = [...findings]
+    .sort((a, b) => (_SEV_RANK[(a.severity || '').toUpperCase()] ?? 99) - (_SEV_RANK[(b.severity || '').toUpperCase()] ?? 99))
+    .slice(0, 3);
+  grid.textContent = '';
+  top.forEach(f => {
+    const sev = String(f.severity || '').toUpperCase();
+    const border = _SEV_BORDER[sev] || 'var(--dim)';
+    const card = document.createElement('div');
+    card.className = 'd-action-card';
+    card.style.cssText = 'border-left:4px solid ' + border + ';background:var(--bg2);border-radius:8px;padding:12px;';
+    const badge = document.createElement('span');
+    badge.className = 'status-pill';
+    badge.setAttribute('data-status', (SEVERITY_TO_STATUS[sev] || 'neutral'));
+    badge.textContent = sev || 'INFO';
+    const finding = document.createElement('div');
+    finding.style.cssText = 'margin-top:6px;font-weight:600;font-size:.92rem;';
+    finding.textContent = f.finding || '';
+    const action = document.createElement('div');
+    action.style.cssText = 'margin-top:4px;color:var(--dim);font-style:italic;font-size:.85rem;';
+    action.textContent = f.action || '';
+    card.appendChild(badge);
+    card.appendChild(finding);
+    card.appendChild(action);
+    grid.appendChild(card);
+  });
+}
+
 /* renderMaturity placeholder — body filled in Task 3 */
 function renderMaturity(snap) {
   const wrap = document.getElementById('d-maturity');
@@ -1379,6 +1421,7 @@ async function loadDashboardSnapshot() {
     // Key Findings
     const fb = $('snap-findings-body');
     const findings = s.key_findings || [];
+    renderTopActions(findings);
     if (findings.length) {
       fb.innerHTML = findings.map(f => {
         const sev = f.severity || '';
