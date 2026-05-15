@@ -38,7 +38,9 @@ def make_auth_blueprint(
         pce_url = _get_active_pce_url(cm)
         rules_count = len(cm.config.get("rules", []))
         schedules_count = len(cm.config.get("report_schedules", []))
-        config_loaded_at = _dt.datetime.now()
+        # cm.load() above guarantees last_loaded_at is set; reflect the real
+        # load time (not render time) so the header's relative display works.
+        config_loaded_at = _dt.datetime.fromtimestamp(cm.last_loaded_at)
         lang = cm.config.get("settings", {}).get("language", "en")
         ui_translations = _ui_translation_dict(lang)
         return render_template(
