@@ -3,6 +3,97 @@ let _settings = {};
 let _security = {};
 let _alertPlugins = {};
 
+// ── Settings sub-tab state (Phase 1.1) ─────────────────────────────
+let _activeSettingsTab = 'pce';
+
+// ── Dirty-tracking (Phase 1.1) ─────────────────────────────────────
+// _settingsDirty is a Set of sub-tab keys ('pce' | 'channels' | 'display' | 'security')
+// representing which panels the user has modified since last save.
+const _settingsDirty = new Set();
+
+function _markSettingsDirty(which) {
+  _settingsDirty.add(which);
+  _updateSaveButtonLabel();
+}
+
+function _resetSettingsDirty() {
+  _settingsDirty.clear();
+  _updateSaveButtonLabel();
+}
+
+function _updateSaveButtonLabel() {
+  const label = document.getElementById('s-save-label');
+  if (!label) return;
+  const dirty = Array.from(_settingsDirty);
+  if (dirty.length === 0) {
+    label.textContent = _t('gui_save_all');
+    return;
+  }
+  if (dirty.length === 1) {
+    // Explicit key lookup so static i18n audit sees each key literal.
+    const sectionKeys = {
+      'pce':      'gui_settings_section_pce',
+      'channels': 'gui_settings_section_channels',
+      'display':  'gui_settings_section_display',
+      'security': 'gui_settings_section_security',
+    };
+    const which = dirty[0];
+    const sectionName = _t(sectionKeys[which] || 'gui_save_all');
+    label.textContent = _t('gui_settings_save_one').replace('{section}', sectionName);
+    return;
+  }
+  label.textContent = _t('gui_settings_save_many').replace('{n}', dirty.length);
+}
+
+function _wireSettingsDirtyTracking() {
+  // Each sub-panel container's 'input' and 'change' bubbling marks that tab dirty.
+  const mapping = {
+    'pce':      's-panel-pce',
+    'channels': 's-panel-channels',
+    'display':  's-panel-display',
+    'security': 's-panel-security',
+  };
+  Object.entries(mapping).forEach(([which, panelId]) => {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    // Idempotent: dataset flag prevents double-binding when loadSettings re-runs.
+    if (panel.dataset.dirtyBound === '1') return;
+    panel.dataset.dirtyBound = '1';
+    panel.addEventListener('input',  () => _markSettingsDirty(which));
+    panel.addEventListener('change', () => _markSettingsDirty(which));
+  });
+}
+
+// CSP-friendly handler bound from index.html via data-action.
+// Mirrors switchQTab() in quarantine.js:4-11 but scoped to #p-settings.
+function switchSettingsTab(which, updateUrl = true) {
+  const valid = ['pce', 'channels', 'display', 'security'];
+  if (!valid.includes(which)) return;
+
+  // Toggle button active state (within #p-settings only)
+  document.querySelectorAll('#p-settings .sub-nav-btn').forEach(b => {
+    const isActive = b.id === 'sbtn-' + which;
+    if (isActive) {
+      b.classList.add('active');
+      b.setAttribute('aria-selected', 'true');
+    } else {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    }
+  });
+
+  // Toggle panel visibility
+  document.querySelectorAll('#p-settings .s-subpanel').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById('settings-' + which);
+  if (target) target.classList.add('active');
+
+  _activeSettingsTab = which;
+  if (updateUrl) updateUrlState('stab', which);
+
+  // Update sticky save button label (Task 5 will define _updateSaveButtonLabel)
+  if (typeof _updateSaveButtonLabel === 'function') _updateSaveButtonLabel();
+}
+
 // Format day count as humanized "N days (about Yy Mm)" / "N days (about M months)".
 // Negative / null returns empty string. Falls back to short form for short ranges.
 function humanizeDays(n) {
@@ -190,14 +281,55 @@ async function loadSettings() {
   try { _alertPlugins = (await api('/api/alert-plugins')).plugins || {}; } catch (e) { _alertPlugins = {}; }
   try { _tlsStatus = await api('/api/tls/status'); } catch (e) { _tlsStatus = {}; }
 
-  const s = _settings, a = s.api || {}, e = s.email || {}, sm = s.smtp || {}, al = s.alerts || {}, st = s.settings || {}, rpt = s.report || {};
+  const s = _settings, a = s.api || {}, al = s.alerts || {}, st = s.settings || {}, rpt = s.report || {};
   const sec = _security || {};
   const active = al.active || [];
   const profiles = s.pce_profiles || [];
   const activePceId = s.active_pce_id || null;
-  const profileOptions = profiles.map(p =>
-    `<option value="${p.id}" ${p.id === activePceId ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
-  ).join('');
+
+  // Render into the 4 sub-panel targets created in index.html.
+  // (Each helper returns an HTML string assembled from escapeHtml-protected
+  //  values — same XSS-surface as the pre-refactor single-string approach.)
+  const pcePanel  = $('s-panel-pce');
+  const chPanel   = $('s-panel-channels');
+  const dispPanel = $('s-panel-display');
+  const secPanel  = $('s-panel-security');
+  if (pcePanel)  pcePanel.innerHTML  = _renderPceSection(a, profiles, activePceId);
+  if (chPanel)   chPanel.innerHTML   = _renderChannelsSection(active, s);
+  if (dispPanel) dispPanel.innerHTML = _renderDisplaySection(st, rpt);
+  if (secPanel)  secPanel.innerHTML  = _renderSecuritySection(sec, _tlsStatus);
+
+  // Auto-detect browser timezone and pre-select if currently set to 'local'
+  const tzSel = $('s-timezone');
+  if (tzSel && (tzSel.value === 'local' || !tzSel.value)) {
+    const detected = _detectBrowserTimezone();
+    const opt = Array.from(tzSel.options).find(o => o.value === detected);
+    if (opt) tzSel.value = detected;
+  }
+  await loadTranslations();
+
+  // TLS toggle logic (element lives in #s-panel-security after refactor)
+  const tlsEn = $('s-tls-enabled');
+  if (tlsEn) tlsEn.addEventListener('change', () => {
+    const opts = $('s-tls-options');
+    if (opts) opts.style.display = tlsEn.checked ? 'block' : 'none';
+  });
+
+  // Render cert info if available
+  _renderTlsCertInfo();
+
+  // Mark all sub-tabs clean and wire dirty-tracking (Task 5 defines these helpers).
+  if (typeof _resetSettingsDirty === 'function') _resetSettingsDirty();
+  if (typeof _wireSettingsDirtyTracking === 'function') _wireSettingsDirtyTracking();
+}
+
+// ── Sub-tab render helpers (Phase 1.1) ─────────────────────────────
+// Each returns an HTML string. Caller (loadSettings) writes the string to
+// the matching #s-panel-* container. IMPORTANT: input ids must match what
+// saveSettings() reads — see tests/test_gui_settings_subtab_render.py for
+// the canonical list. All user-supplied values are escaped via escapeHtml().
+
+function _renderPceSection(a, profiles, activePceId) {
   const profileRows = profiles.map(p => `
     <tr>
       <td>${escapeHtml(p.name)}</td>
@@ -208,8 +340,7 @@ async function loadSettings() {
         <button class="btn btn-sm" style="margin-left:4px" onclick="deletePceProfile(${p.id})" data-i18n="gui_pce_delete_profile">Delete</button>
       </td>
     </tr>`).join('');
-
-  $('s-form').innerHTML = `
+  return `
 <fieldset><legend data-i18n="gui_pce_profiles">PCE Profiles</legend>
   ${profiles.length > 0 ? `
   <div style="overflow-x:auto;margin-bottom:12px">
@@ -238,10 +369,18 @@ async function loadSettings() {
   <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${a.url || ''}"><small class="form-text text-muted" data-i18n="gui_url_help"></small></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${a.org_id || ''}"><small class="form-text text-muted" data-i18n="gui_org_id_help"></small></div></div>
   <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${a.key || ''}"><small class="form-text text-muted" data-i18n="gui_api_key_help"></small></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${a.secret || ''}"><small class="form-text text-muted" data-i18n="gui_api_secret_help"></small></div></div>
   <div class="chk"><label><input type="checkbox" id="s-ssl" ${a.verify_ssl ? 'checked' : ''}> <span data-i18n="gui_verify_ssl">Verify SSL</span></label></div>
-</fieldset>
+</fieldset>`;
+}
+
+function _renderChannelsSection(active, s) {
+  return `
 <fieldset><legend data-i18n="gui_alert_channels">Alert Channels</legend>
   ${_renderAlertPluginCards(active, s)}
-</fieldset>
+</fieldset>`;
+}
+
+function _renderDisplaySection(st, rpt) {
+  return `
 <fieldset><legend data-i18n="gui_lang_settings">Display & General</legend>
   <div class="form-row">
     <div class="form-group">
@@ -309,7 +448,11 @@ async function loadSettings() {
       <small style="color:var(--dim)" data-i18n="gui_retention_hint">0 = keep forever</small>
     </div>
   </div>
-</fieldset>
+</fieldset>`;
+}
+
+function _renderSecuritySection(sec, _tlsStatus) {
+  return `
 <fieldset><legend data-i18n="gui_tls_title">TLS / HTTPS</legend>
   <div class="chk" style="margin-bottom:10px"><label><input type="checkbox" id="s-tls-enabled" ${_tlsStatus.enabled ? 'checked' : ''}> <span data-i18n="gui_tls_enable">Enable HTTPS</span></label></div>
   <div id="s-tls-options" style="display:${_tlsStatus.enabled ? 'block' : 'none'}">
@@ -382,24 +525,6 @@ async function loadSettings() {
     <div class="form-group"><label data-i18n="gui_new_password_confirm">Confirm New Password</label><input id="s-sec-newpass-confirm" type="password"></div>
   </div>
 </fieldset>`;
-  // Auto-detect browser timezone and pre-select if currently set to 'local'
-  const tzSel = $('s-timezone');
-  if (tzSel && (tzSel.value === 'local' || !tzSel.value)) {
-    const detected = _detectBrowserTimezone();
-    const opt = Array.from(tzSel.options).find(o => o.value === detected);
-    if (opt) tzSel.value = detected;
-  }
-  await loadTranslations();
-
-  // TLS toggle logic
-  const tlsEn = $('s-tls-enabled');
-  if (tlsEn) tlsEn.addEventListener('change', () => {
-    const opts = $('s-tls-options');
-    if (opts) opts.style.display = tlsEn.checked ? 'block' : 'none';
-  });
-
-  // Render cert info if available
-  _renderTlsCertInfo();
 }
 
 function toggleTlsMode() {
@@ -582,6 +707,7 @@ async function saveSettings() {
   if (typeof renderQtPage === 'function') renderQtPage();
   if (typeof renderQwPage === 'function') renderQwPage();
   if (typeof renderDashboardQueries === 'function') renderDashboardQueries();
+  _resetSettingsDirty();
   toast(_t('gui_msg_settings_saved'));
 }
 
