@@ -4,7 +4,7 @@ audience: [operator, developer, api, security]
 last_verified: 2026-05-15
 verified_against:
   - docs/superpowers/specs/2026-05-15-docs-refactor-design.md
-  - commit a9ae661
+  - commit db1ed6f
 related_docs:
   - getting-started.md
   - reference/glossary.md
@@ -47,6 +47,15 @@ related_docs:
 |------|-------|----|----|
 | Index | Entry point | [INDEX.md](INDEX.md) | [INDEX_zh.md](INDEX_zh.md) |
 | Onboarding | Install + first run + upgrade | [getting-started.md](getting-started.md) | [getting-started_zh.md](getting-started_zh.md) |
+| User Guide | Dashboard | [user-guide/dashboard.md](user-guide/dashboard.md) | [user-guide/dashboard_zh.md](user-guide/dashboard_zh.md) |
+| User Guide | Reports | [user-guide/reports.md](user-guide/reports.md) | [user-guide/reports_zh.md](user-guide/reports_zh.md) |
+| User Guide | Alerts & Quarantine | [user-guide/alerts-and-quarantine.md](user-guide/alerts-and-quarantine.md) | [user-guide/alerts-and-quarantine_zh.md](user-guide/alerts-and-quarantine_zh.md) |
+| User Guide | Rule Scheduler | [user-guide/rule-scheduler.md](user-guide/rule-scheduler.md) | [user-guide/rule-scheduler_zh.md](user-guide/rule-scheduler_zh.md) |
+| User Guide | SIEM Integration | [user-guide/siem-integration.md](user-guide/siem-integration.md) | [user-guide/siem-integration_zh.md](user-guide/siem-integration_zh.md) |
+| User Guide | Multi-PCE | [user-guide/multi-pce.md](user-guide/multi-pce.md) | [user-guide/multi-pce_zh.md](user-guide/multi-pce_zh.md) |
+| User Guide | TLS & Certificates | [user-guide/tls-and-certificates.md](user-guide/tls-and-certificates.md) | [user-guide/tls-and-certificates_zh.md](user-guide/tls-and-certificates_zh.md) |
+| User Guide | Settings & PCE Cache | [user-guide/settings-and-pce-cache.md](user-guide/settings-and-pce-cache.md) | [user-guide/settings-and-pce-cache_zh.md](user-guide/settings-and-pce-cache_zh.md) |
+| User Guide | Troubleshooting | [user-guide/troubleshooting.md](user-guide/troubleshooting.md) | [user-guide/troubleshooting_zh.md](user-guide/troubleshooting_zh.md) |
 <!-- END:doc-map -->
 
 > _Additional rows are appended at the end of each batch (B1 → B2 → B3)._

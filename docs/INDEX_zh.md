@@ -4,7 +4,7 @@ audience: [operator, developer, api, security]
 last_verified: 2026-05-15
 verified_against:
   - docs/superpowers/specs/2026-05-15-docs-refactor-design.md
-  - commit a9ae661
+  - commit db1ed6f
 related_docs:
   - getting-started.md
   - reference/glossary.md
@@ -47,6 +47,15 @@ related_docs:
 |------|------|----|----|
 | 索引 | 進入點 | [INDEX.md](INDEX.md) | [INDEX_zh.md](INDEX_zh.md) |
 | 上手 | 安裝 + 首次執行 + 升級 | [getting-started.md](getting-started.md) | [getting-started_zh.md](getting-started_zh.md) |
+| 使用者指引 | 儀表板 | [user-guide/dashboard.md](user-guide/dashboard.md) | [user-guide/dashboard_zh.md](user-guide/dashboard_zh.md) |
+| 使用者指引 | 報告 | [user-guide/reports.md](user-guide/reports.md) | [user-guide/reports_zh.md](user-guide/reports_zh.md) |
+| 使用者指引 | 警示與隔離 | [user-guide/alerts-and-quarantine.md](user-guide/alerts-and-quarantine.md) | [user-guide/alerts-and-quarantine_zh.md](user-guide/alerts-and-quarantine_zh.md) |
+| 使用者指引 | 規則排程器 | [user-guide/rule-scheduler.md](user-guide/rule-scheduler.md) | [user-guide/rule-scheduler_zh.md](user-guide/rule-scheduler_zh.md) |
+| 使用者指引 | SIEM 整合 | [user-guide/siem-integration.md](user-guide/siem-integration.md) | [user-guide/siem-integration_zh.md](user-guide/siem-integration_zh.md) |
+| 使用者指引 | 多 PCE | [user-guide/multi-pce.md](user-guide/multi-pce.md) | [user-guide/multi-pce_zh.md](user-guide/multi-pce_zh.md) |
+| 使用者指引 | TLS 與憑證 | [user-guide/tls-and-certificates.md](user-guide/tls-and-certificates.md) | [user-guide/tls-and-certificates_zh.md](user-guide/tls-and-certificates_zh.md) |
+| 使用者指引 | 設定與 PCE 快取 | [user-guide/settings-and-pce-cache.md](user-guide/settings-and-pce-cache.md) | [user-guide/settings-and-pce-cache_zh.md](user-guide/settings-and-pce-cache_zh.md) |
+| 使用者指引 | 疑難排解 | [user-guide/troubleshooting.md](user-guide/troubleshooting.md) | [user-guide/troubleshooting_zh.md](user-guide/troubleshooting_zh.md) |
 <!-- END:doc-map -->
 
 > _後續每批（B1 → B2 → B3）完成時將逐步補充列。_
