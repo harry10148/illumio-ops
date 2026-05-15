@@ -6,6 +6,7 @@ from typing import Any
 
 from .attack_posture import summarize_attack_posture
 from src.i18n import t, get_language
+from src.humanize_ext import fmt_bytes_auto
 
 def _fmt(n) -> str:
     try:
@@ -179,7 +180,7 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
             mod03.get("pb_uncovered_count", mod03.get("n_potentially_blocked", 0))
         )},
         {"label_key": "mod12_kpi_unmanaged_src_pct", "label": t("mod12_kpi_unmanaged_src_pct", default="Unmanaged Src %", lang=lang), "value": f"{100 - mod01.get('src_managed_pct', 100):.1f}%"},
-        {"label_key": "mod12_kpi_total_data_volume", "label": t("mod12_kpi_total_data_volume", default="Total Data Volume", lang=lang), "value": f"{mod01.get('total_mb', 0):.1f} MB"},
+        {"label_key": "mod12_kpi_total_data_volume", "label": t("mod12_kpi_total_data_volume", default="Total Data Volume", lang=lang), "value": fmt_bytes_auto(mod01.get('total_mb', 0), input_unit='MB')},
         {"label_key": "mod12_kpi_date_range",        "label": t("mod12_kpi_date_range", default="Date Range", lang=lang), "value": mod01.get("date_range", "N/A")},
     ]
 
