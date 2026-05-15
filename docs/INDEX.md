@@ -4,7 +4,7 @@ audience: [operator, developer, api, security]
 last_verified: 2026-05-15
 verified_against:
   - docs/superpowers/specs/2026-05-15-docs-refactor-design.md
-  - commit db1ed6f
+  - commit 05196a2
 related_docs:
   - getting-started.md
   - reference/glossary.md
@@ -56,6 +56,13 @@ related_docs:
 | User Guide | TLS & Certificates | [user-guide/tls-and-certificates.md](user-guide/tls-and-certificates.md) | [user-guide/tls-and-certificates_zh.md](user-guide/tls-and-certificates_zh.md) |
 | User Guide | Settings & PCE Cache | [user-guide/settings-and-pce-cache.md](user-guide/settings-and-pce-cache.md) | [user-guide/settings-and-pce-cache_zh.md](user-guide/settings-and-pce-cache_zh.md) |
 | User Guide | Troubleshooting | [user-guide/troubleshooting.md](user-guide/troubleshooting.md) | [user-guide/troubleshooting_zh.md](user-guide/troubleshooting_zh.md) |
+| Reference | Glossary | [reference/glossary.md](reference/glossary.md) | [reference/glossary_zh.md](reference/glossary_zh.md) |
+| Reference | CLI | [reference/cli.md](reference/cli.md) | [reference/cli_zh.md](reference/cli_zh.md) |
+| Reference | REST API | [reference/rest-api.md](reference/rest-api.md) | [reference/rest-api_zh.md](reference/rest-api_zh.md) |
+| Architecture | Overview | [architecture/overview.md](architecture/overview.md) | [architecture/overview_zh.md](architecture/overview_zh.md) |
+| Architecture | Report Engine | [architecture/report-engine.md](architecture/report-engine.md) | [architecture/report-engine_zh.md](architecture/report-engine_zh.md) |
+| Architecture | SIEM Pipeline | [architecture/siem-pipeline.md](architecture/siem-pipeline.md) | [architecture/siem-pipeline_zh.md](architecture/siem-pipeline_zh.md) |
+| Architecture | i18n Contract | [architecture/i18n-contract.md](architecture/i18n-contract.md) | [architecture/i18n-contract_zh.md](architecture/i18n-contract_zh.md) |
 <!-- END:doc-map -->
 
 > _Additional rows are appended at the end of each batch (B1 → B2 → B3)._

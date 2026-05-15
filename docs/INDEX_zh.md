@@ -4,7 +4,7 @@ audience: [operator, developer, api, security]
 last_verified: 2026-05-15
 verified_against:
   - docs/superpowers/specs/2026-05-15-docs-refactor-design.md
-  - commit db1ed6f
+  - commit 05196a2
 related_docs:
   - getting-started.md
   - reference/glossary.md
@@ -56,6 +56,13 @@ related_docs:
 | 使用者指引 | TLS 與憑證 | [user-guide/tls-and-certificates.md](user-guide/tls-and-certificates.md) | [user-guide/tls-and-certificates_zh.md](user-guide/tls-and-certificates_zh.md) |
 | 使用者指引 | 設定與 PCE 快取 | [user-guide/settings-and-pce-cache.md](user-guide/settings-and-pce-cache.md) | [user-guide/settings-and-pce-cache_zh.md](user-guide/settings-and-pce-cache_zh.md) |
 | 使用者指引 | 疑難排解 | [user-guide/troubleshooting.md](user-guide/troubleshooting.md) | [user-guide/troubleshooting_zh.md](user-guide/troubleshooting_zh.md) |
+| 參考 | 詞彙表 | [reference/glossary.md](reference/glossary.md) | [reference/glossary_zh.md](reference/glossary_zh.md) |
+| 參考 | CLI | [reference/cli.md](reference/cli.md) | [reference/cli_zh.md](reference/cli_zh.md) |
+| 參考 | REST API | [reference/rest-api.md](reference/rest-api.md) | [reference/rest-api_zh.md](reference/rest-api_zh.md) |
+| 架構 | 總覽 | [architecture/overview.md](architecture/overview.md) | [architecture/overview_zh.md](architecture/overview_zh.md) |
+| 架構 | 報告引擎 | [architecture/report-engine.md](architecture/report-engine.md) | [architecture/report-engine_zh.md](architecture/report-engine_zh.md) |
+| 架構 | SIEM 管線 | [architecture/siem-pipeline.md](architecture/siem-pipeline.md) | [architecture/siem-pipeline_zh.md](architecture/siem-pipeline_zh.md) |
+| 架構 | i18n 介面契約 | [architecture/i18n-contract.md](architecture/i18n-contract.md) | [architecture/i18n-contract_zh.md](architecture/i18n-contract_zh.md) |
 <!-- END:doc-map -->
 
 > _後續每批（B1 → B2 → B3）完成時將逐步補充列。_
