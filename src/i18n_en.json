@@ -711,6 +711,7 @@
   "gui_err_csrf_expired": "Session security token expired. Retrying request...",
   "gui_err_empty_csv": "CSV filename is empty.",
   "gui_err_forbidden": "Forbidden.",
+  "gui_err_generic": "An error occurred. Please try again.",
   "gui_err_internal": "Internal server error",
   "gui_err_invalid_auth": "Invalid username or password.",
   "gui_err_invalid_expire_fmt": "Invalid expiration format",
