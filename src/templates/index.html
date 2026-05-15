@@ -124,17 +124,17 @@
       </svg>
       Illumio PCE Ops
     </h1>
-    <div id="hdr-meta" class="pce-badge" title="{{ t('gui_connected_pce', url=(pce_url or '—')) }}">
-      <svg class="icon" style="width:14px;height:14px;flex-shrink:0;color:var(--accent2);" aria-hidden="true">
-        <use href="#icon-shield"></use>
-      </svg>
-      <span id="hdr-meta-url">{{ pce_url or '—' }}</span>
-    </div>
-    <div id="hdr-stats" style="display:flex;gap:12px;align-items:center;font-size:0.75rem;color:var(--dim);"
-         title="{{ t('gui_config_loaded_title', when=(config_loaded_at | human_time_ago)) }}">
-      <span><span data-i18n="gui_rules_count">Rules</span>: <strong>{{ rules_count | human_number }}</strong></span>
-      <span><span data-i18n="gui_schedules_count">Schedules</span>: <strong>{{ schedules_count | human_number }}</strong></span>
-      <span title="{{ config_loaded_at }}"><span data-i18n="gui_config_loaded">Loaded</span>: {{ config_loaded_at | human_time_ago }}</span>
+    <div id="hdr-chip" class="pce-chip" role="status"
+         aria-label="{{ t('gui_hdr_chip_aria', rules=rules_count, schedules=schedules_count, loaded=(config_loaded_at | human_time_ago)) }}"
+         title="{{ t('gui_connected_pce', url=(pce_url or '—')) }}">
+      <span id="hdr-chip-dot" class="status-dot" data-status="unknown" aria-hidden="true"></span>
+      <span id="hdr-chip-host" class="pce-host">{{ (pce_url or '—') }}</span>
+      <span class="chip-sep" aria-hidden="true">|</span>
+      <span class="chip-kpi"><span data-i18n="gui_rules_count">Rules</span> <strong>{{ rules_count | human_number }}</strong></span>
+      <span class="chip-dot" aria-hidden="true">·</span>
+      <span class="chip-kpi"><span data-i18n="gui_schedules_count">Schedules</span> <strong>{{ schedules_count | human_number }}</strong></span>
+      <span class="chip-dot" aria-hidden="true">·</span>
+      <span class="chip-kpi" title="{{ config_loaded_at }}"><span data-i18n="gui_config_loaded">Loaded</span> {{ config_loaded_at | human_time_ago }}</span>
     </div>
     <div class="header-right">
       <div class="ui-pref" aria-label="Theme mode selector">
