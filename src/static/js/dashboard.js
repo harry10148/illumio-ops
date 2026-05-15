@@ -1348,24 +1348,42 @@ function renderMaturity(snap) {
   if (gradeEl) { gradeEl.textContent = String(grade); gradeEl.style.color = COLOR[grade] || 'var(--dim)'; }
   if (scoreEl) scoreEl.textContent = String(Math.round(score));
   if (bars) {
+    // Static i18n key map so the audit scanner can resolve each key explicitly
+    // (dimension keys are mod12 schema — see src/report/exporters/html_exporter.py).
+    const dimLabelKey = {
+      enforcement_coverage: 'gui_maturity_dim_enforcement_coverage',
+      policy_coverage: 'gui_maturity_dim_policy_coverage',
+      lateral_movement_control: 'gui_maturity_dim_lateral_movement_control',
+      managed_asset_ratio: 'gui_maturity_dim_managed_asset_ratio',
+      risk_port_control: 'gui_maturity_dim_risk_port_control',
+    };
     const order = ['enforcement_coverage', 'policy_coverage', 'lateral_movement_control', 'managed_asset_ratio', 'risk_port_control'];
-    const rows = order.map(k => {
+    bars.textContent = '';
+    order.forEach(k => {
       const d = dims[k] || {};
       const sv = Number(d.score || 0);
       const wt = Number(d.weight || 1) || 1;
       const pct = Math.max(0, Math.min(100, Math.round((sv / wt) * 100)));
       const color = pct >= 70 ? '#22C55E' : pct >= 40 ? '#EAB308' : '#EF4444';
-      const label = _t('gui_maturity_dim_' + k) || k;
-      const labelHtml = document.createElement('div');
-      labelHtml.textContent = label;
-      const safeLabel = labelHtml.textContent;
-      return `<div style="display:flex;align-items:center;gap:10px;margin:6px 0;font-size:.85rem;">`
-        + `<div style="flex:0 0 180px;color:var(--dim);">${escapeHtml(safeLabel)}</div>`
-        + `<div style="flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;">`
-        + `<div style="width:${pct}%;height:100%;background:${color};"></div></div>`
-        + `<div style="flex:0 0 40px;text-align:right;font-weight:600;">${pct}%</div></div>`;
-    }).join('');
-    bars.innerHTML = rows;
+      const label = _t(dimLabelKey[k]) || k;
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;margin:6px 0;font-size:.85rem;';
+      const lbl = document.createElement('div');
+      lbl.style.cssText = 'flex:0 0 180px;color:var(--dim);';
+      lbl.textContent = label;
+      const barWrap = document.createElement('div');
+      barWrap.style.cssText = 'flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;';
+      const barFill = document.createElement('div');
+      barFill.style.cssText = 'width:' + pct + '%;height:100%;background:' + color + ';';
+      barWrap.appendChild(barFill);
+      const pctEl = document.createElement('div');
+      pctEl.style.cssText = 'flex:0 0 40px;text-align:right;font-weight:600;';
+      pctEl.textContent = pct + '%';
+      row.appendChild(lbl);
+      row.appendChild(barWrap);
+      row.appendChild(pctEl);
+      bars.appendChild(row);
+    });
   }
   wrap.style.display = 'block';
 }
