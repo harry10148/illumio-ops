@@ -223,6 +223,11 @@ def make_dashboard_blueprint(
             with open(snapshot_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             _retranslate_kpi_labels(data, lang)
+            try:
+                from src.dashboard_hero import build_hero
+                data["hero"] = build_hero(data, status={})
+            except Exception as hero_exc:
+                logger.warning("dashboard hero build failed: {}", hero_exc)
             return jsonify({"ok": True, "snapshot": data})
         except Exception as e:
             return _err_with_log("dashboard_snapshot", e, lang=lang)

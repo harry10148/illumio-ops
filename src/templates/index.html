@@ -231,40 +231,64 @@
   <!-- Traffic & Quarantine (Dashboard Tab) -->
   <div class="panel active" id="p-dashboard">
 
-    <!-- Top level stats -->
-    <div class="cards">
-      <div class="card">
-        <div class="label" data-i18n="gui_dashboard_rules">Rules</div>
-        <div class="value" id="d-rules">-</div>
+    <!-- Story-mode hero (one-sentence health summary + CTA) -->
+    <div id="d-hero" class="dashboard-hero" style="margin-bottom:20px;display:none;">
+      <div class="dashboard-hero-sentence" id="d-hero-sentence" style="font-size:1.15rem;font-weight:600;line-height:1.5;"></div>
+      <button class="btn btn-primary" id="d-hero-cta" data-action="scrollToFindings"
+              data-i18n="gui_hero_view_high_risk" style="display:none;margin-top:10px;">
+        View high-risk findings
+      </button>
+    </div>
+
+    <!-- Top level stats — Phase 3.1: grouped into 3 story cards (Health / Traffic / Risk) -->
+    <div class="cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">
+      <div class="card story-card story-card--health">
+        <div class="story-card-title label" data-i18n="gui_story_group_health">Health</div>
+        <div class="story-card-body">
+          <div class="story-stat"><span class="story-stat-label" data-i18n="gui_card_health_rule">Health Rule</span><span class="story-stat-value value" id="d-health">-</span></div>
+          <div class="story-stat"><span class="story-stat-label" data-i18n="gui_card_event_poll">Event Poll</span><span class="story-stat-value value" id="d-event-poll">-</span></div>
+          <div class="story-stat"><span class="story-stat-label" data-i18n="gui_card_last_dispatch">Last Dispatch</span><span class="story-stat-value value" id="d-dispatch">-</span></div>
+        </div>
       </div>
-      <div class="card">
-        <div class="label" data-i18n="gui_card_health_rule">Health Rule</div>
-        <div class="value" id="d-health">-</div>
+      <div class="card story-card story-card--traffic">
+        <div class="story-card-title label" data-i18n="gui_story_group_traffic">Traffic</div>
+        <div class="story-card-body">
+          <div class="story-stat"><span class="story-stat-label" data-i18n="gui_dashboard_rules">Rules</span><span class="story-stat-value value" id="d-rules">-</span></div>
+          <div class="story-stat"><span class="story-stat-label" data-i18n="gui_card_unknown_types">Unknown Types</span><span class="story-stat-value value" id="d-unknown">-</span></div>
+          <div class="story-stat"><span class="story-stat-label" data-i18n="gui_card_suppressed">Suppressed</span><span class="story-stat-value value" id="d-suppressed">-</span></div>
+        </div>
       </div>
-      <div class="card">
-        <div class="label" data-i18n="gui_card_event_poll">Event Poll</div>
-        <div class="value" id="d-event-poll">-</div>
-      </div>
-      <div class="card">
-        <div class="label" data-i18n="gui_card_last_dispatch">Last Dispatch</div>
-        <div class="value" id="d-dispatch">-</div>
-      </div>
-      <div class="card">
-        <div class="label" data-i18n="gui_card_unknown_types">Unknown Types</div>
-        <div class="value" id="d-unknown">-</div>
-      </div>
-      <div class="card">
-        <div class="label" data-i18n="gui_card_suppressed">Suppressed</div>
-        <div class="value" id="d-suppressed">-</div>
-      </div>
-      <div class="card" id="card-ransom" style="display:none">
-        <div class="label" data-i18n="gui_card_ransomware_exp">Ransomware Exp</div>
-        <div class="value" id="d-ransom">—</div>
+      <div class="card story-card story-card--risk">
+        <div class="story-card-title label" data-i18n="gui_story_group_risk">Risk</div>
+        <div class="story-card-body">
+          <div class="story-stat" id="card-ransom" style="display:none">
+            <span class="story-stat-label" data-i18n="gui_card_ransomware_exp">Ransomware Exp</span>
+            <span class="story-stat-value value" id="d-ransom">—</span>
+          </div>
+          <div class="story-stat" id="card-hi-risk-count" style="display:none">
+            <span class="story-stat-label" data-i18n="gui_hi_risk_findings">High-risk findings</span>
+            <span class="story-stat-value value" id="d-hi-risk-count">0</span>
+          </div>
+        </div>
       </div>
     </div>
 
     <fieldset id="cd-field" style="display:none;margin-bottom:24px;border:none;padding:0;">
       <div id="cd-list" class="cards" style="margin-bottom:0;"></div>
+    </fieldset>
+
+    <!-- Microsegmentation Maturity (Phase 3.1 Task 3) -->
+    <fieldset id="d-maturity" style="display:none;margin-bottom:24px;">
+      <legend data-i18n="gui_maturity_heading">Microsegmentation Maturity</legend>
+      <div class="d-maturity-header" style="display:flex;align-items:center;gap:24px;margin-bottom:14px;">
+        <div style="text-align:center;min-width:100px;">
+          <div id="d-maturity-grade" style="font-size:48px;font-weight:700;line-height:1;">?</div>
+          <div style="font-size:14px;color:var(--dim);margin-top:4px;">
+            <span data-i18n="gui_maturity_score_label">Score</span>: <span id="d-maturity-score">—</span>/100
+          </div>
+        </div>
+        <div id="d-maturity-bars" style="flex:1;"></div>
+      </div>
     </fieldset>
 
     <!-- Live Plotly charts (auto-refresh every 60s) -->
@@ -461,18 +485,29 @@
             <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_date_range">Date Range:</span> <span id="snap-date-range">??/span></span>
           </div>
 
-          <!-- KPI Cards -->
-          <div id="snap-kpi-grid" class="kpi-grid"></div>
+          <!-- KPI Cards (Phase 3.1 Task 5 — collapsed by default) -->
+          <details id="d-detailed-kpis" style="margin-bottom:16px;">
+            <summary style="cursor:pointer;font-weight:600;color:var(--dim);" data-i18n="gui_detailed_kpis_label">Detailed metrics (12 KPIs)</summary>
+            <div id="snap-kpi-grid" class="kpi-grid" style="margin:10px 0 0;"></div>
+          </details>
 
-          <!-- Key Findings -->
+          <!-- Top Actions (Phase 3.1 Task 4) -->
+          <div id="d-top-actions" style="margin-bottom:16px;">
+            <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--accent2);" data-i18n="gui_top_actions_heading">Top Actions</div>
+            <div id="d-top-actions-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;"></div>
+          </div>
+
+          <!-- Key Findings (collapsed full table) -->
           <div id="snap-findings-wrap" style="margin-bottom:16px;">
-            <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_snap_key_findings">Key Findings</div>
-            <table class="data-table" data-density="compact">
-              <thead><tr><th style="width:90px" data-i18n="gui_snap_col_severity">Severity</th><th data-i18n="gui_snap_col_finding">Finding</th><th data-i18n="gui_snap_col_action">Action</th></tr></thead>
-              <tbody id="snap-findings-body">
-                <tr><td colspan="3" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_snap_no_findings">No findings.</td></tr>
-              </tbody>
-            </table>
+            <details>
+              <summary style="cursor:pointer;font-weight:600;color:var(--dim);" data-i18n="gui_findings_details_label">All findings</summary>
+              <table class="data-table" data-density="compact" style="margin-top:8px;">
+                <thead><tr><th style="width:90px" data-i18n="gui_snap_col_severity">Severity</th><th data-i18n="gui_snap_col_finding">Finding</th><th data-i18n="gui_snap_col_action">Action</th></tr></thead>
+                <tbody id="snap-findings-body">
+                  <tr><td colspan="3" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_snap_no_findings">No findings.</td></tr>
+                </tbody>
+              </table>
+            </details>
           </div>
 
           <!-- Two-column: Policy Breakdown + Top Ports -->
