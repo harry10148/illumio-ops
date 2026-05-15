@@ -59,12 +59,13 @@ BASE_CSS = """\
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Montserrat', -apple-system, sans-serif; background: var(--tan); color: var(--slate); }
-  nav { position: fixed; top: 0; left: 0; width: 210px; height: 100vh; background: var(--cyan-120); overflow-y: auto; padding: 60px 0 20px; z-index: 100; }
-  nav a { display: block; color: var(--slate-20); text-decoration: none; padding: 7px 16px; font-size: 12px; border-left: 3px solid transparent; }
+  nav { position: fixed; top: 0; left: 0; width: 220px; height: 100vh; background: var(--cyan-120); overflow-y: auto; padding: 60px 0 20px; z-index: 100; }
+  nav a { display: block; color: #FFFFFF; text-decoration: none; padding: 8px 18px; font-size: 13px; border-left: 3px solid transparent; }
   nav a:hover, nav a.active { background: var(--cyan-100); border-left-color: var(--orange); color: #fff; }
+  .nav-brand { display: block; padding: 12px 18px; color: #FFFFFF; font-weight: 700; font-size: 14px; border-bottom: 1px solid rgba(255,255,255,0.18); margin-bottom: 8px; letter-spacing: 0.02em; }
   .print-btn { display: block; margin: 12px 16px 0; padding: 7px 16px; background: var(--orange); color: #fff; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; text-align: center; width: calc(100% - 32px); }
   .print-btn:hover { background: var(--orange-dark, #cc4400); }
-  main { margin-left: 210px; padding: 24px; container-type: inline-size; container-name: main; }
+  main { margin-left: 220px; padding: 24px; container-type: inline-size; container-name: main; }
   h1 { color: var(--orange); font-size: 22px; font-weight: 700; margin-bottom: 4px; }
   h2 { color: var(--cyan-120); font-size: 16px; font-weight: 600; margin: 24px 0 10px; border-bottom: 2px solid var(--orange); padding-bottom: 6px; }
   h3 { color: var(--slate); font-size: 13px; font-weight: 600; margin: 16px 0 8px; }
