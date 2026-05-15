@@ -26,6 +26,11 @@ def test_rsyslog_targets_remote_host():
 
 
 def test_siem_doc_exists_with_four_options():
-    doc = Path("docs/SIEM_Integration.md").read_text(encoding="utf-8")
-    for option in ("Option A", "Option B", "Option C", "Option D"):
-        assert option in doc, f"SIEM doc missing {option}"
+    # Doc was moved during 2026-05 refactor (PR #29). New path:
+    #   docs/user-guide/siem-integration.md
+    # The legacy doc labelled destinations "Option A..D"; the new doc uses
+    # the actual transport keys (udp / tcp / tls / hec), which are what the
+    # user wires into config/config.json under siem.destinations.transport.
+    doc = Path("docs/user-guide/siem-integration.md").read_text(encoding="utf-8")
+    for transport in ("udp", "tcp", "tls", "hec"):
+        assert f"`{transport}`" in doc, f"SIEM doc missing transport: {transport}"

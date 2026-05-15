@@ -228,7 +228,7 @@ python3 illumio-ops.py report policy-usage [OPTIONS]
 | `csv` | `report_<date>_raw.zip` | CSV 原始流量資料；適合 SIEM 擷取 |
 | `xlsx` | `report_<date>.xlsx` | 含逐模組工作表的 Excel 活頁簿 |
 | `pdf` | `report_<date>_print.html` | 列印就緒 HTML；在瀏覽器開啟後列印為 PDF |
-| `all` | 以上全部 | 同時產生 HTML + CSV |
+| `all` | 以上全部 | 同時產生 html、csv、xlsx 與 pdf |
 
 ---
 

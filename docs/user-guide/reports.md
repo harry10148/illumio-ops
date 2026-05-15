@@ -229,7 +229,7 @@ Export formats summary:
 | `csv` | `report_<date>_raw.zip` | Raw flow data as CSV; suitable for SIEM ingestion |
 | `xlsx` | `report_<date>.xlsx` | Excel workbook with per-module sheets |
 | `pdf` | `report_<date>_print.html` | Print-ready HTML; open in browser and print-to-PDF |
-| `all` | All of the above | Generates HTML + CSV together |
+| `all` | All of the above | Generates html, csv, xlsx, and pdf together |
 
 ---
 
