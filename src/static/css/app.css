@@ -1796,3 +1796,15 @@ select[aria-invalid="true"] {
   border-color: var(--color-danger);
   outline-color: var(--color-danger);
 }
+
+/* ─── Story-mode dashboard cards (Phase 3.1) ───────────────────────── */
+.story-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.story-card-title { margin: 0 0 12px; font-size: .85rem; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); }
+.story-card--health .story-card-title { color: var(--success); }
+.story-card--traffic .story-card-title { color: var(--accent2); }
+.story-card--risk .story-card-title { color: var(--warn); }
+.story-card-body { display: flex; flex-direction: column; gap: 10px; }
+.story-stat { display: flex; justify-content: space-between; align-items: center; font-size: .95rem; }
+.story-stat-label { color: var(--dim); }
+.story-stat-value { font-weight: 700; color: var(--fg); }
+.dashboard-hero { background: var(--bg2); border-left: 4px solid var(--accent2); border-radius: 8px; padding: 18px; }
