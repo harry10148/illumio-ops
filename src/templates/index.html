@@ -467,7 +467,7 @@
           <!-- Key Findings -->
           <div id="snap-findings-wrap" style="margin-bottom:16px;">
             <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_snap_key_findings">Key Findings</div>
-            <table class="rule-table" style="font-size:0.8rem;">
+            <table class="data-table" data-density="compact">
               <thead><tr><th style="width:90px" data-i18n="gui_snap_col_severity">Severity</th><th data-i18n="gui_snap_col_finding">Finding</th><th data-i18n="gui_snap_col_action">Action</th></tr></thead>
               <tbody id="snap-findings-body">
                 <tr><td colspan="3" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_snap_no_findings">No findings.</td></tr>
@@ -479,7 +479,7 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
             <div>
               <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_snap_policy_breakdown">Policy Decision Breakdown</div>
-              <table class="rule-table" style="font-size:0.8rem;">
+              <table class="data-table" data-density="compact">
                 <thead><tr><th data-i18n="gui_snap_col_decision">Decision</th><th data-i18n="gui_snap_col_flows">Flows</th></tr></thead>
                 <tbody id="snap-policy-body">
                   <tr><td colspan="2" style="text-align:center;color:var(--dim);">??/td></tr>
@@ -488,7 +488,7 @@
             </div>
             <div>
               <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_snap_top_ports">Top 10 Ports (by Flow Count)</div>
-              <table class="rule-table" style="font-size:0.8rem;">
+              <table class="data-table" data-density="compact">
                 <thead><tr><th data-i18n="gui_snap_col_port">Port</th><th data-i18n="gui_snap_col_flow_count">Flow Count</th></tr></thead>
                 <tbody id="snap-ports-body">
                   <tr><td colspan="2" style="text-align:center;color:var(--dim);">??/td></tr>
@@ -500,7 +500,7 @@
           <!-- Top Uncovered Flows -->
           <div id="snap-uncovered-wrap" style="margin-bottom:16px;">
             <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);"><span data-i18n="gui_snap_uncovered_flows">Top Uncovered Flows</span> <span id="snap-uncovered-pct" style="font-weight:400;color:var(--dim);font-size:0.8rem;"></span></div>
-            <table class="rule-table" style="font-size:0.8rem;">
+            <table class="data-table" data-density="compact">
               <thead><tr><th>Flow</th><th data-i18n="gui_snap_col_decision">Decision</th><th data-i18n="gui_snap_col_connections">Connections</th><th data-i18n="gui_snap_col_recommendation">Recommendation</th></tr></thead>
               <tbody id="snap-uncovered-body">
                 <tr><td colspan="4" style="text-align:center;color:var(--dim);padding:12px;">??/td></tr>
@@ -511,7 +511,7 @@
           <!-- Top Bandwidth (shown only if byte data available) -->
           <div id="snap-bw-wrap" style="display:none;margin-bottom:8px;">
             <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_snap_bw_title">Top Connections by Data Volume</div>
-            <table class="rule-table" style="font-size:0.8rem;">
+            <table class="data-table" data-density="compact">
               <thead><tr><th data-i18n="gui_snap_col_src_ip">Src IP</th><th data-i18n="gui_snap_col_dst_ip">Dst IP</th><th data-i18n="gui_snap_col_port">Port</th><th data-i18n="gui_snap_col_bytes">Bytes Total</th><th data-i18n="gui_snap_col_decision">Decision</th></tr></thead>
               <tbody id="snap-bw-body">
                 <tr><td colspan="5" style="text-align:center;color:var(--dim);padding:12px;">??/td></tr>

@@ -917,6 +917,67 @@
       background: rgba(255, 255, 255, 0.03);
     }
 
+    /* Data Table - canonical name for tabular grids.
+       Standalone class (does not alias .rule-table so density attribute is
+       not accidentally applied to legacy rule-table markup).
+       New code should prefer .data-table[data-density="..."]                   */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .data-table th,
+    .data-table td {
+      text-align: left;
+      padding: var(--row-cell-y, 8px) var(--row-cell-x, 12px);
+      border-bottom: 1px solid var(--border);
+      font-size: .84rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-variant-numeric: tabular-nums;
+    }
+    .data-table th {
+      color: var(--dim);
+      font-weight: 700;
+      background: var(--bg3);
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      letter-spacing: 0.5px;
+      position: relative;
+    }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table tr:hover td      { background: rgba(255,255,255,0.03); }
+
+    /* Density variants - replaces inline `style="font-size:0.8rem;"` */
+    .data-table[data-density="compact"] th,
+    .data-table[data-density="compact"] td {
+      padding: 4px 8px;
+      font-size: 0.78rem;
+    }
+    .data-table[data-density="comfortable"] th,
+    .data-table[data-density="comfortable"] td {
+      padding: 12px 16px;
+      font-size: 0.92rem;
+    }
+
+    /* Sortable column indicator (used with aria-sort="ascending"|"descending") */
+    .data-table th[aria-sort] {
+      cursor: pointer;
+      user-select: none;
+    }
+    .data-table th[aria-sort]::after {
+      content: '';
+      display: inline-block;
+      margin-left: 6px;
+      width: 0; height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      opacity: 0.5;
+    }
+    .data-table th[aria-sort="ascending"]::after  { border-bottom: 5px solid currentColor; opacity: 1; }
+    .data-table th[aria-sort="descending"]::after { border-top: 5px solid currentColor; opacity: 1; }
+
     .resizer {
       position: absolute;
       top: 25%;

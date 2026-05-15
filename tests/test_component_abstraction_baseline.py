@@ -25,7 +25,7 @@ BASELINES: dict[str, int] = {
     "filter_bar_buttons": 0,  # all 4 migrated in Task 3 (traffic + workload toolbars)
     "empty_states": 41,       # 3 of 44 migrated in Task 4 (traffic + workload + events)
     "fieldset_sections": 2,   # 2 of 4 migrated in Task 5 (snap + ranking summary)
-    "styled_tables": 15,      # <table class="rule-table" style="..."> (measured)
+    "styled_tables": 10,      # 5 of 15 migrated in Task 6 (snap mini-tables)
 }
 
 
