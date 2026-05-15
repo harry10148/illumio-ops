@@ -30,8 +30,15 @@ function _updateSaveButtonLabel() {
     return;
   }
   if (dirty.length === 1) {
+    // Explicit key lookup so static i18n audit sees each key literal.
+    const sectionKeys = {
+      'pce':      'gui_settings_section_pce',
+      'channels': 'gui_settings_section_channels',
+      'display':  'gui_settings_section_display',
+      'security': 'gui_settings_section_security',
+    };
     const which = dirty[0];
-    const sectionName = _t('gui_settings_section_' + which);
+    const sectionName = _t(sectionKeys[which] || 'gui_save_all');
     label.textContent = _t('gui_settings_save_one').replace('{section}', sectionName);
     return;
   }
