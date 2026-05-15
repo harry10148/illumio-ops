@@ -14,8 +14,8 @@ INDEX = Path(__file__).parent.parent / "src" / "templates" / "index.html"
 # Phase 2.1 Task 2 migrated ~27 single-value; Task 3 collapsed gap shortcuts.
 # Remaining ~31 are mostly composite multi-value shortcuts (margin: 0 4px 4px 0)
 # and zero resets that don't map to a single --space-* token.
-# 32 = current count + 1 buffer; lower this if you can migrate more.
-MAGIC_THRESHOLD = 32
+# 33 = post Phase 2.2 Task 1 (.kpi-card padding:10px 14px); lower when migrate more.
+MAGIC_THRESHOLD = 33
 
 
 def test_magic_number_margin_padding_count_below_threshold():

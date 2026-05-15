@@ -592,6 +592,48 @@
       color: var(--color-danger);
     }
 
+    /* KPI Card - unified across dashboard snapshot, policy usage, audit, ven. */
+    .kpi-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
+    }
+    .kpi-card .kpi-label {
+      font-size: 0.72rem;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .kpi-card .kpi-value {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--fg);
+      font-variant-numeric: tabular-nums;
+    }
+    .kpi-card .kpi-trend {
+      font-size: 0.78rem;
+      color: var(--dim);
+    }
+    .kpi-card .kpi-trend.up    { color: var(--success); }
+    .kpi-card .kpi-trend.down  { color: var(--danger); }
+    .kpi-card .kpi-trend.flat  { color: var(--dim); }
+
+    /* KPI grid container - replaces inline style on #snap-kpi-grid etc. */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: var(--space-panel);
+    }
+
     /* Buttons */
     .btn {
       display: inline-flex;

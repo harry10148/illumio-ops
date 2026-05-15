@@ -20,7 +20,7 @@ from tests._inline_scanner import (
 # Day-0 baseline values measured during recon (2026-05-15).
 # Adjust the right-hand limit downward in each Task N.B step.
 BASELINES: dict[str, int] = {
-    "kpi_cards": 4,           # dashboard.js x2 + dashboard_v2.js x2
+    "kpi_cards": 0,           # all migrated to .kpi-card (Task 1)
     "status_pills": 5,        # severity + policy-decision pills (measured 2026-05-15)
     "filter_bar_buttons": 8,  # `height: 42px; align-self:flex-end;` repetitions
     "empty_states": 44,       # colspan + inline style across index.html + js (measured)
