@@ -1815,6 +1815,7 @@ select[aria-invalid="true"] {
 .story-card--risk .story-card-title { color: var(--warn); }
 .story-card-body { display: flex; flex-direction: column; gap: 10px; }
 .story-stat { display: flex; justify-content: space-between; align-items: center; font-size: .95rem; }
+.story-stat[title] { cursor: help; }
 .story-stat-label { color: var(--dim); }
 .story-stat-value { font-weight: 700; color: var(--fg); }
 .dashboard-hero { background: var(--bg2); border-left: 4px solid var(--accent2); border-radius: 8px; padding: 18px; }
