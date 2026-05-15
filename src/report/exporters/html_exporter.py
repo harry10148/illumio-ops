@@ -1352,7 +1352,7 @@ class HtmlExporter:
             html += (
                 f'<h4>{_s("rpt_tr_hub_apps")}</h4>'
                 + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_summary")}</h5>'
-                + _ha_sub(["app_env_key", "infrastructure_score", "tier", "role", "provider_score", "consumer_score"])
+                + _ha_sub(["app_env_key", "infrastructure_score", "tier", "role", "asset_type", "provider_score", "consumer_score"])
                 + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_risk_factors")}</h5>'
                 + _ha_sub(["app_env_key", "betweenness_score", "mixed_traffic_ratio", "dampening_factor", "non_prod_penalty"])
                 + f'<h5 class="subtable-label">{_s("rpt_tr_top_apps_connections")}</h5>'
