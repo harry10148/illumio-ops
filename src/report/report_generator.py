@@ -127,6 +127,10 @@ def _build_snapshot(module_results: dict) -> dict:
         'total_mb_bw':       _safe_val(mod11.get('total_mb', 0)),
         'top_by_bytes':      _df_records(mod11.get('top_by_bytes'), limit=10),
         'top_bandwidth':     _df_records(mod11.get('top_bandwidth'), limit=10),
+        # Phase 3.1: client-side Microsegmentation Maturity bar chart
+        'maturity_dimensions': mod12.get('maturity_dimensions', {}),
+        'maturity_score':      _safe_val(mod12.get('maturity_score', 0)),
+        'maturity_grade':      mod12.get('maturity_grade', '?'),
     }
 
 # ─── Result container ─────────────────────────────────────────────────────────

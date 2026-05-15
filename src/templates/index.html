@@ -277,6 +277,20 @@
       <div id="cd-list" class="cards" style="margin-bottom:0;"></div>
     </fieldset>
 
+    <!-- Microsegmentation Maturity (Phase 3.1 Task 3) -->
+    <fieldset id="d-maturity" style="display:none;margin-bottom:24px;">
+      <legend data-i18n="gui_maturity_heading">Microsegmentation Maturity</legend>
+      <div class="d-maturity-header" style="display:flex;align-items:center;gap:24px;margin-bottom:14px;">
+        <div style="text-align:center;min-width:100px;">
+          <div id="d-maturity-grade" style="font-size:48px;font-weight:700;line-height:1;">?</div>
+          <div style="font-size:14px;color:var(--dim);margin-top:4px;">
+            <span data-i18n="gui_maturity_score_label">Score</span>: <span id="d-maturity-score">—</span>/100
+          </div>
+        </div>
+        <div id="d-maturity-bars" style="flex:1;"></div>
+      </div>
+    </fieldset>
+
     <!-- Live Plotly charts (auto-refresh every 60s) -->
     <div class="dashboard-charts" style="display:none;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
       <div id="chart-traffic-timeline" style="min-height:200px;display:none;"></div>
