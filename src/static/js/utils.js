@@ -322,6 +322,11 @@ async function init() {
   if (qtab && ['traffic', 'workloads', 'legacy'].includes(qtab)) {
     switchQTab(qtab, false);
   }
+  // Settings sub-tab deep-link support (Phase 1.1)
+  const stab = params.get('stab');
+  if (stab && ['pce', 'channels', 'display', 'security'].includes(stab)) {
+    if (typeof switchSettingsTab === 'function') switchSettingsTab(stab, false);
+  }
   // Refresh dashboard status every 30s
   setInterval(() => { if (document.querySelector('.tab.active[data-tab="dashboard"]')) loadDashboard(); }, 30000);
   setInterval(() => { if (document.querySelector('.tab.active[data-tab="events"]')) loadEventViewer(true); }, 45000);

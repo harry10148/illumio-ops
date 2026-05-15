@@ -3,6 +3,39 @@ let _settings = {};
 let _security = {};
 let _alertPlugins = {};
 
+// ── Settings sub-tab state (Phase 1.1) ─────────────────────────────
+let _activeSettingsTab = 'pce';
+
+// CSP-friendly handler bound from index.html via data-action.
+// Mirrors switchQTab() in quarantine.js:4-11 but scoped to #p-settings.
+function switchSettingsTab(which, updateUrl = true) {
+  const valid = ['pce', 'channels', 'display', 'security'];
+  if (!valid.includes(which)) return;
+
+  // Toggle button active state (within #p-settings only)
+  document.querySelectorAll('#p-settings .sub-nav-btn').forEach(b => {
+    const isActive = b.id === 'sbtn-' + which;
+    if (isActive) {
+      b.classList.add('active');
+      b.setAttribute('aria-selected', 'true');
+    } else {
+      b.classList.remove('active');
+      b.setAttribute('aria-selected', 'false');
+    }
+  });
+
+  // Toggle panel visibility
+  document.querySelectorAll('#p-settings .s-subpanel').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById('settings-' + which);
+  if (target) target.classList.add('active');
+
+  _activeSettingsTab = which;
+  if (updateUrl) updateUrlState('stab', which);
+
+  // Update sticky save button label (Task 5 will define _updateSaveButtonLabel)
+  if (typeof _updateSaveButtonLabel === 'function') _updateSaveButtonLabel();
+}
+
 // Format day count as humanized "N days (about Yy Mm)" / "N days (about M months)".
 // Negative / null returns empty string. Falls back to short form for short ranges.
 function humanizeDays(n) {
