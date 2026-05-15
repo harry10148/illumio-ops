@@ -683,6 +683,8 @@ class HtmlExporter:
             pce_url=self._pce_url,
             org_name=self._org_name,
             lang=self._lang,
+            maturity_grade=mod12.get("maturity_grade"),
+            maturity_score=mod12.get("maturity_score"),
         )
         html_lang = "zh-TW" if self._lang == "zh_TW" else "en"
         return (

@@ -16,6 +16,9 @@ def build_cover_page(
     pce_url: str = "",
     org_name: str = "",
     lang: str = "en",
+    *,
+    maturity_grade: str | None = None,
+    maturity_score: int | None = None,
 ) -> str:
     date_str = " – ".join(d for d in date_range if d)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -37,6 +40,20 @@ def build_cover_page(
         f'<div class="cover-type">{report_type}</div>'
         if report_type else ""
     )
+    grade_block = ""
+    if maturity_grade and maturity_grade != "?":
+        from src.report.exporters.grade_colors import grade_color
+        color = grade_color(maturity_grade)
+        score_part = (
+            f' <span style="font-size:14pt;font-weight:400;opacity:0.7">'
+            f'({maturity_score}/100)</span>'
+            if maturity_score is not None else ""
+        )
+        grade_block = (
+            f'<div class="cover-grade" style="margin-top:12px;color:{color};'
+            f'font-size:28pt;font-weight:700;">'
+            f'{_escape(str(maturity_grade))}{score_part}</div>'
+        )
     org_html = (
         f'<div class="cover-org">{org_name}</div>'
         if org_name else '<div></div>'
@@ -49,6 +66,7 @@ def build_cover_page(
         f'<div class="cover-title">{title}</div>'
         '<div class="cover-rule"></div>'
         f'{type_badge}'
+        f'{grade_block}'
         f'<div class="cover-meta">{date_line}{pce_line}</div>'
         '</div>'
         '<div class="cover-footer">'
