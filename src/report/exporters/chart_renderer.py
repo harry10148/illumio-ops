@@ -145,7 +145,7 @@ _BASE_LAYOUT = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
     font=dict(family="Montserrat, -apple-system, sans-serif", size=13, color="#313638"),
-    title_font=dict(size=15, color="#1A2C32", family="Montserrat, sans-serif"),
+    title_font=dict(size=16, color="#1A2C32", family="Montserrat, sans-serif"),
     margin=dict(l=48, r=24, t=52, b=48),
     legend=dict(
         bgcolor="rgba(247,244,238,0.88)",
@@ -168,13 +168,13 @@ def _apply_base_layout(fig, title: str, x_label: str = "", y_label: str = "") ->
             title=x_label,
             gridcolor="rgba(50,81,88,0.10)",
             linecolor="rgba(50,81,88,0.18)",
-            tickfont=dict(size=11),
+            tickfont=dict(size=13),
         )
         updates["yaxis"] = dict(
             title=y_label,
             gridcolor="rgba(50,81,88,0.10)",
             linecolor="rgba(50,81,88,0.18)",
-            tickfont=dict(size=11),
+            tickfont=dict(size=13),
         )
     fig.update_layout(**updates)
 
@@ -264,8 +264,8 @@ def render_plotly_html(spec: dict[str, Any], *, include_js: bool = True) -> str:
         ))
         _apply_base_layout(fig, title)
         fig.update_layout(
-            xaxis=dict(tickfont=dict(size=11), gridcolor="rgba(0,0,0,0)"),
-            yaxis=dict(tickfont=dict(size=11), gridcolor="rgba(0,0,0,0)"),
+            xaxis=dict(tickfont=dict(size=13), gridcolor="rgba(0,0,0,0)"),
+            yaxis=dict(tickfont=dict(size=13), gridcolor="rgba(0,0,0,0)"),
         )
     elif chart_type == "network":
         nodes = data.get("nodes", [])
@@ -296,7 +296,7 @@ def render_plotly_html(spec: dict[str, Any], *, include_js: bool = True) -> str:
                 line=dict(color="#fff", width=2),
             ),
             textposition="bottom center",
-            textfont=dict(size=11),
+            textfont=dict(size=13),
             hovertemplate="%{text}<extra></extra>",
         ))
         _apply_base_layout(fig, title)

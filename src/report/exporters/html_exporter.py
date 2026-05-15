@@ -40,18 +40,7 @@ from src.report.exporters.cover_page import build_cover_page as _build_cover_pag
 # Grade → semantic color mapping. Mirrors --color-success / --color-warning /
 # --color-danger from the WebUI CSS token system (Improvement_Plan §A 1.3).
 # A/B = green (success), C = orange (warning), D/F = red (danger).
-_GRADE_COLORS = {
-    "A": "#16A34A",
-    "B": "#16A34A",
-    "C": "#F59E0B",
-    "D": "#BE122F",
-    "F": "#BE122F",
-}
-
-
-def _grade_to_color(grade: str) -> str:
-    """Return the semantic hex color for a maturity / readiness grade letter."""
-    return _GRADE_COLORS.get((grade or "").upper(), "#6B7280")
+from src.report.exporters.grade_colors import GRADE_COLOR as _GRADE_COLORS, grade_color as _grade_to_color  # noqa: E402,F401
 
 
 _CSS = build_css('traffic')
@@ -619,9 +608,7 @@ class HtmlExporter:
             + summary_pills +
             f'<h2>{_s("rpt_tr_maturity_heading")}</h2>'
             + maturity_html +
-            f'<h2>{_s("rpt_key_metrics")}</h2>'
-            '<div class="kpi-grid">' + kpi_cards + '</div>'
-            + trend_html +
+            trend_html +
             f'<h2>{_s("rpt_key_findings")}</h2>' + key_findings_html +
             attack_summary_html +
             '</section>\n' +
@@ -696,6 +683,8 @@ class HtmlExporter:
             pce_url=self._pce_url,
             org_name=self._org_name,
             lang=self._lang,
+            maturity_grade=mod12.get("maturity_grade"),
+            maturity_score=mod12.get("maturity_score"),
         )
         html_lang = "zh-TW" if self._lang == "zh_TW" else "en"
         return (

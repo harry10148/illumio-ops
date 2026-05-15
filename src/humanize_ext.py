@@ -44,6 +44,35 @@ def human_number(n: int | float) -> str:
     """Format a number with thousands separator: 12345 -> '12,345'."""
     return _humanize.intcomma(n)
 
+def fmt_bytes_auto(value, *, input_unit: str = "bytes") -> str:
+    """Auto-scale a byte (or MB) count to a human-readable string.
+
+    >>> fmt_bytes_auto(0)
+    '0 B'
+    >>> fmt_bytes_auto(1500)
+    '1.5 KB'
+    >>> fmt_bytes_auto(6062571061).endswith("GB")
+    True
+    """
+    try:
+        b = float(value)
+    except (TypeError, ValueError):
+        return "—"
+    if b < 0:
+        return "—"
+    if input_unit.lower() == "mb":
+        b = b * 1024 * 1024
+    if b >= 1024 ** 4:
+        return f"{b / 1024 ** 4:.2f} TB"
+    if b >= 1024 ** 3:
+        return f"{b / 1024 ** 3:.2f} GB"
+    if b >= 1024 ** 2:
+        return f"{b / 1024 ** 2:.1f} MB"
+    if b >= 1024:
+        return f"{b / 1024:.1f} KB"
+    return f"{int(b)} B"
+
+
 def human_time_ago(past: _dt.datetime) -> str:
     """Format a past datetime as 'X time ago'."""
     _activate_locale()
