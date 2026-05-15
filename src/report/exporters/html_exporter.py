@@ -40,18 +40,7 @@ from src.report.exporters.cover_page import build_cover_page as _build_cover_pag
 # Grade → semantic color mapping. Mirrors --color-success / --color-warning /
 # --color-danger from the WebUI CSS token system (Improvement_Plan §A 1.3).
 # A/B = green (success), C = orange (warning), D/F = red (danger).
-_GRADE_COLORS = {
-    "A": "#16A34A",
-    "B": "#16A34A",
-    "C": "#F59E0B",
-    "D": "#BE122F",
-    "F": "#BE122F",
-}
-
-
-def _grade_to_color(grade: str) -> str:
-    """Return the semantic hex color for a maturity / readiness grade letter."""
-    return _GRADE_COLORS.get((grade or "").upper(), "#6B7280")
+from src.report.exporters.grade_colors import GRADE_COLOR as _GRADE_COLORS, grade_color as _grade_to_color  # noqa: E402,F401
 
 
 _CSS = build_css('traffic')
