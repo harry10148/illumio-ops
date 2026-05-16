@@ -30,11 +30,15 @@ GLOSSARY_PATH = ROOT / "src" / "i18n" / "data" / "glossary.json"
 
 
 def _resolve_zh(key: str, en_val: str) -> str:
-    """Replicate the legacy _build_messages('zh_TW') resolution order, but as data."""
-    if _is_strict_surface_key(key):
-        return f"[MISSING:{key}]"
+    """Replicate the legacy _build_messages('zh_TW') resolution order, but as data.
+
+    zh_explicit is checked first so that explicit overrides always win, even for
+    strict-surface keys (which would otherwise fall through to [MISSING:key]).
+    """
     if key in _ZH_EXPLICIT:
         return _ZH_EXPLICIT[key]
+    if _is_strict_surface_key(key):
+        return f"[MISSING:{key}]"
     if isinstance(en_val, str) and en_val:
         translated = _translate_text(en_val)
         if translated and translated != en_val:

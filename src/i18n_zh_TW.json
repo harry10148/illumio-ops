@@ -3082,5 +3082,14 @@
   "wgs_tls_valid_until": "有效期至",
   "wgs_user_input": "帳號",
   "wgs_username": "帳號",
-  "would_trigger": "會觸發"
+  "would_trigger": "會觸發",
+  "alert_plugin_field_telegram_bot_token": "Bot Token",
+  "alert_plugin_field_telegram_chat_id": "Chat ID",
+  "alert_plugin_telegram_description": "將精煉後的警示推送至 Telegram Bot 對話。",
+  "alert_plugin_telegram_display_name": "Telegram Bot",
+  "alert_tpl_telegram_title": "Illumio 監控警示",
+  "telegram_alert_failed": "Telegram 告警送出失敗（status={status}）：{error}",
+  "telegram_alert_sent": "Telegram 告警已送出。",
+  "telegram_config_missing": "Telegram 告警略過：尚未設定 Bot Token 或 Chat ID。",
+  "telegram_truncated_footer": "… 還有 {more} 條訊息（已截斷以符合 Telegram 4096 字元上限）"
 }
