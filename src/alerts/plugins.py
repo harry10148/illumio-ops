@@ -133,3 +133,48 @@ class WebhookAlertPlugin(AlertOutputPlugin):
         except Exception as exc:
             print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=exc, status='')}{Colors.ENDC}")
             return {"channel": "webhook", "status": "failed", "target": webhook_url, "error": str(exc)}
+
+
+class TelegramAlertPlugin(AlertOutputPlugin):
+    name = "telegram"
+
+    def send(self, reporter, subject: str, *, lang: str = "en") -> dict:
+        alerts_cfg = self.cm.config.get("alerts", {})
+        token = alerts_cfg.get("telegram_bot_token", "")
+        chat_id = alerts_cfg.get("telegram_chat_id", "")
+        if not token or not chat_id:
+            print(f"{Colors.WARNING}{t('telegram_config_missing', lang=lang)}{Colors.ENDC}")
+            return {"channel": "telegram", "status": "skipped", "target": chat_id or "", "error": "missing configuration"}
+
+        text = reporter._build_telegram_message(subject)
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+        }
+        data = json.dumps(payload).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+
+        try:
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    print(f"{Colors.GREEN}{t('telegram_alert_sent', lang=lang)}{Colors.ENDC}")
+                    return {"channel": "telegram", "status": "success", "target": chat_id}
+                print(f"{Colors.FAIL}{t('telegram_alert_failed', lang=lang, error='', status=response.status)}{Colors.ENDC}")
+                return {"channel": "telegram", "status": "failed", "target": chat_id, "error": f"status={response.status}"}
+        except urllib.error.HTTPError as exc:
+            try:
+                error_body = exc.read().decode("utf-8")
+            except Exception:
+                error_body = ""
+            print(f"{Colors.FAIL}{t('telegram_alert_failed', lang=lang, error=f'{exc} - {error_body}', status=exc.code)}{Colors.ENDC}")
+            return {"channel": "telegram", "status": "failed", "target": chat_id, "error": f"{exc} - {error_body}"}
+        except (urllib.error.URLError, TimeoutError) as exc:
+            print(f"{Colors.FAIL}{t('telegram_alert_failed', lang=lang, error=f'Connection Error/Timeout: {exc}', status='')}{Colors.ENDC}")
+            return {"channel": "telegram", "status": "failed", "target": chat_id, "error": f"Connection Error/Timeout: {exc}"}
+        except Exception as exc:
+            print(f"{Colors.FAIL}{t('telegram_alert_failed', lang=lang, error=exc, status='')}{Colors.ENDC}")
+            return {"channel": "telegram", "status": "failed", "target": chat_id, "error": str(exc)}

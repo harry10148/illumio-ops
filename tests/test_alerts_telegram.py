@@ -83,3 +83,77 @@ def test_telegram_digest_template_renders_sections():
     assert "<b>event item</b>" in rendered
     # No literal $placeholder leakage
     assert "$" not in rendered
+
+
+# ---------------------------------------------------------------------------
+# TelegramAlertPlugin tests (Task 6)
+# ---------------------------------------------------------------------------
+import json
+import urllib.error
+import urllib.request
+from unittest.mock import MagicMock, patch
+
+from src.alerts import build_output_plugin, get_output_registry
+
+
+def _make_cm(token="T", chat="C"):
+    cm = MagicMock()
+    cm.config = {
+        "alerts": {"telegram_bot_token": token, "telegram_chat_id": chat},
+        "settings": {"language": "en"},
+    }
+    return cm
+
+
+def _reporter_stub():
+    r = MagicMock()
+    r._build_telegram_message.return_value = "<b>hi</b>"
+    return r
+
+
+def test_telegram_plugin_registered():
+    assert "telegram" in get_output_registry()
+
+
+def test_telegram_plugin_skipped_when_unconfigured():
+    plug = build_output_plugin("telegram", _make_cm(token="", chat=""))
+    res = plug.send(_reporter_stub(), "subj")
+    assert res == {"channel": "telegram", "status": "skipped", "target": "", "error": "missing configuration"}
+
+
+def test_telegram_plugin_posts_payload_on_success():
+    plug = build_output_plugin("telegram", _make_cm())
+    fake_resp = MagicMock(status=200)
+    fake_resp.__enter__ = lambda self: self
+    fake_resp.__exit__ = lambda self, *a: False
+    with patch("urllib.request.urlopen", return_value=fake_resp) as mock_open:
+        res = plug.send(_reporter_stub(), "subj")
+    assert res["channel"] == "telegram"
+    assert res["status"] == "success"
+    assert res["target"] == "C"
+    # Inspect outgoing request
+    req = mock_open.call_args[0][0]
+    assert req.full_url == "https://api.telegram.org/botT/sendMessage"
+    payload = json.loads(req.data.decode())
+    assert payload["chat_id"] == "C"
+    assert payload["text"] == "<b>hi</b>"
+    assert payload["parse_mode"] == "HTML"
+    assert payload["disable_web_page_preview"] is True
+
+
+def test_telegram_plugin_fails_on_4xx():
+    plug = build_output_plugin("telegram", _make_cm())
+    err = urllib.error.HTTPError("https://x", 400, "Bad Request", {}, MagicMock(read=lambda: b'{"description":"bad"}'))
+    with patch("urllib.request.urlopen", side_effect=err):
+        res = plug.send(_reporter_stub(), "subj")
+    assert res["status"] == "failed"
+    assert res["target"] == "C"
+    assert "400" in res["error"] or "Bad Request" in res["error"]
+
+
+def test_telegram_plugin_fails_on_url_error():
+    plug = build_output_plugin("telegram", _make_cm())
+    with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("timeout")):
+        res = plug.send(_reporter_stub(), "subj")
+    assert res["status"] == "failed"
+    assert "timeout" in res["error"]
