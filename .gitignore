@@ -80,3 +80,9 @@ docs/_notebooklm_excerpts/
 # Per-deployment rule schedule state (written by GUI/scheduler at runtime —
 # same category as config.json / alerts.json which are also gitignored).
 config/rule_schedules.json
+
+# Session handoff notes — local context only, may contain test-lab creds
+.session-handoff-*.md
+
+# UX review raw screenshots (large binaries, may contain internal hostnames/IPs)
+docs/ux-review-*/screenshots/

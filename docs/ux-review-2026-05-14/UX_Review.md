@@ -4,10 +4,10 @@
 |---|---|
 | 評估日期 | 2026-05-14 |
 | 評估對象 | Illumio PCE Ops `v3.25.0-tracks-abcd`（branch `feat/e2e-playwright-gui-tests`） |
-| 測試環境 | https://172.16.15.106:5001（Web GUI）+ 同機 CLI |
+| 測試環境 | 內網測試 PCE（HTTPS GUI + 同機 CLI） |
 | 評估方法 | Playwright 自動化逐頁截圖 + 真實使用者點擊路徑模擬 |
 | Viewport | 1440 × 900 desktop |
-| 帳號 | illumio / 1qaz@WSX |
+| 帳號 | 測試 lab 帳號（密碼透過環境變數注入；見 `scripts/ux_review_runner.py`） |
 | 報告 / 截圖 | `docs/ux-review-2026-05-14/`、`docs/ux-review-2026-05-14/screenshots/`（66 張） |
 
 > **TL;DR**：核心功能完整、視覺有品牌一致性，**主要問題集中在 i18n 翻譯品質、長表單組織、語意色彩、欄位間距與一些 leak 出來的英文字串**。沒有阻擋使用的硬傷，但專業度被細節拖累。

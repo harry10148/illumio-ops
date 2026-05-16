@@ -16,9 +16,9 @@ the whole module is skipped, so unit-test CI doesn't have to spin up a
 real daemon. To run locally or on a staging host::
 
     pip install --user playwright && playwright install chromium
-    ILLUMIO_OPS_E2E_BASE_URL=https://172.16.15.106:5001 \
-    ILLUMIO_OPS_E2E_USER=illumio \
-    ILLUMIO_OPS_E2E_PASSWORD=1qaz@WSX \
+    ILLUMIO_OPS_E2E_BASE_URL=https://<host>:5001 \
+    ILLUMIO_OPS_E2E_USER=<user> \
+    ILLUMIO_OPS_E2E_PASSWORD=<password> \
     pytest tests/test_gui_e2e_playwright.py -v
 
 The TARGET server must be reachable and accept the supplied credentials.
