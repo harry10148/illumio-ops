@@ -23,6 +23,16 @@ def test_alert_plugins_endpoint_returns_metadata(client):
     assert response.json["plugins"]["mail"]["display_name"] == "Email (SMTP)"
     assert any(field["key"] == "sender" for field in response.json["plugins"]["mail"]["fields"])
     assert response.json["plugins"]["line"]["fields"][0]["secret"] is True
+    # Telegram plugin metadata exposed identically to LINE
+    assert "telegram" in response.json["plugins"]
+    tg = response.json["plugins"]["telegram"]
+    assert tg["display_name"] == "Telegram Bot"
+    token_field = next(f for f in tg["fields"] if f["key"] == "alerts.telegram_bot_token")
+    assert token_field["secret"] is True
+    assert token_field["required"] is True
+    chat_field = next(f for f in tg["fields"] if f["key"] == "alerts.telegram_chat_id")
+    assert chat_field["required"] is True
+    assert chat_field["secret"] is False
     assert any(field["key"] == "smtp.enable_tls" for field in response.json["plugins"]["mail"]["fields"])
     recipients = next(field for field in response.json["plugins"]["mail"]["fields"] if field["key"] == "recipients")
     assert recipients["input_type"] == "list"
