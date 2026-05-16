@@ -157,3 +157,15 @@ def test_telegram_plugin_fails_on_url_error():
         res = plug.send(_reporter_stub(), "subj")
     assert res["status"] == "failed"
     assert "timeout" in res["error"]
+
+
+def test_telegram_plugin_metadata_present():
+    from src.alerts.metadata import PLUGIN_METADATA
+    assert "telegram" in PLUGIN_METADATA
+    meta = PLUGIN_METADATA["telegram"]
+    assert meta.display_name == "Telegram Bot"
+    assert "alerts.telegram_bot_token" in meta.fields
+    assert "alerts.telegram_chat_id" in meta.fields
+    assert meta.fields["alerts.telegram_bot_token"].secret is True
+    assert meta.fields["alerts.telegram_bot_token"].required is True
+    assert meta.fields["alerts.telegram_chat_id"].required is True

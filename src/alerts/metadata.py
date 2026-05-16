@@ -147,4 +147,25 @@ PLUGIN_METADATA: dict[str, PluginMeta] = {
             ),
         },
     ),
+    "telegram": PluginMeta(
+        name="telegram",
+        display_name="Telegram Bot",
+        display_name_key="alert_plugin_telegram_display_name",
+        description="Push triaged alert summaries to a Telegram Bot chat.",
+        description_key="alert_plugin_telegram_description",
+        fields={
+            "alerts.telegram_bot_token": FieldMeta(
+                label="Bot Token",
+                label_key="alert_plugin_field_telegram_bot_token",
+                required=True, secret=True,
+                placeholder="123456789:AAExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            ),
+            "alerts.telegram_chat_id": FieldMeta(
+                label="Chat ID",
+                label_key="alert_plugin_field_telegram_chat_id",
+                required=True,
+                placeholder="-1001234567890 or 1284061527",
+            ),
+        },
+    ),
 }
