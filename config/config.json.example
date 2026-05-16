@@ -19,10 +19,14 @@
         "verify_ssl": true
     },
     "alerts": {
-        "active": ["mail"],
+        "active": [
+            "mail"
+        ],
         "line_channel_access_token": "",
         "line_target_id": "",
-        "webhook_url": ""
+        "webhook_url": "",
+        "telegram_bot_token": "",
+        "telegram_chat_id": ""
     },
     "email": {
         "sender": "pce-monitor@example.com",
