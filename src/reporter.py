@@ -922,6 +922,97 @@ class Reporter:
             metric_section="\n".join(metric_section_lines),
         ).strip()
 
+    def _build_telegram_message(self, subj: str) -> str:
+        """Build an HTML-formatted alert digest for Telegram (parse_mode=HTML).
+
+        Mirrors _build_line_message's section structure but produces Telegram-flavored
+        HTML — <b>, <code>, <a href> — and escapes every dynamic value with
+        html.escape(value, quote=False). Output is capped at 3500 chars (Telegram's
+        hard limit is 4096) with a translated footer announcing how many entries got
+        truncated.
+        """
+        def esc(value) -> str:
+            return html.escape(self._compact_text(value), quote=False)
+
+        records: str = t("alert_field_records")
+
+        def section_header(title: str, count: int) -> str:
+            return f"\n<b>{html.escape(title)}</b> · {count} {records}"
+
+        total_issues = (
+            len(self.health_alerts) + len(self.event_alerts)
+            + len(self.traffic_alerts) + len(self.metric_alerts)
+        )
+        time_lbl = t("alert_field_time")
+        summary_lbl = t("alert_field_summary")
+        sev_crit = t("alert_sev_critical")
+        sev_warn = t("alert_sev_warning")
+
+        kept_total = 0
+
+        health_lines = []
+        if self.health_alerts:
+            health_lines.append(section_header(t("alert_sec_health"), len(self.health_alerts)))
+            for idx, alert in enumerate(self.health_alerts, start=1):
+                status = self._compact_text(alert.get("status", ""))
+                label = sev_crit if status.lower() in {"503", "error", "critical"} else sev_warn
+                health_lines.append(f"{idx}. [<b>{html.escape(label)}</b>] {esc(alert.get('rule', t('alert_field_health_rule_fallback')))}")
+                health_lines.append(f"{time_lbl}：{esc(alert.get('time', ''))}")
+                health_lines.append(f"{summary_lbl}：{esc(alert.get('details', ''))}")
+                health_lines.append("")
+                kept_total += 1
+
+        event_lines = []
+        if self.event_alerts:
+            event_lines.append(section_header(t("alert_sec_event"), len(self.event_alerts)))
+            for payload in self._build_all_event_alert_payloads():
+                first = payload["events"][0] if payload["events"] else {}
+                event_lines.append(f"[<b>{html.escape(payload['severity_label'])}</b>] {esc(payload['rule'])}")
+                if first.get("event_type"):
+                    event_lines.append(f"<code>{html.escape(first['event_type'])}</code>")
+                if first.get("pce_link"):
+                    event_lines.append(f"<a href=\"{html.escape(first['pce_link'], quote=True)}\">PCE</a>")
+                event_lines.append("")
+                kept_total += 1
+
+        traffic_lines = []
+        if self.traffic_alerts:
+            traffic_lines.append(section_header(t("alert_sec_traffic"), len(self.traffic_alerts)))
+            for alert in self.traffic_alerts:
+                traffic_lines.append(f"• {esc(alert.get('summary', ''))}")
+                kept_total += 1
+            traffic_lines.append("")
+
+        metric_lines = []
+        if self.metric_alerts:
+            metric_lines.append(section_header(t("alert_sec_metric"), len(self.metric_alerts)))
+            for alert in self.metric_alerts:
+                metric_lines.append(f"• {esc(alert.get('summary', ''))}")
+                kept_total += 1
+            metric_lines.append("")
+
+        body = render_alert_template(
+            "telegram_digest.html.tmpl",
+            subject=html.escape(subj),
+            generated_at=html.escape(self._now_str()),
+            total_issues=total_issues,
+            health_count=len(self.health_alerts),
+            event_count=len(self.event_alerts),
+            traffic_count=len(self.traffic_alerts),
+            metric_count=len(self.metric_alerts),
+            health_section="\n".join(health_lines),
+            event_section="\n".join(event_lines),
+            traffic_section="\n".join(traffic_lines),
+            metric_section="\n".join(metric_lines),
+        )
+
+        if len(body) > 3500:
+            cut = body[:3300].rstrip()
+            more = total_issues - kept_total
+            footer = t("telegram_truncated_footer").format(more=max(more, 0))
+            body = f"{cut}\n\n{footer}"
+        return body
+
     def _send_line(self, subj: str, *, lang: str | None = None) -> dict[str, Any]:
         plugin = self._get_output_plugin("line")
         if not plugin:
