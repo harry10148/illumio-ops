@@ -169,3 +169,27 @@ def test_telegram_plugin_metadata_present():
     assert meta.fields["alerts.telegram_bot_token"].secret is True
     assert meta.fields["alerts.telegram_bot_token"].required is True
     assert meta.fields["alerts.telegram_chat_id"].required is True
+
+
+def test_send_alerts_routes_through_telegram_plugin(monkeypatch):
+    """Reporter.send_alerts must route an active telegram channel through TelegramAlertPlugin."""
+    from src.reporter import Reporter
+    cm = MagicMock()
+    cm.config = {
+        "alerts": {"active": ["telegram"], "telegram_bot_token": "T", "telegram_chat_id": "C"},
+        "settings": {"language": "en"},
+        "gui_base_url": "",
+    }
+    r = Reporter(cm)
+    r.add_health_alert({"rule": "X", "status": "503", "time": "t", "details": "d"})
+    fake_resp = MagicMock(status=200)
+    fake_resp.__enter__ = lambda self: self
+    fake_resp.__exit__ = lambda self, *a: False
+    with patch("urllib.request.urlopen", return_value=fake_resp), \
+         patch("src.events.persist_dispatch_results"):
+        results = r.send_alerts(force_test=False)
+    chans = [x["channel"] for x in results]
+    assert "telegram" in chans
+    tg = next(x for x in results if x["channel"] == "telegram")
+    assert tg["status"] == "success"
+    assert tg["target"] == "C"
