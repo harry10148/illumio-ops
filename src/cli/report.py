@@ -96,6 +96,7 @@ def generate_traffic_report(
         output_dir=out,
         send_email=email,
         reporter=reporter if email else None,
+        traffic_report_profile=traffic_report_profile,
         lang=lang,
     )
 
