@@ -57,6 +57,8 @@ class AlertsSettings(_Base):
     )
     line_target_id: str = ""
     webhook_url: str = ""
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
 
 class EmailSettings(_Base):
     sender: str = "monitor@localhost"
