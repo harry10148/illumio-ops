@@ -167,3 +167,49 @@ illumio-ops/
 ├── deploy/                     # systemd（Ubuntu/RHEL）+ NSSM（Windows）服務設定
 └── scripts/                    # 工具腳本（離線 bundle 建置、安裝/解除安裝、preflight）
 ```
+
+---
+
+## 部署注意事項 / Deployment Notes
+
+> 稽核依據：`docs/security-audit-2026-05-22.md` L-11 至 L-14。
+
+### L-11: Reverse Proxy
+
+本服務未自動配置 Flask `ProxyFix`。如部署於 reverse proxy（nginx、Apache、Traefik）後方：
+
+- 必須在啟動前設定 `ProxyFix` middleware，且只信任 1 個 hop。
+- 否則 IP allowlist 將失效（所有來源顯示為 proxy 的 IP）。
+
+範例（在 cheroot 伺服器啟動前，於 `src/gui/__init__.py` 加入）：
+
+```python
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+```
+
+### L-12: Telegram Alert Plugin — Token 洩漏風險
+
+Telegram Bot API 將 token 嵌在 URL path（`https://api.telegram.org/bot<TOKEN>/sendMessage`）。在金融 / 國防 / 高敏感環境部署 Telegram alert plugin 時，**必須**採取下列其中一項措施：
+
+- 禁止 forward proxy 或 WAF 將完整 URL path 寫入 access log。
+- 使用 NoProxy direct 連線繞過企業代理。
+- 改用 webhook 模式（雖然 webhook 仍會經過代理，但 URL 不含 token）。
+
+Loguru log 已加入 Telegram token 正則屏蔽（commit T2.14），但無法保護中介網路設備。
+
+### L-13: Server Header 指紋識別
+
+cheroot 預設輸出 `Server: Cheroot/<version>` 響應 header，可被指紋識別。若稽核要求嚴格 strip：
+
+- 在 reverse proxy 端以 `proxy_hide_header Server;`（nginx）或相應指令移除。
+- 或自訂 cheroot WSGI middleware 移除 header（後續優化計畫）。
+
+### L-14: 正式環境 Git 流程 — autoStash 與可重現性
+
+`scripts/setup-prod-git.sh` 啟用 `git config merge.autoStash=true`，意味著 prod box 在 `git pull` 時可能**靜默 stash 未提交的本地編輯**，且不會發出警告。後果：
+
+- prod box 與 `git tag` **可能不是 bit-for-bit reproducible**。
+- 稽核時若要證明 prod 與某 release tag 完全一致，必須額外確認沒有 stashed changes：`git stash list` 必須為空。
+
+**建議：** 每次正式部署完成後執行 `git stash list` 並確認為空。若正式環境需保證可重現性，請改用 `scripts/setup.sh` 而非 `setup-prod-git.sh`。
