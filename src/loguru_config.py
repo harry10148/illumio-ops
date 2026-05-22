@@ -38,6 +38,38 @@ _LOG_SECRET_FIELD = _re.compile(
     _re.IGNORECASE,
 )
 
+# M-14: Telegram bot tokens embedded in URL path (not key:value form).
+# Matches: bot<numeric-id>:<secret> as used in https://api.telegram.org/bot.../
+_LOG_TG_TOKEN = _re.compile(r'bot\d+:[A-Za-z0-9_-]{30,}')
+
+# M-14: PCE href identifiers that leak topology info (org/workload/label UUIDs).
+# Masks the resource UUID while preserving the resource type for log readability.
+_LOG_PCE_HREF = _re.compile(
+    r'/orgs/(\d+)/'
+    r'(workloads|labels|rule_sets|services|virtual_services|ven|workload_settings)'
+    r'/[A-Za-z0-9_-]{8,}'
+)
+
+
+def _redact_secrets_in_text(text: str) -> str:
+    """Apply all redaction patterns to a log message string.
+
+    Centralised so that the same logic can be unit-tested independently of
+    loguru's record machinery.
+    """
+    if not text:
+        return text
+    # M-14: Telegram bot token in URL path
+    text = _LOG_TG_TOKEN.sub('bot<REDACTED>', text)
+    # M-14: PCE href UUID — keep org number and resource type, mask the ID
+    text = _LOG_PCE_HREF.sub(lambda m: f'/orgs/{m.group(1)}/{m.group(2)}/<HREF>', text)
+    # Existing key:value secret fields
+    text = _LOG_SECRET_FIELD.sub(
+        lambda m: m.group(0).replace(m.group(2), '[REDACTED]'),
+        text,
+    )
+    return text
+
 
 def _redact_log_record(record):
     """Loguru filter: replace secret-like values in record['message'].
@@ -50,10 +82,7 @@ def _redact_log_record(record):
     msg = record.get('message') or ''
     if not msg:
         return True
-    record['message'] = _LOG_SECRET_FIELD.sub(
-        lambda m: m.group(0).replace(m.group(2), '[REDACTED]'),
-        msg,
-    )
+    record['message'] = _redact_secrets_in_text(msg)
     return True
 
 
