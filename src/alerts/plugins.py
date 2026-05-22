@@ -6,6 +6,7 @@ import json
 import os
 import smtplib
 import socket
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -43,7 +44,7 @@ class MailAlertPlugin(AlertOutputPlugin):
             with smtplib.SMTP(host, port, timeout=30) as smtp:
                 smtp.ehlo()
                 if smtp_conf.get("enable_tls"):
-                    smtp.starttls()
+                    smtp.starttls(context=ssl.create_default_context())
                     smtp.ehlo()
 
                 if smtp_conf.get("enable_auth"):

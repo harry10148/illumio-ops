@@ -114,3 +114,41 @@ def test_smtp_timeout_returns_fast_not_hang():
     assert elapsed < 5, f"plugin should return fast on timeout, took {elapsed:.2f}s"
     assert isinstance(result, dict)
     assert result.get("status") != "success"
+
+
+# ---------------------------------------------------------------------------
+# Test 4 — starttls() must pass explicit ssl context (M-9 polish)
+# ---------------------------------------------------------------------------
+
+def test_mail_plugin_uses_explicit_tls_context():
+    """MailAlertPlugin.starttls() must pass explicit ssl context (consistency with reporter.py)."""
+    import ssl
+
+    starttls_kwargs = {}
+
+    class MockSMTP:
+        def __init__(self, host, port, timeout=None, **kw): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def ehlo(self): pass
+        def starttls(self, *a, **kw):
+            starttls_kwargs.update(kw)
+        def login(self, *a): pass
+        def sendmail(self, *a, **kw): pass
+
+    from src.alerts.plugins import MailAlertPlugin
+
+    cm = MagicMock()
+    cm.config = {
+        "smtp": {"host": "x", "port": 587, "user": "u", "password": "p", "enable_tls": True},
+        "email": {"sender": "from@x", "recipients": ["to@y"]},
+        "alerts": {},
+    }
+    plugin = MailAlertPlugin(cm)
+    reporter = _make_reporter_mock()
+
+    with patch("smtplib.SMTP", MockSMTP):
+        plugin.send(reporter, "subject")
+
+    assert starttls_kwargs.get("context") is not None, "starttls must be called with explicit ssl context"
+    assert isinstance(starttls_kwargs["context"], ssl.SSLContext)
