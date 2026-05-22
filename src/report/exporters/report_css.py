@@ -3,13 +3,10 @@ src/report/exporters/report_css.py
 Shared CSS/JS foundation for HTML report exporters.
 """
 
-FONT_LINK = (
-    '<link rel="preconnect" href="https://fonts.googleapis.com">'
-    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
-    '<link href="https://fonts.googleapis.com/css2?'
-    'family=Montserrat:wght@400;500;600;700&'
-    'family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">'
-)
+# Offline-only: reports must work in air-gapped deployments.
+# Local @font-face for Inter / JetBrains Mono / Space Grotesk is in
+# REPORT_FONT_FACE_CSS below; no CDN preconnect / link tag needed.
+FONT_LINK = ""
 
 REPORT_FONT_FACE_CSS = """\
 @font-face {
@@ -34,12 +31,12 @@ REPORT_FONT_FACE_CSS = """\
 
 BASE_CSS = """\
   :root {
-    --cyan-120:#1A2C32; --cyan-110:#24393F; --cyan-100:#2D454C; --cyan-90:#325158;
-    --orange:#FF5500; --gold:#FFA22F; --gold-110:#F97607;
-    --green:#166644; --green-80:#299B65; --green-10:#D1FAE5;
-    --red:#BE122F; --red-80:#F43F51; --red-10:#FEE2E2;
-    --slate:#313638; --slate-10:#EAEBEB; --slate-20:#D6D7D7; --slate-50:#989A9B;
-    --tan:#F7F4EE; --tan-120:#E3D8C5; --border:#D6D7D7;
+    --cyan-120:#0a0a0a; --cyan-110:#131316; --cyan-100:#1c1c1f; --cyan-90:#232327;
+    --orange:#FF5500; --gold:#FFA22F; --gold-110:#d97706;
+    --green:#16a34a; --green-80:#22c55e; --green-10:#dcfce7;
+    --red:#dc2626; --red-80:#ef4444; --red-10:#fee2e2;
+    --slate:#0a0a0a; --slate-10:#f5f5f5; --slate-20:#e5e5e5; --slate-50:#6f6f6f;
+    --tan:#fafafa; --tan-120:#e5e5e5; --border:#e5e5e5;
     --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
     --shadow-card: 0 1px 4px rgba(0,0,0,.08);
     --shadow-panel: 0 6px 18px rgba(26,44,50,.07);
@@ -58,7 +55,7 @@ BASE_CSS = """\
     --color-signal-info:    #0077CC;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Montserrat', -apple-system, sans-serif; background: var(--tan); color: var(--slate); }
+  body { font-family: 'Inter', -apple-system, sans-serif; background: var(--tan); color: var(--slate); }
   nav { position: fixed; top: 0; left: 0; width: 220px; height: 100vh; background: var(--cyan-120); overflow-y: auto; padding: 60px 0 20px; z-index: 100; }
   nav a { display: block; color: #FFFFFF; text-decoration: none; padding: 8px 18px; font-size: 13px; border-left: 3px solid transparent; }
   nav a:hover, nav a.active { background: var(--cyan-100); border-left-color: var(--orange); color: #fff; }
