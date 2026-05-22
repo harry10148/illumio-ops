@@ -1,6 +1,6 @@
 [Unit]
-Description=Illumio PCE Ops (offline bundle)
-Documentation=https://github.com/your-org/illumio-ops
+Description=Illumio PCE Operations Monitor
+Documentation=https://github.com/illumio-ops/illumio-ops
 After=network-online.target
 Wants=network-online.target
 
@@ -10,19 +10,38 @@ User=illumio-ops
 Group=illumio-ops
 WorkingDirectory=/opt/illumio-ops
 ExecStart=/opt/illumio-ops/python/bin/python3 /opt/illumio-ops/illumio-ops.py --monitor-gui --interval 10
-Restart=always
+Restart=on-failure
 RestartSec=10
-TimeoutStartSec=30
+TimeoutStopSec=30
+KillSignal=SIGTERM
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=illumio-ops
 
-# Security hardening
+# --- Hardening ---
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/opt/illumio-ops
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/opt/illumio-ops/logs /opt/illumio-ops/config /opt/illumio-ops/data /opt/illumio-ops/reports
 
 [Install]
 WantedBy=multi-user.target

@@ -153,6 +153,13 @@ chown -R illumio-ops:illumio-ops "$INSTALL_ROOT"
 chmod 600 "$INSTALL_ROOT/config/config.json" 2>/dev/null || true
 chmod 600 "$INSTALL_ROOT/config/alerts.json" 2>/dev/null || true
 
+# Fine-grained permissions: secrets 0600, configs 0640, sensitive dirs 0750
+find "$INSTALL_ROOT/config" -type f -name "*.json" -exec chmod 0600 {} \; 2>/dev/null || true
+find "$INSTALL_ROOT/config" -type f -name "*.yaml" -exec chmod 0640 {} \; 2>/dev/null || true
+find "$INSTALL_ROOT/config/tls" -type f -name "*key*.pem" -exec chmod 0600 {} \; 2>/dev/null || true
+find "$INSTALL_ROOT/config/tls" -type f -name "*.pem" ! -name "*key*" -exec chmod 0640 {} \; 2>/dev/null || true
+chmod 0750 "$INSTALL_ROOT/logs" "$INSTALL_ROOT/config" 2>/dev/null || true
+
 sed "s|/opt/illumio-ops|$INSTALL_ROOT|g" "$SRC/deploy/illumio-ops.service" > "$SERVICE_FILE"
 chmod 0644 "$SERVICE_FILE"
 systemctl daemon-reload
