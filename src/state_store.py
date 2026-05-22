@@ -62,11 +62,23 @@ def update_state_file(state_file: str, updater) -> dict:
         if not isinstance(updated, dict):
             raise ValueError("State updater must return a dict")
 
-        fd, tmp_path = tempfile.mkstemp(dir=os.path.dirname(state_file) or ".", suffix=".tmp")
+        state_dir = os.path.dirname(state_file) or "."
+        fd, tmp_path = tempfile.mkstemp(dir=state_dir, suffix=".tmp")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
                 json.dump(updated, f, indent=4, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp_path, state_file)
+            # fsync parent dir for metadata durability (Linux only; harmless on other POSIX)
+            try:
+                dirfd = os.open(state_dir, os.O_RDONLY)
+                try:
+                    os.fsync(dirfd)
+                finally:
+                    os.close(dirfd)
+            except OSError:
+                pass  # best-effort
         except Exception:
             try:
                 os.unlink(tmp_path)
