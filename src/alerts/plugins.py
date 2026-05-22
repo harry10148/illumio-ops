@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import smtplib
+import time
 import urllib.error
 import urllib.request
 from email.mime.multipart import MIMEMultipart
@@ -60,12 +61,21 @@ class MailAlertPlugin(AlertOutputPlugin):
 class LineAlertPlugin(AlertOutputPlugin):
     name = "line"
 
+    def __init__(self, config_manager):
+        super().__init__(config_manager)
+        self._consecutive_failures: int = 0
+        self._cooldown_until: float = 0.0
+
     def send(self, reporter, subject: str, *, lang: str = "en") -> dict:
         token = self.cm.config.get("alerts", {}).get("line_channel_access_token", "")
         target_id = self.cm.config.get("alerts", {}).get("line_target_id", "")
         if not token or not target_id:
             print(f"{Colors.WARNING}{t('line_config_missing', lang=lang)}{Colors.ENDC}")
             return {"channel": "line", "status": "skipped", "target": target_id or "", "error": "missing configuration"}
+
+        if time.monotonic() < self._cooldown_until:
+            print(f"{Colors.WARNING}LINE alert channel in cooldown — skipping send{Colors.ENDC}")
+            return {"channel": "line", "status": "failed", "target": target_id, "error": "channel cooldown active"}
 
         message_text = reporter._build_line_message(subject)
         payload = {
@@ -85,17 +95,30 @@ class LineAlertPlugin(AlertOutputPlugin):
                 headers=headers,
                 method="POST",
             )
-            with urllib.request.urlopen(req) as response:
+            with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status == 200:
+                    self._consecutive_failures = 0
                     print(f"{Colors.GREEN}{t('line_alert_sent', lang=lang)}{Colors.ENDC}")
                     return {"channel": "line", "status": "success", "target": target_id}
+                self._consecutive_failures += 1
+                if self._consecutive_failures >= 3:
+                    self._cooldown_until = time.monotonic() + 300
+                    print(f"{Colors.WARNING}LINE plugin: 3 consecutive failures — cooling down for 5 min{Colors.ENDC}")
                 print(f"{Colors.FAIL}{t('line_alert_failed', lang=lang, error='', status=response.status)}{Colors.ENDC}")
                 return {"channel": "line", "status": "failed", "target": target_id, "error": f"status={response.status}"}
         except urllib.error.HTTPError as exc:
             error_body = exc.read().decode("utf-8")
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= 3:
+                self._cooldown_until = time.monotonic() + 300
+                print(f"{Colors.WARNING}LINE plugin: 3 consecutive failures — cooling down for 5 min{Colors.ENDC}")
             print(f"{Colors.FAIL}{t('line_alert_failed', lang=lang, error=f'{exc} - {error_body}', status=exc.code)}{Colors.ENDC}")
             return {"channel": "line", "status": "failed", "target": target_id, "error": f"{exc} - {error_body}"}
         except Exception as exc:
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= 3:
+                self._cooldown_until = time.monotonic() + 300
+                print(f"{Colors.WARNING}LINE plugin: 3 consecutive failures — cooling down for 5 min{Colors.ENDC}")
             print(f"{Colors.FAIL}{t('line_alert_failed', lang=lang, error=exc, status='')}{Colors.ENDC}")
             return {"channel": "line", "status": "failed", "target": target_id, "error": str(exc)}
 
