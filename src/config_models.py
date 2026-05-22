@@ -31,7 +31,18 @@ class ApiSettings(_Base):
     org_id: str = Field(default="1", min_length=1)
     key: str = Field(default="")
     secret: str = Field(default="")
+    profile: Literal["production", "dev"] = "production"
     verify_ssl: bool = True
+
+    @field_validator("verify_ssl", mode="after")
+    @classmethod
+    def _verify_ssl_production_guard(cls, v: bool, info) -> bool:
+        if info.data.get("profile") == "production" and v is False:
+            raise ValueError(
+                "verify_ssl=False is not allowed when profile='production'. "
+                "Set profile='dev' explicitly to disable TLS verification."
+            )
+        return v
 
     @field_validator("url", mode="before")
     @classmethod
@@ -222,7 +233,18 @@ class SiemDestinationSettings(_Base):
     format: str = "cef"    # cef|json|syslog_cef|syslog_json
     host: str = ""
     port: int = Field(default=514, ge=1, le=65535)
+    profile: Literal["production", "dev"] = "production"
     tls_verify: bool = True
+
+    @field_validator("tls_verify", mode="after")
+    @classmethod
+    def _tls_verify_production_guard(cls, v: bool, info) -> bool:
+        if info.data.get("profile") == "production" and v is False:
+            raise ValueError(
+                "tls_verify=False is not allowed when profile='production'. "
+                "Set profile='dev' explicitly to disable TLS verification."
+            )
+        return v
     tls_ca_bundle: Optional[str] = None
     hec_token: Optional[str] = None
     batch_size: int = Field(default=100, ge=1, le=10000)
