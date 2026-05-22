@@ -236,11 +236,113 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     from flask_limiter import Limiter
     from flask_limiter.util import get_remote_address
 
+    def _limiter_storage_uri(cm: ConfigManager) -> str:
+        """
+        Return a persistent storage URI for flask_limiter.
+
+        Preference order:
+          1. /var/lib/illumio-ops/limiter  (production install, writable)
+          2. <config_dir>/limiter          (dev/lab fallback)
+
+        The ``file://`` scheme is handled by ``_JsonFileStorage`` (registered
+        below), because limits 5.8.0 ships no built-in file backend.
+        """
+        from pathlib import Path
+
+        prod_dir = Path("/var/lib/illumio-ops/limiter")
+        if prod_dir.parent.exists() and os.access(prod_dir.parent, os.W_OK):
+            prod_dir.mkdir(parents=True, exist_ok=True)
+            return f"file://{prod_dir}"
+
+        cfg_dir = Path(cm.config_file).parent if getattr(cm, "config_file", None) else Path.cwd()
+        lim_dir = cfg_dir / "limiter"
+        lim_dir.mkdir(parents=True, exist_ok=True)
+        return f"file://{lim_dir}"
+
+    def _register_file_storage() -> None:
+        """
+        Register a JSON-file-backed storage under the ``file://`` scheme.
+
+        limits 5.8.0 has no built-in file backend; we implement a thin
+        wrapper around MemoryStorage that snapshots counter state to
+        ``<dir>/rate_limits.json`` on every write, so limits survive
+        process restarts.  Concurrent writes are serialised by the existing
+        per-key ``threading.RLock`` from MemoryStorage.
+        """
+        import time
+        import json as _json
+        from collections import Counter
+        from pathlib import Path as _Path
+        from urllib.parse import urlparse
+        from limits.storage.memory import MemoryStorage
+        from limits.storage import SCHEMES
+
+        if "file" in SCHEMES:
+            return  # already registered (e.g. second app creation in tests)
+
+        class _JsonFileStorage(MemoryStorage):
+            """MemoryStorage that persists fixed-window counters to a JSON file."""
+
+            STORAGE_SCHEME = ["file"]
+
+            def __init__(self, uri: str | None = None, wrap_exceptions: bool = False, **kw: str) -> None:
+                super().__init__(uri, wrap_exceptions=wrap_exceptions, **kw)
+                parsed = urlparse(uri or "file:///tmp/limiter")
+                # uri like file:///var/lib/illumio-ops/limiter  →  netloc="" path="/var/…"
+                self._snapshot_path = _Path(parsed.netloc + parsed.path) / "rate_limits.json"
+                self._snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+                self._load_snapshot()
+
+            def _load_snapshot(self) -> None:
+                if not self._snapshot_path.exists():
+                    return
+                try:
+                    with self._snapshot_path.open() as fh:
+                        data = _json.load(fh)
+                    now = time.time()
+                    for key, entry in data.items():
+                        exp = float(entry.get("exp", 0))
+                        if exp > now:
+                            self.storage[key] = int(entry.get("val", 0))
+                            self.expirations[key] = exp
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("rate-limit snapshot load failed (ignored): {}", exc)
+
+            def _write_snapshot(self) -> None:
+                try:
+                    now = time.time()
+                    data = {
+                        k: {"val": int(v), "exp": self.expirations.get(k, now)}
+                        for k, v in self.storage.items()
+                        if self.expirations.get(k, 0) > now
+                    }
+                    tmp = self._snapshot_path.with_suffix(".tmp")
+                    with tmp.open("w") as fh:
+                        _json.dump(data, fh)
+                    tmp.replace(self._snapshot_path)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("rate-limit snapshot write failed (ignored): {}", exc)
+
+            def incr(self, key: str, expiry: float, amount: int = 1) -> int:
+                result = super().incr(key, expiry, amount)
+                self._write_snapshot()
+                return result
+
+            def check(self) -> bool:
+                return self._snapshot_path.parent.is_dir()
+
+        SCHEMES["file"] = _JsonFileStorage
+
+    _register_file_storage()
+    _limiter_uri = _limiter_storage_uri(cm)
+    app.config["RATELIMIT_STORAGE_URI"] = _limiter_uri
+    logger.info("flask_limiter storage: {}", _limiter_uri)
+
     limiter = Limiter(
         app=app,
         key_func=get_remote_address,
         default_limits=["300 per minute"],
-        storage_uri="memory://",    # single-node deployment
+        storage_uri=_limiter_uri,
         strategy="fixed-window",
     )
 
