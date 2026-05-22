@@ -89,7 +89,7 @@ def run_daemon_with_gui(interval_minutes: int, port: int):
 
 def view_logs(log_file):
     """Simple log viewer for the CLI."""
-    os.system("cls" if os.name == "nt" else "clear")
+    print("\033[2J\033[H", end="", flush=True)
     draw_panel(t("menu_view_logs_title"), [])
     print("")
     try:
@@ -111,7 +111,7 @@ def view_logs(log_file):
 
 def rule_management_menu(cm):
     while True:
-        os.system("cls" if os.name == "nt" else "clear")
+        print("\033[2J\033[H", end="", flush=True)
         cm.load()
         lines = [
             f"{Colors.BOLD}{Colors.CYAN}{t('main_menu_root_1')}{Colors.ENDC}",
@@ -186,7 +186,7 @@ def rule_management_menu(cm):
 
 def report_generation_menu(cm):
     while True:
-        os.system("cls" if os.name == "nt" else "clear")
+        print("\033[2J\033[H", end="", flush=True)
         cm.load()
         lines = [
             f"{Colors.BOLD}{Colors.CYAN}{t('main_menu_root_2')}{Colors.ENDC}",
@@ -235,7 +235,7 @@ def main_menu():
     cm = _pre_cm
 
     while True:
-        os.system("cls" if os.name == "nt" else "clear")
+        print("\033[2J\033[H", end="", flush=True)
         cm.load()
 
         settings = cm.config.get("settings", {})
