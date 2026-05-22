@@ -346,7 +346,11 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
         SCHEMES["file"] = _JsonFileStorage
 
     _register_file_storage()
-    _limiter_uri = _limiter_storage_uri(cm)
+    # Allow test suite (or ops tooling) to override the storage backend via env var.
+    # Production: env var is unset → persistent file:// backend (security improvement retained).
+    # Tests: conftest.py sets ILLUMIO_OPS_RATELIMIT_URI=memory:// → ephemeral, no cross-test pollution.
+    _override_uri = os.environ.get("ILLUMIO_OPS_RATELIMIT_URI")
+    _limiter_uri = _override_uri if _override_uri else _limiter_storage_uri(cm)
     app.config["RATELIMIT_STORAGE_URI"] = _limiter_uri
     logger.info("flask_limiter storage: {}", _limiter_uri)
 

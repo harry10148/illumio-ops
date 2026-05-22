@@ -34,8 +34,14 @@ def _make_cm(tmp_dir: str):
     return cm
 
 
-def test_limiter_storage_is_persistent():
-    """Limiter must not use in-memory storage."""
+def test_limiter_storage_is_persistent(monkeypatch):
+    """Limiter must not use in-memory storage (production code path).
+
+    Temporarily unsets ILLUMIO_OPS_RATELIMIT_URI so the test exercises the
+    real persistent backend, not the memory:// override injected by conftest.py
+    for test-isolation purposes.
+    """
+    monkeypatch.delenv("ILLUMIO_OPS_RATELIMIT_URI", raising=False)
     from src.gui import build_app
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -51,8 +57,9 @@ def test_limiter_storage_is_persistent():
         )
 
 
-def test_limiter_storage_uri_uses_config_dir():
+def test_limiter_storage_uri_uses_config_dir(monkeypatch):
     """In dev/lab (no /var/lib/illumio-ops), the limiter dir sits next to config."""
+    monkeypatch.delenv("ILLUMIO_OPS_RATELIMIT_URI", raising=False)
     from src.gui import build_app
     from pathlib import Path
 

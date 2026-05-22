@@ -5,6 +5,12 @@ import shutil
 import sys
 import tempfile
 
+# Use ephemeral in-memory rate-limit storage for all tests.
+# Prevents cross-test 401/429 failures from persistent file:// counter accumulation
+# (introduced by the file backend in T2.10 / commit f14e2f7).
+# Production code path is unaffected — this env var is only set here.
+os.environ.setdefault("ILLUMIO_OPS_RATELIMIT_URI", "memory://")
+
 import pytest
 from loguru import logger
 
