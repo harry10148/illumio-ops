@@ -22,17 +22,17 @@
 
     :root {
       /* Illumio Brand Colors */
-      --bg:      #1A2C32;   /* System Cyan 120 */
-      --bg2:     #24393F;   /* System Cyan 110 */
-      --bg3:     #2D454C;   /* System Cyan 100 */
-      --fg:      #FFFFFF;
-      --dim:     #989A9B;   /* Server Slate 50 */
+      --bg:      #0a0a0a;   /* Modern near-black (Linear/Vercel) */
+      --bg2:     #131316;   /* Surface 1 */
+      --bg3:     #1c1c1f;   /* Surface 2 */
+      --fg:      #fafafa;   /* Soft white */
+      --dim:     #a1a1a8;   /* Warm muted */
       --accent:  #FF5500;   /* Illumio Orange */
       --accent2: #FFA22F;   /* Circuit Gold 100 */
-      --success: #299B65;   /* Safeguard Green 80 */
-      --warn:    #FFA22F;   /* Circuit Gold 100 */
-      --danger:  #F43F51;   /* Risk Red 80 */
-      --border:  #325158;   /* System Cyan 90 */
+      --success: #16a34a;   /* Tighter green */
+      --warn:    #d97706;   /* Amber */
+      --danger:  #dc2626;   /* Tighter red */
+      --border:  #232327;   /* Neutral border */
       --radius: 8px;
       --shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
       --header-font: var(--font-heading-2);
@@ -45,21 +45,21 @@
       --font-mono-2:    'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
       /* Signal tokens (D.3 共享) — semantic color, not brand */
-      --color-signal-success: #2D9B5E;
-      --color-signal-warning: #C47A00;
-      --color-signal-danger:  #D93025;
-      --color-signal-info:    #0077CC;
+      --color-signal-success: #16a34a;
+      --color-signal-warning: #d97706;
+      --color-signal-danger:  #dc2626;
+      --color-signal-info:    #2563eb;
 
       /* Semantic color tokens — UX_Review §2.2 / Improvement_Plan §A 1.3.
          Use these for *meaning* (success/warning/danger/info) instead of
          the brand-flavoured --accent/--warn/--success which are visual tokens. */
-      --color-success:    #16A34A;
+      --color-success:    #16a34a;
       --color-success-bg: #DCFCE7;
-      --color-warning:    #F59E0B;
+      --color-warning:    #d97706;
       --color-warning-bg: #FEF3C7;
-      --color-danger:     #BE122F;
+      --color-danger:     #dc2626;
       --color-danger-bg:  #FEE2E2;
-      --color-info:       #2563EB;
+      --color-info:       #2563eb;
       --color-info-bg:    #DBEAFE;
 
       /* Spacing scale — 4px grid (Improvement_Plan §A 2.1) */
@@ -105,6 +105,13 @@
       --tab-pad-y: 10px;
       --tab-pad-x: 16px;
       --toolbar-gap: 10px;
+      /* R1 — alias tokens introduced by mock design system; map onto existing layer */
+      --surface:      var(--bg2);
+      --surface-2:    var(--bg3);
+      --text:         var(--fg);
+      --text-muted:   var(--dim);
+      --text-faint:   color-mix(in oklab, var(--dim) 60%, transparent);
+      --border-hover: color-mix(in oklab, var(--border) 60%, var(--fg));
       color-scheme: dark light;
     }
 
@@ -125,27 +132,27 @@
     }
 
     [data-theme="light"] {
-      --bg:      #F5F5F5; /* Server Slate 05 */
-      --bg2:     #FFFFFF; /* White */
-      --bg3:     #EAEBEB; /* Server Slate 10 */
-      --fg:      #313638; /* Server Slate 100 */
-      --dim:     #6F7274; /* Server Slate 70 */
+      --bg:      #fafafa;
+      --bg2:     #ffffff;
+      --bg3:     #f5f5f5;
+      --fg:      #0a0a0a;
+      --dim:     #6f6f6f;
       --accent:  #FF5500; /* Illumio Orange */
-      --accent2: #F97607; /* Circuit Gold 110 */
-      --success: #166644; /* Safeguard Green 100 */
-      --warn:    #F97607; /* Circuit Gold 110 */
-      --danger:  #BE122F; /* Risk Red 100 */
-      --border:  #D6D7D7; /* Server Slate 20 */
-      --color-success:    #16A34A;
+      --accent2: #FFA22F; /* Circuit Gold 100 */
+      --success: #16a34a;
+      --warn:    #d97706;
+      --danger:  #dc2626;
+      --border:  #e5e5e5;
+      --color-success:    #16a34a;
       --color-success-bg: #DCFCE7;
-      --color-danger:     #BE122F;
+      --color-danger:     #dc2626;
       --color-danger-bg:  #FEE2E2;
       --shadow: 0 4px 16px rgba(49, 54, 56, 0.08);
     }
 
     [data-theme="light"] body::before,
     [data-theme="light"] body::after {
-      opacity: 0.04;
+      opacity: 0;
     }
 
     * {
@@ -174,7 +181,7 @@
       pointer-events: none;
       z-index: -1;
       filter: blur(40px);
-      opacity: .22;
+      opacity: 0;
     }
 
     body::before {
