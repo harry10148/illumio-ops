@@ -496,15 +496,20 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
 
     @app.before_request
     def security_check():
-        if request.endpoint == 'static' or request.path.startswith('/static/'):
-            return
+        is_static = request.endpoint == 'static' or request.path.startswith('/static/')
 
-        # IP Allowlist check ??silently drop with TCP RST (no HTTP response)
-        # so port scanners cannot detect an HTTP service on this port
+        # IP Allowlist check — silently drop with TCP RST (no HTTP response)
+        # so port scanners cannot detect an HTTP service on this port.
+        # Applied to ALL paths, including /static/, to prevent IP-enumeration
+        # of static assets by untrusted hosts.
         allowed_ips = cm.config.get("web_gui", {}).get("allowed_ips", [])
         if not _check_ip_allowed(allowed_ips, request.remote_addr):
             logger.warning(f"[GUI] Blocked untrusted IP: {_safe_log(request.remote_addr)}")
             _rst_drop()  # closes socket with RST, raises _RstDrop
+
+        # Static files pass IP allowlist above but do not require session auth
+        if is_static:
+            return
 
         # Auth check (always enforced for all GUI modes)
         # Bypass login routes
