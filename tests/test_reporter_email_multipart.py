@@ -25,6 +25,8 @@ def test_alert_email_body_is_multipart_alternative_with_text_and_html():
     captured = {}
     class FakeSMTP:
         def __init__(self, host, port, *args, **kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
         def ehlo(self): pass
         def starttls(self, context=None): pass
         def login(self, u, p): pass
@@ -52,7 +54,9 @@ def test_report_email_body_is_multipart_alternative():
     r = Reporter(cm)
     captured = {}
     class FakeSMTP:
-        def __init__(self, host, port, timeout): pass
+        def __init__(self, host, port, timeout=None): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
         def ehlo(self): pass
         def starttls(self, context=None): pass
         def login(self, u, p): pass

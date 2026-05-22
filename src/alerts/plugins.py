@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import smtplib
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -39,23 +40,35 @@ class MailAlertPlugin(AlertOutputPlugin):
             host = smtp_conf.get("host", "localhost")
             port = int(smtp_conf.get("port", 25))
 
-            smtp = smtplib.SMTP(host, port)
-            smtp.ehlo()
-            if smtp_conf.get("enable_tls"):
-                smtp.starttls()
+            with smtplib.SMTP(host, port, timeout=30) as smtp:
                 smtp.ehlo()
+                if smtp_conf.get("enable_tls"):
+                    smtp.starttls()
+                    smtp.ehlo()
 
-            if smtp_conf.get("enable_auth"):
-                # Prefer env var over config file to avoid storing credentials in plaintext
-                smtp_password = os.environ.get("ILLUMIO_SMTP_PASSWORD") or smtp_conf.get("password", "")
-                smtp.login(smtp_conf.get("user"), smtp_password)
+                if smtp_conf.get("enable_auth"):
+                    # Prefer env var over config file to avoid storing credentials in plaintext
+                    smtp_password = os.environ.get("ILLUMIO_SMTP_PASSWORD") or smtp_conf.get("password", "")
+                    smtp.login(smtp_conf.get("user"), smtp_password)
 
-            smtp.sendmail(cfg["sender"], cfg["recipients"], msg.as_string())
-            smtp.quit()
+                smtp.sendmail(cfg["sender"], cfg["recipients"], msg.as_string())
+
             print(f"{Colors.GREEN}{t('mail_sent', lang=lang, host=host, port=port)}{Colors.ENDC}")
             return {"channel": "mail", "status": "success", "target": ",".join(cfg["recipients"])}
-        except Exception as exc:
+        except smtplib.SMTPAuthenticationError as exc:
             print(f"{Colors.FAIL}{t('mail_failed', lang=lang, error=exc)}{Colors.ENDC}")
+            from loguru import logger
+            logger.error(f"SMTP auth failed (config error, not retrying): {exc}")
+            return {"channel": "mail", "status": "failed", "target": ",".join(cfg.get("recipients", [])), "error": str(exc)}
+        except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, ConnectionError, OSError, socket.timeout) as exc:
+            print(f"{Colors.FAIL}{t('mail_failed', lang=lang, error=exc)}{Colors.ENDC}")
+            from loguru import logger
+            logger.warning(f"SMTP transient failure: {exc}")
+            return {"channel": "mail", "status": "failed", "target": ",".join(cfg.get("recipients", [])), "error": str(exc)}
+        except smtplib.SMTPException as exc:
+            print(f"{Colors.FAIL}{t('mail_failed', lang=lang, error=exc)}{Colors.ENDC}")
+            from loguru import logger
+            logger.error(f"SMTP error: {exc}")
             return {"channel": "mail", "status": "failed", "target": ",".join(cfg.get("recipients", [])), "error": str(exc)}
 
 class LineAlertPlugin(AlertOutputPlugin):

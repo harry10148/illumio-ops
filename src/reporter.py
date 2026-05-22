@@ -8,6 +8,7 @@ from loguru import logger
 import os
 import re
 import smtplib
+import socket
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from src.alerts import build_output_plugin, get_output_registry, render_alert_template
@@ -1751,20 +1752,25 @@ class Reporter:
             smtp_conf = self.cm.config.get("smtp", {})
             host = smtp_conf.get("host", "localhost")
             port = int(smtp_conf.get("port", 25))
-            s = smtplib.SMTP(host, port, timeout=30)
-            s.ehlo()
-            if smtp_conf.get("enable_tls"):
-                import ssl as _ssl
-                _tls_ctx = _ssl.create_default_context()
-                s.starttls(context=_tls_ctx)
+            with smtplib.SMTP(host, port, timeout=30) as s:
                 s.ehlo()
-            if smtp_conf.get("enable_auth"):
-                s.login(smtp_conf.get("user"), smtp_conf.get("password"))
-            s.sendmail(cfg["sender"], recipients, msg.as_string())
-            s.quit()
+                if smtp_conf.get("enable_tls"):
+                    import ssl as _ssl
+                    _tls_ctx = _ssl.create_default_context()
+                    s.starttls(context=_tls_ctx)
+                    s.ehlo()
+                if smtp_conf.get("enable_auth"):
+                    s.login(smtp_conf.get("user"), smtp_conf.get("password"))
+                s.sendmail(cfg["sender"], recipients, msg.as_string())
             logger.info(t('mail_sent', host=host, port=port))
             return True
-        except Exception as e:
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(f"SMTP auth failed (config error, not retrying): {e}")
+            return False
+        except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, ConnectionError, OSError, socket.timeout) as e:
+            logger.warning(f"SMTP transient failure: {e}")
+            return False
+        except smtplib.SMTPException as e:
             logger.error(t('mail_failed', error=e))
             return False
 
@@ -1825,19 +1831,24 @@ class Reporter:
             smtp_conf = self.cm.config.get("smtp", {})
             host = smtp_conf.get("host", "localhost")
             port = int(smtp_conf.get("port", 25))
-            s = smtplib.SMTP(host, port, timeout=30)
-            s.ehlo()
-            if smtp_conf.get("enable_tls"):
-                import ssl as _ssl
-                _tls_ctx = _ssl.create_default_context()
-                s.starttls(context=_tls_ctx)
+            with smtplib.SMTP(host, port, timeout=30) as s:
                 s.ehlo()
-            if smtp_conf.get("enable_auth"):
-                s.login(smtp_conf.get("user"), smtp_conf.get("password"))
-            s.sendmail(cfg["sender"], cfg["recipients"], msg.as_string())
-            s.quit()
+                if smtp_conf.get("enable_tls"):
+                    import ssl as _ssl
+                    _tls_ctx = _ssl.create_default_context()
+                    s.starttls(context=_tls_ctx)
+                    s.ehlo()
+                if smtp_conf.get("enable_auth"):
+                    s.login(smtp_conf.get("user"), smtp_conf.get("password"))
+                s.sendmail(cfg["sender"], cfg["recipients"], msg.as_string())
             logger.info(t('mail_sent', host=host, port=port))
             return True
-        except Exception as e:
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(f"SMTP auth failed (config error, not retrying): {e}")
+            return False
+        except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, ConnectionError, OSError, socket.timeout) as e:
+            logger.warning(f"SMTP transient failure: {e}")
+            return False
+        except smtplib.SMTPException as e:
             logger.error(t('mail_failed', error=e))
             return False
