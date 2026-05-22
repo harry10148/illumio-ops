@@ -65,6 +65,18 @@ class LineAlertPlugin(AlertOutputPlugin):
         super().__init__(config_manager)
         self._consecutive_failures: int = 0
         self._cooldown_until: float = 0.0
+        self._last_cooldown_log_at: float = 0.0
+
+    def _maybe_log_cooldown(self, target_id: str) -> None:
+        """Emit a cooldown-skip warning at most once per 60 seconds."""
+        now = time.monotonic()
+        if now - self._last_cooldown_log_at >= 60:
+            remaining = max(0.0, self._cooldown_until - now)
+            print(
+                f"{Colors.WARNING}LINE alert channel in cooldown — skipping send"
+                f" ({remaining:.0f}s remaining){Colors.ENDC}"
+            )
+            self._last_cooldown_log_at = now
 
     def send(self, reporter, subject: str, *, lang: str = "en") -> dict:
         token = self.cm.config.get("alerts", {}).get("line_channel_access_token", "")
@@ -74,8 +86,13 @@ class LineAlertPlugin(AlertOutputPlugin):
             return {"channel": "line", "status": "skipped", "target": target_id or "", "error": "missing configuration"}
 
         if time.monotonic() < self._cooldown_until:
-            print(f"{Colors.WARNING}LINE alert channel in cooldown — skipping send{Colors.ENDC}")
+            self._maybe_log_cooldown(target_id)
             return {"channel": "line", "status": "failed", "target": target_id, "error": "channel cooldown active"}
+
+        # Cooldown has expired (or was never set): reset counter for a fresh 3-strike window
+        if self._cooldown_until > 0 and self._consecutive_failures >= 3:
+            self._consecutive_failures = 0
+            self._cooldown_until = 0.0
 
         message_text = reporter._build_line_message(subject)
         payload = {

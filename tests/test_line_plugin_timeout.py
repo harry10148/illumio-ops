@@ -111,3 +111,67 @@ def test_line_plugin_cooldown_resets_after_success():
     assert plugin._consecutive_failures == 0, (
         "Success should reset _consecutive_failures to 0"
     )
+
+
+def test_line_cooldown_resets_counter_when_expired(monkeypatch):
+    """After cooldown expires, a single failure should NOT immediately re-trigger cooldown.
+
+    Without the fix: _consecutive_failures stays at 3 after expiry, so the very
+    next failure sets _cooldown_until again (3 >= 3).  With the fix: the counter
+    is reset to 0 on cooldown expiry, so one failure only brings it to 1.
+    """
+    plugin = _make_line_plugin()
+    reporter = _make_reporter()
+
+    # Simulate state after 3 failures + 300 s cooldown that has now expired
+    plugin._consecutive_failures = 3
+    plugin._cooldown_until = 1000.0  # past timestamp
+
+    fake_now = [2000.0]
+    monkeypatch.setattr("time.monotonic", lambda: fake_now[0])
+
+    # Send one failing request after cooldown expiry
+    with patch("urllib.request.urlopen", side_effect=socket.timeout("simulated")):
+        plugin.send(reporter, "subject")
+
+    # The counter should have been reset before the failure was counted,
+    # so after one failure it should be 1 (not 3+1=4 clamped to 3).
+    assert plugin._consecutive_failures == 1, (
+        f"After cooldown expiry, one failure should give counter=1, got {plugin._consecutive_failures}"
+    )
+    # And cooldown must NOT be re-triggered by a single failure
+    assert plugin._cooldown_until <= fake_now[0], (
+        "A single failure after cooldown expiry must not immediately re-trigger cooldown"
+    )
+
+
+def test_line_cooldown_log_throttled(monkeypatch, capsys):
+    """During cooldown, log should be emitted at most once per 60 seconds."""
+    plugin = _make_line_plugin()
+    reporter = _make_reporter()
+
+    fake_now = [1000.0]
+    monkeypatch.setattr("time.monotonic", lambda: fake_now[0])
+
+    # Force cooldown active: expires at 1300 (300s from now)
+    plugin._cooldown_until = 1300.0
+    plugin._consecutive_failures = 3
+    plugin._last_cooldown_log_at = 0.0  # never logged
+
+    # First call: should log
+    plugin.send(reporter, "s")
+    captured1 = capsys.readouterr().out
+
+    # Second call 10s later: should NOT log again
+    fake_now[0] = 1010.0
+    plugin.send(reporter, "s")
+    captured2 = capsys.readouterr().out
+
+    # Third call 61s after first: SHOULD log again
+    fake_now[0] = 1071.0
+    plugin.send(reporter, "s")
+    captured3 = capsys.readouterr().out
+
+    assert "cooldown" in captured1.lower(), "first cooldown call should log"
+    assert "cooldown" not in captured2.lower(), "second call within 60s should NOT log"
+    assert "cooldown" in captured3.lower(), "third call after 60s should log again"
