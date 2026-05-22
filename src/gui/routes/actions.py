@@ -298,6 +298,7 @@ def make_actions_blueprint(
             return _err_with_log("workloads_accelerate", e, lang=lang)
 
     @bp.route('/api/actions/run', methods=['POST'])
+    @limiter.limit("10 per hour")
     def api_run_once():
         lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
@@ -317,6 +318,7 @@ def make_actions_blueprint(
         return jsonify({"ok": True, "output": t("gui_action_run_completed", lang=lang)})
 
     @bp.route('/api/actions/debug', methods=['POST'])
+    @limiter.limit("10 per hour")
     def api_debug():
         d = request.json or {}
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
@@ -335,6 +337,7 @@ def make_actions_blueprint(
         return jsonify({"ok": True, "output": _strip_ansi(buf.getvalue()).strip() or t("gui_action_debug_completed", lang=lang)})
 
     @bp.route('/api/actions/test-alert', methods=['POST'])
+    @limiter.limit("10 per hour")
     def api_test_alert():
         try:
             from src.module_log import ModuleLog as _ML
@@ -363,6 +366,7 @@ def make_actions_blueprint(
         })
 
     @bp.route('/api/actions/best-practices', methods=['POST'])
+    @limiter.limit("5 per hour")
     def api_best_practices():
         try:
             from src.module_log import ModuleLog as _ML
@@ -386,6 +390,7 @@ def make_actions_blueprint(
         return jsonify({"ok": True, "output": output, "summary": result})
 
     @bp.route('/api/actions/test-connection', methods=['POST'])
+    @limiter.limit("20 per hour")
     def api_test_conn():
         try:
             from src.module_log import ModuleLog as _ML
