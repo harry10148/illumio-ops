@@ -20,8 +20,27 @@ PBS_LINUX_URL="https://github.com/astral-sh/python-build-standalone/releases/dow
 PBS_WIN_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/cpython-${PBS_PYTHON}+${PBS_TAG}-x86_64-pc-windows-msvc-install_only.tar.gz"
 
 # Verify a downloaded file against its PBS-published .sha256 sidecar.
-# Not perfect supply-chain protection (same origin), but catches network
-# corruption and most tampering. For stronger guarantees pin the hash here.
+#
+# SECURITY NOTE — TOFU (trust-on-first-use) risk (L-10):
+#   The .sha256 sidecar is fetched from the SAME GitHub release origin as the
+#   tarball itself.  A compromised release or MITM that replaces both files
+#   simultaneously would pass this check undetected.
+#
+#   Stronger supply-chain protection options (not yet implemented):
+#     - GPG: python-build-standalone signs releases with a PGP key published
+#       at https://github.com/astral-sh/python-build-standalone — verify the
+#       .asc signature before trusting the hash.
+#     - Sigstore: astral-sh publishes cosign bundles for recent PBS releases;
+#       use `cosign verify-blob` for provenance attestation.
+#     - Pin the hash: hard-code PBS_SHA256_LINUX_X86_64 and
+#       PBS_SHA256_WIN_X86_64 in this script so the expected hash never comes
+#       from the same origin.  Update them from a GPG/Sigstore-verified source
+#       whenever upgrading PBS_TAG / PBS_PYTHON above.
+#
+#   Current behaviour (sidecar from same origin) catches network corruption
+#   and simple tampering but does NOT defend against a compromised upstream
+#   release.  Upgrade to GPG or Sigstore verification when supply-chain
+#   assurance is required.
 verify_sha256() {
     local file="$1" url="$2"
     local sha_file="${file}.sha256"
