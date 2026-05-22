@@ -18,9 +18,13 @@ processors:
 output.elasticsearch:
   hosts: ["elastic.example.com:9200"]
   index: "illumio-ops-%{+yyyy.MM.dd}"
+  protocol: "https"
+  ssl.enabled: true
+  ssl.verification_mode: full
+  ssl.certificate_authorities: ["/etc/filebeat/ca.crt"]
   # Uncomment and set credentials if authentication is enabled:
   # username: "filebeat_writer"
-  # password: "changeme"
+  # password: "<REPLACE_ME>"
 
 setup.template.name: "illumio-ops"
 setup.template.pattern: "illumio-ops-*"
