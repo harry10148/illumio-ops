@@ -49,27 +49,42 @@ class ScheduleDB:
         self.db = {}
 
     def load(self):
-        if os.path.exists(self.db_path):
-            try:
-                with open(self.db_path, 'r', encoding='utf-8') as f:
-                    self.db = json.load(f)
-            except Exception:
-                self.db = {}  # intentional fallback: use empty state if DB file is corrupt or unreadable
-        else:
+        if not os.path.exists(self.db_path):
             self.db = {}
+            return self.db
+        try:
+            with open(self.db_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                raise ValueError(f"ScheduleDB root must be dict, got {type(data).__name__}")
+            self.db = data
+        except (json.JSONDecodeError, ValueError, OSError) as e:
+            import time as _time
+            corrupt_path = f"{self.db_path}.corrupt.{int(_time.time())}"
+            try:
+                os.rename(self.db_path, corrupt_path)
+            except OSError as rename_err:
+                logger.error(f"ScheduleDB load failed and quarantine rename also failed: {rename_err}")
+            else:
+                logger.error(f"ScheduleDB corrupt; quarantined to {corrupt_path}: {e}")
+            raise ValueError(f"ScheduleDB corrupt: {e}") from e
         return self.db
 
     def save(self):
-        """Atomic write via tmp + os.replace."""
+        """Atomic write via tmp + os.replace. Failure raises — no fallback."""
         tmp_path = self.db_path + ".tmp"
         try:
             with open(tmp_path, 'w', encoding='utf-8') as f:
                 json.dump(self.db, f, indent=4, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp_path, self.db_path)
         except Exception:
-            # intentional fallback: atomic rename failed (e.g. cross-device), fall back to direct write
-            with open(self.db_path, 'w', encoding='utf-8') as f:
-                json.dump(self.db, f, indent=4, ensure_ascii=False)
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+            raise  # NO fallback — atomic failure must surface to caller
 
     def get_all(self):
         if not self.db:
