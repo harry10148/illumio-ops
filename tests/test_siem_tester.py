@@ -67,7 +67,7 @@ def test_build_transport_tcp():
 def test_build_transport_tls():
     from src.siem.transports.syslog_tls import SyslogTLSTransport
     cfg = _dest(transport="tls", host="syslog.corp", port=6514,
-                tls_verify=False, tls_ca_bundle=None)
+                tls_verify=False, tls_ca_bundle=None, profile="dev")
     with patch("socket.socket"), patch("ssl.create_default_context"):
         t = _build_transport(cfg)
     assert isinstance(t, SyslogTLSTransport)

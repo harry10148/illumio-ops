@@ -85,7 +85,7 @@ def app_persistent(temp_config_file):
         "username": "admin",
         "password": _hash_password("testpass"),
         "allowed_ips": ["127.0.0.1", "192.168.1.0/24"],
-        "secret_key": "test-secret"
+        "secret_key": "x" * 64
     }
     cm.save()
 
