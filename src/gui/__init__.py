@@ -266,12 +266,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
         limits 5.8.0 has no built-in file backend; we implement a thin
         wrapper around MemoryStorage that snapshots counter state to
         ``<dir>/rate_limits.json`` on every write, so limits survive
-        process restarts.  Concurrent writes are serialised by the existing
-        per-key ``threading.RLock`` from MemoryStorage.
+        process restarts.
         """
         import time
         import json as _json
-        from collections import Counter
         from pathlib import Path as _Path
         from urllib.parse import urlparse
         from limits.storage.memory import MemoryStorage
@@ -281,7 +279,21 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
             return  # already registered (e.g. second app creation in tests)
 
         class _JsonFileStorage(MemoryStorage):
-            """MemoryStorage that persists fixed-window counters to a JSON file."""
+            """JSON-file-backed rate-limit storage for flask-limiter.
+
+            Persists counter state to disk so rate limits survive process restart.
+            Thread-safe within a single process via the inherited per-key RLock.
+
+            IMPORTANT: NOT multi-process safe. illumio-ops runs as a single
+            cheroot worker, so this constraint is acceptable. For multi-worker
+            deployments (gunicorn -w N, uWSGI), switch to a ``redis://`` backend
+            instead — two workers writing the JSON snapshot simultaneously would
+            race on the read-modify-write sequence and lose updates.
+
+            Each incr() triggers a synchronous JSON write (tmp + os.replace).
+            Acceptable for an admin UI with sparse traffic; switch to Redis if
+            you need >10 req/sec sustained.
+            """
 
             STORAGE_SCHEME = ["file"]
 

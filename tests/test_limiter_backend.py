@@ -98,3 +98,36 @@ def test_limiter_snapshot_survives_restart():
         assert store2.get("ip:1.2.3.4") == 2, (
             "counter should survive re-instantiation (snapshot not loaded?)"
         )
+
+
+def test_limiter_skips_expired_counters_on_load():
+    """Counters whose expiry has passed must not be restored when loading the snapshot."""
+    import time
+    from limits.storage import SCHEMES
+    from pathlib import Path
+
+    # Ensure the file backend is registered.
+    from src.gui import build_app
+
+    with tempfile.TemporaryDirectory() as tmp:
+        cm = _make_cm(tmp)
+        build_app(cm)
+
+    assert "file" in SCHEMES, "file:// scheme not registered after build_app()"
+
+    with tempfile.TemporaryDirectory() as tmp2:
+        lim_dir = Path(tmp2) / "limiter"
+        lim_dir.mkdir()
+        snapshot_path = lim_dir / "rate_limits.json"
+
+        now = time.time()
+        snapshot_path.write_text(json.dumps({
+            "fresh_key": {"val": 5, "exp": now + 3600},
+            "expired_key": {"val": 99, "exp": now - 3600},
+        }))
+
+        cls = SCHEMES["file"]
+        storage = cls(f"file://{lim_dir}")
+
+        assert storage.get("fresh_key") == 5, "fresh counter must survive load"
+        assert storage.get("expired_key") == 0, "expired counter must NOT be restored"
