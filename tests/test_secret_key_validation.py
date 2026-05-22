@@ -1,6 +1,5 @@
 import json
 import secrets
-from pathlib import Path
 import pytest
 
 
@@ -72,4 +71,20 @@ def test_missing_secret_key_gets_generated(tmp_path):
     from src.config import ConfigManager
     cm = ConfigManager(config_file=str(cfg_file))
     cm.load()
+    assert len(cm.config["web_gui"].get("secret_key", "")) >= 64
+
+
+def test_null_secret_key_treated_as_missing(tmp_path):
+    """JSON null secret_key should not crash; should be regenerated like missing key."""
+    cfg_file = tmp_path / "config.json"
+    cfg_file.write_text(json.dumps({
+        "web_gui": {
+            "secret_key": None,  # JSON null
+            "username": "illumio",
+            "password": "$argon2id$dummy"
+        }
+    }))
+    from src.config import ConfigManager
+    cm = ConfigManager(config_file=str(cfg_file))
+    cm.load()  # must not raise TypeError
     assert len(cm.config["web_gui"].get("secret_key", "")) >= 64

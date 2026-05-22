@@ -295,7 +295,7 @@ class ConfigManager:
 
         changed = False
 
-        current_key = gui.get("secret_key", "")
+        current_key = gui.get("secret_key") or ""
         if len(current_key) < 64:  # require 32-byte hex = 64 chars
             gui["secret_key"] = _secrets.token_hex(32)
             logger.warning(
