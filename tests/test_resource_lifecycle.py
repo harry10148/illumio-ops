@@ -86,3 +86,12 @@ def test_splunk_hec_transport_close_is_idempotent():
     )
     transport.close()
     transport.close()  # must not raise
+
+
+def test_api_client_use_after_close_raises():
+    """Methods on a closed ApiClient must raise RuntimeError clearly, not return fake responses."""
+    from src.api_client import ApiClient
+    client = ApiClient(_make_cm())
+    client.close()
+    with pytest.raises(RuntimeError, match="closed"):
+        client._request("https://localhost/api/v2/orgs/1/labels", "GET")

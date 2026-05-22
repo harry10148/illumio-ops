@@ -187,6 +187,8 @@ class ApiClient:
         Returns (status_code, response_body_bytes | response_object).
         For stream=True, returns (status_code, raw requests.Response).
         """
+        if self._session is None:
+            raise RuntimeError("ApiClient is closed; create a new instance")
         if rate_limit:
             from src.pce_cache.rate_limiter import get_rate_limiter
             rpm = 400
