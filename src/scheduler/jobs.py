@@ -17,14 +17,14 @@ def run_monitor_cycle(cm) -> None:
     mlog = ModuleLog.get("monitor")
     try:
         mlog.info("Starting monitor cycle")
-        api = ApiClient(cm)
-        rep = Reporter(cm)
-        sub_events, sub_flows = _make_subscribers(cm)
-        ana = Analyzer(cm, api, rep,
-                       subscriber_events=sub_events, subscriber_flows=sub_flows,
-                       cache_reader=_make_cache_reader(cm))
-        ana.run_analysis()
-        rep.send_alerts()
+        with ApiClient(cm) as api:
+            rep = Reporter(cm)
+            sub_events, sub_flows = _make_subscribers(cm)
+            ana = Analyzer(cm, api, rep,
+                           subscriber_events=sub_events, subscriber_flows=sub_flows,
+                           cache_reader=_make_cache_reader(cm))
+            ana.run_analysis()
+            rep.send_alerts()
         mlog.info("Monitor cycle complete")
     except Exception as exc:
         logger.error("Monitor cycle failed: {}", exc, exc_info=True)
@@ -55,9 +55,9 @@ def tick_rule_schedules(cm) -> None:
         db.load()
         tz = cm.config.get("settings", {}).get("timezone", "local")
         from src.api_client import ApiClient
-        api = ApiClient(cm)
-        engine = ScheduleEngine(db, api)
-        logs = engine.check(silent=True, tz_str=tz)
+        with ApiClient(cm) as api:
+            engine = ScheduleEngine(db, api)
+            logs = engine.check(silent=True, tz_str=tz)
         for msg in logs:
             clean = re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", msg)
             logger.info("[RuleScheduler] {}", clean)
@@ -95,12 +95,12 @@ def run_events_ingest(cm) -> None:
         engine = create_engine(f"sqlite:///{cfg.db_path}")
         init_schema(engine)
         sf = sessionmaker(engine)
-        api = ApiClient(cm)
-        ing = EventsIngestor(api=api, session_factory=sf,
-                              watermark=WatermarkStore(sf),
-                              async_threshold=cfg.async_threshold_events,
-                              siem_destinations=_enabled_siem_destinations(cm, "audit"))
-        count = ing.run_once()
+        with ApiClient(cm) as api:
+            ing = EventsIngestor(api=api, session_factory=sf,
+                                  watermark=WatermarkStore(sf),
+                                  async_threshold=cfg.async_threshold_events,
+                                  siem_destinations=_enabled_siem_destinations(cm, "audit"))
+            count = ing.run_once()
         logger.info("Events ingest: {} rows inserted", count)
     except Exception as exc:
         logger.exception("run_events_ingest failed: {}", exc)
@@ -118,12 +118,12 @@ def run_traffic_ingest(cm) -> None:
         engine = create_engine(f"sqlite:///{cfg.db_path}")
         init_schema(engine)
         sf = sessionmaker(engine)
-        api = ApiClient(cm)
-        ing = TrafficIngestor(api=api, session_factory=sf,
-                               watermark=WatermarkStore(sf),
-                               max_results=cfg.traffic_sampling.max_rows_per_batch,
-                               siem_destinations=_enabled_siem_destinations(cm, "traffic"))
-        count = ing.run_once()
+        with ApiClient(cm) as api:
+            ing = TrafficIngestor(api=api, session_factory=sf,
+                                   watermark=WatermarkStore(sf),
+                                   max_results=cfg.traffic_sampling.max_rows_per_batch,
+                                   siem_destinations=_enabled_siem_destinations(cm, "traffic"))
+            count = ing.run_once()
         logger.info("Traffic ingest: {} rows inserted", count)
     except Exception as exc:
         logger.exception("run_traffic_ingest failed: {}", exc)
@@ -190,7 +190,8 @@ def run_siem_dispatch(cm) -> None:
             logger.info("run_siem_dispatch: enqueued {} new records", new_count)
         for dest_cfg in enabled_dests:
             try:
-                build_dispatcher(dest_cfg, sf).tick()
+                with build_dispatcher(dest_cfg, sf) as dispatcher:
+                    dispatcher.tick()
             except Exception as exc:
                 logger.exception("run_siem_dispatch destination {!r} failed: {}", dest_cfg.name, exc)
     except Exception as exc:

@@ -128,9 +128,10 @@ def _rs_background_scheduler(cm: ConfigManager) -> None:
                 db_path = os.path.join(_resolve_config_dir(), "rule_schedules.json")
                 db = ScheduleDB(db_path)
                 db.load()
-                engine = ScheduleEngine(db, _ApiClient(cm))
                 tz_str = cm.config.get('settings', {}).get('timezone', 'local')
-                logs = engine.check(silent=True, tz_str=tz_str)
+                with _ApiClient(cm) as api:
+                    engine = ScheduleEngine(db, api)
+                    logs = engine.check(silent=True, tz_str=tz_str)
                 _append_rs_logs(logs)
                 last_check = now
                 logger.info("[RuleScheduler] Auto-check completed ({} entries).", len(logs))

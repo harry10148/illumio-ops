@@ -152,6 +152,27 @@ class ApiClient:
         self._traffic = TrafficQueryBuilder(self)
 
     # ═══════════════════════════════════════════════════════════════════════
+    # Resource lifecycle
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def close(self) -> None:
+        """Release the underlying requests.Session connection pool."""
+        if getattr(self, "_session", None) is not None:
+            try:
+                self._session.close()
+            except Exception as exc:
+                logger.warning("ApiClient.close() failed: {}", exc)
+            finally:
+                self._session = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False  # don't suppress exceptions
+
+    # ═══════════════════════════════════════════════════════════════════════
     # HTTP core (stays on facade — shared infrastructure)
     # ═══════════════════════════════════════════════════════════════════════
 

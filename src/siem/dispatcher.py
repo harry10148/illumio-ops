@@ -42,6 +42,21 @@ class DestinationDispatcher:
         self._mask_pii = mask_pii
         self._lock = threading.Lock()
 
+    def close(self) -> None:
+        """Release transport resources (connection pool)."""
+        if hasattr(self._transport, "close"):
+            try:
+                self._transport.close()
+            except Exception as exc:
+                logger.warning("transport close failed for {!r}: {}", self._name, exc)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
+
     def tick(self) -> dict[str, int]:
         """Process one batch. Returns {sent, failed, quarantined}."""
         if not self._lock.acquire(blocking=False):
