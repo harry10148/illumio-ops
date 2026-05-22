@@ -138,7 +138,16 @@ def run_daemon_with_gui(cm, interval: int = 10, port: int = 5001, host: str = "0
                 _gui._active_server.stop()
         except Exception:
             pass
+        # Propagate shutdown to gui's _rs_background_scheduler if running
+        _gui._shutdown_event.set()
 
     threading.Thread(target=_gui_stopper, daemon=True).start()
 
     launch_gui(cm, port=port, persistent_mode=True)
+
+    # After launch_gui returns (server stopped), join the daemon thread so the
+    # background scheduler exits cooperatively before the process terminates.
+    if t_daemon is not None:
+        t_daemon.join(timeout=10)
+        if t_daemon.is_alive():
+            logger.warning("background scheduler thread did not exit within 10s — proceeding with hard shutdown")

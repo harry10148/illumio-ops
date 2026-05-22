@@ -102,6 +102,9 @@ import collections as _collections
 _rs_log_history: _collections.deque = _collections.deque(maxlen=200)
 _rs_log_lock = threading.Lock()
 
+# Shutdown event for _rs_background_scheduler — set by cli/_runtime.py on SIGTERM.
+_shutdown_event = threading.Event()
+
 def _append_rs_logs(logs: list) -> None:
     """Append one check-run's output to the in-memory log history."""
     with _rs_log_lock:
@@ -112,11 +115,13 @@ def _append_rs_logs(logs: list) -> None:
         _rs_log_history.append(entry)  # deque(maxlen=200) auto-evicts oldest
 
 def _rs_background_scheduler(cm: ConfigManager) -> None:
-    """Background thread: run rule scheduler periodically in GUI-only mode."""
+    """Background thread: run rule scheduler periodically in GUI-only mode.
+
+    Exits cleanly when _shutdown_event is set (interruptible 60-second wait).
+    """
     import time
     last_check: float | None = None
-    while True:
-        time.sleep(60)
+    while not _shutdown_event.is_set():
         try:
             cm.load()
             rs_cfg = cm.config.get("rule_scheduler", {})
@@ -137,6 +142,10 @@ def _rs_background_scheduler(cm: ConfigManager) -> None:
                 logger.info("[RuleScheduler] Auto-check completed ({} entries).", len(logs))
         except Exception as exc:
             logger.error("[RuleScheduler] Background error: {}", exc, exc_info=True)
+        # Interruptible wait — exits within 0-60s of shutdown signal
+        if _shutdown_event.wait(60):
+            break
+    logger.info("_rs_background_scheduler exited cleanly")
 
 def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: bool = True) -> 'Flask':
     app = Flask(__name__, template_folder=os.path.join(_PKG_DIR, 'templates'), static_folder=os.path.join(_PKG_DIR, 'static'))
