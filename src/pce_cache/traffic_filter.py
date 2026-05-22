@@ -48,5 +48,5 @@ class TrafficSampler:
         if self._ratio == 1:
             return True
         key = f"{flow.get('src_ip')}|{flow.get('dst_ip')}|{flow.get('port')}"
-        h = int(hashlib.md5(key.encode("utf-8")).hexdigest(), 16)
+        h = int(hashlib.md5(key.encode("utf-8"), usedforsecurity=False).hexdigest(), 16)
         return (h % self._ratio) == 0

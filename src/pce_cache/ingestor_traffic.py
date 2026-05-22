@@ -141,7 +141,7 @@ def _flow_hash(flow: dict) -> str:
         str(svc.get("proto", "") or flow.get("protocol", "")),
         _ts(flow, "first_detected"),
     ])
-    return hashlib.sha1(key.encode("utf-8")).hexdigest()
+    return hashlib.sha1(key.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def _ts(flow: dict, key: str) -> str:
