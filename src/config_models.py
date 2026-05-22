@@ -71,6 +71,17 @@ class AlertsSettings(_Base):
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
 
+    @field_validator("webhook_url", mode="after")
+    @classmethod
+    def _require_https(cls, v: str) -> str:
+        if v and not v.startswith("https://"):
+            scheme = v.split("://")[0] if "://" in v else "no scheme"
+            raise ValueError(
+                "webhook_url must use https:// scheme (got: "
+                f"{scheme}://...)"
+            )
+        return v
+
 class EmailSettings(_Base):
     sender: str = "monitor@localhost"
     recipients: list[str] = Field(default_factory=lambda: ["admin@example.com"])
