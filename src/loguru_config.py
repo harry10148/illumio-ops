@@ -5,12 +5,17 @@ setup_loguru(log_file, level, json_sink, rotation, retention)
   - Intercepts stdlib logging from 3rd-party libs via _StdLibInterceptHandler
   - L4: Sink-level redaction filter scrubs secret-looking key=value pairs
     from log messages before they hit any sink (console/file/JSON).
+  - L5/L6: Rotated log files are gzip-compressed and chmod'd to 0o640 so
+    they are not world-readable after rotation.
   - Idempotent: removes prior sinks on each call
 """
 from __future__ import annotations
 
+import gzip
 import logging
+import os
 import re as _re
+import shutil
 import sys
 from pathlib import Path
 
@@ -120,6 +125,23 @@ class _StdLibInterceptHandler(logging.Handler):
         )
 
 
+def _compress_and_chmod(filepath: str) -> None:
+    """Loguru compression hook: gzip rotated log files and chmod to 0o640.
+
+    L5/L6: Ensures rotated logs are not world-readable (umask may leave 0o644).
+    Passed as the ``compression`` argument to ``logger.add()`` so loguru calls
+    this instead of its built-in "gz" shorthand — giving us the chmod step.
+    """
+    gz_path = f"{filepath}.gz"
+    with open(filepath, "rb") as src, gzip.open(gz_path, "wb") as dst:
+        shutil.copyfileobj(src, dst)
+    os.remove(filepath)
+    try:
+        os.chmod(gz_path, 0o640)
+    except OSError:
+        pass
+
+
 def setup_loguru(
     log_file: str,
     level: str = "INFO",
@@ -143,12 +165,21 @@ def setup_loguru(
         ),
     )
 
-    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+    log_path = Path(log_file)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    # L5/L6: Pre-chmod the log file to 0o640 before loguru opens it, so the
+    # active log is not world-readable even before the first rotation fires.
+    if log_path.exists():
+        try:
+            os.chmod(log_path, 0o640)
+        except OSError:
+            pass
     logger.add(
         log_file,
         level=level,
         rotation=rotation,
         retention=retention,
+        compression=_compress_and_chmod,  # L5/L6: gzip + chmod 0o640 on rotation
         encoding="utf-8",
         enqueue=True,
         filter=_redact_log_record,  # L4
