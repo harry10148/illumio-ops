@@ -295,8 +295,13 @@ class ConfigManager:
 
         changed = False
 
-        if not gui.get("secret_key"):
+        current_key = gui.get("secret_key", "")
+        if len(current_key) < 64:  # require 32-byte hex = 64 chars
             gui["secret_key"] = _secrets.token_hex(32)
+            logger.warning(
+                f"web_gui.secret_key was {len(current_key)} chars (required ≥64); "
+                f"regenerated automatically. All active sessions invalidated."
+            )
             changed = True
 
         if not gui.get("password") and not gui.get("_initial_password"):
