@@ -56,11 +56,6 @@ def make_config_blueprint(
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         gui_cfg = cm.config.setdefault("web_gui", {})
 
-        # No old_password gate: an authenticated session is sufficient to
-        # change credentials. The CLI menu (settings.py) is the recovery path
-        # when the password is forgotten and is the only way back in if the
-        # admin loses session access too.
-
         if "username" in d:
             gui_cfg["username"] = d["username"]
 
@@ -74,9 +69,16 @@ def make_config_blueprint(
             gui_cfg["allowed_ips"] = allowed_ips
 
         if d.get("new_password"):
+            must_change = bool(gui_cfg.get("must_change_password", False))
+            if not must_change:
+                old_pw = d.get("old_password") or ""
+                if not old_pw:
+                    return jsonify({"ok": False, "error": t("gui_err_old_password_required", lang=lang)}), 400
+                if not verify_password(old_pw, gui_cfg.get("password", "")):
+                    return jsonify({"ok": False, "error": t("gui_err_old_password_incorrect", lang=lang)}), 400
             new_pw = d["new_password"]
             confirm_pw = d.get("confirm_password", new_pw)
-            if not (8 <= len(new_pw) <= 512) or new_pw != confirm_pw:
+            if not (12 <= len(new_pw) <= 512) or new_pw != confirm_pw:
                 return jsonify({"ok": False, "error": t("gui_err_invalid_password_form", lang=lang)}), 400
             gui_cfg["password"] = hash_password(new_pw)
             gui_cfg.pop("_initial_password", None)

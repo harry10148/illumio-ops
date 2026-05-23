@@ -5,12 +5,17 @@ setup_loguru(log_file, level, json_sink, rotation, retention)
   - Intercepts stdlib logging from 3rd-party libs via _StdLibInterceptHandler
   - L4: Sink-level redaction filter scrubs secret-looking key=value pairs
     from log messages before they hit any sink (console/file/JSON).
+  - L5/L6: Rotated log files are gzip-compressed and chmod'd to 0o640 so
+    they are not world-readable after rotation.
   - Idempotent: removes prior sinks on each call
 """
 from __future__ import annotations
 
+import gzip
 import logging
+import os
 import re as _re
+import shutil
 import sys
 from pathlib import Path
 
@@ -38,6 +43,38 @@ _LOG_SECRET_FIELD = _re.compile(
     _re.IGNORECASE,
 )
 
+# M-14: Telegram bot tokens embedded in URL path (not key:value form).
+# Matches: bot<numeric-id>:<secret> as used in https://api.telegram.org/bot.../
+_LOG_TG_TOKEN = _re.compile(r'bot\d+:[A-Za-z0-9_-]{30,}')
+
+# M-14: PCE href identifiers that leak topology info (org/workload/label UUIDs).
+# Masks the resource UUID while preserving the resource type for log readability.
+_LOG_PCE_HREF = _re.compile(
+    r'/orgs/(\d+)/'
+    r'(workloads|labels|rule_sets|services|virtual_services|ven|workload_settings)'
+    r'/[A-Za-z0-9_-]{8,}'
+)
+
+
+def _redact_secrets_in_text(text: str) -> str:
+    """Apply all redaction patterns to a log message string.
+
+    Centralised so that the same logic can be unit-tested independently of
+    loguru's record machinery.
+    """
+    if not text:
+        return text
+    # M-14: Telegram bot token in URL path
+    text = _LOG_TG_TOKEN.sub('bot<REDACTED>', text)
+    # M-14: PCE href UUID — keep org number and resource type, mask the ID
+    text = _LOG_PCE_HREF.sub(lambda m: f'/orgs/{m.group(1)}/{m.group(2)}/<HREF>', text)
+    # Existing key:value secret fields
+    text = _LOG_SECRET_FIELD.sub(
+        lambda m: m.group(0).replace(m.group(2), '[REDACTED]'),
+        text,
+    )
+    return text
+
 
 def _redact_log_record(record):
     """Loguru filter: replace secret-like values in record['message'].
@@ -50,10 +87,7 @@ def _redact_log_record(record):
     msg = record.get('message') or ''
     if not msg:
         return True
-    record['message'] = _LOG_SECRET_FIELD.sub(
-        lambda m: m.group(0).replace(m.group(2), '[REDACTED]'),
-        msg,
-    )
+    record['message'] = _redact_secrets_in_text(msg)
     return True
 
 
@@ -91,6 +125,23 @@ class _StdLibInterceptHandler(logging.Handler):
         )
 
 
+def _compress_and_chmod(filepath: str) -> None:
+    """Loguru compression hook: gzip rotated log files and chmod to 0o640.
+
+    L5/L6: Ensures rotated logs are not world-readable (umask may leave 0o644).
+    Passed as the ``compression`` argument to ``logger.add()`` so loguru calls
+    this instead of its built-in "gz" shorthand — giving us the chmod step.
+    """
+    gz_path = f"{filepath}.gz"
+    with open(filepath, "rb") as src, gzip.open(gz_path, "wb") as dst:
+        shutil.copyfileobj(src, dst)
+    os.remove(filepath)
+    try:
+        os.chmod(gz_path, 0o640)
+    except OSError:
+        pass
+
+
 def setup_loguru(
     log_file: str,
     level: str = "INFO",
@@ -114,12 +165,21 @@ def setup_loguru(
         ),
     )
 
-    Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+    log_path = Path(log_file)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    # L5/L6: Pre-chmod the log file to 0o640 before loguru opens it, so the
+    # active log is not world-readable even before the first rotation fires.
+    if log_path.exists():
+        try:
+            os.chmod(log_path, 0o640)
+        except OSError:
+            pass
     logger.add(
         log_file,
         level=level,
         rotation=rotation,
         retention=retention,
+        compression=_compress_and_chmod,  # L5/L6: gzip + chmod 0o640 on rotation
         encoding="utf-8",
         enqueue=True,
         filter=_redact_log_record,  # L4

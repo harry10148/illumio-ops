@@ -286,6 +286,7 @@ def make_dashboard_blueprint(
             return _err("Chart unavailable", 500)
 
     @bp.route('/api/dashboard/top10', methods=['POST'])
+    @limiter.limit("30 per hour")
     def api_dashboard_top10():
         d = request.json or {}
         try:

@@ -102,6 +102,9 @@ import collections as _collections
 _rs_log_history: _collections.deque = _collections.deque(maxlen=200)
 _rs_log_lock = threading.Lock()
 
+# Shutdown event for _rs_background_scheduler — set by cli/_runtime.py on SIGTERM.
+_shutdown_event = threading.Event()
+
 def _append_rs_logs(logs: list) -> None:
     """Append one check-run's output to the in-memory log history."""
     with _rs_log_lock:
@@ -112,11 +115,13 @@ def _append_rs_logs(logs: list) -> None:
         _rs_log_history.append(entry)  # deque(maxlen=200) auto-evicts oldest
 
 def _rs_background_scheduler(cm: ConfigManager) -> None:
-    """Background thread: run rule scheduler periodically in GUI-only mode."""
+    """Background thread: run rule scheduler periodically in GUI-only mode.
+
+    Exits cleanly when _shutdown_event is set (interruptible 60-second wait).
+    """
     import time
     last_check: float | None = None
-    while True:
-        time.sleep(60)
+    while not _shutdown_event.is_set():
         try:
             cm.load()
             rs_cfg = cm.config.get("rule_scheduler", {})
@@ -128,14 +133,19 @@ def _rs_background_scheduler(cm: ConfigManager) -> None:
                 db_path = os.path.join(_resolve_config_dir(), "rule_schedules.json")
                 db = ScheduleDB(db_path)
                 db.load()
-                engine = ScheduleEngine(db, _ApiClient(cm))
                 tz_str = cm.config.get('settings', {}).get('timezone', 'local')
-                logs = engine.check(silent=True, tz_str=tz_str)
+                with _ApiClient(cm) as api:
+                    engine = ScheduleEngine(db, api)
+                    logs = engine.check(silent=True, tz_str=tz_str)
                 _append_rs_logs(logs)
                 last_check = now
                 logger.info("[RuleScheduler] Auto-check completed ({} entries).", len(logs))
         except Exception as exc:
             logger.error("[RuleScheduler] Background error: {}", exc, exc_info=True)
+        # Interruptible wait — exits within 0-60s of shutdown signal
+        if _shutdown_event.wait(60):
+            break
+    logger.info("_rs_background_scheduler exited cleanly")
 
 def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: bool = True) -> 'Flask':
     app = Flask(__name__, template_folder=os.path.join(_PKG_DIR, 'templates'), static_folder=os.path.join(_PKG_DIR, 'static'))
@@ -226,11 +236,129 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     from flask_limiter import Limiter
     from flask_limiter.util import get_remote_address
 
+    def _limiter_storage_uri(cm: ConfigManager) -> str:
+        """
+        Return a persistent storage URI for flask_limiter.
+
+        Preference order:
+          1. /var/lib/illumio-ops/limiter  (production install, writable)
+          2. <config_dir>/limiter          (dev/lab fallback)
+
+        The ``file://`` scheme is handled by ``_JsonFileStorage`` (registered
+        below), because limits 5.8.0 ships no built-in file backend.
+        """
+        from pathlib import Path
+
+        prod_dir = Path("/var/lib/illumio-ops/limiter")
+        if prod_dir.parent.exists() and os.access(prod_dir.parent, os.W_OK):
+            prod_dir.mkdir(parents=True, exist_ok=True)
+            return f"file://{prod_dir}"
+
+        cfg_dir = Path(cm.config_file).parent if getattr(cm, "config_file", None) else Path.cwd()
+        lim_dir = cfg_dir / "limiter"
+        lim_dir.mkdir(parents=True, exist_ok=True)
+        return f"file://{lim_dir}"
+
+    def _register_file_storage() -> None:
+        """
+        Register a JSON-file-backed storage under the ``file://`` scheme.
+
+        limits 5.8.0 has no built-in file backend; we implement a thin
+        wrapper around MemoryStorage that snapshots counter state to
+        ``<dir>/rate_limits.json`` on every write, so limits survive
+        process restarts.
+        """
+        import time
+        import json as _json
+        from pathlib import Path as _Path
+        from urllib.parse import urlparse
+        from limits.storage.memory import MemoryStorage
+        from limits.storage import SCHEMES
+
+        if "file" in SCHEMES:
+            return  # already registered (e.g. second app creation in tests)
+
+        class _JsonFileStorage(MemoryStorage):
+            """JSON-file-backed rate-limit storage for flask-limiter.
+
+            Persists counter state to disk so rate limits survive process restart.
+            Thread-safe within a single process via the inherited per-key RLock.
+
+            IMPORTANT: NOT multi-process safe. illumio-ops runs as a single
+            cheroot worker, so this constraint is acceptable. For multi-worker
+            deployments (gunicorn -w N, uWSGI), switch to a ``redis://`` backend
+            instead — two workers writing the JSON snapshot simultaneously would
+            race on the read-modify-write sequence and lose updates.
+
+            Each incr() triggers a synchronous JSON write (tmp + os.replace).
+            Acceptable for an admin UI with sparse traffic; switch to Redis if
+            you need >10 req/sec sustained.
+            """
+
+            STORAGE_SCHEME = ["file"]
+
+            def __init__(self, uri: str | None = None, wrap_exceptions: bool = False, **kw: str) -> None:
+                super().__init__(uri, wrap_exceptions=wrap_exceptions, **kw)
+                parsed = urlparse(uri or "file:///tmp/limiter")
+                # uri like file:///var/lib/illumio-ops/limiter  →  netloc="" path="/var/…"
+                self._snapshot_path = _Path(parsed.netloc + parsed.path) / "rate_limits.json"
+                self._snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+                self._load_snapshot()
+
+            def _load_snapshot(self) -> None:
+                if not self._snapshot_path.exists():
+                    return
+                try:
+                    with self._snapshot_path.open() as fh:
+                        data = _json.load(fh)
+                    now = time.time()
+                    for key, entry in data.items():
+                        exp = float(entry.get("exp", 0))
+                        if exp > now:
+                            self.storage[key] = int(entry.get("val", 0))
+                            self.expirations[key] = exp
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("rate-limit snapshot load failed (ignored): {}", exc)
+
+            def _write_snapshot(self) -> None:
+                try:
+                    now = time.time()
+                    data = {
+                        k: {"val": int(v), "exp": self.expirations.get(k, now)}
+                        for k, v in self.storage.items()
+                        if self.expirations.get(k, 0) > now
+                    }
+                    tmp = self._snapshot_path.with_suffix(".tmp")
+                    with tmp.open("w") as fh:
+                        _json.dump(data, fh)
+                    tmp.replace(self._snapshot_path)
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("rate-limit snapshot write failed (ignored): {}", exc)
+
+            def incr(self, key: str, expiry: float, amount: int = 1) -> int:
+                result = super().incr(key, expiry, amount)
+                self._write_snapshot()
+                return result
+
+            def check(self) -> bool:
+                return self._snapshot_path.parent.is_dir()
+
+        SCHEMES["file"] = _JsonFileStorage
+
+    _register_file_storage()
+    # Allow test suite (or ops tooling) to override the storage backend via env var.
+    # Production: env var is unset → persistent file:// backend (security improvement retained).
+    # Tests: conftest.py sets ILLUMIO_OPS_RATELIMIT_URI=memory:// → ephemeral, no cross-test pollution.
+    _override_uri = os.environ.get("ILLUMIO_OPS_RATELIMIT_URI")
+    _limiter_uri = _override_uri if _override_uri else _limiter_storage_uri(cm)
+    app.config["RATELIMIT_STORAGE_URI"] = _limiter_uri
+    logger.info("flask_limiter storage: {}", _limiter_uri)
+
     limiter = Limiter(
         app=app,
         key_func=get_remote_address,
         default_limits=["300 per minute"],
-        storage_uri="memory://",    # single-node deployment
+        storage_uri=_limiter_uri,
         strategy="fixed-window",
     )
 
@@ -372,15 +500,20 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
 
     @app.before_request
     def security_check():
-        if request.endpoint == 'static' or request.path.startswith('/static/'):
-            return
+        is_static = request.endpoint == 'static' or request.path.startswith('/static/')
 
-        # IP Allowlist check ??silently drop with TCP RST (no HTTP response)
-        # so port scanners cannot detect an HTTP service on this port
+        # IP Allowlist check — silently drop with TCP RST (no HTTP response)
+        # so port scanners cannot detect an HTTP service on this port.
+        # Applied to ALL paths, including /static/, to prevent IP-enumeration
+        # of static assets by untrusted hosts.
         allowed_ips = cm.config.get("web_gui", {}).get("allowed_ips", [])
         if not _check_ip_allowed(allowed_ips, request.remote_addr):
             logger.warning(f"[GUI] Blocked untrusted IP: {_safe_log(request.remote_addr)}")
             _rst_drop()  # closes socket with RST, raises _RstDrop
+
+        # Static files pass IP allowlist above but do not require session auth
+        if is_static:
+            return
 
         # Auth check (always enforced for all GUI modes)
         # Bypass login routes

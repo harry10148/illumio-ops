@@ -113,6 +113,8 @@ def test_run_siem_dispatch_calls_tick_and_enqueue():
          patch("sqlalchemy.orm.sessionmaker"):
         mock_enqueue.return_value = 0
         mock_dispatcher = MagicMock()
+        mock_dispatcher.__enter__ = MagicMock(return_value=mock_dispatcher)
+        mock_dispatcher.__exit__ = MagicMock(return_value=False)
         mock_build.return_value = mock_dispatcher
         run_siem_dispatch(cm)
 

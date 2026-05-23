@@ -168,6 +168,52 @@ illumio-ops/
 └── scripts/                    # Utility scripts (offline bundle build, install/uninstall, preflight)
 ```
 
+---
+
+## Deployment Notes / 部署注意事項
+
+> Audit reference: `docs/security-audit-2026-05-22.md` L-11 through L-14.
+
+### L-11: Reverse Proxy
+
+This service does **not** automatically configure Flask `ProxyFix`. When deployed behind a reverse proxy (nginx, Apache, Traefik):
+
+- You **must** apply `ProxyFix` middleware before the app starts, trusting exactly 1 hop.
+- Without it, IP allowlisting breaks — all requests appear to originate from the proxy's IP.
+
+Example (add before the cheroot server starts in `src/gui/__init__.py`):
+
+```python
+from werkzeug.middleware.proxy_fix import ProxyFix
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
+```
+
+### L-12: Telegram Alert Plugin — Token Leakage via Proxy Access Logs
+
+The Telegram Bot API embeds the token in the URL path (`https://api.telegram.org/bot<TOKEN>/sendMessage`). When deploying the Telegram alert plugin in financial, defence, or high-sensitivity environments, you **must** do one of the following:
+
+- Prevent any forward proxy or WAF from writing full URL paths to access logs.
+- Use a direct (NoProxy) connection to bypass corporate proxies.
+- Switch to webhook mode (though webhooks still pass through the proxy; the URL does not contain the token).
+
+Loguru logging includes a Telegram token regex scrubber (commit T2.14), but this cannot protect intermediate network devices.
+
+### L-13: Server Header Fingerprinting
+
+cheroot outputs `Server: Cheroot/<version>` by default, exposing version information to fingerprinting. If your audit policy requires header suppression:
+
+- Strip the header at the reverse proxy with `proxy_hide_header Server;` (nginx) or equivalent.
+- Alternatively, add a custom cheroot WSGI middleware to remove the header (planned enhancement).
+
+### L-14: Production Git Workflow — autoStash and Reproducibility
+
+`scripts/setup-prod-git.sh` enables `git config merge.autoStash=true`, which means the production host may silently stash **uncommitted local edits** during `git pull` without warning. Consequences:
+
+- The production host may **not** be bit-for-bit reproducible against the deployed `git tag`.
+- To prove production exactly matches a release tag during an audit, you must verify no stashed changes exist: `git stash list` must be empty.
+
+**Recommendation:** After each production deployment, run `git stash list` and confirm it is empty. Consider using `scripts/setup.sh` instead of `setup-prod-git.sh` for production hosts where reproducibility must be guaranteed.
+
 ## Translations (i18n)
 
 **Single source of truth:** `src/i18n_en.json` and `src/i18n_zh_TW.json` (~2,767 keys each). Every key has an explicit value in both files; no runtime auto-translation.

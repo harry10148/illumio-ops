@@ -36,7 +36,7 @@ echo "==> Creating virtualenv"
 python3 -m venv "$REPO_ROOT/venv"
 
 echo "==> Installing Python packages"
-"$REPO_ROOT/venv/bin/pip" install -r "$REPO_ROOT/requirements.txt" --quiet
+"$REPO_ROOT/venv/bin/pip" install --require-hashes -r "$REPO_ROOT/requirements.lock" --quiet
 
 # First run: initialise config
 if [ ! -f "$REPO_ROOT/config/config.json" ]; then

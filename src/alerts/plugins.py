@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 import os
 import smtplib
+import socket
+import ssl
+import time
 import urllib.error
 import urllib.request
 from email.mime.multipart import MIMEMultipart
@@ -38,27 +41,56 @@ class MailAlertPlugin(AlertOutputPlugin):
             host = smtp_conf.get("host", "localhost")
             port = int(smtp_conf.get("port", 25))
 
-            smtp = smtplib.SMTP(host, port)
-            smtp.ehlo()
-            if smtp_conf.get("enable_tls"):
-                smtp.starttls()
+            with smtplib.SMTP(host, port, timeout=30) as smtp:
                 smtp.ehlo()
+                if smtp_conf.get("enable_tls"):
+                    smtp.starttls(context=ssl.create_default_context())
+                    smtp.ehlo()
 
-            if smtp_conf.get("enable_auth"):
-                # Prefer env var over config file to avoid storing credentials in plaintext
-                smtp_password = os.environ.get("ILLUMIO_SMTP_PASSWORD") or smtp_conf.get("password", "")
-                smtp.login(smtp_conf.get("user"), smtp_password)
+                if smtp_conf.get("enable_auth"):
+                    # Prefer env var over config file to avoid storing credentials in plaintext
+                    smtp_password = os.environ.get("ILLUMIO_SMTP_PASSWORD") or smtp_conf.get("password", "")
+                    smtp.login(smtp_conf.get("user"), smtp_password)
 
-            smtp.sendmail(cfg["sender"], cfg["recipients"], msg.as_string())
-            smtp.quit()
+                smtp.sendmail(cfg["sender"], cfg["recipients"], msg.as_string())
+
             print(f"{Colors.GREEN}{t('mail_sent', lang=lang, host=host, port=port)}{Colors.ENDC}")
             return {"channel": "mail", "status": "success", "target": ",".join(cfg["recipients"])}
-        except Exception as exc:
+        except smtplib.SMTPAuthenticationError as exc:
             print(f"{Colors.FAIL}{t('mail_failed', lang=lang, error=exc)}{Colors.ENDC}")
+            from loguru import logger
+            logger.error(f"SMTP auth failed (config error, not retrying): {exc}")
+            return {"channel": "mail", "status": "failed", "target": ",".join(cfg.get("recipients", [])), "error": str(exc)}
+        except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, ConnectionError, OSError, socket.timeout) as exc:
+            print(f"{Colors.FAIL}{t('mail_failed', lang=lang, error=exc)}{Colors.ENDC}")
+            from loguru import logger
+            logger.warning(f"SMTP transient failure: {exc}")
+            return {"channel": "mail", "status": "failed", "target": ",".join(cfg.get("recipients", [])), "error": str(exc)}
+        except smtplib.SMTPException as exc:
+            print(f"{Colors.FAIL}{t('mail_failed', lang=lang, error=exc)}{Colors.ENDC}")
+            from loguru import logger
+            logger.error(f"SMTP error: {exc}")
             return {"channel": "mail", "status": "failed", "target": ",".join(cfg.get("recipients", [])), "error": str(exc)}
 
 class LineAlertPlugin(AlertOutputPlugin):
     name = "line"
+
+    def __init__(self, config_manager):
+        super().__init__(config_manager)
+        self._consecutive_failures: int = 0
+        self._cooldown_until: float = 0.0
+        self._last_cooldown_log_at: float = 0.0
+
+    def _maybe_log_cooldown(self, target_id: str) -> None:
+        """Emit a cooldown-skip warning at most once per 60 seconds."""
+        now = time.monotonic()
+        if now - self._last_cooldown_log_at >= 60:
+            remaining = max(0.0, self._cooldown_until - now)
+            print(
+                f"{Colors.WARNING}LINE alert channel in cooldown — skipping send"
+                f" ({remaining:.0f}s remaining){Colors.ENDC}"
+            )
+            self._last_cooldown_log_at = now
 
     def send(self, reporter, subject: str, *, lang: str = "en") -> dict:
         token = self.cm.config.get("alerts", {}).get("line_channel_access_token", "")
@@ -66,6 +98,15 @@ class LineAlertPlugin(AlertOutputPlugin):
         if not token or not target_id:
             print(f"{Colors.WARNING}{t('line_config_missing', lang=lang)}{Colors.ENDC}")
             return {"channel": "line", "status": "skipped", "target": target_id or "", "error": "missing configuration"}
+
+        if time.monotonic() < self._cooldown_until:
+            self._maybe_log_cooldown(target_id)
+            return {"channel": "line", "status": "failed", "target": target_id, "error": "channel cooldown active"}
+
+        # Cooldown has expired (or was never set): reset counter for a fresh 3-strike window
+        if self._cooldown_until > 0 and self._consecutive_failures >= 3:
+            self._consecutive_failures = 0
+            self._cooldown_until = 0.0
 
         message_text = reporter._build_line_message(subject)
         payload = {
@@ -85,17 +126,30 @@ class LineAlertPlugin(AlertOutputPlugin):
                 headers=headers,
                 method="POST",
             )
-            with urllib.request.urlopen(req) as response:
+            with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status == 200:
+                    self._consecutive_failures = 0
                     print(f"{Colors.GREEN}{t('line_alert_sent', lang=lang)}{Colors.ENDC}")
                     return {"channel": "line", "status": "success", "target": target_id}
+                self._consecutive_failures += 1
+                if self._consecutive_failures >= 3:
+                    self._cooldown_until = time.monotonic() + 300
+                    print(f"{Colors.WARNING}LINE plugin: 3 consecutive failures — cooling down for 5 min{Colors.ENDC}")
                 print(f"{Colors.FAIL}{t('line_alert_failed', lang=lang, error='', status=response.status)}{Colors.ENDC}")
                 return {"channel": "line", "status": "failed", "target": target_id, "error": f"status={response.status}"}
         except urllib.error.HTTPError as exc:
             error_body = exc.read().decode("utf-8")
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= 3:
+                self._cooldown_until = time.monotonic() + 300
+                print(f"{Colors.WARNING}LINE plugin: 3 consecutive failures — cooling down for 5 min{Colors.ENDC}")
             print(f"{Colors.FAIL}{t('line_alert_failed', lang=lang, error=f'{exc} - {error_body}', status=exc.code)}{Colors.ENDC}")
             return {"channel": "line", "status": "failed", "target": target_id, "error": f"{exc} - {error_body}"}
         except Exception as exc:
+            self._consecutive_failures += 1
+            if self._consecutive_failures >= 3:
+                self._cooldown_until = time.monotonic() + 300
+                print(f"{Colors.WARNING}LINE plugin: 3 consecutive failures — cooling down for 5 min{Colors.ENDC}")
             print(f"{Colors.FAIL}{t('line_alert_failed', lang=lang, error=exc, status='')}{Colors.ENDC}")
             return {"channel": "line", "status": "failed", "target": target_id, "error": str(exc)}
 

@@ -52,4 +52,10 @@ class SplunkHECTransport(Transport):
         resp.raise_for_status()
 
     def close(self) -> None:
-        self._session.close()
+        if getattr(self, "_session", None) is not None:
+            try:
+                self._session.close()
+            except Exception:
+                pass
+            finally:
+                self._session = None

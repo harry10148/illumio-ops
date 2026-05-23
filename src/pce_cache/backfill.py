@@ -134,7 +134,7 @@ def _backfill_flow_hash(flow: dict) -> str:
         str(svc.get("proto", "") or flow.get("protocol", "")),
         first_detected,
     ])
-    return hashlib.sha1(key.encode("utf-8")).hexdigest()
+    return hashlib.sha1(key.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 
 def _proto_to_str(proto) -> str:

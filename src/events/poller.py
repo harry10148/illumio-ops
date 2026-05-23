@@ -40,7 +40,7 @@ def event_identity(event: dict[str, Any]) -> str:
         "message": event.get("message"),
     }
     encoded = json.dumps(fingerprint, sort_keys=True, ensure_ascii=True, default=str)
-    return "sha1:" + hashlib.sha1(encoded.encode("utf-8")).hexdigest()
+    return "sha1:" + hashlib.sha1(encoded.encode("utf-8"), usedforsecurity=False).hexdigest()
 
 @dataclass
 class EventBatch:

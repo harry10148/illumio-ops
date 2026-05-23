@@ -268,6 +268,7 @@ def make_reports_blueprint(
             return _err_with_log("report_traffic_generate", e, lang=lang)
 
     @bp.route('/api/audit_report/generate', methods=['POST'])
+    @limiter.limit("10 per hour")
     def api_generate_audit_report():
         d = request.json or {}
         _arlog = None
@@ -322,6 +323,7 @@ def make_reports_blueprint(
 
     # ── API: VEN Status Report ────────────────────────────────────────────────
     @bp.route('/api/ven_status_report/generate', methods=['POST'])
+    @limiter.limit("10 per hour")
     def api_generate_ven_status_report():
         d = request.json or {}
         _vrlog = None
@@ -370,6 +372,7 @@ def make_reports_blueprint(
 
     # ── API: Policy Usage Report ──────────────────────────────────────────────
     @bp.route('/api/policy_usage_report/generate', methods=['POST'])
+    @limiter.limit("10 per hour")
     def api_generate_policy_usage_report():
         d = request.json or {}
         _pulog = None
@@ -513,6 +516,7 @@ def make_reports_blueprint(
             return _err_with_log("report_schedule_toggle", e, 400, lang=lang)
 
     @bp.route('/api/report-schedules/<int:schedule_id>/run', methods=['POST'])
+    @limiter.limit("20 per hour")
     def api_run_report_schedule(schedule_id):
         lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:

@@ -152,6 +152,27 @@ class ApiClient:
         self._traffic = TrafficQueryBuilder(self)
 
     # ═══════════════════════════════════════════════════════════════════════
+    # Resource lifecycle
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def close(self) -> None:
+        """Release the underlying requests.Session connection pool."""
+        if getattr(self, "_session", None) is not None:
+            try:
+                self._session.close()
+            except Exception as exc:
+                logger.warning("ApiClient.close() failed: {}", exc)
+            finally:
+                self._session = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False  # don't suppress exceptions
+
+    # ═══════════════════════════════════════════════════════════════════════
     # HTTP core (stays on facade — shared infrastructure)
     # ═══════════════════════════════════════════════════════════════════════
 
@@ -166,6 +187,8 @@ class ApiClient:
         Returns (status_code, response_body_bytes | response_object).
         For stream=True, returns (status_code, raw requests.Response).
         """
+        if self._session is None:
+            raise RuntimeError("ApiClient is closed; create a new instance")
         if rate_limit:
             from src.pce_cache.rate_limiter import get_rate_limiter
             rpm = 400

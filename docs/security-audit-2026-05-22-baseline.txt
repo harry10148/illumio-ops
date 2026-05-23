@@ -1,0 +1,18 @@
+=== systemd-analyze security ===
+✗ UMask=                                                      Files created by service are world-readable by default                       0.1
+
+→ Overall exposure level for illumio-ops.service: 9.6 UNSAFE :-{
+=== process baseline ===
+main_pid=1066355
+user=root
+fds: 19
+VmRSS:	  242220 kB
+Threads:	21
+=== listening ports ===
+LISTEN 0      5            0.0.0.0:5001       0.0.0.0:*    users:(("python",pid=1066355,fd=12))                    
+=== git HEAD ===
+db0f3ed09d0fbf3242e5b819f74bec7f798cd91d
+Sat May 16 10:56:28 2026 +0800 fix(cli): propagate --profile to gen.export() so NetworkInventory filename works
+=== file perms summary ===
+600 4
+644 21

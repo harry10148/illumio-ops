@@ -1,4 +1,4 @@
-import json, os, tempfile
+import json
 from unittest.mock import patch
 import pytest
 from src.config import ConfigManager
@@ -7,28 +7,25 @@ from src.siem.tester import TestResult
 
 @pytest.fixture
 def client(tmp_path):
-    fd, path = tempfile.mkstemp(suffix=".json"); os.close(fd)
-    try:
-        with open(path, "w") as f:
-            json.dump({"web_gui": {"username": "admin", "password": "pw",
-                                    "secret_key": "s",
-                                    "allowed_ips": ["127.0.0.1"]},
-                       "siem": {"enabled": False, "dispatch_tick_seconds": 5,
-                                "dlq_max_per_dest": 10000,
-                                "destinations": [{"name": "demo", "transport": "udp",
-                                                  "format": "cef",
-                                                  "endpoint": "127.0.0.1:514"}]}}, f)
-        cm = ConfigManager(config_file=path)
-        from src.gui import _create_app
-        app = _create_app(cm, persistent_mode=True)
-        app.config["TESTING"] = True
-        app.config["WTF_CSRF_ENABLED"] = False
-        with app.test_client() as c:
-            c.post("/api/login", json={"username": "admin", "password": "pw"},
-                   environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
-            yield c
-    finally:
-        os.unlink(path)
+    path = str(tmp_path / "config.json")
+    with open(path, "w") as f:
+        json.dump({"web_gui": {"username": "admin", "password": "pw",
+                                "secret_key": "x" * 64,
+                                "allowed_ips": ["127.0.0.1"]},
+                   "siem": {"enabled": False, "dispatch_tick_seconds": 5,
+                            "dlq_max_per_dest": 10000,
+                            "destinations": [{"name": "demo", "transport": "udp",
+                                              "format": "cef",
+                                              "endpoint": "127.0.0.1:514"}]}}, f)
+    cm = ConfigManager(config_file=path)
+    from src.gui import _create_app
+    app = _create_app(cm, persistent_mode=True)
+    app.config["TESTING"] = True
+    app.config["WTF_CSRF_ENABLED"] = False
+    with app.test_client() as c:
+        c.post("/api/login", json={"username": "admin", "password": "pw"},
+               environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+        yield c
 
 
 def test_test_endpoint_success(client):
