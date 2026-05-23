@@ -933,7 +933,7 @@ class Reporter:
         hard limit is 4096) with a translated footer announcing how many entries got
         truncated.
         """
-        def esc(value) -> str:
+        def esc(value: object) -> str:
             return html.escape(self._compact_text(value), quote=False)
 
         records: str = t("alert_field_records")

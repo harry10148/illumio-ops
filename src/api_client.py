@@ -165,12 +165,12 @@ class ApiClient:
             finally:
                 self._session = None
 
-    def __enter__(self):
+    def __enter__(self) -> "ApiClient":
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
+        # Returns None (≡ False) — does not suppress exceptions
         self.close()
-        return False  # don't suppress exceptions
 
     # ═══════════════════════════════════════════════════════════════════════
     # HTTP core (stays on facade — shared infrastructure)
