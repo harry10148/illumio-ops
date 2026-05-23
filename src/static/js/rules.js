@@ -64,9 +64,9 @@ async function loadRules() {
   rules.forEach(r => {
     const typ = r.type.charAt(0).toUpperCase() + r.type.slice(1);
     const unit = { volume: ' MB', bandwidth: ' Mbps', traffic: ' conns' }[r.type] || '';
-    const throttleLabel = r.throttle ? ' TH:' + r.throttle : '';
+    // R5 simplify: throttle deprecated in UI (cooldown covers per-rule rate cap)
     const cond = (r.threshold_count != null)
-      ? '> ' + r.threshold_count + unit + ' (Win:' + r.threshold_window + 'm CD:' + (r.cooldown_minutes || r.threshold_window) + 'm' + throttleLabel + ')'
+      ? '> ' + r.threshold_count + unit + ' (Win:' + r.threshold_window + 'm CD:' + (r.cooldown_minutes || r.threshold_window) + 'm)'
       : '—';
     const suppressedCount = ((r.throttle_state && r.throttle_state.cooldown_suppressed) || 0) + ((r.throttle_state && r.throttle_state.throttle_suppressed) || 0);
     const nextAllowedAt = r.throttle_state && r.throttle_state.next_allowed_at ? formatDateZ(r.throttle_state.next_allowed_at) : '';
@@ -94,7 +94,7 @@ async function loadRules() {
     if (r.port) f.push('Port:' + r.port);
     if (r.src_label) f.push('Src:' + r.src_label); if (r.dst_label) f.push('Dst:' + r.dst_label);
     if (r.src_ip_in) f.push('SrcIP:' + r.src_ip_in); if (r.dst_ip_in) f.push('DstIP:' + r.dst_ip_in);
-    if (r.throttle) f.push('Throttle:' + r.throttle);
+    // R5: throttle removed from UI; existing rule data retained server-side.
     if (suppressedCount > 0) f.push('Suppressed:' + suppressedCount);
     if (r.match_fields && Object.keys(r.match_fields).length) f.push('Match:' + Object.keys(r.match_fields).join(', '));
     const editBtn = `<button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="Edit Rule" title="Edit Rule">✏️</button>`;
@@ -133,14 +133,12 @@ function openModal(id, isEdit) {
     $('ev-status').value = 'all';
     $('ev-severity').value = 'all';
     $('ev-match-fields').value = '';
-    $('ev-throttle').value = '';
     $('ev-advanced').open = false;
     onEvTtChange();
   }
   if (id === 'm-event' && _editIdx !== null) { onEvTtChange(); }
-  if (id === 'm-traffic' && _editIdx === null) $('tr-throttle').value = '';
+  // R5 simplify: throttle reset lines removed — field deprecated in UI
   if (id === 'm-bw' && _editIdx === null) {
-    $('bw-throttle').value = '';
     setRv('bw-mt', 'bandwidth');
     onBwMetricTypeChange();
   }
@@ -148,7 +146,6 @@ function openModal(id, isEdit) {
     $('sys-name').value = _t('rule_pce_health');
     $('sys-type').value = 'pce_health';
     $('sys-cd').value = 30;
-    $('sys-throttle').value = '';
   }
   // Update modal title
   let target;
@@ -439,14 +436,12 @@ async function editRule(idx, type) {
       $('ev-cnt').value = r.threshold_count || 5;
       $('ev-win').value = r.threshold_window || 10;
       $('ev-cd').value = r.cooldown_minutes || 10;
-      $('ev-throttle').value = r.throttle || '';
       $('ev-advanced').open = !!(r.match_fields && Object.keys(r.match_fields).length);
       openModal('m-event', idx);
     } else if (type === 'system') {
       $('sys-name').value = r.name || (_t('rule_pce_health'));
       $('sys-type').value = r.filter_value || 'pce_health';
       $('sys-cd').value = r.cooldown_minutes || 30;
-      $('sys-throttle').value = r.throttle || '';
       openModal('m-system', idx);
     } else if (type === 'traffic') {
       $('tr-name').value = r.name || '';
@@ -461,7 +456,6 @@ async function editRule(idx, type) {
       $('tr-cnt').value = r.threshold_count || 10;
       $('tr-win').value = r.threshold_window || 10;
       $('tr-cd').value = r.cooldown_minutes || 10;
-      $('tr-throttle').value = r.throttle || '';
       openModal('m-traffic', idx);
     } else {
       $('bw-name').value = r.name || '';
@@ -477,7 +471,6 @@ async function editRule(idx, type) {
       $('bw-val').value = r.threshold_count || 100;
       $('bw-win').value = r.threshold_window || 10;
       $('bw-cd').value = r.cooldown_minutes || 30;
-      $('bw-throttle').value = r.throttle || '';
       openModal('m-bw', idx);
     }
   } catch (e) {
@@ -507,8 +500,7 @@ async function saveEvent() {
     threshold_type: rv('ev-tt'),
     threshold_count: $('ev-cnt').value,
     threshold_window: $('ev-win').value,
-    cooldown_minutes: $('ev-cd').value,
-    throttle: $('ev-throttle').value.trim()
+    cooldown_minutes: $('ev-cd').value
   };
   if (_editIdx !== null) await put('/api/rules/' + _editIdx, data); else await post('/api/rules/event', data);
   closeModal('m-event'); toast(_t('gui_msg_event_rule_saved')); loadRules(); loadDashboard();
@@ -518,8 +510,7 @@ async function saveSystemRule() {
   const data = {
     name,
     filter_value: $('sys-type').value || 'pce_health',
-    cooldown_minutes: $('sys-cd').value || 30,
-    throttle: $('sys-throttle').value.trim()
+    cooldown_minutes: $('sys-cd').value || 30
   };
   if (_editIdx !== null) {
     await put('/api/rules/' + _editIdx, data);
@@ -530,7 +521,7 @@ async function saveSystemRule() {
 }
 async function saveTraffic() {
   const name = $('tr-name').value.trim(); if (!name) { toast(_t('gui_msg_name_required'), 'err'); return }
-  const data = { name, pd: rv('tr-pd'), port: $('tr-port').value, proto: $('tr-proto').value, src: $('tr-src').value, dst: $('tr-dst').value, ex_port: $('tr-expt').value, ex_src: $('tr-exsrc').value, ex_dst: $('tr-exdst').value, threshold_count: $('tr-cnt').value, threshold_window: $('tr-win').value, cooldown_minutes: $('tr-cd').value, throttle: $('tr-throttle').value.trim() };
+  const data = { name, pd: rv('tr-pd'), port: $('tr-port').value, proto: $('tr-proto').value, src: $('tr-src').value, dst: $('tr-dst').value, ex_port: $('tr-expt').value, ex_src: $('tr-exsrc').value, ex_dst: $('tr-exdst').value, threshold_count: $('tr-cnt').value, threshold_window: $('tr-win').value, cooldown_minutes: $('tr-cd').value };
   if (_editIdx !== null) await put('/api/rules/' + _editIdx, data); else await post('/api/rules/traffic', data);
   closeModal('m-traffic'); toast(_t('gui_msg_traffic_rule_saved')); loadRules(); loadDashboard();
 }
@@ -540,7 +531,7 @@ async function saveBW() {
     name, rule_type: rv('bw-mt'), pd: rv('bw-pd'),
     port: $('bw-port').value, src: $('bw-src').value, dst: $('bw-dst').value,
     ex_port: $('bw-expt').value, ex_src: $('bw-exsrc').value, ex_dst: $('bw-exdst').value,
-    threshold_count: $('bw-val').value, threshold_window: $('bw-win').value, cooldown_minutes: $('bw-cd').value, throttle: $('bw-throttle').value.trim()
+    threshold_count: $('bw-val').value, threshold_window: $('bw-win').value, cooldown_minutes: $('bw-cd').value
   };
   if (_editIdx !== null) await put('/api/rules/' + _editIdx, { ...data, type: data.rule_type }); else await post('/api/rules/bandwidth', data);
   closeModal('m-bw'); toast(_t('gui_msg_rule_saved')); loadRules(); loadDashboard();

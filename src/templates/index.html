@@ -2509,9 +2509,9 @@
           <div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="ev-cd" type="number"
               value="10"></div>
         </div>
-        <div class="form-group"><label data-i18n="gui_ev_throttle">Throttle</label><input id="ev-throttle" data-i18n-placeholder="gui_ev_throttle_placeholder" placeholder="e.g. 2/10m or 5/1h"></div>
+<!-- R5 simplify: throttle removed; cooldown covers the per-rule rate cap. -->
         <details style="margin-top:6px;">
-          <summary style="cursor:pointer;color:var(--dim);font-size:.85rem;" data-i18n="gui_ev_threshold_help_title">How threshold and throttle work</summary>
+          <summary style="cursor:pointer;color:var(--dim);font-size:.85rem;" data-i18n="gui_ev_threshold_help_title">How threshold and cooldown work</summary>
           <div style="margin-top:8px;color:var(--dim);font-size:.85rem;line-height:1.65;" data-i18n="gui_ev_threshold_help_body">Immediate means every matching event is eligible to alert. Cumulative means the event must occur N times within the window first. Cooldown pauses repeats after an alert is sent. Throttle adds an extra cap such as 2 alerts per 10 minutes and is usually only needed for noisy rules.</div>
         </details>
       </fieldset>
@@ -2543,10 +2543,10 @@
       </div>
       <fieldset>
         <legend data-i18n="gui_threshold">Threshold</legend>
-        <div style="color:var(--dim);font-size:.9rem;line-height:1.6;margin-bottom:12px;" data-i18n="gui_system_health_threshold_hint">This rule triggers immediately when the health check fails. Only cooldown and throttle are configurable.</div>
+        <div style="color:var(--dim);font-size:.9rem;line-height:1.6;margin-bottom:12px;" data-i18n="gui_system_health_threshold_hint">This rule triggers immediately when the health check fails. Only cooldown is configurable.</div>
         <div class="form-row-2">
           <div class="form-group"><label data-i18n="gui_cooldown">Cooldown (mins)</label><input id="sys-cd" type="number" value="30"></div>
-          <div class="form-group"><label data-i18n="gui_ev_throttle">Throttle</label><input id="sys-throttle" data-i18n-placeholder="gui_ev_throttle_placeholder" placeholder="e.g. 2/10m or 5/1h"></div>
+<!-- R5 simplify: throttle removed; cooldown covers the per-rule rate cap. -->
         </div>
       </fieldset>
       <div class="modal-actions"><button class="btn btn-secondary" data-action="closeModal" data-args='["m-system"]' data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" data-action="saveSystemRule" data-i18n="gui_save"><svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg> Save</button></div>
@@ -2608,7 +2608,7 @@
           <div class="form-group"><label data-i18n="gui_cooldown">Cooldown (min)</label><input id="tr-cd" type="number"
               value="10"></div>
         </div>
-        <div class="form-group"><label data-i18n="gui_ev_throttle">Throttle</label><input id="tr-throttle" data-i18n-placeholder="gui_ev_throttle_placeholder" placeholder="e.g. 2/10m or 5/1h"></div>
+<!-- R5 simplify: throttle removed; cooldown covers the per-rule rate cap. -->
       </fieldset>
       <div class="modal-actions"><button class="btn btn-secondary" data-action="closeModal" data-args='["m-traffic"]'
           data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" data-action="saveTraffic"
@@ -2674,7 +2674,7 @@
               value="30"></div>
         </div>
         <div id="bw-val-help" style="color:var(--dim);font-size:.82rem;margin-top:4px;" data-i18n="gui_bw_help_bandwidth">Use Mbps for peak bandwidth threshold.</div>
-        <div class="form-group"><label data-i18n="gui_ev_throttle">Throttle</label><input id="bw-throttle" data-i18n-placeholder="gui_ev_throttle_placeholder" placeholder="e.g. 2/10m or 5/1h"></div>
+<!-- R5 simplify: throttle removed; cooldown covers the per-rule rate cap. -->
       </fieldset>
       <div class="modal-actions"><button class="btn btn-secondary" data-action="closeModal" data-args='["m-bw"]'
           data-i18n="gui_cancel">Cancel</button><button class="btn btn-success" data-action="saveBW"
