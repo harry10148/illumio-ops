@@ -524,7 +524,33 @@ window._integrations.setRender('siem', async function renderSiem() {
   }
   var dests = destsBody.destinations || destsBody || [];
 
-  el.innerHTML = buildSiemForwarderForm(fw) + buildSiemDestinationsSection();
+  // ── KPI strip ────────────────────────────────────────────────────────────────
+  var siemRows = (status && status.status) || [];
+  var kpiSent = 0, kpiFailed = 0, kpiDlq = 0;
+  siemRows.forEach(function(d) {
+    kpiSent   += Number(d.sent    || 0);
+    kpiFailed += Number(d.failed  || 0);
+    kpiDlq    += Number(d.dlq     || 0);
+  });
+  var kpiAttempts = kpiSent + kpiFailed;
+  var kpiRate = kpiAttempts > 0
+    ? (kpiSent / kpiAttempts * 100).toFixed(2) + '%'
+    : '\u2014';
+  var kpiRateColor = kpiFailed > 0 ? 'var(--color-danger,#f43f5e)' : 'var(--color-success,#22c55e)';
+  var kpiDlqColor  = kpiDlq   > 0 ? 'var(--warn,#f59e0b)' : 'inherit';
+
+  var kpiHtml = '<div class="it-kpi-strip">'
+    + '<div class="it-kpi-cell"><div class="it-kpi-label">\u7e3d\u9001\u51fa</div>'
+    + '<div class="it-kpi-value">' + kpiSent.toLocaleString() + '</div></div>'
+    + '<div class="it-kpi-cell"><div class="it-kpi-label">\u6210\u529f\u7387</div>'
+    + '<div class="it-kpi-value" style="color:' + kpiRateColor + ';">' + kpiRate + '</div></div>'
+    + '<div class="it-kpi-cell"><div class="it-kpi-label">DLQ \u7d2f\u7a4d</div>'
+    + '<div class="it-kpi-value" style="color:' + kpiDlqColor + ';">' + kpiDlq + '</div></div>'
+    + '<div class="it-kpi-cell"><div class="it-kpi-label">\u5e73\u5747\u5ef6\u9072</div>'
+    + '<div class="it-kpi-value it-kpi-muted">\u2014</div></div>'
+    + '</div>';
+
+  el.innerHTML = kpiHtml + buildSiemForwarderForm(fw) + buildSiemDestinationsSection();
 
   var tbody = document.getElementById('siem-dest-tbody');
   var perDest = (status && status.per_destination) || {};
@@ -604,7 +630,9 @@ function buildSiemRow(d, st) {
   var dim = d.enabled ? '' : ' <span style="color:var(--dim);font-size:.8rem;">(disabled)</span>';
   return '<tr>'
     + '<td><b>' + escapeAttr(d.name) + '</b>' + dim + '</td>'
-    + '<td><code>' + escapeAttr(d.transport) + '</code></td>'
+    + '<td><code>' + escapeAttr(d.transport) + '</code>'
+    + ((/udp/i.test(d.transport)) ? ' <span class="it-chip-noack" title="UDP 無 ACK，不支援 DLQ 確認">無 ACK · 監測</span>' : '')
+    + '</td>'
     + '<td><code>' + escapeAttr(d.format) + '</code></td>'
     + '<td>' + escapeAttr(d.host || '') + '</td>'
     + '<td>' + Number(d.port || 514) + '</td>'
@@ -944,6 +972,11 @@ function buildDlqSkeleton() {
     + '<tbody id="dlq-tbody"></tbody>'
     + '</table>'
     + '</div>'
+    + '<div id="dlq-empty-state" class="it-dlq-empty" style="display:none;">'
+    + '<div class="it-dlq-empty-icon">∅</div>'
+    + '<h3>DLQ 是空的</h3>'
+    + '<p>所有 destination 目前正常推送。如需測試回填，可晩時將 host 改為黑洞 IP（如 192.0.2.1）再送事件。</p>'
+    + '</div>'
     + '<div id="dlq-pager" style="margin-top:8px;"></div>'
     + '<div id="dlq-modal-host"></div>';
 }
@@ -1006,8 +1039,14 @@ async function _dlqLoadPage() {
   window._dlqCurrentEntries = pageEntries;
   var tbody = document.getElementById('dlq-tbody');
   if (!tbody) return;
-  tbody.innerHTML = pageEntries.map(buildDlqRow).join('')
-    || '<tr><td colspan="7" style="color:var(--dim);" data-i18n="gui_dlq_empty">(no DLQ entries)</td></tr>';
+  var dlqEmptyEl = document.getElementById('dlq-empty-state');
+  if (pageEntries.length === 0) {
+    tbody.innerHTML = '';
+    if (dlqEmptyEl) dlqEmptyEl.style.display = '';
+  } else {
+    if (dlqEmptyEl) dlqEmptyEl.style.display = 'none';
+    tbody.innerHTML = pageEntries.map(buildDlqRow).join('');
+  }
 
   var pager = document.getElementById('dlq-pager');
   if (pager) {
@@ -1271,14 +1310,16 @@ window._integrations.setRender('overview', async function renderOverview() {
   if (!el) return;
   el.innerHTML = '<p class="subtitle" data-i18n="gui_it_loading">Loading...</p>';
 
-  var cache, siem;
+  var cache, siem, settings;
   try {
     var results = await Promise.all([
       fetch('/api/cache/status').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
       fetch('/api/siem/status').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
+      fetch('/api/settings').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
     ]);
     cache = results[0] || {};
     siem  = results[1] || {status: []};
+    settings = results[2] || {};
   } catch (err) {
     el.textContent = '';
     var p = document.createElement('p');
@@ -1298,6 +1339,111 @@ window._integrations.setRender('overview', async function renderOverview() {
   });
 
   el.innerHTML = _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq)
-               + _buildOvRecentTable(siemStatus);
+               + _buildOvRecentTable(siemStatus)
+               + _buildAlertChannelCards(settings);
   if (typeof window.i18nApply === 'function') window.i18nApply();
 });
+
+function _buildAlertChannelCards(settings) {
+  var alerts = settings.alerts || {};
+  var smtp   = settings.smtp   || {};
+  var email  = settings.email  || {};
+
+  // Mail card
+  var mailConfigured = !!(smtp.host || email.smtp_host);
+  var mailHost = smtp.host || email.smtp_host || '';
+  var mailPort = smtp.port || email.smtp_port || '';
+  var mailSender = (alerts.mail && alerts.mail.sender) || email.sender || '';
+  var mailStatus = mailConfigured ? 'ok' : 'muted';
+  var mailStatusLabel = mailConfigured ? '已驗證' : '未設定';
+  var mailSub = mailHost ? (mailHost + (mailPort ? ':' + mailPort : '')) : 'SMTP 未設定';
+
+  // LINE card
+  var lineToken = (alerts.line && alerts.line.channel_access_token) || '';
+  var lineConfigured = !!(lineToken && lineToken.indexOf('*') < 0 && lineToken.length > 4);
+  var lineStatus = lineConfigured ? 'ok' : 'muted';
+  var lineStatusLabel = lineConfigured ? '已驗證' : '未設定';
+  var lineTarget = (alerts.line && alerts.line.user_id) || '';
+
+  // Telegram card
+  var tgToken = (alerts.telegram && alerts.telegram.bot_token) || '';
+  var tgConfigured = !!(tgToken && tgToken.indexOf('*') < 0 && tgToken.length > 4);
+  var tgChatId = (alerts.telegram && alerts.telegram.chat_id) || '';
+  var tgStatus = tgConfigured ? 'ok' : 'muted';
+  var tgStatusLabel = tgConfigured ? '已設定' : '未設定';
+
+  // Webhook card
+  var whUrl = (alerts.webhook && alerts.webhook.url) || '';
+  var whConfigured = !!(whUrl && whUrl.length > 5);
+  var whStatus = whConfigured ? 'ok' : 'muted';
+  var whStatusLabel = whConfigured ? '已驗證' : '未設定';
+  var whDisplay = whUrl.length > 40 ? whUrl.slice(0, 37) + '...' : whUrl;
+
+  function chip(cls, label) {
+    return '<span class="it-status-chip it-status-' + cls + '">' + label + '</span>';
+  }
+
+  var cards = '<div class="it-channel-section">'
+    + '<div class="it-channel-header">'
+    + '<div><strong>告警通道</strong><span class="it-channel-sub">Mail · LINE · Telegram · Webhook</span></div>'
+    + '</div>'
+    + '<div class="integ-grid">';
+
+  // Mail
+  cards += '<div class="integ-card">'
+    + '<div class="integ-card-h">'
+    + '<div class="integ-card-logo">@</div>'
+    + '<div><div class="integ-card-name">Mail (SMTP)</div>'
+    + '<div class="integ-card-sub">' + escapeAttr(mailSub) + '</div></div>'
+    + chip(mailStatus, mailStatusLabel)
+    + '</div>';
+  if (mailConfigured) {
+    cards += '<div class="integ-card-meta">'
+      + (mailSender ? '<span>寄件者 <strong>' + escapeAttr(mailSender) + '</strong></span>' : '')
+      + '</div>';
+  }
+  cards += '</div>';
+
+  // LINE
+  cards += '<div class="integ-card">'
+    + '<div class="integ-card-h">'
+    + '<div class="integ-card-logo">L</div>'
+    + '<div><div class="integ-card-name">LINE Push</div>'
+    + '<div class="integ-card-sub">Channel access token</div></div>'
+    + chip(lineStatus, lineStatusLabel)
+    + '</div>';
+  if (lineConfigured && lineTarget) {
+    var lineShort = lineTarget.length > 14 ? lineTarget.slice(0, 7) + '…' + lineTarget.slice(-6) : lineTarget;
+    cards += '<div class="integ-card-meta"><span>Target ID <strong>' + escapeAttr(lineShort) + '</strong></span></div>';
+  }
+  cards += '</div>';
+
+  // Telegram
+  cards += '<div class="integ-card">'
+    + '<div class="integ-card-h">'
+    + '<div class="integ-card-logo">T</div>'
+    + '<div><div class="integ-card-name">Telegram</div>'
+    + '<div class="integ-card-sub">Bot token · HTML parse_mode</div></div>'
+    + chip(tgStatus, tgStatusLabel)
+    + '</div>';
+  if (tgChatId) {
+    cards += '<div class="integ-card-meta"><span>Chat ID <strong>' + escapeAttr(String(tgChatId)) + '</strong></span></div>';
+  }
+  cards += '</div>';
+
+  // Webhook
+  cards += '<div class="integ-card">'
+    + '<div class="integ-card-h">'
+    + '<div class="integ-card-logo">W</div>'
+    + '<div><div class="integ-card-name">Webhook</div>'
+    + '<div class="integ-card-sub">POST JSON · https only</div></div>'
+    + chip(whStatus, whStatusLabel)
+    + '</div>';
+  if (whConfigured) {
+    cards += '<div class="integ-card-meta integ-card-mono"><span>' + escapeAttr(whDisplay) + '</span></div>';
+  }
+  cards += '</div>';
+
+  cards += '</div></div>'; // close integ-grid + it-channel-section
+  return cards;
+}
