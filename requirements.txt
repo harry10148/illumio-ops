@@ -14,7 +14,7 @@
 
 # ── Existing core (Web GUI + reports) ────────────────────────────────────────
 flask>=3.0,<4.0
-pandas>=2.0,<4.0
+pandas>=2.0,<3.0        # 3.0+ requires py3.11; pin until we drop py3.10 from CI matrix
 numpy>=1.26,<2.3        # 2.3+ drops py3.10 support; pin until we drop py3.10 from CI matrix
 pyyaml>=6.0,<7.0
 cheroot>=10.0,<12.0
