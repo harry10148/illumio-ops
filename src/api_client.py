@@ -23,7 +23,7 @@ import re
 import threading
 import time
 import urllib.parse
-from typing import Any, Iterator
+from typing import Any, Iterator, Literal
 
 import orjson
 import requests
@@ -168,7 +168,7 @@ class ApiClient:
     def __enter__(self) -> "ApiClient":
         return self
 
-    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> bool:
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> Literal[False]:
         # Returns False — does not suppress exceptions; explicit per H-2 contract test
         self.close()
         return False
