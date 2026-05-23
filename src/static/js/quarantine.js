@@ -709,7 +709,7 @@ async function loadTrafficTrend() {
   if (_trendFetching) return;
   _trendFetching = true;
   const meta = document.getElementById('tw-trend-meta');
-  if (meta) meta.textContent = '— 載入中';
+  if (meta) meta.textContent = '— loading';
   try {
     const r = await get('/api/traffic/trend');
     renderTrafficTrend((r && r.buckets) ? r.buckets : []);
@@ -737,7 +737,7 @@ function renderTrafficTrend(buckets) {
   svg.replaceChildren(); // clear previous render — no innerHTML
 
   if (!buckets || !buckets.length) {
-    if (meta) meta.textContent = '無歷史資料';
+    if (meta) meta.textContent = 'No history data';
     if (x0El) x0El.textContent = '—';
     if (x1El) x1El.textContent = '—';
     return;

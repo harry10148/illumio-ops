@@ -724,8 +724,8 @@ async function rsRenderTimeline() {
     }
     const label = String(h).padStart(2, '0') + ':00';
     const tip = dataAvailable
-      ? (c > 0 ? `${label}　${c} 次觸發${hasErr ? '（含錯誤）' : ''}` : `${label}　無觸發`)
-      : `${label}　資料準備中`;
+      ? (c > 0 ? `${label}  ${c} trigger${c !== 1 ? 's' : ''}${hasErr ? ' (with errors)' : ''}` : `${label}  no triggers`)
+      : `${label}  loading`;
     const div = document.createElement('div');
     div.className = 'rs-tl-bucket' + (cls ? ' ' + cls : '');
     div.setAttribute('data-tip', tip);
@@ -734,7 +734,7 @@ async function rsRenderTimeline() {
 
   if (meta) {
     meta.textContent = dataAvailable
-      ? `共 ${total} 次觸發`
-      : '資料準備中';
+      ? `${total} trigger${total !== 1 ? 's' : ''} total`
+      : 'Loading...';
   }
 }

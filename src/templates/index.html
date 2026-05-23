@@ -663,7 +663,7 @@
     </div>
 
     <details class="db-legacy-section" open>
-      <summary data-i18n="gui_db_detail_metrics">詳細指標與表格</summary>
+      <summary data-i18n="gui_db_detail_metrics"></summary>
 
     <!-- Traffic Analyzer Panel -->
     <div id="q-panel-traffic" class="q-panel active">
@@ -671,22 +671,22 @@
       <!-- R4i: KPI strip — additive, above query panel -->
       <div class="tw-kpi-strip">
         <div class="tw-kpi-cell">
-          <div class="tw-kpi-label" data-i18n="gui_tw_kpi_flows">總流量</div>
+          <div class="tw-kpi-label" data-i18n="gui_tw_kpi_flows"></div>
           <div class="tw-kpi-value" id="tw-kpi-flows">—<span>flows</span></div>
           <div class="tw-kpi-delta flat" id="tw-kpi-flows-delta">—</div>
         </div>
         <div class="tw-kpi-cell">
-          <div class="tw-kpi-label" data-i18n="gui_tw_kpi_conns">總連線</div>
+          <div class="tw-kpi-label" data-i18n="gui_tw_kpi_conns"></div>
           <div class="tw-kpi-value" id="tw-kpi-conns">—<span>M</span></div>
           <div class="tw-kpi-delta flat" id="tw-kpi-conns-delta">—</div>
         </div>
         <div class="tw-kpi-cell">
-          <div class="tw-kpi-label" data-i18n="gui_tw_kpi_dst_ips">唯一目的 IP</div>
+          <div class="tw-kpi-label" data-i18n="gui_tw_kpi_dst_ips"></div>
           <div class="tw-kpi-value" id="tw-kpi-dst-ips">—</div>
           <div class="tw-kpi-delta flat" id="tw-kpi-dst-delta">—</div>
         </div>
         <div class="tw-kpi-cell">
-          <div class="tw-kpi-label" data-i18n="gui_tw_kpi_peak_bw">尖峰頻寬</div>
+          <div class="tw-kpi-label" data-i18n="gui_tw_kpi_peak_bw"></div>
           <div class="tw-kpi-value" id="tw-kpi-peak-bw">—<span>Gbps</span></div>
           <div class="tw-kpi-delta flat" id="tw-kpi-peak-delta">—</div>
         </div>
@@ -695,11 +695,11 @@
       <!-- R4k: 7-day traffic trend SVG chart — additive, below KPI strip -->
       <div class="tw-trend-panel">
         <div class="tw-trend-head">
-          <h3 data-i18n="gui_tw_trend_title">過去 7 天流量趨勢</h3>
-          <span class="tw-trend-meta" id="tw-trend-meta">— 載入中</span>
+          <h3 data-i18n="gui_tw_trend_title"></h3>
+          <span class="tw-trend-meta" id="tw-trend-meta" data-i18n="gui_loading_ph"></span>
         </div>
         <svg id="tw-trend-svg" viewBox="0 0 800 200" preserveAspectRatio="none"
-             xmlns="http://www.w3.org/2000/svg" aria-label="流量趨勢圖"></svg>
+             xmlns="http://www.w3.org/2000/svg" aria-label="Traffic trend chart"></svg>
         <div class="tw-trend-axis">
           <span id="tw-trend-x0">—</span>
           <span id="tw-trend-x1">—</span>
@@ -1087,18 +1087,18 @@
         <!-- B2: event detail card -->
         <div class="event-detail-card">
           <div class="event-detail-h">
-            <div class="event-detail-title">事件詳情</div>
+            <div class="event-detail-title" data-i18n="gui_ev_detail_title"></div>
             <span class="event-detail-rule" id="ev-detail-rule">—</span>
           </div>
           <dl class="event-detail-meta">
             <dt>event_id</dt><dd id="ev-detail-id">—</dd>
-            <dt>時間</dt><dd id="ev-detail-time">—</dd>
-            <dt>嚴重度</dt><dd id="ev-detail-sev">—</dd>
-            <dt>使用者 / IP</dt><dd id="ev-detail-user">—</dd>
+            <dt data-i18n="gui_ev_detail_time"></dt><dd id="ev-detail-time">—</dd>
+            <dt data-i18n="gui_ev_detail_sev"></dt><dd id="ev-detail-sev">—</dd>
+            <dt data-i18n="gui_ev_detail_user_ip"></dt><dd id="ev-detail-user">—</dd>
           </dl>
           <pre id="ev-detail-json">—</pre>
           <div class="event-detail-actions">
-            <button class="btn sm" id="ev-detail-copy" data-i18n="gui_ev_copy_json">複製 JSON</button>
+            <button class="btn sm" id="ev-detail-copy" data-i18n="gui_ev_copy_json"></button>
           </div>
         </div>
         <div class="code-panel" style="border-top:1px solid var(--border);">
@@ -1123,10 +1123,10 @@
     <div id="rules-sv-rules" class="rules-subview">
       <!-- R4h: Classification chip filter bar (additive) -->
       <div class="rules-filterbar" id="rules-filterbar">
-        <span class="sectiontag active" data-ruletype="event" data-action="filterRuleType" data-args='["event"]' data-i18n="gui_ruletype_event">事件</span>
-        <span class="sectiontag" data-ruletype="traffic" data-action="filterRuleType" data-args='["traffic"]' data-i18n="gui_ruletype_traffic">流量</span>
-        <span class="sectiontag" data-ruletype="system" data-action="filterRuleType" data-args='["system"]' data-i18n="gui_ruletype_system">系統健康</span>
-        <span class="sectiontag" data-ruletype="bandwidth" data-action="filterRuleType" data-args='["bandwidth"]' data-i18n="gui_ruletype_bandwidth">頻寬</span>
+        <span class="sectiontag active" data-ruletype="event" data-action="filterRuleType" data-args='["event"]' data-i18n="gui_ruletype_event"></span>
+        <span class="sectiontag" data-ruletype="traffic" data-action="filterRuleType" data-args='["traffic"]' data-i18n="gui_ruletype_traffic"></span>
+        <span class="sectiontag" data-ruletype="system" data-action="filterRuleType" data-args='["system"]' data-i18n="gui_ruletype_system"></span>
+        <span class="sectiontag" data-ruletype="bandwidth" data-action="filterRuleType" data-args='["bandwidth"]' data-i18n="gui_ruletype_bandwidth"></span>
       </div>
       <div class="toolbar">
         <span class="badge" id="r-badge">0</span>
@@ -1774,19 +1774,19 @@
     <div class="sub-nav" role="tablist" aria-label="Settings sections">
       <button class="sub-nav-btn active" data-action="switchSettingsTab" data-args='["pce"]' id="sbtn-pce" role="tab" aria-selected="true" aria-controls="s-panel-pce">
         <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
-        <span data-i18n="gui_settings_tab_pce">PCE 連線</span>
+        <span data-i18n="gui_settings_tab_pce"></span>
       </button>
       <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["channels"]' id="sbtn-channels" role="tab" aria-selected="false" aria-controls="s-panel-channels">
         <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
-        <span data-i18n="gui_settings_tab_channels">通知通道</span>
+        <span data-i18n="gui_settings_tab_channels"></span>
       </button>
       <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["display"]' id="sbtn-display" role="tab" aria-selected="false" aria-controls="s-panel-display">
         <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
-        <span data-i18n="gui_settings_tab_display">介面 / 報表</span>
+        <span data-i18n="gui_settings_tab_display"></span>
       </button>
       <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["security"]' id="sbtn-security" role="tab" aria-selected="false" aria-controls="s-panel-security">
         <svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg>
-        <span data-i18n="gui_settings_tab_security">安全</span>
+        <span data-i18n="gui_settings_tab_security"></span>
       </button>
     </div>
 
@@ -1814,7 +1814,7 @@
       <div class="s-save-bar-right">
         <button class="btn btn-success" data-action="saveSettings">
           <svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg>
-          <span id="s-save-label" data-i18n="gui_save_all">儲存設定</span>
+          <span id="s-save-label" data-i18n="gui_save_all"></span>
         </button>
       </div>
     </div>
@@ -1911,7 +1911,7 @@
 
     <!-- B1: 24h trigger timeline panel -->
     <div class="rs-timeline-panel">
-      <div class="rs-tl-head"><h3>過去 24 小時觸發時間軸</h3><span class="rs-tl-meta" id="rs-tl-meta">— 載入中</span></div>
+      <div class="rs-tl-head"><h3 data-i18n="gui_rs_tl_title"></h3><span class="rs-tl-meta" id="rs-tl-meta" data-i18n="gui_loading_ph"></span></div>
       <div class="rs-tl-row" id="rs-tl-row">
         <!-- 24 bars rendered by JS -->
       </div>
@@ -1921,22 +1921,22 @@
     <!-- R4j: KPI strip — additive, above sub-tab bar -->
     <div class="rs-kpi-strip">
       <div class="rs-kpi-cell">
-        <div class="rs-kpi-label" data-i18n="gui_rs_kpi_total">總排程</div>
+        <div class="rs-kpi-label" data-i18n="gui_rs_kpi_total"></div>
         <div class="rs-kpi-value" id="rs-kpi-total">—</div>
         <div class="rs-kpi-sub ok" id="rs-kpi-total-sub">—</div>
       </div>
       <div class="rs-kpi-cell">
-        <div class="rs-kpi-label" data-i18n="gui_rs_kpi_next">下次觸發</div>
+        <div class="rs-kpi-label" data-i18n="gui_rs_kpi_next"></div>
         <div class="rs-kpi-value" id="rs-kpi-next">—</div>
         <div class="rs-kpi-sub" id="rs-kpi-next-sub">—</div>
       </div>
       <div class="rs-kpi-cell">
-        <div class="rs-kpi-label" data-i18n="gui_rs_kpi_today">今日已執行</div>
+        <div class="rs-kpi-label" data-i18n="gui_rs_kpi_today"></div>
         <div class="rs-kpi-value" id="rs-kpi-today">—</div>
         <div class="rs-kpi-sub ok" id="rs-kpi-today-sub">—</div>
       </div>
       <div class="rs-kpi-cell">
-        <div class="rs-kpi-label" data-i18n="gui_rs_kpi_hits">命中規則</div>
+        <div class="rs-kpi-label" data-i18n="gui_rs_kpi_hits"></div>
         <div class="rs-kpi-value" id="rs-kpi-hits">—</div>
         <div class="rs-kpi-sub" id="rs-kpi-hits-sub">—</div>
       </div>

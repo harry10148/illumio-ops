@@ -383,7 +383,7 @@ async function deleteReport(filename) {
   }
 }
 
-/* ─── A5: rcard meta (上次 / 排程) ──────────────────────────────────── */
+/* --- A5: rcard meta (last run / schedule) --- */
 async function loadRcardMeta() {
   // Fetch reports list and schedules in parallel; populate rcard-meta strips.
   // API: /api/reports → {reports:[{report_type, mtime, ...}]}
@@ -413,12 +413,12 @@ async function loadRcardMeta() {
 
   // Derive schedule chip label from interval / frequency field
   function schedChip(s) {
-    if (!s || !s.enabled) return '手動觸發';
+    if (!s || !s.enabled) return 'Manual';
     const iv = (s.interval || s.frequency || '').toLowerCase();
-    if (iv.includes('daily')  || iv === 'day')   return '每日自動';
-    if (iv.includes('weekly') || iv === 'week')  return '每週自動';
-    if (iv.includes('month'))                    return '每月自動';
-    return '已排程';
+    if (iv.includes('daily')  || iv === 'day')   return 'Daily';
+    if (iv.includes('weekly') || iv === 'week')  return 'Weekly';
+    if (iv.includes('month'))                    return 'Monthly';
+    return 'Scheduled';
   }
 
   document.querySelectorAll('.rcard[data-rtype]').forEach(card => {
@@ -430,9 +430,9 @@ async function loadRcardMeta() {
     const mtime = latestByType[rtype];
     if (mtime) {
       const d = new Date(mtime * 1000);
-      lastEl.textContent = '上次：' + d.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      lastEl.textContent = 'Last: ' + d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     } else {
-      lastEl.textContent = '上次：—';
+      lastEl.textContent = 'Last: —';
     }
 
     const sched = schedByType[rtype];

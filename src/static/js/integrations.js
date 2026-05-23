@@ -631,7 +631,7 @@ function buildSiemRow(d, st) {
   return '<tr>'
     + '<td><b>' + escapeAttr(d.name) + '</b>' + dim + '</td>'
     + '<td><code>' + escapeAttr(d.transport) + '</code>'
-    + ((/udp/i.test(d.transport)) ? ' <span class="it-chip-noack" title="UDP 無 ACK，不支援 DLQ 確認">無 ACK · 監測</span>' : '')
+    + ((/udp/i.test(d.transport)) ? ' <span class="it-chip-noack" title="UDP — no ACK, DLQ confirmation not supported">No ACK · Monitor</span>' : '')
     + '</td>'
     + '<td><code>' + escapeAttr(d.format) + '</code></td>'
     + '<td>' + escapeAttr(d.host || '') + '</td>'
@@ -974,8 +974,8 @@ function buildDlqSkeleton() {
     + '</div>'
     + '<div id="dlq-empty-state" class="it-dlq-empty" style="display:none;">'
     + '<div class="it-dlq-empty-icon">∅</div>'
-    + '<h3>DLQ 是空的</h3>'
-    + '<p>所有 destination 目前正常推送。如需測試回填，可晩時將 host 改為黑洞 IP（如 192.0.2.1）再送事件。</p>'
+    + '<h3>DLQ is empty</h3>'
+    + '<p>All destinations are currently delivering normally. To test backfill, temporarily point the host to a blackhole IP (e.g. 192.0.2.1) and send an event.</p>'
     + '</div>'
     + '<div id="dlq-pager" style="margin-top:8px;"></div>'
     + '<div id="dlq-modal-host"></div>';
@@ -1355,14 +1355,14 @@ function _buildAlertChannelCards(settings) {
   var mailPort = smtp.port || email.smtp_port || '';
   var mailSender = (alerts.mail && alerts.mail.sender) || email.sender || '';
   var mailStatus = mailConfigured ? 'ok' : 'muted';
-  var mailStatusLabel = mailConfigured ? '已驗證' : '未設定';
-  var mailSub = mailHost ? (mailHost + (mailPort ? ':' + mailPort : '')) : 'SMTP 未設定';
+  var mailStatusLabel = mailConfigured ? 'Verified' : 'Not configured';
+  var mailSub = mailHost ? (mailHost + (mailPort ? ':' + mailPort : '')) : 'SMTP not configured';
 
   // LINE card
   var lineToken = (alerts.line && alerts.line.channel_access_token) || '';
   var lineConfigured = !!(lineToken && lineToken.indexOf('*') < 0 && lineToken.length > 4);
   var lineStatus = lineConfigured ? 'ok' : 'muted';
-  var lineStatusLabel = lineConfigured ? '已驗證' : '未設定';
+  var lineStatusLabel = lineConfigured ? 'Verified' : 'Not configured';
   var lineTarget = (alerts.line && alerts.line.user_id) || '';
 
   // Telegram card
@@ -1370,13 +1370,13 @@ function _buildAlertChannelCards(settings) {
   var tgConfigured = !!(tgToken && tgToken.indexOf('*') < 0 && tgToken.length > 4);
   var tgChatId = (alerts.telegram && alerts.telegram.chat_id) || '';
   var tgStatus = tgConfigured ? 'ok' : 'muted';
-  var tgStatusLabel = tgConfigured ? '已設定' : '未設定';
+  var tgStatusLabel = tgConfigured ? 'Configured' : 'Not configured';
 
   // Webhook card
   var whUrl = (alerts.webhook && alerts.webhook.url) || '';
   var whConfigured = !!(whUrl && whUrl.length > 5);
   var whStatus = whConfigured ? 'ok' : 'muted';
-  var whStatusLabel = whConfigured ? '已驗證' : '未設定';
+  var whStatusLabel = whConfigured ? 'Verified' : 'Not configured';
   var whDisplay = whUrl.length > 40 ? whUrl.slice(0, 37) + '...' : whUrl;
 
   function chip(cls, label) {
@@ -1385,7 +1385,7 @@ function _buildAlertChannelCards(settings) {
 
   var cards = '<div class="it-channel-section">'
     + '<div class="it-channel-header">'
-    + '<div><strong>告警通道</strong><span class="it-channel-sub">Mail · LINE · Telegram · Webhook</span></div>'
+    + '<div><strong>Alert channels</strong><span class="it-channel-sub">Mail · LINE · Telegram · Webhook</span></div>'
     + '</div>'
     + '<div class="integ-grid">';
 
@@ -1399,7 +1399,7 @@ function _buildAlertChannelCards(settings) {
     + '</div>';
   if (mailConfigured) {
     cards += '<div class="integ-card-meta">'
-      + (mailSender ? '<span>寄件者 <strong>' + escapeAttr(mailSender) + '</strong></span>' : '')
+      + (mailSender ? '<span>Sender <strong>' + escapeAttr(mailSender) + '</strong></span>' : '')
       + '</div>';
   }
   cards += '</div>';

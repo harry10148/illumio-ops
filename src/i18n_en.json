@@ -3115,5 +3115,11 @@
   "gui_tw_kpi_dst_ips": "Unique destination IPs",
   "gui_tw_kpi_flows": "Total Flows",
   "gui_tw_kpi_peak_bw": "Peak bandwidth",
-  "gui_tw_trend_title": "Traffic trend — past 7 days"
+  "gui_tw_trend_title": "Traffic trend — past 7 days",
+  "gui_ev_detail_title": "Event details",
+  "gui_ev_detail_time": "Time",
+  "gui_ev_detail_sev": "Severity",
+  "gui_ev_detail_user_ip": "User / IP",
+  "gui_rs_tl_title": "Past 24h trigger timeline",
+  "gui_loading_ph": "— loading"
 }

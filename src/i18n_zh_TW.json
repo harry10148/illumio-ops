@@ -3115,5 +3115,11 @@
   "gui_tw_kpi_dst_ips": "唯一目的 IP",
   "gui_tw_kpi_flows": "總流量",
   "gui_tw_kpi_peak_bw": "尖峰頻寬",
-  "gui_tw_trend_title": "過去 7 天流量趨勢"
+  "gui_tw_trend_title": "過去 7 天流量趨勢",
+  "gui_ev_detail_title": "事件詳情",
+  "gui_ev_detail_time": "時間",
+  "gui_ev_detail_sev": "嚴重度",
+  "gui_ev_detail_user_ip": "使用者 / IP",
+  "gui_rs_tl_title": "過去 24 小時觸發時間軸",
+  "gui_loading_ph": "— 載入中"
 }
