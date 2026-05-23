@@ -12,46 +12,34 @@ DIST_DIR="$REPO_ROOT/dist"
 
 VERSION="${VERSION:-$(cd "$REPO_ROOT" && git describe --tags --always 2>/dev/null || echo "dev")}"
 
-# python-build-standalone release — update these two lines when upgrading Python
+# python-build-standalone release — update these lines when upgrading Python.
+# After bumping PBS_TAG / PBS_PYTHON, refresh the SHA256 pins below from a
+# GPG / Sigstore-verified source (NOT the same release origin) and commit
+# all four fields together in the same patch.
 PBS_TAG="20241016"
 PBS_PYTHON="3.12.7"
 
 PBS_LINUX_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/cpython-${PBS_PYTHON}+${PBS_TAG}-x86_64-unknown-linux-gnu-install_only.tar.gz"
 PBS_WIN_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/cpython-${PBS_PYTHON}+${PBS_TAG}-x86_64-pc-windows-msvc-install_only.tar.gz"
 
-# Verify a downloaded file against its PBS-published .sha256 sidecar.
-#
-# SECURITY NOTE — TOFU (trust-on-first-use) risk (L-10):
-#   The .sha256 sidecar is fetched from the SAME GitHub release origin as the
-#   tarball itself.  A compromised release or MITM that replaces both files
-#   simultaneously would pass this check undetected.
-#
-#   Stronger supply-chain protection options (not yet implemented):
-#     - GPG: python-build-standalone signs releases with a PGP key published
-#       at https://github.com/astral-sh/python-build-standalone — verify the
-#       .asc signature before trusting the hash.
-#     - Sigstore: astral-sh publishes cosign bundles for recent PBS releases;
-#       use `cosign verify-blob` for provenance attestation.
-#     - Pin the hash: hard-code PBS_SHA256_LINUX_X86_64 and
-#       PBS_SHA256_WIN_X86_64 in this script so the expected hash never comes
-#       from the same origin.  Update them from a GPG/Sigstore-verified source
-#       whenever upgrading PBS_TAG / PBS_PYTHON above.
-#
-#   Current behaviour (sidecar from same origin) catches network corruption
-#   and simple tampering but does NOT defend against a compromised upstream
-#   release.  Upgrade to GPG or Sigstore verification when supply-chain
-#   assurance is required.
+# L-10: hard-coded SHA256 pins — verified against the GitHub release sidecar
+# (https://github.com/astral-sh/python-build-standalone/releases/tag/20241016)
+# at commit time. Pinning the hash in-tree breaks the same-origin TOFU loop
+# from the original sidecar-on-download approach: a future MITM that swaps
+# both the tarball AND the published .sha256 will still mismatch this in-tree
+# pin. For higher-assurance environments, swap verify_sha256 for a GPG / cosign
+# bundle check (astral-sh publishes both).
+PBS_SHA256_LINUX_X86_64="43576f7db1033dd57b900307f09c2e86f371152ac8a2607133afa51cbfc36064"
+PBS_SHA256_WIN_X86_64="f05531bff16fa77b53be0776587b97b466070e768e6d5920894de988bdcd547a"
+
 verify_sha256() {
-    local file="$1" url="$2"
-    local sha_file="${file}.sha256"
+    local file="$1" expected="$2"
     echo "==> Verifying SHA256 for $(basename "$file")"
-    curl -fL "${url}.sha256" -o "$sha_file"
-    local expected actual
-    expected=$(awk '{print $1}' "$sha_file")
+    local actual
     actual=$(sha256sum "$file" | awk '{print $1}')
     if [[ "$expected" != "$actual" ]]; then
         echo "ERROR: SHA256 mismatch for $(basename "$file")" >&2
-        echo "  expected: $expected" >&2
+        echo "  expected: $expected (in-tree pin)" >&2
         echo "  actual:   $actual" >&2
         exit 1
     fi
@@ -91,9 +79,9 @@ build_linux() {
     echo "==> [Linux] Downloading PBS ${PBS_PYTHON}"
     local PBS_TAR="$BUILD/pbs-linux.tar.gz"
     curl -fL "$PBS_LINUX_URL" -o "$PBS_TAR"
-    verify_sha256 "$PBS_TAR" "$PBS_LINUX_URL"
+    verify_sha256 "$PBS_TAR" "$PBS_SHA256_LINUX_X86_64"
     tar xzf "$PBS_TAR" -C "$BUILD"
-    rm -f "$PBS_TAR" "${PBS_TAR}.sha256"
+    rm -f "$PBS_TAR"
 
     echo "==> [Linux] Downloading manylinux_2_17_x86_64 wheels"
     mkdir -p "$BUILD/wheels"
@@ -137,9 +125,9 @@ build_windows() {
     echo "==> [Windows] Downloading PBS ${PBS_PYTHON} for Windows"
     local PBS_TAR="$BUILD/pbs-win.tar.gz"
     curl -fL "$PBS_WIN_URL" -o "$PBS_TAR"
-    verify_sha256 "$PBS_TAR" "$PBS_WIN_URL"
+    verify_sha256 "$PBS_TAR" "$PBS_SHA256_WIN_X86_64"
     tar xzf "$PBS_TAR" -C "$BUILD"
-    rm -f "$PBS_TAR" "${PBS_TAR}.sha256"
+    rm -f "$PBS_TAR"
 
     echo "==> [Windows] Downloading win_amd64 wheels"
     mkdir -p "$BUILD/wheels"
