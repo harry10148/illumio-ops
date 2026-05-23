@@ -65,7 +65,9 @@ async function loadRules() {
     const typ = r.type.charAt(0).toUpperCase() + r.type.slice(1);
     const unit = { volume: ' MB', bandwidth: ' Mbps', traffic: ' conns' }[r.type] || '';
     const throttleLabel = r.throttle ? ' TH:' + r.throttle : '';
-    const cond = '> ' + r.threshold_count + unit + ' (Win:' + r.threshold_window + 'm CD:' + (r.cooldown_minutes || r.threshold_window) + 'm' + throttleLabel + ')';
+    const cond = (r.threshold_count != null)
+      ? '> ' + r.threshold_count + unit + ' (Win:' + r.threshold_window + 'm CD:' + (r.cooldown_minutes || r.threshold_window) + 'm' + throttleLabel + ')'
+      : '—';
     const suppressedCount = ((r.throttle_state && r.throttle_state.cooldown_suppressed) || 0) + ((r.throttle_state && r.throttle_state.throttle_suppressed) || 0);
     const nextAllowedAt = r.throttle_state && r.throttle_state.next_allowed_at ? formatDateZ(r.throttle_state.next_allowed_at) : '';
 

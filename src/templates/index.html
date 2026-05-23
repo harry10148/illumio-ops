@@ -394,6 +394,34 @@
         #p-dashboard details.db-kpi-details > summary::before { transition: none; }
       }
 
+      /* ── R4 polish: tame pre-R4c legacy KPI strip elements ── */
+      #p-dashboard .chip-kpi,
+      #p-dashboard [class*="kpi"]:not(.db-kpi-toggle):not(.db-kpi-details):not(.story-stat-value) {
+        font-size: 13px;
+        font-weight: 400;
+      }
+      #p-dashboard .kpi-label,
+      #p-dashboard [class*="kpi-label"] {
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--dim);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      #p-dashboard .kpi-value,
+      #p-dashboard [class*="kpi-value"] {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--fg);
+      }
+      /* Prevent bare .value elements outside story/status cards from going accent-orange */
+      #p-dashboard > div > .value:not(.story-stat-value),
+      #p-dashboard > section > .value:not(.story-stat-value) {
+        color: var(--fg) !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+      }
+
       /* ── R4g: Events master-detail layout ── */
       #p-events .event-viewer-layout {
         display: grid;
