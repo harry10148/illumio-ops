@@ -506,10 +506,33 @@
       }
 
       /* Severity stripe on first <td> of each event row */
-      #p-events #ev-body tr { position: relative; }
-      #p-events #ev-body td:first-child {
-        padding-left: 10px;
+      /* R5 Bug 3: position:relative on <tr> caused table layout drift where
+         tbody columns rendered offset by one column from thead. Removed. */
+      /* #p-events #ev-body tr { position: relative; } */
+      /* R5 Bug 3: events table column misalignment. Two compounding causes:
+         (1) rule-table default `td:first-child { text-align:center;
+             overflow:visible; padding:4px }` was authored for the checkbox
+             column used by other tables, not the time column here.
+         (2) `table-layout: fixed` + 3 explicit th widths + 3 auto th widths
+             let the browser distribute remaining width unevenly, so
+             tbody and thead resolved to different per-column widths,
+             which made data render one column to the right of headers.
+         Force this table to `table-layout: auto` and reset first-child. */
+      #p-events #ev-body td:first-child,
+      #p-events thead th:first-child {
+        text-align: left !important;
+        padding: var(--row-cell-y) var(--row-cell-x) !important;
         white-space: nowrap;
+        overflow: hidden !important;
+        text-overflow: clip !important;
+        vertical-align: top !important;
+      }
+      #p-events #ev-body td {
+        vertical-align: top;
+      }
+      #p-events .event-viewer-layout .table-container .rule-table {
+        table-layout: auto !important;
+        width: 100% !important;
       }
       #p-events #ev-body .ev-sev-bar {
         display: inline-block;
@@ -533,7 +556,7 @@
         font-variant-numeric: tabular-nums;
         font-size: 12px;
         color: var(--dim);
-        vertical-align: middle;
+        vertical-align: top;
       }
 
       /* Selected row highlight */
@@ -542,6 +565,20 @@
         outline: none;
       }
       #p-events #ev-body tr.is-selected td:first-child .ev-sev-bar { opacity: 1; }
+
+      /* R5 Bug 3: event-type cell two-line layout */
+      #p-events #ev-body .ev-evtype-name {
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--fg);
+        line-height: 1.4;
+      }
+      #p-events #ev-body .ev-evtype-meta {
+        font-size: 11px;
+        color: var(--dim);
+        line-height: 1.35;
+        margin-top: 2px;
+      }
 
       /* B2: event detail card */
       #p-events .event-detail-card { padding:16px 18px; }
@@ -1064,9 +1101,9 @@
           <table class="rule-table">
             <thead>
               <tr>
-                <th style="width:150px;" data-i18n="gui_time">Time</th>
-                <th style="width:220px;" data-i18n="gui_event">Event</th>
-                <th style="width:110px;" data-i18n="gui_col_status">Status</th>
+                <th data-i18n="gui_time">Time</th>
+                <th data-i18n="gui_event">Event</th>
+                <th data-i18n="gui_col_status">Status</th>
                 <th data-i18n="gui_actor">Actor</th>
                 <th data-i18n="gui_target">Target</th>
                 <th data-i18n="gui_action">Action</th>
@@ -1123,7 +1160,7 @@
     <div id="rules-sv-rules" class="rules-subview">
       <!-- R4h: Classification chip filter bar (additive) -->
       <div class="rules-filterbar" id="rules-filterbar">
-        <span class="sectiontag active" data-ruletype="event" data-action="filterRuleType" data-args='["event"]' data-i18n="gui_ruletype_event"></span>
+        <span class="sectiontag" data-ruletype="event" data-action="filterRuleType" data-args='["event"]' data-i18n="gui_ruletype_event"></span>
         <span class="sectiontag" data-ruletype="traffic" data-action="filterRuleType" data-args='["traffic"]' data-i18n="gui_ruletype_traffic"></span>
         <span class="sectiontag" data-ruletype="system" data-action="filterRuleType" data-args='["system"]' data-i18n="gui_ruletype_system"></span>
         <span class="sectiontag" data-ruletype="bandwidth" data-action="filterRuleType" data-args='["bandwidth"]' data-i18n="gui_ruletype_bandwidth"></span>

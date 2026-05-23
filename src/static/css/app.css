@@ -1927,6 +1927,75 @@
       margin-bottom: 14px;
     }
 
+    /* R5 Bug 5: normalize scattered font-size / color inline styles inside
+       rule-edit modals. Walk findings showed 5+ distinct font sizes
+       (15.2 / 14 / 13.76 / 13.6 / 13.3333 px) and 5 colours per modal —
+       collapse to 3 sizes + 2 colours via !important overrides of the
+       inline styles littered through the HTML.
+       Note: !important on bare * here intentionally overrides browser
+       inheritance of body 1.1em -> 15.2px we saw in walk findings. */
+    .modal--rules-edit,
+    .modal--rules-edit * {
+      font-size: 14px !important;
+    }
+    .modal--rules-edit { line-height: 1.55; color: var(--fg); }
+    .modal--rules-edit h2,
+    .modal--rules-edit h2 * { font-size: 18px !important; font-weight: 600; }
+    .modal--rules-edit small,
+    .modal--rules-edit small *,
+    .modal--rules-edit details summary,
+    .modal--rules-edit code,
+    .modal--rules-edit code * { font-size: 12px !important; }
+    .modal--rules-edit label,
+    .modal--rules-edit legend { font-size: 13px !important; }
+    .modal--rules-edit code,
+    .modal--rules-edit small,
+    .modal--rules-edit details summary,
+    .modal--rules-edit details > div,
+    .modal--rules-edit .form-group small,
+    .modal--rules-edit [style*="font-size:.78"],
+    .modal--rules-edit [style*="font-size: .78"],
+    .modal--rules-edit [style*="font-size:.8"],
+    .modal--rules-edit [style*="font-size: .8"],
+    .modal--rules-edit [style*="font-size:.82"],
+    .modal--rules-edit [style*="font-size: .82"],
+    .modal--rules-edit [style*="font-size:.85"],
+    .modal--rules-edit [style*="font-size: .85"],
+    .modal--rules-edit [style*="font-size:.9"],
+    .modal--rules-edit [style*="font-size: .9"],
+    .modal--rules-edit [style*="font-size:11px"],
+    .modal--rules-edit [style*="font-size:12px"] {
+      font-size: 12px !important;
+      line-height: 1.55 !important;
+    }
+    .modal--rules-edit [style*="color: var(--dim)"],
+    .modal--rules-edit [style*="color:var(--dim)"],
+    .modal--rules-edit small,
+    .modal--rules-edit details summary {
+      color: var(--text-muted, var(--dim)) !important;
+    }
+    /* Inline-styled value highlights inside fieldsets (e.g. orange accent) */
+    .modal--rules-edit [style*="color:var(--accent2)"],
+    .modal--rules-edit [style*="color: var(--accent2)"] {
+      color: var(--accent2) !important;
+      font-weight: 600 !important;
+    }
+    /* Section labels (legend) — single consistent size */
+    .modal--rules-edit fieldset legend {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent2);
+      padding: 0 6px;
+    }
+    /* Help / footnote paragraphs */
+    .modal--rules-edit p,
+    .modal--rules-edit .modal-help {
+      font-size: 12px;
+      color: var(--text-muted, var(--dim));
+      line-height: 1.55;
+    }
+    /* Buttons inside modal — use shared .btn size, do not override */
+
     /* ── Integrations UI ──────────────────────────────────────────────────── */
 
     /* Sub-tab active underline (matches .rs-tab-bar pattern) */

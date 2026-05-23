@@ -215,6 +215,37 @@ function _clearHighlight(tr) {
   tr.querySelectorAll('mark').forEach(m => m.replaceWith(m.textContent));
 }
 
+/* ─── Rules type chip filter (R5: Bug 4 fix) ─────────────────────────
+ * data-action="filterRuleType" handlers on the #rules-filterbar chips
+ * had no JS implementation, so clicking event/traffic/system/bandwidth
+ * was a no-op. Toggle the chip and hide rows whose Type column does not
+ * match. Clicking the active chip again clears the filter.
+ */
+window.filterRuleType = function filterRuleType(ruletype) {
+  const bar = document.getElementById('rules-filterbar');
+  if (!bar) return;
+  const chip = bar.querySelector(`.sectiontag[data-ruletype="${ruletype}"]`);
+  if (!chip) return;
+  const wasActive = chip.classList.contains('active');
+  bar.querySelectorAll('.sectiontag.active').forEach(c => c.classList.remove('active'));
+  const nextType = wasActive ? null : ruletype;
+  if (nextType) chip.classList.add('active');
+  const rows = document.querySelectorAll('#r-body tr');
+  let shown = 0, total = 0;
+  rows.forEach(tr => {
+    // skip empty-state row (uses colspan)
+    if (tr.querySelector('td[colspan]')) return;
+    total++;
+    if (!nextType) { tr.style.display = ''; shown++; return; }
+    const typeCell = tr.children[1];
+    const rowType = (typeCell?.textContent || '').trim().toLowerCase();
+    if (rowType === nextType) { tr.style.display = ''; shown++; }
+    else { tr.style.display = 'none'; }
+  });
+  const counter = document.getElementById('r-search-count');
+  if (counter) counter.textContent = nextType ? `${shown}/${total}` : '';
+};
+
 /* ─── Skeleton / Spinner helpers ─────────────────────────────────── */
 function showSkeleton(tbodyId, cols, rows = 4) {
   const el = $(tbodyId); if (!el) return;

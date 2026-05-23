@@ -298,13 +298,73 @@ async function runTrafficAnalyzer() {
     _qt_data = r.data || [];
     _qt_page = 1;
     renderQtPage();
+    // R5 Bug 1: previously the KPI strip (tw-kpi-flows / -conns / -dst-ips
+    // / -peak-bw) was never wired — it stayed on placeholder "—". Compute
+    // KPIs from the same dataset the table renders from.
+    updateTrafficKpis(_qt_data);
 
   } catch (err) {
     bd.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--danger);">${_t('gui_rs_error_prefix')}: ${escapeHtml(err.message)}</td></tr>`;
+    updateTrafficKpis([]);
   } finally {
     setTrafficQueryLoading(false);
   }
 }
+
+/* R5 Bug 1: populate the 4-cell KPI strip above the traffic query results.
+ * Pure DOM update, no API call — derives all 4 KPIs from the query payload
+ * the user just ran (so the numbers always match the table the user sees). */
+function updateTrafficKpis(data) {
+  const fmtInt = (n) => (n == null ? '—' : Number(n).toLocaleString('en-US'));
+  const fmtCompact = (n) => {
+    if (n == null || isNaN(n)) return '—';
+    const abs = Math.abs(n);
+    if (abs >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+    if (abs >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (abs >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return String(n);
+  };
+  const fmtBw = (mbps) => {
+    if (mbps == null || mbps === 0) return '—';
+    if (mbps >= 1000) return (mbps / 1000).toFixed(2) + ' Gbps';
+    return mbps.toFixed(1) + ' Mbps';
+  };
+
+  const rows = Array.isArray(data) ? data : [];
+  const flows = rows.length;
+  let conns = 0;
+  let peakBw = 0;
+  const dstSet = new Set();
+  for (const r of rows) {
+    if (r && typeof r === 'object') {
+      conns += Number(r.num_connections || r.connections || 0);
+      const bw = Number(r.max_bandwidth_mbps || r.avg_bandwidth_mbps || 0);
+      if (bw > peakBw) peakBw = bw;
+      const dstIps = (r.destination && (r.destination.ip || r.destination.ip_list)) || r.dst_ip;
+      if (typeof dstIps === 'string') dstIps.split(/[,\s]+/).filter(Boolean).forEach(ip => dstSet.add(ip));
+      else if (Array.isArray(dstIps)) dstIps.forEach(ip => dstSet.add(ip));
+    }
+  }
+
+  const setKpi = (id, value, suffix) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (suffix) {
+      const suffixSpan = el.querySelector('span');
+      el.textContent = value;
+      if (suffixSpan) el.appendChild(suffixSpan);
+      else el.innerHTML = `${value}<span>${suffix}</span>`;
+    } else {
+      el.textContent = value;
+    }
+  };
+
+  setKpi('tw-kpi-flows', fmtInt(flows), 'flows');
+  setKpi('tw-kpi-conns', fmtCompact(conns), '');
+  setKpi('tw-kpi-dst-ips', fmtInt(dstSet.size), '');
+  setKpi('tw-kpi-peak-bw', fmtBw(peakBw), '');
+}
+window.updateTrafficKpis = updateTrafficKpis;
 
 let _qt_data = [];
 let _qt_page = 1;

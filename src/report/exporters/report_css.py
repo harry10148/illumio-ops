@@ -258,8 +258,11 @@ BASE_CSS = """\
   .chart-container > div { width: 100% !important; }
   .chart-img { width: 100%; height: auto; display: block; }
 
+  /* R5 Bug 6: landscape A4 for print so 17+ column wide tables fit
+     without the print engine clipping rightmost columns. */
   @page {
-    margin: 15mm 15mm 22mm;
+    size: A4 landscape;
+    margin: 12mm 14mm 18mm;
   }
   @page {
     @bottom-right {
@@ -420,7 +423,10 @@ POLICY_USAGE_CSS = """\
 
 MODERN_SHELL_CSS = """\
 /* ── Batch D: Modern SaaS report shell ─────────────────────────────────── */
-.report-shell { display: grid; grid-template-columns: 240px 1fr; max-width: 1280px; margin: 0 auto; }
+/* R5 Bug 6: widen shell so wide audit/policy/VEN tables fit without
+   forcing the user into horizontal scroll inside .report-table-wrap.
+   Was 1280px (too narrow for 17+ column tables). */
+.report-shell { display: grid; grid-template-columns: 240px 1fr; max-width: 1600px; margin: 0 auto; }
 .report-toc { background: #fff; border-right: 1px solid var(--border); padding: 32px 16px; position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto; }
 .report-toc h3 { font-size: 11px; font-weight: 600; color: var(--slate-50); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px; padding: 0 12px; }
 .report-toc ol { list-style: none; padding: 0; margin: 0; counter-reset: chap; }
@@ -428,7 +434,7 @@ MODERN_SHELL_CSS = """\
 .report-toc a { display: block; padding: 7px 12px; color: var(--slate-50); text-decoration: none; font-size: 13px; border-radius: 6px; }
 .report-toc a::before { content: counter(chap, decimal-leading-zero) '\00a0'; font-family: var(--font-mono); font-size: 11px; color: #a8a8a8; margin-right: 6px; }
 .report-toc a:hover { color: var(--slate); background: var(--slate-10); }
-.report-main { padding: 48px 56px 96px; max-width: 920px; }
+.report-main { padding: 48px 56px 96px; max-width: 1300px; }
 .report-cover-block { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
 .report-cover-block .eyebrow { font-size: 12px; color: var(--slate-50); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 8px; }
 .report-cover-block h1 { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; margin: 0 0 8px; color: var(--slate); }
