@@ -2342,3 +2342,20 @@ select {
 #p-reports [class*="row"]:not(.rcard) {
   flex-wrap: wrap;
 }
+
+/* ── Polish round 3 — eliminate the last 2 tiny overflows ── */
+/* Dashboard KPI labels can be long ("Unmanaged 來源比率"); allow 2-line wrap */
+#p-dashboard .kpi-label,
+#p-dashboard .db-status-card .story-card-title,
+#snap-kpi-grid .kpi-label {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.35;
+}
+/* Reports history table: filenames can be 60+ chars; let them wrap */
+#rt-body td {
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
