@@ -160,7 +160,7 @@ def make_reports_blueprint(
             try:
                 from src.module_log import ModuleLog as _ML
                 _rlog = _ML.get("reports")
-                _rlog.separator(f"Traffic Report {datetime.datetime.now().strftime('%H:%M:%S')}")
+                _rlog.separator(f"Traffic Report {datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')} UTC")
                 _rlog.info(f"source={d.get('source')} format={d.get('format')} range={d.get('start_date')}~{d.get('end_date')}")
             except Exception:
                 pass  # intentional fallback: ModuleLog is optional; report generation must not fail if logging setup fails
@@ -278,7 +278,7 @@ def make_reports_blueprint(
             try:
                 from src.module_log import ModuleLog as _ML
                 _arlog = _ML.get("reports")
-                _arlog.separator(f"Audit Report {datetime.datetime.now().strftime('%H:%M:%S')}")
+                _arlog.separator(f"Audit Report {datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')} UTC")
                 _arlog.info(f"range={d.get('start_date')}~{d.get('end_date')}")
             except Exception:
                 pass  # intentional fallback: ModuleLog is optional; audit report must not fail if logging setup fails
@@ -333,7 +333,7 @@ def make_reports_blueprint(
             try:
                 from src.module_log import ModuleLog as _ML
                 _vrlog = _ML.get("reports")
-                _vrlog.separator(f"VEN Status Report {datetime.datetime.now().strftime('%H:%M:%S')}")
+                _vrlog.separator(f"VEN Status Report {datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')} UTC")
             except Exception:
                 pass  # intentional fallback: ModuleLog is optional; VEN status report must not fail if logging setup fails
 
@@ -382,7 +382,7 @@ def make_reports_blueprint(
             try:
                 from src.module_log import ModuleLog as _ML
                 _pulog = _ML.get("reports")
-                _pulog.separator(f"Policy Usage Report {datetime.datetime.now().strftime('%H:%M:%S')}")
+                _pulog.separator(f"Policy Usage Report {datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')} UTC")
                 _pulog.info(f"range={d.get('start_date')}~{d.get('end_date')}")
             except Exception:
                 pass  # intentional fallback: ModuleLog is optional; policy usage report must not fail if logging setup fails

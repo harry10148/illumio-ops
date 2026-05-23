@@ -69,7 +69,7 @@ class ModuleLog:
         self._file_logger = lg
 
     def _append(self, level: str, message: str) -> None:
-        ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         clean = _ANSI_RE.sub("", str(message))
         entry = {"ts": ts, "level": level, "msg": clean}
         line = f"{ts} [{level:5s}] {clean}"
