@@ -8,6 +8,11 @@ function switchQTab(tabStr, updateUrl = true) {
   document.querySelectorAll('.q-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('q-panel-' + tabStr).classList.add('active');
   if (updateUrl) updateUrlState('qtab', tabStr);
+
+  // R4k: load trend chart whenever the traffic analyzer sub-tab is shown
+  if (tabStr === 'traffic') {
+    try { loadTrafficTrend(); } catch (_) {}
+  }
 }
 
 // Checkboxes and Bulk Bar
@@ -690,4 +695,104 @@ function _showAccelCountdown() {
     if (left <= 0) { cancelAccelerate(); return; }
     remEl.textContent = fmt(left);
   }, 1000);
+}
+
+// ─── R4k: 7-day traffic trend SVG chart ──────────────────────────────────────
+
+/**
+ * Fetch /api/traffic/trend and render an inline SVG area chart.
+ * Safe to call multiple times; debounced by _trendFetching flag.
+ */
+let _trendFetching = false;
+
+async function loadTrafficTrend() {
+  if (_trendFetching) return;
+  _trendFetching = true;
+  const meta = document.getElementById('tw-trend-meta');
+  if (meta) meta.textContent = '— 載入中';
+  try {
+    const r = await get('/api/traffic/trend');
+    renderTrafficTrend((r && r.buckets) ? r.buckets : []);
+  } catch (_) {
+    renderTrafficTrend([]);
+  } finally {
+    _trendFetching = false;
+  }
+}
+
+function _svgEl(tag, attrs) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+function renderTrafficTrend(buckets) {
+  const svg  = document.getElementById('tw-trend-svg');
+  const meta = document.getElementById('tw-trend-meta');
+  if (!svg) return;
+
+  const x0El = document.getElementById('tw-trend-x0');
+  const x1El = document.getElementById('tw-trend-x1');
+
+  svg.replaceChildren(); // clear previous render — no innerHTML
+
+  if (!buckets || !buckets.length) {
+    if (meta) meta.textContent = '無歷史資料';
+    if (x0El) x0El.textContent = '—';
+    if (x1El) x1El.textContent = '—';
+    return;
+  }
+
+  const W = 800, H = 200, padX = 8, padY = 14;
+  const maxY = Math.max(...buckets.map(b => b.flows), 1);
+  const n = buckets.length;
+  const pts = buckets.map((b, i) => {
+    const x = padX + (W - 2 * padX) * (i / Math.max(n - 1, 1));
+    const y = H - padY - (H - 2 * padY) * (b.flows / maxY);
+    return [x, y];
+  });
+
+  const lineD = pts.map((p, i) =>
+    `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`
+  ).join(' ');
+  const areaD =
+    lineD +
+    ` L${pts[pts.length - 1][0].toFixed(1)},${(H - padY).toFixed(1)}` +
+    ` L${pts[0][0].toFixed(1)},${(H - padY).toFixed(1)} Z`;
+
+  // gridlines
+  const frag = document.createDocumentFragment();
+  for (const p of [0.25, 0.5, 0.75]) {
+    const y = (padY + (H - 2 * padY) * p).toFixed(1);
+    frag.appendChild(_svgEl('line', {
+      x1: padX, y1: y, x2: W - padX, y2: y,
+      stroke: 'var(--border)', 'stroke-dasharray': '2 4',
+    }));
+  }
+
+  // area fill
+  frag.appendChild(_svgEl('path', {
+    d: areaD, fill: 'var(--accent)', 'fill-opacity': '0.15',
+  }));
+
+  // line stroke
+  frag.appendChild(_svgEl('path', {
+    d: lineD, fill: 'none', stroke: 'var(--accent)',
+    'stroke-width': '1.5', 'stroke-linejoin': 'round',
+  }));
+
+  // max label
+  const label = _svgEl('text', {
+    x: padX, y: padY - 2, fill: 'var(--dim)',
+    'font-size': '10', 'font-family': 'var(--font-mono-2,monospace)',
+  });
+  label.textContent = maxY.toLocaleString();
+  frag.appendChild(label);
+
+  svg.appendChild(frag);
+
+  const totalFlows = buckets.reduce((s, b) => s + b.flows, 0);
+  if (meta) meta.textContent = `${totalFlows.toLocaleString()} flows · 7d`;
+  if (x0El && buckets[0]?.ts)     x0El.textContent = String(buckets[0].ts).slice(0, 10);
+  if (x1El && buckets[n - 1]?.ts) x1El.textContent = String(buckets[n - 1].ts).slice(0, 10);
 }

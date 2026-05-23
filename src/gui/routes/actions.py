@@ -385,6 +385,47 @@ def make_actions_blueprint(
         )
         return jsonify({"ok": True, "output": output, "summary": result})
 
+    @bp.route('/api/traffic/trend', methods=['GET'])
+    def api_traffic_trend():
+        """Return per-day flow counts for the past 7 days from the local cache agg table.
+
+        Response: {"ok": true, "buckets": [{"ts": "YYYY-MM-DD", "flows": N}, ...]}
+        Buckets are ordered oldest-first. Falls back to empty list when cache is disabled.
+        """
+        try:
+            import datetime
+            from sqlalchemy import create_engine, func, select as sa_select
+            from sqlalchemy.orm import sessionmaker
+            from src.pce_cache.models import PceTrafficFlowAgg
+            from src.pce_cache.schema import init_schema
+
+            cfg = cm.models.pce_cache
+            if not cfg.enabled:
+                return jsonify({"ok": True, "buckets": []})
+
+            engine = create_engine(f"sqlite:///{cfg.db_path}")
+            init_schema(engine)
+            sf = sessionmaker(engine)
+
+            now = datetime.datetime.now(datetime.timezone.utc)
+            cutoff = now - datetime.timedelta(days=7)
+
+            with sf() as session:
+                rows = session.execute(
+                    sa_select(
+                        func.date(PceTrafficFlowAgg.bucket_day).label("day"),
+                        func.sum(PceTrafficFlowAgg.flow_count).label("flows"),
+                    )
+                    .where(PceTrafficFlowAgg.bucket_day >= cutoff)
+                    .group_by(func.date(PceTrafficFlowAgg.bucket_day))
+                    .order_by(func.date(PceTrafficFlowAgg.bucket_day))
+                ).all()
+
+            buckets = [{"ts": str(row.day), "flows": int(row.flows)} for row in rows]
+            return jsonify({"ok": True, "buckets": buckets})
+        except Exception as e:
+            return _err_with_log("traffic_trend", e)
+
     @bp.route('/api/actions/test-connection', methods=['POST'])
     def api_test_conn():
         try:

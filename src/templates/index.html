@@ -653,6 +653,20 @@
         </div>
       </div>
 
+      <!-- R4k: 7-day traffic trend SVG chart — additive, below KPI strip -->
+      <div class="tw-trend-panel">
+        <div class="tw-trend-head">
+          <h3 data-i18n="gui_tw_trend_title">過去 7 天流量趨勢</h3>
+          <span class="tw-trend-meta" id="tw-trend-meta">— 載入中</span>
+        </div>
+        <svg id="tw-trend-svg" viewBox="0 0 800 200" preserveAspectRatio="none"
+             xmlns="http://www.w3.org/2000/svg" aria-label="流量趨勢圖"></svg>
+        <div class="tw-trend-axis">
+          <span id="tw-trend-x0">—</span>
+          <span id="tw-trend-x1">—</span>
+        </div>
+      </div>
+
       <fieldset>
         <legend data-i18n="gui_ta_query">Traffic Analysis Query</legend>
         <div class="toolbar filter-bar">
@@ -1477,6 +1491,13 @@
     #q-panel-traffic .tw-kpi-delta.up   { color: var(--success, #22c55e); }
     #q-panel-traffic .tw-kpi-delta.flat { color: var(--dim); }
     #q-panel-traffic .tw-kpi-delta.warn { color: var(--danger, #ef4444); }
+    /* R4k: trend panel */
+    #q-panel-traffic .tw-trend-panel { background:var(--bg2); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:16px; }
+    #q-panel-traffic .tw-trend-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:12px; }
+    #q-panel-traffic .tw-trend-head h3 { font-size:14px; font-weight:600; margin:0; }
+    #q-panel-traffic .tw-trend-meta { font-size:12px; color:var(--dim); font-family:var(--font-mono-2, monospace); }
+    #q-panel-traffic #tw-trend-svg { width:100%; height:200px; display:block; }
+    #q-panel-traffic .tw-trend-axis { display:flex; justify-content:space-between; font-size:11px; color:var(--dim); font-family:var(--font-mono-2, monospace); margin-top:6px; }
   </style>
 
   <!-- R4j: Rule Scheduler scoped styles -->
