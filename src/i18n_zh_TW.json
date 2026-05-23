@@ -3098,5 +3098,22 @@
   "telegram_alert_failed": "Telegram 告警送出失敗（status={status}）：{error}",
   "telegram_alert_sent": "Telegram 告警已送出。",
   "telegram_config_missing": "Telegram 告警略過：尚未設定 Bot Token 或 Chat ID。",
-  "telegram_truncated_footer": "… 還有 {more} 條訊息（已截斷以符合 Telegram 4096 字元上限）"
+  "telegram_truncated_footer": "… 還有 {more} 條訊息（已截斷以符合 Telegram 4096 字元上限）",
+  "gui_db_detail_metrics": "詳細指標與表格",
+  "gui_ev_copy_json": "複製 JSON",
+  "gui_hero_eyebrow": "過去 24 小時",
+  "gui_rs_kpi_hits": "命中規則",
+  "gui_rs_kpi_next": "下次觸發",
+  "gui_rs_kpi_today": "今日已執行",
+  "gui_rs_kpi_total": "總排程",
+  "gui_ruletype_bandwidth": "頻寬",
+  "gui_ruletype_event": "事件",
+  "gui_ruletype_system": "系統健康",
+  "gui_ruletype_traffic": "流量",
+  "gui_top_actions_meta": "依風險權重排序",
+  "gui_tw_kpi_conns": "總連線",
+  "gui_tw_kpi_dst_ips": "唯一目的 IP",
+  "gui_tw_kpi_flows": "總流量",
+  "gui_tw_kpi_peak_bw": "尖峰頻寬",
+  "gui_tw_trend_title": "過去 7 天流量趨勢"
 }

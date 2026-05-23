@@ -3098,5 +3098,22 @@
   "wgs_tls_valid_until": "Valid until",
   "wgs_user_input": "Username",
   "wgs_username": "Username",
-  "would_trigger": "WOULD TRIGGER"
+  "would_trigger": "WOULD TRIGGER",
+  "gui_db_detail_metrics": "Detailed metrics & tables",
+  "gui_ev_copy_json": "Copy JSON",
+  "gui_hero_eyebrow": "Past 24 hours",
+  "gui_rs_kpi_hits": "Rule hits",
+  "gui_rs_kpi_next": "Next trigger",
+  "gui_rs_kpi_today": "Executed today",
+  "gui_rs_kpi_total": "Total schedules",
+  "gui_ruletype_bandwidth": "Bandwidth",
+  "gui_ruletype_event": "Event",
+  "gui_ruletype_system": "System Health",
+  "gui_ruletype_traffic": "Traffic",
+  "gui_top_actions_meta": "by risk weight",
+  "gui_tw_kpi_conns": "Total Connections",
+  "gui_tw_kpi_dst_ips": "Unique destination IPs",
+  "gui_tw_kpi_flows": "Total Flows",
+  "gui_tw_kpi_peak_bw": "Peak bandwidth",
+  "gui_tw_trend_title": "Traffic trend — past 7 days"
 }
