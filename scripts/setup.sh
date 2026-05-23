@@ -45,7 +45,22 @@ if [ ! -f "$REPO_ROOT/config/config.json" ]; then
 fi
 
 VENV_PYTHON="$REPO_ROOT/venv/bin/python3"
-SVC_USER="${SUDO_USER:-$(whoami)}"
+
+# L-8: dedicated system account — avoid running as a login user via $SUDO_USER.
+# Creates illumio-ops (nologin, no home) if absent; idempotent across re-runs.
+if ! id -u illumio-ops >/dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin --comment "Illumio PCE Ops" illumio-ops
+fi
+SVC_USER="illumio-ops"
+chown -R "$SVC_USER:$SVC_USER" "$REPO_ROOT"
+
+# L-6: tighten config + TLS material to 0o640 (group-readable for ops, not world).
+chmod 0640 \
+    "$REPO_ROOT"/config/*.json \
+    "$REPO_ROOT"/config/*.yaml \
+    "$REPO_ROOT"/config/tls/*.pem \
+    2>/dev/null || true
+chmod 0640 "$REPO_ROOT"/config/limiter/*.json 2>/dev/null || true
 
 cat > "$SERVICE_FILE" << EOF
 [Unit]
