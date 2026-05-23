@@ -231,18 +231,186 @@
   <!-- Traffic & Quarantine (Dashboard Tab) -->
   <div class="panel active" id="p-dashboard">
 
+    <!-- ═══ R4c Dashboard storytelling styles (scoped to #p-dashboard) ═══ -->
+    <style>
+      /* Hero */
+      #p-dashboard .db-hero-wrap {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 20px;
+        background: var(--bg2, var(--surface, #f8f9fa));
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--accent2, var(--accent));
+        border-radius: 10px;
+        padding: 18px 22px;
+        margin-bottom: 20px;
+      }
+      #p-dashboard .db-hero-wrap.is-hidden { display: none; }
+      #p-dashboard .db-hero-eyebrow {
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--dim);
+        margin: 0 0 6px;
+      }
+      #p-dashboard #d-hero-sentence {
+        font-size: 1.05rem;
+        font-weight: 600;
+        line-height: 1.5;
+        color: var(--fg, var(--text));
+      }
+      /* Status row — 3 cards */
+      #p-dashboard .db-status-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+      }
+      #p-dashboard .db-status-card {
+        background: var(--bg2, var(--surface));
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 16px;
+        min-height: 90px;
+      }
+      #p-dashboard .db-status-card.db-ok   { border-left-color: var(--success); }
+      #p-dashboard .db-status-card.db-info { border-left-color: var(--accent2, var(--accent)); }
+      #p-dashboard .db-status-card.db-warn { border-left-color: var(--warn); }
+      #p-dashboard .db-status-card .story-card-title {
+        margin-bottom: 8px;
+        font-size: 11px;
+      }
+      #p-dashboard .db-status-card .story-card-body {
+        gap: 6px;
+      }
+      #p-dashboard .db-status-card .story-stat-label {
+        font-size: 12px;
+        color: var(--dim);
+        min-width: 96px;
+      }
+      #p-dashboard .db-status-card .story-stat-value {
+        font-size: 13px;
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+      /* Maturity panel */
+      #p-dashboard .db-maturity-panel {
+        background: var(--bg2, var(--surface));
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px 22px;
+        margin-bottom: 20px;
+      }
+      #p-dashboard .db-maturity-panel.is-hidden { display: none; }
+      #p-dashboard .db-maturity-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      #p-dashboard .db-maturity-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0;
+        color: var(--fg, var(--text));
+      }
+      #p-dashboard .db-maturity-meta {
+        font-size: 12px;
+        color: var(--dim);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #p-dashboard #d-maturity-grade {
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1;
+      }
+      /* Actions panel */
+      #p-dashboard .db-actions-panel {
+        background: var(--bg2, var(--surface));
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 18px 22px;
+        margin-bottom: 20px;
+      }
+      #p-dashboard .db-actions-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      #p-dashboard .db-actions-title {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0;
+        color: var(--fg, var(--text));
+      }
+      #p-dashboard .db-actions-meta {
+        font-size: 12px;
+        color: var(--dim);
+      }
+      /* KPI toggle — styled like mock detail-toggle */
+      #p-dashboard .db-kpi-toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 10px;
+        color: var(--dim);
+        font-size: 13px;
+        cursor: pointer;
+        user-select: none;
+        font-weight: 500;
+      }
+      #p-dashboard .db-kpi-toggle::marker { display: none; }
+      #p-dashboard details.db-kpi-details > summary {
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--dim);
+        margin-bottom: 10px;
+      }
+      #p-dashboard details.db-kpi-details > summary::before {
+        content: '\25B8';
+        font-size: 10px;
+        transition: transform 120ms ease;
+        display: inline-block;
+      }
+      #p-dashboard details.db-kpi-details[open] > summary::before { transform: rotate(90deg); }
+      #p-dashboard details.db-kpi-details > summary::-webkit-details-marker { display: none; }
+      /* Responsive */
+      @media (max-width: 768px) {
+        #p-dashboard .db-status-row { grid-template-columns: 1fr; }
+        #p-dashboard .db-hero-wrap  { grid-template-columns: 1fr; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #p-dashboard details.db-kpi-details > summary::before { transition: none; }
+      }
+    </style>
+
     <!-- Story-mode hero (one-sentence health summary + CTA) -->
-    <div id="d-hero" class="dashboard-hero" style="margin-bottom:20px;display:none;">
-      <div class="dashboard-hero-sentence" id="d-hero-sentence" style="font-size:1.15rem;font-weight:600;line-height:1.5;"></div>
+    <!-- JS controls display:none via d-hero; db-hero-wrap is purely presentational wrapper -->
+    <div class="db-hero-wrap" id="d-hero" style="display:none;">
+      <div>
+        <p class="db-hero-eyebrow" data-i18n="gui_hero_eyebrow">Past 24 hours</p>
+        <div class="dashboard-hero-sentence" id="d-hero-sentence"></div>
+      </div>
       <button class="btn btn-primary" id="d-hero-cta" data-action="scrollToFindings"
-              data-i18n="gui_hero_view_high_risk" style="display:none;margin-top:10px;">
+              data-i18n="gui_hero_view_high_risk" style="display:none;white-space:nowrap;">
         View high-risk findings
       </button>
     </div>
 
-    <!-- Top level stats — Phase 3.1: grouped into 3 story cards (Health / Traffic / Risk) -->
-    <div class="cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;">
-      <div class="card story-card story-card--health">
+    <!-- Top level stats — 3 status cards (Health / Traffic / Risk) -->
+    <div class="db-status-row">
+      <div class="card story-card story-card--health db-status-card db-ok">
         <div class="story-card-title label" data-i18n="gui_story_group_health">Health</div>
         <div class="story-card-body">
           <div class="story-stat"><span class="story-stat-label" data-i18n="gui_card_health_rule">Health Rule</span><span class="story-stat-value value" id="d-health">-</span></div>
@@ -250,7 +418,7 @@
           <div class="story-stat"><span class="story-stat-label" data-i18n="gui_card_last_dispatch">Last Dispatch</span><span class="story-stat-value value" id="d-dispatch">-</span></div>
         </div>
       </div>
-      <div class="card story-card story-card--traffic">
+      <div class="card story-card story-card--traffic db-status-card db-info">
         <div class="story-card-title label" data-i18n="gui_story_group_traffic">Traffic</div>
         <div class="story-card-body">
           <div class="story-stat"><span class="story-stat-label" data-i18n="gui_dashboard_rules">Rules</span><span class="story-stat-value value" id="d-rules">-</span></div>
@@ -258,7 +426,7 @@
           <div class="story-stat" title="Alerts suppressed by cooldown/throttle rate limits before dispatch." data-i18n-title="gui_card_suppressed_tooltip"><span class="story-stat-label" data-i18n="gui_card_suppressed">Suppressed</span><span class="story-stat-value value" id="d-suppressed">-</span></div>
         </div>
       </div>
-      <div class="card story-card story-card--risk">
+      <div class="card story-card story-card--risk db-status-card db-warn">
         <div class="story-card-title label" data-i18n="gui_story_group_risk">Risk</div>
         <div class="story-card-body">
           <div class="story-stat" id="card-ransom" style="display:none">
@@ -273,23 +441,24 @@
       </div>
     </div>
 
-    <fieldset id="cd-field" style="display:none;margin-bottom:24px;border:none;padding:0;">
+    <fieldset id="cd-field" style="display:none;margin-bottom:20px;border:none;padding:0;">
       <div id="cd-list" class="cards" style="margin-bottom:0;"></div>
     </fieldset>
 
-    <!-- Microsegmentation Maturity (Phase 3.1 Task 3) -->
-    <fieldset id="d-maturity" style="display:none;margin-bottom:24px;">
-      <legend data-i18n="gui_maturity_heading">Microsegmentation Maturity</legend>
-      <div class="d-maturity-header" style="display:flex;align-items:center;gap:24px;margin-bottom:14px;">
-        <div style="text-align:center;min-width:100px;">
-          <div id="d-maturity-grade" style="font-size:48px;font-weight:700;line-height:1;">?</div>
-          <div style="font-size:14px;color:var(--dim);margin-top:4px;">
-            <span data-i18n="gui_maturity_score_label">Score</span>: <span id="d-maturity-score">—</span>/100
-          </div>
+    <!-- Microsegmentation Maturity (Phase 3.1 Task 3) — rewrapped with db-maturity-panel -->
+    <!-- JS uses id="d-maturity" to show/hide; fieldset is now inside the panel wrapper -->
+    <div class="db-maturity-panel" id="d-maturity" style="display:none;">
+      <div class="db-maturity-head">
+        <h2 class="db-maturity-title" data-i18n="gui_maturity_heading">Microsegmentation Maturity</h2>
+        <div class="db-maturity-meta">
+          <span data-i18n="gui_maturity_score_label">Score</span>:
+          <strong id="d-maturity-score" style="font-variant-numeric:tabular-nums;">—</strong>/100
+          &nbsp;·&nbsp;
+          <strong id="d-maturity-grade" style="font-size:18px;font-weight:700;">?</strong>
         </div>
-        <div id="d-maturity-bars" style="flex:1;"></div>
       </div>
-    </fieldset>
+      <div id="d-maturity-bars"></div>
+    </div>
 
     <!-- Live Plotly charts (auto-refresh every 60s) -->
     <div class="dashboard-charts" style="display:none;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
@@ -485,17 +654,20 @@
             <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_date_range">Date Range:</span> <span id="snap-date-range">??/span></span>
           </div>
 
-          <!-- KPI Cards (Phase 3.1 Task 5 — collapsed by default) -->
-          <details id="d-detailed-kpis" style="margin-bottom:16px;">
-            <summary style="cursor:pointer;font-weight:600;color:var(--dim);" data-i18n="gui_detailed_kpis_label">Detailed metrics (12 KPIs)</summary>
-            <div id="snap-kpi-grid" class="kpi-grid" style="margin:10px 0 0;"></div>
-          </details>
-
-          <!-- Top Actions (Phase 3.1 Task 4) -->
-          <div id="d-top-actions" style="margin-bottom:16px;">
-            <div style="font-weight:700;font-size:0.9rem;margin-bottom:8px;color:var(--accent2);" data-i18n="gui_top_actions_heading">Top Actions</div>
+          <!-- Top Actions (Phase 3.1 Task 4) — rewrapped with db-actions-panel -->
+          <div id="d-top-actions" class="db-actions-panel" style="margin-bottom:16px;">
+            <div class="db-actions-head">
+              <h2 class="db-actions-title" data-i18n="gui_top_actions_heading">Top Actions</h2>
+              <span class="db-actions-meta" data-i18n="gui_top_actions_meta">by risk weight</span>
+            </div>
             <div id="d-top-actions-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;"></div>
           </div>
+
+          <!-- KPI Cards (Phase 3.1 Task 5 — collapsed by default) -->
+          <details id="d-detailed-kpis" class="db-kpi-details" style="margin-bottom:16px;">
+            <summary data-i18n="gui_detailed_kpis_label">Detailed metrics (12 KPIs)</summary>
+            <div id="snap-kpi-grid" class="kpi-grid" style="margin:10px 0 0;"></div>
+          </details>
 
           <!-- Key Findings (collapsed full table) -->
           <div id="snap-findings-wrap" style="margin-bottom:16px;">
