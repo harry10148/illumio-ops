@@ -39,6 +39,7 @@ function rsPopulateTzSelect(selectId, selectedValue) {
 function rsLoadTab() {
   rsSearchRulesets('');
   rsInitResizer();
+  rsRenderTimeline();
 }
 
 /* ── Split-pane resizer ── */
@@ -659,8 +660,81 @@ async function rsRunCheck() {
     log.textContent = (data.logs || []).join('\n') || _t('gui_rs_no_output');
     // Refresh full history view after manual check
     await rsLoadLogHistory();
+    // Refresh timeline after manual check
+    rsRenderTimeline();
   } catch (e) {
     const msg = e.name === 'AbortError' ? _t('gui_rs_check_timed_out_unreachable') : e.message;
     log.textContent = _t('gui_rs_error_prefix') + ': ' + msg;
+  }
+}
+
+/* ── B1: 24h trigger timeline ── */
+async function rsRenderTimeline() {
+  const row = $('rs-tl-row');
+  const meta = $('rs-tl-meta');
+  if (!row) return;
+
+  // Build 24 empty buckets (index 0 = 00:xx, 23 = 23:xx)
+  const counts = new Array(24).fill(0);
+  const errors = new Array(24).fill(0);
+  let total = 0;
+  let dataAvailable = false;
+
+  try {
+    const res = await fetch('/api/rule_scheduler/logs');
+    const data = await res.json();
+    const history = data.history || [];
+    const now = Date.now();
+    const cutoff = now - 24 * 60 * 60 * 1000;
+
+    history.forEach(entry => {
+      if (!entry.timestamp) return;
+      const ts = new Date(entry.timestamp).getTime();
+      if (isNaN(ts) || ts < cutoff) return;
+      dataAvailable = true;
+      const hour = new Date(ts).getHours();
+      counts[hour]++;
+      total++;
+      // Detect errors: if any log line contains "error" or "fail" (case-insensitive)
+      const hasErr = (entry.logs || []).some(l => /error|fail/i.test(l));
+      if (hasErr) errors[hour]++;
+    });
+  } catch (_) {
+    // Silently fall through — render placeholder bars
+  }
+
+  const maxCount = Math.max(...counts, 1);
+  while (row.firstChild) row.removeChild(row.firstChild);
+  for (let h = 0; h < 24; h++) {
+    const c = counts[h];
+    const hasErr = errors[h] > 0;
+    let cls = '';
+    if (!dataAvailable) {
+      cls = ''; // muted placeholder
+    } else if (hasErr) {
+      cls = 'err';
+    } else if (c === 0) {
+      cls = '';
+    } else if (c / maxCount > 0.66) {
+      cls = 'lvl-3';
+    } else if (c / maxCount > 0.33) {
+      cls = 'lvl-2';
+    } else {
+      cls = 'lvl-1';
+    }
+    const label = String(h).padStart(2, '0') + ':00';
+    const tip = dataAvailable
+      ? (c > 0 ? `${label}　${c} 次觸發${hasErr ? '（含錯誤）' : ''}` : `${label}　無觸發`)
+      : `${label}　資料準備中`;
+    const div = document.createElement('div');
+    div.className = 'rs-tl-bucket' + (cls ? ' ' + cls : '');
+    div.setAttribute('data-tip', tip);
+    row.appendChild(div);
+  }
+
+  if (meta) {
+    meta.textContent = dataAvailable
+      ? `共 ${total} 次觸發`
+      : '資料準備中';
   }
 }

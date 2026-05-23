@@ -165,10 +165,40 @@ function _renderEventViewerDetails(item) {
   if (!item) {
     normalizedEl.textContent = _evText('gui_ev_select_parsed');
     rawEl.textContent = _evText('gui_ev_select_raw');
+    // Clear detail card
+    _renderEventDetailCard(null);
     return;
   }
   normalizedEl.textContent = JSON.stringify(item.normalized || {}, null, 2);
   rawEl.textContent = JSON.stringify(item.raw || {}, null, 2);
+  _renderEventDetailCard(item);
+}
+
+function _renderEventDetailCard(ev) {
+  const idEl    = $('ev-detail-id');
+  const timeEl  = $('ev-detail-time');
+  const sevEl   = $('ev-detail-sev');
+  const ruleEl  = $('ev-detail-rule');
+  const userEl  = $('ev-detail-user');
+  const jsonEl  = $('ev-detail-json');
+  if (!idEl) return; // detail card not present in DOM
+  if (!ev) {
+    idEl.textContent   = '—';
+    timeEl.textContent = '—';
+    sevEl.textContent  = '—';
+    ruleEl.textContent = '—';
+    userEl.textContent = '—';
+    jsonEl.textContent = '—';
+    return;
+  }
+  idEl.textContent   = ev.event_id || ev.id || '—';
+  timeEl.textContent = ev.timestamp || ev.time || '—';
+  sevEl.textContent  = ev.severity || '—';
+  ruleEl.textContent = ev.event_type || ev.rule || '—';
+  const username = ev.created_by?.user?.username || ev.actor || '—';
+  const ip = ev.src_ip ? ' / ' + ev.src_ip : '';
+  userEl.textContent = username + ip;
+  jsonEl.textContent = JSON.stringify(ev, null, 2);
 }
 
 function selectEventViewerRow(eventId) {
@@ -291,3 +321,13 @@ async function loadMoreEventViewer() {
   _eventViewerOffset = _eventViewerItems.length;
   await loadEventViewer(false);
 }
+
+/* ── B2: event detail card copy button ── */
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'ev-detail-copy') {
+    const jsonEl = document.getElementById('ev-detail-json');
+    if (jsonEl && jsonEl.textContent && jsonEl.textContent !== '—') {
+      navigator.clipboard.writeText(jsonEl.textContent).catch(() => {});
+    }
+  }
+});
