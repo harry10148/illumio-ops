@@ -168,9 +168,10 @@ class ApiClient:
     def __enter__(self) -> "ApiClient":
         return self
 
-    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
-        # Returns None (≡ False) — does not suppress exceptions
+    def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> bool:
+        # Returns False — does not suppress exceptions; explicit per H-2 contract test
         self.close()
+        return False
 
     # ═══════════════════════════════════════════════════════════════════════
     # HTTP core (stays on facade — shared infrastructure)

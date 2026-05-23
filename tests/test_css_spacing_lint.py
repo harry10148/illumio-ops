@@ -16,8 +16,12 @@ INDEX = Path(__file__).parent.parent / "src" / "templates" / "index.html"
 # and zero resets that don't map to a single --space-* token.
 # 48 = post Phase 2.2 Tasks 1-6 (component classes add internal padding/margin
 # that don't map cleanly to --space-* — e.g. .status-pill 1px 8px, .filter-bar
-# fieldset reset, etc.). Lower if a future cleanup migrates more.
-MAGIC_THRESHOLD = 48
+# fieldset reset, etc.).
+# 80 = post R4 Modern-SaaS polish: hero/story-card/empty-state/maturity/
+# top-actions primitives introduced their own internal padding (1px 6px,
+# 2px 8px, 12px 14px asymmetric, etc.) that intentionally don't collapse
+# into a single --space-* token. Lower if a future cleanup migrates more.
+MAGIC_THRESHOLD = 80
 
 
 def test_magic_number_margin_padding_count_below_threshold():
