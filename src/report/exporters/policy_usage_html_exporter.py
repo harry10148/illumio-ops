@@ -171,15 +171,18 @@ class PolicyUsageHtmlExporter:
         today_str = str(datetime.date.today())
 
         nav_html = (
-            "<nav>"
-            '<div class="nav-brand">Illumio PCE Ops</div>'
-            f'<a href="#summary">{_s("rpt_pu_nav_summary")}</a>'
-            f'<a href="#overview">{_s("rpt_pu_nav_overview")}</a>'
-            f'<a href="#hit-rules">{_s("rpt_pu_nav_hit")}</a>'
-            f'<a href="#unused-rules">{_s("rpt_pu_nav_unused")}</a>'
-            f'<a href="#deny-rules">{_s("rpt_pu_nav_deny")}</a>'
-            f'<a href="#draft-pd">{_s("rpt_pu_nav_draft_pd")}</a>'
-            "</nav>"
+            '<aside class="report-toc screen-only">'
+            '<h3>Contents</h3>'
+            '<ol>'
+            f'<li><a href="#summary">{_s("rpt_pu_nav_summary")}</a></li>'
+            f'<li><a href="#overview">{_s("rpt_pu_nav_overview")}</a></li>'
+            f'<li><a href="#hit-rules">{_s("rpt_pu_nav_hit")}</a></li>'
+            f'<li><a href="#unused-rules">{_s("rpt_pu_nav_unused")}</a></li>'
+            f'<li><a href="#deny-rules">{_s("rpt_pu_nav_deny")}</a></li>'
+            f'<li><a href="#draft-pd">{_s("rpt_pu_nav_draft_pd")}</a></li>'
+            '</ol>'
+            '<button class="print-btn" onclick="window.print()">Print / PDF</button>'
+            '</aside>'
         )
 
         exec_html = render_exec_summary_html(mod00, report_name='Policy Usage Report', lang=self._lang)
@@ -248,10 +251,11 @@ class PolicyUsageHtmlExporter:
             + _CSS + _HIGHLIGHT_CSS
             + f'</head>\n<body data-report-title="{_cover_title}">'
             + cover_html
+            + '<div class="report-shell">'
             + nav_html
-            + "<main>"
+            + '<main class="report-main">'
             + body
-            + "</main>"
+            + "</main></div>"
             + TABLE_JS
             + "</body></html>"
         )

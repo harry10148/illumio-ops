@@ -507,24 +507,22 @@ class HtmlExporter:
             dim_score = dim.get('score', 0)
             dim_weight = dim.get('weight', 0)
             dim_pct = round(dim_score / max(dim_weight, 1) * 100, 0) if dim_weight else 0
-            bar_color = '#22C55E' if dim_pct >= 70 else ('#EAB308' if dim_pct >= 40 else '#EF4444')
+            fill_cls = 'good' if dim_pct >= 70 else ('warn' if dim_pct >= 40 else 'bad')
             maturity_bars += (
-                f'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px">'
-                f'<div style="width:200px;flex-shrink:0">{dim_label}</div>'
-                f'<div style="flex:1;height:16px;background:#2D3748;border-radius:4px;overflow:hidden">'
-                f'<div style="width:{dim_pct}%;height:100%;background:{bar_color};border-radius:4px"></div></div>'
-                f'<div style="width:60px;text-align:right;font-weight:600">{dim_score}/{dim_weight}</div>'
+                f'<div class="mat-row">'
+                f'<div class="mat-name">{dim_label}</div>'
+                f'<div class="mat-bar"><div class="mat-fill {fill_cls}" style="width:{dim_pct}%"></div></div>'
+                f'<div class="mat-val">{dim_score}/{dim_weight}</div>'
                 f'</div>'
             )
 
         maturity_html = (
-            '<div style="display:flex;align-items:center;gap:24px;margin:20px 0;padding:20px;'
-            'background:var(--card-bg);border:1px solid var(--border);border-radius:12px">'
-            f'<div style="text-align:center;min-width:100px">'
-            f'<div style="font-size:48px;font-weight:700;color:{m_grade_color};line-height:1">{m_grade}</div>'
-            f'<div style="font-size:14px;color:var(--slate-50);margin-top:4px">'
-            f'{_s("rpt_tr_maturity_score")}: {m_score}/100</div></div>'
-            f'<div style="flex:1">{maturity_bars}</div></div>'
+            '<div class="score-hero">'
+            f'<span class="score-num" style="color:{m_grade_color}">{m_score}</span>'
+            f'<span class="score-denom">/100</span>'
+            f'<span class="grade-chip" style="color:{m_grade_color};border-color:{m_grade_color}">{m_grade}</span>'
+            '</div>'
+            f'<div>{maturity_bars}</div>'
         )
 
         # T6: mod06 user/process — security_risk only, and only when data available
@@ -590,7 +588,21 @@ class HtmlExporter:
                 (_nav_link('change_impact', 'rpt_tr_nav_change_impact', 'Change Impact')
                  if visible_in('mod_change_impact', profile, detail_level) else ''),
             ]
-        nav_html = '<nav>' + ''.join(_nav_links) + '<button class="print-btn" onclick="window.print()">🖨 Print / PDF</button></nav>'
+        _toc_items = ''.join(
+            f'<li><a href="#{_link_anchor}">{_link_label}</a></li>'
+            for _link_anchor, _link_label in [
+                (lnk.split('href="#')[1].split('"')[0],
+                 lnk.split('>')[1].split('<')[0].strip())
+                for lnk in _nav_links if lnk and 'href="#' in lnk
+            ]
+        )
+        nav_html = (
+            '<aside class="report-toc screen-only">'
+            '<h3>Contents</h3>'
+            f'<ol>{_toc_items}</ol>'
+            '<button class="print-btn" onclick="window.print()">Print / PDF</button>'
+            '</aside>'
+        )
 
         exec_html = render_exec_summary_html(_traffic_mod00, report_name='Traffic Report', lang=self._lang)
         body = (
@@ -691,7 +703,13 @@ class HtmlExporter:
             f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
             '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n'
             f"<title>{t('rpt_page_title_traffic', lang=self._lang)}</title>" + _CSS + _HIGHLIGHT_CSS + '</head>\n'
-            f'<body data-report-title="{_report_title}">' + cover_html + nav_html + '<main>' + body + '</main>'
+            f'<body data-report-title="{_report_title}">'
+            + cover_html
+            + '<div class="report-shell">'
+            + nav_html
+            + '<main class="report-main">'
+            + body
+            + '</main></div>'
             + TABLE_JS + '</body></html>'
         )
 

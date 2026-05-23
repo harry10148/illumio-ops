@@ -59,8 +59,43 @@ def build_cover_page(
         if org_name else '<div></div>'
     )
 
+    meta_items = []
+    meta_items.append(
+        f'<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--slate-50);margin-bottom:2px">'
+        f'{_s("rpt_cover_generated", lang)}</div>'
+        f'<strong>{now_str}</strong></div>'
+    )
+    if date_str:
+        meta_items.append(
+            f'<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--slate-50);margin-bottom:2px">'
+            f'{_s("rpt_cover_date_range", lang)}</div>'
+            f'<strong>{date_str}</strong></div>'
+        )
+    if pce_url:
+        meta_items.append(
+            f'<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--slate-50);margin-bottom:2px">'
+            f'PCE</div>'
+            f'<strong>{pce_url}</strong></div>'
+        )
+    if org_name:
+        meta_items.append(
+            f'<div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--slate-50);margin-bottom:2px">'
+            f'{_s("rpt_cover_org", lang) if _s("rpt_cover_org", lang) != "rpt_cover_org" else "Organization"}</div>'
+            f'<strong>{org_name}</strong></div>'
+        )
+    meta_html = '<div class="meta">' + ''.join(meta_items) + '</div>' if meta_items else ''
+
     return (
-        '<section class="report-cover card" id="cover">'
+        # Screen cover block (inside report-main, shown as first content element)
+        '<div class="report-cover-block screen-only">'
+        '<p class="eyebrow">Illumio PCE Ops</p>'
+        f'<h1>{title}</h1>'
+        + (f'<p class="sub">{report_type}</p>' if report_type and report_type != title else '')
+        + grade_block
+        + meta_html
+        + '</div>'
+        # Print-only full-page cover (always present but display:none on screen)
+        + '<section class="report-cover card print-only" id="cover">'
         '<div>'
         '<div class="cover-eyebrow">Illumio Operations</div>'
         f'<div class="cover-title">{title}</div>'

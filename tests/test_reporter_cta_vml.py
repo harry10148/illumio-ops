@@ -13,14 +13,16 @@ def test_cta_has_mso_conditional_vml():
     assert '<a href=' in html
 
 
-def test_cta_signal_color_used_in_vml():
-    """VML fillcolor should match SIGNAL_HEX for the chosen severity."""
-    from src.reporter import SIGNAL_HEX
+def test_cta_is_neutral_white_button():
+    """R3: CTA buttons are white/neutral (no colored fill) with grey border."""
     html = Reporter._render_cta("Open", "https://x/y", severity='danger')
-    expected = SIGNAL_HEX['danger']
-    assert expected in html
-    # Appears at least twice: once in VML fillcolor, once in HTML inline style
-    assert html.count(expected) >= 2
+    # VML uses white fill + grey stroke
+    assert 'fillcolor="#ffffff"' in html.lower()
+    assert 'strokecolor="#e5e5e5"' in html.lower()
+    # Non-MSO uses white background
+    assert 'bgcolor="#ffffff"' in html.lower()
+    # Link text is dark, not white
+    assert 'color:#0a0a0a' in html
 
 
 def test_cta_label_is_html_escaped_in_both_branches():

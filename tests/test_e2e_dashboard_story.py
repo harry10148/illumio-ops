@@ -28,17 +28,19 @@ def _js():
 
 def test_story_pieces_all_present_in_template():
     html = _html()
+    # ID-based anchors: exact match (IDs must be unique)
     for anchor in (
         'id="d-hero"',
         'id="d-hero-cta"',
-        'class="card story-card story-card--health"',
-        'class="card story-card story-card--traffic"',
-        'class="card story-card story-card--risk"',
         'id="d-maturity"',
         'id="d-top-actions-grid"',
         'id="d-detailed-kpis"',
     ):
         assert anchor in html, f"missing template anchor: {anchor}"
+    # Class anchors: tolerate additional classes (extra wrappers allowed)
+    for cls in ("story-card--health", "story-card--traffic", "story-card--risk"):
+        pattern = re.compile(r'class="[^"]*\b' + re.escape(cls) + r'\b[^"]*"')
+        assert pattern.search(html), f"missing template class: {cls}"
 
 
 def test_snapshot_loader_invokes_full_story_pipeline():

@@ -20,10 +20,10 @@ STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
 
 # D.3 signal palette — used by _render_cta for cross-surface consistent CTA color.
 SIGNAL_HEX = {
-    'success': '#2D9B5E',
-    'warning': '#C47A00',
-    'danger':  '#D93025',
-    'info':    '#0077CC',
+    'success': '#16a34a',
+    'warning': '#d97706',
+    'danger':  '#dc2626',
+    'info':    '#2563eb',
 }
 
 class Reporter:
@@ -409,37 +409,37 @@ class Reporter:
 
             badges = "".join(
                 [
-                    f"<span style='display:inline-block; background:#E5F2F9; color:#2D454C; padding:2px 5px; border-radius:4px; font-size:10px; margin:2px 3px 0 0; border:1px solid #C2E2F0;'>{esc(l.get('key'))}:{esc(l.get('value'))}</span>"
+                    f"<span style='display:inline-block; background:#fafafa; color:#6f6f6f; padding:2px 5px; border-radius:4px; font-size:10px; margin:2px 3px 0 0; border:1px solid #e5e5e5;'>{esc(l.get('key'))}:{esc(l.get('value'))}</span>"
                     for l in labels
                 ]
             )
             proc_label = esc(t("alert_snap_process"))
             user_label = esc(t("alert_snap_user"))
             proc_line = (
-                f"<div style='font-size:10px; color:#313638; margin-top:4px;'><strong>{proc_label}:</strong> {esc(proc)}</div>"
+                f"<div style='font-size:10px; color:#0a0a0a; margin-top:4px;'><strong>{proc_label}:</strong> {esc(proc)}</div>"
                 if proc
                 else ""
             )
             user_line = (
-                f"<div style='font-size:10px; color:#6F7274;'><strong>{user_label}:</strong> {esc(user)}</div>"
+                f"<div style='font-size:10px; color:#6f6f6f;'><strong>{user_label}:</strong> {esc(user)}</div>"
                 if user
                 else ""
             )
             return (
-                f"<strong style='color:#FF5500;'>{esc(name)}</strong><br><small style='color:#313638;'>{esc(ip)}</small>"
+                f"<strong style='color:#0a0a0a;'>{esc(name)}</strong><br><small style='color:#6f6f6f;'>{esc(ip)}</small>"
                 f"{proc_line}{user_line}<div style='margin-top:2px;'>{badges}</div>"
             )
 
-        table_html = "<table style='width:100%; border-collapse:collapse; font-family:\"Montserrat\",Arial,sans-serif; font-size:12px; border:1px solid #D6D7D7;'>"
-        table_html += "<tr style='background-color:#1A2C32; color:#FFFFFF; text-align:left;'>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:96px;'>{snapshot_labels['value']}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:132px;'>{snapshot_labels['first_seen']} /<br>{snapshot_labels['last_seen']}</th>"
-        table_html += f"<th style='padding:10px 6px; border:1px solid #325158; width:72px; text-align:center;'>{snapshot_labels['direction']}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158;'>{snapshot_labels['source']}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158;'>{snapshot_labels['destination']}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:88px;'>{snapshot_labels['service']}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:74px; text-align:center;'>{snapshot_labels['connections']}</th>"
-        table_html += f"<th style='padding:10px 8px; border:1px solid #325158; width:88px;'>{snapshot_labels['decision']}</th>"
+        table_html = "<table style='width:100%; border-collapse:collapse; font-family:Inter,-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,Arial,sans-serif; font-size:12px; border:1px solid #e5e5e5;'>"
+        table_html += "<tr style='background-color:#fafafa; color:#0a0a0a; text-align:left; border-bottom:1px solid #e5e5e5;'>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #e5e5e5; width:96px; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#6f6f6f;'>{snapshot_labels['value']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #e5e5e5; width:132px; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#6f6f6f;'>{snapshot_labels['first_seen']} /<br>{snapshot_labels['last_seen']}</th>"
+        table_html += f"<th style='padding:10px 6px; border:1px solid #e5e5e5; width:72px; text-align:center; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#6f6f6f;'>{snapshot_labels['direction']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #e5e5e5; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#6f6f6f;'>{snapshot_labels['source']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #e5e5e5; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#6f6f6f;'>{snapshot_labels['destination']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #e5e5e5; width:88px; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#6f6f6f;'>{snapshot_labels['service']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #e5e5e5; width:74px; text-align:center; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#6f6f6f;'>{snapshot_labels['connections']}</th>"
+        table_html += f"<th style='padding:10px 8px; border:1px solid #e5e5e5; width:88px; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#6f6f6f;'>{snapshot_labels['decision']}</th>"
         table_html += "</tr>"
 
         for i, d in enumerate(data_list):
@@ -466,21 +466,21 @@ class Reporter:
             proto_str = "TCP" if proto == 6 else "UDP" if proto == 17 else str(proto)
             count = d.get("num_connections") or d.get("count") or 1
             pd_map = {
-                "blocked": "<span style='display:inline-block; color:white; background:#BE122F; padding:2px 8px; border-radius:4px; font-weight:700; font-size:10px;'>Blocked</span>",
-                "potentially_blocked": "<span style='display:inline-block; color:white; background:#F97607; padding:2px 8px; border-radius:4px; font-weight:700; font-size:10px;'>Potential</span>",
-                "allowed": "<span style='display:inline-block; color:white; background:#166644; padding:2px 8px; border-radius:4px; font-weight:700; font-size:10px;'>Allowed</span>",
+                "blocked": "<span style='display:inline-block; color:#6f6f6f; background:#fafafa; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; border:1px solid #e5e5e5;'><span style='display:inline-block;width:6px;height:6px;background:#dc2626;border-radius:50%;margin-right:4px;vertical-align:middle;'></span>Blocked</span>",
+                "potentially_blocked": "<span style='display:inline-block; color:#6f6f6f; background:#fafafa; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; border:1px solid #e5e5e5;'><span style='display:inline-block;width:6px;height:6px;background:#d97706;border-radius:50%;margin-right:4px;vertical-align:middle;'></span>Potential</span>",
+                "allowed": "<span style='display:inline-block; color:#6f6f6f; background:#fafafa; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; border:1px solid #e5e5e5;'><span style='display:inline-block;width:6px;height:6px;background:#16a34a;border-radius:50%;margin-right:4px;vertical-align:middle;'></span>Allowed</span>",
             }
             decision = str(d.get("policy_decision")).lower()
             decision_html = pd_map.get(decision, esc(decision))
             table_html += f"<tr style='background:{row_bg};'>"
-            table_html += f"<td style='padding:10px 8px; border:1px solid #D6D7D7; font-weight:700; color:#FF5500;'>{val_str}</td>"
-            table_html += f"<td style='padding:10px 8px; border:1px solid #D6D7D7; white-space:nowrap; font-size:10px; color:#6F7274;'>{t_first}<br>{t_last}</td>"
-            table_html += f"<td style='padding:10px 6px; border:1px solid #D6D7D7; text-align:center; font-weight:700; color:#313638;'>{esc(direction)}</td>"
-            table_html += f"<td style='padding:10px; border:1px solid #D6D7D7; word-break:break-word;'>{actor_view(d, True)}</td>"
-            table_html += f"<td style='padding:10px; border:1px solid #D6D7D7; word-break:break-word;'>{actor_view(d, False)}</td>"
-            table_html += f"<td style='padding:10px 6px; border:1px solid #D6D7D7; text-align:center; color:#313638;'>{esc(port)} / {esc(proto_str)}</td>"
-            table_html += f"<td style='padding:10px 8px; border:1px solid #D6D7D7; text-align:center; color:#313638;'><strong>{esc(count)}</strong></td>"
-            table_html += f"<td style='padding:10px 8px; border:1px solid #D6D7D7;'>{decision_html}</td>"
+            table_html += f"<td style='padding:10px 8px; border:1px solid #e5e5e5; font-weight:600; color:#0a0a0a;'>{val_str}</td>"
+            table_html += f"<td style='padding:10px 8px; border:1px solid #e5e5e5; white-space:nowrap; font-size:10px; color:#6f6f6f;'>{t_first}<br>{t_last}</td>"
+            table_html += f"<td style='padding:10px 6px; border:1px solid #e5e5e5; text-align:center; font-weight:600; color:#0a0a0a;'>{esc(direction)}</td>"
+            table_html += f"<td style='padding:10px; border:1px solid #e5e5e5; word-break:break-word;'>{actor_view(d, True)}</td>"
+            table_html += f"<td style='padding:10px; border:1px solid #e5e5e5; word-break:break-word;'>{actor_view(d, False)}</td>"
+            table_html += f"<td style='padding:10px 6px; border:1px solid #e5e5e5; text-align:center; color:#0a0a0a;'>{esc(port)} / {esc(proto_str)}</td>"
+            table_html += f"<td style='padding:10px 8px; border:1px solid #e5e5e5; text-align:center; color:#0a0a0a;'><strong>{esc(count)}</strong></td>"
+            table_html += f"<td style='padding:10px 8px; border:1px solid #e5e5e5;'>{decision_html}</td>"
             table_html += "</tr>"
 
         table_html += "</table>"
@@ -593,7 +593,6 @@ class Reporter:
         import html as _html
         label_html = _html.escape(label)
         url_html = _html.escape(url, quote=True)
-        bg = SIGNAL_HEX.get(severity, SIGNAL_HEX['info'])
         return (
             # MSO (Outlook) — VML rounded rectangle
             f'<!--[if mso]>'
@@ -601,9 +600,9 @@ class Reporter:
             f'xmlns:w="urn:schemas-microsoft-com:office:word" '
             f'href="{url_html}" '
             f'style="height:40px;v-text-anchor:middle;width:200px;" '
-            f'arcsize="10%" stroke="f" fillcolor="{bg}">'
+            f'arcsize="10%" stroke="t" strokecolor="#e5e5e5" fillcolor="#ffffff">'
             f'<w:anchorlock/>'
-            f'<center style="color:#FFFFFF;font-family:Arial,sans-serif;'
+            f'<center style="color:#0a0a0a;font-family:Arial,sans-serif;'
             f'font-size:14px;font-weight:600;">{label_html}</center>'
             f'</v:roundrect>'
             f'<![endif]-->'
@@ -611,9 +610,9 @@ class Reporter:
             f'<!--[if !mso]><!-- -->'
             f'<table role="presentation" border="0" cellpadding="0" cellspacing="0" '
             f'style="margin:16px 0;">'
-            f'<tr><td bgcolor="{bg}" style="border-radius:4px;background:{bg};">'
+            f'<tr><td bgcolor="#ffffff" style="border-radius:4px;background:#ffffff;border:1px solid #e5e5e5;">'
             f'<a href="{url_html}" '
-            f'style="display:inline-block;padding:10px 20px;color:#FFFFFF;'
+            f'style="display:inline-block;padding:10px 20px;color:#0a0a0a;'
             f'text-decoration:none;font-weight:600;font-family:Arial,sans-serif;">'
             f'{label_html}</a>'
             f'</td></tr></table>'
@@ -647,13 +646,15 @@ class Reporter:
             'info':     ('INFO', SIGNAL_HEX['info']),
             'low':      ('INFO', SIGNAL_HEX['info']),
         }
-        label, bg = mapping.get(sev_norm, mapping['info'])
+        label, dot_color = mapping.get(sev_norm, mapping['info'])
         label_html = _html.escape(label)
         return (
-            f'<span bgcolor="{bg}" '
-            f'style="display:inline-block;padding:2px 6px;margin-right:6px;'
-            f'background:{bg};color:#FFFFFF;font-size:11px;font-weight:700;'
-            f'font-family:Arial,sans-serif;border-radius:3px;letter-spacing:0.5px;">'
+            f'<span style="display:inline-block;padding:2px 6px;margin-right:6px;'
+            f'background:#fafafa;color:#6f6f6f;font-size:11px;font-weight:600;'
+            f'font-family:Arial,sans-serif;border-radius:3px;letter-spacing:0.5px;'
+            f'border:1px solid #e5e5e5;">'
+            f'<span style="display:inline-block;width:6px;height:6px;background:{dot_color};'
+            f'border-radius:50%;margin-right:5px;vertical-align:middle;"></span>'
             f'{label_html}</span>'
         )
 
@@ -670,7 +671,7 @@ class Reporter:
         url_html = _html.escape(str(runbook_url), quote=True)
         return (
             f' <a href="{url_html}" '
-            f'style="color:#0077CC;text-decoration:underline;font-size:12px;'
+            f'style="color:#2563eb;text-decoration:underline;font-size:12px;'
             f'font-family:Arial,sans-serif;">Runbook ↗</a>'
         )
 
@@ -1042,7 +1043,7 @@ class Reporter:
             ):
                 if value:
                     meta_cells.append(
-                        f"<td style='padding:8px 10px;border:1px solid #E6E2D8;font-size:12px;vertical-align:top;'><strong style='display:block;color:#6F7274;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;'>{label}</strong>{esc(value)}</td>"
+                        f"<td style='padding:8px 10px;border:1px solid #e5e5e5;font-size:12px;vertical-align:top;'><strong style='display:block;color:#6f6f6f;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;'>{label}</strong>{esc(value)}</td>"
                     )
 
             action_rows = []
@@ -1055,12 +1056,12 @@ class Reporter:
             ):
                 if value:
                     action_rows.append(
-                        f"<tr><td style='padding:6px 8px;color:#6F7274;width:26%;border-bottom:1px solid #F0ECE4;'>{label}</td><td style='padding:6px 8px;border-bottom:1px solid #F0ECE4;word-break:break-word;'>{esc(value)}</td></tr>"
+                        f"<tr><td style='padding:6px 8px;color:#6f6f6f;width:26%;border-bottom:1px solid #f0f0f0;'>{label}</td><td style='padding:6px 8px;border-bottom:1px solid #f0f0f0;word-break:break-word;'>{esc(value)}</td></tr>"
                     )
             if isinstance(action.get("info"), dict):
                 for key, value in list(action["info"].items())[:4]:
                     action_rows.append(
-                        f"<tr><td style='padding:6px 8px;color:#6F7274;width:26%;border-bottom:1px solid #F0ECE4;'>{esc(key)}</td><td style='padding:6px 8px;border-bottom:1px solid #F0ECE4;word-break:break-word;'>{esc(value)}</td></tr>"
+                        f"<tr><td style='padding:6px 8px;color:#6f6f6f;width:26%;border-bottom:1px solid #f0f0f0;'>{esc(key)}</td><td style='padding:6px 8px;border-bottom:1px solid #f0f0f0;word-break:break-word;'>{esc(value)}</td></tr>"
                     )
 
             change_blocks = []
@@ -1068,63 +1069,63 @@ class Reporter:
                 diff_rows = []
                 for diff in change.get("changes", [])[:5]:
                     diff_rows.append(
-                        f"<tr><td style='padding:4px 6px;border-bottom:1px solid #F0ECE4;color:#6F7274;'>{esc(diff.get('field', ''))}</td><td style='padding:4px 6px;border-bottom:1px solid #F0ECE4;color:#BE122F;'>{esc(diff.get('before', '')) or '—'}</td><td style='padding:4px 6px;border-bottom:1px solid #F0ECE4;color:#166644;'>{esc(diff.get('after', '')) or '—'}</td></tr>"
+                        f"<tr><td style='padding:4px 6px;border-bottom:1px solid #f0f0f0;color:#6f6f6f;'>{esc(diff.get('field', ''))}</td><td style='padding:4px 6px;border-bottom:1px solid #f0f0f0;color:#dc2626;'>{esc(diff.get('before', '')) or '—'}</td><td style='padding:4px 6px;border-bottom:1px solid #f0f0f0;color:#16a34a;'>{esc(diff.get('after', '')) or '—'}</td></tr>"
                     )
                 diff_table = (
                     "<table style='width:100%;border-collapse:collapse;font-size:11px;margin-top:6px;'>"
-                    "<tr><th style='text-align:left;padding:4px 6px;background:#F8F5EF;'>Field</th><th style='text-align:left;padding:4px 6px;background:#F8F5EF;'>Before</th><th style='text-align:left;padding:4px 6px;background:#F8F5EF;'>After</th></tr>"
+                    "<tr><th style='text-align:left;padding:4px 6px;background:#fafafa;'>Field</th><th style='text-align:left;padding:4px 6px;background:#fafafa;'>Before</th><th style='text-align:left;padding:4px 6px;background:#fafafa;'>After</th></tr>"
                     + "".join(diff_rows)
                     + "</table>"
                 ) if diff_rows else ""
                 change_blocks.append(
-                    f"<div style='padding:10px 12px;border:1px solid #E6E2D8;border-radius:10px;background:#FFFFFF;margin-top:8px;'>"
-                    f"<div style='font-size:12px;font-weight:700;color:#24393F;'>{esc(change.get('change_type', 'update').upper())} {esc(change.get('resource_type', 'resource'))}</div>"
-                    f"<div style='font-size:12px;color:#6F7274;margin-top:4px;'>{esc(change.get('resource_name', ''))}</div>"
+                    f"<div style='padding:10px 12px;border:1px solid #e5e5e5;border-radius:6px;background:#FFFFFF;margin-top:8px;'>"
+                    f"<div style='font-size:12px;font-weight:600;color:#0a0a0a;'>{esc(change.get('change_type', 'update').upper())} {esc(change.get('resource_type', 'resource'))}</div>"
+                    f"<div style='font-size:12px;color:#6f6f6f;margin-top:4px;'>{esc(change.get('resource_name', ''))}</div>"
                     f"{diff_table}</div>"
                 )
 
             notification_blocks = []
             for notification in event.get("notifications", [])[:3]:
                 notification_blocks.append(
-                    f"<div style='padding:10px 12px;border:1px solid #E6E2D8;border-radius:10px;background:#FFFFFF;margin-top:8px;'>"
-                    f"<div style='font-size:12px;font-weight:700;color:#24393F;'>{esc(notification.get('notification_type', 'notification'))}</div>"
-                    f"<div style='font-size:12px;color:#6F7274;margin-top:4px;word-break:break-word;'>{esc(notification.get('summary', ''))}</div>"
+                    f"<div style='padding:10px 12px;border:1px solid #e5e5e5;border-radius:6px;background:#FFFFFF;margin-top:8px;'>"
+                    f"<div style='font-size:12px;font-weight:600;color:#0a0a0a;'>{esc(notification.get('notification_type', 'notification'))}</div>"
+                    f"<div style='font-size:12px;color:#6f6f6f;margin-top:4px;word-break:break-word;'>{esc(notification.get('summary', ''))}</div>"
                     f"</div>"
                 )
 
             parser_notes = ""
             if event.get("parser_notes"):
-                parser_notes = f"<div style='margin-top:10px;font-size:11px;color:#8B407A;'>Parser Notes: {esc(', '.join(event.get('parser_notes', [])))}</div>"
+                parser_notes = f"<div style='margin-top:10px;font-size:11px;color:#7c3aed;'>Parser Notes: {esc(', '.join(event.get('parser_notes', [])))}</div>"
 
             pce_link = ""
             if event.get("pce_link"):
                 pce_link = (
                     f"<div style='margin-top:12px;'><a href='{esc(event['pce_link'])}' "
-                    f"style='display:inline-block;background:#1A2C32;color:#FFFFFF;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:700;'>View on PCE</a></div>"
+                    f"style='display:inline-block;background:#ffffff;color:#0a0a0a;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;border:1px solid #e5e5e5;'>View on PCE</a></div>"
                 )
             resource_changes_html = ""
             if event.get("resource_changes_count"):
                 resource_changes_html = (
-                    f"<div style='margin-top:12px;'><div style='font-size:12px;font-weight:800;color:#24393F;'>"
+                    f"<div style='margin-top:12px;'><div style='font-size:12px;font-weight:600;color:#0a0a0a;'>"
                     f"Resource Changes ({event.get('resource_changes_count', 0)})</div>{''.join(change_blocks)}</div>"
                 )
             notifications_html = ""
             if event.get("notifications_count"):
                 notifications_html = (
-                    f"<div style='margin-top:12px;'><div style='font-size:12px;font-weight:800;color:#24393F;'>"
+                    f"<div style='margin-top:12px;'><div style='font-size:12px;font-weight:600;color:#0a0a0a;'>"
                     f"Notifications ({event.get('notifications_count', 0)})</div>{''.join(notification_blocks)}</div>"
                 )
 
             action_rows_html = "".join(action_rows)
             if not action_rows_html:
-                action_rows_html = '<tr><td style="padding:8px 10px;color:#6F7274;">No action details</td></tr>'
+                action_rows_html = '<tr><td style="padding:8px 10px;color:#6f6f6f;">No action details</td></tr>'
             sections.append(
-                f"<div style='margin-top:14px;padding:16px;border:1px solid #E6E2D8;border-radius:16px;background:#FFFDFC;'>"
-                f"<div style='padding:12px 14px;background:#1A2C32;color:#FFFFFF;border-radius:12px 12px 0 0;font-size:16px;font-weight:800;'>{esc(event.get('event_type', 'event'))}</div>"
-                f"<table style='width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #E6E2D8;border-top:none;'><tr>{''.join(meta_cells)}</tr></table>"
+                f"<div style='margin-top:14px;padding:16px;border:1px solid #e5e5e5;border-radius:8px;background:#FFFFFF;'>"
+                f"<div style='padding:12px 14px;background:#fafafa;color:#0a0a0a;border-radius:6px 6px 0 0;font-size:14px;font-weight:600;border-left:3px solid #2563eb;'>{esc(event.get('event_type', 'event'))}</div>"
+                f"<table style='width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #e5e5e5;border-top:none;'><tr>{''.join(meta_cells)}</tr></table>"
                 f"<div style='margin-top:10px;'>"
-                f"<div style='font-size:12px;font-weight:800;color:#24393F;margin-bottom:6px;'>API Action</div>"
-                f"<table style='width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #E6E2D8;border-radius:10px;overflow:hidden;'>{action_rows_html}</table>"
+                f"<div style='font-size:12px;font-weight:600;color:#0a0a0a;margin-bottom:6px;'>API Action</div>"
+                f"<table style='width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #e5e5e5;border-radius:6px;overflow:hidden;'>{action_rows_html}</table>"
                 f"</div>"
                 f"{resource_changes_html}"
                 f"{notifications_html}"
@@ -1134,7 +1135,7 @@ class Reporter:
         if len(payload["events"]) > 5:
             tail = esc(t("alert_field_event_tail", count=len(payload["events"]) - 5))
             sections.append(
-                f"<div style='margin-top:8px;font-size:11px;color:#6F7274;'>{tail}</div>"
+                f"<div style='margin-top:8px;font-size:11px;color:#6f6f6f;'>{tail}</div>"
             )
         return "".join(sections)
 
@@ -1178,32 +1179,32 @@ class Reporter:
 
         # verb → (label, fg color, bg color); label resolved via i18n key.
         _VERB_META = {
-            'create':                       ('alert_verb_create',                   '#166644', '#D1FAE5'),
-            'update':                       ('alert_verb_update',                   '#F97607', '#FFF3CD'),
-            'delete':                       ('alert_verb_delete',                   '#BE122F', '#FEE2E2'),
-            'sign_in':                      ('alert_verb_sign_in',                  '#325158', '#E0F2FE'),
-            'sign_out':                     ('alert_verb_sign_out',                 '#325158', '#E0F2FE'),
-            'authentication_failed':        ('alert_verb_authentication_failed',    '#BE122F', '#FEE2E2'),
-            'tampering':                    ('alert_verb_tampering',                '#BE122F', '#FEE2E2'),
-            'suspend':                      ('alert_verb_suspend',                  '#F97607', '#FFF3CD'),
-            'clone_detected':               ('alert_verb_clone_detected',           '#BE122F', '#FEE2E2'),
-            'csrf_validation_failure':      ('alert_verb_csrf_validation_failure',  '#BE122F', '#FEE2E2'),
-            'unpair':                       ('alert_verb_unpair',                   '#BE122F', '#FEE2E2'),
-            'deactivate':                   ('alert_verb_deactivate',               '#F97607', '#FFF3CD'),
-            'activate':                     ('alert_verb_activate',                 '#166644', '#D1FAE5'),
-            'goodbye':                      ('alert_verb_goodbye',                  '#325158', '#E0F2FE'),
-            'refresh_policy':               ('alert_verb_refresh_policy',           '#325158', '#E0F2FE'),
-            'agent_missed_heartbeats_check':('alert_verb_missed_heartbeats_check',  '#F97607', '#FFF3CD'),
-            'agent_offline_check':          ('alert_verb_offline_check',            '#F97607', '#FFF3CD'),
-            'missed_heartbeats_check':      ('alert_verb_missed_heartbeats_check',  '#F97607', '#FFF3CD'),
-            'offline_check':                ('alert_verb_offline_check',            '#F97607', '#FFF3CD'),
-            'found':                        ('alert_verb_found',                    '#166644', '#D1FAE5'),
-            'service_not_available':        ('alert_verb_service_not_available',    '#BE122F', '#FEE2E2'),
-            'authenticate':                 ('alert_verb_authenticate',             '#166644', '#D1FAE5'),
-            'login_session_terminated':     ('alert_verb_login_session_terminated', '#F97607', '#FFF3CD'),
-            'pce_session_terminated':       ('alert_verb_pce_session_terminated',   '#F97607', '#FFF3CD'),
-            'authorization_failed':         ('alert_verb_authorization_failed',     '#BE122F', '#FEE2E2'),
-            'pce_health':                   ('alert_verb_pce_health',               '#F97607', '#FFF3CD'),
+            'create':                       ('alert_verb_create',                   '#16a34a', '#f0fdf4'),
+            'update':                       ('alert_verb_update',                   '#d97706', '#fffbeb'),
+            'delete':                       ('alert_verb_delete',                   '#dc2626', '#fef2f2'),
+            'sign_in':                      ('alert_verb_sign_in',                  '#2563eb', '#eff6ff'),
+            'sign_out':                     ('alert_verb_sign_out',                 '#2563eb', '#eff6ff'),
+            'authentication_failed':        ('alert_verb_authentication_failed',    '#dc2626', '#fef2f2'),
+            'tampering':                    ('alert_verb_tampering',                '#dc2626', '#fef2f2'),
+            'suspend':                      ('alert_verb_suspend',                  '#d97706', '#fffbeb'),
+            'clone_detected':               ('alert_verb_clone_detected',           '#dc2626', '#fef2f2'),
+            'csrf_validation_failure':      ('alert_verb_csrf_validation_failure',  '#dc2626', '#fef2f2'),
+            'unpair':                       ('alert_verb_unpair',                   '#dc2626', '#fef2f2'),
+            'deactivate':                   ('alert_verb_deactivate',               '#d97706', '#fffbeb'),
+            'activate':                     ('alert_verb_activate',                 '#16a34a', '#f0fdf4'),
+            'goodbye':                      ('alert_verb_goodbye',                  '#2563eb', '#eff6ff'),
+            'refresh_policy':               ('alert_verb_refresh_policy',           '#2563eb', '#eff6ff'),
+            'agent_missed_heartbeats_check':('alert_verb_missed_heartbeats_check',  '#d97706', '#fffbeb'),
+            'agent_offline_check':          ('alert_verb_offline_check',            '#d97706', '#fffbeb'),
+            'missed_heartbeats_check':      ('alert_verb_missed_heartbeats_check',  '#d97706', '#fffbeb'),
+            'offline_check':                ('alert_verb_offline_check',            '#d97706', '#fffbeb'),
+            'found':                        ('alert_verb_found',                    '#16a34a', '#f0fdf4'),
+            'service_not_available':        ('alert_verb_service_not_available',    '#dc2626', '#fef2f2'),
+            'authenticate':                 ('alert_verb_authenticate',             '#16a34a', '#f0fdf4'),
+            'login_session_terminated':     ('alert_verb_login_session_terminated', '#d97706', '#fffbeb'),
+            'pce_session_terminated':       ('alert_verb_pce_session_terminated',   '#d97706', '#fffbeb'),
+            'authorization_failed':         ('alert_verb_authorization_failed',     '#dc2626', '#fef2f2'),
+            'pce_health':                   ('alert_verb_pce_health',               '#d97706', '#fffbeb'),
         }
         _VERB_STYLE = {
             verb: (t(key), fg, bg) for verb, (key, fg, bg) in _VERB_META.items()
@@ -1268,20 +1269,20 @@ class Reporter:
                 return ''
             rows = "<table style='width:100%; border-collapse:collapse; margin-top:6px; font-size:10px;'>"
             rows += ("<tr>"
-                     f"<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:24%;'>{esc(_COL_FIELD)}</th>"
-                     f"<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:38%;'>{esc(_COL_BEFORE)}</th>"
-                     f"<th style='text-align:left; padding:3px 6px; background:#24393F; color:#D6D7D7; width:38%;'>{esc(_COL_AFTER)}</th>"
+                     f"<th style='text-align:left; padding:3px 6px; background:#fafafa; color:#6f6f6f; width:24%;'>{esc(_COL_FIELD)}</th>"
+                     f"<th style='text-align:left; padding:3px 6px; background:#fafafa; color:#6f6f6f; width:38%;'>{esc(_COL_BEFORE)}</th>"
+                     f"<th style='text-align:left; padding:3px 6px; background:#fafafa; color:#6f6f6f; width:38%;'>{esc(_COL_AFTER)}</th>"
                      "</tr>")
             for k, bv, av in changes[:5]:
                 field_label = _FIELD_LABELS.get(k, k)
                 rows += (f"<tr>"
-                         f"<td style='padding:3px 6px; border-bottom:1px solid #E3D8C5; color:#989A9B;'>{esc(field_label)}</td>"
-                         f"<td style='padding:3px 6px; border-bottom:1px solid #E3D8C5; color:#BE122F; word-break:break-word;'>{esc(_fmt_val(bv))}</td>"
-                         f"<td style='padding:3px 6px; border-bottom:1px solid #E3D8C5; color:#166644; word-break:break-word;'>{esc(_fmt_val(av))}</td>"
+                         f"<td style='padding:3px 6px; border-bottom:1px solid #f0f0f0; color:#a8a8a8;'>{esc(field_label)}</td>"
+                         f"<td style='padding:3px 6px; border-bottom:1px solid #f0f0f0; color:#dc2626; word-break:break-word;'>{esc(_fmt_val(bv))}</td>"
+                         f"<td style='padding:3px 6px; border-bottom:1px solid #f0f0f0; color:#16a34a; word-break:break-word;'>{esc(_fmt_val(av))}</td>"
                          f"</tr>")
             if len(changes) > 5:
                 overflow = esc(t('alert_field_changes_overflow', count=len(changes) - 5))
-                rows += f"<tr><td colspan='3' style='padding:3px 6px; color:#989A9B;'>{overflow}</td></tr>"
+                rows += f"<tr><td colspan='3' style='padding:3px 6px; color:#a8a8a8;'>{overflow}</td></tr>"
             rows += "</table>"
             return rows
 
@@ -1303,7 +1304,7 @@ class Reporter:
             resource_label = _RESOURCE_LABELS.get(resource_prefix, resource_prefix.replace('_', ' ').title())
             verb_label, verb_color, verb_bg = _VERB_STYLE.get(
                 verb_key,
-                (verb_key.replace('_', ' ').title() or _EVT_FALLBACK, '#325158', '#E0F2FE'),
+                (verb_key.replace('_', ' ').title() or _EVT_FALLBACK, '#2563eb', '#eff6ff'),
             )
 
             rc = ev.get('resource_changes')
@@ -1347,21 +1348,21 @@ class Reporter:
             if parsed.get('parser_notes'):
                 extras.append(t('alert_ext_parser_notes', notes=", ".join(parsed.get('parser_notes'))))  # type: ignore[arg-type]
 
-            status_color = '#166644' if status == 'success' else '#BE122F'
+            status_color = '#16a34a' if status == 'success' else '#dc2626'
             status_label = _STATUS_LABELS.get(status.lower(), status.upper())
             diff_html = _diff_rows(before, after)
 
             card = (
-                f"<div style='padding:8px 10px; background:#F7F4EE; border-left:3px solid {verb_color};"
-                f" margin-bottom:6px; border-radius:0 4px 4px 0;'>"
+                f"<div style='padding:8px 10px; background:#fafafa; border-left:3px solid {verb_color};"
+                f" margin-bottom:6px; border-radius:0 4px 4px 0; border:1px solid #e5e5e5; border-left-width:3px;'>"
                 f"<div style='display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:4px;'>"
-                f"<span style='background:{verb_bg}; color:{verb_color}; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700;'>{esc(verb_label)}</span>"
-                f"<span style='background:#EDE9FE; color:#8B407A; padding:2px 6px; border-radius:4px; font-size:10px;'>{esc(resource_label)}</span>"
+                f"<span style='background:{verb_bg}; color:{verb_color}; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600;'>{esc(verb_label)}</span>"
+                f"<span style='background:#f5f3ff; color:#7c3aed; padding:2px 6px; border-radius:4px; font-size:10px;'>{esc(resource_label)}</span>"
                 f"<span style='color:{status_color}; border:1px solid {status_color}; padding:1px 5px; border-radius:4px; font-size:10px;'>{esc(status_label)}</span>"
-                f"<code style='font-size:10px; color:#8B407A; margin-left:2px;'>{esc(event_type)}</code>"
-                f"<span style='margin-left:auto; font-size:10px; color:#989A9B; white-space:nowrap;'>{esc(ts)}</span>"
+                f"<code style='font-size:10px; color:#7c3aed; margin-left:2px;'>{esc(event_type)}</code>"
+                f"<span style='margin-left:auto; font-size:10px; color:#a8a8a8; white-space:nowrap;'>{esc(ts)}</span>"
                 f"</div>"
-                f"<div style='font-size:11px; color:#313638;'>{esc(t('alert_ext_source', source=actor))}"
+                f"<div style='font-size:11px; color:#0a0a0a;'>{esc(t('alert_ext_source', source=actor))}"
             )
             if extras:
                 card += f"&nbsp; &bull; &nbsp;{esc(' | '.join(extras))}"
@@ -1374,7 +1375,7 @@ class Reporter:
         if len(events) > 5:
             tail_short = esc(t('alert_field_event_tail_short', count=len(events) - 5))
             cards.append(
-                f"<div style='font-size:10px; color:#989A9B; padding:2px 6px;'>{tail_short}</div>"
+                f"<div style='font-size:10px; color:#a8a8a8; padding:2px 6px;'>{tail_short}</div>"
             )
 
         return "".join(cards)
@@ -1399,19 +1400,19 @@ class Reporter:
 
         generated_at = self._now_str()
         summary_items = [
-            (t("alert_sec_health"),  len(self.health_alerts), "#FDECEC", "#BE122F"),
-            (t("alert_sec_event"),   len(self.event_alerts),  "#E5F2F9", "#1A2C32"),
-            (t("alert_sec_traffic"), len(self.traffic_alerts),"#FFF0E3", "#FF5500"),
-            (t("alert_sec_metric"),  len(self.metric_alerts), "#FFF5E8", "#F97607"),
+            (t("alert_sec_health"),  len(self.health_alerts), "#dc2626"),
+            (t("alert_sec_event"),   len(self.event_alerts),  "#2563eb"),
+            (t("alert_sec_traffic"), len(self.traffic_alerts),"#d97706"),
+            (t("alert_sec_metric"),  len(self.metric_alerts), "#d97706"),
         ]
         summary_html = "".join(
             f"""
-        <div style="display:inline-block; width:44%; min-width:170px; margin:0 12px 12px 0; vertical-align:top; background:{bg}; border:1px solid rgba(49,54,56,0.08); border-radius:16px; padding:16px 18px; box-sizing:border-box;">
-          <div style="font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#6F7274; margin-bottom:8px;">{label}</div>
-          <div style="font-size:28px; line-height:1; font-weight:800; color:{fg};">{count}</div>
+        <div style="display:inline-block; width:44%; min-width:170px; margin:0 12px 12px 0; vertical-align:top; background:#ffffff; border:1px solid #e5e5e5; border-left:3px solid {stripe}; border-radius:6px; padding:16px 18px; box-sizing:border-box;">
+          <div style="font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:#6f6f6f; margin-bottom:8px;">{label}</div>
+          <div style="font-size:28px; line-height:1; font-weight:600; color:#0a0a0a;">{count}</div>
         </div>
 """
-            for label, count, bg, fg in summary_items
+            for label, count, stripe in summary_items
         )
         # Severity labels re-resolved here since the HTML body may be built
         # independently of `_severity_label()` callers.
@@ -1426,12 +1427,12 @@ class Reporter:
             "warning":  t("alert_sev_warning"),
             "info":     t("alert_sev_info"),
         }
-        section_style = "margin-top:28px; border:1px solid #E6E2D8; border-radius:20px; overflow:hidden; background:#FFFFFF; box-shadow:0 12px 28px rgba(26,44,50,0.08);"
-        header_style = "padding:16px 20px; font-size:15px; font-weight:800; font-family:'Montserrat',Arial,sans-serif; letter-spacing:0.02em;"
+        section_style = "margin-top:28px; border:1px solid #e5e5e5; border-radius:8px; overflow:hidden; background:#FFFFFF; box-shadow:0 1px 2px rgba(0,0,0,0.04);"
+        header_style = "padding:16px 20px; font-size:14px; font-weight:600; font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif; letter-spacing:0.02em;"
         table_style = "width:100%; border-collapse:collapse; table-layout:fixed;"
-        th_style = "text-align:left; padding:14px 14px; background:#F8F5EF; border-bottom:1px solid #E6E2D8; font-size:11px; color:#6F7274; font-family:'Montserrat',Arial,sans-serif; text-transform:uppercase; letter-spacing:0.08em;"
-        td_style = "padding:14px 14px; border-bottom:1px solid #F0ECE4; font-size:13px; color:#313638; vertical-align:top; word-break:break-word; font-family:'Montserrat',Arial,sans-serif; line-height:1.55;"
-        section_note_style = "padding:0 20px 18px 20px; font-size:12px; line-height:1.6; color:#6F7274; background:#FFFFFF;"
+        th_style = "text-align:left; padding:14px 14px; background:#fafafa; border-bottom:1px solid #e5e5e5; font-size:11px; color:#6f6f6f; font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif; text-transform:uppercase; letter-spacing:0.08em;"
+        td_style = "padding:14px 14px; border-bottom:1px solid #f0f0f0; font-size:13px; color:#0a0a0a; vertical-align:top; word-break:break-word; font-family:Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif; line-height:1.55;"
+        section_note_style = "padding:0 20px 18px 20px; font-size:12px; line-height:1.6; color:#6f6f6f; background:#FFFFFF;"
 
         gui_base = self._gui_base_url()
         if not gui_base:
@@ -1446,8 +1447,8 @@ class Reporter:
                 rows.append(
                     f"""
             <tr>
-              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('time',''))}</td>
-              <td style="{td_style} font-weight:700; color:#BE122F;">{sev_badge}{esc(alert.get('status',''))}{runbook}</td>
+              <td style="{td_style} font-size:11px; color:#6f6f6f;">{esc(alert.get('time',''))}</td>
+              <td style="{td_style} font-weight:600; color:#0a0a0a;">{sev_badge}{esc(alert.get('status',''))}{runbook}</td>
               <td style="{td_style}">{fmt_multiline(alert.get('details',''))}</td>
             </tr>
 """
@@ -1458,8 +1459,8 @@ class Reporter:
             )
             health_section_html = f"""
       <div style="{section_style}">
-        <div style="{header_style} background:#BE122F; color:#FFFFFF;">{esc(t('health_alerts_header'))}</div>
-        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">{esc(t('alert_note_health'))}</div>
+        <div style="{header_style} background:#fafafa; border:1px solid #e5e5e5; border-left:3px solid #dc2626; color:#0a0a0a;">{esc(t('health_alerts_header'))}</div>
+        <div style="{section_note_style} border-bottom:1px solid #f0f0f0;">{esc(t('alert_note_health'))}</div>
         <table style="{table_style}">
           <thead>
             <tr>
@@ -1484,15 +1485,15 @@ class Reporter:
                 runbook = self._render_runbook_link(alert.get('runbook_url'))
                 row_html = f"""
             <tr>
-              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('time',''))}</td>
-              <td style="{td_style}"><strong>{esc(alert.get('rule',''))}</strong>{runbook}<br><small style="color:#6F7274;">{esc(alert.get('desc',''))}</small></td>
+              <td style="{td_style} font-size:11px; color:#6f6f6f;">{esc(alert.get('time',''))}</td>
+              <td style="{td_style}"><strong>{esc(alert.get('rule',''))}</strong>{runbook}<br><small style="color:#6f6f6f;">{esc(alert.get('desc',''))}</small></td>
               <td style="{td_style} text-align:center;">{sev_badge}<small>({esc(alert.get('count',0))})</small></td>
               <td style="{td_style}">{esc(alert.get('source',''))}</td>
             </tr>
 """
                 if alert.get("raw_data"):
                     detail_html = self._render_vendor_event_detail_html(alert, esc)
-                    row_html += f"<tr><td colspan='4' style='padding:14px 14px 16px; background:#FCFAF6; border-bottom:1px solid #E6E2D8;'>{detail_html}</td></tr>"
+                    row_html += f"<tr><td colspan='4' style='padding:14px 14px 16px; background:#fafafa; border-bottom:1px solid #e5e5e5;'>{detail_html}</td></tr>"
                 rows.append(row_html)
             event_cta = (
                 self._render_cta(t('mail_cta_view_event'), f'{gui_base}/dashboard?tab=events', severity='danger')
@@ -1500,8 +1501,8 @@ class Reporter:
             )
             event_section_html = f"""
       <div style="{section_style}">
-        <div style="{header_style} background:#1A2C32; color:#FFFFFF;">{esc(t('security_events_header'))}</div>
-        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">{esc(t('alert_note_event'))}</div>
+        <div style="{header_style} background:#fafafa; border:1px solid #e5e5e5; border-left:3px solid #2563eb; color:#0a0a0a;">{esc(t('security_events_header'))}</div>
+        <div style="{section_note_style} border-bottom:1px solid #f0f0f0;">{esc(t('alert_note_event'))}</div>
         <table style="{table_style}">
           <thead>
             <tr>
@@ -1528,13 +1529,13 @@ class Reporter:
                 rows.append(
                     f"""
             <tr>
-              <td style="{td_style} font-weight:700; color:#FF5500;">{sev_badge}{esc(alert.get('rule',''))}{runbook}</td>
-              <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(alert.get('count',0))}</td>
-              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('criteria',''))}</td>
+              <td style="{td_style} font-weight:600; color:#0a0a0a;">{sev_badge}{esc(alert.get('rule',''))}{runbook}</td>
+              <td style="{td_style} text-align:center; font-weight:600; font-size:16px; color:#0a0a0a;">{esc(alert.get('count',0))}</td>
+              <td style="{td_style} font-size:11px; color:#6f6f6f;">{esc(alert.get('criteria',''))}</td>
             </tr>
             <tr>
-              <td colspan="3" style="{td_style} background:#FCFAF6; font-size:12px; padding:16px;">
-                <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #ECE7DD; border-radius:14px; background:#FFFFFF;"><strong style="color:#24393F;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(alert.get('details',''))}</div>
+              <td colspan="3" style="{td_style} background:#fafafa; font-size:12px; padding:16px;">
+                <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #e5e5e5; border-radius:6px; background:#FFFFFF;"><strong style="color:#0a0a0a;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(alert.get('details',''))}</div>
                 {self.generate_pretty_snapshot_html(alert.get('raw_data', []))}
               </td>
             </tr>
@@ -1546,8 +1547,8 @@ class Reporter:
             )
             traffic_section_html = f"""
       <div style="{section_style}">
-        <div style="{header_style} background:#FF5500; color:#FFFFFF;">{esc(t('traffic_alerts_header'))}</div>
-        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">{esc(t('alert_note_traffic'))}</div>
+        <div style="{header_style} background:#fafafa; border:1px solid #e5e5e5; border-left:3px solid #d97706; color:#0a0a0a;">{esc(t('traffic_alerts_header'))}</div>
+        <div style="{section_note_style} border-bottom:1px solid #f0f0f0;">{esc(t('alert_note_traffic'))}</div>
         <table style="{table_style}">
           <thead>
             <tr>
@@ -1573,13 +1574,13 @@ class Reporter:
                 rows.append(
                     f"""
             <tr>
-              <td style="{td_style} font-weight:700; color:#313638;">{sev_badge}{esc(alert.get('rule',''))}{runbook}</td>
-              <td style="{td_style} text-align:center; font-weight:700; font-size:16px; color:#FF5500;">{esc(alert.get('count',0))}</td>
-              <td style="{td_style} font-size:11px; color:#6F7274;">{esc(alert.get('criteria',''))}</td>
+              <td style="{td_style} font-weight:600; color:#0a0a0a;">{sev_badge}{esc(alert.get('rule',''))}{runbook}</td>
+              <td style="{td_style} text-align:center; font-weight:600; font-size:16px; color:#0a0a0a;">{esc(alert.get('count',0))}</td>
+              <td style="{td_style} font-size:11px; color:#6f6f6f;">{esc(alert.get('criteria',''))}</td>
             </tr>
             <tr>
-              <td colspan="3" style="{td_style} background:#FCFAF6; font-size:12px; padding:16px;">
-                <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #ECE7DD; border-radius:14px; background:#FFFFFF;"><strong style="color:#24393F;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(alert.get('details',''))}</div>
+              <td colspan="3" style="{td_style} background:#fafafa; font-size:12px; padding:16px;">
+                <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #e5e5e5; border-radius:6px; background:#FFFFFF;"><strong style="color:#0a0a0a;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(alert.get('details',''))}</div>
                 {self.generate_pretty_snapshot_html(alert.get('raw_data', []))}
               </td>
             </tr>
@@ -1591,8 +1592,8 @@ class Reporter:
             )
             metric_section_html = f"""
       <div style="{section_style}">
-        <div style="{header_style} background:#F97607; color:#FFFFFF;">{esc(t('metric_alerts_header'))}</div>
-        <div style="{section_note_style} border-bottom:1px solid #F0ECE4;">{esc(t('alert_note_metric'))}</div>
+        <div style="{header_style} background:#fafafa; border:1px solid #e5e5e5; border-left:3px solid #d97706; color:#0a0a0a;">{esc(t('metric_alerts_header'))}</div>
+        <div style="{section_note_style} border-bottom:1px solid #f0f0f0;">{esc(t('alert_note_metric'))}</div>
         <table style="{table_style}">
           <thead>
             <tr>
@@ -1619,18 +1620,18 @@ class Reporter:
 
         body_html = f"""
 <div style="margin-bottom:20px;">
-  <div style="background:#FF5500;color:#FFFFFF;display:inline-block;padding:6px 14px;border-radius:999px;font-weight:800;font-size:14px;letter-spacing:0.02em;margin-bottom:8px;">Illumio PCE Ops</div>
-  <div style="font-size:12px;color:#6F7274;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">{esc(t('alert_tpl_summary'))}</div>
-  <div style="font-size:12px;color:#8C8E8F;margin-bottom:8px;">{esc(t('alert_tpl_aggregated_blurb'))}</div>
-  <div style="font-size:12px;color:#6F7274;margin-bottom:4px;">{esc(t('alert_tpl_generated_at'))}: <strong>{esc(generated_at)}</strong></div>
+  <div style="background:#FF5500;color:#FFFFFF;display:inline-block;padding:6px 14px;border-radius:999px;font-weight:600;font-size:14px;letter-spacing:0.02em;margin-bottom:8px;">Illumio PCE Ops</div>
+  <div style="font-size:12px;color:#6f6f6f;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">{esc(t('alert_tpl_summary'))}</div>
+  <div style="font-size:12px;color:#a8a8a8;margin-bottom:8px;">{esc(t('alert_tpl_aggregated_blurb'))}</div>
+  <div style="font-size:12px;color:#6f6f6f;margin-bottom:4px;">{esc(t('alert_tpl_generated_at'))}: <strong>{esc(generated_at)}</strong></div>
 </div>
 {summary_html}
 {health_section_html}
 {event_section_html}
 {traffic_section_html}
 {metric_section_html}
-<div style="margin-top:32px;padding:20px 0 4px;border-top:1px solid #ECE7DD;text-align:center;">
-  <p style="color:#8C8E8F;font-size:11px;line-height:1.8;margin:0;">
+<div style="margin-top:32px;padding:20px 0 4px;border-top:1px solid #e5e5e5;text-align:center;">
+  <p style="color:#a8a8a8;font-size:11px;line-height:1.8;margin:0;">
     {esc(t('alert_tpl_auto_generated'))}<br>
     {esc(t('alert_tpl_act_per_runbook'))}
   </p>

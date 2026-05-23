@@ -22,27 +22,42 @@ function _resetSettingsDirty() {
 }
 
 function _updateSaveButtonLabel() {
-  const label = document.getElementById('s-save-label');
+  const label  = document.getElementById('s-save-label');
+  const bar    = document.getElementById('s-save-bar');
+  const status = document.getElementById('s-save-status');
   if (!label) return;
+
   const dirty = Array.from(_settingsDirty);
+
+  // Sticky bar: show only when dirty
+  if (bar) bar.hidden = dirty.length === 0;
+
   if (dirty.length === 0) {
     label.textContent = _t('gui_save_all');
+    if (status) status.textContent = '';
     return;
   }
+
+  // Explicit key lookup so static i18n audit sees each key literal.
+  const sectionKeys = {
+    'pce':      'gui_settings_section_pce',
+    'channels': 'gui_settings_section_channels',
+    'display':  'gui_settings_section_display',
+    'security': 'gui_settings_section_security',
+  };
+
   if (dirty.length === 1) {
-    // Explicit key lookup so static i18n audit sees each key literal.
-    const sectionKeys = {
-      'pce':      'gui_settings_section_pce',
-      'channels': 'gui_settings_section_channels',
-      'display':  'gui_settings_section_display',
-      'security': 'gui_settings_section_security',
-    };
     const which = dirty[0];
     const sectionName = _t(sectionKeys[which] || 'gui_save_all');
-    label.textContent = _t('gui_settings_save_one').replace('{section}', sectionName);
+    const saveText = _t('gui_settings_save_one').replace('{section}', sectionName);
+    label.textContent = saveText;
+    if (status) status.textContent = saveText;
     return;
   }
-  label.textContent = _t('gui_settings_save_many').replace('{n}', dirty.length);
+
+  const manyText = _t('gui_settings_save_many').replace('{n}', dirty.length);
+  label.textContent = manyText;
+  if (status) status.textContent = manyText;
 }
 
 function _wireSettingsDirtyTracking() {

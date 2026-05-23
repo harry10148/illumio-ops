@@ -65,7 +65,9 @@ async function loadRules() {
     const typ = r.type.charAt(0).toUpperCase() + r.type.slice(1);
     const unit = { volume: ' MB', bandwidth: ' Mbps', traffic: ' conns' }[r.type] || '';
     const throttleLabel = r.throttle ? ' TH:' + r.throttle : '';
-    const cond = '> ' + r.threshold_count + unit + ' (Win:' + r.threshold_window + 'm CD:' + (r.cooldown_minutes || r.threshold_window) + 'm' + throttleLabel + ')';
+    const cond = (r.threshold_count != null)
+      ? '> ' + r.threshold_count + unit + ' (Win:' + r.threshold_window + 'm CD:' + (r.cooldown_minutes || r.threshold_window) + 'm' + throttleLabel + ')'
+      : '—';
     const suppressedCount = ((r.throttle_state && r.throttle_state.cooldown_suppressed) || 0) + ((r.throttle_state && r.throttle_state.throttle_suppressed) || 0);
     const nextAllowedAt = r.throttle_state && r.throttle_state.next_allowed_at ? formatDateZ(r.throttle_state.next_allowed_at) : '';
 
@@ -96,13 +98,25 @@ async function loadRules() {
     if (suppressedCount > 0) f.push('Suppressed:' + suppressedCount);
     if (r.match_fields && Object.keys(r.match_fields).length) f.push('Match:' + Object.keys(r.match_fields).join(', '));
     const editBtn = `<button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="Edit Rule" title="Edit Rule">✏️</button>`;
-    html += `<tr><td><input type="checkbox" class="r-chk" data-idx="${r.index}"></td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}">${cond}</td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | ')) || '—'}</td><td>${editBtn}</td></tr>`;
+    const isEnabled = r.enabled !== false;
+    const switchCls = isEnabled ? 'on' : 'off';
+    const switchWrap = `<span class="rule-switch-wrap"><input type="checkbox" class="r-chk" data-idx="${r.index}"${isEnabled ? ' checked' : ''}><span class="rule-switch ${switchCls}" title="${isEnabled ? 'Enabled' : 'Disabled'}" onclick="this.previousElementSibling.click()"></span></span>`;
+    html += `<tr><td>${switchWrap}</td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}"><code class="rule-cond-code">${escapeHtml(cond)}</code></td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | ')) || '—'}</td><td>${editBtn}</td></tr>`;
   });
   $('r-body').innerHTML = html || `<tr><td colspan="7"><div class="empty-state"><svg aria-hidden="true"><use href="#icon-shield"></use></svg><h3>${_t('gui_no_rules_title')}</h3><p>${_t('gui_no_rules_add_one')}</p></div></td></tr>`;
   initTableResizers();
   if (typeof loadAlertTestActions === 'function') loadAlertTestActions();
 }
-function toggleAll(el) { document.querySelectorAll('.r-chk').forEach(c => c.checked = el.checked) }
+function toggleAll(el) {
+  document.querySelectorAll('.r-chk').forEach(c => {
+    c.checked = el.checked;
+    const sw = c.nextElementSibling;
+    if (sw && sw.classList.contains('rule-switch')) {
+      sw.classList.toggle('on', el.checked);
+      sw.classList.toggle('off', !el.checked);
+    }
+  });
+}
 async function deleteSelected() {
   const ids = [...document.querySelectorAll('.r-chk:checked')].map(c => parseInt(c.dataset.idx)).sort((a, b) => b - a);
   if (!ids.length) { toast(_t('gui_msg_select_rules_first'), 'err'); return }

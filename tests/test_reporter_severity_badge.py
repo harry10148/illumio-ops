@@ -4,10 +4,12 @@ from src.reporter import Reporter, SIGNAL_HEX
 
 
 def test_severity_badge_critical():
+    # R3: badge is neutral grey pill with a colored dot — no bgcolor= dual-write
     html = Reporter._render_severity_badge('critical')
-    assert SIGNAL_HEX['danger'] in html
+    assert SIGNAL_HEX['danger'] in html   # dot color still present
     assert 'CRIT' in html.upper()
-    assert 'bgcolor=' in html.lower()  # double-write for Outlook
+    assert 'background:#fafafa' in html   # neutral pill background
+    assert 'border-radius:50%' in html    # dot is a circle
 
 
 def test_severity_badge_warning():
