@@ -242,27 +242,30 @@
       font-family: var(--header-font);
     }
 
-    /* Header */
+    /* Header — E1: condensed to ≤64px single-row (mock-aligned) */
     .header {
       background: var(--bg2);
-      padding: var(--space-header-y) var(--space-header-x);
+      padding: 0 var(--space-header-x);
+      min-height: 56px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: var(--space-3);
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       border-bottom: 1px solid var(--border);
+      overflow: hidden;
     }
 
     .header h1 {
-      font-size: 1.6rem;
+      font-size: 1.1rem;
       font-weight: 700;
       background: linear-gradient(135deg, var(--accent2), var(--success));
       background-clip: text;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      letter-spacing: 0.5px;
-      text-wrap: balance;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .pce-badge {
@@ -529,11 +532,14 @@
       opacity: 0.8;
     }
 
-    /* Panel */
+    /* Panel — E3: max-width 1280px centered content (mock-aligned) */
     .panel {
       display: none;
-      padding: var(--space-panel);
+      padding: var(--space-panel) var(--space-panel);
       animation: fadeIn .25s ease-out;
+      max-width: 1280px;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     .panel.active {
@@ -2039,8 +2045,8 @@
     }
 
     @media (max-width: 640px) {
-      .header { padding: 10px 12px; }
-      .header-right { width: 100%; justify-content: flex-end; }
+      .header { padding: 0 var(--space-2); flex-wrap: wrap; min-height: 48px; }
+      .header-right { margin-left: auto; }
       .toolbar { flex-wrap: wrap; }
       .toolbar .spacer { display: none; }
       .rules-search input { width: 120px; }

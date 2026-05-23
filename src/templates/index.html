@@ -394,6 +394,41 @@
         #p-dashboard details.db-kpi-details > summary::before { transition: none; }
       }
 
+      /* ── E2: db-legacy-section <details> collapsed by default ── */
+      #p-dashboard .db-legacy-section {
+        margin-top: 24px;
+        background: var(--bg2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+      }
+      #p-dashboard .db-legacy-section[open] { padding-bottom: 0; }
+      #p-dashboard .db-legacy-section > summary {
+        padding: 14px 18px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--dim);
+        border-radius: 12px;
+        user-select: none;
+      }
+      #p-dashboard .db-legacy-section[open] > summary {
+        border-bottom: 1px solid var(--border);
+        border-radius: 12px 12px 0 0;
+      }
+      #p-dashboard .db-legacy-section > summary::before {
+        content: '▸';
+        font-size: 11px;
+        transition: transform 120ms ease;
+        color: var(--dim);
+      }
+      #p-dashboard .db-legacy-section[open] > summary::before { transform: rotate(90deg); }
+      #p-dashboard .db-legacy-section > summary::-webkit-details-marker { display: none; }
+      #p-dashboard .db-legacy-section > :not(summary) { padding: 0 18px 18px; }
+
       /* ── R4 polish: tame pre-R4c legacy KPI strip elements ── */
       #p-dashboard .chip-kpi,
       #p-dashboard [class*="kpi"]:not(.db-kpi-toggle):not(.db-kpi-details):not(.story-stat-value) {
@@ -607,6 +642,10 @@
       <div id="chart-ven-status" style="min-height:200px;display:none;"></div>
       <div id="chart-rule-hits" style="min-height:200px;display:none;"></div>
     </div>
+
+    <!-- E2: legacy detail tables collapsed by default -->
+    <details class="db-legacy-section">
+    <summary data-i18n="gui_legacy_section_label">詳細指標與表格</summary>
 
     <!-- Sub Navigation for Traffic & Quarantine -->
     <div class="sub-nav">
@@ -935,6 +974,8 @@
         </div>
       </fieldset>
     </div>
+
+    </details><!-- end db-legacy-section -->
 
   </div>
 
