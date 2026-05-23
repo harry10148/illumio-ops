@@ -531,8 +531,19 @@
         vertical-align: top;
       }
       #p-events .event-viewer-layout .table-container .rule-table {
-        table-layout: auto !important;
+        table-layout: fixed !important;
         width: 100% !important;
+      }
+      #p-events .event-viewer-layout .table-container .rule-table td,
+      #p-events .event-viewer-layout .table-container .rule-table th {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #p-events .event-viewer-layout .table-container .rule-table td .ev-evtype-name,
+      #p-events .event-viewer-layout .table-container .rule-table td .ev-evtype-meta {
+        white-space: normal;
+        overflow-wrap: break-word;
       }
       #p-events #ev-body .ev-sev-bar {
         display: inline-block;
@@ -1098,17 +1109,7 @@
     <div class="event-viewer-layout">
       <div>
         <div class="table-container">
-          <table class="rule-table">
-            <thead>
-              <tr>
-                <th data-i18n="gui_time">Time</th>
-                <th data-i18n="gui_event">Event</th>
-                <th data-i18n="gui_col_status">Status</th>
-                <th data-i18n="gui_actor">Actor</th>
-                <th data-i18n="gui_target">Target</th>
-                <th data-i18n="gui_action">Action</th>
-              </tr>
-            </thead>
+          <table class="rule-table"><colgroup><col style="width:180px"><col style="width:240px"><col style="width:100px"><col style="width:140px"><col style="width:180px"><col></colgroup><thead><tr><th data-i18n="gui_time">Time</th><th data-i18n="gui_event">Event</th><th data-i18n="gui_col_status">Status</th><th data-i18n="gui_actor">Actor</th><th data-i18n="gui_target">Target</th><th data-i18n="gui_action">Action</th></tr></thead>
             <tbody id="ev-body">
               <tr><td colspan="6"><div class="empty-state"><svg aria-hidden="true"><use href="#icon-activity"></use></svg><h3 data-i18n="gui_empty_state_default_title">Nothing here yet</h3><p data-i18n="gui_ev_load_prompt">Load events to inspect raw event data.</p></div></td></tr>
             </tbody>

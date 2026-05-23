@@ -1899,7 +1899,7 @@
     .modal--rules-edit fieldset {
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 12px 16px;
+      padding: 14px 16px 12px;
       margin-bottom: 14px;
     }
     .modal--rules-edit fieldset .form-group {
@@ -1907,17 +1907,56 @@
       display: flex;
       flex-direction: column;
       grid-template-columns: unset;
+      margin-bottom: 12px;
     }
     .modal--rules-edit fieldset .form-group > label {
-      padding: 0 0 4px;
+      padding: 0 0 6px;
       border-right: 0;
       background: transparent;
-      font-size: .85rem;
+      font-size: 13px !important;
+      font-weight: 500;
     }
     .modal--rules-edit fieldset .form-group > input,
     .modal--rules-edit fieldset .form-group > select,
     .modal--rules-edit fieldset .form-group > textarea {
-      padding: 0;
+      padding: 8px 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    /* R5 Bug 5 round 2: form-row inside modal — give each item proper
+       breathing room and consistent input height so labels/inputs/
+       placeholders don't visually collide. */
+    .modal--rules-edit .form-row,
+    .modal--rules-edit .form-row-3 {
+      display: grid;
+      gap: 12px;
+    }
+    .modal--rules-edit .form-row { grid-template-columns: 1fr 1fr; }
+    .modal--rules-edit .form-row-3 { grid-template-columns: repeat(3, 1fr); }
+    .modal--rules-edit .form-row .form-group,
+    .modal--rules-edit .form-row-3 .form-group {
+      margin-bottom: 0;
+    }
+    .modal--rules-edit input[type=text],
+    .modal--rules-edit input[type=number],
+    .modal--rules-edit input:not([type]),
+    .modal--rules-edit select,
+    .modal--rules-edit textarea {
+      min-height: 36px;
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg);
+      color: var(--fg);
+      box-sizing: border-box;
+    }
+    /* Hint / helper text under inputs */
+    .modal--rules-edit .form-group small,
+    .modal--rules-edit .form-group + small {
+      display: block;
+      margin-top: 4px;
+      color: var(--text-muted, var(--dim)) !important;
+      font-size: 12px !important;
     }
     /* Top-level form-group container border (groups the grid rows visually) */
     .modal--rules-edit > .form-group {
@@ -2298,14 +2337,20 @@ a:focus:not(:focus-visible) {
   color: var(--dim);
 }
 
+/* R5 Bug 3 ROOT CAUSE: these global [data-severity]::before rules ran on
+   ANY element with data-severity, including <tr data-severity="info"> in the
+   events table. Chrome promotes a pseudo-element inside <tr> to an anonymous
+   table-cell, which shifted every real <td> right by one column. Scope
+   excludes <tr> so the dot only renders on inline elements (.status-pill,
+   .severity-* badges) where it was intended. */
 .severity-high::before,
 .severity-error::before,
 .severity-critical::before,
 .severity-danger::before,
 .severity-fail::before,
-[data-severity="high"]::before,
-[data-severity="critical"]::before,
-[data-severity="error"]::before {
+[data-severity="high"]:not(tr)::before,
+[data-severity="critical"]:not(tr)::before,
+[data-severity="error"]:not(tr)::before {
   content: '';
   width: 6px; height: 6px;
   background: var(--color-danger);
@@ -2315,9 +2360,9 @@ a:focus:not(:focus-visible) {
 .severity-medium::before,
 .severity-warning::before,
 .severity-warn::before,
-[data-severity="medium"]::before,
-[data-severity="warning"]::before,
-[data-severity="warn"]::before {
+[data-severity="medium"]:not(tr)::before,
+[data-severity="warning"]:not(tr)::before,
+[data-severity="warn"]:not(tr)::before {
   content: '';
   width: 6px; height: 6px;
   background: var(--color-warning);
@@ -2326,8 +2371,8 @@ a:focus:not(:focus-visible) {
 }
 .severity-info::before,
 .severity-low::before,
-[data-severity="info"]::before,
-[data-severity="low"]::before {
+[data-severity="info"]:not(tr)::before,
+[data-severity="low"]:not(tr)::before {
   content: '';
   width: 6px; height: 6px;
   background: var(--accent2);
@@ -2337,7 +2382,7 @@ a:focus:not(:focus-visible) {
 .severity-success::before,
 .severity-ok::before,
 .status-pill[data-status="ok"]::before,
-[data-severity="success"]::before {
+[data-severity="success"]:not(tr)::before {
   content: '';
   width: 6px; height: 6px;
   background: var(--color-success);
