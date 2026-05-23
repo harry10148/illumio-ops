@@ -1222,19 +1222,19 @@
     <div class="sub-nav" role="tablist" aria-label="Settings sections">
       <button class="sub-nav-btn active" data-action="switchSettingsTab" data-args='["pce"]' id="sbtn-pce" role="tab" aria-selected="true" aria-controls="s-panel-pce">
         <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
-        <span data-i18n="gui_settings_tab_pce">PCE Connection</span>
+        <span data-i18n="gui_settings_tab_pce">PCE 連線</span>
       </button>
       <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["channels"]' id="sbtn-channels" role="tab" aria-selected="false" aria-controls="s-panel-channels">
         <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
-        <span data-i18n="gui_settings_tab_channels">Notification Channels</span>
+        <span data-i18n="gui_settings_tab_channels">通知通道</span>
       </button>
       <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["display"]' id="sbtn-display" role="tab" aria-selected="false" aria-controls="s-panel-display">
         <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
-        <span data-i18n="gui_settings_tab_display">Interface &amp; Reports</span>
+        <span data-i18n="gui_settings_tab_display">介面 / 報表</span>
       </button>
       <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["security"]' id="sbtn-security" role="tab" aria-selected="false" aria-controls="s-panel-security">
         <svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg>
-        <span data-i18n="gui_settings_tab_security">Security</span>
+        <span data-i18n="gui_settings_tab_security">安全</span>
       </button>
     </div>
 
@@ -1257,11 +1257,14 @@
     <div id="settings-security" class="s-subpanel"><div id="s-panel-security"></div></div>
 
     <!-- Sticky save bar — label is updated dynamically by _updateSaveButtonLabel() -->
-    <div style="text-align:right;margin-top:16px;">
-      <button class="btn btn-success" data-action="saveSettings">
-        <svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg>
-        <span id="s-save-label" data-i18n="gui_save_all">Save All Settings</span>
-      </button>
+    <div id="s-save-bar" class="s-save-bar" hidden>
+      <span id="s-save-status" class="s-save-status"></span>
+      <div class="s-save-bar-right">
+        <button class="btn btn-success" data-action="saveSettings">
+          <svg class="icon" aria-hidden="true"><use href="#icon-check"></use></svg>
+          <span id="s-save-label" data-i18n="gui_save_all">儲存設定</span>
+        </button>
+      </div>
     </div>
   </div>
 

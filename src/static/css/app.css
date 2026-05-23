@@ -1386,6 +1386,36 @@
       display: block;
     }
 
+    /* Settings sticky save bar (R4d) */
+    .s-save-bar {
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      padding: 12px 24px;
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.06);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 40;
+    }
+    .s-save-bar[hidden] { display: none; }
+    .s-save-status {
+      font-size: 12px;
+      color: var(--warn, #d97706);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .s-save-status:not(:empty)::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: var(--warn, #d97706);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .s-save-bar-right { margin-left: auto; display: flex; gap: 8px; }
+
     .floating-action-bar {
       position: fixed;
       bottom: -100px;
