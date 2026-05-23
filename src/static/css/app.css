@@ -2359,3 +2359,12 @@ select {
   overflow-wrap: anywhere;
   white-space: normal;
 }
+
+/* ── Polish round 4 — floating-action-bar fully out of layout when not active ── */
+/* #bulk-bar without .show was visible at bottom:-100px which works for live
+   viewport but full-page screenshots and any layout query still saw it
+   centered. display:none removes it from layout entirely (Improvement_Plan §0.1). */
+.floating-action-bar:not(.show) {
+  display: none;
+}
+/* #accel-countdown uses inline style="display:none" until activated — leave that alone */
