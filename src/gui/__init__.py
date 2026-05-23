@@ -602,7 +602,11 @@ def _run_http(app, host: str, port: int) -> None:
     from cheroot import wsgi as _cheroot_wsgi
     logger.info("Starting HTTP server via cheroot on {}:{}", host, port)
     server = _cheroot_wsgi.Server((host, port), app, numthreads=10)
-    server.version = ''  # L-13: strip Cheroot version from Server header
+    # L-13: don't advertise the Cheroot version in the Server header.
+    # cheroot/server.py:1247-1253 emits `Server: <server_name>` and __init__
+    # falls back to self.version when server_name is falsy, so set a generic
+    # post-init value rather than passing '' to the constructor.
+    server.server_name = 'Web'
     _self._active_server = server
     try:
         server.start()
@@ -662,11 +666,9 @@ def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None
 
     server.error_log = _filtered_error_log
     server.ssl_adapter = adapter
-    # L-13: strip Cheroot version from Server response header (Flask after_request
-    # hook can only remove Server headers Flask itself sets; cheroot's WSGI layer
-    # injects "Server: Cheroot/x.y.z" outside Flask's reach. Setting version=''
-    # makes cheroot emit no Server header at all.)
-    server.version = ''
+    # L-13: don't advertise the Cheroot version in the Server header
+    # (see _run_http for the rationale).
+    server.server_name = 'Web'
 
     try:
         server.start()
