@@ -72,14 +72,17 @@ class VenHtmlExporter:
         today_str = str(datetime.date.today())
 
         nav_html = (
-            "<nav>"
-            '<div class="nav-brand">Illumio PCE Ops</div>'
-            f'<a href="#summary">{_s("rpt_ven_nav_summary")}</a>'
-            f'<a href="#online">{_s("rpt_ven_nav_online")}</a>'
-            f'<a href="#offline">{_s("rpt_ven_nav_offline")}</a>'
-            f'<a href="#lost-today">{_s("rpt_ven_nav_lost_today")}</a>'
-            f'<a href="#lost-yest">{_s("rpt_ven_nav_lost_yest")}</a>'
-            "</nav>"
+            '<aside class="report-toc screen-only">'
+            '<h3>Contents</h3>'
+            '<ol>'
+            f'<li><a href="#summary">{_s("rpt_ven_nav_summary")}</a></li>'
+            f'<li><a href="#online">{_s("rpt_ven_nav_online")}</a></li>'
+            f'<li><a href="#offline">{_s("rpt_ven_nav_offline")}</a></li>'
+            f'<li><a href="#lost-today">{_s("rpt_ven_nav_lost_today")}</a></li>'
+            f'<li><a href="#lost-yest">{_s("rpt_ven_nav_lost_yest")}</a></li>'
+            '</ol>'
+            '<button class="print-btn" onclick="window.print()">Print / PDF</button>'
+            '</aside>'
         )
 
         kpi_cards_parts = []
@@ -177,10 +180,11 @@ class VenHtmlExporter:
             + "</head>\n"
             + f'<body data-report-title="{_cover_title}">'
             + cover_html
+            + '<div class="report-shell">'
             + nav_html
-            + "<main>"
+            + '<main class="report-main">'
             + body
-            + "</main>"
+            + "</main></div>"
             + TABLE_JS
             + "</body></html>"
         )

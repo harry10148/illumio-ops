@@ -206,14 +206,17 @@ class AuditHtmlExporter:
 
         mod00 = self._r.get("mod00", {})
         nav_html = (
-            "<nav>"
-            '<div class="nav-brand">Illumio PCE Ops</div>'
-            f'<a href="#summary">{_s("rpt_au_nav_summary")}</a>'
-            f'<a href="#health">{_s("rpt_au_nav_health")}</a>'
-            f'<a href="#users">{_s("rpt_au_nav_users")}</a>'
-            f'<a href="#policy">{_s("rpt_au_nav_policy")}</a>'
-            f'<a href="#correlation">{_s("rpt_au_nav_correlation")}</a>'
-            "</nav>"
+            '<aside class="report-toc screen-only">'
+            '<h3>Contents</h3>'
+            '<ol>'
+            f'<li><a href="#summary">{_s("rpt_au_nav_summary")}</a></li>'
+            f'<li><a href="#health">{_s("rpt_au_nav_health")}</a></li>'
+            f'<li><a href="#users">{_s("rpt_au_nav_users")}</a></li>'
+            f'<li><a href="#policy">{_s("rpt_au_nav_policy")}</a></li>'
+            f'<li><a href="#correlation">{_s("rpt_au_nav_correlation")}</a></li>'
+            '</ol>'
+            '<button class="print-btn" onclick="window.print()">Print / PDF</button>'
+            '</aside>'
         )
         def _kpi_label(k: dict) -> str:
             lk = k.get("label_key")
@@ -301,10 +304,11 @@ class AuditHtmlExporter:
             + "</head>\n"
             + f'<body data-report-title="{_cover_title}">'
             + cover_html
+            + '<div class="report-shell">'
             + nav_html
-            + "<main>"
+            + '<main class="report-main">'
             + body
-            + "</main>"
+            + "</main></div>"
             + TABLE_JS
             + "</body></html>"
         )

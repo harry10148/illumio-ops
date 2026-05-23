@@ -418,6 +418,64 @@ POLICY_USAGE_CSS = """\
   }
 """
 
+MODERN_SHELL_CSS = """\
+/* ── Batch D: Modern SaaS report shell ─────────────────────────────────── */
+.report-shell { display: grid; grid-template-columns: 240px 1fr; max-width: 1280px; margin: 0 auto; }
+.report-toc { background: #fff; border-right: 1px solid var(--border); padding: 32px 16px; position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto; }
+.report-toc h3 { font-size: 11px; font-weight: 600; color: var(--slate-50); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 12px; padding: 0 12px; }
+.report-toc ol { list-style: none; padding: 0; margin: 0; counter-reset: chap; }
+.report-toc li { counter-increment: chap; }
+.report-toc a { display: block; padding: 7px 12px; color: var(--slate-50); text-decoration: none; font-size: 13px; border-radius: 6px; }
+.report-toc a::before { content: counter(chap, decimal-leading-zero) '\00a0'; font-family: var(--font-mono); font-size: 11px; color: #a8a8a8; margin-right: 6px; }
+.report-toc a:hover { color: var(--slate); background: var(--slate-10); }
+.report-main { padding: 48px 56px 96px; max-width: 920px; }
+.report-cover-block { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+.report-cover-block .eyebrow { font-size: 12px; color: var(--slate-50); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 8px; }
+.report-cover-block h1 { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; margin: 0 0 8px; color: var(--slate); }
+.report-cover-block .sub { font-size: 14px; color: var(--slate-50); margin: 0; }
+.report-cover-block .meta { display: flex; gap: 24px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--slate-50); flex-wrap: wrap; }
+.report-cover-block .meta strong { color: var(--slate); font-weight: 600; }
+.report-sec { margin-top: 48px; padding-top: 8px; }
+.report-sec .sec-eyebrow { font-size: 11px; color: var(--slate-50); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 6px; font-weight: 500; font-family: var(--font-mono); }
+.report-sec h2 { font-size: 22px; font-weight: 600; margin: 0 0 8px; letter-spacing: -0.015em; }
+.report-sec p.intro { color: var(--slate-50); font-size: 14px; margin: 0 0 20px; max-width: 70ch; }
+
+/* Severity pill */
+.report-shell .pill { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; background: var(--slate-10); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; font-weight: 500; color: var(--slate-50); }
+.report-shell .pill::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
+.report-shell .pill.high::before { background: var(--red); }
+.report-shell .pill.med::before  { background: var(--gold-110); }
+.report-shell .pill.low::before  { background: var(--color-signal-info); }
+
+/* Maturity bars */
+.report-shell .mat-row { display: grid; grid-template-columns: 140px 1fr 64px; gap: 16px; align-items: center; padding: 10px 0; border-top: 1px solid var(--border); }
+.report-shell .mat-row:first-of-type { border-top: 0; }
+.report-shell .mat-name { font-size: 13px; font-weight: 500; }
+.report-shell .mat-bar { height: 6px; background: var(--slate-10); border-radius: 999px; overflow: hidden; }
+.report-shell .mat-fill { height: 100%; border-radius: 999px; }
+.report-shell .mat-fill.good { background: var(--green-80); }
+.report-shell .mat-fill.warn { background: var(--gold-110); }
+.report-shell .mat-fill.bad  { background: var(--red); }
+.report-shell .mat-val { text-align: right; font-family: var(--font-mono); font-size: 13px; }
+
+/* Score hero */
+.report-shell .score-hero { display: flex; align-items: center; gap: 20px; padding: 24px 0 16px; }
+.report-shell .score-hero .score-num { font-size: 48px; font-weight: 700; line-height: 1; letter-spacing: -0.03em; }
+.report-shell .score-hero .score-denom { font-size: 20px; color: var(--slate-50); font-weight: 400; }
+.report-shell .score-hero .grade-chip { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 8px; font-size: 14px; font-weight: 700; background: var(--slate-10); border: 1px solid var(--border); margin-left: 8px; }
+
+@media print {
+  .report-shell { grid-template-columns: 1fr; }
+  .report-toc { display: none; }
+  .report-main { padding: 0 24px; max-width: 100%; }
+}
+@media (max-width: 900px) {
+  .report-shell { grid-template-columns: 1fr; }
+  .report-toc { display: none; }
+  .report-main { padding: 24px 20px 64px; }
+}
+"""
+
 EXEC_SUMMARY_CSS = """
 .exec-summary {
   border: 2px solid var(--color-signal-info, #0077CC);
@@ -459,7 +517,7 @@ def build_css(exporter_type: str) -> str:
     }.get(exporter_type, "")
     return (
         f"{FONT_LINK}\n"
-        f"<style>\n{REPORT_FONT_FACE_CSS}\n{BASE_CSS}\n{EXEC_SUMMARY_CSS}\n{extra}\n</style>\n"
+        f"<style>\n{REPORT_FONT_FACE_CSS}\n{BASE_CSS}\n{MODERN_SHELL_CSS}\n{EXEC_SUMMARY_CSS}\n{extra}\n</style>\n"
     )
 
 TABLE_JS = r"""
