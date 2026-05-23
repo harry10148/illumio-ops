@@ -1720,6 +1720,200 @@
     }
     mark { background: color-mix(in srgb, var(--accent2) 35%, transparent); color: inherit; border-radius: 2px; padding: 0 1px; }
 
+    /* ── Rules R4h: classification chips / switch toggle / cond code chip ─── */
+
+    /* Classification filter bar */
+    .rules-filterbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    /* Pill-style category chip (additive; does not conflict with .chip) */
+    .sectiontag {
+      display: inline-block;
+      padding: 2px 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: default;
+      user-select: none;
+    }
+    .sectiontag.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* CSS-only toggle switch — wraps the existing r-chk checkbox */
+    .rule-switch-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 0;
+      vertical-align: middle;
+    }
+    /* Hide the raw checkbox visually but keep it in DOM for JS */
+    .rule-switch-wrap input[type="checkbox"].r-chk {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+    .rule-switch {
+      display: inline-block;
+      width: 32px;
+      height: 18px;
+      background: var(--text-faint);
+      border-radius: 999px;
+      position: relative;
+      transition: background 120ms ease;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .rule-switch::after {
+      content: '';
+      position: absolute;
+      left: 2px;
+      top: 2px;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 120ms ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+    }
+    .rule-switch.on  { background: var(--success); }
+    .rule-switch.on::after  { transform: translateX(14px); }
+    .rule-switch.off { background: var(--text-faint); }
+
+    /* Monospace code chip for condition cells */
+    .rule-cond-code {
+      display: inline-block;
+      font-family: var(--font-mono-2);
+      font-size: 11px;
+      color: var(--text-faint);
+      background: var(--surface-2);
+      padding: 2px 6px;
+      border-radius: 4px;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: middle;
+    }
+
+    /* Edit form 2-column grid (label 200 px | input fills rest) */
+    .rules-edit-row {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .rules-edit-row__label {
+      padding: 14px 18px;
+      border-right: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 500;
+      background: var(--surface-2);
+    }
+    .rules-edit-row__field {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .rules-edit-row__label:last-of-type,
+    .rules-edit-row__field:last-child {
+      border-bottom: 0;
+    }
+    /* Collapse last border so it doesn't double up with card */
+    .rules-edit-row > :nth-last-child(-n+2) {
+      border-bottom: 0;
+    }
+
+    /* Edit modal 2-column form layout (label 200px | field fills rest)
+       Applies to rule edit modals (m-event / m-traffic / m-bw / m-system).
+       Uses CSS-only override — no JS / id / form-name changes needed.       */
+    .modal--rules-edit .form-group {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      align-items: start;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 0;
+      margin-bottom: 0;
+    }
+    .modal--rules-edit .form-group:last-of-type {
+      border-bottom: 0;
+    }
+    .modal--rules-edit .form-group > label {
+      padding: 12px 16px;
+      border-right: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 500;
+      background: var(--surface-2);
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+      margin-bottom: 0;
+    }
+    /* Field side: all direct children after label get left padding */
+    .modal--rules-edit .form-group > input,
+    .modal--rules-edit .form-group > select,
+    .modal--rules-edit .form-group > textarea,
+    .modal--rules-edit .form-group > div,
+    .modal--rules-edit .form-group > .radio-group {
+      padding: 10px 14px;
+      margin: 0;
+    }
+    /* Nested form-row / form-row-3 inside form-group: don't re-grid */
+    .modal--rules-edit .form-group .form-row,
+    .modal--rules-edit .form-group .form-row-3,
+    .modal--rules-edit .form-group .form-row-2 {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    /* fieldset inside modal keeps its own layout */
+    .modal--rules-edit fieldset {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-bottom: 14px;
+    }
+    .modal--rules-edit fieldset .form-group {
+      border-bottom: 0;
+      display: flex;
+      flex-direction: column;
+      grid-template-columns: unset;
+    }
+    .modal--rules-edit fieldset .form-group > label {
+      padding: 0 0 4px;
+      border-right: 0;
+      background: transparent;
+      font-size: .85rem;
+    }
+    .modal--rules-edit fieldset .form-group > input,
+    .modal--rules-edit fieldset .form-group > select,
+    .modal--rules-edit fieldset .form-group > textarea {
+      padding: 0;
+    }
+    /* Top-level form-group container border (groups the grid rows visually) */
+    .modal--rules-edit > .form-group {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
     /* ── Integrations UI ──────────────────────────────────────────────────── */
 
     /* Sub-tab active underline (matches .rs-tab-bar pattern) */

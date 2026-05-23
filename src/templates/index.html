@@ -967,6 +967,13 @@
 
     <!-- ?? Rules sub-view ?? -->
     <div id="rules-sv-rules" class="rules-subview">
+      <!-- R4h: Classification chip filter bar (additive) -->
+      <div class="rules-filterbar" id="rules-filterbar">
+        <span class="sectiontag active" data-ruletype="event" data-action="filterRuleType" data-args='["event"]' data-i18n="gui_ruletype_event">事件</span>
+        <span class="sectiontag" data-ruletype="traffic" data-action="filterRuleType" data-args='["traffic"]' data-i18n="gui_ruletype_traffic">流量</span>
+        <span class="sectiontag" data-ruletype="system" data-action="filterRuleType" data-args='["system"]' data-i18n="gui_ruletype_system">系統健康</span>
+        <span class="sectiontag" data-ruletype="bandwidth" data-action="filterRuleType" data-args='["bandwidth"]' data-i18n="gui_ruletype_bandwidth">頻寬</span>
+      </div>
       <div class="toolbar">
         <span class="badge" id="r-badge">0</span>
         <div class="rules-search">
@@ -2112,7 +2119,7 @@
 
   <!-- Event -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="m-event">
-    <div class="modal">
+    <div class="modal modal--rules-edit">
       <h2><span data-i18n="gui_add_event_rule" id="me-title">Add Event Rule</span></h2>
       <div class="form-group"><label data-i18n="gui_category">Category</label><select id="ev-cat"
           data-on-change="populateEvents">
@@ -2183,7 +2190,7 @@
 
   <!-- System Health -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="m-system">
-    <div class="modal">
+    <div class="modal modal--rules-edit">
       <h2><span data-i18n="gui_add_system_health_rule" id="ms-title">Add System Health Rule</span></h2>
       <div class="form-group">
         <label data-i18n="gui_rule_name">Rule Name</label>
@@ -2215,7 +2222,7 @@
 
   <!-- Traffic -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="m-traffic">
-    <div class="modal">
+    <div class="modal modal--rules-edit">
       <h2><span data-i18n="gui_add_traffic_rule" id="mt-title">Add Connection Count Rule</span></h2>
       <div style="color:var(--dim);font-size:.9rem;line-height:1.6;margin:-4px 0 12px;" data-i18n="gui_traffic_rule_desc">This rule monitors whether connection counts rise abnormally.</div>
       <div class="form-group"><label data-i18n="gui_rule_name">Rule Name</label><input id="tr-name"></div>
@@ -2278,7 +2285,7 @@
 
   <!-- BW/Volume -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="m-bw">
-    <div class="modal">
+    <div class="modal modal--rules-edit">
       <h2><span data-i18n="gui_add_bw_rule" id="mb-title">Add Bandwidth / Transfer Rule</span></h2>
       <div style="color:var(--dim);font-size:.9rem;line-height:1.6;margin:-4px 0 12px;" data-i18n="gui_bw_rule_desc">This rule monitors bandwidth peaks or transfer volume, not connection counts.</div>
       <div class="form-group"><label data-i18n="gui_rule_name">Rule Name</label><input id="bw-name"></div>
