@@ -643,9 +643,10 @@
       <div id="chart-rule-hits" style="min-height:200px;display:none;"></div>
     </div>
 
-    <!-- E2: legacy detail tables collapsed by default -->
-    <details class="db-legacy-section">
-    <summary data-i18n="gui_legacy_section_label">詳細指標與表格</summary>
+    <!-- E2 reverted: <details> wrapper broke 3 dashboard.js insertBefore calls.
+         Legacy detail tables remain inline. Future cleanup path: audit
+         dashboard.js insertBefore calls to use parent-agnostic patterns
+         before re-introducing a collapse wrapper. -->
 
     <!-- Sub Navigation for Traffic & Quarantine -->
     <div class="sub-nav">
@@ -975,7 +976,7 @@
       </fieldset>
     </div>
 
-    </details><!-- end db-legacy-section -->
+    <!-- end legacy detail tables (E2 wrapper removed) -->
 
   </div>
 
