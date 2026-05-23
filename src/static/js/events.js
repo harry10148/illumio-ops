@@ -192,9 +192,11 @@ function _renderEventViewerRows(items, append = false) {
 
   const rowsHtml = items.map((item) => {
     const normalized = item.normalized || {};
+    const sev = String(item.severity || normalized.severity || '').toLowerCase();
+    const sevClass = sev ? `sev-${sev}` : '';
     return `
-      <tr data-event-id="${escapeHtml(item.event_id)}" onclick="selectEventViewerRow('${escapeHtml(item.event_id)}')" style="cursor:pointer;">
-        <td>${escapeHtml(formatDateZ(item.timestamp || ''))}</td>
+      <tr data-event-id="${escapeHtml(item.event_id)}" data-severity="${escapeHtml(sev)}" onclick="selectEventViewerRow('${escapeHtml(item.event_id)}')" style="cursor:pointer;">
+        <td><span class="ev-sev-bar ${sevClass}" aria-hidden="true"></span><span class="ev-time">${escapeHtml(formatDateZ(item.timestamp || ''))}</span></td>
         <td>
           <div style="font-weight:700;">${escapeHtml(item.event_type || '')}</div>
           <div style="font-size:11px;color:var(--dim);">${escapeHtml(normalized.resource_type || '')}${normalized.resource_name ? ' | ' + escapeHtml(normalized.resource_name) : ''}</div>

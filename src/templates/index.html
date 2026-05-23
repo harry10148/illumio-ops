@@ -393,6 +393,91 @@
       @media (prefers-reduced-motion: reduce) {
         #p-dashboard details.db-kpi-details > summary::before { transition: none; }
       }
+
+      /* ── R4g: Events master-detail layout ── */
+      #p-events .event-viewer-layout {
+        display: grid;
+        grid-template-columns: 1.6fr 1fr;
+        gap: 16px;
+        align-items: start;
+      }
+      @media (max-width: 1100px) {
+        #p-events .event-viewer-layout { grid-template-columns: 1fr; }
+      }
+
+      /* Aside panel */
+      #p-events .event-viewer-aside {
+        background: var(--bg2, var(--surface));
+        border: 1px solid var(--border);
+        border-radius: var(--radius, 8px);
+        overflow: hidden;
+      }
+      #p-events .event-viewer-aside .code-panel {
+        border: none;
+        border-radius: 0;
+      }
+      #p-events .event-viewer-aside .code-panel + .code-panel {
+        border-top: 1px solid var(--border);
+        margin-top: 0;
+      }
+      #p-events .event-viewer-aside .code-panel-head {
+        padding: 8px 14px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: var(--dim);
+        background: var(--bg3, var(--surface-2, rgba(0,0,0,.04)));
+        border-bottom: 1px solid var(--border);
+      }
+      #p-events .event-viewer-aside pre {
+        margin: 0;
+        padding: 12px 14px;
+        font-size: 11px;
+        line-height: 1.65;
+        overflow-x: auto;
+        max-height: 280px;
+        color: var(--fg, var(--text));
+        background: transparent;
+      }
+
+      /* Severity stripe on first <td> of each event row */
+      #p-events #ev-body tr { position: relative; }
+      #p-events #ev-body td:first-child {
+        padding-left: 10px;
+        white-space: nowrap;
+      }
+      #p-events #ev-body .ev-sev-bar {
+        display: inline-block;
+        width: 3px;
+        height: 1.2em;
+        border-radius: 2px;
+        vertical-align: middle;
+        margin-right: 7px;
+        flex-shrink: 0;
+        background: var(--dim);
+      }
+      #p-events #ev-body .ev-sev-bar.sev-critical { background: #dc2626; }
+      #p-events #ev-body .ev-sev-bar.sev-high     { background: #f97316; }
+      #p-events #ev-body .ev-sev-bar.sev-medium   { background: #eab308; }
+      #p-events #ev-body .ev-sev-bar.sev-low,
+      #p-events #ev-body .ev-sev-bar.sev-info     { background: var(--accent2, var(--accent, #3b82f6)); }
+
+      /* Time column monospace + tabular-nums */
+      #p-events #ev-body td:first-child .ev-time {
+        font-family: var(--font-mono, monospace);
+        font-variant-numeric: tabular-nums;
+        font-size: 12px;
+        color: var(--dim);
+        vertical-align: middle;
+      }
+
+      /* Selected row highlight */
+      #p-events #ev-body tr.is-selected {
+        background: var(--accent-muted, rgba(59,130,246,.08)) !important;
+        outline: none;
+      }
+      #p-events #ev-body tr.is-selected td:first-child .ev-sev-bar { opacity: 1; }
     </style>
 
     <!-- Story-mode hero (one-sentence health summary + CTA) -->
