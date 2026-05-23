@@ -964,23 +964,65 @@
 
     <!-- ?? Reports list sub-view ?? -->
     <div id="reports-sv-list" class="reports-subview">
+
+      <!-- Report type cards -->
+      <div class="report-card-grid">
+        <div class="rcard">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_btn_traffic_report">Traffic Flow Report</h3>
+            <p data-i18n="gui_rcard_traffic_desc">Traffic summary across Security Risk / Network Inventory views</p>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-report" data-action="openReportGenModal" data-args='["traffic"]'>
+                <svg class="icon"><use href="#icon-play"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="rcard">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_btn_audit_report">Audit Report</h3>
+            <p data-i18n="gui_rcard_audit_desc">Policy / rule-set / user operation audit trail</p>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-audit" data-action="openReportGenModal" data-args='["audit"]'>
+                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="rcard">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-cpu"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_btn_ven_report">VEN Status Report</h3>
+            <p data-i18n="gui_rcard_ven_desc">VEN agent health / heartbeat / paired status</p>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-ven" data-action="openReportGenModal" data-args='["ven"]'>
+                <svg class="icon"><use href="#icon-cpu"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="rcard">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_btn_pu_report">Policy Usage Report</h3>
+            <p data-i18n="gui_rcard_pu_desc">Rule hit rate / leniency / dormant rule detection</p>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-pu" data-action="openReportGenModal" data-args='["policy_usage"]'>
+                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History table -->
       <div class="toolbar" style="gap:8px;flex-wrap:wrap;">
         <button class="btn btn-danger btn-sm" id="btn-bulk-del-reports" data-action="deleteSelectedReports" style="display:none;">
           <svg class="icon"><use href="#icon-cross"></use></svg> <span data-i18n="gui_delete_selected">Delete Selected</span>
         </button>
         <div class="spacer"></div>
-        <button class="btn btn-primary btn-sm" id="btn-gen-report" data-action="openReportGenModal" data-args='["traffic"]'>
-          <svg class="icon"><use href="#icon-play"></use></svg> <span data-i18n="gui_btn_traffic_report">Traffic Report</span>
-        </button>
-        <button class="btn btn-primary btn-sm" id="btn-gen-audit" data-action="openReportGenModal" data-args='["audit"]' style="background:var(--accent2);">
-          <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_btn_audit_report">Audit Summary</span>
-        </button>
-        <button class="btn btn-primary btn-sm" id="btn-gen-ven" data-action="openReportGenModal" data-args='["ven"]' style="background:var(--accent);">
-          <svg class="icon"><use href="#icon-cpu"></use></svg> <span data-i18n="gui_btn_ven_report">VEN Status</span>
-        </button>
-        <button class="btn btn-primary btn-sm" id="btn-gen-pu" data-action="openReportGenModal" data-args='["policy_usage"]' style="background:var(--accent2);">
-          <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_btn_pu_report">Policy Usage</span>
-        </button>
       </div>
       <div class="table-container">
         <table class="rule-table">

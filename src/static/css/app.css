@@ -1627,6 +1627,55 @@
       white-space: nowrap;
     }
 
+    /* ── Reports type card grid ──────────────────────────────────────────── */
+    .report-card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+      margin-bottom: var(--space-5);
+    }
+
+    .rcard {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-1);
+      padding: 18px 20px;
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .rcard-icon {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: color-mix(in srgb, var(--accent) 15%, transparent);
+      border-radius: var(--radius-md);
+      color: var(--accent);
+    }
+
+    .rcard-icon .icon { width: 18px; height: 18px; }
+
+    .rcard-body { flex: 1; min-width: 0; }
+
+    .rcard-body h3 {
+      margin: 0 0 4px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--fg);
+    }
+
+    .rcard-body p {
+      margin: 0 0 0;
+      font-size: 0.8rem;
+      color: var(--dim);
+      line-height: 1.45;
+    }
+
     /* Rules page rhythm */
     #p-rules .rs-tab-bar {
       margin-bottom: 18px;
