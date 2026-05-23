@@ -2323,3 +2323,22 @@ select {
 }
 
 /* ══ end R4a ════════════════════════════════════════════════════════ */
+
+/* ── Rules table: allow narrow column cells (e.g. "Suppressed N until …") to wrap ── */
+#r-body td div,
+#r-body td span:not(.r-chip):not(.chip):not(.pill):not(.badge) {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+#r-body td {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* ── Reports tab: tighten narrow row to wrap cleanly ── */
+#p-reports .row,
+#p-reports [class*="row"]:not(.rcard) {
+  flex-wrap: wrap;
+}
