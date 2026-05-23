@@ -507,6 +507,22 @@
       }
       #p-events #ev-body tr.is-selected td:first-child .ev-sev-bar { opacity: 1; }
     </style>
+    <!-- ═══ Batch-A: maturity bar rows + rcard meta (scoped) ═══ -->
+    <style>
+      #p-dashboard .db-mat-row { display:grid; grid-template-columns:110px 1fr 56px; gap:16px; align-items:center; padding:10px 0; border-top:1px solid var(--border); }
+      #p-dashboard .db-mat-row:first-of-type { border-top:0; }
+      #p-dashboard .db-mat-name { font-size:13px; color:var(--fg); font-weight:500; }
+      #p-dashboard .db-mat-bar { height:6px; background:var(--surface-2,var(--bg2)); border-radius:999px; overflow:hidden; }
+      #p-dashboard .db-mat-fill { height:100%; border-radius:999px; transition:width 300ms ease; }
+      #p-dashboard .db-mat-fill.good { background:var(--color-signal-success,var(--success)); }
+      #p-dashboard .db-mat-fill.warn { background:var(--color-signal-warning,var(--warn)); }
+      #p-dashboard .db-mat-fill.bad  { background:var(--color-signal-danger,var(--danger)); }
+      #p-dashboard .db-mat-val { text-align:right; font-family:var(--font-mono-2); font-size:13px; }
+      /* rcard meta strip */
+      .rcard-meta { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; font-size:11px; color:var(--dim); align-items:center; }
+      .rcard-meta-last { }
+      .rcard-meta-sched { display:inline-block; padding:1px 7px; border-radius:999px; background:var(--surface-2,var(--bg2)); border:1px solid var(--border); font-size:10px; font-weight:500; color:var(--dim); }
+    </style>
 
     <!-- Story-mode hero (one-sentence health summary + CTA) -->
     <!-- JS controls display:none via d-hero; db-hero-wrap is purely presentational wrapper -->
@@ -1112,11 +1128,12 @@
 
       <!-- Report type cards -->
       <div class="report-card-grid">
-        <div class="rcard">
+        <div class="rcard" data-rtype="traffic">
           <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg></div>
           <div class="rcard-body">
             <h3 data-i18n="gui_btn_traffic_report">Traffic Flow Report</h3>
             <p data-i18n="gui_rcard_traffic_desc">Traffic summary across Security Risk / Network Inventory views</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-report" data-action="openReportGenModal" data-args='["traffic"]'>
                 <svg class="icon"><use href="#icon-play"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
@@ -1124,11 +1141,12 @@
             </div>
           </div>
         </div>
-        <div class="rcard">
+        <div class="rcard" data-rtype="audit">
           <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
           <div class="rcard-body">
             <h3 data-i18n="gui_btn_audit_report">Audit Report</h3>
             <p data-i18n="gui_rcard_audit_desc">Policy / rule-set / user operation audit trail</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-audit" data-action="openReportGenModal" data-args='["audit"]'>
                 <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
@@ -1136,11 +1154,12 @@
             </div>
           </div>
         </div>
-        <div class="rcard">
+        <div class="rcard" data-rtype="ven">
           <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-cpu"></use></svg></div>
           <div class="rcard-body">
             <h3 data-i18n="gui_btn_ven_report">VEN Status Report</h3>
             <p data-i18n="gui_rcard_ven_desc">VEN agent health / heartbeat / paired status</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-ven" data-action="openReportGenModal" data-args='["ven"]'>
                 <svg class="icon"><use href="#icon-cpu"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
@@ -1148,11 +1167,12 @@
             </div>
           </div>
         </div>
-        <div class="rcard">
+        <div class="rcard" data-rtype="policy_usage">
           <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
           <div class="rcard-body">
             <h3 data-i18n="gui_btn_pu_report">Policy Usage Report</h3>
             <p data-i18n="gui_rcard_pu_desc">Rule hit rate / leniency / dormant rule detection</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-pu" data-action="openReportGenModal" data-args='["policy_usage"]'>
                 <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>

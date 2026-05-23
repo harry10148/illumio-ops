@@ -38,7 +38,7 @@ function switchTab(id, updateUrl = true) {
     if (typeof loadDashboardQueries === 'function') { showSkeletonCards('#p-traffic-workload .data-area', 3); loadDashboardQueries(); }
   }
   if (id === 'events') { showSkeletonCards('#p-events .data-area', 3); loadEventViewer(true); }
-  if (id === 'reports') { showSkeletonCards('#p-reports .data-area', 3); loadReports(); }
+  if (id === 'reports') { showSkeletonCards('#p-reports .data-area', 3); loadReports(); if (typeof loadRcardMeta === 'function') loadRcardMeta(); }
   if (id === 'rule-scheduler') rsLoadTab();
   if (typeof updateBulkBar === 'function') updateBulkBar();
   if (updateUrl) updateUrlState('tab', id);

@@ -383,6 +383,71 @@ async function deleteReport(filename) {
   }
 }
 
+/* ─── A5: rcard meta (上次 / 排程) ──────────────────────────────────── */
+async function loadRcardMeta() {
+  // Fetch reports list and schedules in parallel; populate rcard-meta strips.
+  // API: /api/reports → {reports:[{report_type, mtime, ...}]}
+  // API: /api/report-schedules → {schedules:[{report_type, enabled, interval, ...}]}
+  let reports = [], schedules = [];
+  try {
+    const [rRes, sRes] = await Promise.all([
+      api('/api/reports'),
+      api('/api/report-schedules'),
+    ]);
+    reports   = (rRes  && rRes.reports)   || [];
+    schedules = (sRes  && sRes.schedules) || [];
+  } catch (_) { return; }  // best-effort; silent on failure
+
+  // Build per-type maps: latest mtime, schedule entry
+  const latestByType = {};
+  reports.forEach(rp => {
+    const t = rp.report_type || '';
+    if (!t) return;
+    if (!latestByType[t] || rp.mtime > latestByType[t]) latestByType[t] = rp.mtime;
+  });
+  const schedByType = {};
+  schedules.forEach(s => {
+    const t = s.report_type || '';
+    if (t && !schedByType[t]) schedByType[t] = s;
+  });
+
+  // Derive schedule chip label from interval / frequency field
+  function schedChip(s) {
+    if (!s || !s.enabled) return '手動觸發';
+    const iv = (s.interval || s.frequency || '').toLowerCase();
+    if (iv.includes('daily')  || iv === 'day')   return '每日自動';
+    if (iv.includes('weekly') || iv === 'week')  return '每週自動';
+    if (iv.includes('month'))                    return '每月自動';
+    return '已排程';
+  }
+
+  document.querySelectorAll('.rcard[data-rtype]').forEach(card => {
+    const rtype = card.getAttribute('data-rtype');
+    const lastEl  = card.querySelector('.rcard-meta-last');
+    const schedEl = card.querySelector('.rcard-meta-sched');
+    if (!lastEl || !schedEl) return;
+
+    const mtime = latestByType[rtype];
+    if (mtime) {
+      const d = new Date(mtime * 1000);
+      lastEl.textContent = '上次：' + d.toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    } else {
+      lastEl.textContent = '上次：—';
+    }
+
+    const sched = schedByType[rtype];
+    schedEl.textContent = schedChip(sched);
+    schedEl.style.display = '';
+    if (!sched || !sched.enabled) {
+      schedEl.style.color = 'var(--dim)';
+      schedEl.style.borderColor = 'var(--border)';
+    } else {
+      schedEl.style.color = 'var(--accent2, var(--accent))';
+      schedEl.style.borderColor = 'var(--accent2, var(--accent))';
+    }
+  });
+}
+
 /* ─── Report Schedules Logic ────────────────────────────────────────── */
 let _schedules = [];
 let _editSchedId = null;
@@ -1364,20 +1429,21 @@ function renderMaturity(snap) {
       const sv = Number(d.score || 0);
       const wt = Number(d.weight || 1) || 1;
       const pct = Math.max(0, Math.min(100, Math.round((sv / wt) * 100)));
-      const color = pct >= 70 ? '#22C55E' : pct >= 40 ? '#EAB308' : '#EF4444';
+      const fillCls = pct >= 70 ? 'good' : pct >= 40 ? 'warn' : 'bad';
       const label = _t(dimLabelKey[k]) || k;
       const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:10px;margin:6px 0;font-size:.85rem;';
+      row.className = 'db-mat-row';
       const lbl = document.createElement('div');
-      lbl.style.cssText = 'flex:0 0 180px;color:var(--dim);';
+      lbl.className = 'db-mat-name';
       lbl.textContent = label;
       const barWrap = document.createElement('div');
-      barWrap.style.cssText = 'flex:1;background:var(--bg2);border-radius:4px;height:10px;overflow:hidden;';
+      barWrap.className = 'db-mat-bar';
       const barFill = document.createElement('div');
-      barFill.style.cssText = 'width:' + pct + '%;height:100%;background:' + color + ';';
+      barFill.className = 'db-mat-fill ' + fillCls;
+      barFill.style.width = pct + '%';
       barWrap.appendChild(barFill);
       const pctEl = document.createElement('div');
-      pctEl.style.cssText = 'flex:0 0 40px;text-align:right;font-weight:600;';
+      pctEl.className = 'db-mat-val';
       pctEl.textContent = pct + '%';
       row.appendChild(lbl);
       row.appendChild(barWrap);
