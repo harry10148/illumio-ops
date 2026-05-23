@@ -5,6 +5,7 @@ import datetime
 
 from src.config import ConfigManager
 from src.i18n import t
+from src.rule_id import gen_rule_id
 from src.utils import Colors, safe_input, draw_panel, draw_table
 from src.events.catalog import (
     FULL_EVENT_CATALOG,
@@ -131,11 +132,7 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
             help_text=t("def_cooldown"),
         )
         cd = int(cd_in) if cd_in and cd_in != "" else def_cd
-        rid = (
-            edit_rule.get("id", int(datetime.datetime.now().timestamp()))
-            if edit_rule
-            else int(datetime.datetime.now().timestamp())
-        )
+        rid = edit_rule.get("id", gen_rule_id()) if edit_rule else gen_rule_id()
 
         # Determine if we should show Advanced Filters based on event type
         sel_status = "all"

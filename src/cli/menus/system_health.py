@@ -5,6 +5,7 @@ import datetime
 
 from src.config import ConfigManager
 from src.i18n import t
+from src.rule_id import gen_rule_id
 from src.utils import Colors, safe_input, draw_panel
 from src.cli.menus._helpers import _menu_hints, _wizard_step, _wizard_confirm
 
@@ -60,11 +61,7 @@ def add_system_health_menu(cm: ConfigManager, edit_rule=None) -> None:
     if not _wizard_confirm(summary):
         return
 
-    rid = (
-        edit_rule.get("id", int(datetime.datetime.now().timestamp()))
-        if edit_rule
-        else int(datetime.datetime.now().timestamp())
-    )
+    rid = edit_rule.get("id", gen_rule_id()) if edit_rule else gen_rule_id()
     cm.add_or_update_rule(
         {
             "id": rid,

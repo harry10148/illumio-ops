@@ -5,6 +5,7 @@ import datetime
 
 from src.config import ConfigManager
 from src.i18n import t
+from src.rule_id import gen_rule_id
 from src.utils import Colors, safe_input, draw_panel, get_last_input_action
 from src.cli.menus._helpers import (
     _menu_hints,
@@ -233,11 +234,7 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
         (ex_dst_in, None) if ex_dst_in and "=" in ex_dst_in else (None, ex_dst_in)
     )
 
-    rid = (
-        edit_rule.get("id", int(datetime.datetime.now().timestamp()))
-        if edit_rule
-        else int(datetime.datetime.now().timestamp())
-    )
+    rid = edit_rule.get("id", gen_rule_id()) if edit_rule else gen_rule_id()
 
     _wizard_step(5, 5, t("wiz_review_save"))
     summary = [
