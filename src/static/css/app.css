@@ -1331,31 +1331,30 @@
     }
     .toast-close:hover { opacity: 1; }
 
-    /* Quarantine Feature - SubNav & Floating Bar */
+    /* SubNav — underline-tab style (dashboard + settings) */
     .sub-nav {
       display: flex;
-      gap: var(--space-2);
-      margin-bottom: var(--space-5);
-      background: var(--bg2);
-      padding: var(--space-1);
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-      width: fit-content;
+      gap: 0;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      width: 100%;
     }
 
     .sub-nav-btn {
       background: transparent;
+      border: 0;
+      border-radius: 0;
+      border-bottom: 2px solid transparent;
+      padding: 10px 14px;
       color: var(--dim);
-      border: none;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: var(--text-base);
-      font-weight: 600;
+      font-size: 13px;
+      font-weight: 500;
       cursor: pointer;
-      transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
       display: flex;
       align-items: center;
       gap: var(--space-2);
+      transition: color 120ms ease, border-color 120ms ease;
+      margin-bottom: -1px;
     }
 
     .sub-nav-btn:hover {
@@ -1363,9 +1362,9 @@
     }
 
     .sub-nav-btn.active {
-      background: var(--accent);
-      color: #fff;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      color: var(--fg);
+      border-bottom-color: var(--accent);
+      background: transparent;
     }
 
     .sub-nav-btn svg {

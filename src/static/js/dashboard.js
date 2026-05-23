@@ -171,7 +171,7 @@ function ensureTrafficWorkloadLayout() {
   const snapshotFieldset = $('snap-fieldset');
 
   if (snapshotFieldset && legacyPanel && snapshotFieldset.parentElement === legacyPanel) {
-    dashboard.insertBefore(snapshotFieldset, legacyPanel);
+    legacyPanel.before(snapshotFieldset);
   }
   if (subNav) panel.appendChild(subNav);
   if (trafficPanel) panel.appendChild(trafficPanel);
