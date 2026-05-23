@@ -32,8 +32,8 @@ def _now_in_schedule_tz(tz_str: str) -> datetime.datetime:
     """Return current naive datetime adjusted to the configured schedule timezone."""
     now_utc = datetime.datetime.now(datetime.timezone.utc)
     if not tz_str or tz_str == 'local':
-        # Fall back to server local time
-        return datetime.datetime.now()
+        # Fall back to UTC-aware (avoids naive datetime / DST ambiguity)
+        return datetime.datetime.now(datetime.timezone.utc)
     if tz_str == 'UTC':
         return now_utc.replace(tzinfo=None)
     offset = _tz_offset_hours(tz_str)

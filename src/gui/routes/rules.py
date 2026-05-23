@@ -10,6 +10,7 @@ from loguru import logger
 
 from src.config import ConfigManager
 from src.i18n import t
+from src.rule_id import gen_rule_id
 from src.gui._helpers import (
     _err,
     _normalize_rule_throttle,
@@ -85,7 +86,7 @@ def make_rules_blueprint(
         if filter_value == 'pce_health':
             return _err("pce_health must be created from the system health rule form", 400)
         cm.add_or_update_rule({
-            "id": int(datetime.datetime.now().timestamp()),
+            "id": gen_rule_id(),
             "type": "event",
             "filter_key": "event_type",
             "name": d.get('name', ''),
@@ -115,7 +116,7 @@ def make_rules_blueprint(
         if filter_value != 'pce_health':
             return _err("unsupported system rule type", 400)
         cm.add_or_update_rule({
-            "id": int(datetime.datetime.now().timestamp()),
+            "id": gen_rule_id(),
             "type": "system",
             "name": d.get('name') or t('rule_pce_health', lang=lang),
             "filter_value": "pce_health",
@@ -160,7 +161,7 @@ def make_rules_blueprint(
             except (ValueError, TypeError): proto = None
 
         cm.add_or_update_rule({
-            "id": int(datetime.datetime.now().timestamp()),
+            "id": gen_rule_id(),
             "type": "traffic",
             "name": d.get('name', ''),
             "pd": int(d.get('pd', 2)),
@@ -205,7 +206,7 @@ def make_rules_blueprint(
             except (ValueError, TypeError): ex_port = None
 
         cm.add_or_update_rule({
-            "id": int(datetime.datetime.now().timestamp()),
+            "id": gen_rule_id(),
             "type": d.get('rule_type', 'bandwidth'),
             "name": d.get('name', ''),
             "pd": int(d.get('pd', -1)),

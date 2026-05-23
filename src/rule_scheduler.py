@@ -16,14 +16,14 @@ def _now_in_tz(tz_str: str) -> datetime.datetime:
     import datetime as _dt
     now_utc = _dt.datetime.now(_dt.timezone.utc)
     if not tz_str or tz_str == 'local':
-        return _dt.datetime.now()
+        return _dt.datetime.now(_dt.timezone.utc)  # UTC-aware fallback (avoids DST ambiguity)
     if tz_str == 'UTC':
         return now_utc.replace(tzinfo=None)
     m = re.match(r'^UTC([+-])(\d+(?:\.\d+)?)$', tz_str)
     if m:
         offset = _dt.timedelta(hours=float(m.group(1) + m.group(2)))
         return (now_utc + offset).replace(tzinfo=None)
-    return _dt.datetime.now()
+    return _dt.datetime.now(_dt.timezone.utc)  # UTC-aware fallback
 
 def truncate(text, width):
     """Truncate text to width, stripping schedule tags."""

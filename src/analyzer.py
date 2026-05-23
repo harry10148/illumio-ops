@@ -499,7 +499,7 @@ class Analyzer:
             for rule in pce_health_rules:
                 if self._check_cooldown(rule):
                     self.reporter.add_health_alert({
-                        "time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        "time": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
                         "rule": rule["name"],
                         "status": str(h_status),
                         "details": h_msg[:200]

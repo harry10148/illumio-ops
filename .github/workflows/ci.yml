@@ -45,6 +45,9 @@ jobs:
           pip-audit -r requirements.lock --strict
         continue-on-error: false
 
+      - name: Lint naive datetime
+        run: python3 scripts/check_no_naive_datetime.py
+
       - name: Doc link check
         run: python scripts/check_doc_links.py
 

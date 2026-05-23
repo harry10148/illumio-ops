@@ -109,7 +109,7 @@ def _append_rs_logs(logs: list) -> None:
     """Append one check-run's output to the in-memory log history."""
     with _rs_log_lock:
         entry = {
-            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
             "logs": [_ANSI_RE.sub('', l) for l in logs],
         }
         _rs_log_history.append(entry)  # deque(maxlen=200) auto-evicts oldest
