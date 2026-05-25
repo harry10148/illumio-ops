@@ -2673,6 +2673,7 @@
   "rpt_tr_staged_coverage": "已就位待強制覆蓋率",
   "rpt_tr_suspicious_pivot_behavior": "可疑橫向樞紐行為",
   "rpt_tr_title": "Illumio 流量分析報表",
+  "rpt_exec_summary_label": "執行摘要",
   "rpt_tr_top_app_flows": "熱門 App 流向",
   "rpt_tr_top_apps_connections": "連線統計",
   "rpt_tr_top_apps_infra": "依基礎架構評分排序的 Applications",

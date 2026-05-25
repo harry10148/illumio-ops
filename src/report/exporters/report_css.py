@@ -76,11 +76,11 @@ BASE_CSS = """\
 
   .report-hero { position: relative; overflow: hidden; background:
     radial-gradient(circle at top right, rgba(255,162,47,.16), transparent 24rem),
-    linear-gradient(135deg, #FFFFFF, #F7F4EE 62%, #F2EEE6); color: var(--slate); border: 1px solid rgba(50,81,88,.10); box-shadow: 0 10px 30px rgba(26,44,50,.10); }
+    linear-gradient(135deg, #FFFFFF, #FAFAFA); color: var(--slate); border: 1px solid var(--border); box-shadow: var(--shadow-card); }
   .report-hero h1 { color: var(--cyan-120); font-size: 30px; margin-bottom: 8px; }
   .report-hero h2 { color: var(--cyan-120); border-bottom-color: rgba(255,85,0,.24); }
   .report-subtitle { color: var(--slate-50); font-size: 13px; margin-bottom: 14px; }
-  .report-kicker { display: inline-block; padding: 7px 12px; margin-bottom: 12px; border-radius: 999px; background: rgba(45,69,76,.08); color: var(--cyan-120); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; }
+  .report-kicker { display: inline-block; padding: 7px 12px; margin-bottom: 12px; border-radius: 999px; background: var(--slate-10); color: var(--slate-50); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; }
   .summary-pill-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
   .summary-pill { min-width: 140px; padding: 12px 14px; border-radius: 14px; background: rgba(255,255,255,.92); border: 1px solid rgba(50,81,88,.10); box-shadow: 0 6px 14px rgba(26,44,50,.06); }
   .summary-pill-label { display: block; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--slate-50); margin-bottom: 4px; }
@@ -102,7 +102,7 @@ BASE_CSS = """\
      table. Narrow tables (e.g. 3-col Top Ports) now show as a tight panel
      with empty space OUTSIDE the panel (in the section card), rather than
      a full-width panel with a half-filled table and dead space inside. */
-  .report-table-panel { position: relative; margin: 12px 0 18px; border: 1px solid rgba(50,81,88,.14); border-radius: var(--radius-panel); overflow: hidden; background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(247,244,238,.92)); box-shadow: var(--shadow-panel-strong); width: max-content; max-width: 100%; }
+  .report-table-panel { position: relative; margin: 12px 0 18px; border: 1px solid rgba(50,81,88,.14); border-radius: var(--radius-panel); overflow: hidden; background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(245,245,245,.92)); box-shadow: var(--shadow-panel-strong); width: max-content; max-width: 100%; }
   /* Wide panels (sticky first col) need full container width so the sticky
      column is visually anchored. */
   .report-table-panel--wide { width: auto; }
@@ -175,7 +175,7 @@ BASE_CSS = """\
   .report-table-panel--wide::after {
     content: ""; position: absolute; top: 0; right: 0; bottom: 0; width: 28px;
     pointer-events: none;
-    background: linear-gradient(90deg, rgba(247,244,238,0), rgba(247,244,238,.96));
+    background: linear-gradient(90deg, rgba(245,245,245,0), rgba(245,245,245,.96));
     opacity: 0; transition: opacity .18s ease;
     z-index: 4;
   }
@@ -353,7 +353,7 @@ TRAFFIC_CSS = """\
 
 AUDIT_CSS = """\
   td { word-break: break-all; }
-  .bp-box { margin: 12px 0; padding: 12px 14px; border-left: 4px solid var(--orange); border-radius: 6px; background: linear-gradient(180deg, #FFFDF8, #F7F4EE); color: var(--cyan-120); line-height: 1.7; font-size: 12px; }
+  .bp-box { margin: 12px 0; padding: 12px 14px; border-left: 4px solid var(--orange); border-radius: 6px; background: linear-gradient(180deg, #FFFFFF, #F5F5F5); color: var(--cyan-120); line-height: 1.7; font-size: 12px; }
   .bp-box b { color: var(--cyan-120); }
   .report-hero + .card .report-table-panel,
   .card .report-table-panel { box-shadow: var(--shadow-panel); }
@@ -432,9 +432,9 @@ MODERN_SHELL_CSS = """\
 .report-toc ol { list-style: none; padding: 0; margin: 0; counter-reset: chap; }
 .report-toc li { counter-increment: chap; }
 .report-toc a { display: block; padding: 7px 12px; color: var(--slate-50); text-decoration: none; font-size: 13px; border-radius: 6px; }
-.report-toc a::before { content: counter(chap, decimal-leading-zero) '\00a0'; font-family: var(--font-mono); font-size: 11px; color: #a8a8a8; margin-right: 6px; }
+.report-toc a::before { content: counter(chap, decimal-leading-zero); font-family: var(--font-mono); font-size: 11px; color: #a8a8a8; margin-right: 6px; }
 .report-toc a:hover { color: var(--slate); background: var(--slate-10); }
-.report-main { padding: 48px 56px 96px; max-width: 1300px; }
+.report-main { margin-left: 0; padding: 48px 56px 96px; max-width: 1300px; }
 .report-cover-block { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
 .report-cover-block .eyebrow { font-size: 12px; color: var(--slate-50); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 8px; }
 .report-cover-block h1 { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; margin: 0 0 8px; color: var(--slate); }
@@ -484,16 +484,18 @@ MODERN_SHELL_CSS = """\
 
 EXEC_SUMMARY_CSS = """
 .exec-summary {
-  border: 2px solid var(--color-signal-info, #0077CC);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--orange);
   border-radius: 8px;
   padding: 24px;
   margin: 0 0 32px 0;
-  background: rgba(0,119,204,0.04);
+  background: #fff;
+  box-shadow: var(--shadow-card);
 }
 .exec-summary h2 {
   margin-top: 0;
   font-size: 1.4rem;
-  color: var(--color-signal-info, #0077CC);
+  color: var(--cyan-120);
 }
 .exec-summary .verdict { font-weight: 600; font-size: 1.1rem; }
 .exec-summary .kpi-strip {
@@ -503,14 +505,14 @@ EXEC_SUMMARY_CSS = """
   margin: 16px 0;
 }
 .exec-summary .kpi { display: flex; flex-direction: column; align-items: flex-start; }
-.exec-summary .kpi-label { font-size: 0.85rem; color: var(--color-text-secondary, #6F7274); }
+.exec-summary .kpi-label { font-size: 0.85rem; color: var(--slate-50); }
 .exec-summary .kpi-value {
   font-size: 1.6rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 .exec-summary .summary-text { margin: 12px 0; line-height: 1.6; }
-.exec-summary .notes { margin: 12px 0 0 20px; color: var(--color-text-secondary, #6F7274); }
+.exec-summary .notes { margin: 12px 0 0 20px; color: var(--slate-50); }
 """
 
 

@@ -686,9 +686,11 @@ class AuditGenerator:
     def export(self, result: AuditReportResult, fmt: str = 'html',
                output_dir: str = 'reports',
                detail_level: str = _REPORT_DETAIL_LEVEL,
-               lang: str = "en") -> list[str]:
+               lang: str | None = None) -> list[str]:
         from src.report.exporters.audit_html_exporter import AuditHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
+        # Inherit the generation language when caller omits lang (see ReportGenerator.export).
+        lang = lang or getattr(self, '_lang', 'en')
         paths = []
         if fmt in ('html', 'all'):
             path = AuditHtmlExporter(

@@ -185,7 +185,7 @@ class PolicyUsageHtmlExporter:
             '</aside>'
         )
 
-        exec_html = render_exec_summary_html(mod00, report_name='Policy Usage Report', lang=self._lang)
+        exec_html = render_exec_summary_html(mod00, report_name=t('gui_btn_pu_report', lang=self._lang), lang=self._lang)
         body = (
             exec_html
             + '<section id="summary" class="card report-hero">'

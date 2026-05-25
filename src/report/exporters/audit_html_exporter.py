@@ -257,7 +257,7 @@ class AuditHtmlExporter:
             )
             summary_pills = summary_pills.replace("</div>", data_source_pill + "</div>", 1)
 
-        exec_html = render_exec_summary_html(mod00, report_name='Audit Report', lang=self._lang)
+        exec_html = render_exec_summary_html(mod00, report_name=t('gui_btn_audit_report', lang=self._lang), lang=self._lang)
         body = (
             exec_html
             + render_section_guidance("audit_mod00_executive", profile="security_risk", detail_level="full", lang=self._lang)

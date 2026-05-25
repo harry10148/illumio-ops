@@ -72,10 +72,12 @@ class VenStatusGenerator:
         )
 
     def export(self, result: VenStatusResult, fmt: str = 'html', output_dir: str = 'reports',
-               detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en",
+               detail_level: str = _REPORT_DETAIL_LEVEL, lang: str | None = None,
                pce_url: str = "", org_name: str = "") -> list:
         from src.report.exporters.ven_html_exporter import VenHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
+        # Inherit the generation language when caller omits lang (see ReportGenerator.export).
+        lang = lang or getattr(self, '_lang', 'en')
         os.makedirs(output_dir, exist_ok=True)
         paths = []
         if fmt in ('html', 'all'):

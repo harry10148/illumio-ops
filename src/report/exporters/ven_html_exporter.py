@@ -133,7 +133,7 @@ class VenHtmlExporter:
             return render_df_table(df, col_i18n=_COL_I18N, no_data_key=no_data_key,
                                    render_cell=_render_cell, lang=_sl)
 
-        exec_html = render_exec_summary_html(_ven_mod00, report_name='VEN Status Report', lang=self._lang)
+        exec_html = render_exec_summary_html(_ven_mod00, report_name=t('gui_btn_ven_report', lang=self._lang), lang=self._lang)
         body = (
             exec_html
             + '<section id="summary" class="card report-hero">'

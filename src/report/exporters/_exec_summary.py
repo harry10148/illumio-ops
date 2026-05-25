@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from html import escape
 
+from src.i18n import t
 from .report_i18n import STRINGS
 
 
@@ -55,9 +56,11 @@ def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en') ->
         items = ''.join(f'<li>{escape(str(n))}</li>' for n in notes[:2])
         notes_html = f'<ul class="notes">{items}</ul>'
 
+    label = t('rpt_exec_summary_label', lang=lang, default='Executive Summary')
+    heading = f'{escape(label)} — {escape(report_name)}' if report_name else escape(label)
     return (
         f'<section class="exec-summary" aria-labelledby="exec-summary-title">'
-        f'<h2 id="exec-summary-title">Executive Summary — {escape(report_name)}</h2>'
+        f'<h2 id="exec-summary-title">{heading}</h2>'
         f'{verdict_html}{kpi_html}{summary_html}{notes_html}'
         f'</section>'
     )

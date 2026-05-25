@@ -678,7 +678,10 @@ async function saveSettings() {
   const pluginConfig = _collectAlertPluginConfig();
   const theme = rv('s-theme');
   const lang = rv('s-lang');
-  applyThemeMode(getStoredThemeMode());
+  // Apply the theme the user just picked (and persist it to the same store the
+  // top-bar selector uses) — previously this re-applied the *stored* mode, so
+  // toggling the Settings radio had no visible effect.
+  onUiThemeModeChange(theme);
   const settingsPayload = {
     api: { url: $('s-url').value, org_id: $('s-org').value, key: $('s-key').value, secret: $('s-sec').value, verify_ssl: $('s-ssl').checked },
     settings: { language: lang, theme: theme, timezone: $('s-timezone').value },

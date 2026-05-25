@@ -321,7 +321,7 @@ class ReportGenerator:
                reporter=None,
                traffic_report_profile: str = "security_risk",
                detail_level: str = _REPORT_DETAIL_LEVEL,
-               lang: str = "en") -> list[str]:
+               lang: str | None = None) -> list[str]:
         """
         Export a ReportResult to one or more files.
 
@@ -338,6 +338,13 @@ class ReportGenerator:
         """
         from src.report.exporters.html_exporter import HtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
+
+        # When the caller (CLI / scheduler) omits lang, inherit the language the
+        # report was generated and analysed in. Exec-summary KPI labels are
+        # resolved at analysis time while section/nav text resolves at export
+        # time — if the two stages disagree the report comes out half-Chinese,
+        # half-English. Defaulting to self._lang keeps a single source of truth.
+        lang = lang or getattr(self, '_lang', 'en')
 
         paths = []
         # Per-format errors surface to the GUI so the user can see why a format
@@ -691,7 +698,7 @@ class ReportGenerator:
         attack_rows_html = "".join(attack_rows)
 
         return f"""
-<html><body style="margin:0;padding:0;background:#F7F4EE;font-family:'Montserrat',Arial,sans-serif;color:#313638;line-height:1.5">
+<html><body style="margin:0;padding:0;background:#F4F4F4;font-family:'Montserrat',Arial,sans-serif;color:#313638;line-height:1.5">
 <div style="max-width:700px;margin:0 auto;padding:16px">
   <div style="border-radius:10px;overflow:hidden;border:1px solid #325158">
     <div style="background:#1A2C32;border-left:4px solid #FF5500;padding:18px 20px;color:#fff">
@@ -712,7 +719,7 @@ class ReportGenerator:
         {attack_rows_html or f'<tr><td colspan="3" style="padding:8px;color:#989A9B">{t("rpt_email_no_attack_findings", lang=lang)}</td></tr>'}
       </table>
     </div>
-    <div style="background:#F7F4EE;padding:12px 20px;border-top:1px solid #E3D8C5;text-align:center;color:#989A9B;font-size:11px">
+    <div style="background:#F4F4F4;padding:12px 20px;border-top:1px solid #E5E5E5;text-align:center;color:#989A9B;font-size:11px">
       {t("rpt_email_footer", lang=lang)}
     </div>
   </div>

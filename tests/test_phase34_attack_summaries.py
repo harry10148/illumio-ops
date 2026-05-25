@@ -204,7 +204,7 @@ def test_dashboard_summaries_include_attack_sections():
 
 
 def test_all_report_hero_css_uses_light_header_style():
-    expected_gradient = "linear-gradient(135deg, #FFFFFF, #F7F4EE 62%, #F2EEE6)"
+    expected_gradient = "linear-gradient(135deg, #FFFFFF, #FAFAFA)"
     legacy_dark_gradient = "linear-gradient(135deg, rgba(26,44,50,.98), rgba(45,69,76,.96))"
 
     for exporter_type in ("traffic", "audit", "policy_usage", "ven"):

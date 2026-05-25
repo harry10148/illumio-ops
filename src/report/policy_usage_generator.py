@@ -236,11 +236,13 @@ class PolicyUsageGenerator:
         fmt: str = 'html',
         output_dir: str = 'reports',
         detail_level: str = _REPORT_DETAIL_LEVEL,
-        lang: str = "en",
+        lang: str | None = None,
     ) -> list[str]:
         from src.report.exporters.policy_usage_html_exporter import PolicyUsageHtmlExporter
         from src.report.exporters.csv_exporter import CsvExporter
 
+        # Inherit the generation language when caller omits lang (see ReportGenerator.export).
+        lang = lang or getattr(self, '_lang', 'en')
         os.makedirs(output_dir, exist_ok=True)
         paths = []
 

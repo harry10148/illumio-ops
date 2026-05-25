@@ -313,7 +313,7 @@ class ReportScheduler:
         start_disp = start_date[:10] if start_date else "N/A"
         end_disp = end_date[:10] if end_date else "N/A"
 
-        body = "<html><body style='margin:0;padding:0;background:#F7F4EE;font-family:\"Montserrat\",Arial,sans-serif;color:#313638;'>"
+        body = "<html><body style='margin:0;padding:0;background:#F4F4F4;font-family:\"Montserrat\",Arial,sans-serif;color:#313638;'>"
         body += "<div style='max-width:860px;margin:0 auto;padding:16px;'>"
         body += "<div style='border:1px solid #325158;border-radius:10px;background:#fff;overflow:hidden;'>"
 
@@ -324,10 +324,10 @@ class ReportScheduler:
         body += "</div>"
 
         # KPI bar
-        body += "<div style='padding:14px 20px;border-bottom:1px solid #E3D8C5;background:#F7F4EE;display:flex;flex-wrap:wrap;gap:8px;'>"
+        body += "<div style='padding:14px 20px;border-bottom:1px solid #E5E5E5;background:#F4F4F4;display:flex;flex-wrap:wrap;gap:8px;'>"
         body += f"<span style='background:#FF5500;color:#fff;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;'>{t('rpt_email_records', lang=lang, count=esc(result.record_count))}</span>"
         body += f"<span style='background:#1A2C32;color:#D6D7D7;padding:4px 10px;border-radius:999px;font-size:12px;'>{t('rpt_email_period', lang=lang, start=esc(start_disp), end=esc(end_disp))}</span>"
-        body += f"<span style='background:#E3D8C5;color:#313638;padding:4px 10px;border-radius:999px;font-size:12px;'>{t('rpt_email_source_api', lang=lang)}</span>"
+        body += f"<span style='background:#E5E5E5;color:#313638;padding:4px 10px;border-radius:999px;font-size:12px;'>{t('rpt_email_source_api', lang=lang)}</span>"
         body += "</div>"
 
         body += "<div style='padding:16px 20px;'>"
@@ -347,7 +347,7 @@ class ReportScheduler:
                 label = esc(kpi.get("label", ""))
                 value = esc(kpi.get("value", ""))
                 color = kpi.get("color", "#313638")
-                body += f"<div style='background:#F7F4EE;border:1px solid #E3D8C5;border-radius:8px;padding:10px;text-align:center;'>"
+                body += f"<div style='background:#F4F4F4;border:1px solid #E5E5E5;border-radius:8px;padding:10px;text-align:center;'>"
                 body += f"<div style='font-size:22px;font-weight:700;color:{esc(color)};'>{value}</div>"
                 body += f"<div style='font-size:11px;color:#989A9B;margin-top:4px;'>{label}</div>"
                 body += "</div>"
@@ -364,7 +364,7 @@ class ReportScheduler:
             body += "</tr>"
             sev_colors = {"CRITICAL": "#BE122F", "HIGH": "#F97607", "MEDIUM": "#F59E0B", "LOW": "#166644"}
             for i, f in enumerate(findings[:15]):
-                row_bg = "#fff" if i % 2 == 0 else "#F7F4EE"
+                row_bg = "#fff" if i % 2 == 0 else "#F4F4F4"
                 # Finding is a dataclass; support dict fallback for forward compatibility
                 if hasattr(f, 'severity'):
                     sev   = str(getattr(f, 'severity',    'INFO') or 'INFO').upper()
@@ -378,9 +378,9 @@ class ReportScheduler:
                     fdesc = str(f.get('description', ''))
                 sev_color = sev_colors.get(sev, "#313638")
                 body += f"<tr style='background:{row_bg};'>"
-                body += f"<td style='padding:8px;border-bottom:1px solid #E3D8C5;font-weight:700;color:#FF5500;'>{esc(fid)}</td>"
-                body += f"<td style='padding:8px;border-bottom:1px solid #E3D8C5;'><strong>{esc(fname)}</strong><br><small style='color:#989A9B;'>{esc(fdesc)}</small></td>"
-                body += f"<td style='padding:8px;border-bottom:1px solid #E3D8C5;font-weight:700;color:{sev_color};'>{esc(sev)}</td>"
+                body += f"<td style='padding:8px;border-bottom:1px solid #E5E5E5;font-weight:700;color:#FF5500;'>{esc(fid)}</td>"
+                body += f"<td style='padding:8px;border-bottom:1px solid #E5E5E5;'><strong>{esc(fname)}</strong><br><small style='color:#989A9B;'>{esc(fdesc)}</small></td>"
+                body += f"<td style='padding:8px;border-bottom:1px solid #E5E5E5;font-weight:700;color:{sev_color};'>{esc(sev)}</td>"
                 body += "</tr>"
             body += "</table></div>"
 
@@ -404,7 +404,7 @@ class ReportScheduler:
             row_index = 0
             for key, label in section_labels.items():
                 for item in (attack_summary.get(key) or [])[:2]:
-                    row_bg = "#fff" if row_index % 2 == 0 else "#F7F4EE"
+                    row_bg = "#fff" if row_index % 2 == 0 else "#F4F4F4"
                     finding_en = esc(item.get("finding", ""))
                     if key == "action_matrix" and not finding_en:
                         finding_en = esc(item.get("action", ""))
@@ -424,16 +424,16 @@ class ReportScheduler:
                             action_html += f"<br><small style='color:#989A9B;'>{action_zh}</small>"
 
                     body += f"<tr style='background:{row_bg};'>"
-                    body += f"<td style='padding:8px;border-bottom:1px solid #E3D8C5;font-weight:700;color:#1A2C32;'>{esc(label)}</td>"
-                    body += f"<td style='padding:8px;border-bottom:1px solid #E3D8C5;'>{finding_html}</td>"
-                    body += f"<td style='padding:8px;border-bottom:1px solid #E3D8C5;'>{action_html}</td>"
+                    body += f"<td style='padding:8px;border-bottom:1px solid #E5E5E5;font-weight:700;color:#1A2C32;'>{esc(label)}</td>"
+                    body += f"<td style='padding:8px;border-bottom:1px solid #E5E5E5;'>{finding_html}</td>"
+                    body += f"<td style='padding:8px;border-bottom:1px solid #E5E5E5;'>{action_html}</td>"
                     body += "</tr>"
                     row_index += 1
             body += "</table></div>"
 
         # Attachments note
         if paths:
-            body += "<div style='background:#F7F4EE;border:1px solid #E3D8C5;border-radius:8px;padding:12px;margin-bottom:16px;'>"
+            body += "<div style='background:#F4F4F4;border:1px solid #E5E5E5;border-radius:8px;padding:12px;margin-bottom:16px;'>"
             body += f"<div style='font-size:13px;font-weight:700;color:#1A2C32;margin-bottom:6px;'>{t('rpt_email_attached_files', lang=lang)}</div>"
             for p in paths:
                 body += f"<div style='font-size:12px;color:#313638;padding:2px 0;'>📎 {esc(os.path.basename(p))}</div>"

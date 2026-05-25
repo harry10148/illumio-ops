@@ -604,7 +604,7 @@ class HtmlExporter:
             '</aside>'
         )
 
-        exec_html = render_exec_summary_html(_traffic_mod00, report_name='Traffic Report', lang=self._lang)
+        exec_html = render_exec_summary_html(_traffic_mod00, report_name=t('gui_btn_traffic_report', lang=self._lang), lang=self._lang)
         body = (
             exec_html
             + '<section id="summary" class="card report-hero">'
