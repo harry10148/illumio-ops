@@ -17,6 +17,8 @@ Then further buckets offline VENs by when they last sent a heartbeat:
   - Lost in previous 24-48 h window
   - Long-term offline (last heartbeat > 48 h ago or unknown)
 """
+from __future__ import annotations
+
 import datetime
 from loguru import logger
 import os
