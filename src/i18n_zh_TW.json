@@ -943,7 +943,7 @@
   "gui_org_id": "組織 ID",
   "gui_org_id_help": "PCE 組織 ID，可在 PCE 管理介面的 URL 或「設定 → 組織」中查看。",
   "gui_output": "輸出",
-  "gui_ov_cache_lag": "快取列數",
+  "gui_ov_cache_rows": "快取列數",
   "gui_ov_destinations_fmt": "{n} 個目的地",
   "gui_ov_dlq": "DLQ",
   "gui_ov_dlq_total": "DLQ 總數",

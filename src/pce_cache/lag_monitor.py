@@ -13,8 +13,11 @@ from src.i18n import t
 def check_cache_lag(session_factory: sessionmaker, max_lag_seconds: int = 300) -> list[dict]:
     """Return lag info for all watermark sources.
 
-    Each entry is a dict with keys: source, last_sync_at, lag_seconds, level.
-    level is 'ok', 'warning', or 'error'.
+    Each entry is a dict with keys: source, last_sync_at, lag_seconds, level,
+    last_status, last_error. level is 'ok', 'warning', or 'error' (time-based).
+    last_status/last_error carry the most recent ingest outcome — note that a
+    failed ingest still bumps last_sync_at, so callers should treat
+    last_status == 'error' as unhealthy regardless of a small lag.
     """
     now = datetime.now(timezone.utc)
     results = []
@@ -38,6 +41,8 @@ def check_cache_lag(session_factory: sessionmaker, max_lag_seconds: int = 300) -
             "last_sync_at": wm.last_sync_at,
             "lag_seconds": lag,
             "level": level,
+            "last_status": wm.last_status,
+            "last_error": wm.last_error,
         })
     return results
 

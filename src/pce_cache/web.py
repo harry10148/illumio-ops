@@ -159,6 +159,8 @@ def api_cache_lag():
                 "last_sync_at": r["last_sync_at"].isoformat() if r["last_sync_at"] else None,
                 "lag_seconds": int(r["lag_seconds"]),
                 "level": r["level"],
+                "last_status": r.get("last_status"),
+                "last_error": r.get("last_error"),
             }
             for r in check_cache_lag(sf, max_lag_seconds=max_lag)
         ]

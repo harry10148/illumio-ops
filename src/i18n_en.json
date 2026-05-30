@@ -948,7 +948,7 @@
   "gui_org_id": "Org ID",
   "gui_org_id_help": "PCE Organisation ID. Visible in the PCE web console URL or under Settings → Organisation.",
   "gui_output": "Output",
-  "gui_ov_cache_lag": "Cache Rows",
+  "gui_ov_cache_rows": "Cache Rows",
   "gui_ov_destinations_fmt": "{n} destination(s)",
   "gui_ov_dlq": "DLQ",
   "gui_ov_dlq_total": "DLQ Total",

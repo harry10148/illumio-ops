@@ -152,8 +152,14 @@ function buildCacheLagRow(lag) {
     return Math.floor(sec / 3600) + 'h';
   }
   var parts = sources.map(function (r) {
-    var c = colors[r.level] || 'var(--dim)';
-    return escapeAttr(String(r.source)) + ' <strong style="color:' + c + '">' + fmtLag(r.lag_seconds) + '</strong>';
+    // A failed ingest still bumps last_sync_at, so a small lag can mask an error —
+    // treat last_status 'error' as unhealthy and expose the reason via a tooltip.
+    var errored = r.last_status === 'error';
+    var c = colors[errored ? 'error' : r.level] || 'var(--dim)';
+    var title = (errored && r.last_error) ? ' title="' + escapeAttr(String(r.last_error)) + '"' : '';
+    return '<span' + title + '>' + escapeAttr(String(r.source))
+      + ' <strong style="color:' + c + '">' + fmtLag(r.lag_seconds)
+      + (errored ? ' &#9888;' : '') + '</strong></span>';
   }).join(' &middot; ');
   return '<div class="cache-lag" style="margin:-8px 0 16px;font-size:.85rem;color:var(--dim);">'
     + '<span data-i18n="gui_cache_ingest_lag">Ingestion lag</span>: ' + parts
@@ -1275,7 +1281,7 @@ function _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, 
     + '</div>';
   return '<div class="cards" style="margin-bottom:16px;">'
     + '<div class="card card-neutral">'
-    + '<div class="label" data-i18n="gui_ov_cache_lag">Cache Rows</div>'
+    + '<div class="label" data-i18n="gui_ov_cache_rows">Cache Rows</div>'
     + '<div class="value" style="font-size:.95rem;line-height:1.5;">'
     + cacheEvents.toLocaleString() + ' <span style="font-size:.7rem;color:var(--dim);" data-i18n="gui_ov_events">events</span><br>'
     + cacheTraffic.toLocaleString() + ' <span style="font-size:.7rem;color:var(--dim);" data-i18n="gui_ov_traffic">traffic</span>'

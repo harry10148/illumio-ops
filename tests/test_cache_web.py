@@ -164,6 +164,34 @@ def test_cache_lag_reports_level(client, tmp_path):
     assert row["level"] == "ok"            # just synced → within threshold
     assert row["lag_seconds"] < 60
     assert row["last_sync_at"]             # iso timestamp present
+    assert "last_status" in row and "last_error" in row   # surfaced for the UI
+
+
+def test_cache_lag_surfaces_error(client, tmp_path):
+    # A failed ingest bumps last_sync_at (small lag) but sets last_status='error'.
+    # The route must surface status + reason so the UI can flag it despite low lag.
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.models import IngestionWatermark
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'cache.sqlite'}")
+    init_schema(engine)
+    with sessionmaker(engine)() as s:
+        s.add(IngestionWatermark(source="traffic",
+                                 last_sync_at=datetime.now(timezone.utc),
+                                 last_status="error",
+                                 last_error="boom: 503 from PCE"))
+        s.commit()
+
+    resp = client.get("/api/cache/lag",
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    row = resp.get_json()["sources"][0]
+    assert row["source"] == "traffic"
+    assert row["last_status"] == "error"
+    assert "boom" in (row["last_error"] or "")
 
 
 def test_cache_lag_requires_login(tmp_path):
