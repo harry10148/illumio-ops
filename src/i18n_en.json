@@ -1374,7 +1374,7 @@
   "gui_stopped_title": "Web GUI Stopped",
   "gui_story_group_health": "Health",
   "gui_story_group_risk": "Risk",
-  "gui_story_group_traffic": "Traffic",
+  "gui_story_group_traffic": "Rules & Alerts",
   "gui_summary": "Summary",
   "gui_system_health_desc": "When the PCE health check fails, send an alert so you can verify PCE service status and network reachability.",
   "gui_system_health_pce": "PCE API Health",

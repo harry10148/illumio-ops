@@ -1369,7 +1369,7 @@
   "gui_stopped_title": "已停止",
   "gui_story_group_health": "健康",
   "gui_story_group_risk": "風險",
-  "gui_story_group_traffic": "流量",
+  "gui_story_group_traffic": "規則與告警",
   "gui_summary": "摘要",
   "gui_system_health_desc": "當 PCE 健康檢查失敗時發送告警，方便你立即確認 PCE Service 狀態與連線可達性。",
   "gui_system_health_pce": "PCE API 健康檢查",
