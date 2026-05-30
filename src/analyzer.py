@@ -565,9 +565,14 @@ class Analyzer:
             try:
                 events = self._sub_events.poll_new_rows(limit=5000)
                 logger.info("Analyzer event path: cache ({} rows)", len(events))
+                # Record poll health like the legacy path does — the dashboard
+                # "Event Poll" card reads pce_stats.event_poll_status, which would
+                # otherwise stay 'unknown' forever on the cache path.
+                self.stats.record_pce_success("events", status=200, message=f"cache rows={len(events)}")
             except Exception as e:
                 logger.error(f"Cache event poll failed: {e}")
                 logger.error(t('api_fetch_events_error', error=str(e)))
+                self.stats.record_pce_error("events", str(e))
         else:
             try:
                 events, event_batch = self._legacy_event_pull()

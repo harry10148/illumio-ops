@@ -144,6 +144,37 @@ class TestAnalyzerOnCache(unittest.TestCase):
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["rule"], rule["name"])
 
+    def test_cache_poll_records_event_poll_status_ok(self):
+        """The cache event path must record event_poll_status='ok' — the dashboard
+        'Event Poll' card reads pce_stats.event_poll_status. The legacy path set it;
+        the cache path must too, else the card is stuck 'unknown' despite live polls."""
+        mock_sub = MagicMock()
+        mock_sub.poll_new_rows.return_value = []  # successful poll, no new rows
+
+        az = _make_analyzer(rules=[_event_rule()], subscriber_events=mock_sub)
+        # clean baseline — don't depend on any state file the ctor may have loaded
+        az.state["pce_stats"].update({"event_poll_status": "unknown", "last_event_poll": ""})
+        az._run_event_analysis()
+
+        ps = az.state["pce_stats"]
+        self.assertEqual(ps["event_poll_status"], "ok")
+        self.assertTrue(ps["last_event_poll"])  # timestamp recorded
+
+    def test_cache_poll_failure_records_event_poll_status_error(self):
+        """When the cache poll raises, event_poll_status must flip to 'error' with
+        the reason captured (parity with the legacy path's record_pce_error)."""
+        mock_sub = MagicMock()
+        mock_sub.poll_new_rows.side_effect = Exception("cache db locked")
+
+        az = _make_analyzer(rules=[_event_rule()], subscriber_events=mock_sub)
+        # clean baseline — don't depend on any state file the ctor may have loaded
+        az.state["pce_stats"].update({"event_poll_status": "unknown", "last_error": ""})
+        az._run_event_analysis()
+
+        ps = az.state["pce_stats"]
+        self.assertEqual(ps["event_poll_status"], "error")
+        self.assertIn("cache db locked", ps["last_error"])
+
 
     # ─── _fetch_query_flows hybrid (partial) ──────────────────────────────────
 
