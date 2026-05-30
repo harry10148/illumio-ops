@@ -1,7 +1,7 @@
 # Dashboard i18n Audit
 
-**Scope keys:** 232
-**Findings:** 94
+**Scope keys:** 236
+**Findings:** 97
 
 ## Rule: mixed_language (31)
 
@@ -106,7 +106,7 @@
 | `gui_tw_kpi_peak_bw` | Peak bandwidth | 尖峰頻寬 | en_len=14 zh_len=4 |
 | `gui_window_min` | Window (min) | 分鐘 | en_len=12 zh_len=2 |
 
-## Rule: untranslated (6)
+## Rule: untranslated (9)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
@@ -115,4 +115,7 @@
 | `gui_service_port` | Service | Service | zh equals en (case-insensitive) |
 | `gui_snap_col_flows` | Flows | Flows | zh equals en (case-insensitive) |
 | `gui_snap_col_port` | Port | Port | zh equals en (case-insensitive) |
+| `gui_tw_trend_allowed` | Allowed | Allowed | zh equals en (case-insensitive) |
+| `gui_tw_trend_blocked` | Blocked | Blocked | zh equals en (case-insensitive) |
+| `gui_tw_trend_potential` | Potentially Blocked | Potentially Blocked | zh equals en (case-insensitive) |
 | `gui_ws_col_labels` | Labels | Labels | zh equals en (case-insensitive) |

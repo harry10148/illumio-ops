@@ -391,10 +391,12 @@ def make_actions_blueprint(
 
     @bp.route('/api/traffic/trend', methods=['GET'])
     def api_traffic_trend():
-        """Return per-day flow counts for the past 7 days from the local cache agg table.
+        """Return per-day flow counts for the past 7 days, split by policy decision.
 
-        Response: {"ok": true, "buckets": [{"ts": "YYYY-MM-DD", "flows": N}, ...]}
-        Buckets are ordered oldest-first. Falls back to empty list when cache is disabled.
+        Response: {"ok": true, "buckets": [
+            {"ts": "YYYY-MM-DD", "allowed": N, "potential": N, "blocked": N}, ...]}
+        Buckets are ordered oldest-first. A raw `flows` total is included per bucket
+        for backward compatibility. Falls back to empty list when cache is disabled.
         """
         try:
             import datetime
@@ -418,14 +420,29 @@ def make_actions_blueprint(
                 rows = session.execute(
                     sa_select(
                         func.date(PceTrafficFlowAgg.bucket_day).label("day"),
+                        PceTrafficFlowAgg.action.label("action"),
                         func.sum(PceTrafficFlowAgg.flow_count).label("flows"),
                     )
                     .where(PceTrafficFlowAgg.bucket_day >= cutoff)
-                    .group_by(func.date(PceTrafficFlowAgg.bucket_day))
+                    .group_by(func.date(PceTrafficFlowAgg.bucket_day), PceTrafficFlowAgg.action)
                     .order_by(func.date(PceTrafficFlowAgg.bucket_day))
                 ).all()
 
-            buckets = [{"ts": str(row.day), "flows": int(row.flows)} for row in rows]
+            # PCE policy_decision → chart series. Unknown actions roll into "blocked"
+            # so no traffic silently vanishes from the totals.
+            _SERIES = {"allowed": "allowed", "potentially_blocked": "potential", "blocked": "blocked"}
+            by_day: dict[str, dict] = {}
+            for row in rows:
+                day = str(row.day)
+                b = by_day.setdefault(day, {"ts": day, "allowed": 0, "potential": 0, "blocked": 0})
+                key = _SERIES.get((row.action or "").lower(), "blocked")
+                b[key] += int(row.flows or 0)
+
+            buckets = []
+            for day in sorted(by_day):
+                b = by_day[day]
+                b["flows"] = b["allowed"] + b["potential"] + b["blocked"]
+                buckets.append(b)
             return jsonify({"ok": True, "buckets": buckets})
         except Exception as e:
             return _err_with_log("traffic_trend", e)

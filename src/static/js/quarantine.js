@@ -764,6 +764,16 @@ function _showAccelCountdown() {
  * Safe to call multiple times; debounced by _trendFetching flag.
  */
 let _trendFetching = false;
+let _trendFlaggedOnly = false;   // R4k: hide the dominant allowed band, rescale to flagged
+let _trendBuckets = null;        // last-rendered data, so the toggle re-renders without a refetch
+
+// Toggle: drop the allowed band and rescale Y to flagged traffic so spikes show.
+document.addEventListener('change', function (e) {
+  if (e.target && e.target.id === 'tw-trend-flagged-only') {
+    _trendFlaggedOnly = e.target.checked;
+    renderTrafficTrend(_trendBuckets || []);
+  }
+});
 
 async function loadTrafficTrend() {
   if (_trendFetching) return;
@@ -786,6 +796,14 @@ function _svgEl(tag, attrs) {
   return el;
 }
 
+// Stacked-area series, bottom→top. Security-relevant bands ride on top so spikes
+// in blocked / potentially-blocked traffic are visually obvious.
+const _TREND_SERIES = [
+  { key: 'allowed',   stroke: '#16a34a', fill: 'rgba(22,163,74,0.16)' },
+  { key: 'potential', stroke: '#f59e0b', fill: 'rgba(245,158,11,0.28)' },
+  { key: 'blocked',   stroke: '#dc2626', fill: 'rgba(220,38,38,0.42)' },
+];
+
 function renderTrafficTrend(buckets) {
   const svg  = document.getElementById('tw-trend-svg');
   const meta = document.getElementById('tw-trend-meta');
@@ -793,6 +811,8 @@ function renderTrafficTrend(buckets) {
 
   const x0El = document.getElementById('tw-trend-x0');
   const x1El = document.getElementById('tw-trend-x1');
+
+  _trendBuckets = buckets; // cache so the flagged-only toggle re-renders without a refetch
 
   svg.replaceChildren(); // clear previous render — no innerHTML
 
@@ -803,25 +823,29 @@ function renderTrafficTrend(buckets) {
     return;
   }
 
-  const W = 800, H = 200, padX = 8, padY = 14;
-  const maxY = Math.max(...buckets.map(b => b.flows), 1);
-  const n = buckets.length;
-  const pts = buckets.map((b, i) => {
-    const x = padX + (W - 2 * padX) * (i / Math.max(n - 1, 1));
-    const y = H - padY - (H - 2 * padY) * (b.flows / maxY);
-    return [x, y];
-  });
+  // Back-compat: a bucket may carry only a legacy `flows` total. Treat it as allowed.
+  const norm = buckets.map(b => ({
+    allowed:   +b.allowed   || (b.potential == null && b.blocked == null ? (+b.flows || 0) : 0),
+    potential: +b.potential || 0,
+    blocked:   +b.blocked   || 0,
+  }));
 
-  const lineD = pts.map((p, i) =>
-    `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`
-  ).join(' ');
-  const areaD =
-    lineD +
-    ` L${pts[pts.length - 1][0].toFixed(1)},${(H - padY).toFixed(1)}` +
-    ` L${pts[0][0].toFixed(1)},${(H - padY).toFixed(1)} Z`;
+  // Flagged-only drops the allowed band; remaining series rescale to fill the chart.
+  const series = _trendFlaggedOnly
+    ? _TREND_SERIES.filter(s => s.key !== 'allowed')
+    : _TREND_SERIES;
+  const visKeys = series.map(s => s.key);
+
+  const W = 800, H = 200, padX = 8, padY = 14;
+  const n = norm.length;
+  const totals = norm.map(b => visKeys.reduce((a, k) => a + b[k], 0));
+  const maxY = Math.max(...totals, 1);
+  const xAt = i => padX + (W - 2 * padX) * (i / Math.max(n - 1, 1));
+  const yAt = v => H - padY - (H - 2 * padY) * (v / maxY);
+
+  const frag = document.createDocumentFragment();
 
   // gridlines
-  const frag = document.createDocumentFragment();
   for (const p of [0.25, 0.5, 0.75]) {
     const y = (padY + (H - 2 * padY) * p).toFixed(1);
     frag.appendChild(_svgEl('line', {
@@ -830,16 +854,21 @@ function renderTrafficTrend(buckets) {
     }));
   }
 
-  // area fill
-  frag.appendChild(_svgEl('path', {
-    d: areaD, fill: 'var(--accent)', 'fill-opacity': '0.15',
-  }));
-
-  // line stroke
-  frag.appendChild(_svgEl('path', {
-    d: lineD, fill: 'none', stroke: 'var(--accent)',
-    'stroke-width': '1.5', 'stroke-linejoin': 'round',
-  }));
+  // Stacked bands: each series fills between its lower and upper cumulative boundary.
+  const lower = norm.map(() => 0);
+  for (const s of series) {
+    const upper = norm.map((b, i) => lower[i] + b[s.key]);
+    const upPts  = upper.map((v, i) => [xAt(i), yAt(v)]);
+    const lowPts = lower.map((v, i) => [xAt(i), yAt(v)]);
+    const fwd = upPts.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+    const back = lowPts.slice().reverse().map(p => `L${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+    frag.appendChild(_svgEl('path', { d: `${fwd} ${back} Z`, fill: s.fill, stroke: 'none' }));
+    frag.appendChild(_svgEl('path', {
+      d: fwd, fill: 'none', stroke: s.stroke,
+      'stroke-width': '1.5', 'stroke-linejoin': 'round',
+    }));
+    for (let i = 0; i < n; i++) lower[i] = upper[i];
+  }
 
   // max label
   const label = _svgEl('text', {
@@ -851,8 +880,13 @@ function renderTrafficTrend(buckets) {
 
   svg.appendChild(frag);
 
-  const totalFlows = buckets.reduce((s, b) => s + b.flows, 0);
-  if (meta) meta.textContent = `${totalFlows.toLocaleString()} flows · 7d`;
+  const sum = k => norm.reduce((s, b) => s + b[k], 0);
+  const flagged = sum('potential') + sum('blocked');
+  if (meta) {
+    meta.textContent = flagged
+      ? `${flagged.toLocaleString()} blocked/potential · ${(sum('allowed') + flagged).toLocaleString()} flows · 7d`
+      : `${(sum('allowed') + flagged).toLocaleString()} flows · 7d`;
+  }
   if (x0El && buckets[0]?.ts)     x0El.textContent = String(buckets[0].ts).slice(0, 10);
   if (x1El && buckets[n - 1]?.ts) x1El.textContent = String(buckets[n - 1].ts).slice(0, 10);
 }
