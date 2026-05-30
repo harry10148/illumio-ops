@@ -382,7 +382,10 @@ AUDIT_CSS = """\
 """
 
 VEN_CSS = """\
-  td { word-break: break-all; }
+  /* overflow-wrap (not word-break:break-all) so short tokens like timestamps and
+     hostnames don't shatter mid-character; only genuinely long strings wrap. */
+  .report-table td { overflow-wrap: anywhere; }
+  .ip-more { display: inline-block; font-size: 10px; font-weight: 600; color: var(--slate-50); background: var(--slate-10); padding: 0 5px; border-radius: 999px; vertical-align: baseline; }
 """
 
 POLICY_USAGE_CSS = """\

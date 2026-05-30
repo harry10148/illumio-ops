@@ -26,7 +26,7 @@ import pandas as pd
 from dataclasses import dataclass, field
 
 from src.i18n import t
-from src.report.tz_utils import parse_tz, fmt_tz_str as _fmt_tz_str, fmt_ts_local as _fmt_ts_local
+from src.report.tz_utils import parse_tz, fmt_tz_str as _fmt_tz_str
 
 _REPORT_DETAIL_LEVEL = "full"
 
@@ -34,6 +34,52 @@ _ONLINE_STATUSES = {'active', 'online'}
 # VENs whose last heartbeat is older than this are considered offline,
 # even when PCE reports their administrative status as "active".
 _ONLINE_HEARTBEAT_THRESHOLD_HOURS = 1.0
+
+
+def _parse_iso(ts):
+    """Parse a PCE ISO-8601 timestamp; return None on empty/unparseable input."""
+    if not ts:
+        return None
+    try:
+        return datetime.datetime.fromisoformat(str(ts).replace('Z', '+00:00'))
+    except Exception:
+        return None  # intentional fallback: unparseable timestamps render blank
+
+
+def _rel_time(ts, now: datetime.datetime) -> str:
+    """Compact, language-neutral relative age of a timestamp, e.g. '3m' / '2h' / '19d'.
+
+    Far narrower than an absolute '2026-05-29 13:30 (UTC+8)' string, which is what
+    bloated the VEN print table. Unit-only (no localized 'ago' word) keeps the source
+    CJK-free and reads correctly under any UI language — the column header already
+    conveys "last seen". Frozen at report-generation time (PDF snapshot).
+    """
+    dt = _parse_iso(ts)
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=now.tzinfo)
+    secs = (now - dt.astimezone(now.tzinfo)).total_seconds()
+    if secs < 0:
+        secs = 0
+    days, hrs, mins = secs / 86400, secs / 3600, secs / 60
+    if days >= 1:
+        return f"{int(days)}d"
+    if hrs >= 1:
+        return f"{int(hrs)}h"
+    if mins >= 1:
+        return f"{int(mins)}m"
+    return "now"
+
+
+def _fmt_date_local(ts, tz: datetime.timezone) -> str:
+    """Date-only (YYYY-MM-DD) in the report timezone; blank on bad input."""
+    dt = _parse_iso(ts)
+    if dt is None:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(tz).strftime("%Y-%m-%d")
 
 @dataclass
 class VenStatusResult:
@@ -182,15 +228,15 @@ class VenStatusGenerator:
         cutoff_24h = now - datetime.timedelta(hours=24)
         cutoff_48h = now - datetime.timedelta(hours=48)
 
-        # Columns included in the final display tables (internal-only fields excluded)
-        _DISPLAY_COLS = ['hostname', 'ip', 'role', 'app', 'env', 'loc',
+        # Columns included in the final display tables (internal-only fields excluded).
+        # Role/App are segmentation labels, not VEN-health signals — dropped here to
+        # keep the print/PDF table narrow (see test_ven_report_compact).
+        _DISPLAY_COLS = ['hostname', 'ip', 'env', 'loc',
                          'policy_sync', 'last_heartbeat', 'policy_received',
                          'paired_at', 'ven_version']
         _COL_RENAME = {
             'hostname':        'Hostname',
             'ip':              'IP',
-            'role':            'Role',
-            'app':             'App',
             'env':             'Env',
             'loc':             'Loc',
             'policy_sync':     'Policy Sync',
@@ -219,11 +265,13 @@ class VenStatusGenerator:
                 return pd.DataFrame(columns=list(_COL_RENAME.values()))
             cols = [c for c in _DISPLAY_COLS if c in d.columns]
             out = d[cols].copy().sort_values('last_heartbeat', ascending=False, na_position='last')
-            # Format timestamp columns to human-readable local time
+            # Freshness columns → compact relative age (narrow for print); paired_at → date-only.
             tz = now.tzinfo
-            for ts_col in ('last_heartbeat', 'policy_received', 'paired_at'):
+            for ts_col in ('last_heartbeat', 'policy_received'):
                 if ts_col in out.columns:
-                    out[ts_col] = out[ts_col].apply(lambda v: _fmt_ts_local(v, tz))
+                    out[ts_col] = out[ts_col].apply(lambda v: _rel_time(v, now))
+            if 'paired_at' in out.columns:
+                out['paired_at'] = out['paired_at'].apply(lambda v: _fmt_date_local(v, tz))
             return out.rename(columns=_COL_RENAME).reset_index(drop=True)
 
         df = df.copy()

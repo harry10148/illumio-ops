@@ -4,6 +4,7 @@ Self-contained HTML report for the VEN Status Inventory Report.
 from __future__ import annotations
 
 import datetime
+import html
 from loguru import logger
 import os
 
@@ -127,8 +128,17 @@ class VenHtmlExporter:
         def _df_to_html(df, no_data_key: str = "rpt_no_records") -> str:
             def _render_cell(col, val, _row):
                 val_str = "" if val is None or str(val) in ("None", "nan") else str(val)
-                if str(col).strip().lower().replace(" ", "_") == "policy_sync":
+                col_key = str(col).strip().lower().replace(" ", "_")
+                if col_key == "policy_sync":
                     return _policy_sync_badge(val_str)
+                if col_key == "ip" and ", " in val_str:
+                    # Multi-homed hosts blow out the column width; show the first IP
+                    # plus a +N chip, full list preserved in the title (and in CSV).
+                    parts = val_str.split(", ")
+                    first = html.escape(parts[0])
+                    full = html.escape(val_str, quote=True)
+                    return (f'<span title="{full}">{first} '
+                            f'<span class="ip-more">+{len(parts) - 1}</span></span>')
                 return val_str
             return render_df_table(df, col_i18n=_COL_I18N, no_data_key=no_data_key,
                                    render_cell=_render_cell, lang=_sl)
