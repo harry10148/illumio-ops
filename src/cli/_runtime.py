@@ -93,6 +93,20 @@ def run_gui_only(cm, port: int = 5001, host: str = "0.0.0.0") -> None:
             print(f"Import error: {FLASK_IMPORT_ERROR}")
         print(t("cli_pip_install_hint", pkg="flask"))
         sys.exit(1)
+
+    # GUI-only mode runs no scheduler, so PCE cache ingestion/aggregation/retention
+    # never fire automatically — the cache only fills via manual Backfill. Warn loudly
+    # so a cache-enabled deployment isn't silently left without live ingestion.
+    try:
+        if cm.models.pce_cache.enabled:
+            logger.warning(
+                "GUI-only mode: PCE cache is enabled but no scheduler runs here — "
+                "automatic ingestion/aggregation/retention will NOT fire (manual Backfill "
+                "only). Use 'monitor-gui' for live cache ingestion."
+            )
+    except Exception as e:
+        logger.debug("cache-enabled check skipped in gui-only mode: {}", e)
+
     launch_gui(cm, port=port)
 
 

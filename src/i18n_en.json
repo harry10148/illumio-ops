@@ -576,6 +576,7 @@
   "gui_bw_value_volume": "Threshold (MB)",
   "gui_cache_async_threshold_events_help": "If a single poll returns this many events, the ingestor switches to async bulk-export mode automatically. Increase if you have a high-volume PCE.",
   "gui_cache_card_traffic_agg": "Traffic Agg",
+  "gui_cache_ingest_lag": "Ingestion lag",
   "gui_cache_card_traffic_raw": "Traffic Raw",
   "gui_cache_db_path": "DB path",
   "gui_cache_db_path_help": "File path for the SQLite cache database. Changing this path requires a restart.",

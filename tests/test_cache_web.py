@@ -129,3 +129,62 @@ def test_retention_run_requires_login(tmp_path):
             assert resp.status_code in (302, 401)
     finally:
         os.unlink(path)
+
+
+def test_cache_lag_empty(client):
+    resp = client.get("/api/cache/lag",
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert isinstance(body.get("sources"), list)
+    assert body["sources"] == []  # no watermarks synced yet
+
+
+def test_cache_lag_reports_level(client, tmp_path):
+    from datetime import datetime, timezone
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.models import IngestionWatermark
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'cache.sqlite'}")
+    init_schema(engine)
+    with sessionmaker(engine)() as s:
+        s.add(IngestionWatermark(source="events",
+                                 last_sync_at=datetime.now(timezone.utc)))
+        s.commit()
+
+    resp = client.get("/api/cache/lag",
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    sources = resp.get_json()["sources"]
+    assert len(sources) == 1
+    row = sources[0]
+    assert row["source"] == "events"
+    assert row["level"] == "ok"            # just synced → within threshold
+    assert row["lag_seconds"] < 60
+    assert row["last_sync_at"]             # iso timestamp present
+
+
+def test_cache_lag_requires_login(tmp_path):
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    try:
+        with open(path, "w") as f:
+            json.dump({
+                "web_gui": {"username": "admin", "password": "pw",
+                            "secret_key": "s", "allowed_ips": ["127.0.0.1"]},
+                "pce_cache": {"enabled": False,
+                              "db_path": str(tmp_path / "cache.sqlite")},
+            }, f)
+        cm = ConfigManager(config_file=path)
+        from src.gui import _create_app
+        app = _create_app(cm, persistent_mode=True)
+        app.config["TESTING"] = True
+        app.config["WTF_CSRF_ENABLED"] = False
+        with app.test_client() as c:
+            resp = c.get("/api/cache/lag",
+                         environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+            assert resp.status_code in (302, 401)
+    finally:
+        os.unlink(path)

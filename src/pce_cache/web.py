@@ -134,6 +134,40 @@ def api_cache_status():
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/lag", methods=["GET"])
+@login_required
+def api_cache_lag():
+    """Return ingestor lag per watermark source (level ok/warning/error)."""
+    lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
+    try:
+        sf = _get_sf()
+    except Exception as e:
+        return jsonify({"error": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
+    try:
+        from src.pce_cache.lag_monitor import check_cache_lag
+        cfg = current_app.config["CM"].models.pce_cache
+        try:
+            max_lag = max(
+                int(cfg.events_poll_interval_seconds),
+                int(cfg.traffic_poll_interval_seconds),
+            ) * 3
+        except (AttributeError, TypeError, ValueError):
+            max_lag = 300
+        sources = [
+            {
+                "source": r["source"],
+                "last_sync_at": r["last_sync_at"].isoformat() if r["last_sync_at"] else None,
+                "lag_seconds": int(r["lag_seconds"]),
+                "level": r["level"],
+            }
+            for r in check_cache_lag(sf, max_lag_seconds=max_lag)
+        ]
+        return jsonify({"sources": sources})
+    except Exception as e:
+        logger.exception("cache lag error: {}", e)
+        return jsonify({"error": str(e)}), 500
+
+
 @bp.route("/settings", methods=["GET"])
 @login_required
 def get_cache_settings():

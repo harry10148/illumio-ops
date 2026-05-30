@@ -93,9 +93,14 @@ window._integrations.setRender('cache', async function renderCache() {
     return;
   }
 
+  // Ingestor lag is best-effort: a 503 (cache not configured) or fetch error must
+  // not blank out the status cards, so swallow failures and just skip the row.
+  var lag = null;
+  try { var lr = await fetch('/api/cache/lag'); if (lr.ok) lag = await lr.json(); } catch (_) {}
+
   var header = buildCacheStatusCards(status, s);
   var form = buildCacheForm(s);
-  el.innerHTML = header + form;
+  el.innerHTML = header + buildCacheLagRow(lag) + form;
   el.dataset.settings = JSON.stringify(s);
   renderTrafficFilter(s);
   renderTrafficSampling(s);
@@ -131,6 +136,27 @@ function buildCacheStatusCards(status, s) {
     + '<div class="toolbar" style="margin-bottom:16px;">'
     + '<button class="btn btn-sm" data-action="cacheBackfill" data-i18n="gui_backfill">Backfill</button>'
     + '<button class="btn btn-sm" data-action="cacheRetentionNow" data-i18n="gui_retention_now">Retention now</button>'
+    + '</div>';
+}
+
+// Ingestor lag row: one entry per watermark source, coloured by level (ok/warning/error).
+// Returns '' when no watermark data exists yet (cache never synced) so nothing is shown.
+function buildCacheLagRow(lag) {
+  var sources = (lag && lag.sources) || [];
+  if (!sources.length) return '';
+  var colors = { ok: 'var(--color-success)', warning: 'var(--color-warning,#f59e0b)', error: 'var(--color-danger)' };
+  function fmtLag(sec) {
+    sec = Math.max(0, Math.floor(Number(sec) || 0));
+    if (sec < 60)   return sec + 's';
+    if (sec < 3600) return Math.floor(sec / 60) + 'm';
+    return Math.floor(sec / 3600) + 'h';
+  }
+  var parts = sources.map(function (r) {
+    var c = colors[r.level] || 'var(--dim)';
+    return escapeAttr(String(r.source)) + ' <strong style="color:' + c + '">' + fmtLag(r.lag_seconds) + '</strong>';
+  }).join(' &middot; ');
+  return '<div class="cache-lag" style="margin:-8px 0 16px;font-size:.85rem;color:var(--dim);">'
+    + '<span data-i18n="gui_cache_ingest_lag">Ingestion lag</span>: ' + parts
     + '</div>';
 }
 
@@ -1358,26 +1384,26 @@ function _buildAlertChannelCards(settings) {
   var mailStatusLabel = mailConfigured ? 'Verified' : 'Not configured';
   var mailSub = mailHost ? (mailHost + (mailPort ? ':' + mailPort : '')) : 'SMTP not configured';
 
+  // Alert channel config is stored FLAT under `alerts` (e.g. alerts.line_channel_access_token),
+  // not as nested sub-objects. Secret fields are redacted to asterisks by /api/settings, which
+  // also emits an authoritative `<key>__set` boolean — trust that for "configured", not the value.
+
   // LINE card
-  var lineToken = (alerts.line && alerts.line.channel_access_token) || '';
-  var lineConfigured = !!(lineToken && lineToken.indexOf('*') < 0 && lineToken.length > 4);
+  var lineConfigured = !!alerts.line_channel_access_token__set;
   var lineStatus = lineConfigured ? 'ok' : 'muted';
   var lineStatusLabel = lineConfigured ? 'Verified' : 'Not configured';
-  var lineTarget = (alerts.line && alerts.line.user_id) || '';
+  var lineTarget = alerts.line_target_id || '';
 
   // Telegram card
-  var tgToken = (alerts.telegram && alerts.telegram.bot_token) || '';
-  var tgConfigured = !!(tgToken && tgToken.indexOf('*') < 0 && tgToken.length > 4);
-  var tgChatId = (alerts.telegram && alerts.telegram.chat_id) || '';
+  var tgConfigured = !!alerts.telegram_bot_token__set;
+  var tgChatId = alerts.telegram_chat_id || '';
   var tgStatus = tgConfigured ? 'ok' : 'muted';
   var tgStatusLabel = tgConfigured ? 'Configured' : 'Not configured';
 
-  // Webhook card
-  var whUrl = (alerts.webhook && alerts.webhook.url) || '';
-  var whConfigured = !!(whUrl && whUrl.length > 5);
+  // Webhook card (url is redacted, so the real value can't be displayed)
+  var whConfigured = !!alerts.webhook_url__set;
   var whStatus = whConfigured ? 'ok' : 'muted';
   var whStatusLabel = whConfigured ? 'Verified' : 'Not configured';
-  var whDisplay = whUrl.length > 40 ? whUrl.slice(0, 37) + '...' : whUrl;
 
   function chip(cls, label) {
     return '<span class="it-status-chip it-status-' + cls + '">' + label + '</span>';
@@ -1439,9 +1465,6 @@ function _buildAlertChannelCards(settings) {
     + '<div class="integ-card-sub">POST JSON · https only</div></div>'
     + chip(whStatus, whStatusLabel)
     + '</div>';
-  if (whConfigured) {
-    cards += '<div class="integ-card-meta integ-card-mono"><span>' + escapeAttr(whDisplay) + '</span></div>';
-  }
   cards += '</div>';
 
   cards += '</div></div>'; // close integ-grid + it-channel-section

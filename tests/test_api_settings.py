@@ -102,6 +102,30 @@ def test_redaction_response(authed_client):
     assert smtp.get("host") == "smtp.example.com"
 
 
+# ── Test 1b: the contract the Integrations → Overview channel cards depend on ──
+# Regression guard for the "LINE configured but displayed as Not configured" bug.
+# The overview detects a configured channel via the redacted-secret companion flag
+# `<key>__set`, reading FLAT keys (alerts.line_channel_access_token) — NOT the masked
+# value (which contains asterisks) and NOT a nested alerts.line object. If this
+# contract drifts, the channel cards silently misreport configured channels.
+
+def test_alert_channel_configured_flag_contract(authed_client):
+    client, _ = authed_client
+    alerts = client.get("/api/settings").get_json().get("alerts", {})
+
+    # configured secret → __set True; value is masked, so the UI must trust __set
+    assert alerts.get("line_channel_access_token__set") is True
+    assert "*" in str(alerts.get("line_channel_access_token")), "secret value must be masked"
+    assert alerts.get("webhook_url__set") is True
+
+    # keys stay FLAT under `alerts`, not nested (alerts.line / alerts.webhook)
+    assert not isinstance(alerts.get("line"), dict), "config must stay flat, not nested alerts.line"
+    assert not isinstance(alerts.get("webhook"), dict)
+
+    # an unconfigured secret must not read as configured
+    assert not alerts.get("telegram_bot_token__set")
+
+
 # ── Test 2: mass-assignment via __proto__ or unknown keys is rejected ──────────
 
 def test_mass_assignment_rejected(authed_client, app):

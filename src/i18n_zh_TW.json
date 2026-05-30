@@ -571,6 +571,7 @@
   "gui_bw_value_volume": "門檻值（MB）",
   "gui_cache_async_threshold_events_help": "單次輪詢回傳事件數達到此值時，自動切換為非同步批次匯出模式。高流量 PCE 可提高此值。",
   "gui_cache_card_traffic_agg": "彙總流量",
+  "gui_cache_ingest_lag": "擷取延遲",
   "gui_cache_card_traffic_raw": "原始流量",
   "gui_cache_db_path": "資料庫路徑",
   "gui_cache_db_path_help": "SQLite 快取資料庫的檔案路徑，修改後需重新啟動才生效。",
