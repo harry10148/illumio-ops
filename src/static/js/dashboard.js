@@ -138,6 +138,10 @@ function ensureDashboardLayout() {
   const cdField = $('cd-field');
   if (cdField) cdField.style.display = 'none';
 
+  // Mark cooldown / pce-health value elements as ok (green) by default
+  const _cdv = document.querySelector('#d-cooldown'); if (_cdv) _cdv.querySelector('.value') && _cdv.querySelector('.value').classList.add('ok');
+  const _phv = document.querySelector('#d-pce-health'); if (_phv) _phv.querySelector('.value') && _phv.querySelector('.value').classList.add('ok');
+
   if (!$('audit-fieldset')) {
     const snapFieldset = $('snap-fieldset');
     const auditFieldset = _buildAuditSummaryFieldset();
@@ -149,6 +153,94 @@ function ensureDashboardLayout() {
   }
 
   dashboard.dataset.layoutReady = '1';
+}
+
+/* ─── Phase 3.1 story-mode render functions ─────────────────────────────── */
+
+function renderHero(snap) {
+  const wrap = document.querySelector('#d-hero');
+  if (!wrap) return;
+  const score = snap.maturity_score ?? null;
+  const grade = snap.maturity_grade || '';
+  const highRisk = (snap.key_findings || []).filter(
+    (f) => f.severity === 'CRITICAL' || f.severity === 'HIGH'
+  ).length;
+  const sentence = document.querySelector('#d-hero-sentence');
+  if (sentence) {
+    if (score != null) {
+      sentence.textContent = _t('gui_hero_sentence')
+        .replace('{score}', `${score}/100 (${grade})`)
+        .replace('{high_risk}', highRisk);
+    } else {
+      sentence.textContent = _t('gui_hero_no_data');
+    }
+  }
+  const cta = $('d-hero-cta');
+  if (cta) cta.href = '#findings';
+  wrap.classList.remove('is-hidden');
+}
+
+function renderHeroEmpty() {
+  const wrap = document.querySelector('#d-hero');
+  if (wrap) wrap.classList.add('is-hidden');
+}
+
+function renderMaturity(snap) {
+  const panel = document.querySelector('#d-maturity');
+  if (!panel) return;
+  const dims = snap.maturity_dimensions || {};
+  const dimOrder = [
+    'enforcement_coverage',
+    'policy_coverage',
+    'lateral_movement_control',
+    'managed_asset_ratio',
+    'risk_port_control',
+  ];
+  const bars = $('d-maturity-bars');
+  if (!bars) return;
+  bars.innerHTML = dimOrder.map((key) => {
+    const d = dims[key] || {};
+    const score = d.score ?? 0;
+    const weight = d.weight ?? 10;
+    const pct = weight > 0 ? Math.round((score / weight) * 100) : 0;
+    const label = key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    return `<div class="db-mat-row">
+      <div class="db-mat-name">${escapeHtml(label)}</div>
+      <div class="db-mat-bar"><div class="db-mat-fill" style="width:${pct}%;background:var(--color-success,#16a34a);"></div></div>
+      <div class="db-mat-name" style="text-align:right;">${score}/${weight}</div>
+    </div>`;
+  }).join('');
+  panel.classList.remove('is-hidden');
+}
+
+function renderStoryGroups(snap) {
+  // story-card groups are static in index.html; just populate the stat values
+  const ids = ['d-rules', 'd-health', 'd-event-poll', 'd-dispatch', 'd-unknown', 'd-suppressed', 'd-ransom'];
+  const vals = snap.story_stats || {};
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el && vals[id] !== undefined) el.textContent = vals[id];
+  });
+}
+
+function renderTopActions(snap) {
+  const grid = $('d-top-actions-grid');
+  if (!grid) return;
+  const actions = (snap.top_actions || snap.key_findings || []).slice(0, 3);
+  if (!actions.length) { grid.innerHTML = ''; return; }
+  grid.innerHTML = actions.map((a) => {
+    const sev = String(a.severity || '');
+    let sevColor = 'var(--dim)';
+    if (sev === 'CRITICAL') sevColor = '#c0392b';
+    else if (sev === 'HIGH') sevColor = 'var(--danger)';
+    else if (sev === 'MEDIUM') sevColor = 'var(--warn)';
+    return `<div class="db-status-card db-warn" style="padding:12px;border-radius:8px;">
+      <div class="story-card-title" style="font-size:12px;margin-bottom:4px;">
+        <span style="background:${sevColor};color:#fff;padding:1px 5px;border-radius:3px;font-size:11px;">${escapeHtml(sev)}</span>
+      </div>
+      <div class="story-card-body" style="font-size:13px;">${escapeHtml(a.finding || a.action || '')}</div>
+    </div>`;
+  }).join('');
 }
 
 function formatBytes(bytes) {
@@ -1212,14 +1304,20 @@ async function loadDashboardSnapshot() {
 
   try {
     const r = await api('/api/dashboard/snapshot');
-    if (!r || !r.ok || !r.snapshot) return;
+    if (!r || !r.ok || !r.snapshot) { renderHeroEmpty(); return; }
     const s = r.snapshot;
-    if (!s.generated_at || !placeholder || !content) return;
+    if (!s.generated_at || !placeholder || !content) { renderHeroEmpty(); return; }
 
     placeholder.style.display = 'none';
     content.style.display = 'block';
     $('snap-generated-at').textContent = s.generated_at;
     $('snap-date-range').textContent = s.date_range || '-';
+
+    // Phase 3.1 story pipeline
+    renderHero(s);
+    renderStoryGroups(s);
+    renderMaturity(s);
+    renderTopActions(s);
 
     const kpiGrid = $('snap-kpi-grid');
     if (kpiGrid) {

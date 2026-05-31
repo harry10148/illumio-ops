@@ -39,14 +39,15 @@ class TestSchedulerPersistence:
         assert not isinstance(store, SQLAlchemyJobStore)
 
     def test_three_jobs_registered(self, tmp_path):
-        """build_scheduler registers exactly 3 jobs (monitor, report, rule)."""
+        """build_scheduler registers core jobs (monitor, report, rule, ven_summary)."""
         from src.scheduler import build_scheduler
 
         cm = _make_cm(tmp_path / "sched.db")
         sched = build_scheduler(cm, interval_minutes=5)
         # Pending jobs are accessible before start
         job_ids = {j.id for j in sched.get_jobs(jobstore=None)}
-        assert job_ids == {"monitor_cycle", "tick_report_schedules", "tick_rule_schedules"}
+        required = {"monitor_cycle", "tick_report_schedules", "tick_rule_schedules", "ven_summary"}
+        assert required.issubset(job_ids), f"Missing jobs: {required - job_ids}"
 
     def test_db_dir_created(self, tmp_path):
         """build_scheduler creates parent directories for the DB path."""

@@ -658,6 +658,75 @@
         <div class="ov-tile-body" id="ov-alerts-body"></div></a>
     </div>
 
+    <!-- ══ Phase 3.1 Hero block ══════════════════════════════════════════ -->
+    <div id="d-hero" class="db-hero-wrap is-hidden" style="margin-bottom:16px;">
+      <div class="db-hero-eyebrow" data-i18n="gui_hero_eyebrow">Security Posture</div>
+      <div id="d-hero-sentence" style="font-size:1.1rem;font-weight:600;margin:6px 0;"></div>
+      <a id="d-hero-cta" href="#findings" style="font-size:13px;color:var(--accent);" data-i18n="gui_hero_view_high_risk">View high-risk findings →</a>
+    </div>
+
+    <!-- ══ Phase 3.1 Story-card groups ══════════════════════════════════ -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
+      <!-- Health group -->
+      <div class="db-status-card story-card--health db-ok">
+        <div class="story-card-title" data-i18n="gui_story_group_health">Health</div>
+        <div class="story-card-body">
+          <div class="story-stat">
+            <span class="story-stat-label" data-i18n="gui_card_rules">Rules</span>
+            <span class="story-stat-value" id="d-rules">—</span>
+          </div>
+          <div class="story-stat">
+            <span class="story-stat-label" data-i18n="gui_card_health">PCE Health</span>
+            <span class="story-stat-value" id="d-health">—</span>
+          </div>
+        </div>
+      </div>
+      <!-- Traffic group -->
+      <div class="db-status-card story-card--traffic db-info">
+        <div class="story-card-title" data-i18n="gui_story_group_traffic">Traffic</div>
+        <div class="story-card-body">
+          <div class="story-stat">
+            <span class="story-stat-label" data-i18n="gui_card_event_poll">Events</span>
+            <span class="story-stat-value" id="d-event-poll">—</span>
+          </div>
+          <div class="story-stat">
+            <span class="story-stat-label" data-i18n="gui_card_dispatch">Dispatched</span>
+            <span class="story-stat-value" id="d-dispatch">—</span>
+          </div>
+          <div class="story-stat" title="Unknown traffic types" data-i18n-title="gui_card_unknown_types_tooltip">
+            <span class="story-stat-label" data-i18n="gui_card_unknown">Unknown</span>
+            <span class="story-stat-value" id="d-unknown">—</span>
+          </div>
+        </div>
+      </div>
+      <!-- Risk group -->
+      <div class="db-status-card story-card--risk db-warn">
+        <div class="story-card-title" data-i18n="gui_story_group_risk">Risk</div>
+        <div class="story-card-body">
+          <div class="story-stat" title="Suppressed alerts" data-i18n-title="gui_card_suppressed_tooltip">
+            <span class="story-stat-label" data-i18n="gui_card_suppressed">Suppressed</span>
+            <span class="story-stat-value" id="d-suppressed">—</span>
+          </div>
+          <div class="story-stat">
+            <span class="story-stat-label" data-i18n="gui_hi_risk_findings">High-risk</span>
+            <span class="story-stat-value" id="d-ransom">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ Phase 3.1 Maturity panel ════════════════════════════════════ -->
+    <div id="d-maturity" class="db-maturity-panel is-hidden" style="margin-bottom:16px;">
+      <div class="db-maturity-head">
+        <h2 class="db-maturity-title" data-i18n="gui_maturity_title">Microsegmentation Maturity</h2>
+        <span class="db-maturity-meta">
+          <span data-i18n="gui_maturity_grade_label">Grade:</span>
+          <strong id="d-maturity-grade">—</strong>
+        </span>
+      </div>
+      <div id="d-maturity-bars"></div>
+    </div>
+
     <fieldset id="cd-field" style="display:none;margin-bottom:20px;border:none;padding:0;">
       <div id="cd-list" class="cards" style="margin-bottom:0;"></div>
     </fieldset>
