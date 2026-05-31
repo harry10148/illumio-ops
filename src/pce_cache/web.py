@@ -184,7 +184,13 @@ def api_cache_health():
         from src.pce_cache.lag_monitor import check_cache_lag
         from src.siem.web import _siem_window_totals
 
-        lag = check_cache_lag(sf)
+        try:
+            _cfg = current_app.config["CM"].models.pce_cache
+            _max_lag = max(_cfg.events_poll_interval_seconds,
+                           _cfg.traffic_poll_interval_seconds) * 3
+        except AttributeError:
+            _max_lag = 300
+        lag = check_cache_lag(sf, max_lag_seconds=_max_lag)
         levels = [r["level"] for r in lag]
 
         with sf() as s:

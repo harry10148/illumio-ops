@@ -109,7 +109,13 @@ def _overview_pipeline(cm):
         from src.pce_cache.models import SiemDispatch, DeadLetter
         from src.pce_cache.health import pipeline_verdict
         sf = _cache_session(cm)
-        lag = check_cache_lag(sf, max_lag_seconds=300)
+        try:
+            _cfg = cm.models.pce_cache
+            _max_lag = max(_cfg.events_poll_interval_seconds,
+                           _cfg.traffic_poll_interval_seconds) * 3
+        except AttributeError:
+            _max_lag = 300
+        lag = check_cache_lag(sf, max_lag_seconds=_max_lag)
         cache_lag = [{"source": r["source"], "lag_s": int(r["lag_seconds"]),
                       "level": r["level"]} for r in lag]
         now = dt.datetime.now(dt.timezone.utc)
