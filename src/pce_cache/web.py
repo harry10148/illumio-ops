@@ -170,6 +170,47 @@ def api_cache_lag():
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/health", methods=["GET"])
+@login_required
+def api_cache_health():
+    """Return a single pipeline-health verdict (ok/warn/error/unknown)."""
+    lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
+    try:
+        sf = _get_sf()
+    except Exception as e:
+        return jsonify({"verdict": "unknown", "note": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
+    try:
+        from src.pce_cache.health import pipeline_verdict
+        from src.pce_cache.lag_monitor import check_cache_lag
+        from src.siem.web import _siem_window_totals
+
+        lag = check_cache_lag(sf)
+        levels = [r["level"] for r in lag]
+
+        with sf() as s:
+            totals = _siem_window_totals(s)
+
+        success_1h = (
+            round(totals["sent_1h"] / totals["denom"] * 100, 1)
+            if totals["denom"] else 100.0
+        )
+        verdict = pipeline_verdict(
+            lag_levels=levels,
+            siem_success_1h=success_1h,
+            denom=totals["denom"],
+            dlq=totals["dlq"],
+        )
+        return jsonify({
+            "verdict": verdict,
+            "lag_levels": levels,
+            "siem_success_1h": success_1h,
+            "dlq": totals["dlq"],
+        })
+    except Exception as e:
+        logger.exception("cache health error: {}", e)
+        return jsonify({"error": str(e)}), 500
+
+
 @bp.route("/settings", methods=["GET"])
 @login_required
 def get_cache_settings():

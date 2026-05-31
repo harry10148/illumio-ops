@@ -123,6 +123,34 @@ def delete_destination(name: str):
         return jsonify({"ok": False, "error": str(exc)}), 400
 
 
+def _siem_window_totals(s):
+    """Return aggregate sent_1h, failed_1h, denom, dlq across ALL destinations.
+
+    Intended for consumers that need a fleet-wide health signal rather than
+    per-destination breakdown (e.g. /api/cache/health).
+    Returns a dict with keys: sent_1h, failed_1h, denom, dlq.
+    Must be called inside an open SQLAlchemy session context.
+    """
+    import datetime as _dt
+    from sqlalchemy import func, select
+    from src.pce_cache.models import DeadLetter, SiemDispatch
+
+    now = _dt.datetime.now(_dt.timezone.utc)
+    hr = now - _dt.timedelta(hours=1)
+    sent_1h = s.execute(
+        select(func.count()).select_from(SiemDispatch)
+        .where(SiemDispatch.status == "sent")
+        .where(SiemDispatch.sent_at >= hr)
+    ).scalar() or 0
+    failed_1h = s.execute(
+        select(func.count()).select_from(SiemDispatch)
+        .where(SiemDispatch.status == "failed")
+        .where(SiemDispatch.queued_at >= hr)
+    ).scalar() or 0
+    dlq = s.execute(select(func.count()).select_from(DeadLetter)).scalar() or 0
+    return {"sent_1h": sent_1h, "failed_1h": failed_1h, "denom": sent_1h + failed_1h, "dlq": dlq}
+
+
 @bp.route("/status", methods=["GET"])
 @login_required
 def dispatch_status():

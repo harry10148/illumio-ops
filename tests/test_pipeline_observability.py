@@ -38,6 +38,17 @@ def _seed_dispatch(db, rows):
         s.commit()
 
 
+def test_pipeline_verdict_thresholds():
+    from src.pce_cache.health import pipeline_verdict
+    assert pipeline_verdict(lag_levels=["ok"], siem_success_1h=100.0, denom=10, dlq=0) == "ok"
+    assert pipeline_verdict(lag_levels=["warning"], siem_success_1h=100.0, denom=10, dlq=0) == "warn"
+    assert pipeline_verdict(lag_levels=["ok"], siem_success_1h=98.0, denom=10, dlq=0) == "warn"
+    assert pipeline_verdict(lag_levels=["ok"], siem_success_1h=100.0, denom=10, dlq=1) == "warn"
+    assert pipeline_verdict(lag_levels=["error"], siem_success_1h=100.0, denom=10, dlq=0) == "error"
+    assert pipeline_verdict(lag_levels=["ok"], siem_success_1h=90.0, denom=10, dlq=0) == "error"
+    assert pipeline_verdict(lag_levels=["ok"], siem_success_1h=100.0, denom=0, dlq=0) == "ok"  # no traffic
+
+
 def test_siem_status_has_1h_window_and_latency(app_cm):
     cm, tmp = app_cm
     now = dt.datetime.now(dt.timezone.utc)
