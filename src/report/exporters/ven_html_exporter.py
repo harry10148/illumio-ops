@@ -22,6 +22,7 @@ from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 from src.report.exporters._exec_summary import render_exec_summary_html
 from src.report.exporters.cover_page import build_cover_page as _build_cover_page
+from src.report.exporters.html_exporter import _trend_deltas_section
 
 _CSS = build_css("ven")
 _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
@@ -146,7 +147,6 @@ class VenHtmlExporter:
         exec_html = render_exec_summary_html(_ven_mod00, report_name=t('gui_btn_ven_report', lang=self._lang), lang=self._lang)
         _deltas = (self._r or {}).get("_trend_deltas") or []
         if _deltas:
-            from src.report.exporters.html_exporter import _trend_deltas_section
             exec_html += _trend_deltas_section(_deltas, self._lang)
         body = (
             exec_html

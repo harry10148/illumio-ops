@@ -126,7 +126,7 @@ class VenStatusGenerator:
         try:
             _kpi_dict = build_kpi_dict_from_metadata(result.module_results.get("kpis", []))
             _prev = load_previous(output_dir, "ven")
-            save_snapshot(output_dir, "ven", _kpi_dict)
+            save_snapshot(output_dir, "ven", _kpi_dict, generated_at=result.generated_at.isoformat(timespec="seconds"))
             result.module_results["_trend_deltas"] = compute_deltas(_kpi_dict, _prev) if _prev else []
         except Exception as e:
             logger.warning("VEN trend delta skipped: {}", e)
