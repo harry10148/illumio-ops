@@ -35,6 +35,45 @@ def test_concern_card_unknown_risk_does_not_raise():
     assert "x" in html  # rendered without raising
 
 
+def test_ven_status_chart_is_bar_not_pie(tmp_path):
+    """VEN Status Distribution chart must be bar, not pie.
+
+    Plotly serialises trace data before layout (which contains the title), so we
+    search the Plotly.newPlot call block rather than the text after the title.
+    """
+    import re
+    import pandas as pd
+    from src.report.exporters.ven_html_exporter import VenHtmlExporter
+
+    results = {
+        "kpis": [],
+        "generated_at": "2026-05-31T00:00:00Z",
+        "online": pd.DataFrame([{"hostname": f"h{i}", "ip": "10.0.0.1"} for i in range(15)]),
+        "offline": pd.DataFrame([{"hostname": "off1", "ip": "10.0.0.2"}]),
+        "lost_today": pd.DataFrame(),
+        "lost_yesterday": pd.DataFrame(),
+        "_trend_deltas": [],
+    }
+    html_out = VenHtmlExporter(results, lang="en")._build()
+    assert "VEN Status Distribution" in html_out
+
+    # Plotly serialises trace data at the START of Plotly.newPlot() — within
+    # the first ~1000 chars of the call.  The layout title follows after.
+    # The Plotly JS bundle contains schema entries like "pie":[{"type":"pie"}]
+    # which are NOT trace data; those appear thousands of chars after newPlot.
+    # We therefore search only the first 1000 chars of each newPlot block for
+    # the actual trace type.
+    newplot_blocks = [html_out[m.start(): m.start() + 1000]
+                      for m in re.finditer(r"Plotly\.newPlot\(", html_out)]
+    # At least one block must declare a bar trace (the VEN Status chart)
+    assert any('"type":"bar"' in b or '"type": "bar"' in b for b in newplot_blocks), \
+        "No bar chart found in any Plotly.newPlot block"
+    # No newPlot block should declare a pie trace as the first/primary trace
+    for b in newplot_blocks:
+        assert '"type":"pie"' not in b and '"type": "pie"' not in b, \
+            f"A pie trace was found in a Plotly.newPlot block: {b[:200]}"
+
+
 def test_ven_generate_produces_trend_deltas(tmp_path):
     from src.report.ven_status_generator import VenStatusGenerator
     cm = types.SimpleNamespace(config={"settings": {"timezone": "UTC"}})

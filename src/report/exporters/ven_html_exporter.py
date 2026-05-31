@@ -113,7 +113,7 @@ class VenHtmlExporter:
         if total_vens > 0:
             try:
                 spec = {
-                    "type": "pie",
+                    "type": "bar",
                     "title": "VEN Status Distribution",
                     "data": {
                         "labels": [t("chart_ven_online", lang=self._lang), t("chart_ven_offline", lang=self._lang), t("chart_ven_lost_24h", lang=self._lang), t("chart_ven_lost_48h", lang=self._lang)],

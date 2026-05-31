@@ -95,7 +95,7 @@ def pu_deny_effectiveness(
     total_for_chart = total_allow + len(deny_hit) + len(deny_unused)
     if total_for_chart > 0:
         chart_spec = {
-            "type": "pie",
+            "type": "bar",
             "title": "Policy Decision Distribution",
             "title_key": "rpt_chart_policy_decision_distribution",
             "data": {

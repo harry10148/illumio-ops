@@ -292,7 +292,7 @@ class AuditHtmlExporter:
             values = sev_df["Count"].tolist()
             if labels and any(v > 0 for v in values):
                 spec = {
-                    "type": "pie",
+                    "type": "bar",
                     "title": "Event Severity Distribution",
                     "data": {"labels": labels, "values": values},
                 }

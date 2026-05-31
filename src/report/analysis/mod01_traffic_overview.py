@@ -94,7 +94,7 @@ def traffic_overview(df: pd.DataFrame) -> dict:
                   .rename(columns={'proto': 'Protocol', 'count': 'Flow Count'}))
 
     chart_spec = {
-        'type': 'pie',
+        'type': 'bar',
         'title': 'Policy Decision Breakdown',
         'title_key': 'rpt_chart_policy_decision_breakdown',
         'data': {
