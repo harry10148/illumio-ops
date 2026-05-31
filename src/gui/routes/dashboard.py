@@ -101,6 +101,59 @@ def _overview_blocked(cm, window_days=7):
             "vs_prev_pct": vs_prev, "verdict": verdict}
 
 
+def _overview_pipeline(cm):
+    import datetime as dt
+    from sqlalchemy import func, select
+    try:
+        from src.pce_cache.lag_monitor import check_cache_lag
+        from src.pce_cache.models import SiemDispatch, DeadLetter
+        from src.pce_cache.health import pipeline_verdict
+        sf = _cache_session(cm)
+        lag = check_cache_lag(sf, max_lag_seconds=300)
+        cache_lag = [{"source": r["source"], "lag_s": int(r["lag_seconds"]),
+                      "level": r["level"]} for r in lag]
+        now = dt.datetime.now(dt.timezone.utc)
+        hr_ago = now - dt.timedelta(hours=1)
+        with sf() as s:
+            sent = s.execute(select(func.count()).select_from(SiemDispatch)
+                             .where(SiemDispatch.status == "sent")
+                             .where(SiemDispatch.sent_at >= hr_ago)).scalar() or 0
+            failed = s.execute(select(func.count()).select_from(SiemDispatch)
+                               .where(SiemDispatch.status == "failed")
+                               .where(SiemDispatch.queued_at >= hr_ago)).scalar() or 0
+            dlq = s.execute(select(func.count()).select_from(DeadLetter)).scalar() or 0
+        denom = sent + failed
+        success_1h = round(sent / denom * 100, 1) if denom else 100.0
+        lag_levels = [c["level"] for c in cache_lag]
+        verdict = pipeline_verdict(lag_levels=lag_levels, siem_success_1h=success_1h,
+                                   denom=denom, dlq=int(dlq))
+        return {"cache_lag": cache_lag, "siem_success_1h": success_1h,
+                "dlq": int(dlq), "verdict": verdict}
+    except Exception as e:
+        return {"verdict": "unknown", "note": str(e)[:120]}
+
+
+def _overview_alerts(state):
+    import datetime as dt
+    hist = state.get("dispatch_history") or []
+    cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=24)
+
+    def _recent(ts):
+        try:
+            return dt.datetime.fromisoformat(str(ts).replace("Z", "+00:00")) >= cutoff
+        except Exception:
+            return True
+
+    last24 = [h for h in hist if _recent(h.get("timestamp"))]
+    failed = sum(1 for h in last24 if h.get("status") == "failed")
+    suppressed = sum(int((v or {}).get("suppressed", 0))
+                     for v in (state.get("throttle_state") or {}).values()
+                     if isinstance(v, dict))
+    verdict = "warn" if failed >= 1 else "ok"
+    return {"fired_24h": len(last24), "suppressed": suppressed, "failed": failed,
+            "recent": last24[-5:], "verdict": verdict}
+
+
 def _overview_ven(state):
     vs = state.get("ven_summary")
     if not isinstance(vs, dict) or "total" not in vs:
@@ -212,6 +265,8 @@ def make_dashboard_blueprint(
             "as_of": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "ven": _overview_ven(state),
             "blocked": _overview_blocked(cm),
+            "pipeline": _overview_pipeline(cm),
+            "alerts": _overview_alerts(state),
         })
 
     @bp.route('/api/dashboard/queries', methods=['GET'])

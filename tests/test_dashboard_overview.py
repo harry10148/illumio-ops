@@ -45,6 +45,26 @@ def test_overview_ven_unknown_when_missing(client, tmp_path, monkeypatch):
     assert r.get_json()["ven"]["verdict"] == "unknown"
 
 
+def test_overview_alerts_from_state(client, tmp_path, monkeypatch):
+    from src.gui import _helpers
+    sf = str(tmp_path / "state.json")
+    json.dump({"dispatch_history": [
+                  {"timestamp": "2026-05-31T00:00:00Z", "channel": "line", "status": "success"},
+                  {"timestamp": "2026-05-31T00:01:00Z", "channel": "mail", "status": "failed"}],
+               "throttle_state": {"r1": {"suppressed": 8}}}, open(sf, "w"))
+    monkeypatch.setattr(_helpers, "_resolve_state_file", lambda: sf)
+    r = client.get("/api/dashboard/overview", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    al = r.get_json()["alerts"]
+    assert al["failed"] >= 1 and al["verdict"] == "warn"
+    assert "recent" in al
+
+
+def test_overview_pipeline_present(client, monkeypatch):
+    r = client.get("/api/dashboard/overview", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    pl = r.get_json()["pipeline"]
+    assert "verdict" in pl   # ok/warn/error/unknown depending on cache availability
+
+
 def test_overview_blocked_from_agg(client, tmp_path):
     import datetime as dt
     from sqlalchemy import create_engine
