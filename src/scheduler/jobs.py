@@ -194,11 +194,21 @@ def run_ven_summary(cm) -> None:
             st = (w.get("agent") or {}).get("status") or {}
             total += 1
             status = str(st.get("status", "")).lower()
+            # Try PCE-computed field first; fall back to computing from timestamp
             hslh = st.get("hours_since_last_heartbeat")
             try:
                 hslh = float(hslh) if hslh is not None else None
             except (TypeError, ValueError):
                 hslh = None
+            if hslh is None:
+                hb_str = st.get("last_heartbeat_on")
+                if hb_str:
+                    try:
+                        hb_dt = datetime.datetime.fromisoformat(
+                            hb_str.replace("Z", "+00:00"))
+                        hslh = (now - hb_dt).total_seconds() / 3600
+                    except Exception:
+                        pass
             is_online = status in _ONLINE and hslh is not None and hslh <= _THRESH_H
             if is_online:
                 online += 1
