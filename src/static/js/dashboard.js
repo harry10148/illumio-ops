@@ -1752,6 +1752,79 @@ function setTop10Window(mins) {
 }
 window.setTop10Window = setTop10Window;
 
+// ── Overview tiles ──────────────────────────────────────────────────────────
+function _ovMark(id, verdict) {
+  var el = document.getElementById(id); if (!el) return;
+  el.className = 'ov-mark ' + (['ok','warn','error'].indexOf(verdict) >= 0 ? verdict : '');
+}
+function _ovRows(rows) {
+  return rows.map(function (r) { return '<div>' + r + '</div>'; }).join('');
+}
+function _fmtAge(s) {
+  s = Math.max(0, Math.floor(Number(s) || 0));
+  if (s < 60) return s + 's'; if (s < 3600) return Math.floor(s / 60) + 'm'; return Math.floor(s / 3600) + 'h';
+}
+function renderOverview(d) {
+  d = d || {};
+  var T = function(k, f) { return (window._t ? window._t(k) : f); };
+  // VEN
+  var v = d.ven || {};
+  _ovMark('ov-ven-mark', v.verdict);
+  document.getElementById('ov-ven-body').innerHTML = (v.verdict === 'unknown')
+    ? '<div style="color:var(--dim)">—</div>'
+    : _ovRows([(v.online + '/' + v.total + ' ' + T('gui_ov_online','online')),
+               (v.offline ? ('⚠ ' + v.offline + ' ' + T('gui_ov_offline','offline')) : ('0 ' + T('gui_ov_offline','offline'))),
+               (T('gui_ov_oldest_hb','oldest heartbeat') + ' ' + _fmtAge(v.oldest_heartbeat_age_s))])
+      + '<div class="ov-drill">→ Workloads</div>';
+  // Blocked
+  var b = d.blocked || {};
+  _ovMark('ov-blocked-mark', b.verdict);
+  document.getElementById('ov-blocked-body').innerHTML = (b.verdict === 'unknown')
+    ? '<div style="color:var(--dim)">—</div>'
+    : _ovRows(['Blocked ' + (b.blocked || 0).toLocaleString(),
+               'Potentially Blocked ' + (b.potential || 0).toLocaleString(),
+               (b.vs_prev_pct >= 0 ? '↑' : '↓') + Math.abs(b.vs_prev_pct || 0) + '% ' + T('gui_ov_vs_prev','vs prev')])
+      + '<div class="ov-drill">→ Traffic</div>';
+  // Pipeline
+  var p = d.pipeline || {};
+  _ovMark('ov-pipeline-mark', p.verdict);
+  var lag = (p.cache_lag || []).map(function (c) { return c.source + ' ' + _fmtAge(c.lag_s); }).join(' · ');
+  document.getElementById('ov-pipeline-body').innerHTML = (p.verdict === 'unknown')
+    ? '<div style="color:var(--dim)">—</div>'
+    : _ovRows([(T('gui_ov_cache_lag_label','cache lag') + ' ' + (lag || '—')),
+               (T('gui_ov_siem_1h','SIEM 1h') + ' ' + (p.siem_success_1h != null ? p.siem_success_1h + '%' : '—')),
+               'DLQ ' + (p.dlq || 0)])
+      + '<div class="ov-drill">→ Integrations</div>';
+  // Alerts
+  var a = d.alerts || {};
+  _ovMark('ov-alerts-mark', a.verdict);
+  document.getElementById('ov-alerts-body').innerHTML = _ovRows([
+      T('gui_ov_fired_24h','fired 24h') + ' ' + (a.fired_24h || 0),
+      T('gui_ov_suppressed','suppressed') + ' ' + (a.suppressed || 0),
+      T('gui_ov_failed','failed') + ' ' + (a.failed || 0)])
+    + '<div class="ov-drill">→ Events</div>';
+  // freshness
+  var asOf = document.getElementById('ov-as-of');
+  if (asOf && d.as_of) asOf.textContent = new Date(d.as_of).toLocaleTimeString();
+  // stale indicator (>60s old)
+  var freshEl = document.querySelector('.ov-fresh');
+  if (freshEl && d.as_of) {
+    freshEl.classList.toggle('stale', Date.now() - Date.parse(d.as_of) > 60000);
+  }
+}
+async function loadOverview(force) {
+  if (!force) {
+    var cb = document.getElementById('ov-autorefresh');
+    if (cb && !cb.checked) return;
+    if (document.hidden) return;
+  }
+  try {
+    var r = await get('/api/dashboard/overview');
+    renderOverview(r || {});
+  } catch (e) { /* leave previous render */ }
+}
+window.loadOverview = loadOverview;
+
 function openQueryModal(idx = -1) {
   $('dq-idx').value = idx;
   if (idx < 0) {

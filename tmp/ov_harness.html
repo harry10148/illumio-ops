@@ -1,0 +1,29 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>
+<div id="p-dashboard">
+  <span class="ov-fresh"><span id="ov-as-of">—</span></span>
+  <div class="ov-tile" id="ov-ven"><i class="ov-mark" id="ov-ven-mark"></i><div id="ov-ven-body"></div></div>
+  <div class="ov-tile" id="ov-blocked"><i class="ov-mark" id="ov-blocked-mark"></i><div id="ov-blocked-body"></div></div>
+  <div class="ov-tile" id="ov-pipeline"><i class="ov-mark" id="ov-pipeline-mark"></i><div id="ov-pipeline-body"></div></div>
+  <div class="ov-tile" id="ov-alerts"><i class="ov-mark" id="ov-alerts-mark"></i><div id="ov-alerts-body"></div></div>
+</div>
+<script>
+  window.get = async function() { return {}; };
+  window._t = function(k) { return k; };
+  window.debounce = function(f) { return f; };
+  window.escapeHtml = function(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  window.$ = function(id) { return document.getElementById(id); };
+  window._csrfToken = function() { return ''; };
+  window.applyLang = function() {};
+  window.initTableResizers = function() {};
+  window.runAllQueries = function() {};
+  window._t = function(k, f) { return f !== undefined ? f : k; };
+</script>
+<script src="../src/static/js/dashboard.js"></script>
+<script>
+  window.__sample = { as_of: "2026-05-31T06:00:00Z",
+    ven: { total:21, online:19, offline:2, oldest_heartbeat_age_s:147600, verdict:"warn" },
+    blocked: { blocked:1290, potential:16298, vs_prev_pct:12, verdict:"ok" },
+    pipeline: { cache_lag:[{source:"events",lag_s:240,level:"ok"}], siem_success_1h:100, dlq:0, verdict:"ok" },
+    alerts: { fired_24h:2, suppressed:8, failed:0, verdict:"ok" } };
+</script>
+</body></html>

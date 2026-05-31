@@ -125,6 +125,7 @@ async function loadDashboard() {
   await loadTranslations();
   ensureTrafficWorkloadLayout();
   ensureDashboardLayout();
+  if (typeof loadOverview === 'function') loadOverview(true);
 
   try {
     const d = await api('/api/status');
