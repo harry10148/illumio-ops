@@ -1,8 +1,7 @@
-"""Phase 3.1 Task 7 — integrated story-flow assertions.
+"""Dashboard story-card end-to-end assertions (real-time data, no report dependency).
 
 Full Playwright run requires ILLUMIO_OPS_E2E_BASE_URL; this lightweight
-suite asserts that every Phase 3.1 surface (hero / story-cards / maturity /
-top-actions / collapsed KPIs / empty-state) is wired end-to-end through
+suite asserts that story-card surfaces are wired end-to-end through
 the static template + JS files. Skips the live browser run when no
 E2E base URL is configured.
 """
@@ -28,30 +27,16 @@ def _js():
 
 def test_story_pieces_all_present_in_template():
     html = _html()
-    # ID-based anchors: exact match (IDs must be unique)
+    # Legacy snapshot section (in q-panel-legacy) still has these IDs
     for anchor in (
-        'id="d-hero"',
-        'id="d-hero-cta"',
-        'id="d-maturity"',
         'id="d-top-actions-grid"',
         'id="d-detailed-kpis"',
     ):
         assert anchor in html, f"missing template anchor: {anchor}"
-    # Class anchors: tolerate additional classes (extra wrappers allowed)
+    # Real-time story-card classes exist in the main dashboard
     for cls in ("story-card--health", "story-card--traffic", "story-card--risk"):
         pattern = re.compile(r'class="[^"]*\b' + re.escape(cls) + r'\b[^"]*"')
         assert pattern.search(html), f"missing template class: {cls}"
-
-
-def test_snapshot_loader_invokes_full_story_pipeline():
-    js = _js()
-    # all five render hooks called from loadDashboardSnapshot
-    block = re.search(r"async function loadDashboardSnapshot[\s\S]*?\n}\n", js)
-    assert block, "loadDashboardSnapshot not found"
-    body = block.group(0)
-    for fn in ("renderHero(", "renderStoryGroups(", "renderMaturity(", "renderTopActions("):
-        assert fn in body, f"loadDashboardSnapshot must call {fn}"
-    assert "renderHeroEmpty()" in body, "empty-state fallback must be wired"
 
 
 def test_findings_table_collapsed_by_details():
@@ -89,16 +74,8 @@ def test_dashboard_story_live_browser():
             page.click("button[type=submit]")
             page.wait_for_load_state("networkidle", timeout=20000)
             page.wait_for_selector("#p-dashboard", timeout=15000)
-            # Hero block exists in DOM (visibility depends on snapshot data being
-            # present / non-empty — when test environment has no PCE snapshot,
-            # renderHero may hide the wrap; that's expected, not a failure).
-            assert page.locator("#d-hero").count() == 1, "hero block must exist in DOM"
             # Story-group cards exist in DOM regardless of data state.
             for cls in ("story-card--health", "story-card--traffic", "story-card--risk"):
                 assert page.locator(f".{cls}").count() >= 1, f"missing {cls} in DOM"
-            details_open = page.eval_on_selector(
-                "#d-detailed-kpis", "el => el.hasAttribute('open')"
-            )
-            assert details_open is False, "detailed-kpis must default to collapsed"
         finally:
             browser.close()

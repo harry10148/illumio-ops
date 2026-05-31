@@ -1,4 +1,4 @@
-"""Phase 3.1 Task 2 — story-card grouping for Dashboard top stats."""
+"""Dashboard real-time story-card groups (Health / Traffic / Risk)."""
 import json
 from pathlib import Path
 
@@ -16,20 +16,21 @@ def test_index_html_has_three_story_card_classes():
     assert "story-card--risk" in html
 
 
-def test_legacy_card_ids_preserved():
+def test_story_stat_ids_present():
     html = INDEX_HTML.read_text(encoding="utf-8")
-    for lid in ("d-rules", "d-health", "d-event-poll", "d-dispatch", "d-unknown", "d-suppressed", "d-ransom"):
-        assert f'id="{lid}"' in html, f"missing legacy id {lid}"
+    for lid in ("d-rules", "d-health", "d-event-poll", "d-dispatch", "d-unknown", "d-suppressed"):
+        assert f'id="{lid}"' in html, f"missing story-stat id {lid}"
 
 
 def test_i18n_has_group_keys():
     en = json.loads(I18N_EN.read_text(encoding="utf-8"))
     zh = json.loads(I18N_ZH.read_text(encoding="utf-8"))
-    for k in ("gui_story_group_health", "gui_story_group_traffic", "gui_story_group_risk", "gui_hi_risk_findings"):
+    for k in ("gui_story_group_health", "gui_story_group_traffic", "gui_story_group_risk"):
         assert k in en, f"missing EN {k}"
         assert k in zh, f"missing ZH {k}"
 
 
-def test_dashboard_js_has_renderStoryGroups():
+def test_load_dashboard_populates_story_stats():
     js = DASHBOARD_JS.read_text(encoding="utf-8")
-    assert "renderStoryGroups" in js
+    for sid in ("d-rules", "d-health", "d-event-poll", "d-dispatch", "d-unknown", "d-suppressed"):
+        assert f"'{sid}'" in js, f"loadDashboard must reference story-stat id {sid}"

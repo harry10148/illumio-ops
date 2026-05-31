@@ -40,12 +40,11 @@ def test_ensure_layout_does_not_hide_cards_by_index():
 
 
 def test_load_dashboard_populates_six_story_stats():
-    """renderStoryGroups() in dashboard.js must enumerate all 6 Phase 3.1
-    story-stat IDs so they are populated from snap.story_stats."""
+    """loadDashboard() must populate all 6 story-stat IDs from real-time /api/status data."""
     js = JS.read_text(encoding="utf-8")
     required_ids = ['d-rules', 'd-health', 'd-event-poll',
                     'd-dispatch', 'd-unknown', 'd-suppressed']
     missing = [i for i in required_ids if f"'{i}'" not in js]
     assert not missing, (
-        f"dashboard.js renderStoryGroups must reference these IDs: {missing}"
+        f"dashboard.js loadDashboard must reference these story-stat IDs: {missing}"
     )
