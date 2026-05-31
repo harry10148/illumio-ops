@@ -117,6 +117,8 @@ class SiemDispatch(Base):
 
     __table_args__ = (
         Index("ix_dispatch_pending", "status", "next_attempt_at"),
+        Index("ix_dispatch_queued_at", "queued_at"),
+        Index("ix_dispatch_sent_at", "sent_at"),
     )
 
 

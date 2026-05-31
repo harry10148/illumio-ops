@@ -147,6 +147,26 @@ def dispatch_status():
                     .where(DeadLetter.destination == dest)
                 ).scalar() or 0
                 result.append({"destination": dest, **counts, "dlq": dlq_cnt})
+            import datetime as _dt
+            from sqlalchemy import func
+            now = _dt.datetime.now(_dt.timezone.utc); hr = now - _dt.timedelta(hours=1)
+            for entry in result:
+                dest = entry["destination"]
+                sent_1h = s.execute(select(func.count()).select_from(SiemDispatch)
+                    .where(SiemDispatch.destination == dest)
+                    .where(SiemDispatch.status == "sent").where(SiemDispatch.sent_at >= hr)).scalar() or 0
+                failed_1h = s.execute(select(func.count()).select_from(SiemDispatch)
+                    .where(SiemDispatch.destination == dest)
+                    .where(SiemDispatch.status == "failed").where(SiemDispatch.queued_at >= hr)).scalar() or 0
+                denom = sent_1h + failed_1h
+                lat = s.execute(select(func.avg(
+                        func.julianday(SiemDispatch.sent_at) - func.julianday(SiemDispatch.queued_at)))
+                    .where(SiemDispatch.destination == dest)
+                    .where(SiemDispatch.status == "sent").where(SiemDispatch.sent_at >= hr)).scalar()
+                entry["sent_1h"] = sent_1h
+                entry["failed_1h"] = failed_1h
+                entry["success_1h"] = round(sent_1h / denom * 100, 1) if denom else 100.0
+                entry["avg_latency_ms"] = int(lat * 86400 * 1000) if lat else None
         return jsonify({"status": result})
     except Exception as exc:
         logger.exception("siem dispatch_status error: {}", exc)
