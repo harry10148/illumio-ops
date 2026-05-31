@@ -20,6 +20,7 @@ from .chart_renderer import render_plotly_html, FirstChartTracker
 from .code_highlighter import get_highlight_css
 from src.report.analysis.audit.audit_risk import RISK_BG, RISK_COLOR, get_risk
 from src.report.exporters._exec_summary import render_exec_summary_html
+from src.report.exporters.concern_card import render_concern_cards
 from src.report.exporters.cover_page import build_cover_page as _build_cover_page
 
 _CSS = build_css("audit")
@@ -145,40 +146,7 @@ class AuditHtmlExporter:
         if not attention_items:
             return ""
         _s = self._s
-        items_html = ""
-        for item in attention_items:
-            risk = item.get("risk", "INFO")
-            badge = self._risk_badge(risk)
-            event_type = item.get("event_type", "")
-            count = item.get("count", 0)
-            summary = item.get("summary", "")
-            rec = item.get("recommendation", "")
-            actors_str = ", ".join(str(a) for a in item.get("actors", [])[:3]) or "N/A"
-            targets_str = ", ".join(str(a) for a in item.get("targets", [])[:3])
-            resources_str = ", ".join(str(a) for a in item.get("resources", [])[:3])
-            src_ips_str = ", ".join(str(ip) for ip in item.get("src_ips", [])[:3])
-            items_html += (
-                f'<div class="audit-attn-item risk-{risk}">'
-                f'<div class="audit-attn-header">'
-                f'{badge}'
-                f'<code class="audit-attn-event-code">{event_type}</code>'
-                f'<span class="audit-attn-count">x{count}</span>'
-                f'</div>'
-                f'<div class="audit-attn-summary">{summary}</div>'
-                f'<div class="audit-attn-meta">'
-                f'<strong>{_s("rpt_au_actor")}</strong> {actors_str}'
-                + (f' &nbsp;|&nbsp; <strong>IP:</strong> {src_ips_str}' if src_ips_str else '')
-                + '</div>'
-                + (
-                    f'<div class="audit-attn-meta">'
-                    f'<strong>{_s("rpt_au_target")}</strong> {targets_str}'
-                    + (f' &nbsp;|&nbsp; <strong>{_s("rpt_au_resource")}</strong> {resources_str}' if resources_str else '')
-                    + '</div>'
-                    if targets_str or resources_str else ''
-                )
-                + f'<div class="audit-attn-rec"><strong>{_s("rpt_au_rec")}</strong> {rec}</div>'
-                f'</div>'
-            )
+        items_html = render_concern_cards(attention_items, self._lang)
         return (
             '<div style="margin-bottom:20px">'
             f'<h2 style="color:var(--red)">{_s("rpt_au_attention_title")}</h2>'

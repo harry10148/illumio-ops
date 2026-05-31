@@ -2,6 +2,19 @@ import types
 import pandas as pd
 
 
+def test_concern_card_renders_severity_and_recommendation():
+    from src.report.exporters.concern_card import render_concern_cards
+    items = [{"risk": "CRITICAL", "event_type": "agent.tampering", "count": 3,
+              "summary": "Firewall tampered", "actors": ["admin@lab"], "targets": [],
+              "resources": [], "src_ips": ["10.0.0.1"],
+              "recommendation": "Investigate workload compromise"}]
+    html = render_concern_cards(items, lang="en")
+    assert "risk-CRITICAL" in html
+    assert "agent.tampering" in html
+    assert "Investigate workload compromise" in html
+    assert render_concern_cards([], lang="en") == ""   # empty → no markup
+
+
 def test_ven_generate_produces_trend_deltas(tmp_path):
     from src.report.ven_status_generator import VenStatusGenerator
     cm = types.SimpleNamespace(config={"settings": {"timezone": "UTC"}})

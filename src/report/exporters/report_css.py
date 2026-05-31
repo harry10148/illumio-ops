@@ -349,6 +349,28 @@ TRAFFIC_CSS = """\
     .section-guidance { background: #161b22; border-left-color: #58a6ff; color: #c9d1d9; }
     .section-guidance b { color: #c9d1d9; }
   }
+
+  /* ── Shared concern cards (also used by audit-attn-* back-compat aliases) ── */
+  .concern-card, .audit-attn-item { border-left: 4px solid var(--slate-20); padding: 10px 14px; margin-bottom: 8px; border-radius: 0 6px 6px 0; }
+  .concern-card.risk-CRITICAL, .audit-attn-item.risk-CRITICAL { border-left-color: var(--red); background: var(--red-10); }
+  .concern-card.risk-HIGH, .audit-attn-item.risk-HIGH { border-left-color: #F97316; background: #FFF7ED; }
+  .concern-card.risk-MEDIUM, .audit-attn-item.risk-MEDIUM { border-left-color: #EAB308; background: #FEFCE8; }
+  .concern-card.risk-LOW, .audit-attn-item.risk-LOW { border-left-color: var(--green-80); background: var(--green-10); }
+  .concern-card.risk-INFO, .audit-attn-item.risk-INFO { border-left-color: var(--slate-50); background: var(--tan); }
+  .concern-header, .audit-attn-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+  .concern-event, .audit-attn-event-code { font-size: 11px; color: #8B407A; font-family: var(--font-mono); background: rgba(139,64,122,.08); padding: 1px 5px; border-radius: 3px; }
+  .concern-count, .audit-attn-count { font-size: 11px; font-weight: 700; }
+  .risk-CRITICAL .concern-count, .risk-CRITICAL .audit-attn-count { color: var(--red); }
+  .risk-HIGH .concern-count, .risk-HIGH .audit-attn-count { color: #F97316; }
+  .risk-MEDIUM .concern-count, .risk-MEDIUM .audit-attn-count { color: #EAB308; }
+  .risk-LOW .concern-count, .risk-LOW .audit-attn-count { color: var(--green-80); }
+  .risk-INFO .concern-count, .risk-INFO .audit-attn-count { color: var(--slate-50); }
+  .concern-summary, .audit-attn-summary { font-size: 12px; color: var(--slate); margin-bottom: 3px; }
+  .concern-meta, .audit-attn-meta { font-size: 11px; color: var(--slate-50); }
+  .concern-rec, .audit-attn-rec { font-size: 11px; color: var(--cyan-100); margin-top: 3px; }
+
+  /* ── Risk badge (shared for event_type column) ───────────────────────── */
+  .risk-badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; white-space: nowrap; margin-right: 5px; border: 1px solid currentColor; }
 """
 
 AUDIT_CSS = """\
@@ -357,28 +379,6 @@ AUDIT_CSS = """\
   .bp-box b { color: var(--cyan-120); }
   .report-hero + .card .report-table-panel,
   .card .report-table-panel { box-shadow: var(--shadow-panel); }
-
-  /* ── Audit attention items ──────────────────────────────────────────── */
-  .audit-attn-item { border-left: 4px solid var(--slate-20); padding: 10px 14px; margin-bottom: 8px; border-radius: 0 6px 6px 0; }
-  .audit-attn-item.risk-CRITICAL { border-left-color: var(--red); background: var(--red-10); }
-  .audit-attn-item.risk-HIGH { border-left-color: #F97316; background: #FFF7ED; }
-  .audit-attn-item.risk-MEDIUM { border-left-color: #EAB308; background: #FEFCE8; }
-  .audit-attn-item.risk-LOW { border-left-color: var(--green-80); background: var(--green-10); }
-  .audit-attn-item.risk-INFO { border-left-color: var(--slate-50); background: var(--tan); }
-  .audit-attn-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
-  .audit-attn-event-code { font-size: 11px; color: #8B407A; font-family: var(--font-mono); background: rgba(139,64,122,.08); padding: 1px 5px; border-radius: 3px; }
-  .audit-attn-count { font-size: 11px; font-weight: 700; }
-  .risk-CRITICAL .audit-attn-count { color: var(--red); }
-  .risk-HIGH .audit-attn-count { color: #F97316; }
-  .risk-MEDIUM .audit-attn-count { color: #EAB308; }
-  .risk-LOW .audit-attn-count { color: var(--green-80); }
-  .risk-INFO .audit-attn-count { color: var(--slate-50); }
-  .audit-attn-summary { font-size: 12px; color: var(--slate); margin-bottom: 3px; }
-  .audit-attn-meta { font-size: 11px; color: var(--slate-50); }
-  .audit-attn-rec { font-size: 11px; color: var(--cyan-100); margin-top: 3px; }
-
-  /* ── Risk badge (shared for event_type column) ───────────────────────── */
-  .risk-badge { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10px; font-weight: 700; white-space: nowrap; margin-right: 5px; border: 1px solid currentColor; }
 """
 
 VEN_CSS = """\
