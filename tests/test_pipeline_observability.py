@@ -70,6 +70,33 @@ def test_siem_status_has_1h_window_and_latency(app_cm):
     assert d1["avg_latency_ms"] is not None and d1["avg_latency_ms"] > 0
 
 
+def test_dlq_item_rebuilds_full_payload(app_cm):
+    cm, tmp = app_cm
+    import datetime as dt
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.models import DeadLetter, PceEvent
+    now = dt.datetime.now(dt.timezone.utc)
+    eng = create_engine(f"sqlite:///{tmp / 'c.sqlite'}"); init_schema(eng)
+    with sessionmaker(eng)() as s:
+        ev = PceEvent(pce_href="/x", pce_event_id="ev1", timestamp=now,
+                      event_type="agent.tampering", severity="err", status="active",
+                      pce_fqdn="pce.local", raw_json='{"full":"event-body"}',
+                      ingested_at=now)
+        s.add(ev); s.flush()
+        s.add(DeadLetter(source_table="pce_events", source_id=ev.id, destination="d1",
+                         retries=3, last_error="connrefused", payload_preview='{"full":"eve',
+                         quarantined_at=now))
+        s.commit()
+        dl_id = s.execute(__import__("sqlalchemy").select(DeadLetter.id)).scalar()
+    c = _client(cm)
+    body = c.get(f"/api/siem/dlq/{dl_id}", environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
+    assert body["id"] == dl_id
+    assert body["last_error"] == "connrefused"
+    assert "event-body" in (body["payload"] or "")   # full payload rebuilt from source row
+
+
 def test_cache_throughput_last_1h(app_cm):
     cm, tmp = app_cm
     from sqlalchemy import create_engine

@@ -231,6 +231,37 @@ def list_dlq():
         return jsonify({"error": str(exc)}), 500
 
 
+@bp.route("/dlq/<int:dl_id>", methods=["GET"])
+@login_required
+def get_dlq_item(dl_id):
+    from src.pce_cache.models import DeadLetter, PceEvent, PceTrafficFlowRaw
+    sf = _get_sf()
+    with sf() as s:
+        dl = s.get(DeadLetter, dl_id)
+        if dl is None:
+            return jsonify({"error": "not found"}), 404
+        out = {
+            "id": dl.id,
+            "destination": dl.destination,
+            "source_table": dl.source_table,
+            "source_id": dl.source_id,
+            "retries": dl.retries,
+            "last_error": dl.last_error,
+            "quarantined_at": dl.quarantined_at.isoformat() if dl.quarantined_at else None,
+            "payload": None,
+            "payload_source": None,
+        }
+        model = {"pce_events": PceEvent, "pce_traffic_flows_raw": PceTrafficFlowRaw}.get(dl.source_table)
+        src = s.get(model, dl.source_id) if model else None
+        if src is not None:
+            out["payload"] = src.raw_json
+            out["payload_source"] = "rebuilt"
+        else:
+            out["payload"] = dl.payload_preview
+            out["payload_source"] = "preview (source gone)" if model else "preview (unknown table)"
+    return jsonify(out)
+
+
 @bp.route("/dlq/replay", methods=["POST"])
 @login_required
 def replay_dlq():
