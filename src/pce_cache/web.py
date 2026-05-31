@@ -211,6 +211,27 @@ def api_cache_health():
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/throughput", methods=["GET"])
+@login_required
+def api_cache_throughput():
+    """Return ingest event and traffic counts for the last 1 hour."""
+    import datetime as dt
+    from sqlalchemy import func, select
+    from src.pce_cache.models import PceEvent, PceTrafficFlowRaw
+    lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
+    try:
+        sf = _get_sf()
+    except Exception as e:
+        return jsonify({"error": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
+    hr = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=1)
+    with sf() as s:
+        ev = s.execute(select(func.count()).select_from(PceEvent)
+                       .where(PceEvent.ingested_at >= hr)).scalar() or 0
+        tr = s.execute(select(func.count()).select_from(PceTrafficFlowRaw)
+                       .where(PceTrafficFlowRaw.ingested_at >= hr)).scalar() or 0
+    return jsonify({"events_1h": int(ev), "traffic_1h": int(tr)})
+
+
 @bp.route("/settings", methods=["GET"])
 @login_required
 def get_cache_settings():

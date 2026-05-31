@@ -68,3 +68,26 @@ def test_siem_status_has_1h_window_and_latency(app_cm):
     assert d1["sent_1h"] == 1 and d1["failed_1h"] == 1
     assert d1["success_1h"] == 50.0
     assert d1["avg_latency_ms"] is not None and d1["avg_latency_ms"] > 0
+
+
+def test_cache_throughput_last_1h(app_cm):
+    cm, tmp = app_cm
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.models import PceEvent
+    now = dt.datetime.now(dt.timezone.utc)
+    eng = create_engine(f"sqlite:///{tmp / 'c.sqlite'}"); init_schema(eng)
+    with sessionmaker(eng)() as s:
+        s.add(PceEvent(pce_href="/a", pce_event_id="e1", timestamp=now,
+                       event_type="x", severity="info", status="ok",
+                       pce_fqdn="pce.local", raw_json="{}",
+                       ingested_at=now - dt.timedelta(minutes=5)))
+        s.add(PceEvent(pce_href="/b", pce_event_id="e2", timestamp=now,
+                       event_type="x", severity="info", status="ok",
+                       pce_fqdn="pce.local", raw_json="{}",
+                       ingested_at=now - dt.timedelta(hours=3)))
+        s.commit()
+    c = _client(cm)
+    body = c.get("/api/cache/throughput", environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
+    assert body["events_1h"] == 1
