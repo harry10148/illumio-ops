@@ -5,6 +5,10 @@ from loguru import logger
 import os
 import re
 
+# Module-level imports required for test patching (patch targets must be attributes of this module)
+from src.api_client import ApiClient
+from src.gui._helpers import _resolve_state_file
+
 
 def run_monitor_cycle(cm) -> None:
     """Execute one monitoring analysis + alert dispatch."""
@@ -165,6 +169,67 @@ def run_cache_retention(cm) -> None:
         logger.info("Cache retention purged: {}", result)
     except Exception as exc:
         logger.exception("run_cache_retention failed: {}", exc)
+
+
+def run_ven_summary(cm) -> None:
+    """Fetch managed workloads, compute a VEN health summary, write to state.
+
+    Independent of pce_cache. Stored in logs/state.json["ven_summary"] so the
+    dashboard overview reads it instantly without hitting the PCE per refresh.
+    On failure, last-good counts are preserved and last_error is recorded.
+    """
+    import datetime
+    from src.state_store import update_state_file
+
+    _ONLINE = {"active", "online"}
+    _THRESH_H = 1.0
+    now = datetime.datetime.now(datetime.timezone.utc)
+    try:
+        with ApiClient(cm) as api:
+            workloads = api.fetch_managed_workloads()
+        total = online = 0
+        attention = []
+        oldest_age = 0.0
+        for w in workloads or []:
+            st = (w.get("agent") or {}).get("status") or {}
+            total += 1
+            status = str(st.get("status", "")).lower()
+            hslh = st.get("hours_since_last_heartbeat")
+            try:
+                hslh = float(hslh) if hslh is not None else None
+            except (TypeError, ValueError):
+                hslh = None
+            is_online = status in _ONLINE and hslh is not None and hslh <= _THRESH_H
+            if is_online:
+                online += 1
+            else:
+                host = w.get("hostname") or w.get("name") or "?"
+                reason = (f"{int(hslh)}h no heartbeat" if hslh is not None
+                          else f"status={status or 'unknown'}")
+                attention.append({"host": host, "reason": reason})
+            if hslh is not None:
+                oldest_age = max(oldest_age, hslh * 3600.0)
+        summary = {
+            "total": total, "online": online, "offline": total - online,
+            "degraded": 0,
+            "oldest_heartbeat_age_s": int(oldest_age),
+            "attention": attention[:20],
+            "updated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
+        update_state_file(_resolve_state_file(),
+                          lambda s: {**s, "ven_summary": summary})
+        logger.info("VEN summary: {}/{} online", online, total)
+    except Exception as exc:
+        logger.exception("run_ven_summary failed: {}", exc)
+        def _mark_err(s):
+            vs = dict(s.get("ven_summary") or {})
+            vs["last_error"] = str(exc)[:300]
+            vs["updated_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+            return {**s, "ven_summary": vs}
+        try:
+            update_state_file(_resolve_state_file(), _mark_err)
+        except Exception:
+            pass
 
 
 def run_siem_dispatch(cm) -> None:
