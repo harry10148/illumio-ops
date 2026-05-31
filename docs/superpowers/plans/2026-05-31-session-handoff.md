@@ -5,7 +5,7 @@
 ## TL;DR — where we are
 - Everything committed to **`origin/main` @ `8ab2cd3`**; working tree clean (only `tmp/` untracked).
 - **Status: PLANNING COMPLETE** for 3 big changes; **user is REVIEWING** the specs/plans. **No implementation started.**
-- Test machine **`illumio-ops-test` (172.16.15.106) @ `221e7e8`, service active** — behind origin by 1 cosmetic relabel + docs (functionally current).
+- Test machine **`illumio-ops-test` (172.16.15.106) @ `a8fcd75`, service active** — fully synced with origin/main.
 
 ## Shipped & DEPLOYED this session (live on test machine @ 221e7e8)
 1. VEN report column-slimming (drop Role/App, relative-time heartbeat, IP truncate).
@@ -14,8 +14,8 @@
 4. Cache ingestion-lag surfacing (`/api/cache/lag` + UI row + error state) + gui-only scheduler-absent warning.
 5. `event_poll_status` recorded on the cache event path (dashboard "Event Poll" card was stuck UNKNOWN).
 
-## Committed but NOT deployed (cosmetic)
-- `76629f9` relabel dashboard "Traffic" story card → "Rules & Alerts" (its stats are rule/alert metrics). Test machine still shows old label. Deploy anytime / with dashboard work.
+## Also deployed (cosmetic)
+- `76629f9` relabel dashboard "Traffic" story card → "Rules & Alerts" (its stats are rule/alert-pipeline metrics, not traffic). Deployed to test machine.
 
 ## Planning artifacts — READ THESE TO RESUME (all on origin/main)
 - Assessment: `docs/ux-review-2026-05-30/assessment.md`
@@ -41,7 +41,6 @@
 
 ## Open housekeeping
 - `tmp/uxaudit/` = 26 screenshots + 5 report HTML + capture scripts (scratch, untracked). Delete when review done.
-- Relabel `76629f9` undeployed (cosmetic).
 
 ## NEXT STEP
 User is reviewing the 3 specs + 3 plans. When they return: act on review feedback, OR pick a plan to execute (dashboard = highest user value; report-engine = most independent / no cross-dep), choosing **subagent-driven** (`superpowers:subagent-driven-development`, recommended) or **inline** (`superpowers:executing-plans`). Optionally fold governance back in (new spec→plan). Nothing is half-built — clean resume point.
