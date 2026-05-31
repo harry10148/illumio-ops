@@ -98,7 +98,10 @@ window._integrations.setRender('cache', async function renderCache() {
   var lag = null;
   try { var lr = await fetch('/api/cache/lag'); if (lr.ok) lag = await lr.json(); } catch (_) {}
 
-  var header = buildCacheStatusCards(status, s);
+  var throughput = null;
+  try { var tr = await fetch('/api/cache/throughput'); if (tr.ok) throughput = await tr.json(); } catch (_) {}
+
+  var header = buildCacheStatusCards(status, s, throughput);
   var form = buildCacheForm(s);
   el.innerHTML = header + buildCacheLagRow(lag) + form;
   el.dataset.settings = JSON.stringify(s);
