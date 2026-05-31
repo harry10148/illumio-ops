@@ -268,6 +268,9 @@ def replay_dlq():
     try:
         from src.siem.dlq import DeadLetterQueue
         data = request.get_json(force=True) or {}
+        if data.get("ids"):
+            results = DeadLetterQueue(_get_sf()).replay_ids(data["ids"])
+            return jsonify({"status": "ok", "requeued": results})
         dest = data.get("dest", "")
         limit = min(int(data.get("limit", 100)), 1000)
         sf = _get_sf()

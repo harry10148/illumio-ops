@@ -118,3 +118,28 @@ def test_cache_throughput_last_1h(app_cm):
     c = _client(cm)
     body = c.get("/api/cache/throughput", environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
     assert body["events_1h"] == 1
+
+
+def test_dlq_replay_by_ids(app_cm):
+    cm, tmp = app_cm
+    import datetime as dt
+    from sqlalchemy import create_engine, select, func
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.models import DeadLetter, SiemDispatch
+    now = dt.datetime.now(dt.timezone.utc)
+    eng = create_engine(f"sqlite:///{tmp / 'c.sqlite'}"); init_schema(eng)
+    with sessionmaker(eng)() as s:
+        s.add(DeadLetter(source_table="pce_events", source_id=7, destination="d1",
+                         retries=3, last_error="x", payload_preview="{}", quarantined_at=now))
+        s.commit()
+        dl_id = s.execute(select(DeadLetter.id)).scalar()
+    c = _client(cm)
+    body = c.post("/api/siem/dlq/replay", json={"ids": [dl_id]},
+                  environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
+    assert body["status"] == "ok"
+    assert any(r["id"] == dl_id and r["ok"] for r in body["requeued"])
+    with sessionmaker(eng)() as s:                  # a pending dispatch row was created
+        pend = s.execute(select(func.count()).select_from(SiemDispatch)
+                         .where(SiemDispatch.status == "pending")).scalar()
+        assert pend == 1

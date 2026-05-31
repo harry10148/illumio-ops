@@ -41,6 +41,27 @@ class DeadLetterQueue:
                 requeued += 1
         return requeued
 
+    def replay_ids(self, ids: list[int]) -> list[dict]:
+        """Requeue specific DLQ entries by id, returning per-item results."""
+        now = datetime.now(timezone.utc)
+        out = []
+        with self._sf.begin() as s:
+            for dl_id in ids:
+                dl = s.get(DeadLetter, dl_id)
+                if dl is None:
+                    out.append({"id": dl_id, "ok": False, "error": "not found"})
+                    continue
+                s.add(SiemDispatch(
+                    source_table=dl.source_table,
+                    source_id=dl.source_id,
+                    destination=dl.destination,
+                    status="pending",
+                    retries=0,
+                    queued_at=now,
+                ))
+                out.append({"id": dl_id, "ok": True})
+        return out
+
     def purge(self, destination: str, older_than_days: int = 30) -> int:
         cutoff = datetime.now(timezone.utc) - timedelta(days=older_than_days)
         with self._sf.begin() as s:
