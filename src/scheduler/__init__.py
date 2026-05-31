@@ -11,6 +11,7 @@ from src.scheduler.jobs import (
     run_monitor_cycle,
     tick_report_schedules,
     tick_rule_schedules,
+    run_ven_summary,
 )
 from src.siem.preview import emit_preview_warning
 from src.i18n import t, get_language
@@ -87,6 +88,17 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         args=[cm],
         id="tick_rule_schedules",
         name="Rule schedule tick",
+        replace_existing=True,
+    )
+    ven_summary_interval = int(
+        cm.config.get("dashboard", {}).get("ven_summary_interval_seconds", 300)
+    )
+    sched.add_job(
+        run_ven_summary,
+        trigger=IntervalTrigger(seconds=ven_summary_interval),
+        args=[cm],
+        id="ven_summary",
+        name="VEN status summary",
         replace_existing=True,
     )
 
