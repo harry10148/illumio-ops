@@ -95,7 +95,8 @@ class VenStatusGenerator:
 
     # ── public ───────────────────────────────────────────────────────────────
 
-    def generate(self, detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en") -> VenStatusResult:
+    def generate(self, detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en",
+                 output_dir: str = "reports/") -> VenStatusResult:
         if not self.api:
             raise RuntimeError("api_client required for VEN status report")
 
@@ -113,11 +114,25 @@ class VenStatusGenerator:
         results = self._analyze(df)
         print(t("rpt_ven_analysis_done", lang=self._lang))
 
-        return VenStatusResult(
+        result = VenStatusResult(
             record_count=len(df),
             module_results=results,
             dataframe=df,
         )
+
+        from src.report.trend_store import (
+            load_previous, save_snapshot, compute_deltas, build_kpi_dict_from_metadata,
+        )
+        try:
+            _kpi_dict = build_kpi_dict_from_metadata(result.module_results.get("kpis", []))
+            _prev = load_previous(output_dir, "ven")
+            save_snapshot(output_dir, "ven", _kpi_dict)
+            result.module_results["_trend_deltas"] = compute_deltas(_kpi_dict, _prev) if _prev else []
+        except Exception as e:
+            logger.warning("VEN trend delta skipped: {}", e)
+            result.module_results["_trend_deltas"] = []
+
+        return result
 
     def export(self, result: VenStatusResult, fmt: str = 'html', output_dir: str = 'reports',
                detail_level: str = _REPORT_DETAIL_LEVEL, lang: str | None = None,
