@@ -61,6 +61,7 @@ artifacts/
 .worktrees/
 
 # Temporary / backup files
+tmp/
 tmp_*.py
 config-old*.json
 test_*.json

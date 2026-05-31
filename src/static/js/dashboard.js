@@ -1947,8 +1947,10 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     loadDashboardCharts();
     setInterval(loadDashboardCharts, 60000);
+    setInterval(function () { if (typeof loadOverview === 'function') loadOverview(false); }, 30000);
   });
 } else {
   loadDashboardCharts();
   setInterval(loadDashboardCharts, 60000);
+  setInterval(function () { if (typeof loadOverview === 'function') loadOverview(false); }, 30000);
 }
