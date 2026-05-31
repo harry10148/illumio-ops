@@ -169,7 +169,8 @@ function renderHero(snap) {
   if (sentence) {
     if (score != null) {
       sentence.textContent = _t('gui_hero_sentence')
-        .replace('{score}', `${score}/100 (${grade})`)
+        .replace('{score}', score)
+        .replace('{grade}', grade)
         .replace('{high_risk}', highRisk);
     } else {
       sentence.textContent = _t('gui_hero_no_data');
