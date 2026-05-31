@@ -10,6 +10,7 @@ from loguru import logger
 
 from src.config import ConfigManager
 from src import __version__
+from src.gui import _helpers
 from src.gui._helpers import (
     _ok, _err, _err_with_log,
     _resolve_reports_dir, _resolve_state_file,
@@ -52,6 +53,24 @@ def _retranslate_kpi_labels(data: dict, lang: str) -> None:
         rendered = t(key, lang=lang, default=kpi.get("label", ""))
         if rendered and not rendered.startswith("[MISSING:"):
             kpi["label"] = rendered
+
+
+def _overview_ven(state):
+    vs = state.get("ven_summary")
+    if not isinstance(vs, dict) or "total" not in vs:
+        return {"verdict": "unknown", "note": "no ven_summary yet"}
+    total = int(vs.get("total", 0)); offline = int(vs.get("offline", 0))
+    err_threshold = max(1, -(-total // 10))  # ceil(total*0.10)
+    if offline == 0:
+        verdict = "ok"
+    elif offline > err_threshold:
+        verdict = "error"
+    else:
+        verdict = "warn"
+    return {"total": total, "online": int(vs.get("online", 0)), "offline": offline,
+            "degraded": int(vs.get("degraded", 0)),
+            "oldest_heartbeat_age_s": int(vs.get("oldest_heartbeat_age_s", 0)),
+            "attention": (vs.get("attention") or [])[:20], "verdict": verdict}
 
 
 def make_dashboard_blueprint(
@@ -130,6 +149,22 @@ def make_dashboard_blueprint(
             "dispatch_history": state.get("dispatch_history", []),
             "alert_channels": _summarize_alert_channels(cm.config, state.get("dispatch_history", []), lang=lang),
             "event_timeline": state.get("event_timeline", []),
+        })
+
+    @bp.route('/api/dashboard/overview', methods=['GET'])
+    def api_dashboard_overview():
+        cm.load()
+        state = {}
+        STATE_FILE = _helpers._resolve_state_file()
+        if os.path.exists(STATE_FILE):
+            try:
+                with open(STATE_FILE, 'r', encoding='utf-8') as f:
+                    state = json.load(f)
+            except Exception:
+                state = {}
+        return jsonify({
+            "as_of": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "ven": _overview_ven(state),
         })
 
     @bp.route('/api/dashboard/queries', methods=['GET'])
