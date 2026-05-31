@@ -156,6 +156,9 @@ class Analyzer:
             if not isinstance(self.state.get("event_parser_samples"), list):
                 self.state["event_parser_samples"] = []
             ensure_monitoring_state(self.state)
+            # Strip keys owned by external scheduler jobs; the analyzer must not
+            # overwrite them in save_state() with stale startup-time copies.
+            self.state.pop("ven_summary", None)
         except Exception as e:
             logger.warning(f"Error loading state file: {e}. Starting fresh.")
 

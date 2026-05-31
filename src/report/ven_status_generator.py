@@ -124,7 +124,11 @@ class VenStatusGenerator:
             load_previous, save_snapshot, compute_deltas, build_kpi_dict_from_metadata,
         )
         try:
-            _kpi_dict = build_kpi_dict_from_metadata(result.module_results.get("kpis", []))
+            # VEN kpis use i18n_key instead of label — normalize before passing
+            _raw_kpis = result.module_results.get("kpis", [])
+            _kpis_labeled = [dict(k, label=k.get("label") or k.get("i18n_key", ""))
+                             for k in _raw_kpis]
+            _kpi_dict = build_kpi_dict_from_metadata(_kpis_labeled)
             _prev = load_previous(output_dir, "ven")
             save_snapshot(output_dir, "ven", _kpi_dict, generated_at=result.generated_at.isoformat(timespec="seconds"))
             result.module_results["_trend_deltas"] = compute_deltas(_kpi_dict, _prev) if _prev else []
