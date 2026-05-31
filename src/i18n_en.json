@@ -2111,6 +2111,7 @@
   "rpt_cover_pce": "PCE",
   "rpt_cover_type_audit": "Audit Report",
   "rpt_cover_type_policy": "Policy Usage Report",
+  "rpt_cover_type_inventory": "Network Inventory",
   "rpt_cover_type_security": "Security Risk Profile",
   "rpt_cover_type_ven": "VEN Status Report",
   "rpt_csv_saved": "CSV saved: {path}",

@@ -92,3 +92,13 @@ def test_ven_generate_produces_trend_deltas(tmp_path):
     r2 = g.generate(lang="en", output_dir=str(tmp_path))
     assert "_trend_deltas" in r2.module_results
     assert isinstance(r2.module_results["_trend_deltas"], list)
+
+
+def test_network_inventory_cover_distinct_and_no_grade(monkeypatch):
+    # Build the traffic report with profile=network_inventory and assert the cover
+    # title differs from security and no maturity grade block is emitted.
+    from src.report.exporters.cover_page import build_cover_page
+    inv = build_cover_page(title="Network Inventory", report_type="Network Inventory",
+                           lang="en")   # no maturity_grade kwarg
+    assert "Network Inventory" in inv
+    assert "report-cover-grade" not in inv   # grade block suppressed when no grade passed

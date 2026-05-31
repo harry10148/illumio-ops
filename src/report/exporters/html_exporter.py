@@ -687,17 +687,28 @@ class HtmlExporter:
             ) if profile == 'security_risk' else '') +
             f'<footer>{_s("rpt_tr_footer")} &middot; {today_str}</footer>'
         )
-        _report_title = t("rpt_cover_type_security", lang=self._lang)
-        cover_html = _build_cover_page(
-            title=_report_title,
-            report_type=_report_title,
-            date_range=self._date_range,
-            pce_url=self._pce_url,
-            org_name=self._org_name,
-            lang=self._lang,
-            maturity_grade=mod12.get("maturity_grade"),
-            maturity_score=mod12.get("maturity_score"),
-        )
+        if self._profile == "network_inventory":
+            _report_title = t("rpt_cover_type_inventory", lang=self._lang)
+            cover_html = _build_cover_page(
+                title=_report_title,
+                report_type=_report_title,
+                date_range=self._date_range,
+                pce_url=self._pce_url,
+                org_name=self._org_name,
+                lang=self._lang,
+            )
+        else:
+            _report_title = t("rpt_cover_type_security", lang=self._lang)
+            cover_html = _build_cover_page(
+                title=_report_title,
+                report_type=_report_title,
+                date_range=self._date_range,
+                pce_url=self._pce_url,
+                org_name=self._org_name,
+                lang=self._lang,
+                maturity_grade=mod12.get("maturity_grade"),
+                maturity_score=mod12.get("maturity_score"),
+            )
         html_lang = "zh-TW" if self._lang == "zh_TW" else "en"
         return (
             f'<!DOCTYPE html><html lang="{html_lang}"><head>\n'
