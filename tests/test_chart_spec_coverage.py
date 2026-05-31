@@ -273,7 +273,7 @@ class TestPuMod04DenyEffectiveness:
         baseline_rules, hit_counts, ruleset_map = self._minimal_args()
         result = pu_deny_effectiveness(baseline_rules, hit_counts, ruleset_map)
         spec = result["chart_spec"]
-        assert spec["type"] == "pie"
+        assert spec["type"] == "bar"
         assert "labels" in spec["data"]
         assert "values" in spec["data"]
 

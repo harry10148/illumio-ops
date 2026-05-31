@@ -358,7 +358,7 @@ TRAFFIC_CSS = """\
   /* ── Shared concern cards (also used by audit-attn-* back-compat aliases) ── */
   .concern-card, .audit-attn-item { border-left: 4px solid var(--slate-20); padding: 10px 14px; margin-bottom: 8px; border-radius: 0 6px 6px 0; }
   .concern-card.risk-CRITICAL, .audit-attn-item.risk-CRITICAL { border-left-color: var(--red); background: var(--red-10); }
-  .concern-card.risk-HIGH, .audit-attn-item.risk-HIGH { border-left-color: #F97316; background: #FFF7ED; }
+  .concern-card.risk-HIGH, .audit-attn-item.risk-HIGH { border-left-color: var(--orange); background: #FFF7ED; }
   .concern-card.risk-MEDIUM, .audit-attn-item.risk-MEDIUM { border-left-color: #EAB308; background: #FEFCE8; }
   .concern-card.risk-LOW, .audit-attn-item.risk-LOW { border-left-color: var(--green-80); background: var(--green-10); }
   .concern-card.risk-INFO, .audit-attn-item.risk-INFO { border-left-color: var(--slate-50); background: var(--tan); }
@@ -366,7 +366,7 @@ TRAFFIC_CSS = """\
   .concern-event, .audit-attn-event-code { font-size: 11px; color: #8B407A; font-family: var(--font-mono); background: rgba(139,64,122,.08); padding: 1px 5px; border-radius: 3px; }
   .concern-count, .audit-attn-count { font-size: 11px; font-weight: 700; }
   .risk-CRITICAL .concern-count, .risk-CRITICAL .audit-attn-count { color: var(--red); }
-  .risk-HIGH .concern-count, .risk-HIGH .audit-attn-count { color: #F97316; }
+  .risk-HIGH .concern-count, .risk-HIGH .audit-attn-count { color: var(--orange); }
   .risk-MEDIUM .concern-count, .risk-MEDIUM .audit-attn-count { color: #EAB308; }
   .risk-LOW .concern-count, .risk-LOW .audit-attn-count { color: var(--green-80); }
   .risk-INFO .concern-count, .risk-INFO .audit-attn-count { color: var(--slate-50); }
