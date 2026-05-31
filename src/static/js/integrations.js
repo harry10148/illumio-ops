@@ -1168,9 +1168,9 @@ async function dlqReplaySelected() {
     if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
     var body = await r.json();
     // Show per-item requeued results if available
-    if (body && body.results) {
-      var summary = body.results.map(function(item) {
-        return 'id=' + item.id + ': ' + (item.requeued ? 'requeued' : 'skipped');
+    if (body && body.requeued) {
+      var summary = body.requeued.map(function(item) {
+        return 'id=' + item.id + ': ' + (item.ok ? 'requeued' : 'skipped');
       }).join('\n');
       console.info('[DLQ replay]', summary);
     }
@@ -1187,9 +1187,9 @@ async function dlqReplay(ids) {
     });
     if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
     var body = await r.json();
-    if (body && body.results) {
-      var summary = body.results.map(function(item) {
-        return 'id=' + item.id + ': ' + (item.requeued ? 'requeued' : 'skipped');
+    if (body && body.requeued) {
+      var summary = body.requeued.map(function(item) {
+        return 'id=' + item.id + ': ' + (item.ok ? 'requeued' : 'skipped');
       }).join('\n');
       console.info('[DLQ replay]', summary);
     }

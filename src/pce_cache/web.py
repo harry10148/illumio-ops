@@ -229,7 +229,7 @@ def api_cache_throughput():
                        .where(PceEvent.ingested_at >= hr)).scalar() or 0
         tr = s.execute(select(func.count()).select_from(PceTrafficFlowRaw)
                        .where(PceTrafficFlowRaw.ingested_at >= hr)).scalar() or 0
-    return jsonify({"events_1h": int(ev), "traffic_1h": int(tr)})
+    return jsonify({"events_1h": int(ev), "traffic_raw_1h": int(tr), "traffic_agg_1h": 0})
 
 
 @bp.route("/settings", methods=["GET"])
