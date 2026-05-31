@@ -323,6 +323,11 @@ BASE_CSS = """\
     .layout-b .section-top > .section-intro { flex: 1; margin: 0; }
     .layout-b .section-top > .chart-container { flex: 1; }
     .badge { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+    .card, .kpi-card, .audit-attn-item, .concern-card, .pu-card,
+    .score-hero, .mat-row, .report-table-panel {
+      page-break-inside: avoid; break-inside: avoid;
+    }
+    h2, h3 { break-after: avoid; }
   }
 """
 
