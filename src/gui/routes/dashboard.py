@@ -55,6 +55,52 @@ def _retranslate_kpi_labels(data: dict, lang: str) -> None:
             kpi["label"] = rendered
 
 
+def _cache_session(cm):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    eng = create_engine(f"sqlite:///{cm.models.pce_cache.db_path}")
+    init_schema(eng)
+    return sessionmaker(eng)
+
+
+_BLOCKED_KEYS = {"allowed": "allowed", "potentially_blocked": "potential", "blocked": "blocked"}
+
+
+def _overview_blocked(cm, window_days=7):
+    import datetime as dt
+    from sqlalchemy import func, select
+    from src.pce_cache.models import PceTrafficFlowAgg
+    now = dt.datetime.now(dt.timezone.utc)
+    cur_start = now - dt.timedelta(days=window_days)
+    prev_start = now - dt.timedelta(days=2 * window_days)
+    try:
+        sf = _cache_session(cm)
+
+        def _sum(s, lo, hi):
+            out = {"allowed": 0, "potential": 0, "blocked": 0}
+            rows = s.execute(
+                select(PceTrafficFlowAgg.action, func.sum(PceTrafficFlowAgg.flow_count))
+                .where(PceTrafficFlowAgg.bucket_day >= lo)
+                .where(PceTrafficFlowAgg.bucket_day < hi)
+                .group_by(PceTrafficFlowAgg.action)).all()
+            for action, n in rows:
+                out[_BLOCKED_KEYS.get((action or "").lower(), "blocked")] += int(n or 0)
+            return out
+
+        with sf() as s:
+            cur = _sum(s, cur_start, now)
+            prev = _sum(s, prev_start, cur_start)
+    except Exception as e:
+        return {"verdict": "unknown", "note": str(e)[:120]}
+    cur_flag = cur["blocked"] + cur["potential"]
+    prev_flag = prev["blocked"] + prev["potential"]
+    vs_prev = int(round((cur_flag - prev_flag) / prev_flag * 100)) if prev_flag else 0
+    verdict = "warn" if (prev_flag and vs_prev > 50) else "ok"
+    return {"window_days": window_days, **cur, "flagged": cur_flag,
+            "vs_prev_pct": vs_prev, "verdict": verdict}
+
+
 def _overview_ven(state):
     vs = state.get("ven_summary")
     if not isinstance(vs, dict) or "total" not in vs:
@@ -165,6 +211,7 @@ def make_dashboard_blueprint(
         return jsonify({
             "as_of": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "ven": _overview_ven(state),
+            "blocked": _overview_blocked(cm),
         })
 
     @bp.route('/api/dashboard/queries', methods=['GET'])

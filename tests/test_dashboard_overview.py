@@ -43,3 +43,24 @@ def test_overview_ven_unknown_when_missing(client, tmp_path, monkeypatch):
     monkeypatch.setattr(_helpers, "_resolve_state_file", lambda: sf)
     r = client.get("/api/dashboard/overview", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert r.get_json()["ven"]["verdict"] == "unknown"
+
+
+def test_overview_blocked_from_agg(client, tmp_path):
+    import datetime as dt
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.models import PceTrafficFlowAgg
+    eng = create_engine(f"sqlite:///{tmp_path / 'c.sqlite'}"); init_schema(eng)
+    today = dt.datetime.now(dt.timezone.utc)
+    rows = [("allowed", 100, today), ("blocked", 30, today),
+            ("potentially_blocked", 70, today)]
+    with sessionmaker(eng)() as s:
+        for i, (act, n, day) in enumerate(rows):
+            s.add(PceTrafficFlowAgg(bucket_day=day, src_workload="a", dst_workload="b",
+                                    port=440 + i, protocol="TCP", action=act, flow_count=n))
+        s.commit()
+    r = client.get("/api/dashboard/overview", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    blocked = r.get_json()["blocked"]
+    assert blocked["blocked"] == 30 and blocked["potential"] == 70 and blocked["allowed"] == 100
+    assert blocked["verdict"] == "ok"   # no spike vs prev window
