@@ -636,19 +636,6 @@
       @media (max-width:900px){ #p-dashboard .ov-tiles { grid-template-columns:repeat(2,1fr); } }
     </style>
 
-    <!-- Story-mode hero (one-sentence health summary + CTA) -->
-    <!-- JS controls display:none via d-hero; db-hero-wrap is purely presentational wrapper -->
-    <div class="db-hero-wrap" id="d-hero" style="display:none;">
-      <div>
-        <p class="db-hero-eyebrow" data-i18n="gui_hero_eyebrow">Past 24 hours</p>
-        <div class="dashboard-hero-sentence" id="d-hero-sentence"></div>
-      </div>
-      <button class="btn btn-primary" id="d-hero-cta" data-action="scrollToFindings"
-              data-i18n="gui_hero_view_high_risk" style="display:none;white-space:nowrap;">
-        View high-risk findings
-      </button>
-    </div>
-
     <!-- Overview bar + 4-tile grid (replaces 3-card db-status-row) -->
     <div class="ov-bar">
       <span class="ov-fresh"><span data-i18n="gui_ov_as_of">as of</span> <span id="ov-as-of">—</span></span>
@@ -674,21 +661,6 @@
     <fieldset id="cd-field" style="display:none;margin-bottom:20px;border:none;padding:0;">
       <div id="cd-list" class="cards" style="margin-bottom:0;"></div>
     </fieldset>
-
-    <!-- Microsegmentation Maturity (Phase 3.1 Task 3) — rewrapped with db-maturity-panel -->
-    <!-- JS uses id="d-maturity" to show/hide; fieldset is now inside the panel wrapper -->
-    <div class="db-maturity-panel" id="d-maturity" style="display:none;">
-      <div class="db-maturity-head">
-        <h2 class="db-maturity-title" data-i18n="gui_maturity_heading">Microsegmentation Maturity</h2>
-        <div class="db-maturity-meta">
-          <span data-i18n="gui_maturity_score_label">Score</span>:
-          <strong id="d-maturity-score" style="font-variant-numeric:tabular-nums;">—</strong>/100
-          &nbsp;·&nbsp;
-          <strong id="d-maturity-grade" style="font-size:18px;font-weight:700;">?</strong>
-        </div>
-      </div>
-      <div id="d-maturity-bars"></div>
-    </div>
 
     <!-- Live Plotly charts (auto-refresh every 60s) -->
     <div class="dashboard-charts" style="display:none;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
@@ -2925,7 +2897,6 @@
   <script defer src="{{ url_for('static', filename='js/integrations.js') }}"></script>
   <script defer src="/static/js/tabs.js"></script>
   <script defer src="/static/js/dashboard.js"></script>
-  <script defer src="/static/js/dashboard_v2.js"></script>
   <script defer src="/static/js/events.js"></script>
   <script defer src="/static/js/rules.js"></script>
   <script defer src="/static/js/settings.js"></script>

@@ -100,64 +100,6 @@ function _buildAuditSummaryFieldset() {
   return fieldset;
 }
 
-function _buildPolicyUsageSummaryFieldset() {
-  const fieldset = document.createElement('fieldset');
-  fieldset.id = 'policy-usage-fieldset';
-  fieldset.style.marginBottom = '18px';
-  fieldset.innerHTML = `
-    <legend style="font-size:1.05rem;" data-i18n="gui_dashboard_policy_usage_summary">Latest Policy Usage Summary</legend>
-    <div id="policy-usage-placeholder" style="text-align:center;padding:24px;color:var(--dim);font-size:0.9rem;" data-i18n="gui_dashboard_no_policy_usage_summary">
-      No policy usage report summary found. Generate a Policy Usage Report to populate this section.
-    </div>
-    <div id="policy-usage-content" style="display:none;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-        <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_generated">Generated:</span> <span id="policy-usage-generated-at">-</span></span>
-        <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_date_range">Date Range:</span> <span id="policy-usage-date-range">-</span></span>
-      </div>
-      <div id="policy-usage-kpi-grid" class="kpi-grid"></div>
-      <div style="margin-bottom:16px;">
-        <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_pu_top_hit_ports">Top Hit Ports</div>
-        <table class="rule-table" style="font-size:0.8rem;">
-          <thead><tr><th data-i18n="gui_pu_col_port_proto">Port / Proto</th><th data-i18n="gui_pu_col_flows">Flows</th></tr></thead>
-          <tbody id="policy-usage-top-ports-body">
-            <tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_no_data">No data</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
-        <div>
-          <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_pu_pending_rules">Pending Rules</div>
-          <table class="rule-table" style="font-size:0.8rem;">
-            <thead><tr><th data-i18n="gui_rs_type_rule">Rule</th><th data-i18n="gui_rs_type_ruleset">Ruleset</th></tr></thead>
-            <tbody id="policy-usage-pending-body">
-              <tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_no_data">No data</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div>
-          <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_pu_failed_rules">Failed Rules</div>
-          <table class="rule-table" style="font-size:0.8rem;">
-            <thead><tr><th data-i18n="gui_rs_type_rule">Rule</th><th data-i18n="gui_rs_type_ruleset">Ruleset</th></tr></thead>
-            <tbody id="policy-usage-failed-body">
-              <tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_no_data">No data</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div>
-          <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_pu_reused_rules">Reused Rules</div>
-          <table class="rule-table" style="font-size:0.8rem;">
-            <thead><tr><th data-i18n="gui_rs_type_rule">Rule</th><th data-i18n="gui_rs_type_ruleset">Ruleset</th></tr></thead>
-            <tbody id="policy-usage-reused-body">
-              <tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_no_data">No data</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
-  return fieldset;
-}
-
 function ensureTrafficWorkloadLayout() {
   const panel = $('p-traffic-workload');
   const dashboard = $('p-dashboard');
@@ -186,32 +128,12 @@ function ensureDashboardLayout() {
   const dashboard = $('p-dashboard');
   if (!dashboard || dashboard.dataset.layoutReady === '1') return;
 
-  const cards = dashboard.querySelectorAll('.cards .card');
-  if (cards[0]) {
-    const label = cards[0].querySelector('.label');
-    if (label) label.textContent = _t('gui_dashboard_rules');
-  }
-  if (cards[1]) {
-    const label = cards[1].querySelector('.label');
-    const value = cards[1].querySelector('.value');
-    if (label) label.textContent = _t('gui_dashboard_cooldown');
-    if (value) {
-      value.id = 'd-cooldown';
-      cards[1].querySelector('.value').classList.add('ok');
-    }
-  }
-  if (cards[2]) {
-    const label = cards[2].querySelector('.label');
-    const value = cards[2].querySelector('.value');
-    if (label) label.textContent = _t('gui_dashboard_pce_health');
-    if (value) {
-      value.id = 'd-pce-health';
-      cards[2].querySelector('.value').classList.add('ok');
-    }
-  }
-  cards.forEach((card, idx) => {
-    if (idx > 2) card.style.display = 'none';
-  });
+  // Phase 3.1 story-card redesign moved all card labels + IDs into index.html
+  // as authoritative server-rendered markup. Do NOT mutate `.cards .card`
+  // label/id pairs at runtime — that was the legacy v1 behaviour and broke
+  // story-cards by re-assigning `d-cooldown` / `d-pce-health` to the wrong
+  // stats. The remaining responsibility here is just injecting the audit
+  // summary fieldset (a sibling container that's not in the template).
 
   const cdField = $('cd-field');
   if (cdField) cdField.style.display = 'none';
@@ -223,16 +145,6 @@ function ensureDashboardLayout() {
       snapFieldset.insertAdjacentElement('afterend', auditFieldset);
     } else {
       dashboard.appendChild(auditFieldset);
-    }
-  }
-
-  if (!$('policy-usage-fieldset')) {
-    const auditFieldset = $('audit-fieldset');
-    const policyUsageFieldset = _buildPolicyUsageSummaryFieldset();
-    if (auditFieldset) {
-      auditFieldset.insertAdjacentElement('afterend', policyUsageFieldset);
-    } else {
-      dashboard.appendChild(policyUsageFieldset);
     }
   }
 
@@ -1228,30 +1140,32 @@ async function _doGeneratePolicyUsageClean() {
 }
 
 async function loadDashboard() {
-  // Status section — failures must not block queries/translations from loading
+  await loadTranslations();
+  ensureTrafficWorkloadLayout();
+  ensureDashboardLayout();
+  if (typeof loadOverview === 'function') loadOverview(true);
+
   try {
     const d = await api('/api/status');
     if (d) {
       window._uiLang = (d.language === 'zh_TW') ? 'zh_TW' : 'en';
-      const _hostEl = $('hdr-chip-host');
-      if (_hostEl && d.api_url) _hostEl.textContent = d.api_url;
-      const _chip = $('hdr-chip');
-      if (_chip) _chip.title = `PCE: ${d.api_url || _hostEl?.textContent}  |  v${d.version}`;
-      const _dot = $('hdr-chip-dot');
-      if (_dot) {
-        // pce_stats.event_poll_status: 'ok' | 'warn' | 'error' | 'unknown'
+      const hostEl = $('hdr-chip-host');
+      if (hostEl && d.api_url) hostEl.textContent = d.api_url;
+      const chip = $('hdr-chip');
+      if (chip) chip.title = `PCE: ${d.api_url || hostEl?.textContent}  |  v${d.version}`;
+      const dot = $('hdr-chip-dot');
+      if (dot) {
         const polled = String((d.pce_stats || {}).event_poll_status || 'unknown').toLowerCase();
         let status = 'unknown';
         if (polled === 'ok') status = 'ok';
         else if (polled === 'warn' || polled === 'degraded') status = 'warn';
         else if (polled && polled !== 'unknown') status = 'err';
-        _dot.setAttribute('data-status', status);
-        const tooltipKey = status === 'ok' ? 'gui_hdr_status_ok'
-                        : status === 'warn' ? 'gui_hdr_status_warn'
-                        : status === 'err' ? 'gui_hdr_status_err' : '';
-        if (tooltipKey) _dot.setAttribute('title', _t(tooltipKey));
+        dot.setAttribute('data-status', status);
       }
       const pceStats = d.pce_stats || {};
+      if (d.timezone) _timezone = d.timezone;
+      applyThemeMode(getStoredThemeMode());
+
       const dispatchHistory = Array.isArray(d.dispatch_history) ? d.dispatch_history : [];
       const latestDispatch = dispatchHistory.length ? dispatchHistory[dispatchHistory.length - 1] : null;
       const unknownTotal = Object.values(d.unknown_events || {}).reduce((total, entry) => {
@@ -1263,411 +1177,220 @@ async function loadDashboard() {
         const throttle = parseInt(entry.throttle_suppressed, 10) || 0;
         return total + cooldown + throttle;
       }, 0);
-      const setCard = (id, value, tone = '') => {
-        const el = $(id);
-        if (!el) return;
-        el.textContent = value;
-        el.className = tone ? `value ${tone}` : 'value';
-      };
+
       const eventPollStatus = String(pceStats.event_poll_status || 'unknown').toUpperCase();
       const dispatchStatus = latestDispatch
         ? `${String(latestDispatch.channel || 'dispatch').toUpperCase()} ${String(latestDispatch.status || 'unknown').toUpperCase()}`
         : _t('gui_state_none');
-      setCard('d-rules', String(d.rules_count ?? 0));
-      setCard('d-health', d.health_check ? _t('gui_state_on') : _t('gui_state_off'), d.health_check ? 'ok' : 'warn');
-      setCard('d-event-poll', eventPollStatus, (pceStats.event_poll_status || '').toLowerCase() === 'ok' ? 'ok' : '');
-      setCard('d-dispatch', dispatchStatus, latestDispatch && latestDispatch.status === 'success' ? 'ok' : '');
-      setCard('d-unknown', String(unknownTotal), unknownTotal > 0 ? 'warn' : 'ok');
-      setCard('d-suppressed', String(suppressedTotal), suppressedTotal > 0 ? 'warn' : 'ok');
-      if (d.timezone) _timezone = d.timezone;
-      applyThemeMode(getStoredThemeMode());
 
-      if (d.cooldowns && d.cooldowns.length > 0) {
-        const activeCds = d.cooldowns.filter(c => c.remaining_mins > 0).length;
-        if (activeCds > 0) {
-          const title = _t('gui_cooldown_title');
-          $('cd-field').style.display = 'block';
-          $('cd-list').innerHTML = `<div class="card" style="border-color:var(--warn);"><div class="label" style="color:var(--warn);"><span style="margin-right:4px;">⏳</span>${title}</div><div class="value" style="color:var(--warn);">${activeCds}</div></div>`;
-        } else {
-          $('cd-field').style.display = 'none';
-          $('cd-list').innerHTML = '';
-        }
-      } else {
-        $('cd-field').style.display = 'none';
-        $('cd-list').innerHTML = '';
-      }
+      // Phase 3.1 story-card stats — populate the 6 sub-KPI rows.
+      _dashboardSetCard('d-rules', String(d.rules_count ?? 0));
+      _dashboardSetCard('d-health', d.health_check ? _t('gui_state_on') : _t('gui_state_off'),
+                        d.health_check ? 'ok' : 'warn');
+      _dashboardSetCard('d-event-poll', eventPollStatus,
+                        (pceStats.event_poll_status || '').toLowerCase() === 'ok' ? 'ok' : '');
+      _dashboardSetCard('d-dispatch', dispatchStatus,
+                        latestDispatch && latestDispatch.status === 'success' ? 'ok' : '');
+      _dashboardSetCard('d-unknown', String(unknownTotal), unknownTotal > 0 ? 'warn' : 'ok');
+      _dashboardSetCard('d-suppressed', String(suppressedTotal), suppressedTotal > 0 ? 'warn' : 'ok');
     }
   } catch (e) {
     console.warn('[loadDashboard] status failed:', e);
   }
 
-  await loadDashboardQueries();
   await loadDashboardSnapshot();
-  await loadDashboardPolicyUsageSummary();
-}
-
-/* ─── Story-mode hero (Phase 3.1) ─────────────────────────────────── */
-function renderHero(hero) {
-  const wrap = document.getElementById('d-hero');
-  const sentenceEl = document.getElementById('d-hero-sentence');
-  const ctaEl = document.getElementById('d-hero-cta');
-  if (!wrap || !sentenceEl) return;
-  if (!hero || typeof hero !== 'object') { wrap.style.display = 'none'; return; }
-  const key = hero.sentence_key || 'gui_hero_no_data';
-  let tmpl = _t(key) || '';
-  const params = hero.sentence_params || {};
-  Object.keys(params).forEach(k => {
-    tmpl = tmpl.split('{' + k + '}').join(String(params[k]));
-  });
-  sentenceEl.textContent = tmpl;
-  wrap.style.display = 'block';
-  if (ctaEl) ctaEl.style.display = (hero.high_risk_count || 0) > 0 ? 'inline-block' : 'none';
-}
-
-function renderHeroEmpty() {
-  const wrap = document.getElementById('d-hero');
-  const sentenceEl = document.getElementById('d-hero-sentence');
-  const ctaEl = document.getElementById('d-hero-cta');
-  if (wrap && sentenceEl) {
-    wrap.style.display = 'block';
-    sentenceEl.textContent = _t('gui_hero_no_data');
-    if (ctaEl) ctaEl.style.display = 'none';
-  }
-  const matWrap = document.getElementById('d-maturity');
-  if (matWrap) matWrap.style.display = 'none';
-  const riskCnt = document.getElementById('card-hi-risk-count');
-  if (riskCnt) riskCnt.style.display = 'none';
-}
-
-function scrollToFindings() {
-  const el = document.getElementById('snap-findings-wrap');
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function renderStoryGroups(hero) {
-  if (!hero) return;
-  const cnt = hero.high_risk_count || 0;
-  const wrap = document.getElementById('card-hi-risk-count');
-  if (wrap) wrap.style.display = cnt > 0 ? 'flex' : 'none';
-  const v = document.getElementById('d-hi-risk-count');
-  if (v) v.textContent = String(cnt);
-}
-
-const _SEV_RANK = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3, INFO: 4 };
-const _SEV_BORDER = { CRITICAL: '#c0392b', HIGH: 'var(--danger)', MEDIUM: 'var(--warn)', LOW: 'var(--dim)', INFO: 'var(--success)' };
-
-function renderTopActions(findings) {
-  const grid = document.getElementById('d-top-actions-grid');
-  if (!grid) return;
-  if (!findings || !findings.length) {
-    grid.textContent = '';
-    const empty = document.createElement('div');
-    empty.style.color = 'var(--dim)';
-    empty.style.fontSize = '.85rem';
-    empty.textContent = _t('gui_snap_no_findings') || 'No findings.';
-    grid.appendChild(empty);
-    return;
-  }
-  const top = [...findings]
-    .sort((a, b) => (_SEV_RANK[(a.severity || '').toUpperCase()] ?? 99) - (_SEV_RANK[(b.severity || '').toUpperCase()] ?? 99))
-    .slice(0, 3);
-  grid.textContent = '';
-  top.forEach(f => {
-    const sev = String(f.severity || '').toUpperCase();
-    const border = _SEV_BORDER[sev] || 'var(--dim)';
-    const card = document.createElement('div');
-    card.className = 'd-action-card';
-    card.style.cssText = 'border-left:4px solid ' + border + ';background:var(--bg2);border-radius:8px;padding:12px;';
-    const badge = document.createElement('span');
-    badge.className = 'status-pill';
-    badge.setAttribute('data-status', (SEVERITY_TO_STATUS[sev] || 'neutral'));
-    badge.textContent = sev || 'INFO';
-    const finding = document.createElement('div');
-    finding.style.cssText = 'margin-top:6px;font-weight:600;font-size:.92rem;';
-    finding.textContent = f.finding || '';
-    const action = document.createElement('div');
-    action.style.cssText = 'margin-top:4px;color:var(--dim);font-style:italic;font-size:.85rem;';
-    action.textContent = f.action || '';
-    card.appendChild(badge);
-    card.appendChild(finding);
-    card.appendChild(action);
-    grid.appendChild(card);
-  });
-}
-
-/* renderMaturity placeholder — body filled in Task 3 */
-function renderMaturity(snap) {
-  const wrap = document.getElementById('d-maturity');
-  if (!wrap) return;
-  if (!snap || !snap.maturity_dimensions || !Object.keys(snap.maturity_dimensions).length) {
-    wrap.style.display = 'none';
-    return;
-  }
-  const dims = snap.maturity_dimensions || {};
-  const score = snap.maturity_score || 0;
-  const grade = snap.maturity_grade || '?';
-  const gradeEl = document.getElementById('d-maturity-grade');
-  const scoreEl = document.getElementById('d-maturity-score');
-  const bars = document.getElementById('d-maturity-bars');
-  const COLOR = { A: '#22C55E', B: '#84CC16', C: '#EAB308', D: '#EF4444', F: '#EF4444' };
-  if (gradeEl) { gradeEl.textContent = String(grade); gradeEl.style.color = COLOR[grade] || 'var(--dim)'; }
-  if (scoreEl) scoreEl.textContent = String(Math.round(score));
-  if (bars) {
-    // Static i18n key map so the audit scanner can resolve each key explicitly
-    // (dimension keys are mod12 schema — see src/report/exporters/html_exporter.py).
-    const dimLabelKey = {
-      enforcement_coverage: 'gui_maturity_dim_enforcement_coverage',
-      policy_coverage: 'gui_maturity_dim_policy_coverage',
-      lateral_movement_control: 'gui_maturity_dim_lateral_movement_control',
-      managed_asset_ratio: 'gui_maturity_dim_managed_asset_ratio',
-      risk_port_control: 'gui_maturity_dim_risk_port_control',
-    };
-    const order = ['enforcement_coverage', 'policy_coverage', 'lateral_movement_control', 'managed_asset_ratio', 'risk_port_control'];
-    bars.textContent = '';
-    order.forEach(k => {
-      const d = dims[k] || {};
-      const sv = Number(d.score || 0);
-      const wt = Number(d.weight || 1) || 1;
-      const pct = Math.max(0, Math.min(100, Math.round((sv / wt) * 100)));
-      const fillCls = pct >= 70 ? 'good' : pct >= 40 ? 'warn' : 'bad';
-      const label = _t(dimLabelKey[k]) || k;
-      const row = document.createElement('div');
-      row.className = 'db-mat-row';
-      const lbl = document.createElement('div');
-      lbl.className = 'db-mat-name';
-      lbl.textContent = label;
-      const barWrap = document.createElement('div');
-      barWrap.className = 'db-mat-bar';
-      const barFill = document.createElement('div');
-      barFill.className = 'db-mat-fill ' + fillCls;
-      barFill.style.width = pct + '%';
-      barWrap.appendChild(barFill);
-      const pctEl = document.createElement('div');
-      pctEl.className = 'db-mat-val';
-      pctEl.textContent = pct + '%';
-      row.appendChild(lbl);
-      row.appendChild(barWrap);
-      row.appendChild(pctEl);
-      bars.appendChild(row);
-    });
-  }
-  wrap.style.display = 'block';
+  await loadDashboardAuditSummary();
+  await loadDashboardCharts();
+  await loadDashboardQueries();
 }
 
 async function loadDashboardSnapshot() {
+  const placeholder = $('snap-placeholder');
+  const content = $('snap-content');
+  if (placeholder) placeholder.style.display = 'block';
+  if (content) content.style.display = 'none';
+
   try {
     const r = await api('/api/dashboard/snapshot');
-    if (!r || !r.ok || !r.snapshot) { renderHeroEmpty(); return; }
+    if (!r || !r.ok || !r.snapshot) return;
     const s = r.snapshot;
-    renderHero(s.hero);
-    renderStoryGroups(s.hero);
-    renderMaturity(s);
+    if (!s.generated_at || !placeholder || !content) return;
 
-    // ── Legacy header cards ───────────────────────────────────────────
-    const kpis = s.kpis || [];
-    const tk = kpis.find(k => k.label === 'Total Flows');
-    const rk = kpis.find(k => k.label && k.label.toLowerCase().includes('ransomware'));
-    if (rk) {
-      $('card-ransom').style.display = 'block'; $('d-ransom').textContent = rk.value;
-      let rc = 'var(--success)';
-      if (rk.value.includes('High') || rk.value.includes('Critical')) rc = 'var(--danger)';
-      else if (rk.value.includes('Medium')) rc = 'var(--warn)';
-      $('d-ransom').style.color = rc;
-    }
-
-    // ── Traffic Report Summary section ────────────────────────────────
-    if (!s.generated_at) return;  // snapshot has no traffic report data
-    $('snap-placeholder').style.display = 'none';
-    $('snap-content').style.display = 'block';
+    placeholder.style.display = 'none';
+    content.style.display = 'block';
     $('snap-generated-at').textContent = s.generated_at;
-    $('snap-date-range').textContent   = s.date_range || '—';
+    $('snap-date-range').textContent = s.date_range || '-';
 
-    // KPI cards
     const kpiGrid = $('snap-kpi-grid');
-    kpiGrid.textContent = '';
-    (s.kpis || []).forEach(k => {
-      const card = document.createElement('div');
-      card.className = 'kpi-card';
-      const labelEl = document.createElement('div');
-      labelEl.className = 'kpi-label';
-      labelEl.textContent = k.label;
-      const valueEl = document.createElement('div');
-      valueEl.className = 'kpi-value';
-      valueEl.textContent = k.value;
-      card.appendChild(labelEl);
-      card.appendChild(valueEl);
-      kpiGrid.appendChild(card);
-    });
-
-    // KPI card labels are already translated server-side (mod12 generates them in English)
-    // Dynamic text uses _translations for i18n
-
-    // Key Findings
-    const fb = $('snap-findings-body');
-    const findings = s.key_findings || [];
-    renderTopActions(findings);
-    if (findings.length) {
-      fb.innerHTML = findings.map(f => {
-        const sev = f.severity || '';
-        const sevStatus = SEVERITY_TO_STATUS[sev] || 'neutral';
-        return `<tr>
-          <td><span class="status-pill" data-status="${sevStatus}">${escapeHtml(sev)}</span></td>
-          <td>${escapeHtml(f.finding || '')}</td>
-          <td style="color:var(--dim);font-style:italic;">${escapeHtml(f.action || '')}</td>
-        </tr>`;
-      }).join('');
-    } else {
-      fb.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--dim);padding:12px;">${_t('gui_snap_no_findings')}</td></tr>`;
-    }
-
-    // Policy Breakdown
-    const pb = $('snap-policy-body');
-    const psum = s.policy_summary || [];
-    if (psum.length) {
-      pb.innerHTML = psum.map(row => {
-        const dec = row['Decision'] || '';
-        const decStatus = DECISION_TO_STATUS[dec] || 'neutral';
-        return `<tr><td><span class="status-pill" data-status="${decStatus}">${escapeHtml(dec)}</span></td><td>${escapeHtml(String(row['Flows'] ?? ''))}</td></tr>`;
-      }).join('');
-    } else {
-      pb.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--dim);">—</td></tr>';
-    }
-
-    // Top Ports
-    const portsB = $('snap-ports-body');
-    const ports = s.top_ports || [];
-    if (ports.length) {
-      portsB.innerHTML = ports.map(row =>
-        `<tr><td>${escapeHtml(String(_pickValue(row, ['Port', 'port', 'port_proto'], '-')))}</td><td>${escapeHtml(String(_pickValue(row, ['Flow Count', 'flow_count', 'Count', 'count'], '')))}</td></tr>`
-      ).join('');
-    } else {
-      portsB.innerHTML = '<tr><td colspan="2" style="text-align:center;color:var(--dim);">—</td></tr>';
-    }
-
-    // Top Uncovered Flows
-    const uncovB = $('snap-uncovered-body');
-    const uncovered = s.top_uncovered || [];
-    if (s.uncovered_pct != null) {
-      $('snap-uncovered-pct').textContent = `(${_t('gui_snap_uncovered_pct').replace('{pct}', (+s.uncovered_pct).toFixed(1))})`;
-    }
-    if (uncovered.length) {
-      uncovB.innerHTML = uncovered.map(row => {
-        const dec = row['Decision'] || '';
-        let dColor = dec === 'blocked' ? 'var(--danger)' : 'var(--warn)';
-        return `<tr>
-          <td style="font-size:0.78rem;">${escapeHtml(row['Flow'] || '')}</td>
-          <td><span style="color:${dColor};font-weight:600;">${escapeHtml(dec)}</span></td>
-          <td>${escapeHtml(String(row['Connections'] ?? ''))}</td>
-          <td style="color:var(--dim);font-size:0.78rem;">${escapeHtml(row['recommendation'] || row['Recommendation'] || '')}</td>
-        </tr>`;
-      }).join('');
-    } else {
-      uncovB.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--dim);padding:12px;">${_t('gui_snap_no_uncovered')}</td></tr>`;
-    }
-
-    // Top Bandwidth / Bytes
-    if (s.bw_data_available) {
-      $('snap-bw-wrap').style.display = 'block';
-      const bwB = $('snap-bw-body');
-      const bwRows = s.top_by_bytes || [];
-      if (bwRows.length) {
-        bwB.innerHTML = bwRows.map(row => {
-          const bytes = _pickValue(row, ['Bytes Total', 'bytes_total', 'Bytes', 'bytes'], 0);
-          const bytesStr = formatBytes(bytes);
-          const dec = _pickValue(row, ['Decision', 'policy_decision'], '');
-          let dColor = dec === 'allowed' ? 'var(--success)' : dec === 'blocked' ? 'var(--danger)' : 'var(--warn)';
-          return `<tr>
-            <td>${escapeHtml(String(_pickValue(row, ['Src IP', 'Source IP', 'src_ip', 'source_ip'], '')))}</td>
-            <td>${escapeHtml(String(_pickValue(row, ['Dst IP', 'Destination IP', 'dst_ip', 'destination_ip'], '')))}</td>
-            <td>${escapeHtml(String(_pickValue(row, ['Port', 'port', 'port_proto'], '')))}</td>
-            <td>${escapeHtml(bytesStr)}</td>
-            <td><span style="color:${dColor};font-weight:600;">${escapeHtml(dec)}</span></td>
-          </tr>`;
-        }).join('');
-      } else {
-        bwB.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--dim);padding:12px;">—</td></tr>';
-      }
-    }
-
-  } catch(e) {
-    console.warn('Dashboard Snapshot Error:', e);
-  }
-}
-
-async function loadDashboardPolicyUsageSummary() {
-  try {
-    const r = await api('/api/dashboard/policy_usage_summary');
-    if (!r || !r.ok || !r.summary) return;
-    const s = r.summary;
-
-    const placeholder = $('policy-usage-placeholder');
-    const content = $('policy-usage-content');
-    if (placeholder) placeholder.style.display = 'none';
-    if (content) content.style.display = 'block';
-
-    if ($('policy-usage-generated-at')) $('policy-usage-generated-at').textContent = s.generated_at || '-';
-    if ($('policy-usage-date-range')) $('policy-usage-date-range').textContent = (s.date_range || []).join(' ~ ') || '-';
-
-    const stats = s.execution_stats || {};
-    const cards = [
-      [_t('gui_pu_stat_hit_rules'), stats.hit_rules || 0],
-      [_t('gui_pu_stat_unused_rules'), stats.unused_rules || 0],
-      [_t('gui_pu_stat_cached_reuse'), stats.cached_rules || 0],
-      [_t('gui_pu_stat_new_queries'), stats.submitted_rules || 0],
-      [_t('gui_pu_stat_pending_jobs'), stats.pending_jobs || 0],
-      [_t('gui_pu_stat_failed_jobs'), stats.failed_jobs || 0],
-    ];
-    const grid = $('policy-usage-kpi-grid');
-    if (grid) {
-      grid.textContent = '';
-      cards.forEach(([label, value]) => {
+    if (kpiGrid) {
+      kpiGrid.textContent = '';
+      (s.kpis || []).forEach((k) => {
         const card = document.createElement('div');
         card.className = 'kpi-card';
         const labelEl = document.createElement('div');
         labelEl.className = 'kpi-label';
-        labelEl.textContent = String(label);
+        labelEl.textContent = k.label;
         const valueEl = document.createElement('div');
         valueEl.className = 'kpi-value';
-        valueEl.textContent = String(value);
+        valueEl.textContent = k.value;
         card.appendChild(labelEl);
         card.appendChild(valueEl);
-        grid.appendChild(card);
+        kpiGrid.appendChild(card);
       });
     }
 
-    const renderRows = (bodyId, rows) => {
-      const body = $(bodyId);
-      if (!body) return;
-      if (!rows || !rows.length) {
-        body.innerHTML = `<tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;">${_t('gui_no_data')}</td></tr>`;
-        return;
-      }
-      body.innerHTML = rows.map(row => {
-        const rule = _formatPolicyUsageRuleLabel(row);
-        const ruleset = row.ruleset_name || '—';
-        return `<tr><td>${escapeHtml(String(rule))}</td><td>${escapeHtml(String(ruleset))}</td></tr>`;
-      }).join('');
-    };
-
-    const topPortsBody = $('policy-usage-top-ports-body');
-    if (topPortsBody) {
-      const topPorts = s.top_hit_ports || [];
-      if (!topPorts.length) {
-        topPortsBody.innerHTML = `<tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;">${_t('gui_no_data')}</td></tr>`;
-      } else {
-        topPortsBody.innerHTML = topPorts.map(item => {
-          const label = _pickValue(item, ['port_proto', 'Port / Proto', 'port', 'Port'], '-');
-          const count = _pickValue(item, ['flow_count', 'Flow Count', 'count', 'Count'], 0);
-          return `<tr><td>${escapeHtml(String(label))}</td><td>${escapeHtml(String(count))}</td></tr>`;
-        }).join('');
-      }
+    const findings = $('snap-findings-body');
+    if (findings) {
+      const rows = s.key_findings || [];
+      findings.innerHTML = rows.length
+        ? rows.map((f) => {
+          const sev = String(f.severity || '');
+          let sevColor = 'var(--dim)';
+          if (sev === 'CRITICAL') sevColor = '#c0392b';
+          else if (sev === 'HIGH') sevColor = 'var(--danger)';
+          else if (sev === 'MEDIUM') sevColor = 'var(--warn)';
+          else if (sev === 'INFO') sevColor = 'var(--success)';
+          return `<tr>
+            <td><span style="background:${sevColor};color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:700;">${escapeHtml(sev)}</span></td>
+            <td>${escapeHtml(f.finding || '')}</td>
+            <td style="color:var(--dim);font-style:italic;">${escapeHtml(f.action || '')}</td>
+          </tr>`;
+        }).join('')
+        : `<tr><td colspan="3" style="text-align:center;color:var(--dim);padding:12px;">${_t('gui_snap_no_findings')}</td></tr>`;
     }
 
-    renderRows('policy-usage-pending-body', s.pending_rule_details || []);
-    renderRows('policy-usage-failed-body', s.failed_rule_details || []);
-    renderRows('policy-usage-reused-body', s.reused_rule_details || []);
+    const policyBody = $('snap-policy-body');
+    if (policyBody) {
+      const rows = s.policy_summary || [];
+      policyBody.innerHTML = rows.length
+        ? rows.map((row) => {
+          const dec = String(row['Decision'] || '');
+          let color = 'var(--fg)';
+          if (dec === 'allowed') color = 'var(--success)';
+          else if (dec === 'blocked') color = 'var(--danger)';
+          else if (dec === 'potentially_blocked') color = 'var(--warn)';
+          return `<tr><td style="color:${color};font-weight:600;">${escapeHtml(dec)}</td><td>${escapeHtml(String(row['Flows'] ?? ''))}</td></tr>`;
+        }).join('')
+        : '<tr><td colspan="2" style="text-align:center;color:var(--dim);">-</td></tr>';
+    }
+
+    const portsBody = $('snap-ports-body');
+    if (portsBody) {
+      const rows = s.top_ports || [];
+      portsBody.innerHTML = rows.length
+        ? rows.map((row) =>
+          `<tr><td>${escapeHtml(String(_pickValue(row, ['Port', 'port', 'port_proto'], '-')))}</td><td>${escapeHtml(String(_pickValue(row, ['Flow Count', 'flow_count', 'Count', 'count'], '')))}</td></tr>`
+        ).join('')
+        : '<tr><td colspan="2" style="text-align:center;color:var(--dim);">-</td></tr>';
+    }
+
+    const uncoveredBody = $('snap-uncovered-body');
+    const uncoveredPct = $('snap-uncovered-pct');
+    if (uncoveredPct && s.uncovered_pct != null) uncoveredPct.textContent = `(${_t('gui_snap_uncovered_pct').replace('{pct}', (+s.uncovered_pct).toFixed(1))})`;
+    if (uncoveredBody) {
+      const rows = s.top_uncovered || [];
+      uncoveredBody.innerHTML = rows.length
+        ? rows.map((row) => {
+          const dec = String(row['Decision'] || '');
+          const color = dec === 'blocked' ? 'var(--danger)' : 'var(--warn)';
+          return `<tr>
+            <td style="font-size:0.78rem;">${escapeHtml(row['Flow'] || '')}</td>
+            <td><span style="color:${color};font-weight:600;">${escapeHtml(dec)}</span></td>
+            <td>${escapeHtml(String(row['Connections'] ?? ''))}</td>
+            <td style="color:var(--dim);font-size:0.78rem;">${escapeHtml(row['recommendation'] || row['Recommendation'] || '')}</td>
+          </tr>`;
+        }).join('')
+        : `<tr><td colspan="4" style="text-align:center;color:var(--dim);padding:12px;">${_t('gui_snap_no_uncovered')}</td></tr>`;
+    }
+
+    const bwWrap = $('snap-bw-wrap');
+    const bwBody = $('snap-bw-body');
+    if (bwWrap) bwWrap.style.display = s.bw_data_available ? 'block' : 'none';
+    if (bwBody && s.bw_data_available) {
+      const rows = s.top_by_bytes || [];
+      bwBody.innerHTML = rows.length
+        ? rows.map((row) => {
+          const bytes = _pickValue(row, ['Bytes Total', 'bytes_total', 'Bytes', 'bytes'], 0);
+          const dec = String(_pickValue(row, ['Decision', 'policy_decision'], ''));
+          let color = dec === 'allowed' ? 'var(--success)' : dec === 'blocked' ? 'var(--danger)' : 'var(--warn)';
+          return `<tr>
+            <td>${escapeHtml(String(_pickValue(row, ['Src IP', 'Source IP', 'src_ip', 'source_ip'], '')))}</td>
+            <td>${escapeHtml(String(_pickValue(row, ['Dst IP', 'Destination IP', 'dst_ip', 'destination_ip'], '')))}</td>
+            <td>${escapeHtml(String(_pickValue(row, ['Port', 'port', 'port_proto'], '')))}</td>
+            <td>${escapeHtml(formatBytes(bytes))}</td>
+            <td><span style="color:${color};font-weight:600;">${escapeHtml(dec)}</span></td>
+          </tr>`;
+        }).join('')
+        : '<tr><td colspan="5" style="text-align:center;color:var(--dim);padding:12px;">-</td></tr>';
+    }
   } catch (e) {
-    console.warn('Policy Usage Summary Error:', e);
+    console.warn('[loadDashboardSnapshot] failed:', e);
+  }
+}
+
+async function loadDashboardAuditSummary() {
+  const placeholder = $('audit-placeholder');
+  const content = $('audit-content');
+  if (!placeholder || !content) return;
+  placeholder.style.display = 'block';
+  content.style.display = 'none';
+
+  try {
+    const r = await api('/api/dashboard/audit_summary');
+    if (!r || !r.ok || !r.summary) return;
+    const s = r.summary;
+    placeholder.style.display = 'none';
+    content.style.display = 'block';
+    $('audit-generated-at').textContent = s.generated_at || '-';
+    $('audit-date-range').textContent = (s.date_range || []).filter(Boolean).join(' ~ ') || '-';
+
+    const kpiGrid = $('audit-kpi-grid');
+    if (kpiGrid) {
+      kpiGrid.textContent = '';
+      (s.kpis || []).slice(0, 8).forEach((k) => {
+        const card = document.createElement('div');
+        card.className = 'kpi-card';
+        const labelEl = document.createElement('div');
+        labelEl.className = 'kpi-label';
+        labelEl.textContent = k.label;
+        const valueEl = document.createElement('div');
+        valueEl.className = 'kpi-value';
+        valueEl.textContent = k.value;
+        card.appendChild(labelEl);
+        card.appendChild(valueEl);
+        kpiGrid.appendChild(card);
+      });
+    }
+
+    const attentionBody = $('audit-attention-body');
+    if (attentionBody) {
+      const rows = s.attention_items || [];
+      attentionBody.innerHTML = rows.length
+        ? rows.map((item) => {
+          const risk = String(item.risk || 'INFO');
+          let color = 'var(--dim)';
+          if (risk === 'CRITICAL') color = '#c0392b';
+          else if (risk === 'HIGH') color = 'var(--danger)';
+          else if (risk === 'MEDIUM') color = 'var(--warn)';
+          else if (risk === 'INFO') color = 'var(--success)';
+          return `<tr>
+            <td><span style="background:${color};color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:700;">${escapeHtml(risk)}</span></td>
+            <td>${escapeHtml(item.event_type || '')}</td>
+            <td>${escapeHtml(item.summary || '')}</td>
+          </tr>`;
+        }).join('')
+        : `<tr><td colspan="3" style="text-align:center;color:var(--dim);padding:12px;">${_t('gui_no_data')}</td></tr>`;
+    }
+
+    const topEventsBody = $('audit-top-events-body');
+    if (topEventsBody) {
+      const rows = s.top_events || [];
+      topEventsBody.innerHTML = rows.length
+        ? rows.map((row) => `<tr><td>${escapeHtml(row['Event Type'] || '')}</td><td>${escapeHtml(String(row['Count'] ?? ''))}</td></tr>`).join('')
+        : `<tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;">${_t('gui_no_data')}</td></tr>`;
+    }
+  } catch (e) {
+    console.warn('[loadDashboardAuditSummary] failed:', e);
   }
 }
 
@@ -1824,6 +1547,16 @@ async function loadOverview(force) {
   } catch (e) { /* leave previous render */ }
 }
 window.loadOverview = loadOverview;
+
+/* ─── Overview tile drill-down + manual refresh ─────────────────────── */
+document.addEventListener('click', function (e) {
+  if (e.target.closest('#ov-refresh')) { loadOverview(true); return; }
+  var tile = e.target.closest('.ov-tile'); if (!tile) return;
+  e.preventDefault();
+  var tab = tile.getAttribute('data-tab'); var qtab = tile.getAttribute('data-qtab');
+  if (tab && window.switchTab) window.switchTab(tab);
+  if (qtab && window.switchQTab) window.switchQTab(qtab);
+});
 
 function openQueryModal(idx = -1) {
   $('dq-idx').value = idx;
