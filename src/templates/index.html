@@ -617,6 +617,23 @@
       .rcard-meta { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; font-size:11px; color:var(--dim); align-items:center; }
       .rcard-meta-last { }
       .rcard-meta-sched { display:inline-block; padding:1px 7px; border-radius:999px; background:var(--surface-2,var(--bg2)); border:1px solid var(--border); font-size:10px; font-weight:500; color:var(--dim); }
+      /* ov-tiles: 4-tile overview grid */
+      #p-dashboard .ov-bar { display:flex; align-items:center; gap:12px; justify-content:flex-end;
+        font-size:12px; color:var(--dim); margin-bottom:8px; }
+      #p-dashboard .ov-bar .ov-fresh.stale { color:var(--danger,#ef4444); }
+      #p-dashboard .ov-tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+      #p-dashboard .ov-tile { display:block; background:var(--bg2); border:1px solid var(--border);
+        border-radius:12px; padding:14px 16px; text-decoration:none; color:inherit; cursor:pointer; }
+      #p-dashboard .ov-tile:hover { border-color:var(--slate-50,#64748b); }
+      #p-dashboard .ov-tile-h { display:flex; justify-content:space-between; align-items:center;
+        font-weight:600; font-size:13px; margin-bottom:8px; }
+      #p-dashboard .ov-mark { width:10px; height:10px; border-radius:999px; display:inline-block; background:var(--dim); }
+      #p-dashboard .ov-mark.ok { background:var(--color-success,#16a34a); }
+      #p-dashboard .ov-mark.warn { background:var(--color-warning,#f59e0b); }
+      #p-dashboard .ov-mark.error { background:var(--color-danger,#dc2626); }
+      #p-dashboard .ov-tile-body { font-size:13px; line-height:1.7; }
+      #p-dashboard .ov-tile-body .ov-drill { font-size:11px; color:var(--dim); margin-top:6px; }
+      @media (max-width:900px){ #p-dashboard .ov-tiles { grid-template-columns:repeat(2,1fr); } }
     </style>
 
     <!-- Story-mode hero (one-sentence health summary + CTA) -->
@@ -632,37 +649,26 @@
       </button>
     </div>
 
-    <!-- Top level stats — 3 status cards (Health / Traffic / Risk) -->
-    <div class="db-status-row">
-      <div class="card story-card story-card--health db-status-card db-ok">
-        <div class="story-card-title label" data-i18n="gui_story_group_health">Health</div>
-        <div class="story-card-body">
-          <div class="story-stat"><span class="story-stat-label" data-i18n="gui_card_health_rule">Health Rule</span><span class="story-stat-value value" id="d-health">-</span></div>
-          <div class="story-stat"><span class="story-stat-label" data-i18n="gui_card_event_poll">Event Poll</span><span class="story-stat-value value" id="d-event-poll">-</span></div>
-          <div class="story-stat"><span class="story-stat-label" data-i18n="gui_card_last_dispatch">Last Dispatch</span><span class="story-stat-value value" id="d-dispatch">-</span></div>
-        </div>
-      </div>
-      <div class="card story-card story-card--traffic db-status-card db-info">
-        <div class="story-card-title label" data-i18n="gui_story_group_traffic">Traffic</div>
-        <div class="story-card-body">
-          <div class="story-stat"><span class="story-stat-label" data-i18n="gui_dashboard_rules">Rules</span><span class="story-stat-value value" id="d-rules">-</span></div>
-          <div class="story-stat" title="PCE event types received but matched no configured monitoring rule. Cap 100 types." data-i18n-title="gui_card_unknown_types_tooltip"><span class="story-stat-label" data-i18n="gui_card_unknown_types">Unknown Types</span><span class="story-stat-value value" id="d-unknown">-</span></div>
-          <div class="story-stat" title="Alerts suppressed by cooldown/throttle rate limits before dispatch." data-i18n-title="gui_card_suppressed_tooltip"><span class="story-stat-label" data-i18n="gui_card_suppressed">Suppressed</span><span class="story-stat-value value" id="d-suppressed">-</span></div>
-        </div>
-      </div>
-      <div class="card story-card story-card--risk db-status-card db-warn">
-        <div class="story-card-title label" data-i18n="gui_story_group_risk">Risk</div>
-        <div class="story-card-body">
-          <div class="story-stat" id="card-ransom" style="display:none">
-            <span class="story-stat-label" data-i18n="gui_card_ransomware_exp">Ransomware Exp</span>
-            <span class="story-stat-value value" id="d-ransom">—</span>
-          </div>
-          <div class="story-stat" id="card-hi-risk-count" style="display:none">
-            <span class="story-stat-label" data-i18n="gui_hi_risk_findings">High-risk findings</span>
-            <span class="story-stat-value value" id="d-hi-risk-count">0</span>
-          </div>
-        </div>
-      </div>
+    <!-- Overview bar + 4-tile grid (replaces 3-card db-status-row) -->
+    <div class="ov-bar">
+      <span class="ov-fresh"><span data-i18n="gui_ov_as_of">as of</span> <span id="ov-as-of">—</span></span>
+      <label class="ov-auto"><input type="checkbox" id="ov-autorefresh" checked>
+        <span data-i18n="gui_ov_autorefresh">auto-refresh</span> 30s</label>
+      <button class="btn btn-sm" id="ov-refresh" data-i18n="gui_ov_refresh_now">Refresh</button>
+    </div>
+    <div class="ov-tiles">
+      <a class="ov-tile" id="ov-ven"      data-tab="traffic-workload" data-qtab="workloads">
+        <div class="ov-tile-h"><span data-i18n="gui_ov_ven_title">VEN Health</span><i class="ov-mark" id="ov-ven-mark"></i></div>
+        <div class="ov-tile-body" id="ov-ven-body"></div></a>
+      <a class="ov-tile" id="ov-blocked"  data-tab="traffic-workload" data-qtab="traffic">
+        <div class="ov-tile-h"><span data-i18n="gui_ov_blocked_title">Blocked now</span><i class="ov-mark" id="ov-blocked-mark"></i></div>
+        <div class="ov-tile-body" id="ov-blocked-body"></div></a>
+      <a class="ov-tile" id="ov-pipeline" data-tab="integrations">
+        <div class="ov-tile-h"><span data-i18n="gui_ov_pipeline_title">Pipeline</span><i class="ov-mark" id="ov-pipeline-mark"></i></div>
+        <div class="ov-tile-body" id="ov-pipeline-body"></div></a>
+      <a class="ov-tile" id="ov-alerts"   data-tab="events">
+        <div class="ov-tile-h"><span data-i18n="gui_ov_alerts_title">Alerts</span><i class="ov-mark" id="ov-alerts-mark"></i></div>
+        <div class="ov-tile-body" id="ov-alerts-body"></div></a>
     </div>
 
     <fieldset id="cd-field" style="display:none;margin-bottom:20px;border:none;padding:0;">
