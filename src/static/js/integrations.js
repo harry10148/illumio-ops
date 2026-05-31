@@ -107,7 +107,7 @@ window._integrations.setRender('cache', async function renderCache() {
   if (typeof window.i18nApply === 'function') window.i18nApply();
 });
 
-function buildCacheStatusCards(status, s) {
+function buildCacheStatusCards(status, s, throughput) {
   var events     = Number(status.events      || 0);
   var trafficRaw = Number(status.traffic_raw || 0);
   var trafficAgg = Number(status.traffic_agg || 0);
@@ -115,6 +115,16 @@ function buildCacheStatusCards(status, s) {
   var stateText  = s.enabled
     ? '<span style="color:var(--color-success)">✓ ' + escapeAttr(_t('gui_cache_enabled')) + '</span>'
     : '<span style="color:var(--color-danger)">✗ ' + escapeAttr(_t('gui_cache_disabled')) + '</span>';
+
+  // 1h ingest counts from throughput endpoint
+  var events1h     = throughput && throughput.events_1h     != null ? Number(throughput.events_1h)     : null;
+  var trafficRaw1h = throughput && throughput.traffic_raw_1h != null ? Number(throughput.traffic_raw_1h) : null;
+  var trafficAgg1h = throughput && throughput.traffic_agg_1h != null ? Number(throughput.traffic_agg_1h) : null;
+  function fmt1h(n) {
+    if (n == null) return '';
+    return ' <span style="font-size:.7rem;color:var(--accent2);" data-i18n="gui_ov_cache_ingest_1h">+' + n.toLocaleString() + ' (1h)</span>';
+  }
+
   return '<div class="cards" style="margin-bottom:16px;">'
     + '<div class="card card-' + stateClass + '">'
     + '<div class="label" data-i18n="gui_cache_status">Cache Status</div>'
@@ -122,15 +132,15 @@ function buildCacheStatusCards(status, s) {
     + '</div>'
     + '<div class="card card-ok">'
     + '<div class="label" data-i18n="gui_ov_events">events</div>'
-    + '<div class="value">' + events.toLocaleString() + '</div>'
+    + '<div class="value">' + events.toLocaleString() + fmt1h(events1h) + '</div>'
     + '</div>'
     + '<div class="card card-ok">'
     + '<div class="label" data-i18n="gui_cache_card_traffic_raw">Traffic Raw</div>'
-    + '<div class="value">' + trafficRaw.toLocaleString() + '</div>'
+    + '<div class="value">' + trafficRaw.toLocaleString() + fmt1h(trafficRaw1h) + '</div>'
     + '</div>'
     + '<div class="card card-ok">'
     + '<div class="label" data-i18n="gui_cache_card_traffic_agg">Traffic Agg</div>'
-    + '<div class="value">' + trafficAgg.toLocaleString() + '</div>'
+    + '<div class="value">' + trafficAgg.toLocaleString() + fmt1h(trafficAgg1h) + '</div>'
     + '</div>'
     + '</div>'
     + '<div class="toolbar" style="margin-bottom:16px;">'
@@ -556,37 +566,60 @@ window._integrations.setRender('siem', async function renderSiem() {
   }
   var dests = destsBody.destinations || destsBody || [];
 
-  // ── KPI strip ────────────────────────────────────────────────────────────────
+  // ── KPI strip ──────────────────────────────────────────────────────────────────────────────────
   var siemRows = (status && status.status) || [];
   var kpiSent = 0, kpiFailed = 0, kpiDlq = 0;
+  var kpiSent1h = 0, kpiFailed1h = 0;
+  var kpiLatencyWsum = 0, kpiLatencyWtotal = 0;
   siemRows.forEach(function(d) {
     kpiSent   += Number(d.sent    || 0);
     kpiFailed += Number(d.failed  || 0);
     kpiDlq    += Number(d.dlq     || 0);
+    var s1h = Number(d.sent_1h   || 0);
+    var f1h = Number(d.failed_1h || 0);
+    kpiSent1h   += s1h;
+    kpiFailed1h += f1h;
+    var w = s1h + f1h;
+    if (w > 0 && d.avg_latency_ms != null) {
+      kpiLatencyWsum   += Number(d.avg_latency_ms) * w;
+      kpiLatencyWtotal += w;
+    }
   });
-  var kpiAttempts = kpiSent + kpiFailed;
-  var kpiRate = kpiAttempts > 0
-    ? (kpiSent / kpiAttempts * 100).toFixed(2) + '%'
-    : '\u2014';
   var kpiRateColor = kpiFailed > 0 ? 'var(--color-danger,#f43f5e)' : 'var(--color-success,#22c55e)';
   var kpiDlqColor  = kpiDlq   > 0 ? 'var(--warn,#f59e0b)' : 'inherit';
 
+  // 1h success rate (weighted across destinations)
+  var kpiAttempts1h = kpiSent1h + kpiFailed1h;
+  var kpiRate1h = kpiAttempts1h > 0
+    ? (kpiSent1h / kpiAttempts1h * 100).toFixed(1) + '%'
+    : '\u2014';
+  var kpiRate1hColor = kpiFailed1h > 0 ? 'var(--color-danger,#f43f5e)' : 'var(--color-success,#22c55e)';
+
+  // Weighted average latency across destinations
+  var kpiLatencyStr = '\u2014';
+  if (kpiLatencyWtotal > 0) {
+    var avgMs = kpiLatencyWsum / kpiLatencyWtotal;
+    kpiLatencyStr = avgMs < 1000 ? Math.round(avgMs) + 'ms' : (avgMs / 1000).toFixed(1) + 's';
+  }
+
   var kpiHtml = '<div class="it-kpi-strip">'
-    + '<div class="it-kpi-cell"><div class="it-kpi-label">\u7e3d\u9001\u51fa</div>'
+    + '<div class="it-kpi-cell"><div class="it-kpi-label" data-i18n="gui_ov_sent">\u7e3d\u9001\u51fa</div>'
     + '<div class="it-kpi-value">' + kpiSent.toLocaleString() + '</div></div>'
-    + '<div class="it-kpi-cell"><div class="it-kpi-label">\u6210\u529f\u7387</div>'
-    + '<div class="it-kpi-value" style="color:' + kpiRateColor + ';">' + kpiRate + '</div></div>'
+    + '<div class="it-kpi-cell"><div class="it-kpi-label" data-i18n="gui_ov_siem_success_1h">\u6210\u529f\u7387 (1h)</div>'
+    + '<div class="it-kpi-value" style="color:' + kpiRate1hColor + ';">' + kpiRate1h + '</div></div>'
     + '<div class="it-kpi-cell"><div class="it-kpi-label">DLQ \u7d2f\u7a4d</div>'
     + '<div class="it-kpi-value" style="color:' + kpiDlqColor + ';">' + kpiDlq + '</div></div>'
-    + '<div class="it-kpi-cell"><div class="it-kpi-label">\u5e73\u5747\u5ef6\u9072</div>'
-    + '<div class="it-kpi-value it-kpi-muted">\u2014</div></div>'
+    + '<div class="it-kpi-cell"><div class="it-kpi-label" data-i18n="gui_ov_siem_latency">\u5e73\u5747\u5ef6\u9072</div>'
+    + '<div class="it-kpi-value it-kpi-muted">' + kpiLatencyStr + '</div></div>'
     + '</div>';
 
   el.innerHTML = kpiHtml + buildSiemForwarderForm(fw) + buildSiemDestinationsSection();
 
   var tbody = document.getElementById('siem-dest-tbody');
-  var perDest = (status && status.per_destination) || {};
-  var rows = dests.map(function(d) { return buildSiemRow(d, perDest[d.name] || {}); }).join('');
+  // Build a name→stats lookup from status.status rows (status.per_destination is not populated)
+  var perDestMap = {};
+  siemRows.forEach(function(d) { if (d.destination) perDestMap[d.destination] = d; });
+  var rows = dests.map(function(d) { return buildSiemRow(d, perDestMap[d.name] || {}); }).join('');
   tbody.innerHTML = rows || '<tr><td colspan="6" style="color:var(--dim);">(none)</td></tr>';
   if (typeof window.i18nApply === 'function') window.i18nApply();
 });
@@ -1124,27 +1157,39 @@ function _dlqSelectedIds() {
 async function dlqReplaySelected() {
   var ids = _dlqSelectedIds();
   if (!ids.length) return;
-  var dest = (document.getElementById('dlq-dest') || {}).value || '';
-  if (!dest) { alert('Select a destination filter first.'); return; }
   try {
     var r = await fetch('/api/siem/dlq/replay', {
       method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
-      body: JSON.stringify({dest: dest, limit: ids.length}),
+      body: JSON.stringify({ids: ids}),
     });
     if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
+    var body = await r.json();
+    // Show per-item requeued results if available
+    if (body && body.results) {
+      var summary = body.results.map(function(item) {
+        return 'id=' + item.id + ': ' + (item.requeued ? 'requeued' : 'skipped');
+      }).join('\n');
+      console.info('[DLQ replay]', summary);
+    }
   } catch (err) { alert('Replay error: ' + String(err)); return; }
   dlqSearch();
 }
 
 async function dlqReplay(ids) {
-  var dest = (document.getElementById('dlq-dest') || {}).value || '';
-  if (!dest) { alert('Select a destination filter first.'); return; }
+  if (!ids || !ids.length) return;
   try {
     var r = await fetch('/api/siem/dlq/replay', {
       method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
-      body: JSON.stringify({dest: dest, limit: ids.length || 1}),
+      body: JSON.stringify({ids: ids}),
     });
     if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
+    var body = await r.json();
+    if (body && body.results) {
+      var summary = body.results.map(function(item) {
+        return 'id=' + item.id + ': ' + (item.requeued ? 'requeued' : 'skipped');
+      }).join('\n');
+      console.info('[DLQ replay]', summary);
+    }
   } catch (err) { alert('Replay error: ' + String(err)); return; }
   dlqSearch();
 }
@@ -1195,14 +1240,20 @@ function dlqExport() {
 }
 
 async function dlqView(id) {
-  var entry = null;
-  if (window._dlqCurrentEntries) {
-    entry = window._dlqCurrentEntries.filter(function(e) { return Number(e.id) === id; })[0] || null;
-  }
-  if (!entry) { alert('Entry not found'); return; }
-
   var host = document.getElementById('dlq-modal-host');
   if (!host) return;
+
+  // Fetch full entry from API (includes full payload + last_error)
+  var entry = null;
+  try {
+    var r = await fetch('/api/siem/dlq/' + id);
+    if (!r.ok) { alert('Failed to load entry: HTTP ' + r.status); return; }
+    entry = await r.json();
+  } catch (err) {
+    alert('Inspect error: ' + String(err));
+    return;
+  }
+
   host.innerHTML = '';
   var backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -1219,7 +1270,6 @@ async function dlqView(id) {
   [
     ['Destination', entry.destination || entry.source_table],
     ['Event ID', entry.source_id],
-    ['Reason', entry.last_error],
     ['Failed at', entry.quarantined_at],
     ['Retries', entry.retries],
   ].forEach(function(pair) {
@@ -1231,11 +1281,33 @@ async function dlqView(id) {
     modal.appendChild(d);
   });
 
-  if (entry.payload_preview) {
-    var pre = document.createElement('pre');
-    pre.style.cssText = 'background:var(--bg3);padding:10px;overflow:auto;max-height:400px;';
-    pre.textContent = entry.payload_preview;
-    modal.appendChild(pre);
+  // Full last_error
+  if (entry.last_error) {
+    var errLabel = document.createElement('div');
+    errLabel.style.marginTop = '10px';
+    var errB = document.createElement('b');
+    errB.textContent = 'Reason';
+    errLabel.appendChild(errB);
+    modal.appendChild(errLabel);
+    var errPre = document.createElement('pre');
+    errPre.style.cssText = 'background:var(--bg3);padding:10px;overflow:auto;max-height:160px;white-space:pre-wrap;';
+    errPre.innerHTML = escapeHtml(String(entry.last_error));
+    modal.appendChild(errPre);
+  }
+
+  // Full payload
+  if (entry.payload) {
+    var payLabel = document.createElement('div');
+    payLabel.style.marginTop = '10px';
+    var payB = document.createElement('b');
+    payB.textContent = 'Payload';
+    payLabel.appendChild(payB);
+    modal.appendChild(payLabel);
+    var payPre = document.createElement('pre');
+    payPre.style.cssText = 'background:var(--bg3);padding:10px;overflow:auto;max-height:400px;white-space:pre-wrap;';
+    var payStr = typeof entry.payload === 'string' ? entry.payload : JSON.stringify(entry.payload, null, 2);
+    payPre.innerHTML = escapeHtml(payStr);
+    modal.appendChild(payPre);
   }
 
   var row = document.createElement('div');
@@ -1265,6 +1337,19 @@ window.dlqExport = dlqExport;
 window.dlqView = dlqView;
 
 // ── Overview sub-tab ─────────────────────────────────────────────────────────
+function _buildOvPipelineHealth(health) {
+  var verdict = (health && health.verdict) || 'ok';
+  var colorMap = {ok: 'var(--color-success,#22c55e)', warn: 'var(--color-warning,#f59e0b)', error: 'var(--color-danger,#f43f5e)'};
+  var cardClass = verdict === 'error' ? 'card-err' : verdict === 'warn' ? 'card-warn' : 'card-ok';
+  var color = colorMap[verdict] || colorMap.ok;
+  return '<div class="cards" style="margin-bottom:8px;">'
+    + '<div class="card ' + cardClass + '" style="flex:0 0 auto;min-width:160px;">'
+    + '<div class="label" data-i18n="gui_ov_pipeline_health">Pipeline Health</div>'
+    + '<div class="value" style="color:' + color + ';font-size:1.1rem;font-weight:700;">' + verdict.toUpperCase() + '</div>'
+    + '</div>'
+    + '</div>';
+}
+
 function _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq) {
   var siemClass = totalFailed > 0 ? 'card-err' : 'card-ok';
   var dlqClass  = totalDlq  > 0 ? 'card-warn' : 'card-ok';
@@ -1342,16 +1427,18 @@ window._integrations.setRender('overview', async function renderOverview() {
   if (!el) return;
   el.innerHTML = '<p class="subtitle" data-i18n="gui_it_loading">Loading...</p>';
 
-  var cache, siem, settings;
+  var cache, siem, settings, health;
   try {
     var results = await Promise.all([
       fetch('/api/cache/status').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
       fetch('/api/siem/status').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
       fetch('/api/settings').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
+      fetch('/api/cache/health').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
     ]);
-    cache = results[0] || {};
-    siem  = results[1] || {status: []};
+    cache    = results[0] || {};
+    siem     = results[1] || {status: []};
     settings = results[2] || {};
+    health   = results[3] || {};
   } catch (err) {
     el.textContent = '';
     var p = document.createElement('p');
@@ -1370,7 +1457,8 @@ window._integrations.setRender('overview', async function renderOverview() {
     totalDlq     += Number(d.dlq     || 0);
   });
 
-  el.innerHTML = _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq)
+  el.innerHTML = _buildOvPipelineHealth(health)
+               + _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq)
                + _buildOvRecentTable(siemStatus)
                + _buildAlertChannelCards(settings);
   if (typeof window.i18nApply === 'function') window.i18nApply();
