@@ -133,15 +133,6 @@ class AuditHtmlExporter:
         self._pce_url = pce_url
         self._org_name = org_name
 
-    @staticmethod
-    def _risk_badge(risk_level: str) -> str:
-        color = RISK_COLOR.get(risk_level, "#989A9B")
-        bg = RISK_BG.get(risk_level, "#F9FAFB")
-        return (
-            f"<span class='risk-badge' style='background:{bg};color:{color};border-color:{color}'>"
-            f"{risk_level}</span>"
-        )
-
     def _attention_section(self, attention_items: list) -> str:
         if not attention_items:
             return ""

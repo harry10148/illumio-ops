@@ -15,6 +15,26 @@ def test_concern_card_renders_severity_and_recommendation():
     assert render_concern_cards([], lang="en") == ""   # empty → no markup
 
 
+def test_concern_card_sort_order():
+    """CRITICAL sorts before HIGH sorts before LOW."""
+    from src.report.exporters.concern_card import render_concern_cards
+    items = [
+        {"risk": "LOW", "event_type": "low.event", "count": 1, "summary": "", "actors": [], "src_ips": []},
+        {"risk": "CRITICAL", "event_type": "critical.event", "count": 2, "summary": "", "actors": [], "src_ips": []},
+        {"risk": "HIGH", "event_type": "high.event", "count": 3, "summary": "", "actors": [], "src_ips": []},
+    ]
+    html = render_concern_cards(items, lang="en")
+    assert html.index("critical.event") < html.index("high.event") < html.index("low.event")
+
+
+def test_concern_card_unknown_risk_does_not_raise():
+    """Unknown risk level falls back gracefully."""
+    from src.report.exporters.concern_card import render_concern_cards
+    items = [{"risk": "UNKNOWN_LEVEL", "event_type": "x", "count": 1, "summary": "", "actors": [], "src_ips": []}]
+    html = render_concern_cards(items, lang="en")
+    assert "x" in html  # rendered without raising
+
+
 def test_ven_generate_produces_trend_deltas(tmp_path):
     from src.report.ven_status_generator import VenStatusGenerator
     cm = types.SimpleNamespace(config={"settings": {"timezone": "UTC"}})
