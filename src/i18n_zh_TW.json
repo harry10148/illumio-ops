@@ -990,6 +990,7 @@
   "gui_ov_suppressed": "已抑制",
   "gui_ov_traffic": "流量",
   "gui_ov_ven_title": "VEN 健康",
+  "gui_ov_cache_required": "請開啟 PCE Cache 以顯示流量資料",
   "gui_ov_vs_prev": "vs 前期",
   "gui_page_size": "每頁筆數",
   "gui_param_guide": "參數說明",

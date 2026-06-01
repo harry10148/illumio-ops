@@ -990,6 +990,7 @@
   "gui_ov_suppressed": "suppressed",
   "gui_ov_traffic": "traffic",
   "gui_ov_ven_title": "VEN Health",
+  "gui_ov_cache_required": "Enable PCE Cache to see traffic data",
   "gui_ov_vs_prev": "vs prev",
   "gui_page_size": "Page Size",
   "gui_param_guide": "Parameter Guide",

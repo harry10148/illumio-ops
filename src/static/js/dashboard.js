@@ -1235,8 +1235,11 @@ function renderOverview(d) {
   // Blocked
   var b = d.blocked || {};
   _ovMark('ov-blocked-mark', b.verdict);
-  document.getElementById('ov-blocked-body').innerHTML = (b.verdict === 'unknown')
-    ? '<div style="color:var(--dim)">—</div>'
+  document.getElementById('ov-blocked-body').innerHTML =
+    (b.verdict === 'no_cache')
+      ? '<div style="color:var(--warn);font-size:12px;">' + T('gui_ov_cache_required','Enable PCE Cache') + '</div>'
+    : (b.verdict === 'unknown')
+      ? '<div style="color:var(--dim)">—</div>'
     : _ovRows(['Blocked ' + (b.blocked || 0).toLocaleString(),
                'Potentially Blocked ' + (b.potential || 0).toLocaleString(),
                (b.vs_prev_pct >= 0 ? '↑' : '↓') + Math.abs(b.vs_prev_pct || 0) + '% ' + T('gui_ov_vs_prev','vs prev')])
@@ -1245,8 +1248,11 @@ function renderOverview(d) {
   var p = d.pipeline || {};
   _ovMark('ov-pipeline-mark', p.verdict);
   var lag = (p.cache_lag || []).map(function (c) { return c.source + ' ' + _fmtAge(c.lag_s); }).join(' · ');
-  document.getElementById('ov-pipeline-body').innerHTML = (p.verdict === 'unknown')
-    ? '<div style="color:var(--dim)">—</div>'
+  document.getElementById('ov-pipeline-body').innerHTML =
+    (p.verdict === 'no_cache')
+      ? '<div style="color:var(--warn);font-size:12px;">' + T('gui_ov_cache_required','Enable PCE Cache') + '</div>'
+    : (p.verdict === 'unknown')
+      ? '<div style="color:var(--dim)">—</div>'
     : _ovRows([(T('gui_ov_cache_lag_label','cache lag') + ' ' + (lag || '—')),
                (T('gui_ov_siem_1h','SIEM 1h') + ' ' + (p.siem_success_1h != null ? p.siem_success_1h + '%' : '—')),
                'DLQ ' + (p.dlq || 0)])
@@ -1582,10 +1588,10 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     loadDashboardCharts();
     setInterval(loadDashboardCharts, 60000);
-    setInterval(function () { if (typeof loadOverview === 'function') loadOverview(false); }, 30000);
+    setInterval(function () { if (typeof loadOverview === 'function') loadOverview(false); }, 600000);
   });
 } else {
   loadDashboardCharts();
   setInterval(loadDashboardCharts, 60000);
-  setInterval(function () { if (typeof loadOverview === 'function') loadOverview(false); }, 30000);
+  setInterval(function () { if (typeof loadOverview === 'function') loadOverview(false); }, 600000);
 }

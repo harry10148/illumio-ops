@@ -68,6 +68,8 @@ _BLOCKED_KEYS = {"allowed": "allowed", "potentially_blocked": "potential", "bloc
 
 
 def _overview_blocked(cm, window_days=7):
+    if not cm.models.pce_cache.enabled:
+        return {"verdict": "no_cache"}
     import datetime as dt
     from sqlalchemy import func, select
     from src.pce_cache.models import PceTrafficFlowAgg
@@ -102,6 +104,8 @@ def _overview_blocked(cm, window_days=7):
 
 
 def _overview_pipeline(cm):
+    if not cm.models.pce_cache.enabled:
+        return {"verdict": "no_cache"}
     import datetime as dt
     from sqlalchemy import func, select
     try:
