@@ -883,9 +883,11 @@ function renderTrafficTrend(buckets) {
   const sum = k => norm.reduce((s, b) => s + b[k], 0);
   const flagged = sum('potential') + sum('blocked');
   if (meta) {
-    meta.textContent = flagged
-      ? `${flagged.toLocaleString()} blocked/potential · ${(sum('allowed') + flagged).toLocaleString()} flows · 7d`
-      : `${(sum('allowed') + flagged).toLocaleString()} flows · 7d`;
+    const total = sum('allowed') + flagged;
+    const label = flagged
+      ? `${flagged.toLocaleString()} blocked/potential · ${total.toLocaleString()} flows`
+      : `${total.toLocaleString()} flows`;
+    meta.textContent = label + ' · 7d (complete days only)';
   }
   if (x0El && buckets[0]?.ts)     x0El.textContent = String(buckets[0].ts).slice(0, 10);
   if (x1El && buckets[n - 1]?.ts) x1El.textContent = String(buckets[n - 1].ts).slice(0, 10);

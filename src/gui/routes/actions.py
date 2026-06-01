@@ -414,7 +414,9 @@ def make_actions_blueprint(
             sf = sessionmaker(engine)
 
             now = datetime.datetime.now(datetime.timezone.utc)
-            cutoff = now - datetime.timedelta(days=7)
+            today = str(now.date())
+            # Fetch 8 days so we always have 7 complete days after excluding today
+            cutoff = now - datetime.timedelta(days=8)
 
             with sf() as session:
                 rows = session.execute(
@@ -424,6 +426,7 @@ def make_actions_blueprint(
                         func.sum(PceTrafficFlowAgg.flow_count).label("flows"),
                     )
                     .where(PceTrafficFlowAgg.bucket_day >= cutoff)
+                    .where(func.date(PceTrafficFlowAgg.bucket_day) < today)
                     .group_by(func.date(PceTrafficFlowAgg.bucket_day), PceTrafficFlowAgg.action)
                     .order_by(func.date(PceTrafficFlowAgg.bucket_day))
                 ).all()
