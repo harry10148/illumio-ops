@@ -218,6 +218,27 @@ class ConfigManager:
         "authentication_settings.update":           "rule_auth_settings_change",
     }
 
+    # Map rule filter_value → canonical name_key (for legacy alerts.json migration).
+    # Built from apply_best_practices.event_specs; kept in sync manually.
+    _LEGACY_FILTER_TO_NAME_KEY = {
+        "agent.tampering":                          "rule_agent_tampering",
+        "user.sign_in,user.login":                  "rule_login_failed",
+        "lost_agent.found":                         "rule_lost_agent",
+        "system_task.agent_missed_heartbeats_check":"rule_agent_heartbeat",
+        "system_task.agent_offline_check":          "rule_agent_offline",
+        "agent.suspend":                            "rule_agent_suspend",
+        "agent.clone_detected":                     "rule_agent_clone",
+        "request.authentication_failed":            "rule_api_auth_failed",
+        "agent.refresh_policy":                     "rule_policy_fail",
+        "rule_set.create,rule_set.update,rule_set.delete": "rule_ruleset_change",
+        "sec_policy.create":                        "rule_policy_provision",
+        "request.authorization_failed":             "rule_api_authz_failed",
+        "api_key.create,api_key.delete":            "rule_api_key_change",
+        "sec_rule.create,sec_rule.update,sec_rule.delete": "rule_sec_rule_change",
+        "workloads.unpair,agents.unpair":           "rule_bulk_unpair",
+        "authentication_settings.update":           "rule_auth_settings_change",
+    }
+
     def _resolve_rule_keys(self) -> None:
         """Resolve name/desc/rec text for all rules at read time.
 
