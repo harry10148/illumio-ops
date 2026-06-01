@@ -395,40 +395,6 @@
         #p-dashboard details.db-kpi-details > summary::before { transition: none; }
       }
 
-      /* ── E2: db-legacy-section <details> collapsed by default ── */
-      #p-dashboard .db-legacy-section {
-        margin-top: 24px;
-        background: var(--bg2);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-      }
-      #p-dashboard .db-legacy-section[open] { padding-bottom: 0; }
-      #p-dashboard .db-legacy-section > summary {
-        padding: 14px 18px;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        list-style: none;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        color: var(--dim);
-        border-radius: 12px;
-        user-select: none;
-      }
-      #p-dashboard .db-legacy-section[open] > summary {
-        border-bottom: 1px solid var(--border);
-        border-radius: 12px 12px 0 0;
-      }
-      #p-dashboard .db-legacy-section > summary::before {
-        content: '▸';
-        font-size: 11px;
-        transition: transform 120ms ease;
-        color: var(--dim);
-      }
-      #p-dashboard .db-legacy-section[open] > summary::before { transform: rotate(90deg); }
-      #p-dashboard .db-legacy-section > summary::-webkit-details-marker { display: none; }
-      #p-dashboard .db-legacy-section > :not(summary) { padding: 0 18px 18px; }
 
       /* ── R4 polish: tame pre-R4c legacy KPI strip elements ── */
       #p-dashboard .chip-kpi,
@@ -730,9 +696,6 @@
       </button>
     </div>
 
-    <details class="db-legacy-section" open>
-      <summary data-i18n="gui_db_detail_metrics"></summary>
-
     <!-- Traffic Analyzer Panel -->
     <div id="q-panel-traffic" class="q-panel active">
 
@@ -934,7 +897,6 @@
       </fieldset>
     </div>
 
-    </details><!-- /.db-legacy-section -->
 
     <!-- Legacy Dashboards -->
     <div id="q-panel-legacy" class="q-panel">
@@ -2946,15 +2908,6 @@
   <script defer src="/static/js/quarantine.js"></script>
   <script defer src="/static/js/rule-scheduler.js"></script>
   <script defer src="/static/js/module-log.js"></script>
-  <script nonce="{{ csp_nonce() }}">
-    /* F1: auto-open db-legacy-section <details> when a dashboard sub-nav btn is clicked */
-    document.addEventListener('click', function(e) {
-      const btn = e.target.closest('#p-dashboard .sub-nav-btn');
-      if (!btn) return;
-      const details = document.querySelector('#p-dashboard .db-legacy-section');
-      if (details && !details.open) details.open = true;
-    }, true);
-  </script>
   </main>
 </body>
 
