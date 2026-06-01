@@ -1345,7 +1345,7 @@
   "gui_siem_sec_hec": "HEC",
   "gui_siem_sec_tls": "TLS",
   "gui_siem_sec_transport": "Transport",
-  "gui_siem_sent": "Sent",
+  "gui_siem_sent": "Sent (7d)",
   "gui_siem_source_types": "Forwarding Content",
   "gui_siem_status": "SIEM Status",
   "gui_siem_status_disabled": "Disabled",

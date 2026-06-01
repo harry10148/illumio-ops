@@ -159,17 +159,25 @@ def dispatch_status():
         from src.pce_cache.models import DeadLetter, SiemDispatch
         sf = _get_sf()
         result = []
+        import datetime as _dt
+        _7d_ago = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=7)
         with sf() as s:
             dests = s.execute(select(SiemDispatch.destination).distinct()).scalars().all()
             for dest in dests:
                 counts = {}
-                for st in ["pending", "sent", "failed"]:
+                for st in ["pending", "failed"]:
                     cnt = s.execute(
                         select(func.count()).select_from(SiemDispatch)
                         .where(SiemDispatch.destination == dest)
                         .where(SiemDispatch.status == st)
                     ).scalar() or 0
                     counts[st] = cnt
+                counts["sent"] = s.execute(
+                    select(func.count()).select_from(SiemDispatch)
+                    .where(SiemDispatch.destination == dest)
+                    .where(SiemDispatch.status == "sent")
+                    .where(SiemDispatch.sent_at >= _7d_ago)
+                ).scalar() or 0
                 dlq_cnt = s.execute(
                     select(func.count()).select_from(DeadLetter)
                     .where(DeadLetter.destination == dest)
