@@ -241,17 +241,23 @@ class ApiClient:
     # Events (stays on facade — not part of any moved domain)
     # ═══════════════════════════════════════════════════════════════════════
 
-    def _build_events_url(self, start_time_str: str, end_time_str: str | None = None, max_results: int = 5000) -> str:
-        params = {
+    def _build_events_url(self, start_time_str: str, end_time_str: str | None = None,
+                          max_results: int = 5000, event_type: str | None = None) -> str:
+        params: dict[str, Any] = {
             "timestamp[gte]": start_time_str,
             "max_results": max_results,
         }
         if end_time_str:
             params["timestamp[lte]"] = end_time_str
-        return f"{self.base_url}/events?{urllib.parse.urlencode(params)}"
+        url = f"{self.base_url}/events?{urllib.parse.urlencode(params)}"
+        if event_type:
+            url += f"&event_type[eq][]={urllib.parse.quote(event_type)}"
+        return url
 
-    def fetch_events_strict(self, start_time_str: str, end_time_str: str | None = None, max_results: int = 5000) -> list[dict[str, Any]]:
-        url = self._build_events_url(start_time_str, end_time_str=end_time_str, max_results=max_results)
+    def fetch_events_strict(self, start_time_str: str, end_time_str: str | None = None,
+                            max_results: int = 5000, event_type: str | None = None) -> list[dict[str, Any]]:
+        url = self._build_events_url(start_time_str, end_time_str=end_time_str,
+                                     max_results=max_results, event_type=event_type)
         status, body = self._request(url, timeout=30)
         if status != 200:
             err_msg = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)

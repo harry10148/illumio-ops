@@ -54,7 +54,12 @@ def make_events_blueprint(
         since_utc = now_utc - datetime.timedelta(minutes=mins)
         query_since = format_utc(since_utc)
         query_until = format_utc(now_utc)
-        fetch_limit = min(max((offset + limit) * 4, 100), 5000)
+        # When filters are active the PCE can't filter by category/group, so we
+        # must fetch the full window and filter locally. Use max (5000) to avoid
+        # silently missing matching events that fall outside a smaller batch.
+        any_filter = bool(category_filter or type_group_filter or event_type_filter)
+        fetch_limit = 5000 if any_filter else min(max((offset + limit) * 4, 100), 5000)
+        pce_event_type = event_type_filter if event_type_filter else None
 
         api_client = ApiClient(cm)
         try:
@@ -62,6 +67,7 @@ def make_events_blueprint(
                 start_time_str=query_since,
                 end_time_str=query_until,
                 max_results=fetch_limit,
+                event_type=pce_event_type,
             )
         except EventFetchError as exc:
             logger.error("Event viewer fetch failed: {} - {}", exc.status, exc.message)
