@@ -2392,6 +2392,8 @@
   "rpt_pd_chart_title": "Policy Decision Breakdown",
   "rpt_pd_potential": "Potentially Blocked",
   "rpt_pd_unknown": "Unknown",
+  "rpt_pdf_saved": "PDF report saved: {path}",
+  "rpt_pdf_static_note": "Static PDF summary. Use HTML or XLSX for full localized detail.",
   "rpt_period": "Period:",
   "rpt_pill_attention": "Attention",
   "rpt_pill_findings": "Findings",

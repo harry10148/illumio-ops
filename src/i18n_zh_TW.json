@@ -2392,6 +2392,8 @@
   "rpt_pd_chart_title": "Policy 決策分布",
   "rpt_pd_potential": "Potentially Blocked",
   "rpt_pd_unknown": "未知",
+  "rpt_pdf_saved": "PDF 報表已儲存：{path}",
+  "rpt_pdf_static_note": "此 PDF 為靜態摘要，完整多語系報表請使用 HTML 或 XLSX 格式。",
   "rpt_period": "期間：",
   "rpt_pill_attention": "重點關注",
   "rpt_pill_findings": "發現數",

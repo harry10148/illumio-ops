@@ -490,6 +490,7 @@ MODERN_SHELL_CSS = """\
 }
 """
 
+
 EXEC_SUMMARY_CSS = """
 .exec-summary {
   border: 1px solid var(--border);
