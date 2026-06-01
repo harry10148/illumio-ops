@@ -74,7 +74,7 @@ async function loadRules() {
     let statusHtml = '';
     if (r.cooldown_remaining > 0) {
       const rem = remTempl.replace('{mins}', r.cooldown_remaining);
-      statusHtml = `<span style="background:var(--warn);color:#1a2c32;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">⏳ ${cdTitle} (${rem})</span>`;
+      statusHtml = `<span style="background:var(--warn);color:#1a2c32;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;display:inline-block;line-height:1.4;">⏳ ${cdTitle}<br><span style="font-weight:400;font-size:0.7rem;">(${rem})</span></span>`;
     } else {
       statusHtml = `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">✅ ${readyTitle}</span>`;
     }
