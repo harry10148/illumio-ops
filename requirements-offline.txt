@@ -39,7 +39,7 @@ flask-limiter>=3.5,<5.0
 flask-talisman>=1.1,<2.0
 flask-login>=0.6,<0.7
 argon2-cffi>=23.1,<25.0
-cryptography>=42.0,<46.0     # Phase 2: ECDSA cert generation (TLS)
+cryptography>=46.0.7,<48.0   # Phase 2: ECDSA cert (TLS); >= 46.0.7 fixes PYSEC-2026-36/35 + CVE-2026-26007
 
 # ── Phase 5: Reports (Excel + interactive charts) ────────────────────────────
 openpyxl>=3.1,<4.0

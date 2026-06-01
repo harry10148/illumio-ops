@@ -49,57 +49,6 @@ function _pickValue(row, keys, fallback = '') {
   return fallback;
 }
 
-function _buildAuditSummaryFieldset() {
-  const fieldset = document.createElement('fieldset');
-  fieldset.id = 'audit-fieldset';
-  fieldset.style.marginBottom = '18px';
-  fieldset.innerHTML = `
-    <legend style="font-size:1.05rem;" data-i18n="gui_dashboard_audit_summary">Latest Audit Report Summary</legend>
-    <div id="audit-placeholder" style="text-align:center;padding:24px;color:var(--dim);font-size:0.9rem;" data-i18n="gui_dashboard_no_audit_summary">
-      No audit report summary found. Generate an Audit Report to populate this section.
-    </div>
-    <div id="audit-content" style="display:none;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-        <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_generated">Generated:</span> <span id="audit-generated-at">-</span></span>
-        <span style="color:var(--dim);font-size:0.82rem;"><span data-i18n="gui_snap_date_range">Date Range:</span> <span id="audit-date-range">-</span></span>
-      </div>
-      <div id="audit-kpi-grid" class="kpi-grid"></div>
-      <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:14px;">
-        <div>
-          <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_dashboard_audit_attention">Attention Required</div>
-          <table class="rule-table" style="font-size:0.8rem;">
-            <thead>
-              <tr>
-                <th style="width:90px" data-i18n="gui_snap_col_severity">Severity</th>
-                <th data-i18n="gui_event_type">Event Type</th>
-                <th data-i18n="gui_summary">Summary</th>
-              </tr>
-            </thead>
-            <tbody id="audit-attention-body">
-              <tr><td colspan="3" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_no_data">No data</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div>
-          <div style="font-weight:700;font-size:0.9rem;margin-bottom:6px;color:var(--accent2);" data-i18n="gui_dashboard_audit_top_events">Top Event Types</div>
-          <table class="rule-table" style="font-size:0.8rem;">
-            <thead>
-              <tr>
-                <th data-i18n="gui_event_type">Event Type</th>
-                <th data-i18n="gui_count">Count</th>
-              </tr>
-            </thead>
-            <tbody id="audit-top-events-body">
-              <tr><td colspan="2" style="text-align:center;color:var(--dim);padding:12px;" data-i18n="gui_no_data">No data</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
-  return fieldset;
-}
-
 function ensureTrafficWorkloadLayout() {
   const panel = $('p-traffic-workload');
   const dashboard = $('p-dashboard');
@@ -110,11 +59,7 @@ function ensureTrafficWorkloadLayout() {
   const workloadPanel = $('q-panel-workloads');
   const legacyButton = $('qbtn-legacy');
   const legacyPanel = $('q-panel-legacy');
-  const snapshotFieldset = $('snap-fieldset');
 
-  if (snapshotFieldset && legacyPanel && snapshotFieldset.parentElement === legacyPanel) {
-    legacyPanel.before(snapshotFieldset);
-  }
   if (subNav) panel.appendChild(subNav);
   if (trafficPanel) panel.appendChild(trafficPanel);
   if (workloadPanel) panel.appendChild(workloadPanel);
@@ -127,30 +72,6 @@ function ensureTrafficWorkloadLayout() {
 function ensureDashboardLayout() {
   const dashboard = $('p-dashboard');
   if (!dashboard || dashboard.dataset.layoutReady === '1') return;
-
-  // Phase 3.1 story-card redesign moved all card labels + IDs into index.html
-  // as authoritative server-rendered markup. Do NOT mutate `.cards .card`
-  // label/id pairs at runtime — that was the legacy v1 behaviour and broke
-  // story-cards by re-assigning `d-cooldown` / `d-pce-health` to the wrong
-  // stats. The remaining responsibility here is just injecting the audit
-  // summary fieldset (a sibling container that's not in the template).
-
-  const cdField = $('cd-field');
-  if (cdField) cdField.style.display = 'none';
-
-  // Mark cooldown / pce-health value elements as ok (green) by default
-  const _cdv = document.querySelector('#d-cooldown'); if (_cdv) _cdv.querySelector('.value') && _cdv.querySelector('.value').classList.add('ok');
-  const _phv = document.querySelector('#d-pce-health'); if (_phv) _phv.querySelector('.value') && _phv.querySelector('.value').classList.add('ok');
-
-  if (!$('audit-fieldset')) {
-    const snapFieldset = $('snap-fieldset');
-    const auditFieldset = _buildAuditSummaryFieldset();
-    if (snapFieldset) {
-      snapFieldset.insertAdjacentElement('afterend', auditFieldset);
-    } else {
-      dashboard.appendChild(auditFieldset);
-    }
-  }
 
   dashboard.dataset.layoutReady = '1';
 }
