@@ -536,9 +536,9 @@ def main():
     )
     parser.add_argument(
         "--format",
-        choices=["html", "csv", "xlsx", "all"],
+        choices=["html", "csv", "pdf", "xlsx", "all"],
         default="html",
-        help="Report output format: html (default), csv, xlsx, or all",
+        help="Report output format: html (default), csv, pdf, xlsx, or all",
     )
 
     parser.add_argument(

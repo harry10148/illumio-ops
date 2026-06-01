@@ -1,20 +1,4 @@
-# Illumio PCE Ops
-
-<!-- BEGIN:doc-map -->
-| Document | EN | 中文 |
-|---|---|---|
-| README | [README.md](README.md) | [README_zh.md](README_zh.md) |
-| Installation | [Installation.md](docs/Installation.md) | [Installation_zh.md](docs/Installation_zh.md) |
-| User Manual | [User_Manual.md](docs/User_Manual.md) | [User_Manual_zh.md](docs/User_Manual_zh.md) |
-| Report Modules | [Report_Modules.md](docs/Report_Modules.md) | [Report_Modules_zh.md](docs/Report_Modules_zh.md) |
-| Security Rules | [Security_Rules_Reference.md](docs/Security_Rules_Reference.md) | [Security_Rules_Reference_zh.md](docs/Security_Rules_Reference_zh.md) |
-| SIEM Integration | [SIEM_Integration.md](docs/SIEM_Integration.md) | [SIEM_Integration_zh.md](docs/SIEM_Integration_zh.md) |
-| Architecture | [Architecture.md](docs/Architecture.md) | [Architecture_zh.md](docs/Architecture_zh.md) |
-| PCE Cache | [PCE_Cache.md](docs/PCE_Cache.md) | [PCE_Cache_zh.md](docs/PCE_Cache_zh.md) |
-| API Cookbook | [API_Cookbook.md](docs/API_Cookbook.md) | [API_Cookbook_zh.md](docs/API_Cookbook_zh.md) |
-| Glossary | [Glossary.md](docs/Glossary.md) | [Glossary_zh.md](docs/Glossary_zh.md) |
-| Troubleshooting | [Troubleshooting.md](docs/Troubleshooting.md) | [Troubleshooting_zh.md](docs/Troubleshooting_zh.md) |
-<!-- END:doc-map -->
+# illumio-ops
 
 ![Version](https://img.shields.io/badge/Version-v4.0.0--secure--modern--saas-blue?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.10%2B-yellow?style=flat-square&logo=python&logoColor=white)
@@ -22,118 +6,44 @@
 
 > **[English](README.md)** | **[繁體中文](README_zh.md)**
 
-An advanced **agentless** monitoring and automation tool for **Illumio Core (PCE)** via REST API.
+**illumio-ops** is an agentless monitoring and automation companion for **Illumio Core (PCE)**, communicating exclusively via the PCE REST API. It fills the operational gaps left by the PCE Web Console: scheduled traffic/audit/VEN-status reports, multi-channel alerting (Email, LINE, Webhook), SIEM forwarding, safe rule scheduling, workload quarantine, and multi-PCE management — all without deploying agents or touching workloads.
 
 ---
 
-## What is this for?
+## Quick Start
 
-Illumio PCE manages workload microsegmentation policy and captures traffic telemetry, but day-to-day ops needs sit outside its built-in UI: scheduled reports, multi-channel alerting, SIEM forwarding, rule scheduling, and switching between PCE environments. **illumio-ops** fills those gaps as an agentless companion that talks to PCE only via REST API.
+```bash
+git clone <repo-url>
+cd illumio-ops
+cp config/config.json.example config/config.json   # edit api.url / api.key / api.secret
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
 
-You'll likely want this if any of these match your situation:
+# Persistent daemon + Web GUI at https://127.0.0.1:5001
+python illumio-ops.py --monitor-gui --interval 5 --port 5001
+```
 
-- You operate one or more PCE deployments and want **scheduled traffic / audit / VEN-status / policy-usage reports** delivered by email.
-- You need **continuous monitoring** of PCE audit events and traffic anomalies with alerts via Email, LINE, or Webhook (Slack/Teams).
-- You want to **forward PCE events / flows to a SIEM** (Splunk HEC, Splunk syslog, ELK, Sentinel) without standing up a separate forwarder.
-- You manage **multiple PCEs** and want a single tool to switch between them.
-- You want a **safe rule scheduler** that auto-enables/disables PCE rules with three-layer Draft protection.
+First login: `illumio` / `illumio` (forced password change on first use).
 
-If you only need the PCE web console for occasional manual queries, you don't need this tool.
+For air-gapped installs, systemd/NSSM service setup, and Windows deployment, see **[docs/getting-started.md](docs/getting-started.md)**.
+
+---
+
+## Documentation
+
+All documentation lives in [docs/](docs/). Start at [INDEX.md](docs/INDEX.md).
+
+Chinese (繁體中文): [INDEX_zh.md](docs/INDEX_zh.md).
 
 ---
 
 ## Highlights
 
-| Feature | Description |
-|:---|:---|
-| **Execution Modes** | Background daemon (`--monitor`), interactive CLI, standalone Web GUI (`--gui`), or **Persistent Monitor + UI** (`--monitor-gui`) |
-| **Enterprise Security** | Argon2id passwords with first-login force-change, HTTPS by default (ECDSA P-256 self-signed), CSRF synchronizer tokens, login rate limiting, IP allowlisting (CIDR/Subnet) |
-| **Security Event Monitoring** | Tracks PCE audit events with anchor-based timestamps — guaranteed zero duplicate alerts |
-| **High-Performance Traffic Engine** | Aggregates rules into a single bulk API query; O(1) memory streaming for large datasets |
-| **Advanced Report Engine** | 15-module traffic reports with **Bulk-Delete** management; 4-module audit reports, policy usage reports, and VEN Status inventory reports — HTML, CSV, PDF, XLSX, or all formats |
-| **Security Findings** | 24 automated rules: B-series (B001–B009: Ransomware, Coverage) + L-series (L001–L010: Lateral Movement, Exfiltration) + R-series (R01–R05: Draft Policy alignment) |
-| **Report Schedules** | Cron-style recurring reports (daily/weekly/monthly) with automatic email delivery |
-| **Rule Scheduler** | Auto enable/disable PCE rules; **three-layer Draft protection** prevents accidental provisioning |
-| **Workload Quarantine** | Isolate compromised workloads with Quarantine labels; supports IP/CIDR/subnet search |
-| **Multi-Channel Alerts** | Email (SMTP), LINE Notifications, and Webhooks dispatched simultaneously |
-| **Internationalization** | Full English + Traditional Chinese (繁體中文) across CLI, Web GUI, reports, and alerts |
-
-> [!NOTE]
-> **SIEM Forwarder** — built-in CEF / JSON / RFC5424 syslog / Splunk HEC forwarding over UDP / TCP / TLS / HTTPS, with per-destination DLQ and exponential backoff. New cache rows are enqueued inline at ingest time. See **[SIEM Integration](docs/SIEM_Integration.md)**.
-
----
-
-## Quick Start (development from source)
-
-> Production deployments use the self-contained offline bundle (no system Python, no network on target). See **[Installation](docs/Installation.md#12-installation)** for the bundle workflow on Linux and Windows.
-
-### Prerequisites
-
-- **PCE admin access** to mint an API Key — in the PCE Web Console, top-right user menu → **My API Keys** → **Add**. Save the resulting `auth_username` (treat as `api.key`) and `secret`.
-- **Network reachability** from this host to PCE on HTTPS (typically port 8443).
-- **Python 3.10+** with `venv`. On Ubuntu 22.04+ / Debian 12+ a venv is required (PEP 668).
-- For lab PCEs using a **self-signed TLS certificate**, set `api.verify_ssl: false` in `config.json` after copying the example — otherwise the first connection fails with an SSL verification error.
-
-### Run
-
-```bash
-git clone <repo-url>
-cd illumio-ops
-cp config/config.json.example config/config.json    # Then edit api.url / api.key / api.secret with the values from "My API Keys"
-python -m venv venv && source venv/bin/activate     # Required on Ubuntu 22.04+ / Debian 12+ (PEP 668)
-pip install -r requirements.txt
-
-# Most common: persistent daemon + Web GUI on https://127.0.0.1:5001
-python illumio-ops.py --monitor-gui --interval 5 --port 5001
-```
-
-### Verify it worked
-
-On first run you should see, in order:
-
-1. A `DEFAULT ADMIN LOGIN` banner on stderr printing `username: illumio` / `password: illumio` (the well-known default — the first login forces a change).
-2. `TLS: Using self-signed certificate (NNN days remaining)`.
-3. `Open in browser: https://127.0.0.1:5001` and (in non-daemon mode) the browser auto-opens.
-
-In the browser: dismiss the self-signed-cert warning, log in as `illumio` / `illumio`, set a new password, then check the Dashboard — the **PCE Status** widget should report "connected". If it shows "auth failed", re-check `api.key` / `api.secret`.
-
-For air-gapped deployments, systemd / NSSM service registration, and the full dependency list, see **[Installation](docs/Installation.md)**. For all execution modes (`--gui` / `--monitor` / interactive CLI), the full subcommand reference, and the operational walkthrough, see **[User Manual §1](docs/User_Manual.md)**.
-
-### First Login (security)
-
-The default credentials `illumio` / `illumio` are seeded automatically on first startup; the GUI gates the session with `must_change_password=true` until the password is changed (see `src/config.py:200`). The plaintext default is also stored at `web_gui._initial_password` in `config.json` — it is wiped on the first successful password change. Full flow: **[User Manual §3](docs/User_Manual.md#3-web-gui-security)**.
-
-### Logging
-
-Plain text rotates at `logs/illumio_ops.log` (10 MB × 10). For SIEM ingest, enable the JSON sink in `config.json` → `logging.json_sink: true` to additionally write `logs/illumio_ops.json.log`. See **[Troubleshooting §7](docs/Troubleshooting.md)** for log diagnostics.
-
----
-
-## Documentation — by role
-
-**Setting up for the first time**
-- [Installation](docs/Installation.md) — RHEL/Ubuntu/Windows install, offline bundle, systemd/NSSM
-- [User Manual §1](docs/User_Manual.md) — execution modes, CLI subcommands
-
-**Day-to-day operations**
-- [User Manual](docs/User_Manual.md) — alerts, quarantine, multi-PCE, settings reference
-- [Report Modules](docs/Report_Modules.md) — what each report section means
-- [Troubleshooting](docs/Troubleshooting.md) — common errors and fixes
-
-**Security analysis**
-- [Security Rules Reference](docs/Security_Rules_Reference.md) — B/L/R rule catalogues, severity model
-- [Report Modules](docs/Report_Modules.md) — module-level findings
-
-**Integrations**
-- [SIEM Integration](docs/SIEM_Integration.md) — CEF/JSON/HEC formats, receiver examples
-- [API Cookbook](docs/API_Cookbook.md) — PCE REST API patterns; tool's HTTP API
-
-**Storage / advanced**
-- [PCE Cache](docs/PCE_Cache.md) — local SQLite cache; backfill; retention
-
-**Background**
-- [Architecture](docs/Architecture.md) — Illumio platform primer + this tool's internals
-- [Glossary](docs/Glossary.md) — Illumio + tool-specific terms
+- **Four execution modes** — background daemon, interactive CLI, standalone Web GUI, or combined monitor + GUI (`--monitor-gui`)
+- **24 automated security rules** — B-series (ransomware/coverage), L-series (lateral movement/exfiltration), R-series (Draft policy alignment)
+- **15-module traffic reports** + audit, policy usage, and VEN status reports; HTML / CSV / PDF / XLSX output
+- **SIEM forwarder** — CEF, JSON, RFC5424 syslog, Splunk HEC over UDP/TCP/TLS/HTTPS with per-destination DLQ
+- **Full i18n** — English and Traditional Chinese (繁體中文) across CLI, Web GUI, reports, and alerts
 
 ---
 
