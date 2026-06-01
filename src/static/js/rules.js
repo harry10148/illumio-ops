@@ -78,10 +78,6 @@ async function loadRules() {
     } else {
       statusHtml = `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">✅ ${readyTitle}</span>`;
     }
-    if (suppressedCount > 0) {
-      const detail = nextAllowedAt ? ` until ${nextAllowedAt}` : '';
-      statusHtml += `<div style="margin-top:4px;color:var(--dim);font-size:0.75rem;">Suppressed ${suppressedCount}${escapeHtml(detail)}</div>`;
-    }
 
     let f = [];
     if (r.type === 'event') f.push('Event: ' + r.filter_value);
