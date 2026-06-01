@@ -34,7 +34,7 @@ if [ "$ARCH" = "x86_64" ]; then pass "Architecture: $ARCH"
 else fail "Architecture: $ARCH — bundle requires x86_64"; fi
 
 # 2. glibc >= 2.17 (required by manylinux_2_17 wheels)
-GLIBC_VER=$(ldd --version 2>&1 | head -1 | grep -oP '\d+\.\d+' | head -1 || echo "0.0")
+GLIBC_VER=$({ ldd --version 2>&1 || true; } | head -1 | grep -oP '\d+\.\d+' | head -1 || echo "0.0")
 GLIBC_MAJOR=$(echo "$GLIBC_VER" | cut -d. -f1)
 GLIBC_MINOR=$(echo "$GLIBC_VER" | cut -d. -f2)
 if [ "$GLIBC_MAJOR" -gt 2 ] || { [ "$GLIBC_MAJOR" -eq 2 ] && [ "$GLIBC_MINOR" -ge 17 ]; }; then

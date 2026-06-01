@@ -126,6 +126,9 @@ IS_UPGRADE=false
 
 echo "==> Installing to $INSTALL_ROOT (upgrade=$IS_UPGRADE)"
 mkdir -p "$INSTALL_ROOT"
+# Ensure all runtime dirs exist — ProtectSystem=strict requires them before service startup
+mkdir -p "$INSTALL_ROOT/logs" "$INSTALL_ROOT/data" "$INSTALL_ROOT/reports" \
+         "$INSTALL_ROOT/config" "$INSTALL_ROOT/config/tls"
 
 rsync -a "$SRC/python/" "$INSTALL_ROOT/python/"
 
@@ -143,6 +146,26 @@ fi
 "$INSTALL_ROOT/python/bin/python3" -m pip install \
     --no-index --find-links "$SRC/wheels" \
     -r "$INSTALL_ROOT/requirements-offline.txt" --quiet
+
+# Migrate deprecated config fields on upgrade
+if [ "$IS_UPGRADE" = true ] && [ -f "$INSTALL_ROOT/config/config.json" ]; then
+    "$INSTALL_ROOT/python/bin/python3" -c "
+import json, sys
+p = sys.argv[1]
+try:
+    with open(p) as f: cfg = json.load(f)
+    changed = []
+    tls = cfg.get('web_gui', {}).get('tls', {})
+    if 'http_redirect_port' in tls:
+        del tls['http_redirect_port']
+        changed.append('web_gui.tls.http_redirect_port')
+    if changed:
+        with open(p, 'w') as f: json.dump(cfg, f, indent=2)
+        print('    Config migration: removed deprecated field(s):', ', '.join(changed))
+except Exception as e:
+    print('    Config migration warning:', e, file=sys.stderr)
+" "$INSTALL_ROOT/config/config.json" || true
+fi
 
 if ! id illumio-ops &>/dev/null; then
     useradd --system --no-create-home --shell /sbin/nologin illumio-ops
