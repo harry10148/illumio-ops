@@ -783,6 +783,12 @@ async function loadTrafficTrend() {
   try {
     const r = await get('/api/traffic/trend');
     renderTrafficTrend((r && r.buckets) ? r.buckets : []);
+    const syncEl = document.getElementById('tw-trend-last-sync');
+    if (syncEl) {
+      syncEl.textContent = r && r.last_sync
+        ? '↻ ' + new Date(r.last_sync).toLocaleString()
+        : '';
+    }
   } catch (_) {
     renderTrafficTrend([]);
   } finally {

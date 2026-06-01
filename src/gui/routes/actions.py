@@ -402,7 +402,7 @@ def make_actions_blueprint(
             import datetime
             from sqlalchemy import create_engine, func, select as sa_select
             from sqlalchemy.orm import sessionmaker
-            from src.pce_cache.models import PceTrafficFlowAgg
+            from src.pce_cache.models import PceTrafficFlowAgg, IngestionWatermark
             from src.pce_cache.schema import init_schema
 
             cfg = cm.models.pce_cache
@@ -430,6 +430,11 @@ def make_actions_blueprint(
                     .group_by(func.date(PceTrafficFlowAgg.bucket_day), PceTrafficFlowAgg.action)
                     .order_by(func.date(PceTrafficFlowAgg.bucket_day))
                 ).all()
+                wm = session.execute(
+                    sa_select(IngestionWatermark.last_sync_at)
+                    .where(IngestionWatermark.source == "traffic_agg")
+                ).scalar_one_or_none()
+                last_sync = wm.isoformat() if wm else None
 
             # PCE policy_decision → chart series. Unknown actions roll into "blocked"
             # so no traffic silently vanishes from the totals.
@@ -446,7 +451,7 @@ def make_actions_blueprint(
                 b = by_day[day]
                 b["flows"] = b["allowed"] + b["potential"] + b["blocked"]
                 buckets.append(b)
-            return jsonify({"ok": True, "buckets": buckets})
+            return jsonify({"ok": True, "buckets": buckets, "last_sync": last_sync})
         except Exception as e:
             return _err_with_log("traffic_trend", e)
 
