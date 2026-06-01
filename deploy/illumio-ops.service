@@ -36,7 +36,9 @@ RestrictNamespaces=true
 RestrictRealtime=true
 RestrictSUIDSGID=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
+# MemoryDenyWriteExecute intentionally omitted: CPython 3.12 memory allocator
+# uses mprotect(PROT_WRITE|PROT_EXEC) during thread init on RHEL/Rocky 9,
+# causing "can't start new thread" failures under this restriction.
 SystemCallFilter=@system-service
 SystemCallErrorNumber=EPERM
 CapabilityBoundingSet=
