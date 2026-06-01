@@ -40,6 +40,7 @@ function rsLoadTab() {
   rsSearchRulesets('');
   rsInitResizer();
   rsRenderTimeline();
+  rsRenderKpi();
 }
 
 /* ── Split-pane resizer ── */
@@ -692,10 +693,11 @@ async function rsRenderTimeline() {
       const ts = new Date(entry.timestamp).getTime();
       if (isNaN(ts) || ts < cutoff) return;
       dataAvailable = true;
+      const actionCount = (entry.logs || []).filter(l => l.includes('[ACTION]')).length;
+      if (actionCount === 0) return;
       const hour = new Date(ts).getHours();
-      counts[hour]++;
-      total++;
-      // Detect errors: if any log line contains "error" or "fail" (case-insensitive)
+      counts[hour] += actionCount;
+      total += actionCount;
       const hasErr = (entry.logs || []).some(l => /error|fail/i.test(l));
       if (hasErr) errors[hour]++;
     });
@@ -724,7 +726,7 @@ async function rsRenderTimeline() {
     }
     const label = String(h).padStart(2, '0') + ':00';
     const tip = dataAvailable
-      ? (c > 0 ? `${label}  ${c} trigger${c !== 1 ? 's' : ''}${hasErr ? ' (with errors)' : ''}` : `${label}  no triggers`)
+      ? (c > 0 ? `${label}  ${c} ${_t('gui_rs_tl_action_unit')}${hasErr ? ' (err)' : ''}` : `${label}  ${_t('gui_rs_tl_no_toggles')}`)
       : `${label}  loading`;
     const div = document.createElement('div');
     div.className = 'rs-tl-bucket' + (cls ? ' ' + cls : '');
@@ -734,7 +736,95 @@ async function rsRenderTimeline() {
 
   if (meta) {
     meta.textContent = dataAvailable
-      ? `${total} trigger${total !== 1 ? 's' : ''} total`
+      ? `${total} ${_t('gui_rs_tl_action_unit')}`
       : 'Loading...';
   }
+}
+
+/* ── B2: KPI summary cards ── */
+async function rsRenderKpi() {
+  try {
+    const [logsRes, statusRes] = await Promise.all([
+      fetch('/api/rule_scheduler/logs'),
+      fetch('/api/rule_scheduler/status'),
+    ]);
+    const logsData = await logsRes.json();
+    const statusData = await statusRes.json();
+    const history = logsData.history || [];
+    const intervalSec = statusData.check_interval_seconds || 300;
+
+    // Total schedules
+    const totalEl = $('rs-kpi-total');
+    const totalSub = $('rs-kpi-total-sub');
+    const count = statusData.schedule_count ?? 0;
+    if (totalEl) totalEl.textContent = count;
+    if (totalSub) {
+      totalSub.textContent = count > 0 ? _t('gui_rs_kpi_enabled') : _t('gui_rs_kpi_none_today');
+      totalSub.className = 'rs-kpi-sub' + (count > 0 ? ' ok' : '');
+    }
+
+    // Derive today stats from history
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+    const todayStartMs = todayStart.getTime();
+    let todayRuns = 0, todayHits = 0, todayErrors = 0, lastRunTs = null;
+
+    history.forEach(entry => {
+      if (!entry.timestamp) return;
+      const ts = new Date(entry.timestamp).getTime();
+      if (isNaN(ts) || ts < todayStartMs) return;
+      todayRuns++;
+      todayHits += (entry.logs || []).filter(l => l.includes('[ACTION]')).length;
+      if ((entry.logs || []).some(l => /\[FAILED\]|\[ERROR\]/.test(l))) todayErrors++;
+      if (lastRunTs === null || ts > lastRunTs) lastRunTs = ts;
+    });
+
+    // Today KPI
+    const todayEl = $('rs-kpi-today');
+    const todaySub = $('rs-kpi-today-sub');
+    if (todayEl) todayEl.textContent = todayRuns;
+    if (todaySub) {
+      if (lastRunTs) {
+        const d = new Date(lastRunTs);
+        const hhmm = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+        todaySub.textContent = _t('gui_rs_kpi_last') + ' ' + hhmm;
+      } else {
+        todaySub.textContent = _t('gui_rs_kpi_none_today');
+        todaySub.className = 'rs-kpi-sub';
+      }
+    }
+
+    // Hits KPI
+    const hitsEl = $('rs-kpi-hits');
+    const hitsSub = $('rs-kpi-hits-sub');
+    if (hitsEl) hitsEl.textContent = todayHits;
+    if (hitsSub) {
+      if (todayErrors > 0) {
+        hitsSub.textContent = todayErrors + ' errors';
+        hitsSub.className = 'rs-kpi-sub warn';
+      } else if (todayHits > 0) {
+        hitsSub.textContent = 'ok';
+        hitsSub.className = 'rs-kpi-sub ok';
+      } else {
+        hitsSub.textContent = _t('gui_rs_kpi_none_today');
+        hitsSub.className = 'rs-kpi-sub';
+      }
+    }
+
+    // Next trigger KPI (estimated from last run + interval)
+    const nextEl = $('rs-kpi-next');
+    const nextSub = $('rs-kpi-next-sub');
+    if (lastRunTs) {
+      const nextMs = lastRunTs + intervalSec * 1000;
+      const nowMs = Date.now();
+      if (nextMs > nowMs) {
+        const nd = new Date(nextMs);
+        if (nextEl) nextEl.textContent = String(nd.getHours()).padStart(2,'0') + ':' + String(nd.getMinutes()).padStart(2,'0');
+        const diffMin = Math.ceil((nextMs - nowMs) / 60000);
+        if (nextSub) nextSub.textContent = 'in ' + diffMin + 'm';
+      } else {
+        if (nextEl) nextEl.textContent = _t('gui_rs_kpi_soon');
+        if (nextSub) nextSub.textContent = '—';
+      }
+    }
+  } catch (_) {}
 }
