@@ -1046,7 +1046,7 @@
       <div class="toolbar" style="align-items:flex-end; flex-wrap:wrap;">
         <div class="form-group" style="margin-bottom:0;">
           <label data-i18n="gui_window">Window</label>
-          <select id="ev-mins" style="width:120px;">
+          <select id="ev-mins" data-on-change="loadEventViewer" data-args='[true]' style="width:120px;">
             <option value="15" data-i18n="gui_ev_window_15m">Last 15m</option>
             <option value="60" selected data-i18n="gui_ev_window_1h">Last 1h</option>
             <option value="360" data-i18n="gui_ev_window_6h">Last 6h</option>
@@ -1058,7 +1058,7 @@
         </div>
         <div class="form-group" style="margin-bottom:0;">
           <label data-i18n="gui_rows">Rows</label>
-          <select id="ev-limit" style="width:100px;">
+          <select id="ev-limit" data-on-change="loadEventViewer" data-args='[true]' style="width:100px;">
             <option value="25">25</option>
             <option value="50" selected>50</option>
             <option value="100">100</option>
