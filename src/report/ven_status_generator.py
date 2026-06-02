@@ -112,6 +112,12 @@ class VenStatusGenerator:
         print(t("rpt_ven_found", count=f"{len(workloads):,}", lang=self._lang))
         df = self._build_dataframe(workloads)
         results = self._analyze(df)
+
+        from src.report.analysis import estate_inventory
+        results["os_distribution"] = estate_inventory.os_distribution(workloads)
+        results["enforcement_distribution"] = estate_inventory.enforcement_distribution(workloads)
+        results["enforcement_by_network"] = estate_inventory.enforcement_by_network(workloads)
+
         print(t("rpt_ven_analysis_done", lang=self._lang))
 
         result = VenStatusResult(

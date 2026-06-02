@@ -171,6 +171,7 @@ class VenHtmlExporter:
             + (self._section("lost-yest", "rpt_ven_sec_lost_yest_title", yest_count, _df_to_html(df_yest), "rpt_ven_sec_lost_yest_intro", "warn", "ven_lost_heartbeat_48h")
                + "\n"
                if visible_in('ven_lost_heartbeat_48h', profile, detail_level) else '')
+            + self._estate_inventory_section()
             + f'<footer>{_s("rpt_ven_footer")} &middot; '
             + today_str
             + "</footer>"
@@ -221,6 +222,98 @@ class VenHtmlExporter:
             )
         html += "</div>"
         return html
+
+    def _estate_inventory_section(self) -> str:
+        """Render the Estate Inventory & Posture section from module_results."""
+        os_dist = self._r.get("os_distribution")
+        enf_dist = self._r.get("enforcement_distribution")
+        enf_net = self._r.get("enforcement_by_network")
+        # Guard: older snapshots may not have these keys
+        if not any([os_dist, enf_dist, enf_net]):
+            return ""
+
+        _s = self._s
+        parts = [
+            f'<section id="estate-inventory" class="card">'
+            f'<h2>{t("rpt_ei_section", lang=self._lang)}</h2>'
+        ]
+
+        # -- OS Distribution sub-block --
+        if os_dist:
+            by_family = os_dist.get("by_family", {})
+            total = os_dist.get("total", 0)
+            parts.append(f'<h3>{t("rpt_ei_os_dist", lang=self._lang)}</h3>')
+            if by_family:
+                rows = "".join(
+                    f"<tr><td>{html.escape(str(fam))}</td><td>{cnt}</td></tr>"
+                    for fam, cnt in sorted(by_family.items(), key=lambda kv: kv[1], reverse=True)
+                )
+                parts.append(
+                    f'<table class="data-table"><thead><tr>'
+                    f'<th>{t("rpt_ei_family", lang=self._lang)}</th>'
+                    f'<th>{t("rpt_ei_count", lang=self._lang)}</th>'
+                    f'</tr></thead><tbody>{rows}</tbody>'
+                    f'<tfoot><tr><td><strong>{t("rpt_ei_total", lang=self._lang)}</strong></td>'
+                    f'<td><strong>{total}</strong></td></tr></tfoot></table>'
+                )
+            else:
+                parts.append(f'<p>{t("rpt_no_records", lang=self._lang)}</p>')
+
+        # -- Enforcement Posture sub-block --
+        if enf_dist:
+            by_mode = enf_dist.get("by_mode", {})
+            total = enf_dist.get("total", 0)
+            parts.append(f'<h3>{t("rpt_ei_enforcement", lang=self._lang)}</h3>')
+            if by_mode:
+                rows = "".join(
+                    f"<tr><td>{html.escape(str(mode))}</td><td>{cnt}</td></tr>"
+                    for mode, cnt in by_mode.items()
+                )
+                parts.append(
+                    f'<table class="data-table"><thead><tr>'
+                    f'<th>{t("rpt_ei_mode", lang=self._lang)}</th>'
+                    f'<th>{t("rpt_ei_count", lang=self._lang)}</th>'
+                    f'</tr></thead><tbody>{rows}</tbody>'
+                    f'<tfoot><tr><td><strong>{t("rpt_ei_total", lang=self._lang)}</strong></td>'
+                    f'<td><strong>{total}</strong></td></tr></tfoot></table>'
+                )
+            else:
+                parts.append(f'<p>{t("rpt_no_records", lang=self._lang)}</p>')
+
+        # -- Enforcement by Network sub-block --
+        if enf_net:
+            parts.append(f'<h3>{t("rpt_ei_by_network", lang=self._lang)}</h3>')
+            # Collect all modes seen across networks for column headers
+            all_modes: list[str] = []
+            seen_modes: set[str] = set()
+            for entry in enf_net:
+                for m in entry.get("by_mode", {}):
+                    if m not in seen_modes:
+                        seen_modes.add(m)
+                        all_modes.append(m)
+            mode_headers = "".join(
+                f"<th>{html.escape(str(m))}</th>" for m in all_modes
+            )
+            header = (
+                f'<tr><th>{t("rpt_ei_network", lang=self._lang)}</th>'
+                f'<th>{t("rpt_ei_total", lang=self._lang)}</th>'
+                f'{mode_headers}</tr>'
+            )
+            rows_html = ""
+            for entry in enf_net:
+                net_name = html.escape(str(entry.get("network", "")))
+                total = entry.get("total", 0)
+                mode_cells = "".join(
+                    f"<td>{entry.get('by_mode', {}).get(m, 0)}</td>" for m in all_modes
+                )
+                rows_html += f"<tr><td>{net_name}</td><td>{total}</td>{mode_cells}</tr>"
+            parts.append(
+                f'<table class="data-table"><thead>{header}</thead>'
+                f'<tbody>{rows_html}</tbody></table>'
+            )
+
+        parts.append("</section>\n")
+        return "".join(parts)
 
     def _section(
         self,
