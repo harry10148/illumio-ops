@@ -49,6 +49,7 @@ def make_auth_blueprint(
             rules_count=rules_count,
             schedules_count=schedules_count,
             config_loaded_at=config_loaded_at,
+            html_lang=lang.replace("_", "-"),
             ui_translations_json=_json.dumps(
                 ui_translations, ensure_ascii=False
             ).replace("</", "<\\/"),

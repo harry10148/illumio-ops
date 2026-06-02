@@ -1458,7 +1458,7 @@ function renderOverview(d) {
   }
   // freshness
   var asOf = document.getElementById('ov-as-of');
-  if (asOf && d.as_of) asOf.textContent = new Date(d.as_of).toLocaleTimeString();
+  if (asOf && d.as_of) asOf.textContent = new Date(d.as_of).toLocaleTimeString([], { hour12: false });
   // stale indicator (>60s old)
   var freshEl = document.querySelector('.ov-fresh');
   if (freshEl && d.as_of) {
