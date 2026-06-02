@@ -173,14 +173,15 @@ def run_cache_retention(cm) -> None:
 
 
 def run_ven_summary(cm) -> None:
-    """Fetch managed workloads, compute a VEN health summary, write to state.
+    """Fetch managed workloads, compute a VEN health summary, write to dedicated store.
 
-    Independent of pce_cache. Stored in logs/state.json["ven_summary"] so the
-    dashboard overview reads it instantly without hitting the PCE per refresh.
+    Independent of pce_cache. Stored in logs/dashboard_summary.json["ven_summary"]
+    so the dashboard overview reads it instantly without hitting the PCE per refresh,
+    and the analyzer's monitor-cycle state writes never stomp it.
     On failure, last-good counts are preserved and last_error is recorded.
     """
     import datetime
-    from src.state_store import update_state_file
+    from src.dashboard_store import write_dashboard_summary
 
     _ONLINE = {"active", "online"}
     _THRESH_H = 1.0
@@ -230,18 +231,17 @@ def run_ven_summary(cm) -> None:
             "os_distribution": estate_inventory.os_distribution(workloads or []),
             "enforcement_distribution": estate_inventory.enforcement_distribution(workloads or []),
         }
-        update_state_file(_resolve_state_file(),
-                          lambda s: {**s, "ven_summary": summary})
+        write_dashboard_summary(lambda d: {**d, "ven_summary": summary})
         logger.info("VEN summary: {}/{} online", online, total)
     except Exception as exc:
         logger.exception("run_ven_summary failed: {}", exc)
-        def _mark_err(s):
-            vs = dict(s.get("ven_summary") or {})
+        def _mark_err(d):
+            vs = dict((d.get("ven_summary") or {}))
             vs["last_error"] = str(exc)[:300]
             vs["updated_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-            return {**s, "ven_summary": vs}
+            return {**d, "ven_summary": vs}
         try:
-            update_state_file(_resolve_state_file(), _mark_err)
+            write_dashboard_summary(_mark_err)
         except Exception:
             pass
 

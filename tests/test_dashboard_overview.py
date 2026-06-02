@@ -1,6 +1,7 @@
 import json, os, tempfile
 import pytest
 from src.config import ConfigManager
+import src.dashboard_store as dashboard_store
 
 
 @pytest.fixture
@@ -22,13 +23,14 @@ def client(tmp_path):
 
 
 def test_overview_ven_verdict_from_state(client, tmp_path, monkeypatch):
-    from src.gui import _helpers
-    sf = str(tmp_path / "state.json")
-    json.dump({"ven_summary": {"total": 21, "online": 19, "offline": 2,
-                               "degraded": 0, "oldest_heartbeat_age_s": 147600,
-                               "attention": [{"host": "x", "reason": "41h no heartbeat"}]}},
-              open(sf, "w"))
-    monkeypatch.setattr(_helpers, "_resolve_state_file", lambda: sf)
+    # _overview_ven now reads from dashboard store, not state.json
+    ds_path = str(tmp_path / "dashboard_summary.json")
+    monkeypatch.setattr(dashboard_store, "_dashboard_file", lambda: ds_path)
+    dashboard_store.write_dashboard_summary(lambda d: {**d, "ven_summary": {
+        "total": 21, "online": 19, "offline": 2,
+        "degraded": 0, "oldest_heartbeat_age_s": 147600,
+        "attention": [{"host": "x", "reason": "41h no heartbeat"}],
+    }})
     r = client.get("/api/dashboard/overview", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert r.status_code == 200
     ven = r.get_json()["ven"]
@@ -38,9 +40,9 @@ def test_overview_ven_verdict_from_state(client, tmp_path, monkeypatch):
 
 
 def test_overview_ven_unknown_when_missing(client, tmp_path, monkeypatch):
-    from src.gui import _helpers
-    sf = str(tmp_path / "state.json"); json.dump({}, open(sf, "w"))
-    monkeypatch.setattr(_helpers, "_resolve_state_file", lambda: sf)
+    # No dashboard store file → _overview_ven returns unknown
+    ds_path = str(tmp_path / "dashboard_summary.json")
+    monkeypatch.setattr(dashboard_store, "_dashboard_file", lambda: ds_path)
     r = client.get("/api/dashboard/overview", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert r.get_json()["ven"]["verdict"] == "unknown"
 
