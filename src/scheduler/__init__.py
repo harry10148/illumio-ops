@@ -12,6 +12,7 @@ from src.scheduler.jobs import (
     tick_report_schedules,
     tick_rule_schedules,
     run_ven_summary,
+    run_posture_summary,
 )
 from src.siem.preview import emit_preview_warning
 from src.i18n import t, get_language
@@ -99,6 +100,17 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         args=[cm],
         id="ven_summary",
         name="VEN status summary",
+        replace_existing=True,
+    )
+    posture_summary_interval = int(
+        cm.config.get("dashboard", {}).get("posture_summary_interval_seconds", 600)
+    )
+    sched.add_job(
+        run_posture_summary,
+        trigger=IntervalTrigger(seconds=posture_summary_interval),
+        args=[cm],
+        id="posture_summary",
+        name="Posture score summary",
         replace_existing=True,
     )
 
