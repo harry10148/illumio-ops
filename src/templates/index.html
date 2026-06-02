@@ -234,6 +234,8 @@
 
     <!-- ═══ R4c Dashboard storytelling styles (scoped to #p-dashboard) ═══ -->
     <style>
+      /* Constrain symbol-based SVG icons so they can't balloon without inline dimensions */
+      .icon { width: 18px; height: 18px; flex: 0 0 auto; vertical-align: middle; }
       /* Hero */
       #p-dashboard .db-hero-wrap {
         display: grid;
