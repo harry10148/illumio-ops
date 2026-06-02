@@ -1,0 +1,2011 @@
+{
+  "access_restriction.create": {
+    "category": "Policy",
+    "description": "This event is triggered when an access restriction is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "access_restriction.delete": {
+    "category": "Policy",
+    "description": "This event is triggered when an access restriction is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "access_restriction.update": {
+    "category": "Policy",
+    "description": "This event is triggered when an access restriction is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent.activate": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when an agent is paired.",
+    "severity": "info",
+    "remediation": "VEN lifecycle event. Activation/deactivation is normal during\ndeployment. Unexpected deactivation or unpair may indicate\nworkload decommissioning or administrative action. Check\nthe actor and verify against change management records.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm"
+  },
+  "agent.activate_clone": {
+    "category": "Agent Security",
+    "description": "This event is triggered when an agent clone is activated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent.clone_detected": {
+    "category": "Agent Security",
+    "description": "This event is triggered when an agent clone is detected.",
+    "severity": "critical",
+    "remediation": "CRITICAL: VEN tampering or clone detected. This may indicate\nthe workload has been compromised. Immediately:\n1. Isolate the workload from the network\n2. Check for unauthorized processes or modifications\n3. Review recent SSH/RDP access to the workload\n4. Consider re-pairing the VEN after investigation\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/ven-tampering-protection.htm"
+  },
+  "agent.deactivate": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when an agent is unpaired.",
+    "severity": "info",
+    "remediation": "VEN lifecycle event. Activation/deactivation is normal during\ndeployment. Unexpected deactivation or unpair may indicate\nworkload decommissioning or administrative action. Check\nthe actor and verify against change management records.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm"
+  },
+  "agent.generate_maintenance_token": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when an agent generates a maintenance token.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent.goodbye": {
+    "category": "Agent Health",
+    "description": "This event is triggered when an agent is disconnected.",
+    "severity": "info",
+    "remediation": "VEN lifecycle event. Activation/deactivation is normal during\ndeployment. Unexpected deactivation or unpair may indicate\nworkload decommissioning or administrative action. Check\nthe actor and verify against change management records.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm"
+  },
+  "agent.machine_identifier": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when agent machine identifiers are updated.",
+    "severity": "info",
+    "remediation": "VEN lifecycle event. Activation/deactivation is normal during\ndeployment. Unexpected deactivation or unpair may indicate\nworkload decommissioning or administrative action. Check\nthe actor and verify against change management records.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm"
+  },
+  "agent.refresh_token": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when an agent refreshes its token.",
+    "severity": "info",
+    "remediation": "VEN lifecycle event. Activation/deactivation is normal during\ndeployment. Unexpected deactivation or unpair may indicate\nworkload decommissioning or administrative action. Check\nthe actor and verify against change management records.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm"
+  },
+  "agent.request_policy": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when an agent requests a policy.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent.request_upgrade": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when a VEN upgrade is requested.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent.service_not_available": {
+    "category": "Agent Health",
+    "description": "This event is triggered when an agent reports a service is not running.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent.suspend": {
+    "category": "Agent Health",
+    "description": "This event is triggered when an agent is suspended.",
+    "severity": "info",
+    "remediation": "VEN lifecycle event. Activation/deactivation is normal during\ndeployment. Unexpected deactivation or unpair may indicate\nworkload decommissioning or administrative action. Check\nthe actor and verify against change management records.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm"
+  },
+  "agent.tampering": {
+    "category": "Agent Security",
+    "description": "This event is triggered when an agent firewall is tampered.",
+    "severity": "critical",
+    "remediation": "CRITICAL: VEN tampering or clone detected. This may indicate\nthe workload has been compromised. Immediately:\n1. Isolate the workload from the network\n2. Check for unauthorized processes or modifications\n3. Review recent SSH/RDP access to the workload\n4. Consider re-pairing the VEN after investigation\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/ven-tampering-protection.htm"
+  },
+  "agent.unsuspend": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when an agent is unsuspended.",
+    "severity": "info",
+    "remediation": "VEN lifecycle event. Activation/deactivation is normal during\ndeployment. Unexpected deactivation or unpair may indicate\nworkload decommissioning or administrative action. Check\nthe actor and verify against change management records.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm"
+  },
+  "agent.update": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when agent properties are updated.",
+    "severity": "info",
+    "remediation": "VEN lifecycle event. Activation/deactivation is normal during\ndeployment. Unexpected deactivation or unpair may indicate\nworkload decommissioning or administrative action. Check\nthe actor and verify against change management records.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm"
+  },
+  "agent.update_interactive_users": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when agent interactive users are updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent.update_iptables_href": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when an agent updates an existing iptables href.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent.update_running_containers": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when an agent updates existing containers.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent.upgrade_successful": {
+    "category": "Agent Health",
+    "description": "This event is triggered when an agent upgrade is successful.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent.upload_existing_ip_table_rules": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when agent existing IP tables are uploaded.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent.upload_support_report": {
+    "category": "Agent Operations",
+    "description": "This event is triggered when an agent support report is uploaded.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent_support_report_request.create": {
+    "category": "Inventory & Identity",
+    "description": "This event is triggered when an agent support report request is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agent_support_report_request.delete": {
+    "category": "Inventory & Identity",
+    "description": "Triggers when an agent support report request is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "agents.clear_conditions": {
+    "category": "Agent Operations",
+    "description": "Triggers when a condition is cleared from a list of VENs.",
+    "severity": "info",
+    "remediation": "VEN lifecycle event. Activation/deactivation is normal during\ndeployment. Unexpected deactivation or unpair may indicate\nworkload decommissioning or administrative action. Check\nthe actor and verify against change management records.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm"
+  },
+  "agents.unpair": {
+    "category": "Agent Operations",
+    "description": "Triggers when multiple agents are unpaired.",
+    "severity": "info",
+    "remediation": "VEN lifecycle event. Activation/deactivation is normal during\ndeployment. Unexpected deactivation or unpair may indicate\nworkload decommissioning or administrative action. Check\nthe actor and verify against change management records.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm"
+  },
+  "api_key.create": {
+    "category": "Auth & API",
+    "description": "Triggers when an API key is created.",
+    "severity": "warning",
+    "remediation": "API key lifecycle event. Verify the change was authorized.\nDeleted keys may break integrations. New keys should follow\nleast-privilege principles. Check key expiration settings.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/rest-api/authentication-and-api-keys.htm"
+  },
+  "api_key.delete": {
+    "category": "Auth & API",
+    "description": "Triggers when an API key is deleted.",
+    "severity": "warning",
+    "remediation": "API key lifecycle event. Verify the change was authorized.\nDeleted keys may break integrations. New keys should follow\nleast-privilege principles. Check key expiration settings.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/rest-api/authentication-and-api-keys.htm"
+  },
+  "api_key.update": {
+    "category": "Auth & API",
+    "description": "Triggers when an API key is updated.",
+    "severity": "warning",
+    "remediation": "API key lifecycle event. Verify the change was authorized.\nDeleted keys may break integrations. New keys should follow\nleast-privilege principles. Check key expiration settings.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/rest-api/authentication-and-api-keys.htm"
+  },
+  "auth_security_principal.create": {
+    "category": "Auth & API",
+    "description": "Triggers when an RBAC auth security principal is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "auth_security_principal.delete": {
+    "category": "Auth & API",
+    "description": "Triggers when an RBAC auth security principal is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "auth_security_principal.update": {
+    "category": "Auth & API",
+    "description": "Triggers when an RBAC auth security principal is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "authentication_settings.update": {
+    "category": "Auth & API",
+    "description": "Triggers when authentication settings are updated.",
+    "severity": "critical",
+    "remediation": "Authentication configuration changed. This is a high-impact\nchange that affects how all users authenticate. Verify:\n1. Was this an authorized change?\n2. Test login with the new configuration immediately\n3. Have a rollback plan ready\n4. Monitor for authentication failures after the change\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/authentication-configuration.htm"
+  },
+  "cluster.create": {
+    "category": "Platform & System",
+    "description": "Triggers when a PCE cluster is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "cluster.delete": {
+    "category": "Platform & System",
+    "description": "Triggers when a PCE cluster is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "cluster.update": {
+    "category": "Platform & System",
+    "description": "Triggers when a PCE cluster is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "container_cluster.create": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when a container cluster is created.",
+    "severity": "info",
+    "remediation": "Container/Kubernetes cluster event. Policy application and\nacknowledgement events are normal during cluster operations.\nProfile changes affect how container workloads are segmented.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/kubernetes-and-openshift/overview.htm"
+  },
+  "container_cluster.delete": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when a container cluster is deleted.",
+    "severity": "info",
+    "remediation": "Container/Kubernetes cluster event. Policy application and\nacknowledgement events are normal during cluster operations.\nProfile changes affect how container workloads are segmented.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/kubernetes-and-openshift/overview.htm"
+  },
+  "container_cluster.kubernetes_workloads_bulk_create": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when multiple Kubernetes workloads are created in bulk within a container cluster.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "container_cluster.kubernetes_workloads_bulk_update": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when multiple Kubernetes workloads are updated in bulk within a container cluster.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "container_cluster.security_policy_acks": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when a container cluster acknowledges the receipt of a security policy.",
+    "severity": "info",
+    "remediation": "Container/Kubernetes cluster event. Policy application and\nacknowledgement events are normal during cluster operations.\nProfile changes affect how container workloads are segmented.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/kubernetes-and-openshift/overview.htm"
+  },
+  "container_cluster.security_policy_applied": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when a security policy is successfully applied to a container cluster.",
+    "severity": "info",
+    "remediation": "Container/Kubernetes cluster event. Policy application and\nacknowledgement events are normal during cluster operations.\nProfile changes affect how container workloads are segmented.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/kubernetes-and-openshift/overview.htm"
+  },
+  "container_cluster.update": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when a container cluster is updated.",
+    "severity": "info",
+    "remediation": "Container/Kubernetes cluster event. Policy application and\nacknowledgement events are normal during cluster operations.\nProfile changes affect how container workloads are segmented.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/kubernetes-and-openshift/overview.htm"
+  },
+  "container_cluster.update_label_map": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when the label mapping configuration for a container cluster is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "container_cluster.update_services": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when container cluster services are updated from Kubelink.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "container_workload.update": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when a container workload is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "container_workload_profile.create": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when a container workload profile is created.",
+    "severity": "info",
+    "remediation": "Container/Kubernetes cluster event. Policy application and\nacknowledgement events are normal during cluster operations.\nProfile changes affect how container workloads are segmented.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/kubernetes-and-openshift/overview.htm"
+  },
+  "container_workload_profile.delete": {
+    "category": "Containers & Workloads",
+    "description": "Triggers when a container workload profile is deleted.",
+    "severity": "info",
+    "remediation": "Container/Kubernetes cluster event. Policy application and\nacknowledgement events are normal during cluster operations.\nProfile changes affect how container workloads are segmented.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/kubernetes-and-openshift/overview.htm"
+  },
+  "container_workload_profile.update": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when a container workload profile is updated.",
+    "severity": "info",
+    "remediation": "Container/Kubernetes cluster event. Policy application and\nacknowledgement events are normal during cluster operations.\nProfile changes affect how container workloads are segmented.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/kubernetes-and-openshift/overview.htm"
+  },
+  "database.temp_table_autocleanup_completed": {
+    "category": "Platform & System",
+    "description": "This event is triggered when a database temporary table cleanup has completed.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "database.temp_table_autocleanup_started": {
+    "category": "Platform & System",
+    "description": "This event is triggered when a database temporary table cleanup has started.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "deny_rule.create": {
+    "category": "General",
+    "description": "This event is triggered when a deny rule is created.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "deny_rule.delete": {
+    "category": "General",
+    "description": "This event is triggered when a deny rule is deleted.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "deny_rule.update": {
+    "category": "General",
+    "description": "This event is triggered when a deny rule is updated.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "domain.create": {
+    "category": "Inventory & Identity",
+    "description": "This event is triggered when a domain is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "domain.delete": {
+    "category": "Inventory & Identity",
+    "description": "This event is triggered when a domain is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "domain.update": {
+    "category": "Inventory & Identity",
+    "description": "This event is triggered when a domain is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "enforcement_boundary.create": {
+    "category": "Policy",
+    "description": "This event is triggered when an enforcement boundary is created.",
+    "severity": "warning",
+    "remediation": "Enforcement boundary changed. Boundaries define the scope of\npolicy enforcement. Verify the change doesn't expose\npreviously protected segments.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/enforcement-boundaries.htm"
+  },
+  "enforcement_boundary.delete": {
+    "category": "Policy",
+    "description": "This event is triggered when an enforcement boundary is deleted.",
+    "severity": "warning",
+    "remediation": "Enforcement boundary changed. Boundaries define the scope of\npolicy enforcement. Verify the change doesn't expose\npreviously protected segments.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/enforcement-boundaries.htm"
+  },
+  "enforcement_boundary.update": {
+    "category": "Policy",
+    "description": "This event is triggered when an enforcement boundary is updated.",
+    "severity": "warning",
+    "remediation": "Enforcement boundary changed. Boundaries define the scope of\npolicy enforcement. Verify the change doesn't expose\npreviously protected segments.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/enforcement-boundaries.htm"
+  },
+  "event_settings.update": {
+    "category": "Platform & System",
+    "description": "This event is triggered when event settings are updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "firewall_settings.update": {
+    "category": "Policy",
+    "description": "This event is triggered when global policy settings are updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "group.create": {
+    "category": "Inventory & Identity",
+    "description": "This event is triggered when a group is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "group.update": {
+    "category": "Inventory & Identity",
+    "description": "This event is triggered when a group is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "ip_list.create": {
+    "category": "Policy",
+    "description": "This event is triggered when an IP list is created.",
+    "severity": "warning",
+    "remediation": "IP list modification. IP lists define network ranges in\npolicy rules. Changes may affect which external systems can\ncommunicate with segmented workloads.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/ip-lists.htm"
+  },
+  "ip_list.delete": {
+    "category": "Policy",
+    "description": "This event is triggered when an IP list is deleted.",
+    "severity": "warning",
+    "remediation": "IP list modification. IP lists define network ranges in\npolicy rules. Changes may affect which external systems can\ncommunicate with segmented workloads.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/ip-lists.htm"
+  },
+  "ip_list.update": {
+    "category": "Policy",
+    "description": "This event is triggered when an IP list is updated.",
+    "severity": "warning",
+    "remediation": "IP list modification. IP lists define network ranges in\npolicy rules. Changes may affect which external systems can\ncommunicate with segmented workloads.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/ip-lists.htm"
+  },
+  "ip_lists.delete": {
+    "category": "Policy",
+    "description": "This event is triggered when IP lists are deleted.",
+    "severity": "warning",
+    "remediation": "IP list modification. IP lists define network ranges in\npolicy rules. Changes may affect which external systems can\ncommunicate with segmented workloads.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/ip-lists.htm"
+  },
+  "ip_tables_rule.create": {
+    "category": "Policy",
+    "description": "This event is triggered when IP tables rules are created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "ip_tables_rule.delete": {
+    "category": "Policy",
+    "description": "This event is triggered when IP tables rules are deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "ip_tables_rule.update": {
+    "category": "Policy",
+    "description": "This event is triggered when IP tables rules are updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "job.delete": {
+    "category": "Platform & System",
+    "description": "This event is triggered when a job is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "label.create": {
+    "category": "Policy",
+    "description": "This event is triggered when a label is created.",
+    "severity": "info",
+    "remediation": "Label taxonomy change. Labels are the foundation of Illumio\nsegmentation policy. Deleted labels may orphan workloads from\npolicy. New labels should follow naming conventions.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/labels-and-label-groups.htm"
+  },
+  "label.delete": {
+    "category": "Policy",
+    "description": "This event is triggered when a label is deleted.",
+    "severity": "info",
+    "remediation": "Label taxonomy change. Labels are the foundation of Illumio\nsegmentation policy. Deleted labels may orphan workloads from\npolicy. New labels should follow naming conventions.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/labels-and-label-groups.htm"
+  },
+  "label.update": {
+    "category": "Policy",
+    "description": "This event is triggered when a label is updated.",
+    "severity": "info",
+    "remediation": "Label taxonomy change. Labels are the foundation of Illumio\nsegmentation policy. Deleted labels may orphan workloads from\npolicy. New labels should follow naming conventions.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/labels-and-label-groups.htm"
+  },
+  "label_dimension.create": {
+    "category": "General",
+    "description": "This event is triggered when a label dimension is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "label_dimension.delete": {
+    "category": "General",
+    "description": "This event is triggered when a label dimension is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "label_dimension.update": {
+    "category": "General",
+    "description": "This event is triggered when a label dimension is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "label_group.create": {
+    "category": "Policy",
+    "description": "This event is triggered when a label group is created.",
+    "severity": "info",
+    "remediation": "Label taxonomy change. Labels are the foundation of Illumio\nsegmentation policy. Deleted labels may orphan workloads from\npolicy. New labels should follow naming conventions.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/labels-and-label-groups.htm"
+  },
+  "label_group.delete": {
+    "category": "Policy",
+    "description": "This event is triggered when a label group is deleted.",
+    "severity": "info",
+    "remediation": "Label taxonomy change. Labels are the foundation of Illumio\nsegmentation policy. Deleted labels may orphan workloads from\npolicy. New labels should follow naming conventions.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/labels-and-label-groups.htm"
+  },
+  "label_group.update": {
+    "category": "Policy",
+    "description": "This event is triggered when a label group is updated.",
+    "severity": "info",
+    "remediation": "Label taxonomy change. Labels are the foundation of Illumio\nsegmentation policy. Deleted labels may orphan workloads from\npolicy. New labels should follow naming conventions.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/labels-and-label-groups.htm"
+  },
+  "label_mapping_rule.create": {
+    "category": "General",
+    "description": "This event is triggered when a label mapping rule is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "label_mapping_rule.delete": {
+    "category": "General",
+    "description": "This event is triggered when a label mapping rule is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "label_mapping_rule.update": {
+    "category": "General",
+    "description": "This event is triggered when a label mapping rule is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "labels.delete": {
+    "category": "Policy",
+    "description": "This event is triggered when multiple labels are deleted.",
+    "severity": "info",
+    "remediation": "Label taxonomy change. Labels are the foundation of Illumio\nsegmentation policy. Deleted labels may orphan workloads from\npolicy. New labels should follow naming conventions.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/labels-and-label-groups.htm"
+  },
+  "ldap_config.create": {
+    "category": "Auth & API",
+    "description": "This event is triggered when an LDAP configuration is created.",
+    "severity": "critical",
+    "remediation": "Authentication configuration changed. This is a high-impact\nchange that affects how all users authenticate. Verify:\n1. Was this an authorized change?\n2. Test login with the new configuration immediately\n3. Have a rollback plan ready\n4. Monitor for authentication failures after the change\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/authentication-configuration.htm"
+  },
+  "ldap_config.delete": {
+    "category": "Auth & API",
+    "description": "This event is triggered when an LDAP configuration is deleted.",
+    "severity": "critical",
+    "remediation": "Authentication configuration changed. This is a high-impact\nchange that affects how all users authenticate. Verify:\n1. Was this an authorized change?\n2. Test login with the new configuration immediately\n3. Have a rollback plan ready\n4. Monitor for authentication failures after the change\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/authentication-configuration.htm"
+  },
+  "ldap_config.update": {
+    "category": "Auth & API",
+    "description": "This event is triggered when an LDAP configuration is updated.",
+    "severity": "critical",
+    "remediation": "Authentication configuration changed. This is a high-impact\nchange that affects how all users authenticate. Verify:\n1. Was this an authorized change?\n2. Test login with the new configuration immediately\n3. Have a rollback plan ready\n4. Monitor for authentication failures after the change\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/authentication-configuration.htm"
+  },
+  "ldap_config.verify_connection": {
+    "category": "Auth & API",
+    "description": "This event is triggered when an LDAP server connection is verified.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "license.delete": {
+    "category": "Platform & System",
+    "description": "This event is triggered when a license is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "license.update": {
+    "category": "Platform & System",
+    "description": "This event is triggered when a license is created or updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "login_proxy_ldap_config.create": {
+    "category": "Auth & API",
+    "description": "This event is triggered by an interservice call to the login service to create an LDAP configuration.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "login_proxy_ldap_config.delete": {
+    "category": "Auth & API",
+    "description": "This event is triggered by an interservice call to the login service to delete an LDAP configuration.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "login_proxy_ldap_config.update": {
+    "category": "Auth & API",
+    "description": "This event is triggered by an interservice call to the login service to update an LDAP configuration.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "login_proxy_ldap_config.verify_connection": {
+    "category": "Auth & API",
+    "description": "This event is triggered by an interservice call to the login service to verify a connection to the LDAP server.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "login_proxy_msp_tenants.create": {
+    "category": "Auth & API",
+    "description": "This event is triggered when a managed service provider (MSP) tenant is created in the login proxy.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "login_proxy_msp_tenants.delete": {
+    "category": "Auth & API",
+    "description": "This event is triggered when a managed service provider (MSP) tenant is deleted from the login proxy.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "login_proxy_msp_tenants.update": {
+    "category": "Auth & API",
+    "description": "This event is triggered when a managed service provider (MSP) tenant is updated in the login proxy.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "login_proxy_orgs.create": {
+    "category": "Auth & API",
+    "description": "A login proxy organization is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "login_proxy_orgs.delete": {
+    "category": "Auth & API",
+    "description": "A login proxy organization is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "login_proxy_orgs.update": {
+    "category": "Auth & API",
+    "description": "A login proxy organization is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "lost_agent.found": {
+    "category": "Agent Health",
+    "description": "A lost agent is found.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network.create": {
+    "category": "Network & Integrations",
+    "description": "A network is created.",
+    "severity": "warning",
+    "remediation": "Network infrastructure change. NEN degradation or missed\nheartbeats may indicate connectivity issues. Device changes\nshould align with network change management.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/network-enforcement/overview.htm"
+  },
+  "network.delete": {
+    "category": "Network & Integrations",
+    "description": "A network is deleted.",
+    "severity": "warning",
+    "remediation": "Network infrastructure change. NEN degradation or missed\nheartbeats may indicate connectivity issues. Device changes\nshould align with network change management.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/network-enforcement/overview.htm"
+  },
+  "network.update": {
+    "category": "Network & Integrations",
+    "description": "A network is updated.",
+    "severity": "warning",
+    "remediation": "Network infrastructure change. NEN degradation or missed\nheartbeats may indicate connectivity issues. Device changes\nshould align with network change management.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/network-enforcement/overview.htm"
+  },
+  "network_device.ack_enforcement_instructions_applied": {
+    "category": "Network & Integrations",
+    "description": "An enforcement instruction is applied to a network device.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_device.assign_workload": {
+    "category": "Network & Integrations",
+    "description": "An existing or new unmanaged workload is assigned to a network device.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_device.create": {
+    "category": "Network & Integrations",
+    "description": "A network device is created.",
+    "severity": "warning",
+    "remediation": "Network infrastructure change. NEN degradation or missed\nheartbeats may indicate connectivity issues. Device changes\nshould align with network change management.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/network-enforcement/overview.htm"
+  },
+  "network_device.delete": {
+    "category": "Network & Integrations",
+    "description": "A network device is deleted.",
+    "severity": "warning",
+    "remediation": "Network infrastructure change. NEN degradation or missed\nheartbeats may indicate connectivity issues. Device changes\nshould align with network change management.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/network-enforcement/overview.htm"
+  },
+  "network_device.update": {
+    "category": "Network & Integrations",
+    "description": "A network device is updated.",
+    "severity": "warning",
+    "remediation": "Network infrastructure change. NEN degradation or missed\nheartbeats may indicate connectivity issues. Device changes\nshould align with network change management.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/network-enforcement/overview.htm"
+  },
+  "network_devices.ack_multi_enforcement_instructions_applied": {
+    "category": "Network & Integrations",
+    "description": "Enforcement instructions are applied to multiple network devices.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_endpoint.create": {
+    "category": "Network & Integrations",
+    "description": "A network endpoint is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_endpoint.delete": {
+    "category": "Network & Integrations",
+    "description": "A network endpoint is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_endpoint.update": {
+    "category": "Network & Integrations",
+    "description": "A network endpoint is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_enforcement_node.activate": {
+    "category": "Network & Integrations",
+    "description": "A network enforcement node is activated.",
+    "severity": "warning",
+    "remediation": "Network infrastructure change. NEN degradation or missed\nheartbeats may indicate connectivity issues. Device changes\nshould align with network change management.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/network-enforcement/overview.htm"
+  },
+  "network_enforcement_node.clear_conditions": {
+    "category": "Network & Integrations",
+    "description": "Network enforcement node conditions are cleared.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_enforcement_node.deactivate": {
+    "category": "Network & Integrations",
+    "description": "A network enforcement node is deactivated.",
+    "severity": "warning",
+    "remediation": "Network infrastructure change. NEN degradation or missed\nheartbeats may indicate connectivity issues. Device changes\nshould align with network change management.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/network-enforcement/overview.htm"
+  },
+  "network_enforcement_node.degraded": {
+    "category": "Network & Integrations",
+    "description": "A network enforcement node enters a degraded state.",
+    "severity": "warning",
+    "remediation": "Network infrastructure change. NEN degradation or missed\nheartbeats may indicate connectivity issues. Device changes\nshould align with network change management.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/network-enforcement/overview.htm"
+  },
+  "network_enforcement_node.missed_heartbeats": {
+    "category": "Network & Integrations",
+    "description": "A network enforcement node misses its expected heartbeats.",
+    "severity": "warning",
+    "remediation": "Network infrastructure change. NEN degradation or missed\nheartbeats may indicate connectivity issues. Device changes\nshould align with network change management.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/network-enforcement/overview.htm"
+  },
+  "network_enforcement_node.missed_heartbeats_check": {
+    "category": "Network & Integrations",
+    "description": "A system check for missed heartbeats from a network enforcement node is executed.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_enforcement_node.network_devices_network_endpoints_workloads": {
+    "category": "Network & Integrations",
+    "description": "A workload is added to a network endpoint.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_enforcement_node.policy_ack": {
+    "category": "Network & Integrations",
+    "description": "A network enforcement node acknowledges a policy.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_enforcement_node.request_policy": {
+    "category": "Network & Integrations",
+    "description": "A network enforcement node requests a policy.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_enforcement_node.update_status": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when a network enforcement node reports that switches are not reachable.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "network_enforcement_nodes.clear_conditions": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when a condition is cleared from a list of network enforcement nodes.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "nfc.activate": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when a network function controller is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "nfc.delete": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when a network function controller is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "nfc.update_discovered_virtual_servers": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when network function controller virtual servers are discovered.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "nfc.update_policy_status": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when a network function controller policy status is reported or updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "nfc.update_slb_state": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when a network function controller server load balancer (SLB) state is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "org.create": {
+    "category": "Platform & System",
+    "description": "This event is triggered when an organization is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "org.recalc_rules": {
+    "category": "Platform & System",
+    "description": "This event is triggered when rules for an organization are recalculated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "org.update": {
+    "category": "Platform & System",
+    "description": "This event is triggered when organization information is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "pairing_profile.create": {
+    "category": "Policy",
+    "description": "This event is triggered when a pairing profile is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "pairing_profile.create_pairing_key": {
+    "category": "Policy",
+    "description": "This event is triggered when a pairing key is created for a pairing profile.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "pairing_profile.delete": {
+    "category": "Policy",
+    "description": "This event is triggered when a pairing profile is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "pairing_profile.delete_all_pairing_keys": {
+    "category": "Policy",
+    "description": "This event is triggered when pairing keys are deleted from a pairing profile.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "pairing_profile.update": {
+    "category": "Policy",
+    "description": "This event is triggered when a pairing profile is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "pairing_profiles.delete": {
+    "category": "Policy",
+    "description": "This event is triggered when multiple pairing profiles are deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "password_policy.create": {
+    "category": "Auth & API",
+    "description": "This event is triggered when a password policy is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "password_policy.delete": {
+    "category": "Auth & API",
+    "description": "This event is triggered when a password policy is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "password_policy.update": {
+    "category": "Auth & API",
+    "description": "This event is triggered when a password policy is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "permission.create": {
+    "category": "Policy",
+    "description": "This event is triggered when a role-based access control (RBAC) permission is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "permission.delete": {
+    "category": "Policy",
+    "description": "This event is triggered when an RBAC permission is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "permission.update": {
+    "category": "Policy",
+    "description": "This event is triggered when an RBAC permission is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "radius_config.create": {
+    "category": "Auth & API",
+    "description": "This event is triggered when a RADIUS authentication configuration is created.",
+    "severity": "critical",
+    "remediation": "Authentication configuration changed. This is a high-impact\nchange that affects how all users authenticate. Verify:\n1. Was this an authorized change?\n2. Test login with the new configuration immediately\n3. Have a rollback plan ready\n4. Monitor for authentication failures after the change\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/authentication-configuration.htm"
+  },
+  "radius_config.delete": {
+    "category": "Auth & API",
+    "description": "This event is triggered when a RADIUS authentication configuration is deleted.",
+    "severity": "critical",
+    "remediation": "Authentication configuration changed. This is a high-impact\nchange that affects how all users authenticate. Verify:\n1. Was this an authorized change?\n2. Test login with the new configuration immediately\n3. Have a rollback plan ready\n4. Monitor for authentication failures after the change\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/authentication-configuration.htm"
+  },
+  "radius_config.update": {
+    "category": "Auth & API",
+    "description": "This event is triggered when a RADIUS authentication configuration is updated.",
+    "severity": "critical",
+    "remediation": "Authentication configuration changed. This is a high-impact\nchange that affects how all users authenticate. Verify:\n1. Was this an authorized change?\n2. Test login with the new configuration immediately\n3. Have a rollback plan ready\n4. Monitor for authentication failures after the change\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/authentication-configuration.htm"
+  },
+  "radius_config.verify_shared_secret": {
+    "category": "Auth & API",
+    "description": "A Login Proxy RADIUS configuration shared secret is verified.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "request.authentication_failed": {
+    "category": "Auth & API",
+    "description": "API request authentication failed.",
+    "severity": "critical",
+    "remediation": "Immediate action required. Review the source IP and username.\nMultiple failures from the same IP may indicate brute force attack.\nCheck if the account is locked. Review API key expiration dates.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm"
+  },
+  "request.authorization_failed": {
+    "category": "Auth & API",
+    "description": "API request authorization failed.",
+    "severity": "critical",
+    "remediation": "Immediate action required. Review the source IP and username.\nMultiple failures from the same IP may indicate brute force attack.\nCheck if the account is locked. Review API key expiration dates.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm"
+  },
+  "request.internal_server_error": {
+    "category": "Auth & API",
+    "description": "API request failed due to an internal server error.",
+    "severity": "critical",
+    "remediation": "PCE server error detected. Check PCE health status and logs.\nRepeated errors may indicate infrastructure issues.\nContact Illumio support if errors persist.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/pce-administration/troubleshooting.htm"
+  },
+  "request.service_unavailable": {
+    "category": "Auth & API",
+    "description": "API request failed due to an unavailable service.",
+    "severity": "critical",
+    "remediation": "PCE server error detected. Check PCE health status and logs.\nRepeated errors may indicate infrastructure issues.\nContact Illumio support if errors persist.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/pce-administration/troubleshooting.htm"
+  },
+  "request.unknown_server_error": {
+    "category": "Auth & API",
+    "description": "API request failed due to an unknown server error.",
+    "severity": "critical",
+    "remediation": "PCE server error detected. Check PCE health status and logs.\nRepeated errors may indicate infrastructure issues.\nContact Illumio support if errors persist.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/pce-administration/troubleshooting.htm"
+  },
+  "resource.create": {
+    "category": "Inventory & Identity",
+    "description": "Login resource created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "resource.delete": {
+    "category": "Inventory & Identity",
+    "description": "Login resource deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "resource.update": {
+    "category": "Inventory & Identity",
+    "description": "Login resource updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "rule_set.create": {
+    "category": "Policy",
+    "description": "Rule set created.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "rule_set.delete": {
+    "category": "Policy",
+    "description": "Rule set deleted.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "rule_set.update": {
+    "category": "Policy",
+    "description": "Rule set updated.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "rule_sets.delete": {
+    "category": "Policy",
+    "description": "Rule sets deleted.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "saml_acs.update": {
+    "category": "Auth & API",
+    "description": "SAML assertion destination services updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "saml_config.create": {
+    "category": "Auth & API",
+    "description": "SAML configuration created.",
+    "severity": "critical",
+    "remediation": "Authentication configuration changed. This is a high-impact\nchange that affects how all users authenticate. Verify:\n1. Was this an authorized change?\n2. Test login with the new configuration immediately\n3. Have a rollback plan ready\n4. Monitor for authentication failures after the change\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/authentication-configuration.htm"
+  },
+  "saml_config.delete": {
+    "category": "Auth & API",
+    "description": "SAML configuration deleted.",
+    "severity": "critical",
+    "remediation": "Authentication configuration changed. This is a high-impact\nchange that affects how all users authenticate. Verify:\n1. Was this an authorized change?\n2. Test login with the new configuration immediately\n3. Have a rollback plan ready\n4. Monitor for authentication failures after the change\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/authentication-configuration.htm"
+  },
+  "saml_config.pce_signing_cert": {
+    "category": "Auth & API",
+    "description": "A new certificate is generated for signing SAML AuthN requests.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "saml_config.update": {
+    "category": "Auth & API",
+    "description": "SAML configuration updated.",
+    "severity": "critical",
+    "remediation": "Authentication configuration changed. This is a high-impact\nchange that affects how all users authenticate. Verify:\n1. Was this an authorized change?\n2. Test login with the new configuration immediately\n3. Have a rollback plan ready\n4. Monitor for authentication failures after the change\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/authentication-configuration.htm"
+  },
+  "saml_sp_config.create": {
+    "category": "Auth & API",
+    "description": "SAML Service Provider created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "saml_sp_config.delete": {
+    "category": "Auth & API",
+    "description": "SAML Service Provider deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "saml_sp_config.update": {
+    "category": "Auth & API",
+    "description": "SAML Service Provider updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "sec_policy.create": {
+    "category": "Policy",
+    "description": "Security policy created.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "sec_policy.restore": {
+    "category": "Policy",
+    "description": "Security policy restored.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "sec_policy_pending.delete": {
+    "category": "Policy",
+    "description": "Pending security policy deleted.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "sec_rule.create": {
+    "category": "Policy",
+    "description": "Security policy rules created.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "sec_rule.delete": {
+    "category": "Policy",
+    "description": "Security policy rules deleted.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "sec_rule.update": {
+    "category": "Policy",
+    "description": "Security policy rules updated.",
+    "severity": "warning",
+    "remediation": "Security policy modification detected. Verify the change was\nauthorized and review the policy diff. Key checks:\n1. Was this change in a change management ticket?\n2. Does the change follow segmentation standards?\n3. Are any deny rules being weakened?\n4. Review the provisioned vs draft policy state.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm"
+  },
+  "secure_connect_gateway.create": {
+    "category": "Network & Integrations",
+    "description": "SecureConnect gateway created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "secure_connect_gateway.delete": {
+    "category": "Network & Integrations",
+    "description": "SecureConnect gateway deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "secure_connect_gateway.update": {
+    "category": "Network & Integrations",
+    "description": "SecureConnect gateway updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "security_principal.create": {
+    "category": "Inventory & Identity",
+    "description": "RBAC security principal created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "security_principal.delete": {
+    "category": "Inventory & Identity",
+    "description": "RBAC security principal bulk deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "security_principal.update": {
+    "category": "Inventory & Identity",
+    "description": "RBAC security principal bulk updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "security_principals.bulk_create": {
+    "category": "Inventory & Identity",
+    "description": "RBAC security principals bulk created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "service.create": {
+    "category": "Policy",
+    "description": "Service created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "service.delete": {
+    "category": "Policy",
+    "description": "Service deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "service.update": {
+    "category": "Policy",
+    "description": "Service updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "service_account.create": {
+    "category": "Policy",
+    "description": "Service account created.",
+    "severity": "warning",
+    "remediation": "API key lifecycle event. Verify the change was authorized.\nDeleted keys may break integrations. New keys should follow\nleast-privilege principles. Check key expiration settings.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/rest-api/authentication-and-api-keys.htm"
+  },
+  "service_account.delete": {
+    "category": "Policy",
+    "description": "Service account deleted.",
+    "severity": "warning",
+    "remediation": "API key lifecycle event. Verify the change was authorized.\nDeleted keys may break integrations. New keys should follow\nleast-privilege principles. Check key expiration settings.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/rest-api/authentication-and-api-keys.htm"
+  },
+  "service_account.update": {
+    "category": "Policy",
+    "description": "Service account updated.",
+    "severity": "warning",
+    "remediation": "API key lifecycle event. Verify the change was authorized.\nDeleted keys may break integrations. New keys should follow\nleast-privilege principles. Check key expiration settings.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/rest-api/authentication-and-api-keys.htm"
+  },
+  "service_binding.create": {
+    "category": "Policy",
+    "description": "Service binding created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "service_binding.delete": {
+    "category": "Policy",
+    "description": "Service binding deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "service_bindings.delete": {
+    "category": "Policy",
+    "description": "Service bindings deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "services.delete": {
+    "category": "Policy",
+    "description": "Services deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "settings.update": {
+    "category": "Platform & System",
+    "description": "Settings updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "slb.create": {
+    "category": "Network & Integrations",
+    "description": "Server load balancer created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "slb.delete": {
+    "category": "Network & Integrations",
+    "description": "Server load balancer deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "slb.update": {
+    "category": "Network & Integrations",
+    "description": "Server load balancer updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "support_report.upload": {
+    "category": "Inventory & Identity",
+    "description": "Support report uploaded.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "syslog_destination.create": {
+    "category": "Network & Integrations",
+    "description": "syslog remote destination created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "syslog_destination.delete": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when a syslog remote destination is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "syslog_destination.update": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when a syslog remote destination is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "system_task.agent_missed_heartbeats_check": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system task checking for agents that have missed heartbeats.",
+    "severity": "info",
+    "remediation": "Automated system maintenance task. These are normal operations.\nAgent offline/missed heartbeat checks may generate follow-up\nevents if agents are unreachable.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/pce-administration/system-tasks.htm"
+  },
+  "system_task.agent_missing_heartbeats_after_upgrade": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon when a VEN is missing its heartbeat after a software upgrade.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "system_task.agent_offline_check": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system task that marks agents as offline after they miss a specified number of heartbeats.",
+    "severity": "info",
+    "remediation": "Automated system maintenance task. These are normal operations.\nAgent offline/missed heartbeat checks may generate follow-up\nevents if agents are unreachable.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/pce-administration/system-tasks.htm"
+  },
+  "system_task.agent_self_signed_certs_check": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon performing a housekeeping check on VEN self-signed certificates.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "system_task.agent_settings_invalidation_error_state_check": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon checking for an invalidation error state in VEN settings.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "system_task.agent_uninstall_timeout": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon evaluating the timeout limit for uninstalling a VEN.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "system_task.clear_auth_recover_condition": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon clearing a VEN authentication recovery condition.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "system_task.compute_policy_for_unmanaged_workloads": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon computing security policies for unmanaged workloads.",
+    "severity": "info",
+    "remediation": "Automated system maintenance task. These are normal operations.\nAgent offline/missed heartbeat checks may generate follow-up\nevents if agents are unreachable.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/pce-administration/system-tasks.htm"
+  },
+  "system_task.delete_expired_service_account_api_keys": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon running an expiry sweep task to delete expired service accounts.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "system_task.delete_old_cached_perspectives": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon deleting old cached perspectives.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "system_task.endpoint_offline_check": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon running a task to check for offline endpoints.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "system_task.provision_container_cluster_services": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon provisioning container cluster services.",
+    "severity": "info",
+    "remediation": "Automated system maintenance task. These are normal operations.\nAgent offline/missed heartbeat checks may generate follow-up\nevents if agents are unreachable.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/pce-administration/system-tasks.htm"
+  },
+  "system_task.prune_old_log_events": {
+    "category": "Platform & System",
+    "description": "This event is triggered when a system task successfully completes the pruning of old log events.",
+    "severity": "info",
+    "remediation": "Automated system maintenance task. These are normal operations.\nAgent offline/missed heartbeat checks may generate follow-up\nevents if agents are unreachable.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/pce-administration/system-tasks.htm"
+  },
+  "system_task.remove_stale_zone_subsets": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon when stale zone subnets are removed.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "system_task.set_server_sync_check": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon running a SetServer synchronization task.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "system_task.vacuum_deactivated_agent_and_deleted_workloads": {
+    "category": "Platform & System",
+    "description": "This event is triggered by a system daemon running a vacuum task to clean up deactivated agents and deleted workloads.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "traffic_collector_setting.create": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when a new traffic collector setting is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "traffic_collector_setting.delete": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when an existing traffic collector setting is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "traffic_collector_setting.update": {
+    "category": "Network & Integrations",
+    "description": "This event is triggered when a traffic collector setting is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "trusted_proxy_ips.update": {
+    "category": "Policy",
+    "description": "This event is triggered when trusted proxy IPs are either created or updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "user.accept_invitation": {
+    "category": "User Access",
+    "description": "This event is triggered when a user accepts an invitation to access the system.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user.authenticate": {
+    "category": "User Access",
+    "description": "This event is triggered when a user is successfully authenticated.",
+    "severity": "info",
+    "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm"
+  },
+  "user.create": {
+    "category": "User Access",
+    "description": "This event is triggered when a new user account is created.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user.create_session": {
+    "category": "User Access",
+    "description": "A user successfully creates a new session.",
+    "severity": "info",
+    "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm"
+  },
+  "user.delete": {
+    "category": "User Access",
+    "description": "A user is deleted from the system.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user.invite": {
+    "category": "User Access",
+    "description": "A user is invited to the system.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user.login": {
+    "category": "User Access",
+    "description": "A user logs into the system.",
+    "severity": "info",
+    "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm"
+  },
+  "user.login_session_terminated": {
+    "category": "User Access",
+    "description": "A user's login session is terminated.",
+    "severity": "info",
+    "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm"
+  },
+  "user.logout": {
+    "category": "User Access",
+    "description": "A user logs out of the system.",
+    "severity": "info",
+    "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm"
+  },
+  "user.pce_session_terminated": {
+    "category": "User Access",
+    "description": "A user's PCE session is terminated.",
+    "severity": "info",
+    "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm"
+  },
+  "user.reset_password": {
+    "category": "User Access",
+    "description": "A user's password is reset.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user.sign_in": {
+    "category": "User Access",
+    "description": "A user session is created upon signing in.",
+    "severity": "info",
+    "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm"
+  },
+  "user.sign_out": {
+    "category": "User Access",
+    "description": "A user session is terminated upon signing out.",
+    "severity": "info",
+    "remediation": "Normal authentication activity. Monitor for unusual patterns:\nlogins at odd hours, from new IPs, or failed attempts preceding success.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm"
+  },
+  "user.update": {
+    "category": "User Access",
+    "description": "A user's information is updated.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user.update_password": {
+    "category": "User Access",
+    "description": "A user's password is updated.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user.use_expired_password": {
+    "category": "User Access",
+    "description": "A user enters an expired password.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user.verify_mfa": {
+    "category": "User Access",
+    "description": "A user successfully verifies their identity using multi-factor authentication.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user_local_profile.create": {
+    "category": "User Access",
+    "description": "A local profile is created for a user.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user_local_profile.delete": {
+    "category": "User Access",
+    "description": "A user's local profile is deleted.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user_local_profile.reinvite": {
+    "category": "User Access",
+    "description": "An invitation email is resent for a local user.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "user_local_profile.update_password": {
+    "category": "User Access",
+    "description": "A user's local password is updated.",
+    "severity": "warning",
+    "remediation": "User account change detected. Verify the change was authorized.\nCheck who made the change (created_by). Ensure MFA is enforced\nfor all administrative accounts.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm"
+  },
+  "users.auth_token": {
+    "category": "User Access",
+    "description": "An authentication token is generated or requested for a user.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "ven_settings.update": {
+    "category": "Containers & Workloads",
+    "description": "The settings for a Virtual Enforcement Node are updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "ven_software.upgrade": {
+    "category": "Containers & Workloads",
+    "description": "The software release of a Virtual Enforcement Node is upgraded.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "ven_software_release.create": {
+    "category": "Containers & Workloads",
+    "description": "A Virtual Enforcement Node software release is created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "ven_software_release.delete": {
+    "category": "Containers & Workloads",
+    "description": "A Virtual Enforcement Node software release is deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "ven_software_release.deploy": {
+    "category": "Containers & Workloads",
+    "description": "A Virtual Enforcement Node software release is deployed.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "ven_software_release.update": {
+    "category": "Containers & Workloads",
+    "description": "A Virtual Enforcement Node software release is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "ven_software_releases.set_default_version": {
+    "category": "Containers & Workloads",
+    "description": "Default VEN software version set.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "virtual_server.create": {
+    "category": "Network & Integrations",
+    "description": "Virtual server created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "virtual_server.delete": {
+    "category": "Network & Integrations",
+    "description": "Virtual server deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "virtual_server.update": {
+    "category": "Network & Integrations",
+    "description": "Virtual server updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "virtual_service.create": {
+    "category": "Network & Integrations",
+    "description": "Virtual service created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "virtual_service.delete": {
+    "category": "Network & Integrations",
+    "description": "Virtual service deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "virtual_service.update": {
+    "category": "Network & Integrations",
+    "description": "Virtual service updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "virtual_services.bulk_create": {
+    "category": "Network & Integrations",
+    "description": "Virtual services created in bulk.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "virtual_services.bulk_update": {
+    "category": "Network & Integrations",
+    "description": "Virtual services updated in bulk.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "vulnerability.create": {
+    "category": "Inventory & Identity",
+    "description": "Vulnerability record created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "vulnerability.delete": {
+    "category": "Inventory & Identity",
+    "description": "Vulnerability record deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "vulnerability.update": {
+    "category": "Inventory & Identity",
+    "description": "Vulnerability record updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "vulnerability_report.delete": {
+    "category": "Inventory & Identity",
+    "description": "Vulnerability report deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "vulnerability_report.update": {
+    "category": "Inventory & Identity",
+    "description": "Vulnerability report created or updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "workload.create": {
+    "category": "Containers & Workloads",
+    "description": "Workload created.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workload.delete": {
+    "category": "Containers & Workloads",
+    "description": "Workload deleted.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workload.online": {
+    "category": "Containers & Workloads",
+    "description": "Workload online.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workload.recalc_rules": {
+    "category": "Containers & Workloads",
+    "description": "Workload policy recalculated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "workload.redetect_network": {
+    "category": "Containers & Workloads",
+    "description": "Workload network redetected.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "workload.undelete": {
+    "category": "Containers & Workloads",
+    "description": "Workload undeleted.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workload.update": {
+    "category": "Containers & Workloads",
+    "description": "Workload settings updated.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workload.upgrade": {
+    "category": "Containers & Workloads",
+    "description": "Workload upgraded.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workload_interface.create": {
+    "category": "Containers & Workloads",
+    "description": "Workload interface created.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "workload_interface.delete": {
+    "category": "Containers & Workloads",
+    "description": "Workload interface deleted.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "workload_interface.update": {
+    "category": "Containers & Workloads",
+    "description": "Workload interface updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "workload_interfaces.update": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when workload interfaces are updated, such as when an IP address changes, a new interface is added, or an interface shuts down.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "workload_service_report.update": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when a workload service report is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "workload_settings.update": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when workload settings are updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "workloads.apply_policy": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when workload policies are applied.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workloads.bulk_create": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when workloads are created in bulk.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workloads.bulk_delete": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when workloads are deleted in bulk.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workloads.bulk_update": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when workloads are updated in bulk.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workloads.remove_labels": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when labels are removed from workloads.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workloads.set_flow_reporting_frequency": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when a workload's flow reporting frequency is changed.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "workloads.set_labels": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when labels are applied to workloads.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workloads.unpair": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when workloads are unpaired.",
+    "severity": "info",
+    "remediation": "Workload lifecycle event. Bulk operations should be verified\nagainst change management. Label changes affect policy\napplication. Verify labels match intended segmentation.\n",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm"
+  },
+  "workloads.update": {
+    "category": "Containers & Workloads",
+    "description": "This event is triggered when workloads are updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  }
+}

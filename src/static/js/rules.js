@@ -76,7 +76,7 @@ async function loadRules() {
       const rem = remTempl.replace('{mins}', r.cooldown_remaining);
       statusHtml = `<span style="background:var(--warn);color:#1a2c32;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;display:inline-block;line-height:1.4;">⏳ ${cdTitle}<br><span style="font-weight:400;font-size:0.7rem;">(${rem})</span></span>`;
     } else {
-      statusHtml = `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;">✅ ${readyTitle}</span>`;
+      statusHtml = `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:0.75rem;font-weight:600;"><svg class="icon" aria-hidden="true" style="width:11px;height:11px;vertical-align:middle;margin-right:2px;"><use href="#icon-check"></use></svg>${readyTitle}</span>`;
     }
 
     let f = [];
@@ -93,7 +93,7 @@ async function loadRules() {
     // R5: throttle removed from UI; existing rule data retained server-side.
     if (suppressedCount > 0) f.push('Suppressed:' + suppressedCount);
     if (r.match_fields && Object.keys(r.match_fields).length) f.push('Match:' + Object.keys(r.match_fields).join(', '));
-    const editBtn = `<button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="Edit Rule" title="Edit Rule">✏️</button>`;
+    const editBtn = `<button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="Edit Rule" title="Edit Rule"><svg class="icon" aria-hidden="true"><use href="#icon-edit"></use></svg></button>`;
     const isEnabled = r.enabled !== false;
     const switchCls = isEnabled ? 'on' : 'off';
     const switchWrap = `<span class="rule-switch-wrap"><input type="checkbox" class="r-chk" data-idx="${r.index}"${isEnabled ? ' checked' : ''}><span class="rule-switch ${switchCls}" title="${isEnabled ? 'Enabled' : 'Disabled'}" onclick="this.previousElementSibling.click()"></span></span>`;
@@ -307,7 +307,7 @@ async function loadCatalog() {
     });
     _catalogCategories = Object.keys(_catalog).map(label => ({ id: label, label, events: Object.keys(_catalog[label] || {}).map(id => _eventMetaById[id]) }));
   }
-  const sel = $('ev-cat'); sel.innerHTML = '<option value="" data-i18n="gui_select">Select...</option>';
+  const sel = $('ev-cat'); sel.innerHTML = '<option value="">' + _t('gui_select') + '</option>';
   _catalogCategories.forEach(category => {
     const o = document.createElement('option');
     o.value = category.id;

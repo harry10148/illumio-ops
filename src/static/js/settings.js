@@ -351,7 +351,7 @@ function _renderPceSection(a, profiles, activePceId) {
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(p.url)}">${escapeHtml(p.url)}</td>
       <td>${p.org_id || ''}</td>
       <td>
-        ${p.id !== activePceId ? `<button class="btn btn-primary btn-sm" onclick="activatePceProfile(${p.id})" data-i18n="gui_pce_activate">Activate</button>` : `<span style="color:var(--success);font-weight:600">✓</span>`}
+        ${p.id !== activePceId ? `<button class="btn btn-primary btn-sm" onclick="activatePceProfile(${p.id})" data-i18n="gui_pce_activate">Activate</button>` : `<span style="color:var(--success);font-weight:600"><svg class="icon" aria-hidden="true" style="width:14px;height:14px;vertical-align:middle;"><use href="#icon-check"></use></svg></span>`}
         <button class="btn btn-sm" style="margin-left:4px" onclick="deletePceProfile(${p.id})" data-i18n="gui_pce_delete_profile">Delete</button>
       </td>
     </tr>`).join('');
@@ -378,7 +378,7 @@ function _renderPceSection(a, profiles, activePceId) {
     <div class="chk" style="margin-bottom:8px"><label><input type="checkbox" id="s-pce-ssl" checked> <span data-i18n="gui_verify_ssl">Verify SSL</span></label></div>
     <button class="btn btn-primary btn-sm" onclick="addPceProfile()" data-i18n="gui_pce_add">Add PCE Profile</button>
   </div></details>
-  ${activePceId ? `<p style="margin-top:8px;color:var(--dim);font-size:0.85em">⚡ <span data-i18n="gui_pce_active">Active PCE</span>: <strong>${escapeHtml((profiles.find(p=>p.id===activePceId)||{}).name||'')}</strong> — <span data-i18n="gui_pce_save_profile" style="font-style:italic">Saving settings will update this profile.</span></p>` : ''}
+  ${activePceId ? `<p style="margin-top:8px;color:var(--dim);font-size:0.85em"><span data-i18n="gui_pce_active">Active PCE</span>: <strong>${escapeHtml((profiles.find(p=>p.id===activePceId)||{}).name||'')}</strong> — <span data-i18n="gui_pce_save_profile" style="font-style:italic">Saving settings will update this profile.</span></p>` : ''}
 </fieldset>
 <fieldset><legend data-i18n="gui_api_conn">API Connection</legend>
   <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${a.url || ''}"><small class="form-text text-muted" data-i18n="gui_url_help"></small></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${a.org_id || ''}"><small class="form-text text-muted" data-i18n="gui_org_id_help"></small></div></div>

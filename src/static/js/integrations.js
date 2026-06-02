@@ -116,8 +116,8 @@ function buildCacheStatusCards(status, s, throughput) {
   var trafficAgg = Number(status.traffic_agg || 0);
   var stateClass = s.enabled ? 'ok' : 'err';
   var stateText  = s.enabled
-    ? '<span style="color:var(--color-success)">✓ ' + escapeAttr(_t('gui_cache_enabled')) + '</span>'
-    : '<span style="color:var(--color-danger)">✗ ' + escapeAttr(_t('gui_cache_disabled')) + '</span>';
+    ? '<span style="color:var(--color-success)"><svg class="icon" aria-hidden="true" style="width:13px;height:13px;vertical-align:middle;margin-right:2px;"><use href="#icon-check"></use></svg>' + escapeAttr(_t('gui_cache_enabled')) + '</span>'
+    : '<span style="color:var(--color-danger)"><svg class="icon" aria-hidden="true" style="width:13px;height:13px;vertical-align:middle;margin-right:2px;"><use href="#icon-cross"></use></svg>' + escapeAttr(_t('gui_cache_disabled')) + '</span>';
 
   // 1h ingest counts from throughput endpoint
   var events1h     = throughput && throughput.events_1h     != null ? Number(throughput.events_1h)     : null;
@@ -319,7 +319,7 @@ async function doDaemonRestart(btn, msgSpan) {
       return;
     }
     if (body.ok) {
-      btn.textContent = '✓';
+      btn.textContent = 'OK';
       msgSpan.textContent = _t('gui_restart_success');
       msgSpan.removeAttribute('data-i18n');
       setTimeout(function() {
@@ -939,8 +939,8 @@ async function siemTestDest(nameEnc) {
     return;
   }
   var msg = body.ok
-    ? '✓ ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)'
-    : '✗ ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
+    ? 'OK: ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)'
+    : 'FAIL: ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
   alert(msg);
 }
 
@@ -967,10 +967,10 @@ async function siemTestDestInline() {
     banner.textContent = 'Destination not yet saved. Save first, then Test.';
   } else if (body.ok) {
     banner.style.color = 'var(--ok, green)';
-    banner.textContent = '✓ ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)';
+    banner.textContent = 'OK: ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)';
   } else {
     banner.style.color = 'var(--color-danger)';
-    banner.textContent = '✗ ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
+    banner.textContent = 'FAIL: ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
   }
 }
 window.siemTestDest = siemTestDest;
