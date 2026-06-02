@@ -1,0 +1,9 @@
+{
+  "agent.tampering": {
+    "category": "Agent Security",
+    "description": "A VEN reported tampering with its firewall rules or agent files.",
+    "severity": "critical",
+    "remediation": "Investigate the host immediately; tampering may indicate compromise.",
+    "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/ven-tampering-protection.htm"
+  }
+}
