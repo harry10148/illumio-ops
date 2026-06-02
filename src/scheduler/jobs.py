@@ -8,6 +8,7 @@ import re
 # Module-level imports required for test patching (patch targets must be attributes of this module)
 from src.api_client import ApiClient
 from src.gui._helpers import _resolve_state_file
+from src.report.snapshot_store import read_latest
 
 
 def run_monitor_cycle(cm) -> None:
@@ -241,6 +242,39 @@ def run_ven_summary(cm) -> None:
             return {**s, "ven_summary": vs}
         try:
             update_state_file(_resolve_state_file(), _mark_err)
+        except Exception:
+            pass
+
+
+def run_posture_summary(cm) -> None:
+    """Read latest traffic snapshot, compute posture score, write to state.
+
+    Reads snapshot only — no heavy analysis.  Written to state["posture_summary"]
+    so /api/dashboard/overview can return it instantly without any computation.
+    On failure or missing snapshot, writes {"available": False}.
+    """
+    import datetime
+    from src.state_store import update_state_file
+    from src.report.posture import compute_posture
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    try:
+        snap = read_latest("traffic")
+        if snap is None:
+            update_state_file(_resolve_state_file(),
+                              lambda s: {**s, "posture_summary": {"available": False}})
+            return
+        posture = compute_posture(snap)
+        posture["generated_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        posture["source_date"] = snap.get("generated_at", "")
+        update_state_file(_resolve_state_file(),
+                          lambda s: {**s, "posture_summary": posture})
+        logger.info("Posture summary: score={}", posture.get("score"))
+    except Exception as exc:
+        logger.warning("run_posture_summary failed: {}", exc)
+        try:
+            update_state_file(_resolve_state_file(),
+                              lambda s: {**s, "posture_summary": {"available": False}})
         except Exception:
             pass
 

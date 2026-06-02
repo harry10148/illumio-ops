@@ -595,14 +595,57 @@
       .rcard-meta { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; font-size:11px; color:var(--dim); align-items:center; }
       .rcard-meta-last { }
       .rcard-meta-sched { display:inline-block; padding:1px 7px; border-radius:999px; background:var(--surface-2,var(--bg2)); border:1px solid var(--border); font-size:10px; font-weight:500; color:var(--dim); }
-      /* ov-tiles: 4-tile overview grid */
+      /* ── Overview redesign: posture hero + sectioned tiles ── */
       #p-dashboard .ov-bar { display:flex; align-items:center; gap:12px; justify-content:flex-end;
         font-size:12px; color:var(--dim); margin-bottom:8px; }
       #p-dashboard .ov-bar .ov-fresh.stale { color:var(--danger,#ef4444); }
-      #p-dashboard .ov-tiles { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:16px; }
+
+      /* eyebrow section heading */
+      #p-dashboard .ov-eyebrow { font-family:'Montserrat',Arial,sans-serif; font-size:11px; font-weight:700;
+        letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin:18px 0 10px; }
+
+      /* posture hero card */
+      #p-dashboard .posture-hero { background:var(--bg2); border:1px solid var(--border);
+        border-left:3px solid var(--accent); border-radius:14px; padding:18px 24px;
+        display:flex; align-items:center; gap:30px; margin-bottom:14px; flex-wrap:wrap; }
+      #p-dashboard .posture-hero .posture-score { text-align:center; padding-right:26px;
+        border-right:1px solid var(--border); flex-shrink:0; }
+      #p-dashboard .posture-hero .posture-score .posture-score-n { font-family:'Montserrat',Arial,sans-serif;
+        font-size:44px; font-weight:700; color:var(--accent2); line-height:1; }
+      #p-dashboard .posture-hero .posture-score .posture-score-c { font-family:'Montserrat',Arial,sans-serif;
+        font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-top:5px; }
+      #p-dashboard .posture-hero .posture-score .posture-score-info { background:none; border:none;
+        cursor:pointer; color:var(--dim); padding:4px; line-height:1; display:inline-flex; align-items:center; }
+      #p-dashboard .posture-hero .posture-score .posture-score-info:hover { color:var(--accent); }
+      #p-dashboard .posture-hero .posture-score .posture-score-info .icon { width:14px; height:14px; }
+      #p-dashboard .posture-metrics { display:flex; gap:28px; flex:1; flex-wrap:wrap; align-items:center; }
+      #p-dashboard .posture-metric .posture-metric-v { font-family:'Montserrat',Arial,sans-serif;
+        font-size:24px; font-weight:700; line-height:1; }
+      #p-dashboard .posture-metric .posture-metric-k { font-size:11px; color:var(--dim); margin-top:4px; }
+      #p-dashboard .posture-metric .v-hi { color:var(--color-danger,#ff5a6e); }
+      #p-dashboard .posture-metric .v-md { color:var(--accent2); }
+      #p-dashboard .posture-metric .v-ok { color:var(--color-success,#16a34a); }
+      #p-dashboard .posture-unavailable { color:var(--dim); font-size:13px; padding:12px 0; }
+
+      /* risk feed */
+      #p-dashboard .ov-risk-feed { display:flex; flex-direction:column; gap:0; }
+      #p-dashboard .ov-risk-item { display:flex; gap:10px; align-items:flex-start; font-size:13px;
+        padding:9px 0; border-bottom:1px solid var(--border); }
+      #p-dashboard .ov-risk-item:last-child { border-bottom:none; }
+      #p-dashboard .ov-risk-tag { font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px;
+        color:#fff; white-space:nowrap; flex-shrink:0; }
+      #p-dashboard .ov-risk-tag.t-hi { background:var(--color-danger,#ff5a6e); }
+      #p-dashboard .ov-risk-tag.t-md { background:var(--accent2); color:#1c1c1f; }
+      #p-dashboard .ov-risk-tag.t-lo { background:var(--dim); }
+
+      /* 3-col + 4-col sectioned grids */
+      #p-dashboard .ov-grid-3 { display:grid; grid-template-columns:2fr 1fr; gap:14px; margin-bottom:14px; }
+      #p-dashboard .ov-grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:16px; }
+
+      /* branded tile cards */
       #p-dashboard .ov-tile { display:block; background:var(--bg2); border:1px solid var(--border);
         border-radius:12px; padding:14px 16px; text-decoration:none; color:inherit; cursor:pointer; }
-      #p-dashboard .ov-tile:hover { border-color:var(--slate-50,#64748b); }
+      #p-dashboard .ov-tile:hover { border-color:var(--accent); }
       #p-dashboard .ov-tile-h { display:flex; justify-content:space-between; align-items:center;
         font-weight:600; font-size:13px; margin-bottom:8px; }
       #p-dashboard .ov-mark { width:10px; height:10px; border-radius:999px; display:inline-block; background:var(--dim); }
@@ -611,30 +654,70 @@
       #p-dashboard .ov-mark.error { background:var(--color-danger,#dc2626); }
       #p-dashboard .ov-tile-body { font-size:13px; line-height:1.7; }
       #p-dashboard .ov-tile-body .ov-drill { font-size:11px; color:var(--dim); margin-top:6px; }
-      @media (max-width:1100px){ #p-dashboard .ov-tiles { grid-template-columns:repeat(3,1fr); } }
-      @media (max-width:700px){ #p-dashboard .ov-tiles { grid-template-columns:repeat(2,1fr); } }
+      #p-dashboard .ov-big { font-family:'Montserrat',Arial,sans-serif; font-size:27px; font-weight:700;
+        margin-top:8px; line-height:1; }
+      #p-dashboard .ov-sub { font-size:12.5px; color:var(--dim); margin-top:6px; line-height:1.5; }
+      #p-dashboard .ov-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+      #p-dashboard .ov-chip { font-size:12px;
+        background:color-mix(in oklab,var(--accent) 10%,transparent);
+        border:1px solid var(--border); border-radius:999px; padding:3px 10px; }
+      #p-dashboard .ov-chip b { color:var(--accent); }
+      #p-dashboard .ov-bar-track { height:13px;
+        background:color-mix(in oklab,var(--fg) 8%,transparent);
+        border-radius:999px; overflow:hidden; margin-top:10px; display:flex; }
+      #p-dashboard .ov-bar-track i { height:100%; display:block; }
+      @media (max-width:1100px){ #p-dashboard .ov-grid-4 { grid-template-columns:repeat(2,1fr); }
+        #p-dashboard .ov-grid-3 { grid-template-columns:1fr; } }
+      @media (max-width:700px){ #p-dashboard .ov-grid-4 { grid-template-columns:1fr 1fr; } }
     </style>
 
-    <!-- Overview bar + 6-tile grid (replaces 3-card db-status-row) -->
+    <!-- ── Overview: refresh bar ── -->
     <div class="ov-bar">
       <span class="ov-fresh"><span data-i18n="gui_ov_as_of">as of</span> <span id="ov-as-of">—</span></span>
       <label class="ov-auto"><input type="checkbox" id="ov-autorefresh" checked>
         <span data-i18n="gui_ov_autorefresh">auto-refresh</span> 10m</label>
       <button class="btn btn-sm" id="ov-refresh" data-i18n="gui_ov_refresh_now">Refresh</button>
     </div>
-    <div class="ov-tiles">
-      <a class="ov-tile" id="ov-ven"      data-tab="traffic-workload" data-qtab="workloads">
+
+    <!-- ── Section 1: Security Posture ── -->
+    <div class="ov-eyebrow" data-i18n="gui_ov_eyebrow_security">Security Posture</div>
+
+    <!-- posture hero (JS populates; hidden until data arrives) -->
+    <div id="ov-posture-hero" class="posture-hero" style="display:none">
+      <div class="posture-score">
+        <div class="posture-score-n" id="ov-posture-score-n">—</div>
+        <div class="posture-score-c" data-i18n="gui_ov_posture_score_label">Posture Score</div>
+        <button class="posture-score-info" aria-label="How is this calculated?"
+                data-action="openModal" data-args='["m-posture-score"]'>
+          <svg class="icon" aria-hidden="true"><use href="#icon-help-circle"></use></svg>
+        </button>
+      </div>
+      <div class="posture-metrics" id="ov-posture-metrics"></div>
+    </div>
+    <div id="ov-posture-unavailable" class="posture-unavailable" style="display:none">
+      <span data-i18n="gui_ov_posture_unavailable">Run a Security Posture report to populate this section.</span>
+    </div>
+
+    <!-- risk feed + alerts row -->
+    <div class="ov-grid-3">
+      <div class="ov-tile" id="ov-risk-feed-card">
+        <div class="ov-tile-h"><span data-i18n="gui_ov_risk_feed_title">Top Risk Findings</span></div>
+        <div id="ov-risk-feed-body" class="ov-risk-feed"></div>
+      </div>
+      <a class="ov-tile" id="ov-alerts" data-tab="events">
+        <div class="ov-tile-h"><span data-i18n="gui_ov_alerts_title">Alerts</span><i class="ov-mark" id="ov-alerts-mark"></i></div>
+        <div class="ov-tile-body" id="ov-alerts-body"></div></a>
+    </div>
+
+    <!-- ── Section 2: Operations & Estate ── -->
+    <div class="ov-eyebrow" data-i18n="gui_ov_eyebrow_ops">Operations &amp; Estate</div>
+    <div class="ov-grid-4">
+      <a class="ov-tile" id="ov-ven" data-tab="traffic-workload" data-qtab="workloads">
         <div class="ov-tile-h"><span data-i18n="gui_ov_ven_title">VEN Health</span><i class="ov-mark" id="ov-ven-mark"></i></div>
         <div class="ov-tile-body" id="ov-ven-body"></div></a>
-      <a class="ov-tile" id="ov-blocked"  data-tab="traffic-workload" data-qtab="traffic">
-        <div class="ov-tile-h"><span data-i18n="gui_ov_blocked_title">Blocked now</span><i class="ov-mark" id="ov-blocked-mark"></i></div>
-        <div class="ov-tile-body" id="ov-blocked-body"></div></a>
       <a class="ov-tile" id="ov-pipeline" data-tab="integrations">
         <div class="ov-tile-h"><span data-i18n="gui_ov_pipeline_title">Pipeline</span><i class="ov-mark" id="ov-pipeline-mark"></i></div>
         <div class="ov-tile-body" id="ov-pipeline-body"></div></a>
-      <a class="ov-tile" id="ov-alerts"   data-tab="events">
-        <div class="ov-tile-h"><span data-i18n="gui_ov_alerts_title">Alerts</span><i class="ov-mark" id="ov-alerts-mark"></i></div>
-        <div class="ov-tile-body" id="ov-alerts-body"></div></a>
       <div class="ov-tile" id="ov-os-dist">
         <div class="ov-tile-h"><span data-i18n="gui_ov_os_dist">OS Distribution</span></div>
         <div class="ov-tile-body" id="ov-os-dist-body"></div></div>
@@ -1366,6 +1449,29 @@
             <tr><td colspan="7" style="text-align:center;color:var(--dim)" data-i18n="gui_sched_empty">No report schedules configured.</td></tr>
           </tbody>
         </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Posture Score Explanation Modal -->
+  <div class="modal-bg" role="dialog" aria-modal="true" id="m-posture-score">
+    <div class="modal" style="max-width:560px;">
+      <h2><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg>
+        <span data-i18n="gui_posture_modal_title">How the Posture Score is Calculated</span></h2>
+      <p id="ov-posture-formula" style="font-size:13px;color:var(--dim);margin:10px 0 16px;line-height:1.6;"></p>
+      <table class="rule-table" id="ov-posture-breakdown-table" style="font-size:13px;margin-bottom:16px;">
+        <thead><tr>
+          <th data-i18n="gui_posture_modal_col_component">Component</th>
+          <th data-i18n="gui_posture_modal_col_value">Value</th>
+          <th data-i18n="gui_posture_modal_col_weight">Weight</th>
+          <th data-i18n="gui_posture_modal_col_points">Points</th>
+        </tr></thead>
+        <tbody id="ov-posture-breakdown-body"></tbody>
+      </table>
+      <div id="ov-posture-risk-detail" style="font-size:13px;color:var(--dim);line-height:1.8;"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" data-action="closeModal" data-args='["m-posture-score"]'
+                data-i18n="gui_close">Close</button>
       </div>
     </div>
   </div>

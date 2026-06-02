@@ -180,6 +180,18 @@ def _overview_enforcement(state):
     return {"by_mode": ed["by_mode"], "total": ed.get("total", 0)}
 
 
+def _overview_posture(state):
+    """Return posture_summary from state if it has a score, else {available: False}.
+
+    READ ONLY — no computation here. The score is precomputed by the
+    run_posture_summary background job.
+    """
+    ps = state.get("posture_summary")
+    if isinstance(ps, dict) and ("score" in ps or ps.get("available") is False):
+        return ps
+    return {"available": False}
+
+
 def _overview_ven(state):
     vs = state.get("ven_summary")
     if not isinstance(vs, dict) or "total" not in vs:
@@ -295,6 +307,7 @@ def make_dashboard_blueprint(
             "alerts": _overview_alerts(state),
             "os_dist": _overview_os_dist(state),
             "enforcement": _overview_enforcement(state),
+            "posture": _overview_posture(state),
         })
 
     @bp.route('/api/dashboard/queries', methods=['GET'])
