@@ -181,11 +181,25 @@ def _overview_enforcement(state):
 
 
 def _overview_posture(state):
-    """Return posture_summary from state if it has a score, else {available: False}.
+    """Compute the posture score directly from the latest report KPI snapshot.
 
-    READ ONLY — no computation here. The score is precomputed by the
-    run_posture_summary background job.
+    Reads a tiny (~1 KB) KPI-only snapshot and runs simple arithmetic — NOT a
+    traffic recompute — so it stays fast while avoiding the state-write race
+    (the analyzer's monitor-cycle state merge could otherwise stomp a
+    background-job-written posture_summary). Falls back to any cached
+    posture_summary in state, then to {available: False}.
     """
+    try:
+        from src.report.snapshot_store import read_latest
+        from src.report.posture import compute_posture
+        snap = read_latest("traffic")
+        if snap:
+            p = compute_posture(snap.get("kpis") or snap)
+            if p.get("available"):
+                p["source_date"] = snap.get("generated_at", "")
+                return p
+    except Exception:
+        pass
     ps = state.get("posture_summary")
     if isinstance(ps, dict) and ("score" in ps or ps.get("available") is False):
         return ps
