@@ -428,9 +428,10 @@ let _toastTimer = null;
 function toast(msg, type) {
   // type: 'err'|'warn'|'info' or falsy for success
   const t = $('toast');
-  const icons = { err: '✕', warn: '⚠', info: 'ℹ' };
+  const _svgIcon = (id) => `<svg class="icon" aria-hidden="true" style="width:14px;height:14px;vertical-align:middle;"><use href="#${id}"></use></svg>`;
+  const icons = { err: _svgIcon('icon-cross'), warn: _svgIcon('icon-alert'), info: 'ℹ' };
   const cls = type === 'err' ? ' err' : type === 'warn' ? ' warn' : type === 'info' ? ' info' : '';
-  t.innerHTML = `<span class="toast-icon">${icons[type] || '✓'}</span><span>${escapeHtml(msg)}</span><button class="toast-close" onclick="this.parentElement.className='toast'" aria-label="Close">✕</button>`;
+  t.innerHTML = `<span class="toast-icon">${icons[type] || _svgIcon('icon-check')}</span><span>${escapeHtml(msg)}</span><button class="toast-close" onclick="this.parentElement.className='toast'" aria-label="Close">${_svgIcon('icon-cross')}</button>`;
   t.className = 'toast' + cls + ' show';
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => t.className = 'toast', 4000);

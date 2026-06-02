@@ -1171,7 +1171,7 @@ function renderDashboardQueries() {
             <span style="font-size:10px;background:var(--dim);color:#fff;padding:2px 6px;border-radius:4px;margin-right:8px;">${rankLabel}</span>
             <span style="flex:1"></span>
             <span id="d-qstate-${i}" style="color:var(--dim);font-size:0.8rem;margin-right:12px;"></span>
-            <button class="btn btn-sm" style="background:var(--bg);border:1px solid var(--border);margin-right:6px;" onclick="openQueryModal(${i})" aria-label="${_t('gui_edit_query_widget')}" title="${_t('gui_edit_query_widget')}">✏️</button>
+            <button class="btn btn-sm" style="background:var(--bg);border:1px solid var(--border);margin-right:6px;" onclick="openQueryModal(${i})" aria-label="${_t('gui_edit_query_widget')}" title="${_t('gui_edit_query_widget')}"><svg class="icon" aria-hidden="true"><use href="#icon-edit"></use></svg></button>
             <button class="btn btn-primary btn-sm" onclick="runTop10Query(${i})">${_t('gui_run_btn')}</button>
          </div>
          
@@ -1229,7 +1229,7 @@ function renderOverview(d) {
   document.getElementById('ov-ven-body').innerHTML = (v.verdict === 'unknown')
     ? '<div style="color:var(--dim)">—</div>'
     : _ovRows([(v.online + '/' + v.total + ' ' + T('gui_ov_online','online')),
-               (v.offline ? ('⚠ ' + v.offline + ' ' + T('gui_ov_offline','offline')) : ('0 ' + T('gui_ov_offline','offline'))),
+               (v.offline ? ('<svg class="icon" aria-hidden="true" style="width:12px;height:12px;vertical-align:middle;color:var(--warn);"><use href="#icon-alert"></use></svg> ' + v.offline + ' ' + T('gui_ov_offline','offline')) : ('0 ' + T('gui_ov_offline','offline'))),
                (T('gui_ov_oldest_hb','oldest heartbeat') + ' ' + _fmtAge(v.oldest_heartbeat_age_s))])
       + '<div class="ov-drill">→ Workloads</div>';
   // Blocked

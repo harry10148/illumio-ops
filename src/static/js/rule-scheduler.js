@@ -194,7 +194,7 @@ async function rsFetchRulesets() {
     }
     data.items.forEach(rs => {
       const schMark = rs.schedule_type === 1
-        ? h('span', { class: 'rs-mark-rs', title: _t('gui_rs_sch_badge_sched') }, '★')
+        ? h('span', { class: 'rs-mark-rs', title: _t('gui_rs_sch_badge_sched') }, h('svg', { class: 'icon', 'aria-hidden': 'true', style: 'width:10px;height:10px;' }, h('use', { href: '#icon-star' })))
         : rs.schedule_type === 2
           ? h('span', { class: 'rs-mark-child', title: _t('gui_rs_sch_badge_child') }, '●')
           : null;
@@ -275,7 +275,7 @@ async function rsViewRuleset(rsId) {
     const statusBadge = rsRow.enabled
       ? '<span class="rs-badge rs-badge-on">ON</span>'
       : '<span class="rs-badge rs-badge-off">OFF</span>';
-    const schRsBadge = rsRow.is_scheduled ? ' &nbsp; <span class="rs-mark-rs" title="' + _t('gui_rs_sch_badge_sched') + '">★ ' + _t('gui_rs_sch_badge_sched') + '</span>' : '';
+    const schRsBadge = rsRow.is_scheduled ? ' &nbsp; <span class="rs-mark-rs" title="' + _t('gui_rs_sch_badge_sched') + '"><svg class="icon" aria-hidden="true" style="width:10px;height:10px;"><use href="#icon-star"></use></svg> ' + _t('gui_rs_sch_badge_sched') + '</span>' : '';
     const detailMeta = $('rs-detail-meta');
     detailMeta.innerHTML = 'ID: ' + rsRow.id + ' &nbsp; ' + provBadge + ' &nbsp; ' + statusBadge + schRsBadge + ' &nbsp; ';
     const schedBtn = document.createElement('button');
