@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ html_lang|default('en') }}">
 
 <head>
   <meta charset="utf-8">
@@ -155,8 +155,7 @@
               aria-expanded="false"
               aria-controls="hdr-menu-panel"
               data-i18n="gui_hdr_operations">
-        Operations
-        <svg class="icon" aria-hidden="true" style="margin-left:4px;">
+        <svg class="icon" aria-hidden="true" style="margin-right:4px;">
           <use href="#icon-settings"></use>
         </svg>
       </button>
@@ -1935,15 +1934,15 @@
     <!-- Sub-tab navigation (Phase 1.1) — mirrors .sub-nav-btn pattern from #p-traffic-workload -->
     <div class="sub-nav" role="tablist" aria-label="Settings sections">
       <button class="sub-nav-btn active" data-action="switchSettingsTab" data-args='["pce"]' id="sbtn-pce" role="tab" aria-selected="true" aria-controls="s-panel-pce">
-        <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+        <svg class="icon" aria-hidden="true"><use href="#icon-cpu"></use></svg>
         <span data-i18n="gui_settings_tab_pce"></span>
       </button>
       <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["channels"]' id="sbtn-channels" role="tab" aria-selected="false" aria-controls="s-panel-channels">
-        <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+        <svg class="icon" aria-hidden="true"><use href="#icon-alert"></use></svg>
         <span data-i18n="gui_settings_tab_channels"></span>
       </button>
       <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["display"]' id="sbtn-display" role="tab" aria-selected="false" aria-controls="s-panel-display">
-        <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+        <svg class="icon" aria-hidden="true"><use href="#icon-settings"></use></svg>
         <span data-i18n="gui_settings_tab_display"></span>
       </button>
       <button class="sub-nav-btn" data-action="switchSettingsTab" data-args='["security"]' id="sbtn-security" role="tab" aria-selected="false" aria-controls="s-panel-security">
@@ -1960,7 +1959,7 @@
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:14px;">
-      <button class="btn btn-primary" data-action="testConn" data-i18n="gui_test_conn"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg> Test Connection</button>
+      <button class="btn btn-primary" data-action="testConn" data-i18n="gui_test_conn"><svg class="icon" aria-hidden="true"><use href="#icon-activity"></use></svg> Test Connection</button>
     </div>
     <div class="log-box" id="s-log" style="height:80px;margin-bottom:14px;font-size:0.85rem;">[Ready]</div>
 

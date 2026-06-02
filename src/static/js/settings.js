@@ -678,6 +678,7 @@ async function saveSettings() {
   const pluginConfig = _collectAlertPluginConfig();
   const theme = rv('s-theme');
   const lang = rv('s-lang');
+  const _prevLang = (_settings.settings || {}).language;
   // Apply the theme the user just picked (and persist it to the same store the
   // top-bar selector uses) — previously this re-applied the *stored* mode, so
   // toggling the Settings radio had no visible effect.
@@ -727,6 +728,13 @@ async function saveSettings() {
   if (typeof renderDashboardQueries === 'function') renderDashboardQueries();
   _resetSettingsDirty();
   toast(_t('gui_msg_settings_saved'));
+  // A language change requires a full reload: the SPA bootstraps its
+  // translation dictionary (and many JS-rendered components fix their strings
+  // at render time) from the index route, so re-fetching translations alone
+  // leaves dynamically-rendered views in the previous language.
+  if (lang && _prevLang && lang !== _prevLang) {
+    location.reload();
+  }
 }
 
 /* ─── PCE Profile Management ──────────────────────────────────────── */
