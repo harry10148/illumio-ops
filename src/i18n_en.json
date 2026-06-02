@@ -1295,7 +1295,7 @@
   "gui_ev_detail_user_ip": "User / IP",
   "gui_ev_failed_to_load": "Failed to load events",
   "gui_ev_field_matchers": "Field Matchers",
-  "gui_ev_field_matchers_hint": "Most rules do not need this. Use one matcher per line in the format field.path=pattern when you need to target a specific actor, source IP, or nested field.",
+  "gui_ev_field_matchers_hint": "Most rules do not need this. Use one matcher per line in the format field.path=pattern (e.g. created_by.user.username=admin@example.com); use * as a wildcard. Only needed to target a specific actor, source IP, or nested field.",
   "gui_ev_load_failed": "Load failed",
   "gui_ev_load_prompt": "Load events to inspect parsed and raw event data.",
   "gui_ev_loading": "Loading events from PCE...",
