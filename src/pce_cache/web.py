@@ -220,7 +220,7 @@ def api_cache_health():
 @bp.route("/throughput", methods=["GET"])
 @login_required
 def api_cache_throughput():
-    """Return ingest event and traffic counts for the last 1 hour."""
+    """Return ingest event and traffic counts for the last 1 hour and 24 hours."""
     import datetime as dt
     from sqlalchemy import func, select
     from src.pce_cache.models import PceEvent, PceTrafficFlowRaw
@@ -229,13 +229,18 @@ def api_cache_throughput():
         sf = _get_sf()
     except Exception as e:
         return jsonify({"error": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
-    hr = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=1)
+    now = dt.datetime.now(dt.timezone.utc)
+    hr = now - dt.timedelta(hours=1)
+    day = now - dt.timedelta(hours=24)
     with sf() as s:
         ev = s.execute(select(func.count()).select_from(PceEvent)
                        .where(PceEvent.ingested_at >= hr)).scalar() or 0
         tr = s.execute(select(func.count()).select_from(PceTrafficFlowRaw)
                        .where(PceTrafficFlowRaw.ingested_at >= hr)).scalar() or 0
-    return jsonify({"events_1h": int(ev), "traffic_raw_1h": int(tr), "traffic_agg_1h": 0})
+        tr24 = s.execute(select(func.count()).select_from(PceTrafficFlowRaw)
+                         .where(PceTrafficFlowRaw.ingested_at >= day)).scalar() or 0
+    return jsonify({"events_1h": int(ev), "traffic_raw_1h": int(tr), "traffic_agg_1h": 0,
+                    "traffic_raw_24h": int(tr24)})
 
 
 @bp.route("/settings", methods=["GET"])

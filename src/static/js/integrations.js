@@ -1353,11 +1353,14 @@ function _buildOvPipelineHealth(health) {
     + '</div>';
 }
 
-function _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq) {
+function _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq, throughput) {
   var siemClass = totalFailed > 0 ? 'card-err' : 'card-ok';
   var dlqClass  = totalDlq  > 0 ? 'card-warn' : 'card-ok';
   var cacheEvents  = Number(cache.events      || 0);
   var cacheTraffic = Number(cache.traffic_raw || 0) + Number(cache.traffic_agg || 0);
+  var traffic24h   = throughput && throughput.traffic_raw_24h != null ? Number(throughput.traffic_raw_24h) : null;
+  var traffic24hBadge = traffic24h == null ? ''
+    : ' <span style="font-size:.7rem;color:var(--accent2);">' + _t('gui_ov_traffic_24h').replace('{n}', traffic24h.toLocaleString()) + '</span>';
   var failedColor  = totalFailed > 0 ? 'var(--color-danger)' : 'var(--dim)';
   var queueInner = '<div style="display:flex;gap:16px;margin-top:6px;">'
     + '<div><div style="font-size:.7rem;color:var(--dim);" data-i18n="gui_ov_pending">pending</div>'
@@ -1373,6 +1376,7 @@ function _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, 
     + '<div class="value" style="font-size:.95rem;line-height:1.5;">'
     + cacheEvents.toLocaleString() + ' <span style="font-size:.7rem;color:var(--dim);" data-i18n="gui_ov_events">events</span><br>'
     + cacheTraffic.toLocaleString() + ' <span style="font-size:.7rem;color:var(--dim);" data-i18n="gui_ov_traffic">traffic</span>'
+    + traffic24hBadge
     + '</div>'
     + '</div>'
     + '<div class="card card-neutral">'
@@ -1430,18 +1434,20 @@ window._integrations.setRender('overview', async function renderOverview() {
   if (!el) return;
   el.innerHTML = '<p class="subtitle" data-i18n="gui_it_loading">Loading...</p>';
 
-  var cache, siem, settings, health;
+  var cache, siem, settings, health, throughput;
   try {
     var results = await Promise.all([
       fetch('/api/cache/status').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
       fetch('/api/siem/status').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
       fetch('/api/settings').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
       fetch('/api/cache/health').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
+      fetch('/api/cache/throughput').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
     ]);
-    cache    = results[0] || {};
-    siem     = results[1] || {status: []};
-    settings = results[2] || {};
-    health   = results[3] || {};
+    cache      = results[0] || {};
+    siem       = results[1] || {status: []};
+    settings   = results[2] || {};
+    health     = results[3] || {};
+    throughput = results[4] || {};
   } catch (err) {
     el.textContent = '';
     var p = document.createElement('p');
@@ -1461,7 +1467,7 @@ window._integrations.setRender('overview', async function renderOverview() {
   });
 
   el.innerHTML = _buildOvPipelineHealth(health)
-               + _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq)
+               + _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq, throughput)
                + _buildOvRecentTable(siemStatus)
                + _buildAlertChannelCards(settings);
   if (typeof window.i18nApply === 'function') window.i18nApply();
