@@ -264,7 +264,7 @@ def run_posture_summary(cm) -> None:
             update_state_file(_resolve_state_file(),
                               lambda s: {**s, "posture_summary": {"available": False}})
             return
-        posture = compute_posture(snap)
+        posture = compute_posture(snap.get("kpis") or snap)
         posture["generated_at"] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
         posture["source_date"] = snap.get("generated_at", "")
         update_state_file(_resolve_state_file(),
