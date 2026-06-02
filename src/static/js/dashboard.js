@@ -1265,6 +1265,21 @@ function renderOverview(d) {
       T('gui_ov_suppressed','suppressed') + ' ' + (a.suppressed || 0),
       T('gui_ov_failed','failed') + ' ' + (a.failed || 0)])
     + '<div class="ov-drill">→ Events</div>';
+  // OS Distribution
+  var os = d.os_dist;
+  document.getElementById('ov-os-dist-body').innerHTML = (os && os.by_family && Object.keys(os.by_family).length)
+    ? _ovRows(Object.keys(os.by_family).map(function (fam) {
+        return fam + ' ' + os.by_family[fam];
+      }).concat([T('gui_ov_total','total') + ' ' + (os.total || 0)]))
+    : '<div style="color:var(--dim)">—</div>';
+  // Enforcement Modes
+  var enf = d.enforcement;
+  var _ENF_ORDER = ['full','selective','visibility_only','idle'];
+  document.getElementById('ov-enforcement-body').innerHTML = (enf && enf.by_mode)
+    ? _ovRows(_ENF_ORDER.filter(function (m) { return enf.by_mode[m] != null; }).map(function (m) {
+        return m.replace('_', ' ') + ' ' + enf.by_mode[m];
+      }).concat([T('gui_ov_total','total') + ' ' + (enf.total || 0)]))
+    : '<div style="color:var(--dim)">—</div>';
   // freshness
   var asOf = document.getElementById('ov-as-of');
   if (asOf && d.as_of) asOf.textContent = new Date(d.as_of).toLocaleTimeString();

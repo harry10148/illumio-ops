@@ -164,6 +164,22 @@ def _overview_alerts(state):
             "recent": last24[-5:], "verdict": verdict}
 
 
+def _overview_os_dist(state):
+    vs = state.get("ven_summary") or {}
+    od = vs.get("os_distribution")
+    if not isinstance(od, dict) or "by_family" not in od:
+        return None
+    return {"by_family": od["by_family"], "total": od.get("total", 0)}
+
+
+def _overview_enforcement(state):
+    vs = state.get("ven_summary") or {}
+    ed = vs.get("enforcement_distribution")
+    if not isinstance(ed, dict) or "by_mode" not in ed:
+        return None
+    return {"by_mode": ed["by_mode"], "total": ed.get("total", 0)}
+
+
 def _overview_ven(state):
     vs = state.get("ven_summary")
     if not isinstance(vs, dict) or "total" not in vs:
@@ -277,6 +293,8 @@ def make_dashboard_blueprint(
             "blocked": _overview_blocked(cm),
             "pipeline": _overview_pipeline(cm),
             "alerts": _overview_alerts(state),
+            "os_dist": _overview_os_dist(state),
+            "enforcement": _overview_enforcement(state),
         })
 
     @bp.route('/api/dashboard/queries', methods=['GET'])

@@ -599,7 +599,7 @@
       #p-dashboard .ov-bar { display:flex; align-items:center; gap:12px; justify-content:flex-end;
         font-size:12px; color:var(--dim); margin-bottom:8px; }
       #p-dashboard .ov-bar .ov-fresh.stale { color:var(--danger,#ef4444); }
-      #p-dashboard .ov-tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+      #p-dashboard .ov-tiles { display:grid; grid-template-columns:repeat(6,1fr); gap:12px; margin-bottom:16px; }
       #p-dashboard .ov-tile { display:block; background:var(--bg2); border:1px solid var(--border);
         border-radius:12px; padding:14px 16px; text-decoration:none; color:inherit; cursor:pointer; }
       #p-dashboard .ov-tile:hover { border-color:var(--slate-50,#64748b); }
@@ -611,10 +611,11 @@
       #p-dashboard .ov-mark.error { background:var(--color-danger,#dc2626); }
       #p-dashboard .ov-tile-body { font-size:13px; line-height:1.7; }
       #p-dashboard .ov-tile-body .ov-drill { font-size:11px; color:var(--dim); margin-top:6px; }
-      @media (max-width:900px){ #p-dashboard .ov-tiles { grid-template-columns:repeat(2,1fr); } }
+      @media (max-width:1100px){ #p-dashboard .ov-tiles { grid-template-columns:repeat(3,1fr); } }
+      @media (max-width:700px){ #p-dashboard .ov-tiles { grid-template-columns:repeat(2,1fr); } }
     </style>
 
-    <!-- Overview bar + 4-tile grid (replaces 3-card db-status-row) -->
+    <!-- Overview bar + 6-tile grid (replaces 3-card db-status-row) -->
     <div class="ov-bar">
       <span class="ov-fresh"><span data-i18n="gui_ov_as_of">as of</span> <span id="ov-as-of">—</span></span>
       <label class="ov-auto"><input type="checkbox" id="ov-autorefresh" checked>
@@ -634,6 +635,12 @@
       <a class="ov-tile" id="ov-alerts"   data-tab="events">
         <div class="ov-tile-h"><span data-i18n="gui_ov_alerts_title">Alerts</span><i class="ov-mark" id="ov-alerts-mark"></i></div>
         <div class="ov-tile-body" id="ov-alerts-body"></div></a>
+      <div class="ov-tile" id="ov-os-dist">
+        <div class="ov-tile-h"><span data-i18n="gui_ov_os_dist">OS Distribution</span></div>
+        <div class="ov-tile-body" id="ov-os-dist-body"></div></div>
+      <div class="ov-tile" id="ov-enforcement">
+        <div class="ov-tile-h"><span data-i18n="gui_ov_enforcement_modes">Enforcement Modes</span></div>
+        <div class="ov-tile-body" id="ov-enforcement-body"></div></div>
     </div>
 
     <!-- ══ Real-time status cards ══════════════════════════════════════ -->

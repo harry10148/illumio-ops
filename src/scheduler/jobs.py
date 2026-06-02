@@ -219,12 +219,15 @@ def run_ven_summary(cm) -> None:
                 attention.append({"host": host, "reason": reason})
             if hslh is not None:
                 oldest_age = max(oldest_age, hslh * 3600.0)
+        from src.report.analysis import estate_inventory
         summary = {
             "total": total, "online": online, "offline": total - online,
             "degraded": 0,
             "oldest_heartbeat_age_s": int(oldest_age),
             "attention": attention[:20],
             "updated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "os_distribution": estate_inventory.os_distribution(workloads or []),
+            "enforcement_distribution": estate_inventory.enforcement_distribution(workloads or []),
         }
         update_state_file(_resolve_state_file(),
                           lambda s: {**s, "ven_summary": summary})
