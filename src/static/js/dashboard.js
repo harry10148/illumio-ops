@@ -1220,30 +1220,186 @@ function _fmtAge(s) {
   s = Math.max(0, Math.floor(Number(s) || 0));
   if (s < 60) return s + 's'; if (s < 3600) return Math.floor(s / 60) + 'm'; return Math.floor(s / 3600) + 'h';
 }
+function _ovSeverityClass(val, hiThresh, mdThresh) {
+  // hiThresh: value >= this is danger; mdThresh: value >= this is warning; else ok
+  if (val == null) return '';
+  if (val >= hiThresh) return 'v-hi';
+  if (val >= mdThresh) return 'v-md';
+  return 'v-ok';
+}
+
+function _renderPostureHero(posture, T) {
+  var hero   = document.getElementById('ov-posture-hero');
+  var nodata = document.getElementById('ov-posture-unavailable');
+  if (!hero || !nodata) return;
+
+  if (!posture || posture.available === false || posture.score == null) {
+    hero.style.display   = 'none';
+    nodata.style.display = '';
+    return;
+  }
+
+  hero.style.display   = '';
+  nodata.style.display = 'none';
+
+  // Score number
+  var scoreEl = document.getElementById('ov-posture-score-n');
+  if (scoreEl) scoreEl.textContent = String(posture.score);
+
+  // Component metrics
+  var metricsEl = document.getElementById('ov-posture-metrics');
+  if (metricsEl) {
+    var comps = Array.isArray(posture.components) ? posture.components : [];
+    var html = '';
+    comps.forEach(function (c) {
+      var valStr = (c.value != null ? c.value : '—') + (c.unit || '');
+      // Severity colouring: risk_health >= 70 ok, >= 40 md, else hi
+      // coverage/readiness: >= 70 ok, >= 40 md, else hi
+      var cls = '';
+      if (c.key === 'risk_health') {
+        cls = c.value >= 70 ? 'v-ok' : (c.value >= 40 ? 'v-md' : 'v-hi');
+      } else {
+        cls = c.value >= 70 ? 'v-ok' : (c.value >= 40 ? 'v-md' : 'v-hi');
+      }
+      var label = T(c.label_key, c.key);
+      html += '<div class="posture-metric">'
+            + '<div class="posture-metric-v ' + cls + '">' + valStr + '</div>'
+            + '<div class="posture-metric-k">' + label + '</div>'
+            + '</div>';
+    });
+    // Add risk detail metrics inline (ransomware / lateral / uncovered)
+    var rh = comps.find(function (c) { return c.key === 'risk_health'; });
+    if (rh && rh.detail) {
+      var det = rh.detail;
+      if (det.ransomware_apps != null) {
+        var rCls = det.ransomware_apps > 0 ? 'v-hi' : 'v-ok';
+        html += '<div class="posture-metric">'
+              + '<div class="posture-metric-v ' + rCls + '">' + det.ransomware_apps + '</div>'
+              + '<div class="posture-metric-k">' + T('gui_ov_posture_ransomware_apps', 'Ransomware apps') + '</div>'
+              + '</div>';
+      }
+      if (det.lateral != null) {
+        var latStr = String(det.lateral);
+        var lCls = (latStr === 'HIGH' || latStr === 'CRITICAL') ? 'v-hi' : (latStr === 'MEDIUM' ? 'v-md' : 'v-ok');
+        html += '<div class="posture-metric">'
+              + '<div class="posture-metric-v ' + lCls + '">' + latStr + '</div>'
+              + '<div class="posture-metric-k">' + T('gui_ov_posture_lateral', 'Lateral movement') + '</div>'
+              + '</div>';
+      }
+    }
+    metricsEl.innerHTML = html;
+  }
+
+  // Populate modal
+  var formulaEl = document.getElementById('ov-posture-formula');
+  if (formulaEl) formulaEl.textContent = posture.formula || '';
+
+  var tbodyEl = document.getElementById('ov-posture-breakdown-body');
+  if (tbodyEl) {
+    var comps2 = Array.isArray(posture.components) ? posture.components : [];
+    tbodyEl.innerHTML = comps2.map(function (c) {
+      var label = T(c.label_key, c.key);
+      var pts   = c.points != null ? Number(c.points).toFixed(1) : '—';
+      return '<tr><td>' + label + '</td>'
+           + '<td>' + (c.value != null ? c.value : '—') + (c.unit || '') + '</td>'
+           + '<td>' + (c.weight != null ? (c.weight * 100).toFixed(0) + '%' : '—') + '</td>'
+           + '<td>' + pts + '</td></tr>';
+    }).join('');
+  }
+
+  var riskDetailEl = document.getElementById('ov-posture-risk-detail');
+  if (riskDetailEl) {
+    var comps3 = Array.isArray(posture.components) ? posture.components : [];
+    var rh2 = comps3.find(function (c) { return c.key === 'risk_health'; });
+    if (rh2 && rh2.detail) {
+      var det2 = rh2.detail;
+      var lines = [];
+      if (det2.ransomware_apps != null)
+        lines.push(T('gui_ov_posture_modal_ransomware', 'Ransomware exposure') + ': ' + det2.ransomware_apps + ' apps');
+      if (det2.lateral != null)
+        lines.push(T('gui_ov_posture_modal_lateral', 'Lateral movement risk') + ': ' + det2.lateral);
+      if (det2.uncovered != null)
+        lines.push(T('gui_ov_posture_modal_uncovered', 'Uncovered flows') + ': ' + det2.uncovered);
+      riskDetailEl.innerHTML = lines.map(function (l) { return '<div>' + l + '</div>'; }).join('');
+    } else {
+      riskDetailEl.innerHTML = '';
+    }
+  }
+}
+
+function _renderRiskFeed(posture, T) {
+  var feedEl = document.getElementById('ov-risk-feed-body');
+  if (!feedEl) return;
+  if (!posture || posture.available === false) {
+    feedEl.innerHTML = '<div style="color:var(--dim);font-size:13px;">'
+      + T('gui_ov_posture_unavailable', 'Run a Security Posture report to populate this section.')
+      + '</div>';
+    return;
+  }
+  var comps = Array.isArray(posture.components) ? posture.components : [];
+  var rh = comps.find(function (c) { return c.key === 'risk_health'; });
+  var det = (rh && rh.detail) ? rh.detail : {};
+  var items = [];
+  if (det.ransomware_apps != null && det.ransomware_apps > 0) {
+    items.push({ cls: 't-hi', tag: T('gui_ov_risk_tag_hi', 'Critical'),
+      text: T('gui_ov_risk_ransomware', 'Ransomware exposure: {n} apps').replace('{n}', det.ransomware_apps) });
+  }
+  if (det.lateral != null) {
+    var latStr2 = String(det.lateral);
+    var tagCls = (latStr2 === 'HIGH' || latStr2 === 'CRITICAL') ? 't-hi' : 't-md';
+    items.push({ cls: tagCls, tag: T('gui_ov_risk_tag_lateral', 'Lateral'),
+      text: T('gui_ov_risk_lateral', 'Lateral movement risk: {level}').replace('{level}', latStr2) });
+  }
+  if (det.uncovered != null && det.uncovered > 0) {
+    items.push({ cls: 't-lo', tag: T('gui_ov_risk_tag_lo', 'Coverage'),
+      text: T('gui_ov_risk_uncovered', 'Uncovered flows: {n}').replace('{n}', (det.uncovered || 0).toLocaleString()) });
+  }
+  if (items.length === 0) {
+    feedEl.innerHTML = '<div style="color:var(--dim);font-size:13px;padding:8px 0;">'
+      + T('gui_ov_risk_no_findings', 'No critical findings. Run a posture report to refresh.')
+      + '</div>';
+    return;
+  }
+  feedEl.innerHTML = items.map(function (it) {
+    return '<div class="ov-risk-item">'
+         + '<span class="ov-risk-tag ' + it.cls + '">' + it.tag + '</span>'
+         + '<span>' + it.text + '</span>'
+         + '</div>';
+  }).join('');
+}
+
 function renderOverview(d) {
   d = d || {};
   var T = function(k, f) { return (window._t ? window._t(k) : f); };
+  // Posture hero + risk feed
+  _renderPostureHero(d.posture, T);
+  _renderRiskFeed(d.posture, T);
   // VEN
   var v = d.ven || {};
   _ovMark('ov-ven-mark', v.verdict);
   document.getElementById('ov-ven-body').innerHTML = (v.verdict === 'unknown')
     ? '<div style="color:var(--dim)">—</div>'
-    : _ovRows([(v.online + '/' + v.total + ' ' + T('gui_ov_online','online')),
-               (v.offline ? ('<svg class="icon" aria-hidden="true" style="width:12px;height:12px;vertical-align:middle;color:var(--warn);"><use href="#icon-alert"></use></svg> ' + v.offline + ' ' + T('gui_ov_offline','offline')) : ('0 ' + T('gui_ov_offline','offline'))),
-               (T('gui_ov_oldest_hb','oldest heartbeat') + ' ' + _fmtAge(v.oldest_heartbeat_age_s))])
-      + '<div class="ov-drill">→ Workloads</div>';
-  // Blocked
+    : '<div class="ov-big">' + v.online + '/' + v.total + '</div>'
+      + '<div class="ov-sub">'
+        + (v.offline ? v.offline + ' ' + T('gui_ov_offline','offline') + ' &middot; ' : '')
+        + T('gui_ov_oldest_hb','oldest heartbeat') + ' ' + _fmtAge(v.oldest_heartbeat_age_s)
+      + '</div>'
+      + '<div class="ov-drill">&#8594; Workloads</div>';
+  // Blocked (tile removed from redesign layout — guard for safety)
   var b = d.blocked || {};
-  _ovMark('ov-blocked-mark', b.verdict);
-  document.getElementById('ov-blocked-body').innerHTML =
-    (b.verdict === 'no_cache')
-      ? '<div style="color:var(--warn);font-size:12px;">' + T('gui_ov_cache_required','Enable PCE Cache') + '</div>'
-    : (b.verdict === 'unknown')
-      ? '<div style="color:var(--dim)">—</div>'
-    : _ovRows(['Blocked ' + (b.blocked || 0).toLocaleString(),
-               'Potentially Blocked ' + (b.potential || 0).toLocaleString(),
-               (b.vs_prev_pct >= 0 ? '↑' : '↓') + Math.abs(b.vs_prev_pct || 0) + '% ' + T('gui_ov_vs_prev','vs prev')])
-      + '<div class="ov-drill">→ Traffic</div>';
+  var _blockedEl = document.getElementById('ov-blocked-body');
+  if (_blockedEl) {
+    _ovMark('ov-blocked-mark', b.verdict);
+    _blockedEl.innerHTML =
+      (b.verdict === 'no_cache')
+        ? '<div style="color:var(--warn);font-size:12px;">' + T('gui_ov_cache_required','Enable PCE Cache') + '</div>'
+      : (b.verdict === 'unknown')
+        ? '<div style="color:var(--dim)">—</div>'
+      : _ovRows(['Blocked ' + (b.blocked || 0).toLocaleString(),
+                 'Potentially Blocked ' + (b.potential || 0).toLocaleString(),
+                 (b.vs_prev_pct >= 0 ? '↑' : '↓') + Math.abs(b.vs_prev_pct || 0) + '% ' + T('gui_ov_vs_prev','vs prev')])
+        + '<div class="ov-drill">&#8594; Traffic</div>';
+  }
   // Pipeline
   var p = d.pipeline || {};
   _ovMark('ov-pipeline-mark', p.verdict);
@@ -1260,26 +1416,46 @@ function renderOverview(d) {
   // Alerts
   var a = d.alerts || {};
   _ovMark('ov-alerts-mark', a.verdict);
-  document.getElementById('ov-alerts-body').innerHTML = _ovRows([
-      T('gui_ov_fired_24h','fired 24h') + ' ' + (a.fired_24h || 0),
-      T('gui_ov_suppressed','suppressed') + ' ' + (a.suppressed || 0),
-      T('gui_ov_failed','failed') + ' ' + (a.failed || 0)])
-    + '<div class="ov-drill">→ Events</div>';
+  document.getElementById('ov-alerts-body').innerHTML =
+    '<div class="ov-big">' + (a.fired_24h || 0) + '</div>'
+    + '<div class="ov-sub">'
+      + T('gui_ov_suppressed','suppressed') + ' ' + (a.suppressed || 0)
+      + ' &middot; ' + T('gui_ov_failed','failed') + ' ' + (a.failed || 0)
+    + '</div>'
+    + '<div class="ov-drill">&#8594; Events</div>';
   // OS Distribution
   var os = d.os_dist;
-  document.getElementById('ov-os-dist-body').innerHTML = (os && os.by_family && Object.keys(os.by_family).length)
-    ? _ovRows(Object.keys(os.by_family).map(function (fam) {
-        return fam + ' ' + os.by_family[fam];
-      }).concat([T('gui_ov_total','total') + ' ' + (os.total || 0)]))
-    : '<div style="color:var(--dim)">—</div>';
+  if (os && os.by_family && Object.keys(os.by_family).length) {
+    var osFams = Object.keys(os.by_family);
+    document.getElementById('ov-os-dist-body').innerHTML =
+      '<div class="ov-chips">'
+      + osFams.map(function (fam) {
+          return '<span class="ov-chip">' + fam + ' <b>' + os.by_family[fam] + '</b></span>';
+        }).join('')
+      + '</div>'
+      + '<div class="ov-sub">' + T('gui_ov_total','total') + ' ' + (os.total || 0) + '</div>';
+  } else {
+    document.getElementById('ov-os-dist-body').innerHTML = '<div style="color:var(--dim)">—</div>';
+  }
   // Enforcement Modes
   var enf = d.enforcement;
   var _ENF_ORDER = ['full','selective','visibility_only','idle'];
-  document.getElementById('ov-enforcement-body').innerHTML = (enf && enf.by_mode)
-    ? _ovRows(_ENF_ORDER.filter(function (m) { return enf.by_mode[m] != null; }).map(function (m) {
-        return m.replace('_', ' ') + ' ' + enf.by_mode[m];
-      }).concat([T('gui_ov_total','total') + ' ' + (enf.total || 0)]))
-    : '<div style="color:var(--dim)">—</div>';
+  var _ENF_COLORS = { full:'var(--color-success)', selective:'var(--accent2)', visibility_only:'var(--dim)', idle:'var(--bg3)' };
+  if (enf && enf.by_mode && enf.total) {
+    var enfTotal = enf.total || 1;
+    var barParts = _ENF_ORDER.filter(function (m) { return enf.by_mode[m]; }).map(function (m) {
+      return '<i style="width:' + (enf.by_mode[m] / enfTotal * 100).toFixed(1)
+           + '%;background:' + (_ENF_COLORS[m] || 'var(--dim)') + '"></i>';
+    }).join('');
+    var chips = _ENF_ORDER.filter(function (m) { return enf.by_mode[m]; }).map(function (m) {
+      return '<span class="ov-chip">' + m.replace(/_/g,' ') + ' <b>' + enf.by_mode[m] + '</b></span>';
+    }).join('');
+    document.getElementById('ov-enforcement-body').innerHTML =
+      '<div class="ov-bar-track">' + barParts + '</div>'
+      + '<div class="ov-chips">' + chips + '</div>';
+  } else {
+    document.getElementById('ov-enforcement-body').innerHTML = '<div style="color:var(--dim)">—</div>';
+  }
   // freshness
   var asOf = document.getElementById('ov-as-of');
   if (asOf && d.as_of) asOf.textContent = new Date(d.as_of).toLocaleTimeString();
