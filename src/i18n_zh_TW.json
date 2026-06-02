@@ -1584,7 +1584,7 @@
   "gui_ov_posture_score_label": "Posture Score",
   "gui_ov_posture_unavailable": "請執行 Security Posture 報表以載入此區塊。",
   "gui_ov_risk_feed_title": "Top 風險發現",
-  "gui_ov_risk_lateral": "橫向移動風險：{level}",
+  "gui_ov_risk_lateral": "橫向移動控制：{level}",
   "gui_ov_risk_no_findings": "無重大發現。請執行 Posture 報表以更新。",
   "gui_ov_risk_ransomware": "Ransomware 暴露：{n} apps",
   "gui_ov_risk_tag_hi": "嚴重",

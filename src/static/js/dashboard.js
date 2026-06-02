@@ -1344,15 +1344,15 @@ function _renderRiskFeed(posture, T) {
     items.push({ cls: 't-hi', tag: T('gui_ov_risk_tag_hi', 'Critical'),
       text: T('gui_ov_risk_ransomware', 'Ransomware exposure: {n} apps').replace('{n}', det.ransomware_apps) });
   }
-  if (det.lateral != null) {
-    var latStr2 = String(det.lateral);
-    var tagCls = (latStr2 === 'HIGH' || latStr2 === 'CRITICAL') ? 't-hi' : 't-md';
+  if (det.lateral_control_ratio != null) {
+    var latPct = Math.round(det.lateral_control_ratio * 100);
+    var tagCls = (latPct < 50) ? 't-hi' : (latPct < 75 ? 't-md' : 't-lo');
     items.push({ cls: tagCls, tag: T('gui_ov_risk_tag_lateral', 'Lateral'),
-      text: T('gui_ov_risk_lateral', 'Lateral movement risk: {level}').replace('{level}', latStr2) });
+      text: T('gui_ov_risk_lateral', 'Lateral movement control: {level}').replace('{level}', latPct + '%') });
   }
-  if (det.uncovered != null && det.uncovered > 0) {
+  if (det.uncovered_pct != null && det.uncovered_pct > 0) {
     items.push({ cls: 't-lo', tag: T('gui_ov_risk_tag_lo', 'Coverage'),
-      text: T('gui_ov_risk_uncovered', 'Uncovered flows: {n}').replace('{n}', (det.uncovered || 0).toLocaleString()) });
+      text: T('gui_ov_risk_uncovered', 'Uncovered flows: {n}').replace('{n}', det.uncovered_pct + '%') });
   }
   if (items.length === 0) {
     feedEl.innerHTML = '<div style="color:var(--dim);font-size:13px;padding:8px 0;">'
