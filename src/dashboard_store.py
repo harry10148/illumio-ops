@@ -68,10 +68,12 @@ def write_dashboard_summary(updater) -> dict:
             json.dump(updated, f, indent=4, ensure_ascii=False)
             f.flush()
             os.fsync(f.fileno())
-        # World-readable: the overview API may run as a different user than the
-        # background job that writes this file (e.g. a root-run CLI vs the
-        # illumio-ops service). 0600 from mkstemp would block cross-user reads.
-        os.chmod(tmp_path, 0o644)
+        # Owner + group readable (NOT world-readable). In production the writer
+        # (background job) and reader (overview API) are the same service user,
+        # so this is effectively 0600; the group bit only helps if an operator
+        # places both users in a shared group. This holds infrastructure posture
+        # data, so it must not be world-readable.
+        os.chmod(tmp_path, 0o640)
         os.replace(tmp_path, path)
         # fsync parent dir for metadata durability (Linux only; harmless on other POSIX)
         try:
