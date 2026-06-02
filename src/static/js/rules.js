@@ -307,7 +307,7 @@ async function loadCatalog() {
     });
     _catalogCategories = Object.keys(_catalog).map(label => ({ id: label, label, events: Object.keys(_catalog[label] || {}).map(id => _eventMetaById[id]) }));
   }
-  const sel = $('ev-cat'); sel.innerHTML = '<option value="" data-i18n="gui_select">Select...</option>';
+  const sel = $('ev-cat'); sel.innerHTML = '<option value="">' + _t('gui_select') + '</option>';
   _catalogCategories.forEach(category => {
     const o = document.createElement('option');
     o.value = category.id;

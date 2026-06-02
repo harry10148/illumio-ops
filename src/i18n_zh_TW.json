@@ -299,6 +299,7 @@
   "event_agent_service_not_available": "Agent Service 無法使用",
   "event_agent_suspend": "Agent 已暫停",
   "event_agent_tampering": "Agent 遭竄改",
+  "event_agent_upgrade_successful": "Agent 升級成功",
   "event_all_events": "全部事件（系統範圍）",
   "event_api_auth_failed": "API 驗證失敗",
   "event_api_authz_failed": "API 授權失敗",

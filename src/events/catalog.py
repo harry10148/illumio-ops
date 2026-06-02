@@ -435,6 +435,7 @@ _LEGACY_STUB = {
         "agent.goodbye": "event_agent_goodbye",
         "agent.suspend": "event_agent_suspend",
         "agent.refresh_policy": "event_agent_refresh_policy",
+        "agent.upgrade_successful": "event_agent_upgrade_successful",
     },
     "Auth & API": {
         "request.authentication_failed": "event_api_auth_failed",

@@ -299,6 +299,7 @@
   "event_agent_service_not_available": "Agent Service Unavailable",
   "event_agent_suspend": "Agent Suspended",
   "event_agent_tampering": "Agent Tampering Detected",
+  "event_agent_upgrade_successful": "Agent Upgrade Successful",
   "event_all_events": "All events (system-wide)",
   "event_api_auth_failed": "API Authentication Failed",
   "event_api_authz_failed": "API Authorization Failed",
