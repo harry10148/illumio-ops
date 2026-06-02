@@ -25,6 +25,7 @@ from src.gui._helpers import (
     _build_rule_hits_spec,
 )
 from src.i18n import t
+from src.dashboard_store import read_dashboard_summary
 
 
 def _retranslate_kpi_labels(data: dict, lang: str) -> None:
@@ -165,7 +166,7 @@ def _overview_alerts(state):
 
 
 def _overview_os_dist(state):
-    vs = state.get("ven_summary") or {}
+    vs = read_dashboard_summary().get("ven_summary") or {}
     od = vs.get("os_distribution")
     if not isinstance(od, dict) or "by_family" not in od:
         return None
@@ -173,7 +174,7 @@ def _overview_os_dist(state):
 
 
 def _overview_enforcement(state):
-    vs = state.get("ven_summary") or {}
+    vs = read_dashboard_summary().get("ven_summary") or {}
     ed = vs.get("enforcement_distribution")
     if not isinstance(ed, dict) or "by_mode" not in ed:
         return None
@@ -207,7 +208,7 @@ def _overview_posture(state):
 
 
 def _overview_ven(state):
-    vs = state.get("ven_summary")
+    vs = read_dashboard_summary().get("ven_summary")
     if not isinstance(vs, dict) or "total" not in vs:
         return {"verdict": "unknown", "note": "no ven_summary yet"}
     total = int(vs.get("total", 0)); offline = int(vs.get("offline", 0))
