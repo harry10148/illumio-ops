@@ -10,6 +10,7 @@ from loguru import logger
 from src.config import ConfigManager
 from src.gui._helpers import _err
 from src.i18n import t
+from src.events.reference import load_reference
 
 
 def make_events_blueprint(
@@ -102,6 +103,7 @@ def make_events_blueprint(
                 if search not in haystack:
                     continue
 
+            _ref = load_reference().get(event_type)
             items.append({
                 "event_id": event_identity(raw_event),
                 "timestamp": normalized.get("timestamp") or raw_event.get("timestamp"),
@@ -112,6 +114,8 @@ def make_events_blueprint(
                 "parser_notes": normalized.get("parser_notes") or [],
                 "category": _event_category(event_type),
                 "type_group": event_group,
+                "description": _ref.description if _ref else "",
+                "remediation": _ref.remediation if _ref else "",
                 "normalized": normalized,
                 "raw": raw_event,
             })

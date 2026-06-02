@@ -35,3 +35,14 @@ def test_every_known_type_has_reference_and_i18n():
         key = "event_desc_" + et.replace(".", "_")
         assert en.get(key), f"{key} missing/empty in i18n_en.json"
         assert zh.get(key), f"{key} missing/empty in i18n_zh_TW.json"
+
+
+def test_enrich_event_context_adds_reference_fields():
+    from src.alerts.template_utils import enrich_event_context
+    ctx = enrich_event_context({"event_type": "request.authentication_failed"})
+    assert ctx["description"]                       # non-empty
+    assert ctx["severity"] == "critical"
+    assert ctx["remediation"]                       # actionable text
+    # unknown type: no crash, original keys preserved, ref fields empty/absent
+    ctx2 = enrich_event_context({"event_type": "totally.unknown.xyz", "foo": 1})
+    assert ctx2["foo"] == 1
