@@ -208,6 +208,13 @@ class Analyzer:
             def _merge(existing: dict[str, Any]) -> dict[str, Any]:
                 merged = dict(existing)
                 merged.update(self.state)
+                # The analyzer's self.state is a snapshot loaded at cycle start;
+                # blindly overlaying it would stomp dashboard summary keys written
+                # by other background jobs (ven_summary, posture_summary) since the
+                # last load. Preserve the freshest on-disk values for those keys.
+                for _k in ("ven_summary", "posture_summary"):
+                    if _k in existing:
+                        merged[_k] = existing[_k]
                 return merged
 
             self.state = update_state_file(STATE_FILE, _merge)
