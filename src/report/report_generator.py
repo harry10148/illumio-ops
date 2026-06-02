@@ -519,6 +519,15 @@ class ReportGenerator:
         except Exception as e:
             logger.warning(f"[ReportGenerator] Change Impact snapshot write failed: {e}")
 
+        # Refresh the dashboard posture summary now that a fresh KPI snapshot
+        # exists, so the overview hero updates immediately after a report run
+        # instead of waiting for the next scheduled posture tick.
+        try:
+            from src.scheduler.jobs import run_posture_summary
+            run_posture_summary(self.cm)
+        except Exception as e:
+            logger.warning(f"[ReportGenerator] posture refresh after report failed: {e}")
+
         if send_email and reporter is not None:
             html_path = next((p for p in paths if p.endswith('.html')), None)
             mod12 = result.module_results.get('mod12', {})
