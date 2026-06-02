@@ -37,6 +37,17 @@ def test_every_known_type_has_reference_and_i18n():
         assert zh.get(key), f"{key} missing/empty in i18n_zh_TW.json"
 
 
+def test_every_visible_type_has_label_key():
+    import json
+    from src.events.catalog import KNOWN_EVENT_TYPES, _HIDDEN_EVENT_TYPES, _event_translation_key
+    en = json.load(open("src/i18n_en.json")); zh = json.load(open("src/i18n_zh_TW.json"))
+    visible = set(KNOWN_EVENT_TYPES) - set(_HIDDEN_EVENT_TYPES)
+    for et in sorted(visible):
+        key = _event_translation_key(et)
+        assert en.get(key), f"{key} missing/empty in en for {et}"
+        assert zh.get(key), f"{key} missing/empty in zh for {et}"
+
+
 def test_enrich_event_context_adds_reference_fields():
     from src.alerts.template_utils import enrich_event_context
     ctx = enrich_event_context({"event_type": "request.authentication_failed"})
