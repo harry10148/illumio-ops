@@ -1315,7 +1315,7 @@ function _renderPostureHero(posture, T) {
       var det2 = rh2.detail;
       var lines = [];
       if (det2.ransomware_apps != null)
-        lines.push(T('gui_ov_posture_modal_ransomware', 'Ransomware exposure') + ': ' + det2.ransomware_apps + ' apps');
+        lines.push(T('gui_ov_posture_modal_ransomware', 'Ransomware exposure') + ': ' + det2.ransomware_apps);
       if (det2.lateral != null)
         lines.push(T('gui_ov_posture_modal_lateral', 'Lateral movement risk') + ': ' + det2.lateral);
       if (det2.uncovered != null)

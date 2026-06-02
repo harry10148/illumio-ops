@@ -68,6 +68,10 @@ def write_dashboard_summary(updater) -> dict:
             json.dump(updated, f, indent=4, ensure_ascii=False)
             f.flush()
             os.fsync(f.fileno())
+        # World-readable: the overview API may run as a different user than the
+        # background job that writes this file (e.g. a root-run CLI vs the
+        # illumio-ops service). 0600 from mkstemp would block cross-user reads.
+        os.chmod(tmp_path, 0o644)
         os.replace(tmp_path, path)
         # fsync parent dir for metadata durability (Linux only; harmless on other POSIX)
         try:
