@@ -1295,7 +1295,7 @@
   "gui_ev_detail_user_ip": "使用者 / IP",
   "gui_ev_failed_to_load": "事件載入失敗",
   "gui_ev_field_matchers": "欄位比對",
-  "gui_ev_field_matchers_hint": "大多數規則不需要這個。每行一條，格式為 field.path=pattern，用在你要鎖定特定帳號、來源 IP 或巢狀欄位時。",
+  "gui_ev_field_matchers_hint": "大多數規則不需要這個。每行一條，格式為 field.path=pattern（例如 created_by.user.username=admin@example.com），可用 * 作為萬用字元。用在你要鎖定特定帳號、來源 IP 或巢狀欄位時。",
   "gui_ev_load_failed": "載入失敗",
   "gui_ev_load_prompt": "載入事件後可檢視解析結果與原始 PCE JSON。",
   "gui_ev_loading": "正在從 PCE 載入事件...",
