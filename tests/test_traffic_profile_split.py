@@ -1,23 +1,26 @@
 """End-to-end: generate Traffic report twice from same fixture, once per profile.
 Verify the two outputs differ in expected sections."""
 import pytest
-from src.report.exporters.html_exporter import HtmlExporter
+from src.report.exporters.html_exporter import (
+    SecurityRiskHtmlExporter, NetworkInventoryHtmlExporter,
+)
 
 # Markers unique to each gated section (taken directly from html_exporter._build):
 #   mod04 ransomware section emits id="ransomware"
 #   mod07 cross-label matrix section emits id="matrix"
+# Profile selection is now expressed by exporter class, not a profile= kwarg.
 _RANSOMWARE_MARKER = 'id="ransomware"'
 _MATRIX_MARKER = 'id="matrix"'
 
 
 @pytest.fixture
 def security_risk_html():
-    return HtmlExporter({}, profile="security_risk")._build()
+    return SecurityRiskHtmlExporter({})._build()
 
 
 @pytest.fixture
 def network_inventory_html():
-    return HtmlExporter({}, profile="network_inventory")._build()
+    return NetworkInventoryHtmlExporter({})._build()
 
 
 def test_security_risk_includes_ransomware_section(security_risk_html):

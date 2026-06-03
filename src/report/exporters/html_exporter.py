@@ -388,7 +388,7 @@ def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
         lang=lang,
     )
 
-class HtmlExporter:
+class _TrafficReportBase:
     """Export report results to a single self-contained HTML file."""
 
     def __init__(self, results: dict, data_source: str = "",
@@ -406,6 +406,17 @@ class HtmlExporter:
         self._pce_url = pce_url
         self._org_name = org_name
 
+    # ── Subclass contract ────────────────────────────────────────────────
+    REPORT_KIND = ""          # "SecurityRisk" | "NetworkInventory" (filename)
+
+    def _ordered_section_keys(self) -> list[str]:
+        """Ordered section keys this report renders (subclass provides)."""
+        raise NotImplementedError
+
+    def _include_maturity(self) -> bool:
+        """Whether the summary hero shows the micro-segmentation maturity block."""
+        raise NotImplementedError
+
     def build(self) -> str:
         """Public alias for _build(); returns the full HTML string."""
         return self._build()
@@ -414,8 +425,7 @@ class HtmlExporter:
         """Write HTML file and return full path."""
         os.makedirs(output_dir, exist_ok=True)
         ts = datetime.datetime.now().strftime('%Y-%m-%d_%H%M')
-        profile_label = "NetworkInventory" if self._profile == "network_inventory" else "SecurityRisk"
-        filename = f'Illumio_Traffic_Report_{profile_label}_{ts}.html'
+        filename = f'Illumio_Traffic_Report_{self.REPORT_KIND or "SecurityRisk"}_{ts}.html'
         filepath = os.path.join(output_dir, filename)
 
         with open(filepath, 'w', encoding='utf-8') as f:
@@ -558,36 +568,28 @@ class HtmlExporter:
             return (f'<a href="#{anchor}">{label}'
                     + (f'<span class="nav-badge">{badge}</span>' if badge else '') + '</a>')
 
-        if profile == 'security_risk':
-            _nav_links = [
-                _nav_link('summary', 'rpt_tr_nav_summary', 'Executive Summary'),
-                _nav_link('overview', 'rpt_tr_nav_overview', '1 Traffic Overview'),
-                _nav_link('policy', 'rpt_tr_nav_policy', '2 Policy Decisions'),
-                _nav_link('uncovered', 'rpt_tr_nav_uncovered', '3 Uncovered Flows'),
-                _nav_link('ransomware', 'rpt_tr_nav_ransomware', '4 Ransomware Exposure'),
-                (_nav_link('user', 'rpt_tr_nav_user', '6 User & Process') if _mod06_has_data else ''),
-                _nav_link('allowed', 'rpt_tr_nav_allowed', '10 Allowed Traffic'),
-                _nav_link('readiness', 'rpt_tr_nav_readiness', '13 Enforcement Readiness'),
-                _nav_link('infrastructure', 'rpt_tr_nav_infrastructure', '14 Infrastructure Scoring'),
-                _nav_link('lateral', 'rpt_tr_nav_lateral', '15 Lateral Movement'),
-                _nav_link('findings', 'rpt_tr_nav_findings', 'Findings', badge=n_findings),
-            ]
-        else:  # network_inventory
-            _nav_links = [
-                _nav_link('summary', 'rpt_tr_nav_summary', 'Executive Summary'),
-                _nav_link('overview', 'rpt_tr_nav_overview', '1 Traffic Overview'),
-                _nav_link('policy', 'rpt_tr_nav_policy', '2 Policy Decisions'),
-                (_nav_link('matrix', 'rpt_tr_nav_matrix', '7 Cross-Label Matrix')
-                 if _mod07_block else ''),
-                _nav_link('unmanaged', 'rpt_tr_nav_unmanaged', '8 Unmanaged Hosts'),
-                _nav_link('distribution', 'rpt_tr_nav_distribution', '9 Traffic Distribution'),
-                _nav_link('bandwidth', 'rpt_tr_nav_bandwidth', '11 Bandwidth & Volume'),
-                _nav_link('readiness', 'rpt_tr_nav_readiness', '13 Enforcement Readiness'),
-                (_nav_link('ringfence', 'rpt_tr_nav_ringfence', 'Application Ringfence')
-                 if visible_in('mod_ringfence', profile, detail_level) else ''),
-                (_nav_link('change_impact', 'rpt_tr_nav_change_impact', 'Change Impact')
-                 if visible_in('mod_change_impact', profile, detail_level) else ''),
-            ]
+        # All possible nav links keyed by section id; subclasses pick the order.
+        _findings_badge = n_findings
+        _nav_spec = {
+            'summary':        _nav_link('summary', 'rpt_tr_nav_summary', 'Executive Summary'),
+            'overview':       _nav_link('overview', 'rpt_tr_nav_overview', '1 Traffic Overview'),
+            'policy':         _nav_link('policy', 'rpt_tr_nav_policy', '2 Policy Decisions'),
+            'uncovered':      _nav_link('uncovered', 'rpt_tr_nav_uncovered', '3 Uncovered Flows'),
+            'ransomware':     _nav_link('ransomware', 'rpt_tr_nav_ransomware', '4 Ransomware Exposure'),
+            'user':           (_nav_link('user', 'rpt_tr_nav_user', '6 User & Process') if _mod06_has_data else ''),
+            'matrix':         (_nav_link('matrix', 'rpt_tr_nav_matrix', '7 Cross-Label Matrix') if _mod07_block else ''),
+            'unmanaged':      _nav_link('unmanaged', 'rpt_tr_nav_unmanaged', '8 Unmanaged Hosts'),
+            'distribution':   _nav_link('distribution', 'rpt_tr_nav_distribution', '9 Traffic Distribution'),
+            'allowed':        _nav_link('allowed', 'rpt_tr_nav_allowed', '10 Allowed Traffic'),
+            'bandwidth':      _nav_link('bandwidth', 'rpt_tr_nav_bandwidth', '11 Bandwidth & Volume'),
+            'readiness':      _nav_link('readiness', 'rpt_tr_nav_readiness', '13 Enforcement Readiness'),
+            'infrastructure': _nav_link('infrastructure', 'rpt_tr_nav_infrastructure', '14 Infrastructure Scoring'),
+            'lateral':        _nav_link('lateral', 'rpt_tr_nav_lateral', '15 Lateral Movement'),
+            'ringfence':      (_nav_link('ringfence', 'rpt_tr_nav_ringfence', 'Application Ringfence') if visible_in('mod_ringfence', profile, detail_level) else ''),
+            'change_impact':  (_nav_link('change_impact', 'rpt_tr_nav_change_impact', 'Change Impact') if visible_in('mod_change_impact', profile, detail_level) else ''),
+            'findings':       _nav_link('findings', 'rpt_tr_nav_findings', 'Findings', badge=_findings_badge),
+        }
+        _nav_links = [_nav_spec.get(k, '') for k in self._ordered_section_keys()]
         _toc_items = ''.join(
             f'<li><a href="#{_link_anchor}">{_link_label}</a></li>'
             for _link_anchor, _link_label in [
@@ -605,88 +607,71 @@ class HtmlExporter:
         )
 
         exec_html = render_exec_summary_html(_traffic_mod00, report_name=t('gui_btn_traffic_report', lang=self._lang), lang=self._lang)
-        body = (
-            exec_html
-            + '<section id="summary" class="card report-hero">'
+
+        # The summary hero: maturity block included only when the subclass opts in.
+        _maturity_block = (f'<h2>{_s("rpt_tr_maturity_heading")}</h2>' + maturity_html) if self._include_maturity() else ''
+        _hero = (
+            '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
             f'<div class="report-kicker">{_s("rpt_kicker_traffic")}</div>'
-            + (
-                f'<div class="report-profile-badge report-profile-badge--security">{_s("rpt_kicker_security_risk")}</div>'
-                if profile == 'security_risk' else
-                f'<div class="report-profile-badge report-profile-badge--inventory">{_s("rpt_kicker_network_inventory")}</div>'
-            ) +
-            f'<h1>{_s("rpt_tr_title")}</h1>'
+            + (f'<div class="report-profile-badge report-profile-badge--security">{_s("rpt_kicker_security_risk")}</div>'
+               if self.REPORT_KIND == "SecurityRisk" else
+               f'<div class="report-profile-badge report-profile-badge--inventory">{_s("rpt_kicker_network_inventory")}</div>')
+            + f'<h1>{_s("rpt_tr_title")}</h1>'
             f'<p class="report-subtitle">{_s("rpt_generated")} ' + generated_at + '</p></div>'
-            + summary_pills +
-            f'<h2>{_s("rpt_tr_maturity_heading")}</h2>'
-            + maturity_html +
-            trend_html +
-            f'<h2>{_s("rpt_key_findings")}</h2>' + key_findings_html +
-            attack_summary_html +
-            '</section>\n' +
-            self._section('overview', 'rpt_tr_sec_overview', 'Traffic Overview',
-                          render_section_guidance('mod01', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod01_html(),
-                          'rpt_tr_sec_overview_intro', 'Start from overall traffic scale, Policy coverage, and top Ports to set a baseline for reading the rest of the report.') + '\n' +
-            (self._section('policy', 'rpt_tr_sec_policy', 'Policy Decisions',
-                           render_section_guidance('mod02', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod02_html(),
-                           layout='layout-b') + '\n'
-             if visible_in('mod02_policy_decisions', profile, detail_level) else '') +
-            (self._section('uncovered', 'rpt_tr_sec_uncovered', 'Uncovered Flows',
-                           render_section_guidance('mod03', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod03_html(),
-                           'rpt_tr_sec_uncovered_intro', 'Focus on traffic not yet covered by effective Policy, helping prioritise which Services and directions to tighten first.') + '\n'
-             if visible_in('mod03_uncovered_flows', profile, detail_level) else '') +
-            (self._section('ransomware', 'rpt_tr_sec_ransomware', 'Ransomware Exposure',
-                           render_section_guidance('mod04', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod04_html(),
-                           'rpt_tr_sec_ransomware_intro', 'Check high-risk Ports, Allowed flows, and host exposure commonly tied to ransomware attack chains.') + '\n'
-             if visible_in('mod04_ransomware_exposure', profile, detail_level) else '') +
-            # mod05 (Remote Access) consolidated into mod15 (Lateral Movement)
-
-            _mod06_block +
-            _mod07_block +
-            (self._section('unmanaged', 'rpt_tr_sec_unmanaged', 'Unmanaged Hosts',
-                           render_section_guidance('mod08', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod08_html(),
-                           'rpt_tr_sec_unmanaged_intro', 'Inventory traffic involving hosts not managed by VEN; these typically sit outside the visibility and control boundary.') + '\n'
-             if visible_in('mod08_unmanaged_hosts', profile, detail_level) else '') +
-            (self._section('distribution', 'rpt_tr_sec_distribution', 'Traffic Distribution',
-                           render_section_guidance('mod09', profile=profile, detail_level=detail_level, lang=self._lang) +
-                           self._mod09_html()) + '\n'
-             if profile == 'network_inventory' else '') +
-            (self._section('allowed', 'rpt_tr_sec_allowed', 'Allowed Traffic',
-                           render_section_guidance('mod10', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod10_html(),
-                           'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.') + '\n'
-             if profile == 'security_risk' else '') +
-            (self._section('bandwidth', 'rpt_tr_sec_bandwidth', 'Bandwidth &amp; Volume',
-                           render_section_guidance('mod11', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod11_html(),
-                           'rpt_tr_sec_bandwidth_intro', 'Review high-volume flows by bandwidth and data volume to identify large backups, batch jobs, or suspected exfiltration.') + '\n'
-             if profile == 'network_inventory' else '') +
-            (self._section('readiness', 'rpt_tr_sec_readiness', 'Enforcement Readiness',
-                           render_section_guidance('mod13', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod13_html(),
-                           'rpt_tr_sec_readiness_intro', 'Aggregate multiple signals into a readiness score to help assess whether it is safe to tighten Enforcement.') + '\n'
-             if visible_in('mod13_readiness', profile, detail_level) else '') +
-            (self._section('infrastructure', 'rpt_tr_sec_infrastructure', 'Infrastructure Scoring',
-                           render_section_guidance('mod14', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod14_html(),
-                           'rpt_tr_sec_infrastructure_intro', 'Identify critical nodes and infrastructure roles with large blast radius from application communication patterns.') + '\n'
-             if profile == 'security_risk' else '') +
-            (self._section('lateral', 'rpt_tr_sec_lateral', 'Lateral Movement',
-                           render_section_guidance('mod15', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod15_html(),
-                           'rpt_tr_sec_lateral_intro', 'Focus on paths, Services, and sources tied to lateral movement to surface spread risk.') + '\n'
-             if visible_in('mod15_lateral_movement', profile, detail_level) else '') +
-            (self._section('ringfence', 'rpt_mod_ringfence_title', 'Application Ringfence',
-                           render_section_guidance('mod_ringfence', profile, detail_level, lang=self._lang) + self._mod_ringfence_html(),
-                           '', '') + '\n'
-             if visible_in('mod_ringfence', profile, detail_level) else '') +
-            (self._section('change_impact', 'rpt_mod_change_impact_title', 'Change Impact',
-                           render_section_guidance('mod_change_impact', profile, detail_level, lang=self._lang) + self._mod_change_impact_html(),
-                           '', '') + '\n'
-             if visible_in('mod_change_impact', profile, detail_level) else '') +
-            ((
-            '<section id="findings" class="card">'
-            f'<h2>{_s("rpt_tr_sec_findings")} ({n_findings})</h2>'
-            + self._findings_html() +
-            '</section>\n'
-            ) if profile == 'security_risk' else '') +
-            f'<footer>{_s("rpt_tr_footer")} &middot; {today_str}</footer>'
+            + summary_pills + _maturity_block + trend_html
+            + f'<h2>{_s("rpt_key_findings")}</h2>' + key_findings_html
+            + attack_summary_html + '</section>\n'
         )
+
+        _sec = {
+            'summary': _hero,
+            'overview': self._section('overview', 'rpt_tr_sec_overview', 'Traffic Overview',
+                          render_section_guidance('mod01', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod01_html(),
+                          'rpt_tr_sec_overview_intro', 'Start from overall traffic scale, Policy coverage, and top Ports to set a baseline for reading the rest of the report.') + '\n',
+            'policy': self._section('policy', 'rpt_tr_sec_policy', 'Policy Decisions',
+                          render_section_guidance('mod02', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod02_html(),
+                          layout='layout-b') + '\n',
+            'uncovered': self._section('uncovered', 'rpt_tr_sec_uncovered', 'Uncovered Flows',
+                          render_section_guidance('mod03', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod03_html(),
+                          'rpt_tr_sec_uncovered_intro', 'Focus on traffic not yet covered by effective Policy, helping prioritise which Services and directions to tighten first.') + '\n',
+            'ransomware': self._section('ransomware', 'rpt_tr_sec_ransomware', 'Ransomware Exposure',
+                          render_section_guidance('mod04', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod04_html(),
+                          'rpt_tr_sec_ransomware_intro', 'Check high-risk Ports, Allowed flows, and host exposure commonly tied to ransomware attack chains.') + '\n',
+            'user': _mod06_block,
+            'matrix': _mod07_block,
+            'unmanaged': self._section('unmanaged', 'rpt_tr_sec_unmanaged', 'Unmanaged Hosts',
+                          render_section_guidance('mod08', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod08_html(),
+                          'rpt_tr_sec_unmanaged_intro', 'Inventory traffic involving hosts not managed by VEN; these typically sit outside the visibility and control boundary.') + '\n',
+            'distribution': self._section('distribution', 'rpt_tr_sec_distribution', 'Traffic Distribution',
+                          render_section_guidance('mod09', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod09_html()) + '\n',
+            'allowed': self._section('allowed', 'rpt_tr_sec_allowed', 'Allowed Traffic',
+                          render_section_guidance('mod10', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod10_html(),
+                          'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.') + '\n',
+            'bandwidth': self._section('bandwidth', 'rpt_tr_sec_bandwidth', 'Bandwidth &amp; Volume',
+                          render_section_guidance('mod11', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod11_html(),
+                          'rpt_tr_sec_bandwidth_intro', 'Review high-volume flows by bandwidth and data volume to identify large backups, batch jobs, or suspected exfiltration.') + '\n',
+            'readiness': self._section('readiness', 'rpt_tr_sec_readiness', 'Enforcement Readiness',
+                          render_section_guidance('mod13', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod13_html(),
+                          'rpt_tr_sec_readiness_intro', 'Aggregate multiple signals into a readiness score to help assess whether it is safe to tighten Enforcement.') + '\n',
+            'infrastructure': self._section('infrastructure', 'rpt_tr_sec_infrastructure', 'Infrastructure Scoring',
+                          render_section_guidance('mod14', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod14_html(),
+                          'rpt_tr_sec_infrastructure_intro', 'Identify critical nodes and infrastructure roles with large blast radius from application communication patterns.') + '\n',
+            'lateral': self._section('lateral', 'rpt_tr_sec_lateral', 'Lateral Movement',
+                          render_section_guidance('mod15', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod15_html(),
+                          'rpt_tr_sec_lateral_intro', 'Focus on paths, Services, and sources tied to lateral movement to surface spread risk.') + '\n',
+            'ringfence': (self._section('ringfence', 'rpt_mod_ringfence_title', 'Application Ringfence',
+                          render_section_guidance('mod_ringfence', profile, detail_level, lang=self._lang) + self._mod_ringfence_html(), '', '') + '\n'),
+            'change_impact': (self._section('change_impact', 'rpt_mod_change_impact_title', 'Change Impact',
+                          render_section_guidance('mod_change_impact', profile, detail_level, lang=self._lang) + self._mod_change_impact_html(), '', '') + '\n'),
+            'findings': (
+                '<section id="findings" class="card">'
+                f'<h2>{_s("rpt_tr_sec_findings")} ({n_findings})</h2>'
+                + self._findings_html() + '</section>\n'),
+        }
+
+        body = exec_html + "".join(_sec.get(k, '') for k in self._ordered_section_keys())
+        body += f'<footer>{_s("rpt_tr_footer")} &middot; {today_str}</footer>'
         if self._profile == "network_inventory":
             _report_title = t("rpt_cover_type_inventory", lang=self._lang)
             cover_html = _build_cover_page(
@@ -1507,4 +1492,37 @@ class HtmlExporter:
                          f'<td style="color:{col};font-weight:600">{dir_label.get(d["direction"], d["direction"])}</td></tr>')
             html += '</table>'
         return html
+
+
+class SecurityRiskHtmlExporter(_TrafficReportBase):
+    REPORT_KIND = "SecurityRisk"
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("profile", "security_risk")
+        super().__init__(*args, **kwargs)
+
+    def _include_maturity(self) -> bool:
+        return True
+
+    def _ordered_section_keys(self) -> list[str]:
+        return ['summary', 'overview', 'policy', 'uncovered', 'ransomware',
+                'user', 'allowed', 'readiness', 'infrastructure', 'lateral', 'findings']
+
+
+class NetworkInventoryHtmlExporter(_TrafficReportBase):
+    REPORT_KIND = "NetworkInventory"
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("profile", "network_inventory")
+        super().__init__(*args, **kwargs)
+
+    def _include_maturity(self) -> bool:
+        return False
+
+    def _ordered_section_keys(self) -> list[str]:
+        return ['summary', 'overview', 'policy', 'matrix', 'unmanaged',
+                'distribution', 'bandwidth', 'ringfence', 'change_impact']
+
+
+HtmlExporter = SecurityRiskHtmlExporter   # legacy import name (defaults to security-risk profile)
 

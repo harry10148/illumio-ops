@@ -336,7 +336,9 @@ class ReportGenerator:
         Returns:
             list of file paths written
         """
-        from src.report.exporters.html_exporter import HtmlExporter
+        from src.report.exporters.html_exporter import (
+            SecurityRiskHtmlExporter, NetworkInventoryHtmlExporter,
+        )
         from src.report.exporters.csv_exporter import CsvExporter
 
         # When the caller (CLI / scheduler) omits lang, inherit the language the
@@ -352,7 +354,10 @@ class ReportGenerator:
         self.last_export_errors: dict[str, str] = {}
 
         if fmt in ('html', 'all', 'all_raw'):
-            path = HtmlExporter(
+            _exporter_cls = (NetworkInventoryHtmlExporter
+                             if traffic_report_profile == "network_inventory"
+                             else SecurityRiskHtmlExporter)
+            path = _exporter_cls(
                 result.module_results,
                 data_source=result.data_source,
                 profile=traffic_report_profile,
