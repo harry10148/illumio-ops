@@ -41,3 +41,19 @@ def test_inventory_omits_maturity_and_readiness():
     assert 'id="distribution"' in html
     # shared sections kept in both:
     assert 'id="overview"' in html and 'id="policy"' in html
+
+
+def test_facades_produce_files(tmp_path, monkeypatch):
+    from src.report.security_risk_report import SecurityRiskReport
+    from src.report.network_inventory_report import NetworkInventoryReport
+    import types
+    fake_result = types.SimpleNamespace(record_count=1, module_results=_results())
+    class _Gen:
+        def __init__(self, *a, **k): pass
+        def generate_from_api(self, **k): return fake_result
+    monkeypatch.setattr("src.report.security_risk_report.ReportGenerator", _Gen)
+    monkeypatch.setattr("src.report.network_inventory_report.ReportGenerator", _Gen)
+    p1 = SecurityRiskReport(cm=None, api_client=None).run(output_dir=str(tmp_path))
+    p2 = NetworkInventoryReport(cm=None, api_client=None).run(output_dir=str(tmp_path))
+    assert "SecurityRisk" in p1 and p1.endswith(".html")
+    assert "NetworkInventory" in p2 and p2.endswith(".html")
