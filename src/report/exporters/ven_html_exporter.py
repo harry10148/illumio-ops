@@ -38,6 +38,28 @@ def _policy_sync_badge(val: str) -> str:
         return f'<span class="badge-unsynced">{val}</span>'
     return ""
 
+
+# Ransomware-posture cell styling (reuse the report's shared badge palette).
+_RWP_SEV_BADGE = {"critical": "CRITICAL", "high": "HIGH", "medium": "MEDIUM",
+                  "low": "LOW", "fully_protected": "LOW"}
+_RWP_SEV_BORDER = {"critical": "var(--red)", "high": "var(--red-80)",
+                   "medium": "var(--gold-110)", "low": "var(--green)",
+                   "fully_protected": "var(--green)"}
+_RWP_PROT_BADGE = {"unprotected": "badge-unsynced", "protected_open": "badge-staged",
+                   "protected_closed": "badge-synced"}
+
+
+def _rwp_severity_badge(sev: str) -> str:
+    cls = _RWP_SEV_BADGE.get(str(sev).lower().strip())
+    label = html.escape(str(sev) or "—")
+    return f'<span class="badge badge-{cls}">{label}</span>' if cls else label
+
+
+def _rwp_protection_badge(state: str) -> str:
+    cls = _RWP_PROT_BADGE.get(str(state).lower().strip())
+    label = html.escape(str(state) or "—")
+    return f'<span class="{cls}">{label}</span>' if cls else label
+
 class VenHtmlExporter:
     def __init__(self, results: dict, df: pd.DataFrame = None,
                  profile: str = "security_risk", detail_level: str = _REPORT_DETAIL_LEVEL, lang: str = "en",
@@ -324,65 +346,71 @@ class VenHtmlExporter:
         per_ven = m.get("per_ven") or []
         if not per_ven:
             return ""
+        import pandas as pd
         _l = self._lang
         kpi = m.get("kpi") or {}
         ports = m.get("ports") or []
 
+        # ── KPI strip: exposure distribution (severity-coloured) + coverage + pending
         by_exp = kpi.get("by_exposure") or {}
-        pills = "".join(
-            f'<div class="summary-pill"><span class="summary-pill-label">{html.escape(lvl)}</span>'
-            f'<span class="summary-pill-value">{by_exp.get(lvl, 0)}</span></div>'
+        cards = "".join(
+            f'<div class="kpi-card" style="border-top-color:{_RWP_SEV_BORDER[lvl]}">'
+            f'<div class="kpi-label">{html.escape(lvl.replace("_", " "))}</div>'
+            f'<div class="kpi-value">{by_exp.get(lvl, 0)}</div></div>'
             for lvl in ("critical", "high", "medium", "low", "fully_protected")
         )
-        kpi_html = (
-            f'<div class="summary-pills">{pills}</div>'
-            f'<p class="section-intro">{t("rpt_rwp_avg_coverage", lang=_l)}: '
-            f'<strong>{kpi.get("avg_protection_percent", 0)}%</strong> · '
-            f'{t("rpt_rwp_computed", lang=_l)}: <strong>{kpi.get("computed", 0)}</strong> · '
-            f'{t("rpt_rwp_pending", lang=_l)}: <strong>{kpi.get("pending", 0)}</strong></p>'
+        cards += (
+            f'<div class="kpi-card"><div class="kpi-label">{t("rpt_rwp_avg_coverage", lang=_l)}</div>'
+            f'<div class="kpi-value">{kpi.get("avg_protection_percent", 0)}%</div></div>'
+            f'<div class="kpi-card"><div class="kpi-label">{t("rpt_rwp_pending", lang=_l)}</div>'
+            f'<div class="kpi-value">{kpi.get("pending", 0)}</div></div>'
         )
+        kpi_html = f'<div class="kpi-grid">{cards}</div>'
 
-        ven_rows = "".join(
-            f'<tr><td>{html.escape(str(r["hostname"]))}</td>'
-            f'<td>{html.escape(str(r["severity"]))}</td>'
-            f'<td>{r["protection_percent"]}%</td>'
-            f'<td>{r["open_risky_count"]}</td></tr>'
-            for r in per_ven
-        )
+        # ── per-VEN risk ranking table
+        ven_df = pd.DataFrame([{
+            "Hostname": r["hostname"], "Severity": r["severity"],
+            "Protection %": r["protection_percent"], "High-Risk Open Ports": r["open_risky_count"],
+        } for r in per_ven])
+        ven_col_i18n = {"Hostname": "rpt_rwp_host", "Severity": "rpt_rwp_severity",
+                        "Protection %": "rpt_rwp_coverage", "High-Risk Open Ports": "rpt_rwp_open_ports"}
+
+        def _ven_cell(col, val, _row):
+            if col == "Severity":
+                return _rwp_severity_badge(str(val))
+            if col == "Protection %":
+                return f"{html.escape(str(val))}%"
+            return html.escape("" if val is None else str(val))
+
         ven_table = (
             f'<h3>{t("rpt_rwp_ven_title", lang=_l)}</h3>'
-            f'<table class="data-table"><thead><tr>'
-            f'<th>{t("rpt_rwp_host", lang=_l)}</th>'
-            f'<th>{t("rpt_rwp_severity", lang=_l)}</th>'
-            f'<th>{t("rpt_rwp_coverage", lang=_l)}</th>'
-            f'<th>{t("rpt_rwp_open_ports", lang=_l)}</th>'
-            f'</tr></thead><tbody>{ven_rows}</tbody></table>'
+            + render_df_table(ven_df, col_i18n=ven_col_i18n, render_cell=_ven_cell, lang=_l)
         )
 
+        # ── per-VEN high-risk open-port detail (severity + protection badges)
         port_table = ""
         if ports:
-            port_rows = "".join(
-                f'<tr><td>{html.escape(str(p["hostname"]))}</td>'
-                f'<td>{html.escape(str(p["port"]))}/{html.escape(str(p["proto"]))}</td>'
-                f'<td>{html.escape(str(p["service"]))}</td>'
-                f'<td>{html.escape(str(p["severity"]))}</td>'
-                f'<td>{html.escape(str(p["protection_state"]))}</td>'
-                f'<td title="{html.escape(str(p["process_full"]))}">'
-                f'{html.escape(str(p["process"])) or "—"}</td>'
-                f'<td>{html.escape(str(p["user"])) or "—"}</td></tr>'
-                for p in ports
-            )
+            port_df = pd.DataFrame([{
+                "Hostname": p["hostname"], "Port/Proto": f'{p["port"]}/{p["proto"]}',
+                "Service": p["service"], "Severity": p["severity"],
+                "Protection": p["protection_state"], "Process": p["process"] or "—",
+                "User": p["user"] or "—",
+            } for p in ports])
+            port_col_i18n = {"Hostname": "rpt_rwp_host", "Port/Proto": "rpt_rwp_portproto",
+                             "Service": "rpt_rwp_service", "Severity": "rpt_rwp_severity",
+                             "Protection": "rpt_rwp_protection", "Process": "rpt_rwp_process",
+                             "User": "rpt_rwp_user"}
+
+            def _port_cell(col, val, _row):
+                if col == "Severity":
+                    return _rwp_severity_badge(str(val))
+                if col == "Protection":
+                    return _rwp_protection_badge(str(val))
+                return html.escape("" if val is None else str(val))
+
             port_table = (
                 f'<h3>{t("rpt_rwp_ports_title", lang=_l)}</h3>'
-                f'<table class="data-table"><thead><tr>'
-                f'<th>{t("rpt_rwp_host", lang=_l)}</th>'
-                f'<th>{t("rpt_rwp_portproto", lang=_l)}</th>'
-                f'<th>{t("rpt_rwp_service", lang=_l)}</th>'
-                f'<th>{t("rpt_rwp_severity", lang=_l)}</th>'
-                f'<th>{t("rpt_rwp_protection", lang=_l)}</th>'
-                f'<th>{t("rpt_rwp_process", lang=_l)}</th>'
-                f'<th>{t("rpt_rwp_user", lang=_l)}</th>'
-                f'</tr></thead><tbody>{port_rows}</tbody></table>'
+                + render_df_table(port_df, col_i18n=port_col_i18n, render_cell=_port_cell, lang=_l)
             )
 
         return (
