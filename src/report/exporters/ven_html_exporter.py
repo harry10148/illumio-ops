@@ -172,6 +172,7 @@ class VenHtmlExporter:
                + "\n"
                if visible_in('ven_lost_heartbeat_48h', profile, detail_level) else '')
             + self._estate_inventory_section()
+            + self._ransomware_posture_section()
             + f'<footer>{_s("rpt_ven_footer")} &middot; '
             + today_str
             + "</footer>"
@@ -314,6 +315,82 @@ class VenHtmlExporter:
 
         parts.append("</section>\n")
         return "".join(parts)
+
+    def _ransomware_posture_section(self) -> str:
+        """Render the Ransomware Exposure & High-Risk Open Ports section."""
+        m = self._r.get("ransomware_posture")
+        if not isinstance(m, dict):
+            return ""
+        per_ven = m.get("per_ven") or []
+        if not per_ven:
+            return ""
+        _l = self._lang
+        kpi = m.get("kpi") or {}
+        ports = m.get("ports") or []
+
+        by_exp = kpi.get("by_exposure") or {}
+        pills = "".join(
+            f'<div class="summary-pill"><span class="summary-pill-label">{html.escape(lvl)}</span>'
+            f'<span class="summary-pill-value">{by_exp.get(lvl, 0)}</span></div>'
+            for lvl in ("critical", "high", "medium", "low", "fully_protected")
+        )
+        kpi_html = (
+            f'<div class="summary-pills">{pills}</div>'
+            f'<p class="section-intro">{t("rpt_rwp_avg_coverage", lang=_l)}: '
+            f'<strong>{kpi.get("avg_protection_percent", 0)}%</strong> · '
+            f'{t("rpt_rwp_computed", lang=_l)}: <strong>{kpi.get("computed", 0)}</strong> · '
+            f'{t("rpt_rwp_pending", lang=_l)}: <strong>{kpi.get("pending", 0)}</strong></p>'
+        )
+
+        ven_rows = "".join(
+            f'<tr><td>{html.escape(str(r["hostname"]))}</td>'
+            f'<td>{html.escape(str(r["severity"]))}</td>'
+            f'<td>{r["protection_percent"]}%</td>'
+            f'<td>{r["open_risky_count"]}</td></tr>'
+            for r in per_ven
+        )
+        ven_table = (
+            f'<h3>{t("rpt_rwp_ven_title", lang=_l)}</h3>'
+            f'<table class="data-table"><thead><tr>'
+            f'<th>{t("rpt_rwp_host", lang=_l)}</th>'
+            f'<th>{t("rpt_rwp_severity", lang=_l)}</th>'
+            f'<th>{t("rpt_rwp_coverage", lang=_l)}</th>'
+            f'<th>{t("rpt_rwp_open_ports", lang=_l)}</th>'
+            f'</tr></thead><tbody>{ven_rows}</tbody></table>'
+        )
+
+        port_table = ""
+        if ports:
+            port_rows = "".join(
+                f'<tr><td>{html.escape(str(p["hostname"]))}</td>'
+                f'<td>{html.escape(str(p["port"]))}/{html.escape(str(p["proto"]))}</td>'
+                f'<td>{html.escape(str(p["service"]))}</td>'
+                f'<td>{html.escape(str(p["severity"]))}</td>'
+                f'<td>{html.escape(str(p["protection_state"]))}</td>'
+                f'<td title="{html.escape(str(p["process_full"]))}">'
+                f'{html.escape(str(p["process"])) or "—"}</td>'
+                f'<td>{html.escape(str(p["user"])) or "—"}</td></tr>'
+                for p in ports
+            )
+            port_table = (
+                f'<h3>{t("rpt_rwp_ports_title", lang=_l)}</h3>'
+                f'<table class="data-table"><thead><tr>'
+                f'<th>{t("rpt_rwp_host", lang=_l)}</th>'
+                f'<th>{t("rpt_rwp_portproto", lang=_l)}</th>'
+                f'<th>{t("rpt_rwp_service", lang=_l)}</th>'
+                f'<th>{t("rpt_rwp_severity", lang=_l)}</th>'
+                f'<th>{t("rpt_rwp_protection", lang=_l)}</th>'
+                f'<th>{t("rpt_rwp_process", lang=_l)}</th>'
+                f'<th>{t("rpt_rwp_user", lang=_l)}</th>'
+                f'</tr></thead><tbody>{port_rows}</tbody></table>'
+            )
+
+        return (
+            f'<section id="ransomware-posture" class="card">'
+            f'<h2>{t("rpt_rwp_section", lang=_l)}</h2>'
+            f'<p class="section-intro">{t("rpt_rwp_intro", lang=_l)}</p>'
+            f'{kpi_html}{ven_table}{port_table}</section>\n'
+        )
 
     def _section(
         self,

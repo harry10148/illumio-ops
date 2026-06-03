@@ -59,3 +59,27 @@ def test_skipped_when_pce_lacks_risk_summary(tmp_path):
         {**_WORKLOADS[0], "risk_summary": None}]
     result = _generate(tmp_path, api)
     assert "ransomware_posture" not in result.module_results
+
+
+def test_section_renders_tables(tmp_path):
+    from src.report.exporters.ven_html_exporter import VenHtmlExporter
+    result = _generate(tmp_path, _make_api())
+    html_out = VenHtmlExporter(result.module_results, df=result.dataframe,
+                               lang="en").export(str(tmp_path))
+    page = open(html_out, encoding="utf-8").read()
+    assert "Ransomware Exposure &amp; High-Risk Open Ports" in page or \
+           "Ransomware Exposure & High-Risk Open Ports" in page
+    assert "TermService" in page
+    assert "ransomware-posture" in page
+
+
+def test_section_absent_without_data(tmp_path):
+    from src.report.exporters.ven_html_exporter import VenHtmlExporter
+    api = _make_api()
+    api.fetch_managed_workloads.return_value = [
+        {**_WORKLOADS[0], "risk_summary": None}]
+    result = _generate(tmp_path, api)
+    html_out = VenHtmlExporter(result.module_results, df=result.dataframe,
+                               lang="en").export(str(tmp_path))
+    page = open(html_out, encoding="utf-8").read()
+    assert "ransomware-posture" not in page
