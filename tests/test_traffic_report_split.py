@@ -57,3 +57,9 @@ def test_facades_produce_files(tmp_path, monkeypatch):
     p2 = NetworkInventoryReport(cm=None, api_client=None).run(output_dir=str(tmp_path))
     assert "SecurityRisk" in p1 and p1.endswith(".html")
     assert "NetworkInventory" in p2 and p2.endswith(".html")
+
+
+def test_cli_has_security_and_inventory_commands(cli_runner):
+    from src.cli.root import cli
+    out = cli_runner.invoke(cli, ['report', '--help']).output
+    assert 'security' in out and 'inventory' in out

@@ -101,6 +101,16 @@ def generate_traffic_report(
     )
 
 
+def generate_security_report(**kw):
+    """Generate the Security & Risk traffic report (fixed profile)."""
+    return generate_traffic_report(traffic_report_profile="security_risk", **kw)
+
+
+def generate_inventory_report(**kw):
+    """Generate the Network & Traffic Inventory report (fixed profile)."""
+    return generate_traffic_report(traffic_report_profile="network_inventory", **kw)
+
+
 def generate_audit_report(
     *,
     start_date: str | None = None,
@@ -222,6 +232,8 @@ def report_group() -> None:
 @click.pass_context
 def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool, traffic_report_profile: str) -> None:
     """Generate Traffic Flow Report."""
+    if ctx.get_parameter_source("traffic_report_profile") == click.core.ParameterSource.COMMANDLINE:
+        click.echo("note: 'report traffic --profile' is deprecated; use 'report security' / 'report inventory'", err=True)
     try:
         paths = generate_traffic_report(
             source=source,
@@ -247,6 +259,84 @@ def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_
         return
     except Exception as exc:
         log.exception("traffic report failed")
+        echo_error(ctx, f"Unexpected error: {exc}")
+        ctx.exit(EXIT_SOFTWARE)
+        return
+    _emit_paths(ctx, paths, fmt)
+
+
+@report_group.command("security")
+@click.option("--source", type=click.Choice(["api", "csv"]), default="api")
+@click.option("--file", "file_path", type=click.Path(exists=True), default=None)
+@click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
+@click.option("--output-dir", type=click.Path(), default=None)
+@click.option("--email", is_flag=True)
+@click.pass_context
+def report_security(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool) -> None:
+    """Generate Security & Risk Report."""
+    try:
+        paths = generate_security_report(
+            source=source,
+            file_path=file_path,
+            fmt=fmt,
+            output_dir=output_dir,
+            email=email,
+        )
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, f"Connection failed: {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
+    except Exception as exc:
+        log.exception("security report failed")
+        echo_error(ctx, f"Unexpected error: {exc}")
+        ctx.exit(EXIT_SOFTWARE)
+        return
+    _emit_paths(ctx, paths, fmt)
+
+
+@report_group.command("inventory")
+@click.option("--source", type=click.Choice(["api", "csv"]), default="api")
+@click.option("--file", "file_path", type=click.Path(exists=True), default=None)
+@click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
+@click.option("--output-dir", type=click.Path(), default=None)
+@click.option("--email", is_flag=True)
+@click.pass_context
+def report_inventory(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool) -> None:
+    """Generate Network & Traffic Inventory Report."""
+    try:
+        paths = generate_inventory_report(
+            source=source,
+            file_path=file_path,
+            fmt=fmt,
+            output_dir=output_dir,
+            email=email,
+        )
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, f"Connection failed: {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
+    except Exception as exc:
+        log.exception("inventory report failed")
         echo_error(ctx, f"Unexpected error: {exc}")
         ctx.exit(EXIT_SOFTWARE)
         return
@@ -385,6 +475,8 @@ def _alias(cmd, canonical_name):
 
 
 report_group.add_command(_alias(report_traffic,      "traffic"),      name="generate-traffic")
+report_group.add_command(_alias(report_security,     "security"),     name="generate-security")
+report_group.add_command(_alias(report_inventory,    "inventory"),    name="generate-inventory")
 report_group.add_command(_alias(report_audit,        "audit"),        name="generate-audit")
 report_group.add_command(_alias(report_ven_status,   "ven-status"),   name="generate-ven-status")
 report_group.add_command(_alias(report_policy_usage, "policy-usage"), name="generate-policy-usage")
