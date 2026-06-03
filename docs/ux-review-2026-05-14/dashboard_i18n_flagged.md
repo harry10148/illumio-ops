@@ -1,14 +1,15 @@
 # Dashboard i18n Audit
 
-**Scope keys:** 228
-**Findings:** 101
+**Scope keys:** 236
+**Findings:** 97
 
-## Rule: mixed_language (34)
+## Rule: mixed_language (31)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
 | `actmtx_staged_enforcement_reco` | Move workloads from test/visibility to selective or full enforcement. | 將 workload 從 test/visibility 模式移至 selective 或 full enforcement。 | non-glossary Latin tokens: ['workload', 'test', 'visibility', 'selective', 'full', 'enforcement'] |
 | `gui_attack_summary_title` | Attack Summary | 攻擊摘要（Boundary/Pivot/Blast Radius/Blind Spots/行動） | non-glossary Latin tokens: ['Boundary', 'Pivot', 'Blast', 'Radius', 'Blind', 'Spots'] |
+| `gui_card_ransomware_exp` | Ransomware Exp | Ransomware 暴露面 | non-glossary Latin tokens: ['Ransomware'] |
 | `gui_card_suppressed_tooltip` | Cumulative alerts suppressed by cooldown or throttle rules. Counts the events th | 因 cooldown 或 throttle 規則被擋下、未派送的累積警示次數。代表事件確實命中規則但限流機制阻止它寄到 Email/LINE/Webhook，避 | non-glossary Latin tokens: ['cooldown', 'throttle', 'Email', 'LINE', 'Webhook'] |
 | `gui_card_unknown_types_tooltip` | PCE event types that arrived but matched no configured monitoring rule. Capped a | PCE 傳來但沒有任何 monitoring 規則涵蓋的 event_type 種類數，上限 100 種。數字大表示規則覆蓋率不足、可能漏抓新型事件；至「事件檢 | non-glossary Latin tokens: ['monitoring', 'event_type'] |
 | `gui_csv_required` | CSV file required | 請先選擇 CSV 檔案 | non-glossary Latin tokens: ['CSV'] |
@@ -16,10 +17,6 @@
 | `gui_err_no_csv` | No CSV file uploaded. | 未上傳 CSV 檔案。 | non-glossary Latin tokens: ['CSV'] |
 | `gui_gen_step_parsing` | Parsing CSV data... | 正在解析 CSV 資料... | non-glossary Latin tokens: ['CSV'] |
 | `gui_ip_address` | IP Address | IP 位址 | non-glossary Latin tokens: ['IP'] |
-| `gui_ov_eyebrow_security` | Security Posture | 安全體質 · Security Posture | non-glossary Latin tokens: ['Security', 'Posture'] |
-| `gui_ov_os_dist` | OS Distribution | OS 分布 | non-glossary Latin tokens: ['OS'] |
-| `gui_ov_posture_unavailable` | Run a Security Posture report to populate this section. | 請執行 Security Posture 報表以載入此區塊。 | non-glossary Latin tokens: ['Security', 'Posture'] |
-| `gui_ov_risk_feed_title` | Top Risk Findings | Top 風險發現 | non-glossary Latin tokens: ['Top'] |
 | `gui_query_flow` | Query Flow | 查詢 Flow | non-glossary Latin tokens: ['Flow'] |
 | `gui_rank_bw` | Max Bandwidth (Mbps) | 最大頻寬（Mbps） | non-glossary Latin tokens: ['Mbps'] |
 | `gui_snap_col_dst_ip` | Destination IP | 目的端 IP | non-glossary Latin tokens: ['IP'] |
@@ -42,17 +39,13 @@
 | `pd_potentially_blocked_by_boundary` | Potentially Blocked by Boundary | Potentially Blocked by Boundary（潛在邊界 Block） | non-glossary Latin tokens: ['Potentially', 'by', 'Boundary'] |
 | `pd_potentially_blocked_by_override_deny` | Potentially Blocked by Override Deny | Potentially Blocked by Override Deny（潛在強制拒絕 Block） | non-glossary Latin tokens: ['Potentially', 'by', 'Override', 'Deny'] |
 
-## Rule: low_han_ratio (24)
+## Rule: low_han_ratio (19)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
 | `actmtx_staged_enforcement_reco` | Move workloads from test/visibility to selective or full enforcement. | 將 workload 從 test/visibility 模式移至 selective 或 full enforcement。 | han_ratio=0.13 |
 | `gui_attack_summary_title` | Attack Summary | 攻擊摘要（Boundary/Pivot/Blast Radius/Blind Spots/行動） | han_ratio=0.15 |
-| `gui_card_health` | PCE Health | PCE 健康 | han_ratio=0.40 |
-| `gui_ov_enforcement_modes` | Enforcement Modes | Enforcement 模式 | han_ratio=0.15 |
-| `gui_ov_eyebrow_security` | Security Posture | 安全體質 · Security Posture | han_ratio=0.21 |
-| `gui_ov_posture_unavailable` | Run a Security Posture report to populate this section. | 請執行 Security Posture 報表以載入此區塊。 | han_ratio=0.42 |
-| `gui_ov_ven_title` | VEN Health | VEN 健康 | han_ratio=0.40 |
+| `gui_card_ransomware_exp` | Ransomware Exp | Ransomware 暴露面 | han_ratio=0.23 |
 | `gui_policy_dec` | Policy Decision | Policy 判定 | han_ratio=0.25 |
 | `gui_query_flow` | Query Flow | 查詢 Flow | han_ratio=0.33 |
 | `gui_sched_rt_pu` | Policy Usage | Policy 使用報表 | han_ratio=0.40 |
@@ -60,7 +53,6 @@
 | `gui_snap_policy_breakdown` | Policy Decision Breakdown | Policy 判定分布 | han_ratio=0.40 |
 | `gui_snap_top_ports` | Top 10 Ports (by flow count) | Top 10 Ports（依流量筆數） | han_ratio=0.38 |
 | `gui_ta_query` | Traffic Analysis Query | 查詢 Flow | han_ratio=0.33 |
-| `gui_tw_trend_flagged_only` | Flagged only (hide Allowed) | 只看可疑（隱藏 Allowed） | han_ratio=0.46 |
 | `gui_workload_name` | Workload Name | Workload 名稱 | han_ratio=0.20 |
 | `gui_workload_search` | Workload Search | Workload 搜尋 | han_ratio=0.20 |
 | `gui_ws_col_management` | Management | Manage 狀態 | han_ratio=0.25 |
@@ -71,21 +63,26 @@
 | `pd_potentially_blocked_by_boundary` | Potentially Blocked by Boundary | Potentially Blocked by Boundary（潛在邊界 Block） | han_ratio=0.11 |
 | `pd_potentially_blocked_by_override_deny` | Potentially Blocked by Override Deny | Potentially Blocked by Override Deny（潛在強制拒絕 Block） | han_ratio=0.14 |
 
-## Rule: too_short_vs_english (33)
+## Rule: too_short_vs_english (38)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
 | `gui_btn_download` | Download | 下載 | en_len=8 zh_len=2 |
+| `gui_cooldown_title` | Rules in Cooldown | 冷卻中規則 | en_len=17 zh_len=5 |
+| `gui_db_detail_metrics` | Detailed metrics & tables | 詳細指標與表格 | en_len=25 zh_len=7 |
 | `gui_delete_partial` | Some items failed to delete | 部分項目刪除失敗 | en_len=27 zh_len=8 |
 | `gui_destination_identity` | Destination Identity | 目的端識別 | en_len=20 zh_len=5 |
 | `gui_filter_details` | Filter Details | 查詢條件 | en_len=14 zh_len=4 |
 | `gui_filter_settings` | Filter Settings | 篩選條件 | en_len=15 zh_len=4 |
 | `gui_gen_audit_title` | Generate Audit Report | 產生稽核報表 | en_len=21 zh_len=6 |
 | `gui_gen_fallback_title` | Generate report | 產生報表 | en_len=15 zh_len=4 |
+| `gui_hero_no_data` | Run a Traffic Report to populate the dashboard hero. | 請先執行流量報表以填入摘要。 | en_len=52 zh_len=14 |
+| `gui_hi_risk_findings` | High-risk findings | 高風險發現 | en_len=18 zh_len=5 |
+| `gui_maturity_heading` | Microsegmentation Maturity | 微分段成熟度 | en_len=26 zh_len=6 |
 | `gui_opt_connections` | Connections | 連線數 | en_len=11 zh_len=3 |
 | `gui_opt_volume` | Total Volume | 總流量 | en_len=12 zh_len=3 |
-| `gui_ov_eyebrow_ops` | Operations & Estate | 營運與估產 | en_len=19 zh_len=5 |
 | `gui_param_guide` | Parameter Guide | 參數說明 | en_len=15 zh_len=4 |
+| `gui_pu_stat_new_queries` | New Queries | 新查詢 | en_len=11 zh_len=3 |
 | `gui_rank_conn` | Connections | 連線 | en_len=11 zh_len=2 |
 | `gui_reports_empty` | Use the buttons above to generate your first report. | 請使用上方按鈕產生第一份報表。 | en_len=52 zh_len=15 |
 | `gui_sched_day_of_month` | Day of month | 每月第 | en_len=12 zh_len=3 |
@@ -109,11 +106,10 @@
 | `gui_tw_kpi_peak_bw` | Peak bandwidth | 尖峰頻寬 | en_len=14 zh_len=4 |
 | `gui_window_min` | Window (min) | 分鐘 | en_len=12 zh_len=2 |
 
-## Rule: untranslated (10)
+## Rule: untranslated (9)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
-| `gui_ov_posture_score_label` | Posture Score | Posture Score | zh equals en (case-insensitive) |
 | `gui_pd_allowed` | Allowed | Allowed | zh equals en (case-insensitive) |
 | `gui_pd_blocked` | Blocked | Blocked | zh equals en (case-insensitive) |
 | `gui_service_port` | Service | Service | zh equals en (case-insensitive) |
