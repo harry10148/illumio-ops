@@ -63,3 +63,46 @@ def test_cli_has_security_and_inventory_commands(cli_runner):
     from src.cli.root import cli
     out = cli_runner.invoke(cli, ['report', '--help']).output
     assert 'security' in out and 'inventory' in out
+
+
+def test_scheduler_routes_network_inventory(monkeypatch, tmp_path):
+    import src.report_scheduler as rs
+    import src.main as main
+    captured = {}
+
+    class _FakeResult:
+        record_count = 1
+        module_results = _results()
+        data_source = "api"
+
+    class _FakeGen:
+        def __init__(self, *a, **k):
+            pass
+
+        def generate_from_api(self, **k):
+            captured["gen_profile"] = k.get("traffic_report_profile")
+            return _FakeResult()
+
+        def export(self, result, **k):
+            captured["export_profile"] = k.get("traffic_report_profile")
+            return ["reports/Illumio_Traffic_Report_NetworkInventory_x.html"]
+
+    # The scheduler does a function-local `from src.report.report_generator
+    # import ReportGenerator`, so patch the source module attribute.
+    monkeypatch.setattr("src.report.report_generator.ReportGenerator", _FakeGen, raising=False)
+    # _make_cache_reader is imported from src.main inside the method and would
+    # dereference cm.models.pce_cache.enabled (cm is None here) — stub it out.
+    monkeypatch.setattr(main, "_make_cache_reader", lambda cm: None)
+
+    sched = rs.ReportScheduler.__new__(rs.ReportScheduler)
+    sched.cm = None
+    sched._config_dir = "config"
+
+    result, paths = sched._generate_report(
+        "network_inventory", api=object(), fmt="html", output_dir=str(tmp_path),
+        start_date=None, end_date=None, name="t",
+    )
+
+    assert captured.get("gen_profile") == "network_inventory"
+    assert captured.get("export_profile") == "network_inventory"
+    assert any("NetworkInventory" in p for p in paths)

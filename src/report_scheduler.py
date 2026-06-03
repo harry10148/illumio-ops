@@ -259,6 +259,19 @@ class ReportScheduler:
                                send_email=False, reporter=None)
             return result, paths
 
+        elif report_type in ("security_risk", "network_inventory"):
+            from src.report.report_generator import ReportGenerator
+            gen = ReportGenerator(self.cm, api_client=api, config_dir=self._config_dir,
+                                  cache_reader=_make_cache_reader(self.cm))
+            result = gen.generate_from_api(start_date=start_date, end_date=end_date,
+                                           filters=filters, traffic_report_profile=report_type, lang=lang)
+            if result.record_count == 0:
+                logger.warning(f"[Scheduler] '{name}': no traffic data — skipping export")
+                return None, []
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir, send_email=False,
+                               reporter=None, traffic_report_profile=report_type)
+            return result, paths
+
         elif report_type == "audit":
             from src.report.audit_generator import AuditGenerator
             gen = AuditGenerator(self.cm, api_client=api, config_dir=self._config_dir,
