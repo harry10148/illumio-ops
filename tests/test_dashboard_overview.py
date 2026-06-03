@@ -10,7 +10,7 @@ def client(tmp_path):
     with open(path, "w") as f:
         json.dump({"web_gui": {"username": "admin", "password": "pw",
                                "secret_key": "s", "allowed_ips": ["127.0.0.1"]},
-                   "pce_cache": {"enabled": False, "db_path": str(tmp_path / "c.sqlite")}}, f)
+                   "pce_cache": {"enabled": True, "db_path": str(tmp_path / "c.sqlite")}}, f)
     cm = ConfigManager(config_file=path)
     from src.gui import _create_app
     app = _create_app(cm, persistent_mode=True)
@@ -48,11 +48,17 @@ def test_overview_ven_unknown_when_missing(client, tmp_path, monkeypatch):
 
 
 def test_overview_alerts_from_state(client, tmp_path, monkeypatch):
+    import datetime as dt
     from src.gui import _helpers
+    # _overview_alerts only counts dispatches within the last 24h, so use recent
+    # timestamps rather than hardcoded dates (which age out of the window).
+    now = dt.datetime.now(dt.timezone.utc)
+    ts1 = (now - dt.timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    ts2 = (now - dt.timedelta(minutes=4)).strftime("%Y-%m-%dT%H:%M:%SZ")
     sf = str(tmp_path / "state.json")
     json.dump({"dispatch_history": [
-                  {"timestamp": "2026-05-31T00:00:00Z", "channel": "line", "status": "success"},
-                  {"timestamp": "2026-05-31T00:01:00Z", "channel": "mail", "status": "failed"}],
+                  {"timestamp": ts1, "channel": "line", "status": "success"},
+                  {"timestamp": ts2, "channel": "mail", "status": "failed"}],
                "throttle_state": {"r1": {"suppressed": 8}}}, open(sf, "w"))
     monkeypatch.setattr(_helpers, "_resolve_state_file", lambda: sf)
     r = client.get("/api/dashboard/overview", environ_overrides={"REMOTE_ADDR": "127.0.0.1"})

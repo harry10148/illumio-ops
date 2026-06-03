@@ -10,7 +10,7 @@ def test_event_viewer_returns_normalized_events(app_persistent, monkeypatch):
     }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
     assert login.status_code == 200
 
-    def fake_fetch_events_strict(self, start_time_str, end_time_str=None, max_results=5000):
+    def fake_fetch_events_strict(self, start_time_str, end_time_str=None, max_results=5000, event_type=None):
         return [{
             "href": "/orgs/1/events/abc",
             "timestamp": "2026-04-08T12:00:00Z",
@@ -48,7 +48,7 @@ def test_event_viewer_supports_offset_pagination(app_persistent, monkeypatch):
     }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
     assert login.status_code == 200
 
-    def fake_fetch_events_strict(self, start_time_str, end_time_str=None, max_results=5000):
+    def fake_fetch_events_strict(self, start_time_str, end_time_str=None, max_results=5000, event_type=None):
         return [
             {
                 "href": f"/orgs/1/events/{idx}",
@@ -82,7 +82,7 @@ def test_event_viewer_supports_hierarchy_filters(app_persistent, monkeypatch):
     }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
     assert login.status_code == 200
 
-    def fake_fetch_events_strict(self, start_time_str, end_time_str=None, max_results=5000):
+    def fake_fetch_events_strict(self, start_time_str, end_time_str=None, max_results=5000, event_type=None):
         return [
             {
                 "href": "/orgs/1/events/1",
