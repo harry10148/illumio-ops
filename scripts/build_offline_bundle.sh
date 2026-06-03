@@ -68,6 +68,36 @@ stage_app() {
     echo "$VERSION" > "$dest/VERSION"
 }
 
+# ── Shared helper: slim the bundled Python ────────────────────────────────────
+# python-build-standalone ships an UNSTRIPPED libpython (~206M of debug_info on
+# Linux) and full .pdb debug files on Windows, plus the Tcl/Tk GUI stack and
+# dev-only stdlib. None are needed at runtime for this web/CLI app (matplotlib
+# uses the Agg backend, so no Tkinter). Stripping + pruning cuts the Linux
+# bundle ~50% and Windows ~30%. ensurepip is KEPT (venv-based deploys need it).
+# Call AFTER all pip downloads complete (the bundled python is still usable).
+slim_python() {
+    local py="$1/python" platform="$2"
+    echo "==> [$platform] Slimming bundled Python (strip debug + prune GUI/dev stdlib)"
+    if [[ "$platform" == "linux" ]]; then
+        local f
+        for f in "$py"/lib/libpython3.*.so.* "$py"/bin/python3.[0-9]*; do
+            [[ -f "$f" ]] && strip --strip-debug "$f" 2>/dev/null || true
+        done
+        rm -rf "$py"/lib/tcl8* "$py"/lib/tk8* "$py"/lib/Tix* "$py"/lib/itcl* \
+               "$py"/lib/thread2* "$py"/include
+        rm -rf "$py"/lib/python3.*/tkinter "$py"/lib/python3.*/idlelib \
+               "$py"/lib/python3.*/lib2to3 "$py"/lib/python3.*/pydoc_data \
+               "$py"/lib/python3.*/test "$py"/lib/python3.*/config-3.*
+        find "$py"/lib -name '*.a' -delete 2>/dev/null || true
+    else  # windows
+        find "$py" -name '*.pdb' -delete 2>/dev/null || true
+        rm -rf "$py"/tcl "$py"/include "$py"/libs \
+               "$py"/Lib/tkinter "$py"/Lib/idlelib "$py"/Lib/lib2to3 \
+               "$py"/Lib/pydoc_data "$py"/Lib/test
+        rm -f "$py"/DLLs/_tkinter.pyd "$py"/DLLs/tcl*.dll "$py"/DLLs/tk*.dll
+    fi
+}
+
 # ── Linux bundle ──────────────────────────────────────────────────────────────
 build_linux() {
     local STAGE_NAME="illumio-ops-${VERSION}-offline-linux-x86_64"
@@ -103,6 +133,8 @@ build_linux() {
     chmod +x "$BUILD/install.sh"
     cp "$REPO_ROOT/scripts/uninstall.sh" "$BUILD/"
     chmod +x "$BUILD/uninstall.sh"
+
+    slim_python "$BUILD" linux
 
     echo "==> [Linux] Creating $ARCHIVE"
     tar czf "$DIST_DIR/$ARCHIVE" -C "$(dirname "$BUILD")" "$(basename "$BUILD")"
@@ -153,6 +185,8 @@ build_windows() {
     echo "==> [Windows] Bundling NSSM"
     unzip -j -o "$REPO_ROOT/vendor/windows/nssm-2.24.zip" \
         "nssm-2.24/win64/nssm.exe" -d "$BUILD/deploy/" >/dev/null
+
+    slim_python "$BUILD" windows
 
     echo "==> [Windows] Creating $ARCHIVE"
     (cd "$(dirname "$BUILD")" && zip -r "$DIST_DIR/$ARCHIVE" "$(basename "$BUILD")" -x "*.pyc" -x "__pycache__/*")
