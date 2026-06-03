@@ -1524,5 +1524,25 @@ class NetworkInventoryHtmlExporter(_TrafficReportBase):
                 'distribution', 'bandwidth', 'ringfence', 'change_impact']
 
 
-HtmlExporter = SecurityRiskHtmlExporter   # legacy import name (defaults to security-risk profile)
+class HtmlExporter(_TrafficReportBase):
+    """Back-compat shim for the pre-split single exporter.
+
+    Legacy callers construct ``HtmlExporter(results, profile=...)`` and expect the
+    section set, maturity hero, profile badge, title and filename to follow that
+    ``profile``. The split moved that choice into dedicated subclasses; this shim
+    routes by ``self._profile`` so existing imports keep working unchanged.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.REPORT_KIND = ("NetworkInventory"
+                            if self._profile == "network_inventory" else "SecurityRisk")
+
+    def _include_maturity(self) -> bool:
+        return self._profile != "network_inventory"
+
+    def _ordered_section_keys(self) -> list[str]:
+        if self._profile == "network_inventory":
+            return NetworkInventoryHtmlExporter._ordered_section_keys(self)
+        return SecurityRiskHtmlExporter._ordered_section_keys(self)
 
