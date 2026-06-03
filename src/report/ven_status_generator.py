@@ -265,14 +265,14 @@ class VenStatusGenerator:
         # Columns included in the final display tables (internal-only fields excluded).
         # Role/App are segmentation labels, not VEN-health signals — dropped here to
         # keep the print/PDF table narrow (see test_ven_report_compact).
-        _DISPLAY_COLS = ['hostname', 'ip', 'env', 'loc',
-                         'policy_sync', 'last_heartbeat', 'policy_received',
-                         'paired_at', 'ven_version']
+        # Display tables drop Env/Loc (static segmentation labels) to keep the
+        # table narrow while retaining Policy Received (policy-refresh recency).
+        # Env/Loc remain in the underlying dataframe for CSV/XLSX exports.
+        _DISPLAY_COLS = ['hostname', 'ip', 'policy_sync', 'last_heartbeat',
+                         'policy_received', 'paired_at', 'ven_version']
         _COL_RENAME = {
             'hostname':        'Hostname',
             'ip':              'IP',
-            'env':             'Env',
-            'loc':             'Loc',
             'policy_sync':     'Policy Sync',
             'last_heartbeat':  'Last Heartbeat',
             'policy_received': 'Policy Received',

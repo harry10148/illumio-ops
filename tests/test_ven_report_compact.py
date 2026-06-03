@@ -1,7 +1,7 @@
 """VEN status report: compact columns for print/PDF.
 
 Verifies the column-slimming work:
-  - Role / App dropped from the display tables (status report ≠ segmentation report)
+  - Role / App / Env / Loc dropped from the display tables (status report ≠ segmentation report)
   - last_heartbeat / policy_received rendered as compact relative time
   - paired_at rendered date-only
   - IP list truncated at the HTML display layer (full value preserved in title)
@@ -48,9 +48,9 @@ def test_display_columns_drop_role_and_app():
     res = g._analyze(df)
     online = res["online"]
     cols = list(online.columns)
-    assert "Role" not in cols and "App" not in cols, cols
-    assert cols == ["Hostname", "IP", "Env", "Loc", "Policy Sync",
-                    "Last Heartbeat", "Policy Received", "Paired At", "VEN Version"], cols
+    assert all(c not in cols for c in ("Role", "App", "Env", "Loc")), cols
+    assert cols == ["Hostname", "IP", "Policy Sync", "Last Heartbeat",
+                    "Policy Received", "Paired At", "VEN Version"], cols
 
 
 def test_heartbeat_is_relative_and_paired_is_date_only():
