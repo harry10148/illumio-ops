@@ -118,3 +118,28 @@ def test_reports_have_distinct_h1_titles():
     # The shared generic title must no longer be the H1 of either.
     assert "<h1>Illumio Traffic Flow Report</h1>" not in sec
     assert "<h1>Illumio Traffic Flow Report</h1>" not in inv
+
+
+def test_scheduler_prune_by_count_handles_new_types(tmp_path):
+    """Count-based pruning must work for security_risk/network_inventory schedules
+    (regression: the new report types were initially absent from _REPORT_PREFIXES,
+    so _prune_by_count returned early and never pruned them)."""
+    import os
+    import src.report_scheduler as rs
+    sched = rs.ReportScheduler.__new__(rs.ReportScheduler)
+    for rtype, prefix in (("network_inventory", "Illumio_Traffic_Report_NetworkInventory_"),
+                          ("security_risk", "Illumio_Traffic_Report_SecurityRisk_")):
+        d = tmp_path / rtype
+        d.mkdir()
+        files = []
+        for i in range(4):
+            f = d / f"{prefix}2026-06-0{i+1}_0000.html"
+            f.write_text("x")
+            os.utime(f, (1_000_000 + i, 1_000_000 + i))  # ascending mtime
+            files.append(f)
+        sched._prune_by_count(str(d), rtype, max_reports=2)
+        remaining = sorted(p.name for p in d.iterdir())
+        assert len(remaining) == 2, remaining
+        # newest two kept (i=2,3)
+        assert files[3].name in remaining and files[2].name in remaining
+        assert files[0].name not in remaining

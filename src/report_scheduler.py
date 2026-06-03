@@ -321,6 +321,8 @@ class ReportScheduler:
         # Build HTML body
         esc = lambda s: _html.escape(str(s), quote=True)
         type_label = {"traffic": t("rpt_email_traffic_subject", lang=lang), "audit": t("rpt_email_audit_subject", lang=lang),
+                      "security_risk": t("rpt_security_report_title", lang=lang),
+                      "network_inventory": t("rpt_inventory_report_title", lang=lang),
                       "ven_status": t("rpt_email_ven_subject", lang=lang),
                       "policy_usage": t("rpt_email_pu_subject", lang=lang)}.get(report_type, "Report")
         start_disp = start_date[:10] if start_date else "N/A"
@@ -467,10 +469,12 @@ class ReportScheduler:
 
     # File prefix patterns for each report type (matches both .html and .zip)
     _REPORT_PREFIXES = {
-        "traffic":      "Illumio_Traffic_Report_",
-        "audit":        "illumio_audit_report_",
-        "ven_status":   "illumio_ven_status_",
-        "policy_usage": "illumio_policy_usage_report_",
+        "traffic":           "Illumio_Traffic_Report_",
+        "security_risk":     "Illumio_Traffic_Report_SecurityRisk_",
+        "network_inventory": "Illumio_Traffic_Report_NetworkInventory_",
+        "audit":             "illumio_audit_report_",
+        "ven_status":        "illumio_ven_status_",
+        "policy_usage":      "illumio_policy_usage_report_",
     }
 
     def _prune_by_count(self, output_dir: str, report_type: str, max_reports: int):
