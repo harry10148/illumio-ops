@@ -112,6 +112,26 @@ def _deep_merge(base: dict, override: dict) -> dict:
             merged[key] = val
     return merged
 
+
+# Removed config keys that may still exist in older deployed config.json files.
+# The schema uses extra="forbid", so leaving them in would fail validation. Each
+# entry is the (section, key) path to drop before validation.
+#   - report.attack_surface: removed with mod16 (Open-Ports Attack Surface).
+_DEPRECATED_KEY_PATHS: tuple[tuple[str, str], ...] = (
+    ("report", "attack_surface"),
+)
+
+
+def _strip_deprecated_keys(merged: dict) -> list[str]:
+    """Drop known-removed keys from *merged* in place; return dotted paths dropped."""
+    dropped: list[str] = []
+    for section, key in _DEPRECATED_KEY_PATHS:
+        sect = merged.get(section)
+        if isinstance(sect, dict) and key in sect:
+            sect.pop(key, None)
+            dropped.append(f"{section}.{key}")
+    return dropped
+
 class ConfigManager:
     def __init__(self, config_file: str = CONFIG_FILE, alerts_file: str | None = None):
         self.config_file = config_file
@@ -169,6 +189,15 @@ class ConfigManager:
 
         # Merge defaults with raw data (deep merge preserves legacy behavior)
         merged = _deep_merge(json.loads(json.dumps(_DEFAULT_CONFIG)), raw_data)
+
+        # Drop keys removed in newer versions so older config.json files (which
+        # may still carry them) don't fail the extra="forbid" schema validation.
+        _dropped = _strip_deprecated_keys(merged)
+        if _dropped:
+            logger.warning(
+                "Ignoring deprecated config key(s): {} (removed in a newer version)",
+                ", ".join(_dropped),
+            )
 
         try:
             self.models = ConfigSchema.model_validate(merged)
