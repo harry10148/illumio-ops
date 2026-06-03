@@ -603,6 +603,23 @@ class ApiClient:
             logger.error(f"Get Workload Error: {e}")
             return {}
 
+    def get_workload_risk_details(self, href: str) -> dict:
+        """Fetch a workload's ransomware risk details. Returns {} on error.
+
+        GET /api/v2{href}/risk_details — payload is
+        ``{"risk_details": {"ransomware": {"details": [...], ...} | null}}``.
+        """
+        try:
+            url = f"{self.api_cfg['url']}/api/v2{href}/risk_details"
+            status, body = self._request(url, timeout=10)
+            if status == 200:
+                return orjson.loads(body)
+            logger.error(f"Get Workload Risk Details Failed: {status} for {href}")
+            return {}
+        except Exception as e:
+            logger.error(f"Get Workload Risk Details Error: {e}")
+            return {}
+
     def update_workload_labels(self, href: str, labels: list) -> bool:
         """Update a workload's labels. labels list should contain dicts with 'href' keys."""
         try:
