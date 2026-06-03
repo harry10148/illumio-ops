@@ -5,8 +5,8 @@ from click.testing import CliRunner
 from src.cli.root import cli
 
 
-def test_unknown_command_suggests_close_match():
-    runner = CliRunner()
+def test_unknown_command_suggests_close_match(cli_runner):
+    runner = cli_runner
     result = runner.invoke(cli, ['staus'])  # typo of 'status'
     assert result.exit_code != 0
     output = (result.stderr or '') + (result.stdout or '') + str(result.exception or '')
@@ -15,8 +15,8 @@ def test_unknown_command_suggests_close_match():
     assert 'did you mean' in output.lower() or 'Did you mean' in output
 
 
-def test_unknown_command_no_close_match_no_suggestion():
-    runner = CliRunner()
+def test_unknown_command_no_close_match_no_suggestion(cli_runner):
+    runner = cli_runner
     result = runner.invoke(cli, ['xyzzy123'])
     assert result.exit_code != 0
     output = (result.stderr or '') + (result.stdout or '')

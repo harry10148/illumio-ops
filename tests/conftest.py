@@ -106,3 +106,18 @@ def app_persistent(temp_config_file):
 @pytest.fixture
 def client(app_persistent):
     return app_persistent.test_client()
+
+
+@pytest.fixture
+def cli_runner():
+    """A click CliRunner that captures stderr separately, across click versions.
+
+    click <8.2 mixes stderr into ``result.output`` unless ``mix_stderr=False``;
+    click >=8.2 removed the parameter and always separates stderr. This keeps
+    ``result.stderr`` usable on any click in the project's ``>=8.1,<9.0`` range.
+    """
+    from click.testing import CliRunner
+    try:
+        return CliRunner(mix_stderr=False)
+    except TypeError:
+        return CliRunner()

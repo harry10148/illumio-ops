@@ -10,8 +10,8 @@ from src.cli._output import echo_info, echo_warning, echo_error, echo_json
 
 
 @pytest.fixture
-def runner():
-    return CliRunner()
+def runner(cli_runner):
+    return cli_runner
 
 
 def test_echo_json_emits_to_stdout_only(runner):

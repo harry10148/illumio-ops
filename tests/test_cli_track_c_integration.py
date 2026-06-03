@@ -21,8 +21,8 @@ def test_top_level_help_lists_track_c_additions():
     assert 'completion' in out
 
 
-def test_did_you_mean_root_typo():
-    runner = CliRunner()
+def test_did_you_mean_root_typo(cli_runner):
+    runner = cli_runner
     result = runner.invoke(cli, ['shel'])
     combined = (result.output or '') + (result.stderr or '') + str(result.exception or '')
     assert 'shell' in combined.lower()
