@@ -570,8 +570,6 @@ class HtmlExporter:
                 _nav_link('readiness', 'rpt_tr_nav_readiness', '13 Enforcement Readiness'),
                 _nav_link('infrastructure', 'rpt_tr_nav_infrastructure', '14 Infrastructure Scoring'),
                 _nav_link('lateral', 'rpt_tr_nav_lateral', '15 Lateral Movement'),
-                (_nav_link('open_ports', 'rpt_ops_section', 'Open-Ports Attack Surface')
-                 if self._r.get('mod16') else ''),
                 _nav_link('findings', 'rpt_tr_nav_findings', 'Findings', badge=n_findings),
             ]
         else:  # network_inventory
@@ -681,10 +679,6 @@ class HtmlExporter:
                            render_section_guidance('mod_change_impact', profile, detail_level, lang=self._lang) + self._mod_change_impact_html(),
                            '', '') + '\n'
              if visible_in('mod_change_impact', profile, detail_level) else '') +
-            (self._section('open_ports', 'rpt_ops_section', 'Open-Ports Attack Surface',
-                           self._mod16_html(),
-                           'rpt_ops_intro', 'Shows static open listening Ports on managed Workloads — the attack surface complement to observed traffic.') + '\n'
-             if self._r.get('mod16') else '') +
             ((
             '<section id="findings" class="card">'
             f'<h2>{_s("rpt_tr_sec_findings")} ({n_findings})</h2>'
@@ -992,46 +986,6 @@ class HtmlExporter:
             + _df_to_html(m.get('part_d_host_exposure'), lang=_lang)
         )
         return out
-
-    def _mod16_html(self):
-        """Render Open-Ports Attack Surface (mod16) — present only when enabled."""
-        _s = self._s
-        _lang = self._lang
-        m = self._r.get('mod16')
-        if not m or not isinstance(m, dict):
-            return ''
-        top_ports = m.get('top_ports') or []
-        if not top_ports:
-            return f'<p class="note">{_s("rpt_no_data")}</p>'
-        import html as _html_mod
-        rows = ''
-        for row in top_ports:
-            hosts = ', '.join(str(h) for h in (row.get('sample_hosts') or []))
-            rows += (
-                '<tr>'
-                f'<td>{_html_mod.escape(str(row.get("port", "")))}</td>'
-                f'<td>{_html_mod.escape(str(row.get("protocol", "")))}</td>'
-                f'<td>{_html_mod.escape(str(row.get("workload_count", "")))}</td>'
-                f'<td>{_html_mod.escape(hosts)}</td>'
-                '</tr>'
-            )
-        thead = (
-            '<thead><tr>'
-            f'<th>{_s("rpt_ops_port")}</th>'
-            f'<th>{_s("rpt_ops_proto")}</th>'
-            f'<th>{_s("rpt_ops_wl_count")}</th>'
-            f'<th>{_s("rpt_ops_hosts")}</th>'
-            '</tr></thead>'
-        )
-        table = f'<table class="sortable">{thead}<tbody>{rows}</tbody></table>'
-        summary_tpl = _s("rpt_ops_summary")
-        summary = (
-            summary_tpl
-            .replace('{wl_with}', str(m.get('workloads_with_services', '—')))
-            .replace('{wl_total}', str(m.get('total_workloads', '—')))
-            .replace('{total_ports}', str(m.get('total_ports', '—')))
-        )
-        return table + f'<p class="note" style="margin-top:8px">{_html_mod.escape(summary)}</p>'
 
     def _mod05_html(self):
         _s = self._s

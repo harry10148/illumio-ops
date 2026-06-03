@@ -147,34 +147,6 @@ class ReportResult:
     dataframe: object = None       # pd.DataFrame, optional
     query_context: dict = field(default_factory=dict)
 
-# ─── Open-Ports Attack Surface helper (mod16) ────────────────────────────────
-
-def _compute_open_ports_surface(api, cm, top_n: int) -> "dict | None":
-    """Run open-ports enrichment + surface analysis when attack_surface.enabled=True.
-
-    Returns the mod16 result dict, or None when disabled / api missing / on error.
-    This function is factored out of _run_modules to keep it unit-testable.
-    """
-    try:
-        asf = cm.models.report.attack_surface
-        if not asf.enabled or api is None:
-            return None
-        from src.report.open_ports_enrichment import refresh_open_ports
-        from src.report.analysis.open_ports_surface import open_ports_surface
-        _wls = api.fetch_managed_workloads()
-        _rpm = getattr(cm.models.pce_cache, "rate_limit_per_minute", 400)
-        _enriched = refresh_open_ports(
-            api, _wls or [],
-            rate_per_minute=_rpm,
-            max_workloads=asf.max_workloads,
-            ttl_hours=asf.cache_ttl_hours,
-        )
-        return open_ports_surface(_enriched, top_n=top_n)
-    except Exception as exc:
-        logger.warning(f"[ReportGenerator] mod16 open-ports surface skipped: {exc}")
-        return None
-
-
 # ─── Generator ───────────────────────────────────────────────────────────────
 
 class ReportGenerator:
@@ -654,11 +626,6 @@ class ReportGenerator:
 
         results['_module_errors'] = module_errors
         print(t("rpt_modules_complete", lang=lang) + "             ")
-
-        # mod16 — Open-Ports Attack Surface (opt-in; no API calls when disabled)
-        _ops = _compute_open_ports_surface(self.api, self.cm, top_n)
-        if _ops is not None:
-            results['mod16'] = _ops
 
         return results
 

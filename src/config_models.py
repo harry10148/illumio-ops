@@ -106,11 +106,6 @@ class ReportApiQuery(_Base):
     end_date: Optional[str] = None
     max_results: int = Field(default=200000, ge=1, le=1_000_000)
 
-class AttackSurfaceSettings(_Base):
-    enabled: bool = False
-    max_workloads: int = Field(default=500, ge=1)
-    cache_ttl_hours: int = Field(default=24, ge=1)
-
 class ReportSettings(_Base):
     enabled: bool = False
     schedule: Literal["daily", "weekly", "monthly"] = "weekly"
@@ -127,7 +122,6 @@ class ReportSettings(_Base):
     api_query: ReportApiQuery = Field(default_factory=ReportApiQuery)
     snapshot_retention_days: int = Field(default=90, ge=1, le=3650)
     draft_actions_enabled: bool = True
-    attack_surface: AttackSurfaceSettings = Field(default_factory=AttackSurfaceSettings)
 
 class LoggingSettings(_Base):
     level: str = "INFO"
