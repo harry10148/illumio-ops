@@ -26,7 +26,10 @@ def test_unit_has_hardening_directives():
     assert s["PrivateTmp"] == "true"
     assert s["RestrictAddressFamilies"] == "AF_INET AF_INET6 AF_UNIX"
     assert s["SystemCallFilter"] == "@system-service"
-    assert s["MemoryDenyWriteExecute"] == "true"
+    # MemoryDenyWriteExecute is intentionally omitted: CPython 3.12's allocator
+    # uses mprotect(PROT_WRITE|PROT_EXEC) during thread init on RHEL/Rocky 9,
+    # which this directive would break ("can't start new thread"). See unit file.
+    assert "MemoryDenyWriteExecute" not in s
     assert s["LockPersonality"] == "true"
     assert s["ProtectKernelTunables"] == "true"
     assert s["ProtectControlGroups"] == "true"

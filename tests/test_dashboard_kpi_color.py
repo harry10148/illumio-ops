@@ -1,5 +1,11 @@
-"""Dashboard top 3 KPI cards: 健康摘要 / 事件查詢 should render in --color-success
-(green) when their state is healthy, not --accent2 (orange)."""
+"""Dashboard story KPI cards should render in --color-success (green) when their
+state is healthy, not --accent2 (orange).
+
+Since the overview redesign (commit 5e67b0f), card colour is driven by
+``_dashboardSetCard(id, value, state)`` during the data refresh rather than by a
+default class applied in ``ensureDashboardLayout`` (which now only marks layout
+ready). The health card must pass the 'ok' state when ``health_check`` is true.
+"""
 from __future__ import annotations
 
 import re
@@ -10,20 +16,15 @@ JS = Path(__file__).parent.parent / "src" / "static" / "js" / "dashboard.js"
 CSS = Path(__file__).parent.parent / "src" / "static" / "css" / "app.css"
 
 
-def test_ensure_layout_sets_ok_class_for_cooldown_and_pce_health():
-    """ensureDashboardLayout must add 'value-ok' (or class 'ok') to cards[1]
-    and cards[2] .value elements so they render green by default."""
+def test_health_card_renders_ok_state_when_healthy():
+    """The health KPI card must use the 'ok' (green) state when health_check is
+    true, via _dashboardSetCard during the dashboard refresh."""
     js = JS.read_text(encoding="utf-8")
-    # Capture the ensureDashboardLayout body
-    m = re.search(r"function ensureDashboardLayout\([^)]*\)\s*\{(.*?)\n\s*dashboard\.dataset\.layoutReady",
-                  js, flags=re.DOTALL)
-    assert m, "ensureDashboardLayout function body not found"
-    body = m.group(1)
-    # Expect at least 2 'classList.add' calls inside this function with 'ok'
-    adds = re.findall(r"\.value[^;\n]*classList\.add\(\s*['\"]ok['\"]\s*\)", body)
-    assert len(adds) >= 2, (
-        f"Expected >=2 `.value.classList.add('ok')` inside ensureDashboardLayout, got {len(adds)}"
+    m = re.search(
+        r"_dashboardSetCard\(\s*'d-health'.*?d\.health_check\s*\?\s*'ok'\s*:\s*'warn'",
+        js, flags=re.DOTALL,
     )
+    assert m, "d-health card should render 'ok' (green) when health_check is true"
 
 
 def test_card_value_ok_uses_color_success_token():
