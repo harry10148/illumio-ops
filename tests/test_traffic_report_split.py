@@ -106,3 +106,15 @@ def test_scheduler_routes_network_inventory(monkeypatch, tmp_path):
     assert captured.get("gen_profile") == "network_inventory"
     assert captured.get("export_profile") == "network_inventory"
     assert any("NetworkInventory" in p for p in paths)
+
+
+def test_reports_have_distinct_h1_titles():
+    sec = SecurityRiskHtmlExporter(_results()).build()
+    inv = NetworkInventoryHtmlExporter(_results()).build()
+    # Each report's H1 uses its own title key (English default lang).
+    # _s() renders the literal "&" (no HTML-escaping) in the live markup.
+    assert "<h1>Illumio Security & Risk Report</h1>" in sec
+    assert "<h1>Illumio Network & Traffic Inventory Report</h1>" in inv
+    # The shared generic title must no longer be the H1 of either.
+    assert "<h1>Illumio Traffic Flow Report</h1>" not in sec
+    assert "<h1>Illumio Traffic Flow Report</h1>" not in inv

@@ -617,7 +617,7 @@ class _TrafficReportBase:
             + (f'<div class="report-profile-badge report-profile-badge--security">{_s("rpt_kicker_security_risk")}</div>'
                if self.REPORT_KIND == "SecurityRisk" else
                f'<div class="report-profile-badge report-profile-badge--inventory">{_s("rpt_kicker_network_inventory")}</div>')
-            + f'<h1>{_s("rpt_tr_title")}</h1>'
+            + f'<h1>{_s("rpt_security_report_title" if self.REPORT_KIND == "SecurityRisk" else "rpt_inventory_report_title")}</h1>'
             f'<p class="report-subtitle">{_s("rpt_generated")} ' + generated_at + '</p></div>'
             + summary_pills + _maturity_block + trend_html
             + f'<h2>{_s("rpt_key_findings")}</h2>' + key_findings_html

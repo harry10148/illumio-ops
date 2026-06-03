@@ -3327,6 +3327,8 @@
   "rpt_tr_service_gaps_subnote": "Uncovered Services tie apps and Ports together, making a better input for future Policy design.",
   "rpt_tr_staged_coverage": "Staged Coverage",
   "rpt_tr_suspicious_pivot_behavior": "Suspicious Pivot Behavior",
+  "rpt_security_report_title": "Illumio Security & Risk Report",
+  "rpt_inventory_report_title": "Illumio Network & Traffic Inventory Report",
   "rpt_tr_title": "Illumio Traffic Flow Report",
   "rpt_tr_top_app_flows": "Top App Flows",
   "rpt_tr_top_apps_connections": "Connection Statistics",
