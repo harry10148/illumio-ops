@@ -118,6 +118,15 @@ class VenStatusGenerator:
         results["enforcement_distribution"] = estate_inventory.enforcement_distribution(workloads)
         results["enforcement_by_network"] = estate_inventory.enforcement_by_network(workloads)
 
+        # Ransomware posture (PCE-native; only when the PCE populates risk_summary)
+        if any((w.get("risk_summary") or {}).get("ransomware") for w in workloads):
+            from src.report import ransomware_posture_enrichment
+            from src.report.analysis import ransomware_posture as _rwp
+            _rpm = (self.cm.config.get("pce_cache") or {}).get("rate_limit_per_minute", 400)
+            _enr = ransomware_posture_enrichment.refresh_ransomware_posture(
+                self.api, workloads, rate_per_minute=_rpm)
+            results["ransomware_posture"] = _rwp.ransomware_posture(workloads, _enr)
+
         print(t("rpt_ven_analysis_done", lang=self._lang))
 
         result = VenStatusResult(
