@@ -223,8 +223,8 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> N
             ctx.exit(EXIT_USAGE)
             return
     else:
-        cm_tmp = ConfigManager()
-        current = cm_tmp.config.get("api", {})
+        cm = ConfigManager()
+        current = cm.config.get("api", {})
         if url is None:
             url = click.prompt("PCE URL", default=current.get("url", "https://pce.example.com:8443"))
         if key is None:
@@ -237,7 +237,8 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> N
     if org_id is None:
         org_id = "1"
 
-    cm = ConfigManager()
+    if no_interactive:
+        cm = ConfigManager()
     cm.config["api"]["url"] = url
     cm.config["api"]["key"] = key
     cm.config["api"]["secret"] = secret
