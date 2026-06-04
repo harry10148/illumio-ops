@@ -162,3 +162,76 @@ def test_config_set_bad_format_no_dot_exits_usage(runner):
     with patch("src.config.ConfigManager", return_value=cm):
         result = runner.invoke(config_group, ["set", "nodotkey", "x"])
     assert result.exit_code == EXIT_USAGE
+
+
+# ---------------------------------------------------------------------------
+# config login tests
+# ---------------------------------------------------------------------------
+
+def test_config_login_non_interactive_sets_all_fields(runner):
+    """--no-interactive with all options sets api fields and saves."""
+    from unittest.mock import patch
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, [
+            "login",
+            "--url", "https://pce.prod:8443",
+            "--key", "mykey",
+            "--secret", "mysecret",
+            "--org-id", "3",
+            "--no-interactive",
+        ])
+    assert result.exit_code == 0
+    assert cm.config["api"]["url"] == "https://pce.prod:8443"
+    assert cm.config["api"]["key"] == "mykey"
+    assert cm.config["api"]["secret"] == "mysecret"
+    assert cm.config["api"]["org_id"] == "3"
+    cm.save.assert_called_once()
+
+
+def test_config_login_invalid_url_exits_config(runner):
+    """--url with bad scheme should exit EXIT_CONFIG."""
+    from unittest.mock import patch
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, [
+            "login",
+            "--url", "ftp://bad",
+            "--key", "k",
+            "--secret", "s",
+            "--no-interactive",
+        ])
+    assert result.exit_code == EXIT_CONFIG
+
+
+def test_config_login_json_output(runner):
+    import json as _json
+    from unittest.mock import patch
+    from src.cli.root import cli
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(cli, [
+            "--json", "config", "login",
+            "--url", "https://pce.test:8443",
+            "--key", "k",
+            "--secret", "s",
+            "--no-interactive",
+        ])
+    assert result.exit_code == 0
+    parsed = _json.loads(result.output)
+    assert parsed["saved"] is True
+    assert parsed["url"] == "https://pce.test:8443"
+
+
+def test_config_login_missing_required_opts_exits_usage(runner):
+    """--no-interactive without --url should exit EXIT_USAGE."""
+    from unittest.mock import patch
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, [
+            "login",
+            "--key", "k",
+            "--secret", "s",
+            "--no-interactive",
+        ])
+    assert result.exit_code == EXIT_USAGE

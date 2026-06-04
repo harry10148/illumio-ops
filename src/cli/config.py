@@ -191,3 +191,70 @@ def set_cmd(ctx: click.Context, key: str, value: str) -> None:
         echo_json(ctx, {"key": key, "value": display_value, "saved": True})
     elif not is_quiet(ctx):
         click.echo(f"Set {key} = {display_value}")
+
+
+# ---------------------------------------------------------------------------
+# config login
+# ---------------------------------------------------------------------------
+
+@config_group.command("login")
+@click.option("--url", default=None, help="PCE URL (e.g. https://pce.example.com:8443)")
+@click.option("--key", default=None, help="API key")
+@click.option("--secret", default=None, help="API secret", hide_input=True)
+@click.option("--org-id", "org_id", default=None, help="Organisation ID (default: 1)")
+@click.option("--no-interactive", "no_interactive", is_flag=True, default=False,
+              help="Skip prompts; require --url, --key, --secret via options.")
+@click.pass_context
+def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> None:
+    """Set PCE API credentials (url, key, secret, org-id).
+
+    Without --no-interactive, prompts for any value not supplied via options.
+    With --no-interactive, --url, --key, and --secret are required.
+    """
+    from pydantic import ValidationError
+    from src.config import ConfigManager
+    from src import config_models
+
+    if no_interactive:
+        missing = [f for f, v in [("--url", url), ("--key", key), ("--secret", secret)]
+                   if v is None]
+        if missing:
+            echo_error(ctx, f"--no-interactive requires: {', '.join(missing)}")
+            ctx.exit(EXIT_USAGE)
+            return
+    else:
+        cm_tmp = ConfigManager()
+        current = cm_tmp.config.get("api", {})
+        if url is None:
+            url = click.prompt("PCE URL", default=current.get("url", "https://pce.example.com:8443"))
+        if key is None:
+            key = click.prompt("API key", default=current.get("key", ""), show_default=False)
+        if secret is None:
+            secret = click.prompt("API secret", default="", hide_input=True, show_default=False)
+        if org_id is None:
+            org_id = click.prompt("Org ID", default=current.get("org_id", "1"))
+
+    if org_id is None:
+        org_id = "1"
+
+    cm = ConfigManager()
+    cm.config["api"]["url"] = url
+    cm.config["api"]["key"] = key
+    cm.config["api"]["secret"] = secret
+    cm.config["api"]["org_id"] = str(org_id)
+
+    try:
+        config_models.ApiSettings.model_validate(cm.config["api"])
+    except ValidationError as e:
+        errors = [f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"
+                  for err in e.errors()]
+        echo_error(ctx, f"Validation failed: {'; '.join(errors)}")
+        ctx.exit(EXIT_CONFIG)
+        return
+
+    cm.save()
+
+    if is_json(ctx):
+        echo_json(ctx, {"url": url, "org_id": str(org_id), "saved": True})
+    elif not is_quiet(ctx):
+        click.echo(f"PCE login saved: {url} (org {org_id})")
