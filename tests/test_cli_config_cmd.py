@@ -221,6 +221,7 @@ def test_config_login_json_output(runner):
     parsed = _json.loads(result.output)
     assert parsed["saved"] is True
     assert parsed["url"] == "https://pce.test:8443"
+    assert parsed["org_id"] == "1"
 
 
 def test_config_login_missing_required_opts_exits_usage(runner):
