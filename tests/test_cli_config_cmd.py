@@ -6,7 +6,7 @@ import pytest
 from click.testing import CliRunner
 
 from src.cli.config import config_group
-from src.cli._exit_codes import EXIT_NOINPUT, EXIT_USAGE
+from src.cli._exit_codes import EXIT_NOINPUT, EXIT_USAGE, EXIT_DATAERR, EXIT_CONFIG
 
 
 @pytest.fixture
@@ -60,3 +60,105 @@ def test_show_section_api_emits_parseable_json(runner, tmp_path):
     assert result.exit_code == 0
     parsed = json.loads(result.output)
     assert parsed["url"] == "https://pce.test"
+
+
+# ---------------------------------------------------------------------------
+# config set tests
+# ---------------------------------------------------------------------------
+
+def _make_cm(api_url="https://pce.test:8443"):
+    """Return a minimal mock ConfigManager whose .config is a real dict."""
+    from unittest.mock import MagicMock
+    cm = MagicMock()
+    cm.config = {
+        "api": {"url": api_url, "org_id": "1", "key": "", "secret": "",
+                "profile": "production", "verify_ssl": True},
+        "smtp": {"host": "localhost", "port": 25, "user": "", "password": "",
+                 "enable_auth": False, "enable_tls": False},
+        "settings": {"language": "en", "theme": "light", "timezone": "local",
+                     "enable_health_check": True, "dashboard_queries": []},
+        "web_gui": {"username": "illumio", "password": "", "secret_key": "",
+                    "allowed_ips": [], "must_change_password": False,
+                    "tls": {"enabled": True, "cert_file": "", "key_file": "",
+                            "self_signed": True, "auto_renew": True,
+                            "auto_renew_days": 30, "min_version": "TLSv1.2",
+                            "ciphers": None, "key_algorithm": "ecdsa-p256",
+                            "validity_days": 397}},
+    }
+    cm.config_file = "/fake/config.json"
+    return cm
+
+
+def test_config_set_api_url(runner):
+    from unittest.mock import patch
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, ["set", "api.url", "https://new.pce:8443"])
+    assert result.exit_code == 0
+    cm.save.assert_called_once()
+    assert cm.config["api"]["url"] == "https://new.pce:8443"
+
+
+def test_config_set_unknown_section_exits_usage(runner):
+    from unittest.mock import patch
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, ["set", "no_such_section.field", "x"])
+    assert result.exit_code == EXIT_USAGE
+
+
+def test_config_set_invalid_url_exits_config(runner):
+    from unittest.mock import patch
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, ["set", "api.url", "ftp://bad"])
+    assert result.exit_code == EXIT_CONFIG
+
+
+def test_config_set_invalid_field_exits_usage(runner):
+    from unittest.mock import patch
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, ["set", "api.nonexistent", "x"])
+    assert result.exit_code == EXIT_USAGE
+
+
+def test_config_set_bool_coercion(runner):
+    from unittest.mock import patch
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, ["set", "smtp.enable_auth", "true"])
+    assert result.exit_code == 0
+    assert cm.config["smtp"]["enable_auth"] is True
+
+
+def test_config_set_json_output(runner):
+    import json as _json
+    from unittest.mock import patch
+    from src.cli.root import cli
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(cli, ["--json", "config", "set", "api.org_id", "5"])
+    assert result.exit_code == 0
+    parsed = _json.loads(result.output)
+    assert parsed["key"] == "api.org_id"
+    assert parsed["value"] == "5"
+    assert parsed["saved"] is True
+
+
+def test_config_set_secret_redacted_in_output(runner):
+    from unittest.mock import patch
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, ["set", "api.key", "my-secret-key"])
+    assert result.exit_code == 0
+    assert "my-secret-key" not in result.output
+    assert "[REDACTED]" in result.output
+
+
+def test_config_set_bad_format_no_dot_exits_usage(runner):
+    from unittest.mock import patch
+    cm = _make_cm()
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, ["set", "nodotkey", "x"])
+    assert result.exit_code == EXIT_USAGE

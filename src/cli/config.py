@@ -87,3 +87,107 @@ def show(ctx: click.Context, section: str | None) -> None:
     else:
         data = cm.config[section]
     echo_json(ctx, data)
+
+
+# ---------------------------------------------------------------------------
+# config set
+# ---------------------------------------------------------------------------
+
+_SETTABLE_SECTIONS = {"api", "smtp", "settings", "web_gui"}
+
+_BOOL_VALUES = {"true": True, "false": False, "1": True, "0": False, "yes": True, "no": False}
+
+_SECTION_MODELS = {
+    "api": "ApiSettings",
+    "smtp": "SmtpSettings",
+    "settings": "GeneralSettings",
+    "web_gui": "WebGuiSettings",
+}
+
+_SECRET_TOKENS = {"key", "secret", "password", "token"}
+
+
+def _coerce_value(raw: str, current) -> object:
+    """Coerce raw string to the type of the current field value."""
+    if isinstance(current, bool):
+        v = raw.lower()
+        if v not in _BOOL_VALUES:
+            raise ValueError(f"Expected true/false, got {raw!r}")
+        return _BOOL_VALUES[v]
+    if isinstance(current, int):
+        return int(raw)
+    if isinstance(current, float):
+        return float(raw)
+    return raw
+
+
+@config_group.command("set")
+@click.argument("key")
+@click.argument("value")
+@click.pass_context
+def set_cmd(ctx: click.Context, key: str, value: str) -> None:
+    """Set a config value by dot-path KEY (e.g. api.url, api.key, smtp.host).
+
+    Changes are validated against the pydantic schema before saving.
+    Secrets (key, secret, password, token) are redacted from output.
+    """
+    from pydantic import ValidationError
+    from src.config import ConfigManager
+    from src import config_models
+
+    # Parse KEY into section.field
+    parts = key.split(".", 1)
+    if len(parts) != 2:
+        echo_error(ctx, f"Key must be in section.field format (got: {key!r}). "
+                        f"Example: api.url")
+        ctx.exit(EXIT_USAGE)
+        return
+
+    section, field = parts
+
+    if section not in _SETTABLE_SECTIONS:
+        echo_error(ctx, f"Unknown section {section!r}. "
+                        f"Settable sections: {', '.join(sorted(_SETTABLE_SECTIONS))}")
+        ctx.exit(EXIT_USAGE)
+        return
+
+    cm = ConfigManager()
+    section_dict = cm.config.get(section, {})
+
+    if field not in section_dict:
+        echo_error(ctx, f"Unknown field {field!r} in section {section!r}. "
+                        f"Available: {', '.join(sorted(section_dict.keys()))}")
+        ctx.exit(EXIT_USAGE)
+        return
+
+    # Type coercion
+    try:
+        typed_value = _coerce_value(value, section_dict[field])
+    except (ValueError, TypeError) as e:
+        echo_error(ctx, f"Invalid value for {key}: {e}")
+        ctx.exit(EXIT_DATAERR)
+        return
+
+    # Apply to in-memory dict
+    cm.config[section][field] = typed_value
+
+    # Validate the affected section via pydantic
+    try:
+        model_cls = getattr(config_models, _SECTION_MODELS[section])
+        model_cls.model_validate(cm.config[section])
+    except ValidationError as e:
+        errors = [f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"
+                  for err in e.errors()]
+        echo_error(ctx, f"Validation failed: {'; '.join(errors)}")
+        ctx.exit(EXIT_CONFIG)
+        return
+
+    # Persist
+    cm.save()
+
+    display_value = "[REDACTED]" if any(t in field.lower() for t in _SECRET_TOKENS) else value
+
+    if is_json(ctx):
+        echo_json(ctx, {"key": key, "value": display_value, "saved": True})
+    elif not is_quiet(ctx):
+        click.echo(f"Set {key} = {display_value}")
