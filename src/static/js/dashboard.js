@@ -1338,7 +1338,7 @@ function _renderPostureHero(posture, T) {
       subs.forEach(function (s) {
         sh += '<div class="posture-sub-row">'
             + '<span class="posture-sub-k">' + T(s.label_key, s.key) + '</span>'
-            + '<span class="posture-sub-v">' + s.value + '%</span>'
+            + '<span class="posture-sub-v">' + (s.value != null ? s.value : '—') + '%</span>'
             + '</div>';
       });
       subEl.innerHTML = sh;
@@ -1356,7 +1356,7 @@ function _renderPostureHero(posture, T) {
                 + T('gui_posture_rmd_title', 'Priority Remediation') + '</div>';
       rem.forEach(function (r) {
         rhtml += '<div class="posture-rmd-row">'
-              + '<span class="posture-rmd-gain">+' + r.recoverable_points + '</span> '
+              + '<span class="posture-rmd-gain">+' + (r.recoverable_points != null ? Number(r.recoverable_points).toFixed(1) : '—') + '</span> '
               + '<span class="posture-rmd-text">' + T(r.recommendation_key, T(r.label_key, r.key)) + '</span>'
               + '</div>';
       });
