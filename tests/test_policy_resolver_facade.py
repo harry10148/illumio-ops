@@ -52,6 +52,18 @@ def test_build_label_group_to_labels_recursive():
     assert out["/lg/inner"] == ["/labels/b"]
 
 
+def test_build_label_group_to_labels_cycle_safe():
+    groups = [
+        {"href": "/lg/A", "labels": [{"href": "/labels/x"}],
+         "sub_groups": [{"href": "/lg/B"}]},
+        {"href": "/lg/B", "labels": [{"href": "/labels/y"}],
+         "sub_groups": [{"href": "/lg/A"}]},
+    ]
+    out = build_label_group_to_labels(groups)
+    assert set(out["/lg/A"]) == {"/labels/x", "/labels/y"}
+    assert set(out["/lg/B"]) == {"/labels/x", "/labels/y"}
+
+
 def test_build_service_to_ports():
     svcs = [{"href": "/services/2", "service_ports": [{"port": 443, "proto": 6}]}]
     assert build_service_to_ports(svcs) == {"/services/2": [{"port": 443, "proto": 6}]}

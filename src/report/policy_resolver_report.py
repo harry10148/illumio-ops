@@ -29,6 +29,7 @@ def build_workload_to_ips(workloads: list[dict]) -> dict[str, list[str]]:
 def build_label_to_ips(workloads: list[dict]) -> dict[str, list[str]]:
     """Single O(N) pass: attribute each workload's IPs to each of its labels."""
     out: dict[str, list[str]] = {}
+    seen_per_label: dict[str, set[str]] = {}
     for wl in workloads:
         ips = [i["address"] for i in (wl.get("interfaces") or [])
                if i.get("address")]
@@ -39,8 +40,10 @@ def build_label_to_ips(workloads: list[dict]) -> dict[str, list[str]]:
             if not href:
                 continue
             bucket = out.setdefault(href, [])
+            seen = seen_per_label.setdefault(href, set())
             for ip in ips:
-                if ip not in bucket:
+                if ip not in seen:
+                    seen.add(ip)
                     bucket.append(ip)
     return out
 
@@ -70,11 +73,8 @@ def build_iplist_to_cidrs(ip_lists: list[dict]) -> dict[str, list[str]]:
 def build_label_group_to_labels(groups: list[dict]) -> dict[str, list[str]]:
     """Recursively flatten each group to its full set of member label hrefs."""
     by_href = {g.get("href"): g for g in groups if g.get("href")}
-    memo: dict[str, list[str]] = {}
 
     def expand(href: str, seen: set[str]) -> list[str]:
-        if href in memo:
-            return memo[href]
         if href in seen:
             return []
         seen.add(href)
@@ -90,7 +90,6 @@ def build_label_group_to_labels(groups: list[dict]) -> dict[str, list[str]]:
             if lh not in s:
                 s.add(lh)
                 out.append(lh)
-        memo[href] = out
         return out
 
     return {h: expand(h, set()) for h in by_href}
@@ -115,6 +114,8 @@ class PolicyResolverReport:
 
     def resolve(self) -> dict[str, Any]:
         """Fetch + build lookups + resolve every active ruleset. No export."""
+        if not self.api:
+            return {"rulesets": {}, "record_count": 0}
         api = self.api
         rulesets = api.get_active_rulesets()
         workloads = api.fetch_managed_workloads()
