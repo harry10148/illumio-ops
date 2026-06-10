@@ -76,3 +76,23 @@ def test_empty_inputs_return_valid_empty_structure():
     assert out["summary"]["total_changes"] == 0
     assert out["ruleset_changes"].empty
     assert out["rule_changes"].empty
+
+
+def test_description_change_detected():
+    draft = [_rs(1, "RS-A", [], description="new desc")]
+    active = [_rs(1, "RS-A", [], description="")]
+    out = diff_rulesets(draft, active)
+    rows = [r for r in out["ruleset_changes"].to_dict("records") if r["field"] == "description"]
+    assert len(rows) == 1
+    assert rows[0]["change_type"] == "modified"
+    assert rows[0]["draft_value"] == "new desc"
+    assert rows[0]["active_value"] == ""
+
+
+def test_ruleset_modified_and_rule_added_both_counted():
+    # Same ruleset id: enabled flips (modified) AND a rule exists only in draft (added).
+    draft = [_rs(1, "RS-A", [_rule(5)], enabled=False)]
+    active = [_rs(1, "RS-A", [], enabled=True)]
+    out = diff_rulesets(draft, active)
+    assert out["summary"]["rulesets_modified"] == 1
+    assert out["summary"]["rules_added"] == 1

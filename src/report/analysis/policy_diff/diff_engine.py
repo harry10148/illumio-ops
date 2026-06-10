@@ -152,7 +152,9 @@ def diff_rulesets(draft: list[dict], active: list[dict]) -> dict:
                           + s["rules_added"] + s["rules_removed"] + s["rules_modified"])
 
     return {
-        "ruleset_changes": pd.DataFrame(rs_rows, columns=_RULESET_COLS),
-        "rule_changes": pd.DataFrame(rule_rows, columns=_RULE_COLS),
+        "ruleset_changes": pd.DataFrame(rs_rows, columns=_RULESET_COLS).sort_values(
+            ["change_type", "ruleset_id", "field"], ignore_index=True),
+        "rule_changes": pd.DataFrame(rule_rows, columns=_RULE_COLS).sort_values(
+            ["change_type", "ruleset_name", "rule_id", "field"], ignore_index=True),
         "summary": s,
     }
