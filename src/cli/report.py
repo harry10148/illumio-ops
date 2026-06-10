@@ -499,6 +499,61 @@ def generate_policy_diff_report(
     return paths
 
 
+def generate_policy_resolver_report(
+    *,
+    fmt: str = "json",
+    output_dir: str | None = None,
+    email: bool = False,
+) -> list[str]:
+    """Resolve ACTIVE policy into IP-level rows; export JSON + CSV."""
+    from src.api_client import ApiClient
+    from src.config import ConfigManager
+    from src.report.policy_resolver_report import PolicyResolverReport
+
+    cm = ConfigManager()
+    api = ApiClient(cm)
+    _root_dir, config_dir = _resolve_paths(output_dir)
+    out = _resolve_output_dir(cm, output_dir)
+    lang = _resolve_lang(cm)
+
+    rpt = PolicyResolverReport(cm, api_client=api, config_dir=config_dir)
+    path = rpt.run(output_dir=out, lang=lang)
+    return [path] if path else []
+
+
+@report_group.command("resolve")
+@click.option("--format", "fmt", type=click.Choice(["json", "csv", "all"]), default="json")
+@click.option("--output-dir", type=click.Path(), default=None)
+@click.option("--email", is_flag=True)
+@click.pass_context
+def report_resolve(ctx: click.Context, fmt: str, output_dir, email: bool) -> None:
+    """Resolve ACTIVE label-based Policy into IP-level firewall rules."""
+    try:
+        paths = generate_policy_resolver_report(
+            fmt=fmt, output_dir=output_dir, email=email,
+        )
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, f"Connection failed: {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
+    except Exception as exc:
+        log.exception("policy resolver report failed")
+        echo_error(ctx, f"Unexpected error: {exc}")
+        ctx.exit(EXIT_SOFTWARE)
+        return
+    _emit_paths(ctx, paths, fmt)
+
+
 @report_group.command("policy-diff")
 @click.option("--format", "fmt", type=click.Choice(["html", "csv", "all"]), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
