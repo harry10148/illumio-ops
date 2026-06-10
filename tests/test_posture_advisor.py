@@ -47,3 +47,30 @@ def test_perfect_axis_excluded():
 def test_unavailable_posture_returns_empty():
     assert build_remediation({"available": False}) == []
     assert build_remediation({}) == []
+
+
+def test_renormalized_weight_single_component():
+    # Only risk signals present -> risk_health effective_weight renormalizes to 1.0,
+    # so recoverable_points must use the renormalized weight (1.0 * penalty_points).
+    kpis = {
+        "risk_flows_total": 4,           # ransomware pts 20
+        "true_gap_pct": 0.0,             # flow_coverage clean (excluded)
+        "maturity_dimensions": {
+            "lateral_movement_control": {"ratio": 1.0},  # lateral clean (excluded)
+        },
+    }
+    items = build_remediation(compute_posture(kpis))
+    assert any(
+        i["key"] == "ransomware_containment" and i["recoverable_points"] == 20.0
+        for i in items
+    )
+
+
+def test_risk_health_no_subscores_returns_no_items():
+    posture = {
+        "available": True,
+        "components": [
+            {"key": "risk_health", "effective_weight": 0.4, "risk_subscores": []},
+        ],
+    }
+    assert build_remediation(posture) == []
