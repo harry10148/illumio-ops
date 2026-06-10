@@ -33,6 +33,9 @@ def alert_settings_menu(cm: ConfigManager) -> None:
         webhook_status = (
             t("ssl_status_on") if "webhook" in active_alerts else t("ssl_status_off")
         )
+        teams_status = (
+            t("ssl_status_on") if "teams" in active_alerts else t("ssl_status_off")
+        )
 
         print(t("change_language", lang=current_lang))
         print(t("toggle_mail_alert", status=mail_status))
@@ -41,9 +44,11 @@ def alert_settings_menu(cm: ConfigManager) -> None:
         print(t("edit_line_channel_access_token"))
         print(t("edit_line_target_id"))
         print(t("edit_webhook_url"))
+        print(t("toggle_teams_alert", status=teams_status))
+        print(t("edit_teams_webhook_url"))
         print(t("menu_return"))
 
-        sel = safe_input(f"\n{t('please_select')}", int, range(0, 8))
+        sel = safe_input(f"\n{t('please_select')}", int, range(0, 10))
         if sel is None:
             break
 
@@ -55,8 +60,13 @@ def alert_settings_menu(cm: ConfigManager) -> None:
                 cm.config.setdefault("settings", {})["language"] = "zh_TW"
             cm.save()
 
-        elif sel in [2, 3, 4]:
-            channel = "mail" if sel == 2 else "line" if sel == 3 else "webhook"
+        elif sel in [2, 3, 4, 8]:
+            channel = (
+                "mail" if sel == 2
+                else "line" if sel == 3
+                else "webhook" if sel == 4
+                else "teams"
+            )
             if channel in active_alerts:
                 active_alerts.remove(channel)
             else:
@@ -96,4 +106,14 @@ def alert_settings_menu(cm: ConfigManager) -> None:
             )
             if new_url:
                 cm.config.setdefault("alerts", {})["webhook_url"] = new_url
+                cm.save()
+
+        elif sel == 9:
+            current_url = cm.config.get("alerts", {}).get("teams_webhook_url", "")
+            masked = current_url[:5] + "..." if current_url else t("not_set")
+            new_url = safe_input(
+                t("teams_webhook_url_input"), str, allow_cancel=True, hint=masked
+            )
+            if new_url:
+                cm.config.setdefault("alerts", {})["teams_webhook_url"] = new_url
                 cm.save()
