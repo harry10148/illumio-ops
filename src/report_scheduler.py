@@ -495,7 +495,7 @@ class ReportScheduler:
 
     # ─── Report retention ────────────────────────────────────────────────────
 
-    # File prefix patterns for each report type (matches both .html and .zip)
+    # File prefix patterns for each report type (matches .html, .zip, and .json)
     _REPORT_PREFIXES = {
         "traffic":           "Illumio_Traffic_Report_",
         "security_risk":     "Illumio_Traffic_Report_SecurityRisk_",
@@ -521,7 +521,7 @@ class ReportScheduler:
 
         candidates = []
         for fname in os.listdir(output_dir):
-            if fname.startswith(prefix) and (fname.endswith(".html") or fname.endswith(".zip")):
+            if fname.startswith(prefix) and fname.endswith((".html", ".zip", ".json")):
                 fpath = os.path.join(output_dir, fname)
                 try:
                     candidates.append((os.path.getmtime(fpath), fpath))

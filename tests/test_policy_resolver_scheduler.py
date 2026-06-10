@@ -15,7 +15,7 @@ def test_prefix_registered():
 def test_prune_by_count_handles_policy_resolver(tmp_path):
     # Create 3 matching files; keep 1.
     for i in range(3):
-        (tmp_path / f"Illumio_Policy_Resolver_2026-06-0{i+1}_0900.html").write_text("{}")
+        (tmp_path / f"Illumio_Policy_Resolver_2026-06-0{i+1}_0900.json").write_text("{}")
     sched = rs.ReportScheduler.__new__(rs.ReportScheduler)
     sched._prune_by_count(str(tmp_path), "policy_resolver", 1)
     remaining = [f for f in os.listdir(tmp_path)
