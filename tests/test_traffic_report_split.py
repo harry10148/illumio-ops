@@ -140,6 +140,53 @@ def test_scheduler_prune_by_count_handles_policy_diff(tmp_path):
     assert remaining == ["Illumio_Policy_Diff_Report_2026-06-02_0900.html"]
 
 
+def test_generate_report_policy_diff_returns_record_count(tmp_path, monkeypatch):
+    """Regression: policy_diff branch must return an object with .record_count,
+    not a raw dict — otherwise _send_report_email crashes with AttributeError."""
+    import src.main as main
+    import src.report_scheduler as rs
+    from unittest.mock import MagicMock
+
+    diff = {
+        "summary": {
+            "total_changes": 3,
+            "rulesets_added": 0,
+            "rulesets_removed": 0,
+            "rulesets_modified": 1,
+            "rules_added": 2,
+            "rules_removed": 0,
+            "rules_modified": 0,
+        }
+    }
+
+    fake_rpt = MagicMock()
+    fake_rpt.build.return_value = diff
+
+    fake_exp = MagicMock()
+    fake_exp.export.return_value = str(tmp_path / "Illumio_Policy_Diff_Report_x.html")
+
+    monkeypatch.setattr("src.report.policy_diff_report.PolicyDiffReport",
+                        lambda *a, **k: fake_rpt, raising=False)
+    monkeypatch.setattr("src.report.exporters.policy_diff_html_exporter.PolicyDiffHtmlExporter",
+                        lambda *a, **k: fake_exp, raising=False)
+    monkeypatch.setattr(main, "_make_cache_reader", lambda cm: None)
+
+    sched = rs.ReportScheduler.__new__(rs.ReportScheduler)
+    sched.cm = MagicMock()
+    sched._config_dir = "config"
+
+    result, paths = sched._generate_report(
+        "policy_diff", api=object(), fmt="html", output_dir=str(tmp_path),
+        start_date=None, end_date=None, name="test-policy-diff",
+    )
+
+    assert result.record_count == 3, (
+        f"Expected record_count=3, got {result!r} — "
+        "policy_diff must return SimpleNamespace, not a raw dict"
+    )
+    assert len(paths) == 1 and paths[0].endswith(".html")
+
+
 def test_scheduler_prune_by_count_handles_new_types(tmp_path):
     """Count-based pruning must work for security_risk/network_inventory schedules
     (regression: the new report types were initially absent from _REPORT_PREFIXES,

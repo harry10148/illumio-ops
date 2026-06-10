@@ -305,14 +305,16 @@ class ReportScheduler:
 
         elif report_type == "policy_diff":
             from src.report.policy_diff_report import PolicyDiffReport
+            from src.report.exporters.policy_diff_html_exporter import PolicyDiffHtmlExporter
+            from types import SimpleNamespace
             rpt = PolicyDiffReport(self.cm, api_client=api, config_dir=self._config_dir,
                                    cache_reader=_make_cache_reader(self.cm))
             diff = rpt.build(lang=lang)
             if diff["summary"]["total_changes"] == 0:
                 logger.info(f"[Scheduler] '{name}': no DRAFT-vs-ACTIVE changes — emitting empty report")
-            from src.report.exporters.policy_diff_html_exporter import PolicyDiffHtmlExporter
             path = PolicyDiffHtmlExporter(diff, lang=lang).export(output_dir)
-            return diff, [path]
+            result = SimpleNamespace(record_count=diff["summary"]["total_changes"])
+            return result, [path]
 
         else:
             logger.error(f"[Scheduler] Unknown report_type: {report_type}")
