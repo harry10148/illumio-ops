@@ -1,0 +1,49 @@
+"""Tests for score-impact remediation advisor (pure derivation)."""
+from __future__ import annotations
+
+from src.report.posture import compute_posture
+from src.report.posture_advisor import build_remediation
+
+
+def _risk_kpis():
+    return {
+        "enforced_coverage_pct": 80.0,   # coverage value 80 -> recoverable 0.3*20=6.0
+        "maturity_score": 70.0,          # readiness value 70 -> recoverable 0.3*30=9.0
+        "risk_flows_total": 4,           # ransomware pts 20 -> recoverable 0.4*20=8.0
+        "true_gap_pct": 20.0,            # flow_coverage pts 10 -> recoverable 0.4*10=4.0
+        "maturity_dimensions": {
+            "lateral_movement_control": {"ratio": 0.5},  # lateral pts 15 -> 0.4*15=6.0
+        },
+    }
+
+
+def test_ranked_by_recoverable_points_desc():
+    posture = compute_posture(_risk_kpis())
+    items = build_remediation(posture)
+    assert [i["key"] for i in items] == [
+        "readiness", "ransomware_containment", "coverage",
+        "lateral_containment", "flow_coverage",
+    ]
+    assert items[0]["recoverable_points"] == 9.0
+    assert items[1]["recoverable_points"] == 8.0
+
+
+def test_item_shape():
+    posture = compute_posture(_risk_kpis())
+    top = build_remediation(posture)[0]
+    assert top["label_key"]
+    assert top["target"] == 100
+    assert "recommendation_key" in top
+    assert isinstance(top["current"], (int, float))
+
+
+def test_perfect_axis_excluded():
+    # coverage already 100 -> no coverage remediation item.
+    kpis = dict(_risk_kpis(), enforced_coverage_pct=100.0)
+    items = build_remediation(compute_posture(kpis))
+    assert all(i["key"] != "coverage" for i in items)
+
+
+def test_unavailable_posture_returns_empty():
+    assert build_remediation({"available": False}) == []
+    assert build_remediation({}) == []
