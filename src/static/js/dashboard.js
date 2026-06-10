@@ -1325,6 +1325,46 @@ function _renderPostureHero(posture, T) {
       riskDetailEl.innerHTML = '';
     }
   }
+
+  // Risk sub-scores table (D)
+  var subEl = document.getElementById('ov-posture-subscores');
+  if (subEl) {
+    var rhSub = (Array.isArray(posture.components) ? posture.components : [])
+      .find(function (c) { return c.key === 'risk_health'; });
+    var subs = (rhSub && Array.isArray(rhSub.risk_subscores)) ? rhSub.risk_subscores : [];
+    if (subs.length) {
+      var sh = '<div class="posture-sub-title">'
+             + T('gui_posture_sub_title', 'Risk Sub-scores') + '</div>';
+      subs.forEach(function (s) {
+        sh += '<div class="posture-sub-row">'
+            + '<span class="posture-sub-k">' + T(s.label_key, s.key) + '</span>'
+            + '<span class="posture-sub-v">' + s.value + '%</span>'
+            + '</div>';
+      });
+      subEl.innerHTML = sh;
+    } else {
+      subEl.innerHTML = '';
+    }
+  }
+
+  // Priority remediation list (B)
+  var remEl = document.getElementById('ov-posture-remediation');
+  if (remEl) {
+    var rem = Array.isArray(posture.remediation) ? posture.remediation : [];
+    if (rem.length) {
+      var rhtml = '<div class="posture-sub-title">'
+                + T('gui_posture_rmd_title', 'Priority Remediation') + '</div>';
+      rem.forEach(function (r) {
+        rhtml += '<div class="posture-rmd-row">'
+              + '<span class="posture-rmd-gain">+' + r.recoverable_points + '</span> '
+              + '<span class="posture-rmd-text">' + T(r.recommendation_key, T(r.label_key, r.key)) + '</span>'
+              + '</div>';
+      });
+      remEl.innerHTML = rhtml;
+    } else {
+      remEl.innerHTML = '';
+    }
+  }
 }
 
 function _renderRiskFeed(posture, T) {

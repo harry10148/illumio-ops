@@ -625,6 +625,10 @@
       #p-dashboard .posture-metric .v-md { color:var(--accent2); }
       #p-dashboard .posture-metric .v-ok { color:var(--color-success,#16a34a); }
       #p-dashboard .posture-unavailable { color:var(--dim); font-size:13px; padding:12px 0; }
+      #p-dashboard .posture-sub-title { font-size:12px; color:var(--dim); margin-bottom:6px; font-weight:600; }
+      #p-dashboard .posture-sub-row, #p-dashboard .posture-rmd-row { display:flex; gap:10px; padding:3px 0; font-size:13px; }
+      #p-dashboard .posture-sub-row .posture-sub-v { margin-left:auto; font-variant-numeric:tabular-nums; }
+      #p-dashboard .posture-rmd-row .posture-rmd-gain { color:var(--color-success,#16a34a); font-variant-numeric:tabular-nums; min-width:40px; }
 
       /* risk feed */
       #p-dashboard .ov-risk-feed { display:flex; flex-direction:column; gap:0; }
@@ -1468,6 +1472,8 @@
         <tbody id="ov-posture-breakdown-body"></tbody>
       </table>
       <div id="ov-posture-risk-detail" style="font-size:13px;color:var(--dim);line-height:1.8;"></div>
+        <div id="ov-posture-subscores" style="margin-top:14px"></div>
+        <div id="ov-posture-remediation" style="margin-top:14px"></div>
       <div class="modal-actions">
         <button class="btn btn-secondary" data-action="closeModal" data-args='["m-posture-score"]'
                 data-i18n="gui_close">Close</button>
