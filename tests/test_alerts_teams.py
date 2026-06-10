@@ -114,6 +114,8 @@ def test_send_alerts_routes_through_teams_plugin():
     with patch("urllib.request.urlopen", return_value=fake_resp), \
          patch("src.reporter.persist_dispatch_results"):
         results = r.send_alerts(force_test=False)
-    teams = next(x for x in results if x["channel"] == "teams")
+    teams_results = [x for x in results if x["channel"] == "teams"]
+    assert teams_results, "teams channel not present in send_alerts results"
+    teams = teams_results[0]
     assert teams["status"] == "success"
     assert "SUPERSECRETSIG" not in teams["target"]

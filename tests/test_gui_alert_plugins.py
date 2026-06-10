@@ -33,6 +33,13 @@ def test_alert_plugins_endpoint_returns_metadata(client):
     chat_field = next(f for f in tg["fields"] if f["key"] == "alerts.telegram_chat_id")
     assert chat_field["required"] is True
     assert chat_field["secret"] is False
+    # Teams plugin metadata exposed identically to Telegram
+    assert "teams" in response.json["plugins"]
+    tm = response.json["plugins"]["teams"]
+    assert tm["display_name"] == "Microsoft Teams"
+    webhook_field = next(f for f in tm["fields"] if f["key"] == "alerts.teams_webhook_url")
+    assert webhook_field["secret"] is True
+    assert webhook_field["required"] is True
     assert any(field["key"] == "smtp.enable_tls" for field in response.json["plugins"]["mail"]["fields"])
     recipients = next(field for field in response.json["plugins"]["mail"]["fields"] if field["key"] == "recipients")
     assert recipients["input_type"] == "list"
