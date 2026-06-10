@@ -74,3 +74,15 @@ def test_teams_plugin_fails_on_url_error():
         res = plug.send(_reporter_stub(), "subj")
     assert res["status"] == "failed"
     assert "timeout" in res["error"]
+
+
+def test_teams_plugin_fails_on_5xx():
+    plug = build_output_plugin("teams", _make_cm())
+    err = urllib.error.HTTPError(_URL, 500, "Internal Server Error", {},
+                                 MagicMock(read=lambda: b'{"error":"flow_failed"}'))
+    with patch("urllib.request.urlopen", side_effect=err):
+        res = plug.send(_reporter_stub(), "subj")
+    assert res["status"] == "failed"
+    assert "500" in res["error"] or "flow_failed" in res["error"]
+    assert "SUPERSECRETSIG" not in res["target"]
+    assert "SUPERSECRETSIG" not in res["error"]
