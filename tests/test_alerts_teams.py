@@ -86,3 +86,34 @@ def test_teams_plugin_fails_on_5xx():
     assert "500" in res["error"] or "flow_failed" in res["error"]
     assert "SUPERSECRETSIG" not in res["target"]
     assert "SUPERSECRETSIG" not in res["error"]
+
+
+def test_teams_plugin_metadata_present():
+    from src.alerts.metadata import PLUGIN_METADATA
+    assert "teams" in PLUGIN_METADATA
+    meta = PLUGIN_METADATA["teams"]
+    assert meta.display_name == "Microsoft Teams"
+    fld = meta.fields["alerts.teams_webhook_url"]
+    assert fld.secret is True
+    assert fld.required is True
+
+
+def test_send_alerts_routes_through_teams_plugin():
+    from src.reporter import Reporter
+    cm = MagicMock()
+    cm.config = {
+        "alerts": {"active": ["teams"], "teams_webhook_url": _URL},
+        "settings": {"language": "en"},
+        "gui_base_url": "",
+    }
+    r = Reporter(cm)
+    r.add_health_alert({"rule": "X", "status": "503", "time": "t", "details": "d"})
+    fake_resp = MagicMock(status=202)
+    fake_resp.__enter__ = lambda self: self
+    fake_resp.__exit__ = lambda self, *a: False
+    with patch("urllib.request.urlopen", return_value=fake_resp), \
+         patch("src.reporter.persist_dispatch_results"):
+        results = r.send_alerts(force_test=False)
+    teams = next(x for x in results if x["channel"] == "teams")
+    assert teams["status"] == "success"
+    assert "SUPERSECRETSIG" not in teams["target"]

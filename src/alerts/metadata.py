@@ -168,4 +168,19 @@ PLUGIN_METADATA: dict[str, PluginMeta] = {
             ),
         },
     ),
+    "teams": PluginMeta(
+        name="teams",
+        display_name="Microsoft Teams",
+        display_name_key="alert_plugin_teams_display_name",
+        description="Post an Adaptive Card to a Teams channel via a Power Automate Workflow webhook.",
+        description_key="alert_plugin_teams_description",
+        fields={
+            "alerts.teams_webhook_url": FieldMeta(
+                label="Workflow Webhook URL",
+                label_key="alert_plugin_field_teams_webhook_url",
+                required=True, secret=True,
+                placeholder="https://prod-XX.logic.azure.com:443/workflows/.../triggers/manual/paths/invoke?...",
+            ),
+        },
+    ),
 }
