@@ -394,14 +394,14 @@ class Reporter:
                 "title": t("alert_tpl_see_web_for_details"),
                 "url": base_url,
             }
-            actions_fragment = ',\n        "actions": ' + json.dumps([action])
+            actions_fragment = ',\n        "actions": ' + json.dumps([action], ensure_ascii=False)
 
         rendered = render_alert_template(
             "teams_card.json.tmpl",
-            title_json=json.dumps(t("alert_tpl_telegram_title")),
-            subject_json=json.dumps(subj),
-            facts_json=json.dumps(facts),
-            summary_json=json.dumps(summary),
+            title_json=json.dumps(t("alert_tpl_teams_title"), ensure_ascii=False),
+            subject_json=json.dumps(subj, ensure_ascii=False),
+            facts_json=json.dumps(facts, ensure_ascii=False),
+            summary_json=json.dumps(summary, ensure_ascii=False),
             actions_fragment=actions_fragment,
         )
         return json.loads(rendered)
