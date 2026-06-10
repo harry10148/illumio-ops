@@ -486,6 +486,18 @@ def generate_policy_diff_report(
         paths.append(rpt.run(output_dir=out, lang=lang, fmt="csv"))
     if not paths:
         paths.append(rpt.run(output_dir=out, lang=lang, fmt="html"))
+
+    if email:
+        from src.reporter import Reporter
+        from src.i18n import t
+        html_paths = [p for p in paths if p.endswith(".html")]
+        if html_paths:
+            html_path = html_paths[0]
+            with open(html_path, encoding="utf-8") as fh:
+                html_body = fh.read()
+            subject = t("rpt_policy_diff_report_title", lang=lang)
+            Reporter(cm).send_report_email(subject, html_body, attachment_path=html_path)
+
     return paths
 
 
