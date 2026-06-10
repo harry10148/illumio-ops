@@ -1,6 +1,8 @@
 """Tests for score-impact remediation advisor (pure derivation)."""
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from src.report.posture import compute_posture
 from src.report.posture_advisor import build_remediation
 
@@ -76,9 +78,6 @@ def test_risk_health_no_subscores_returns_no_items():
     assert build_remediation(posture) == []
 
 
-from unittest.mock import patch
-
-
 def test_overview_posture_attaches_remediation():
     from src.gui.routes.dashboard import _overview_posture
     snap = {"kpis": _risk_kpis(), "generated_at": "2026-06-08T00:00:00Z"}
@@ -87,3 +86,13 @@ def test_overview_posture_attaches_remediation():
     assert result.get("available") is True
     assert "remediation" in result
     assert result["remediation"][0]["key"] == "readiness"
+
+
+def test_overview_posture_fallback_attaches_remediation():
+    """State-fallback path: read_latest returns None, state has posture_summary."""
+    from src.gui.routes.dashboard import _overview_posture
+    state = {"posture_summary": {**compute_posture(_risk_kpis()), "source_date": "2026-06-08"}}
+    with patch("src.report.snapshot_store.read_latest", return_value=None):
+        result = _overview_posture(state)
+    assert result.get("available") is True
+    assert "remediation" in result
