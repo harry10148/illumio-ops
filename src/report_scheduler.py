@@ -322,6 +322,8 @@ class ReportScheduler:
             from types import SimpleNamespace
             rpt = PolicyResolverReport(self.cm, api_client=api, config_dir=self._config_dir)
             results = rpt.resolve()
+            # Unlike policy_diff (which emits an empty diff report), a resolver
+            # run with no resolved rows has nothing to export — skip the schedule.
             if results["record_count"] == 0:
                 logger.warning(f"[Scheduler] '{name}': no policy resolver data — skipping export")
                 return None, []
@@ -541,7 +543,7 @@ class ReportScheduler:
     def _prune_old_reports(self, output_dir: str):
         """Delete report files older than retention_days (default 30).
 
-        Covers .html and .zip files produced by the report engine.
+        Covers .html, .zip, and .json files produced by the report engine.
         Controlled by config.report.retention_days; set to 0 to disable.
         """
         retention_days = int(
@@ -555,7 +557,7 @@ class ReportScheduler:
         cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=retention_days)
         removed = 0
         for fname in os.listdir(output_dir):
-            if not (fname.endswith(".html") or fname.endswith(".zip")):
+            if not fname.endswith((".html", ".zip", ".json")):
                 continue
             fpath = os.path.join(output_dir, fname)
             try:
