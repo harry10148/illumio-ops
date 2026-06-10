@@ -70,6 +70,7 @@ class AlertsSettings(_Base):
     webhook_url: str = ""
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    teams_webhook_url: str = ""
 
     @field_validator("webhook_url", mode="after")
     @classmethod
@@ -78,6 +79,17 @@ class AlertsSettings(_Base):
             scheme = v.split("://")[0] if "://" in v else "no scheme"
             raise ValueError(
                 "webhook_url must use https:// scheme (got: "
+                f"{scheme}://...)"
+            )
+        return v
+
+    @field_validator("teams_webhook_url", mode="after")
+    @classmethod
+    def _require_https_teams(cls, v: str) -> str:
+        if v and not v.startswith("https://"):
+            scheme = v.split("://")[0] if "://" in v else "no scheme"
+            raise ValueError(
+                "teams_webhook_url must use https:// scheme (got: "
                 f"{scheme}://...)"
             )
         return v

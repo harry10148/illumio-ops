@@ -52,7 +52,8 @@ _DEFAULT_CONFIG = {
         "active": ["mail"],
         "line_channel_access_token": "",
         "line_target_id": "",
-        "webhook_url": ""
+        "webhook_url": "",
+        "teams_webhook_url": ""
     },
     "email": {"sender": "monitor@localhost", "recipients": ["admin@example.com"]},
     "smtp": {"host": "localhost", "port": 25, "user": "", "password": "", "enable_auth": False, "enable_tls": False},
