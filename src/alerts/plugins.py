@@ -27,17 +27,20 @@ def redact_webhook_url(url: str) -> str:
     (``...&sig=<SECRET>``) and identifiers in its path (``/workflows/<id>/...``).
     Per README L-12 (Telegram token leaked via proxy access logs), channel
     secrets must never reach logs, debug output, or persisted dispatch results.
-    Keeps only ``scheme://host`` and elides the rest.
+    Keeps only ``scheme://host[:port]`` (userinfo stripped) and elides the rest.
+    Returns the ASCII marker ``...`` for cross-platform (Windows console) safety.
     """
     if not url:
         return ""
     try:
         parts = urlsplit(url)
-        if parts.scheme and parts.netloc:
-            return f"{parts.scheme}://{parts.netloc}/…"
+        if parts.scheme and parts.hostname:
+            host = parts.hostname
+            port = f":{parts.port}" if parts.port else ""
+            return f"{parts.scheme}://{host}{port}/..."
     except Exception:
         pass
-    return "…"
+    return "..."
 
 
 class MailAlertPlugin(AlertOutputPlugin):
