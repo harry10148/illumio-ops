@@ -120,6 +120,26 @@ def test_reports_have_distinct_h1_titles():
     assert "<h1>Illumio Traffic Flow Report</h1>" not in inv
 
 
+def test_scheduler_has_policy_diff_prefix_and_subject():
+    """policy_diff must be wired into prune prefixes and the email subject map,
+    mirroring how security_risk/network_inventory were wired in ff93df9."""
+    from src.report_scheduler import ReportScheduler
+    assert "policy_diff" in ReportScheduler._REPORT_PREFIXES
+    assert ReportScheduler._REPORT_PREFIXES["policy_diff"].startswith("Illumio_Policy_Diff_Report_")
+
+
+def test_scheduler_prune_by_count_handles_policy_diff(tmp_path):
+    """Count-based pruning must work for a policy_diff schedule (no KeyError)."""
+    from src.report_scheduler import ReportScheduler
+    p1 = tmp_path / "Illumio_Policy_Diff_Report_2026-06-01_0900.html"
+    p2 = tmp_path / "Illumio_Policy_Diff_Report_2026-06-02_0900.html"
+    p1.write_text("a"); p2.write_text("b")
+    sched = ReportScheduler.__new__(ReportScheduler)  # no __init__ needed for prune
+    sched._prune_by_count(str(tmp_path), "policy_diff", 1)
+    remaining = sorted(f.name for f in tmp_path.iterdir())
+    assert remaining == ["Illumio_Policy_Diff_Report_2026-06-02_0900.html"]
+
+
 def test_scheduler_prune_by_count_handles_new_types(tmp_path):
     """Count-based pruning must work for security_risk/network_inventory schedules
     (regression: the new report types were initially absent from _REPORT_PREFIXES,

@@ -303,6 +303,17 @@ class ReportScheduler:
             paths = gen.export(result, fmt=fmt, output_dir=output_dir)
             return result, paths
 
+        elif report_type == "policy_diff":
+            from src.report.policy_diff_report import PolicyDiffReport
+            rpt = PolicyDiffReport(self.cm, api_client=api, config_dir=self._config_dir,
+                                   cache_reader=_make_cache_reader(self.cm))
+            diff = rpt.build(lang=lang)
+            if diff["summary"]["total_changes"] == 0:
+                logger.info(f"[Scheduler] '{name}': no DRAFT-vs-ACTIVE changes — emitting empty report")
+            from src.report.exporters.policy_diff_html_exporter import PolicyDiffHtmlExporter
+            path = PolicyDiffHtmlExporter(diff, lang=lang).export(output_dir)
+            return diff, [path]
+
         else:
             logger.error(f"[Scheduler] Unknown report_type: {report_type}")
             return None, []
@@ -324,7 +335,8 @@ class ReportScheduler:
                       "security_risk": t("rpt_security_report_title", lang=lang),
                       "network_inventory": t("rpt_inventory_report_title", lang=lang),
                       "ven_status": t("rpt_email_ven_subject", lang=lang),
-                      "policy_usage": t("rpt_email_pu_subject", lang=lang)}.get(report_type, "Report")
+                      "policy_usage": t("rpt_email_pu_subject", lang=lang),
+                      "policy_diff": t("rpt_policy_diff_report_title", lang=lang)}.get(report_type, "Report")
         start_disp = start_date[:10] if start_date else "N/A"
         end_disp = end_date[:10] if end_date else "N/A"
 
@@ -475,6 +487,7 @@ class ReportScheduler:
         "audit":             "illumio_audit_report_",
         "ven_status":        "illumio_ven_status_",
         "policy_usage":      "illumio_policy_usage_report_",
+        "policy_diff":       "Illumio_Policy_Diff_Report_",
     }
 
     def _prune_by_count(self, output_dir: str, report_type: str, max_reports: int):
