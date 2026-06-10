@@ -41,6 +41,8 @@ def test_get_services_returns_definitions():
     c._api_get = MagicMock(return_value=(200, payload))
     out = c.get_services()
     assert out == payload
+    c._api_get.assert_called_once_with(
+        "/orgs/1/sec_policy/draft/services?max_results=10000")
 
 
 def test_get_ip_lists_empty_on_error():
