@@ -17,6 +17,8 @@ from src.report.exporters.csv_exporter import CsvExporter
 class PolicyResolverExporter:
     def __init__(self, results: dict, lang: str = "en"):
         self._r = results
+        # Kept for signature parity with sibling exporters and the facade's
+        # run(lang=...) contract; JSON+CSV output itself is language-neutral.
         self._lang = lang
 
     def export_json(self, output_dir: str = "reports") -> str:
@@ -29,9 +31,9 @@ class PolicyResolverExporter:
         return path
 
     def export_csv(self, output_dir: str = "reports") -> str:
-        # CsvExporter._iter_dataframes handles list-of-dicts natively,
-        # so passing {"rulesets": {name: [rows]}} works as-is.
-        # We extract just the rulesets dict so each key becomes its own CSV.
+        # Pass the {name: [rows]} rulesets dict directly; CsvExporter's
+        # _iter_dataframes handles list-of-dicts and writes one CSV per key
+        # into a ZIP.
         rulesets = self._r.get("rulesets") or {}
         return CsvExporter(rulesets, report_label="Policy_Resolver").export(output_dir)
 
