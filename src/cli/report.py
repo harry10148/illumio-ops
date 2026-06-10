@@ -484,8 +484,6 @@ def generate_policy_diff_report(
         paths.append(rpt.run(output_dir=out, lang=lang, fmt="html"))
     if fmt in ("csv", "all"):
         paths.append(rpt.run(output_dir=out, lang=lang, fmt="csv"))
-    if not paths:
-        paths.append(rpt.run(output_dir=out, lang=lang, fmt="html"))
 
     if email:
         from src.reporter import Reporter
@@ -502,7 +500,7 @@ def generate_policy_diff_report(
 
 
 @report_group.command("policy-diff")
-@click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
+@click.option("--format", "fmt", type=click.Choice(["html", "csv", "all"]), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
 @click.option("--email", is_flag=True)
 @click.pass_context

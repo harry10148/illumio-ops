@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import click
 from click.testing import CliRunner
 
+from src.cli._exit_codes import EXIT_DATAERR
 from src.cli.report import report_group
 
 
@@ -19,7 +21,7 @@ def test_policy_diff_invokes_report(tmp_path):
         result = runner.invoke(report_group,
                                ["policy-diff", "--output-dir", str(tmp_path)])
     assert result.exit_code == 0, result.output
-    gen.assert_called_once()
+    gen.assert_called_once_with(fmt="html", output_dir=str(tmp_path), email=False)
 
 
 def test_policy_diff_email_sends_report(tmp_path):
@@ -41,3 +43,11 @@ def test_policy_diff_email_sends_report(tmp_path):
 
     assert result.exit_code == 0, result.output
     MockReporter.return_value.send_report_email.assert_called_once()
+
+
+def test_policy_diff_click_exception_maps_to_dataerr():
+    runner = CliRunner()
+    with patch("src.cli.report.generate_policy_diff_report",
+               side_effect=click.ClickException("bad data")):
+        result = runner.invoke(report_group, ["policy-diff"])
+    assert result.exit_code == EXIT_DATAERR
