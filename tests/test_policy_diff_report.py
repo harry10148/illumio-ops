@@ -48,3 +48,11 @@ def test_run_uses_force_refresh_for_draft(tmp_path):
                return_value={"draft_events": pd.DataFrame()}):
         PolicyDiffReport(cm=MagicMock(), api_client=api).run(output_dir=str(tmp_path))
     api.get_all_rulesets.assert_called_once_with(force_refresh=True)
+
+
+def test_build_without_api_returns_empty_diff():
+    report = PolicyDiffReport(cm=MagicMock(), api_client=None)
+    diff = report.build()
+    assert diff["summary"]["total_changes"] == 0
+    assert diff["ruleset_changes"].empty
+    assert diff["rule_changes"].empty

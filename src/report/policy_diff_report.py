@@ -27,6 +27,8 @@ class PolicyDiffReport:
 
     def _fetch_policy_events(self, lang: str = "en") -> dict:
         """Reuse the audit pipeline to get policy-change events for attribution."""
+        if not self.api:
+            return {"draft_events": None}
         from src.report.audit_generator import AuditGenerator
         from src.report.analysis.audit.audit_mod03_policy import audit_policy_changes
         try:
