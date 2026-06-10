@@ -10,6 +10,7 @@ import ssl
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -17,6 +18,27 @@ from src.i18n import t
 from src.utils import Colors
 
 from .base import AlertOutputPlugin
+
+
+def redact_webhook_url(url: str) -> str:
+    """Redact a Teams/Power-Automate webhook URL for safe logging/storage.
+
+    The Teams workflow webhook embeds an invocation secret in its query string
+    (``...&sig=<SECRET>``) and identifiers in its path (``/workflows/<id>/...``).
+    Per README L-12 (Telegram token leaked via proxy access logs), channel
+    secrets must never reach logs, debug output, or persisted dispatch results.
+    Keeps only ``scheme://host`` and elides the rest.
+    """
+    if not url:
+        return ""
+    try:
+        parts = urlsplit(url)
+        if parts.scheme and parts.netloc:
+            return f"{parts.scheme}://{parts.netloc}/…"
+    except Exception:
+        pass
+    return "…"
+
 
 class MailAlertPlugin(AlertOutputPlugin):
     name = "mail"
