@@ -134,6 +134,23 @@ def test_dedup_identical_rows():
     assert len(rows) == 1
 
 
+def test_empty_consumers_resolves_to_any():
+    # An empty consumers list means "any source" — rows appear with src_ip=="ANY"
+    # and src_kind=="any". Contrast: a NON-empty list with an unknown actor
+    # (see test_missing_label_yields_no_rows_no_error) drops the rule entirely.
+    rs = _ruleset([{
+        "href": "/sec_rules/10",
+        "consumers": [],
+        "providers": [{"label": {"href": "/labels/db"}}],
+        "ingress_services": [{"port": 443, "proto": 6}],
+    }])
+    rows = resolve_ruleset(rs, **_lookups())
+    assert len(rows) == 1
+    assert rows[0]["src_ip"] == "ANY"
+    assert rows[0]["src_kind"] == "any"
+    assert rows[0]["dst_ip"] == "10.0.2.7"
+
+
 def test_scope_narrows_providers():
     # provider label /labels/web; scope restricts to /labels/db only -> no rows.
     rs = _ruleset(

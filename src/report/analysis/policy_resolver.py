@@ -18,6 +18,7 @@ _ANY = "ANY"
 
 
 def _proto_name(proto: Any) -> str:
+    # Assumes Illumio ingress_services proto is 6 (TCP) or 17 (UDP); anything non-17 maps to TCP.
     return "UDP" if proto == 17 else "TCP"
 
 
@@ -75,9 +76,14 @@ def _side_ips(
     (unknown refs, scoped out, etc.) — the caller should then drop the rule.
     Returns ([ANY], "any") only when the actors list is empty.
 
-    When scope_hrefs is given (providers side), an actor is only included if
-    it is a label/label_group whose label href intersects the scope, an
-    explicit IP source (ip_list/workload/ip_address), or ANY.
+    When scope_hrefs is given (providers side), scope filtering applies only
+    to ``label`` actors whose href is NOT in scope_hrefs (they are skipped).
+    ``label_group`` actors are NOT scope-filtered — known limitation.
+    Explicit IP sources (ip_list/workload/ip_address) and ANY pass through
+    unconditionally.
+
+    Note: for a multi-actor list the returned ``kind`` reflects the LAST
+    actor's kind; it is metadata only and does not affect IP correctness.
     """
     if not actors:
         return [_ANY], "any"
