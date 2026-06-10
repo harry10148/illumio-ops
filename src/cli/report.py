@@ -503,7 +503,6 @@ def generate_policy_resolver_report(
     *,
     fmt: str = "json",
     output_dir: str | None = None,
-    email: bool = False,
 ) -> list[str]:
     """Resolve ACTIVE policy into IP-level rows; export JSON + CSV."""
     from src.api_client import ApiClient
@@ -524,13 +523,12 @@ def generate_policy_resolver_report(
 @report_group.command("resolve")
 @click.option("--format", "fmt", type=click.Choice(["json", "csv", "all"]), default="json")
 @click.option("--output-dir", type=click.Path(), default=None)
-@click.option("--email", is_flag=True)
 @click.pass_context
-def report_resolve(ctx: click.Context, fmt: str, output_dir, email: bool) -> None:
+def report_resolve(ctx: click.Context, fmt: str, output_dir) -> None:
     """Resolve ACTIVE label-based Policy into IP-level firewall rules."""
     try:
         paths = generate_policy_resolver_report(
-            fmt=fmt, output_dir=output_dir, email=email,
+            fmt=fmt, output_dir=output_dir,
         )
     except click.ClickException as exc:
         echo_error(ctx, exc.format_message())
