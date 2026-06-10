@@ -459,6 +459,67 @@ def report_policy_usage(
     _emit_paths(ctx, paths, fmt)
 
 
+def generate_policy_diff_report(
+    *,
+    fmt: str = "html",
+    output_dir: str | None = None,
+    email: bool = False,
+) -> list[str]:
+    """Generate the Policy Diff (DRAFT vs ACTIVE) report."""
+    from src.api_client import ApiClient
+    from src.config import ConfigManager
+    from src.report.policy_diff_report import PolicyDiffReport
+    from src.main import _make_cache_reader
+
+    cm = ConfigManager()
+    api = ApiClient(cm)
+    _root_dir, config_dir = _resolve_paths(output_dir)
+    out = _resolve_output_dir(cm, output_dir)
+    lang = _resolve_lang(cm)
+
+    rpt = PolicyDiffReport(cm, api_client=api, config_dir=config_dir,
+                           cache_reader=_make_cache_reader(cm))
+    paths: list[str] = []
+    if fmt in ("html", "all"):
+        paths.append(rpt.run(output_dir=out, lang=lang, fmt="html"))
+    if fmt in ("csv", "all"):
+        paths.append(rpt.run(output_dir=out, lang=lang, fmt="csv"))
+    if not paths:
+        paths.append(rpt.run(output_dir=out, lang=lang, fmt="html"))
+    return paths
+
+
+@report_group.command("policy-diff")
+@click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
+@click.option("--output-dir", type=click.Path(), default=None)
+@click.option("--email", is_flag=True)
+@click.pass_context
+def report_policy_diff(ctx: click.Context, fmt: str, output_dir, email: bool) -> None:
+    """Generate Policy Diff Report (DRAFT vs ACTIVE, Ruleset/Rule scope)."""
+    try:
+        paths = generate_policy_diff_report(fmt=fmt, output_dir=output_dir, email=email)
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, f"Connection failed: {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
+    except Exception as exc:
+        log.exception("policy-diff report failed")
+        echo_error(ctx, f"Unexpected error: {exc}")
+        ctx.exit(EXIT_SOFTWARE)
+        return
+    _emit_paths(ctx, paths, fmt)
+
+
 # Verb-prefixed aliases (Track C b2). Canonical names are the short forms
 # (traffic / audit / ven-status / policy-usage); generate-* are aliases kept
 # for backwards compatibility. The alias short_help is annotated so
