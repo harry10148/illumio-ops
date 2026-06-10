@@ -110,7 +110,7 @@ def alert_settings_menu(cm: ConfigManager) -> None:
 
         elif sel == 9:
             current_url = cm.config.get("alerts", {}).get("teams_webhook_url", "")
-            masked = current_url[:5] + "..." if current_url else t("not_set")
+            masked = current_url[:15] + "..." if current_url else t("not_set")
             new_url = safe_input(
                 t("teams_webhook_url_input"), str, allow_cancel=True, hint=masked
             )
