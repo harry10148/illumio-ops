@@ -135,9 +135,11 @@ def compute_posture(kpis: dict) -> dict:
 
     # uncovered_pct: true_gap_pct (% of flows with no policy) or pb_uncovered
     uncovered_pct: float = 0.0
+    uncovered_avail = False
     tgp = _get_float(kpis, "true_gap_pct")
     if tgp is not None:
         uncovered_pct = float(tgp)
+        uncovered_avail = True
     else:
         flat_kpis = kpis.get("kpis") or {}
         if isinstance(flat_kpis, dict):
@@ -146,6 +148,7 @@ def compute_posture(kpis: dict) -> dict:
                 # Convert raw flow count to an approximate percentage (capped at 100)
                 total = _get_float(kpis, "total_flows") or 1.0
                 uncovered_pct = min(100.0, float(pb) / float(total) * 100.0)
+                uncovered_avail = True
 
     # Risk penalty (documented in module docstring)
     ransomware_pts = min(40, ransomware_apps * 5)
@@ -212,6 +215,34 @@ def compute_posture(kpis: dict) -> dict:
 
     if has_risk:
         rh_points = round(eff_rsk * risk_health, 2)
+        risk_subscores = []
+        if rft is not None:
+            risk_subscores.append({
+                "key": "ransomware_containment",
+                "label_key": "gui_posture_sub_ransomware",
+                "value": round(100.0 * (1.0 - ransomware_pts / 40.0)),
+                "unit": "%",
+                "penalty_points": round(ransomware_pts, 2),
+                "max_penalty": 40,
+            })
+        if lm.get("ratio") is not None:
+            risk_subscores.append({
+                "key": "lateral_containment",
+                "label_key": "gui_posture_sub_lateral",
+                "value": round(100.0 * (1.0 - lateral_pts / 30.0)),
+                "unit": "%",
+                "penalty_points": round(lateral_pts, 2),
+                "max_penalty": 30,
+            })
+        if uncovered_avail:
+            risk_subscores.append({
+                "key": "flow_coverage",
+                "label_key": "gui_posture_sub_coverage",
+                "value": round(100.0 * (1.0 - uncovered_pts / 30.0)),
+                "unit": "%",
+                "penalty_points": round(uncovered_pts, 2),
+                "max_penalty": 30,
+            })
         components.append({
             "key": "risk_health",
             "label_key": "gui_posture_risk_health",
@@ -221,6 +252,7 @@ def compute_posture(kpis: dict) -> dict:
             "effective_weight": round(eff_rsk, 3),
             "points": rh_points,
             "note_key": "gui_posture_risk_health_note",
+            "risk_subscores": risk_subscores,
             "detail": {
                 "ransomware_apps": ransomware_apps,
                 "lateral_control_ratio": round(lateral_control_ratio, 4),

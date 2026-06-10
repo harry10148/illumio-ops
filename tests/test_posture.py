@@ -17,6 +17,19 @@ from src.report.posture import compute_posture
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _risk_kpis():
+    """Synthetic snapshot with all three risk signals present (deterministic)."""
+    return {
+        "enforced_coverage_pct": 80.0,
+        "maturity_score": 70.0,
+        "risk_flows_total": 4,          # ransomware_apps=4 -> pts=min(40,20)=20 -> value=50
+        "true_gap_pct": 20.0,           # uncovered_pts=min(30,10)=10 -> value=round(100*(1-10/30))=67
+        "maturity_dimensions": {
+            "lateral_movement_control": {"ratio": 0.5},  # lateral_pts=round(0.5*30)=15 -> value=50
+        },
+    }
+
+
 def _full_kpis(**overrides):
     """Return a realistic traffic snapshot top-level dict."""
     base = {
@@ -219,6 +232,37 @@ class TestRiskPenaltyBounds:
         }
         result = compute_posture(kpis)
         assert result["score"] == 0
+
+
+class TestRiskSubscores:
+    def _risk_component(self, kpis):
+        result = compute_posture(kpis)
+        return next(c for c in result["components"] if c["key"] == "risk_health")
+
+    def test_all_three_subscores_present_with_expected_values(self):
+        rh = self._risk_component(_risk_kpis())
+        subs = {s["key"]: s for s in rh["risk_subscores"]}
+        assert subs["ransomware_containment"]["value"] == 50
+        assert subs["ransomware_containment"]["penalty_points"] == 20
+        assert subs["ransomware_containment"]["max_penalty"] == 40
+        assert subs["lateral_containment"]["value"] == 50
+        assert subs["lateral_containment"]["penalty_points"] == 15
+        assert subs["flow_coverage"]["value"] == 67
+        assert subs["flow_coverage"]["penalty_points"] == 10
+
+    def test_absent_signal_omits_its_subscore(self):
+        # Only ransomware signal present; lateral ratio + gap absent.
+        kpis = {"enforced_coverage_pct": 80.0, "maturity_score": 70.0,
+                "risk_flows_total": 4}
+        rh = self._risk_component(kpis)
+        keys = {s["key"] for s in rh["risk_subscores"]}
+        assert keys == {"ransomware_containment"}
+
+    def test_existing_keys_unchanged(self):
+        rh = self._risk_component(_risk_kpis())
+        for k in ("key", "label_key", "value", "unit", "weight",
+                  "effective_weight", "points", "note_key", "detail"):
+            assert k in rh
 
 
 # ─────────────────────────────────────────────────────────────────────────────
