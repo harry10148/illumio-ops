@@ -36,7 +36,7 @@ def _esc(v) -> str:
 
 
 def _card(n, label) -> str:
-    return f'<div class="card"><div class="n">{n}</div><div class="l">{_esc(label)}</div></div>'
+    return f'<div class="card"><div class="n">{_esc(n)}</div><div class="l">{_esc(label)}</div></div>'
 
 
 class PolicyDiffHtmlExporter:
@@ -70,7 +70,7 @@ class PolicyDiffHtmlExporter:
             + _card(s.get("rules_removed", 0), t("rpt_policy_diff_removed", lang=self._lang) + " Rule")
             + _card(s.get("rules_modified", 0), t("rpt_policy_diff_modified", lang=self._lang) + " Rule")
         )
-        html = f"""<!doctype html><html lang="{self._lang}"><head>
+        html = f"""<!doctype html><html lang="{_esc(self._lang)}"><head>
 <meta charset="utf-8"><title>{_esc(title)}</title><style>{_CSS}</style></head><body>
 <h1>{_esc(title)}</h1>
 <div class="cards">{cards}</div>
