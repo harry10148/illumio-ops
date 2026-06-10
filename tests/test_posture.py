@@ -264,6 +264,36 @@ class TestRiskSubscores:
                   "effective_weight", "points", "note_key", "detail"):
             assert k in rh
 
+    def test_subscores_all_clean_are_100(self):
+        kpis = {
+            "enforced_coverage_pct": 100.0,
+            "maturity_score": 100.0,
+            "risk_flows_total": 0,
+            "true_gap_pct": 0.0,
+            "maturity_dimensions": {"lateral_movement_control": {"ratio": 1.0}},
+        }
+        rh = self._risk_component(kpis)
+        assert {s["key"]: s["value"] for s in rh["risk_subscores"]} == {
+            "ransomware_containment": 100,
+            "lateral_containment": 100,
+            "flow_coverage": 100,
+        }
+
+    def test_subscores_all_saturated_are_0(self):
+        kpis = {
+            "enforced_coverage_pct": 0.0,
+            "maturity_score": 0.0,
+            "risk_flows_total": 8,
+            "true_gap_pct": 60.0,
+            "maturity_dimensions": {"lateral_movement_control": {"ratio": 0.0}},
+        }
+        rh = self._risk_component(kpis)
+        assert {s["key"]: s["value"] for s in rh["risk_subscores"]} == {
+            "ransomware_containment": 0,
+            "lateral_containment": 0,
+            "flow_coverage": 0,
+        }
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Piece B: run_posture_summary scheduler job
