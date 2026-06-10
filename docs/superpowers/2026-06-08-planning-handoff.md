@@ -1,47 +1,55 @@
-# Session Handoff — alexgoller-inspired feature planning (2026-06-08)
+# Session Handoff — alexgoller-inspired features (updated 2026-06-10)
 
-## 狀態：規劃完成，尚未開始實作
+## 狀態：5 項中 3 項已實作並合併進 main（已 push origin）
 
-分析了 alexgoller/illumio-plugger 生態，挑出 5 個能優化 illumio-ops 的設計，**每個都已產出 spec + TDD 實作計畫**。實作尚未開始。
+分析 alexgoller/illumio-plugger 生態後挑出 5 個優化 illumio-ops 的設計，每個都有 spec + TDD 計畫（`docs/superpowers/{specs,plans}/2026-06-08-*`）。目前 **P1、P4、P2 已完整實作、合併進 `main`、push 到 origin**；P3、P5 仍只有 spec+plan。
 
-- **分支**：`feat/posture-subscores-remediation`（所有 spec/plan 都在此分支）
-- **關鍵 commit**：`9b42d80`（P1 spec）、`a728519`（P1 plan）、`6b9e1a7`（P2–P5 spec+plan）
-- 尚未從 `main` 分出獨立的實作分支；尚無任何 source code 變更。
+- **目前分支**：`main`（與 `origin/main` 同步，HEAD `fc0a236`）
+- 所有已完成功能皆以 subagent-driven-development 執行（每任務：實作 → 規格審查 → 程式品質審查 → 最終整體審查）。
 
-## 5 個功能與文件
+## 進度表
 
-| | 功能 | 首版範圍（已拍板） | spec / plan 檔名（`docs/superpowers/{specs,plans}/2026-06-08-*`） | 風險 |
-|---|---|---|---|---|
-| **P1** | 態勢子分數 + 影響式修補清單 | 優化既有 `posture.py`（**放棄合規對映層**） | `posture-subscores-remediation*` | 低（純衍生） |
-| **P2** | Policy Diff | **僅 Ruleset/Rule** draft-vs-active 欄位差異 + audit 歸屬 | `policy-diff*` | 中 |
-| **P3** | Policy Resolver | label→IP（Workload+IP List+Label Group），輸出 JSON+CSV | `policy-resolver*` | 中 |
-| **P4** | Teams 告警通道 | **Adaptive Card via Power Automate Workflows**（非 O365 MessageCard） | `teams-alert-channel*` | 低 |
-| **P5** | AI 輔助規則建議 | 啟發式核心 + 可插拔 LLM（**預設關、氣隙安全、僅建議不套用**） | `ai-assisted-rules*` | 中 |
+| | 功能 | 首版範圍（已拍板） | 狀態 |
+|---|---|---|---|
+| **P1** | 態勢子分數 + 影響式修補清單 | 優化既有 `posture.py`（放棄合規層） | ✅ 合併（HEAD 系列 …fdbd9fe） |
+| **P4** | Teams 告警通道 | Adaptive Card via Power Automate Workflows | ✅ 合併（…29d81a6） |
+| **P2** | Policy Diff | 僅 Ruleset/Rule，draft-vs-active + audit 歸屬 | ✅ 合併（…fc0a236） |
+| **P3** | Policy Resolver | label→IP（Workload+IP List+Label Group），JSON+CSV | 📋 spec+plan，**未實作** |
+| **P5** | AI 輔助規則建議 | 啟發式核心 + 可插拔 LLM（預設關、氣隙安全、僅建議） | 📋 spec+plan，**未實作** |
 
-## 建議實作順序
+## 下一步：接續 P3 Policy Resolver
 
-1. **P1**（最低風險、純衍生、複用最強資產）→ 2. **P4**（最小、獨立）→ 3. **P2** → 4. **P3** → 5. **P5**。
-順序可調；五者彼此獨立，可任意先後。
+P3 計畫：`docs/superpowers/plans/2026-06-08-policy-resolver.md`（7 任務）。spec：`...specs/2026-06-08-policy-resolver-design.md`。
 
-## 如何接續（每個 plan 都是自足的）
+**接續方式**（下個 session 貼這句即可）：
+```
+接續 illumio-ops 的 P3 Policy Resolver 實作。先讀 docs/superpowers/2026-06-08-planning-handoff.md，
+然後從 main 開 feat/policy-resolver 分支，用 subagent-driven-development 執行
+docs/superpowers/plans/2026-06-08-policy-resolver.md。
+```
 
-每份 plan 開頭都有 `REQUIRED SUB-SKILL` 標頭。接續時：
+**P3 必讀揭露假設**：repo 原本**沒有**公開的 `get_ip_lists / get_label_groups / get_services`，plan **Task 1** 已用完整程式碼補上；ip_lists/label_groups/services 取自 **draft**（定義穩定），rulesets 取 **active**。純解析核心 `resolve_ruleset` 為純函式，與 I/O facade 分離。
 
-1. `git checkout feat/posture-subscores-remediation`（或為各功能另開實作分支）。
-2. 選一份 plan，用 **superpowers:subagent-driven-development**（推薦，逐任務派 subagent + 審查）或 **superpowers:executing-plans**（本 session 內逐任務執行）。
-3. 每個 plan 都是 TDD：失敗測試 → 跑 → 實作 → 跑 → commit，含完整真實程式碼與精確 pytest 指令。
+## 執行流程（已驗證有效的工作模式）
 
-## 必讀的揭露假設（實作時要留意）
+1. `git checkout main && git pull` →（每個功能）從 main 開 `feat/<name>` 分支。
+2. 讀該功能的 plan，擷取每個 Task 全文，逐任務派 implementer subagent（內嵌完整任務文字，勿讓 subagent 自讀整份 plan）。
+3. 每任務：implementer（TDD）→ **spec reviewer**（獨立讀碼+跑測試，不信報告）→ **code-quality reviewer**（base→head diff）。controller 對審查意見用技術判斷裁決（採納真問題、有據回絕 YAGNI/cosmetic）。
+4. 全部任務後派**最終整體 reviewer**（跨層契約、向後相容、scope、跑全套測試 + i18n audit）。
+5. 用 finishing-a-development-branch：驗測試 → ff-merge 進 main → 在合併結果再驗 → 刪分支 → `git push origin main`。
+6. 過程中**真實 bug 確實會被審查抓到**（例：P2 的排程+email `record_count` 對 dict 當機、P4 的 webhook userinfo 洩漏）——別跳過審查。
 
-- **P2**：audit events 只提供 `resource_name`，故操作者歸屬**先按物件名稱**匹配（非 href）；plan 已加報表註腳，href 精準對映留待後續。
-- **P3**：repo 原本**沒有**公開的 `get_ip_lists / get_label_groups / get_services`，plan **Task 1** 已用完整程式碼補上；ip_lists/label_groups/services 取自 **draft**（定義穩定），rulesets 取 **active**。
-- **P4**：Teams webhook URL 是 secret，plan 有 `redact_webhook_url` 純函式 + 遮罩測試（沿 README L-12 token 外洩教訓）。
-- **P5**：預設 `provider="none"` 100% 離線；plan 有「provider=none 時不得有任何網路呼叫」的測試（monkeypatch socket）。
+## 共同設計原則（所有功能遵守）
 
-## 共同設計原則
+純函式核心可單元測試、零/可選外部依賴維持氣隙友善、重用既有報表/告警/`pce_cache` 管線、i18n EN+ZH_TW（strict prefix + glossary，`scripts/audit_i18n_usage.py` 須 Total 0）、JSON 設定（非 YAML）、向後相容、L-12 secret 不入 log。
 
-純函式核心可單元測試、零/可選外部依賴維持氣隙友善、重用既有報表/告警/`pce_cache` 管線、i18n EN+ZH_TW（strict prefix + glossary）、JSON 設定（非 YAML）、向後相容。
+## 環境備忘
 
-## 其他
+- pytest 解譯器：這個 shell 的 `python` 不在 PATH，用 `venv/bin/python -m pytest`（subagent 環境的 `python` 可用）。
+- i18n strict prefix：缺 key 時 `t()` 回 `[MISSING:key]`（非 literal fallback），故新 key 須同步進 EN+ZH 兩檔；GUI 端點 display_name 走 `t()`，缺 key 會顯示 `[MISSING:...]`。
 
-- 未追蹤檔 `docs/superpowers/plans/2026-06-04-cli-config-set.md` 為本次工作前既存、與此無關，未處理。
+## 已知 polish 待辦（非阻擋）
+
+- **P2**：HTML 報表表格表頭仍是原始英文欄名；8 個 `rpt_policy_diff_col_*` i18n key 已定義但尚未接進 exporter 本地化（audit 允許 define-but-unused）。
+- **手動驗證未做**：P1 dashboard modal 視覺、P4 CLI 選單與實際 Teams 送出、P2 報表實際畫面。
+- 未追蹤檔 `docs/superpowers/plans/2026-06-04-cli-config-set.md` 為本次工作前既存、與此無關。
