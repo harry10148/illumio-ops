@@ -353,6 +353,59 @@ class Reporter:
         )
         return json.loads(rendered)
 
+    def _build_teams_card(self, subj: str) -> dict:
+        """Build a Power-Automate Adaptive Card (v1.4) POST body for Teams.
+
+        Mirrors _build_webhook_payload's template-driven assembly but emits the
+        `attachments`-wrapped Adaptive Card shape Power Automate Workflows
+        expect. Pure data assembly (no I/O). Values go into TextBlock/FactSet
+        elements as plain text; everything is injected via *_json tokens so the
+        rendered template is valid JSON.
+        """
+        total_issues = (
+            len(self.health_alerts) + len(self.event_alerts)
+            + len(self.traffic_alerts) + len(self.metric_alerts)
+        )
+
+        facts = [
+            {"title": t("alert_sec_health"), "value": str(len(self.health_alerts))},
+            {"title": t("alert_sec_event"), "value": str(len(self.event_alerts))},
+            {"title": t("alert_sec_traffic"), "value": str(len(self.traffic_alerts))},
+            {"title": t("alert_sec_metric"), "value": str(len(self.metric_alerts))},
+            {"title": t("alert_field_time"), "value": self._now_str()},
+        ]
+
+        # Compact one-line summaries of the first few issues (plain text).
+        lines: list[str] = []
+        for alert in self.health_alerts[:5]:
+            lines.append(
+                f"• {self._compact_text(alert.get('rule', ''))}"
+                f" — {self._compact_text(alert.get('details', ''))}"
+            )
+        for payload in self._build_all_event_alert_payloads()[:5]:
+            lines.append(f"• {self._compact_text(payload.get('rule', ''))}")
+        summary = "\n".join(lines) if lines else t("mail_subject", count=total_issues)
+
+        actions_fragment = ""
+        base_url = self.cm.config.get("gui_base_url", "")
+        if base_url:
+            action = {
+                "type": "Action.OpenUrl",
+                "title": t("alert_tpl_see_web_for_details"),
+                "url": base_url,
+            }
+            actions_fragment = ',\n        "actions": ' + json.dumps([action])
+
+        rendered = render_alert_template(
+            "teams_card.json.tmpl",
+            title_json=json.dumps(t("alert_tpl_telegram_title")),
+            subject_json=json.dumps(subj),
+            facts_json=json.dumps(facts),
+            summary_json=json.dumps(summary),
+            actions_fragment=actions_fragment,
+        )
+        return json.loads(rendered)
+
     def generate_pretty_snapshot_html(self, data_list: list[dict[str, Any]]) -> str:
         import re
 
