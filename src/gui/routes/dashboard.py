@@ -193,16 +193,24 @@ def _overview_posture(state):
     try:
         from src.report.snapshot_store import read_latest
         from src.report.posture import compute_posture
+        from src.report.posture_advisor import build_remediation
         snap = read_latest("traffic")
         if snap:
             p = compute_posture(snap.get("kpis") or snap)
             if p.get("available"):
                 p["source_date"] = snap.get("generated_at", "")
+                p["remediation"] = build_remediation(p)
                 return p
     except Exception:
         pass
     ps = state.get("posture_summary")
     if isinstance(ps, dict) and ("score" in ps or ps.get("available") is False):
+        if ps.get("available") and "remediation" not in ps:
+            try:
+                from src.report.posture_advisor import build_remediation
+                ps["remediation"] = build_remediation(ps)
+            except Exception:
+                pass
         return ps
     return {"available": False}
 

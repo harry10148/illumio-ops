@@ -74,3 +74,16 @@ def test_risk_health_no_subscores_returns_no_items():
         ],
     }
     assert build_remediation(posture) == []
+
+
+from unittest.mock import patch
+
+
+def test_overview_posture_attaches_remediation():
+    from src.gui.routes.dashboard import _overview_posture
+    snap = {"kpis": _risk_kpis(), "generated_at": "2026-06-08T00:00:00Z"}
+    with patch("src.report.snapshot_store.read_latest", return_value=snap):
+        result = _overview_posture({})
+    assert result.get("available") is True
+    assert "remediation" in result
+    assert result["remediation"][0]["key"] == "readiness"
