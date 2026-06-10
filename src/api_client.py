@@ -756,6 +756,39 @@ class ApiClient:
         logger.warning(f"get_active_rulesets: status={status}, returned empty list")
         return []
 
+    def get_ip_lists(self) -> list[dict[str, Any]]:
+        """Get all IP Lists with their ip_ranges/fqdns (draft definitions)."""
+        org = self.api_cfg['org_id']
+        status, data = self._api_get(
+            f"/orgs/{org}/sec_policy/draft/ip_lists?max_results=10000"
+        )
+        if status == 200 and data:
+            return data
+        logger.warning(f"get_ip_lists: status={status}, returned empty list")
+        return []
+
+    def get_label_groups(self) -> list[dict[str, Any]]:
+        """Get all Label Groups with their member labels + sub_groups (draft)."""
+        org = self.api_cfg['org_id']
+        status, data = self._api_get(
+            f"/orgs/{org}/sec_policy/draft/label_groups?max_results=10000"
+        )
+        if status == 200 and data:
+            return data
+        logger.warning(f"get_label_groups: status={status}, returned empty list")
+        return []
+
+    def get_services(self) -> list[dict[str, Any]]:
+        """Get all Service definitions with their service_ports (draft)."""
+        org = self.api_cfg['org_id']
+        status, data = self._api_get(
+            f"/orgs/{org}/sec_policy/draft/services?max_results=10000"
+        )
+        if status == 200 and data:
+            return data
+        logger.warning(f"get_services: status={status}, returned empty list")
+        return []
+
     def search_rulesets(self, keyword: str) -> list[dict[str, Any]]:
         """Search cached rulesets by keyword."""
         all_rs = self.get_all_rulesets()
