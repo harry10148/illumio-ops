@@ -516,8 +516,7 @@ def generate_policy_resolver_report(
     lang = _resolve_lang(cm)
 
     rpt = PolicyResolverReport(cm, api_client=api, config_dir=config_dir)
-    path = rpt.run(output_dir=out, lang=lang)
-    return [path] if path else []
+    return rpt.run(output_dir=out, lang=lang, fmt=fmt)
 
 
 @report_group.command("resolve")

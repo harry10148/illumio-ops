@@ -37,6 +37,14 @@ class PolicyResolverExporter:
         rulesets = self._r.get("rulesets") or {}
         return CsvExporter(rulesets, report_label="Policy_Resolver").export(output_dir)
 
-    def export(self, output_dir: str = "reports") -> str:
-        self.export_csv(output_dir)
-        return self.export_json(output_dir)
+    def export(self, output_dir: str = "reports", fmt: str = "all") -> list[str]:
+        """Write outputs selected by fmt; return the list of written paths.
+
+        fmt: "json" -> JSON only; "csv" -> CSV zip only; "all" -> both.
+        """
+        paths: list[str] = []
+        if fmt in ("json", "all"):
+            paths.append(self.export_json(output_dir))
+        if fmt in ("csv", "all"):
+            paths.append(self.export_csv(output_dir))
+        return paths

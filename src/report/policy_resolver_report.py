@@ -139,8 +139,9 @@ class PolicyResolverReport:
             total += len(rows)
         return {"rulesets": per_ruleset, "record_count": total}
 
-    def run(self, output_dir: str = "reports", lang: str = "en") -> str:
+    def run(self, output_dir: str = "reports", lang: str = "en",
+            fmt: str = "all") -> list[str]:
         results = self.resolve()
         if results["record_count"] == 0:
-            return ""
-        return PolicyResolverExporter(results, lang=lang).export(output_dir)
+            return []
+        return PolicyResolverExporter(results, lang=lang).export(output_dir, fmt=fmt)

@@ -18,4 +18,4 @@ def test_report_resolve_invokes_generator(tmp_path):
             ["resolve", "--format", "json", "--output-dir", str(tmp_path)],
         )
     assert result.exit_code == 0, result.output
-    gen.assert_called_once()
+    gen.assert_called_once_with(fmt="json", output_dir=str(tmp_path))

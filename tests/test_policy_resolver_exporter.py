@@ -41,5 +41,21 @@ def test_csv_export_writes_zip_with_rows(tmp_path):
 
 def test_export_default_returns_both(tmp_path):
     paths = PolicyResolverExporter(_results(), lang="en").export(str(tmp_path))
-    # export() returns the JSON path (primary); CSV alongside.
-    assert os.path.exists(paths)
+    assert len(paths) == 2
+    assert all(os.path.exists(p) for p in paths)
+
+
+def test_export_fmt_json_only(tmp_path):
+    paths = PolicyResolverExporter(_results(), lang="en").export(str(tmp_path), fmt="json")
+    assert len(paths) == 1
+    assert paths[0].endswith(".json")
+    assert os.path.exists(paths[0])
+    assert not any(f.endswith(".zip") for f in os.listdir(str(tmp_path)))
+
+
+def test_export_fmt_csv_only(tmp_path):
+    paths = PolicyResolverExporter(_results(), lang="en").export(str(tmp_path), fmt="csv")
+    assert len(paths) == 1
+    assert paths[0].endswith(".zip")
+    assert os.path.exists(paths[0])
+    assert not any(f.endswith(".json") for f in os.listdir(str(tmp_path)))
