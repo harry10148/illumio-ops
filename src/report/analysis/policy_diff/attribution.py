@@ -24,6 +24,7 @@ def _latest_by_name(policy_events: dict) -> dict:
     work = df.copy()
     if "timestamp" not in work.columns:
         work["timestamp"] = ""
+    work["timestamp"] = work["timestamp"].fillna("")
     work = work.sort_values("timestamp", ascending=True)  # last row per name = newest
     latest: dict = {}
     for _, row in work.iterrows():

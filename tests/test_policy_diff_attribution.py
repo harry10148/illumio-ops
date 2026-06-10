@@ -59,3 +59,15 @@ def test_error_events_dict_does_not_raise():
     diff = _diff_with_one_modified_ruleset()
     out = attribute_changes(diff, {"error": "No event data available"})
     assert out["ruleset_changes"].to_dict("records")[0]["last_actor"] == ""
+
+
+def test_non_dict_events_does_not_raise():
+    diff = _diff_with_one_modified_ruleset()
+    out = attribute_changes(diff, None)
+    assert out["ruleset_changes"].to_dict("records")[0]["last_actor"] == ""
+
+
+def test_garbage_events_value_does_not_raise():
+    diff = _diff_with_one_modified_ruleset()
+    out = attribute_changes(diff, "not a dict")
+    assert out["ruleset_changes"].to_dict("records")[0]["last_actor"] == ""
