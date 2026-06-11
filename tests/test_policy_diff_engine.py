@@ -120,3 +120,12 @@ def test_summarize_actors_falls_back_to_href_without_names():
 
     out = _summarize_actors([{"href": "/orgs/1/sec_policy/active/services/9"}])
     assert "/orgs/1/sec_policy/active/services/9" in out
+
+
+def test_summarize_actors_resolves_label_group_names():
+    from src.report.analysis.policy_diff.diff_engine import _summarize_actors
+
+    names = {"/orgs/1/sec_policy/active/label_groups/3": "Prod-Web-Group"}
+    out = _summarize_actors([{"label_group": {"href": "/orgs/1/sec_policy/active/label_groups/3"}}], names=names)
+    assert "label_group:Prod-Web-Group" in out
+    assert "/orgs/1/" not in out

@@ -46,6 +46,8 @@ def _summarize_actors(items: list, names: dict[str, str] | None = None) -> str:
             tokens.append(f"actors:{it['actors']}")
         elif isinstance(it.get("label"), dict) and it["label"].get("href"):
             tokens.append(f"label:{_nm(it['label']['href'])}")
+        elif isinstance(it.get("label_group"), dict) and it["label_group"].get("href"):
+            tokens.append(f"label_group:{_nm(it['label_group']['href'])}")
         elif isinstance(it.get("ip_list"), dict) and it["ip_list"].get("href"):
             tokens.append(f"ip_list:{_nm(it['ip_list']['href'])}")
         elif isinstance(it.get("workload"), dict) and it["workload"].get("href"):
