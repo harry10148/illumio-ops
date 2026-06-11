@@ -460,6 +460,14 @@ class ReportGenerator:
             save_snapshot(output_dir, "traffic", kpi_dict, generated_at=ts)
             if prev:
                 result.module_results["_trend_deltas"] = compute_deltas(kpi_dict, prev)
+            # Baseline drift: compare this run's flow signatures vs last run, then archive.
+            from src.report.flow_history import build_signatures, load_previous_signatures, save_signatures
+            from src.report.analysis.mod_drift import baseline_drift
+            if result.dataframe is not None and not result.dataframe.empty:
+                _prev_sigs, _prev_ts = load_previous_signatures(output_dir, "traffic")
+                result.module_results["mod_drift"] = baseline_drift(
+                    result.dataframe, prev_signatures=_prev_sigs, prev_generated_at=_prev_ts)
+                save_signatures(output_dir, "traffic", build_signatures(result.dataframe), generated_at=ts)
         except Exception as e:
             logger.warning(f"[ReportGenerator] Trend snapshot failed: {e}")
 

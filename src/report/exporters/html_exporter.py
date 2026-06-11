@@ -578,6 +578,7 @@ class _TrafficReportBase:
             'overview':       _nav_link('overview', 'rpt_tr_nav_overview', '1 Traffic Overview'),
             'policy':         _nav_link('policy', 'rpt_tr_nav_policy', '2 Policy Decisions'),
             'uncovered':      _nav_link('uncovered', 'rpt_tr_nav_uncovered', '3 Uncovered Flows'),
+            'drift':          _nav_link('drift', 'rpt_tr_nav_drift', 'Baseline Drift'),
             'ransomware':     _nav_link('ransomware', 'rpt_tr_nav_ransomware', '4 Ransomware Exposure'),
             'user':           (_nav_link('user', 'rpt_tr_nav_user', '6 User & Process') if _mod06_has_data else ''),
             'matrix':         (_nav_link('matrix', 'rpt_tr_nav_matrix', '7 Cross-Label Matrix') if _mod07_block else ''),
@@ -638,6 +639,9 @@ class _TrafficReportBase:
             'uncovered': self._section('uncovered', 'rpt_tr_sec_uncovered', 'Uncovered Flows',
                           render_section_guidance('mod03', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod03_html(),
                           'rpt_tr_sec_uncovered_intro', 'Focus on traffic not yet covered by effective Policy, helping prioritise which Services and directions to tighten first.') + '\n',
+            'drift': self._section('drift', 'rpt_tr_sec_drift', 'Baseline Drift',
+                          render_section_guidance('mod_drift', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod_drift_html(),
+                          'rpt_tr_sec_drift_intro', 'Compare this period\'s app-to-app connections against the previous report to spot new paths and disappeared baselines.') + '\n',
             'ransomware': self._section('ransomware', 'rpt_tr_sec_ransomware', 'Ransomware Exposure',
                           render_section_guidance('mod04', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod04_html(),
                           'rpt_tr_sec_ransomware_intro', 'Check high-risk Ports, Allowed flows, and host exposure commonly tied to ransomware attack chains.') + '\n',
@@ -1075,6 +1079,23 @@ class _TrafficReportBase:
             + _df_to_html(m.get('audit_flags'), lang=_lang)
         )
 
+    def _mod_drift_html(self):
+        _lang = self._lang
+        m = self._r.get('mod_drift', {})
+        if not m.get('available'):
+            return f'<p class="note">{t("rpt_drift_first_run", lang=_lang)}</p>'
+        head = (
+            f'<p class="section-intro">{t("rpt_drift_baseline_from", lang=_lang)}'
+            f' {(m.get("prev_generated_at") or "")[:16]}</p>'
+        )
+        return (
+            head
+            + f'<h3>{t("rpt_drift_new_pairs", lang=_lang)} ({m.get("new_count", 0)})</h3>'
+            + _df_to_html(m.get('new_pairs'), lang=_lang)
+            + f'<h3>{t("rpt_drift_disappeared", lang=_lang)} ({m.get("disappeared_count", 0)})</h3>'
+            + _df_to_html(m.get('disappeared_pairs'), lang=_lang)
+        )
+
     def _mod11_html(self):
         m = self._r.get('mod11', {})
         if not m.get('bytes_data_available', False):
@@ -1508,7 +1529,7 @@ class SecurityRiskHtmlExporter(_TrafficReportBase):
         return True
 
     def _ordered_section_keys(self) -> list[str]:
-        return ['summary', 'overview', 'policy', 'uncovered', 'ransomware',
+        return ['summary', 'drift', 'overview', 'policy', 'uncovered', 'ransomware',
                 'user', 'allowed', 'readiness', 'infrastructure', 'lateral', 'findings']
 
 

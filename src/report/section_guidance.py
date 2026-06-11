@@ -114,6 +114,16 @@ REGISTRY: dict[str, SectionGuidance] = {
         profile_visibility=("security_risk", "network_inventory"),
         min_detail_level="full",
     ),
+    "mod_drift": SectionGuidance(
+        module_id="mod_drift",
+        purpose_key="rpt_guidance_mod_drift_purpose",
+        watch_signals_key="rpt_guidance_mod_drift_signals",
+        how_to_read_key="rpt_guidance_mod_drift_how",
+        recommended_actions_key="rpt_guidance_mod_drift_actions",
+        primary_audience="security",
+        profile_visibility=("security_risk",),
+        min_detail_level="full",
+    ),
     "mod_ringfence": SectionGuidance(
         module_id="mod_ringfence",
         purpose_key="rpt_guidance_mod_ringfence_purpose",
