@@ -35,3 +35,57 @@ def test_identical_periods_produce_zero_drift():
     prev = {"Web|DB|3306|TCP", "Web|Cache|6379|TCP"}
     res = baseline_drift(_df(), prev_signatures=prev, prev_generated_at="x")
     assert res["new_count"] == 0 and res["disappeared_count"] == 0
+
+
+def test_drift_section_reaches_html_output(tmp_path, monkeypatch):
+    """mod_drift must be injected BEFORE exporters consume module_results.
+
+    Two consecutive export() runs: the second run's HTML must contain drift
+    data (new-pairs heading with a count), not the first-run note.
+    A third run additionally checks the trend section (trend_store needs two
+    archived snapshots before load_previous returns a baseline).
+    """
+    import datetime
+    from unittest.mock import MagicMock
+    from src.report.report_generator import ReportGenerator, ReportResult
+
+    # Keep the post-export dashboard refresh from touching repo-level state.
+    monkeypatch.setattr("src.scheduler.jobs.run_posture_summary", lambda cm: None)
+
+    cm = MagicMock()
+    cm.config = {"api": {"url": "https://pce.test", "org_id": "1", "key": "k",
+                         "secret": "s", "verify_ssl": False}}
+    gen = ReportGenerator(cm, api_client=MagicMock())
+
+    def _export(df, run_no, kpi_value):
+        result = ReportResult(
+            # Distinct second-resolution timestamps so snapshot/signature
+            # filenames never collide between back-to-back runs.
+            generated_at=datetime.datetime(2026, 1, 1, 0, 0, run_no),
+            record_count=len(df),
+            date_range=("2024-01-01", "2024-01-31"),
+            module_results={"mod12": {"kpis": [
+                {"label_key": "kpi_total_flows", "label": "Total Flows",
+                 "value": kpi_value}]}},
+            dataframe=df,
+        )
+        paths = gen.export(result, fmt="html", output_dir=str(tmp_path), lang="en")
+        html_path = next(p for p in paths if p.endswith(".html"))
+        with open(html_path, encoding="utf-8") as fh:
+            return fh.read()
+
+    df2 = pd.concat(
+        [_df(), pd.DataFrame([{"src_app": "Batch", "dst_app": "DB", "port": 5432,
+                               "proto": "TCP", "num_connections": 3}])],
+        ignore_index=True)
+
+    _export(_df(), run_no=0, kpi_value=10)          # run 1: builds baseline
+    html2 = _export(df2, run_no=1, kpi_value=11)    # run 2: +1 new pair
+
+    assert "No previous flow baseline" not in html2
+    assert "New App-to-App Pairs (not seen last period) (1)" in html2
+
+    # Run 3: trend deltas must reach the HTML too (same dead-on-arrival bug).
+    html3 = _export(df2, run_no=2, kpi_value=12)
+    assert "No previous snapshot" not in html3
+    assert "trend-chip" in html3

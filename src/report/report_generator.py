@@ -353,6 +353,31 @@ class ReportGenerator:
         # produced no file (previously swallowed by silent except → empty paths).
         self.last_export_errors: dict[str, str] = {}
 
+        # Trend analysis + baseline drift: compute and inject into
+        # result.module_results BEFORE any exporter consumes it — exporters
+        # below render whatever is in module_results at construction time.
+        # Loads read the PREVIOUS run's files; saves archive this run's data.
+        try:
+            from src.report.trend_store import save_snapshot, load_previous, compute_deltas, build_kpi_dict_from_metadata, canonicalize_legacy_keys
+            meta = self._build_report_metadata(result, file_format="snapshot")
+            kpi_dict = build_kpi_dict_from_metadata(meta.get("kpis", []))
+            ts = meta.get("generated_at", "")
+            prev = load_previous(output_dir, "traffic")
+            prev = canonicalize_legacy_keys(prev, candidate_keys=list(kpi_dict.keys()))
+            save_snapshot(output_dir, "traffic", kpi_dict, generated_at=ts)
+            if prev:
+                result.module_results["_trend_deltas"] = compute_deltas(kpi_dict, prev)
+            # Baseline drift: compare this run's flow signatures vs last run, then archive.
+            from src.report.flow_history import build_signatures, load_previous_signatures, save_signatures
+            from src.report.analysis.mod_drift import baseline_drift
+            if result.dataframe is not None and not result.dataframe.empty:
+                _prev_sigs, _prev_ts = load_previous_signatures(output_dir, "traffic")
+                result.module_results["mod_drift"] = baseline_drift(
+                    result.dataframe, prev_signatures=_prev_sigs, prev_generated_at=_prev_ts)
+                save_signatures(output_dir, "traffic", build_signatures(result.dataframe), generated_at=ts)
+        except Exception as e:
+            logger.warning(f"[ReportGenerator] Trend snapshot failed: {e}")
+
         if fmt in ('html', 'all', 'all_raw'):
             _exporter_cls = (NetworkInventoryHtmlExporter
                              if traffic_report_profile == "network_inventory"
@@ -448,28 +473,6 @@ class ReportGenerator:
                 json.dump(_build_snapshot(result.module_results), f, ensure_ascii=False)
         except Exception as e:
             logger.warning(f"[ReportGenerator] Failed to write KPI snapshot: {e}")
-
-        # Trend analysis: archive snapshot and compute deltas
-        try:
-            from src.report.trend_store import save_snapshot, load_previous, compute_deltas, build_kpi_dict_from_metadata, canonicalize_legacy_keys
-            meta = self._build_report_metadata(result, file_format="snapshot")
-            kpi_dict = build_kpi_dict_from_metadata(meta.get("kpis", []))
-            ts = meta.get("generated_at", "")
-            prev = load_previous(output_dir, "traffic")
-            prev = canonicalize_legacy_keys(prev, candidate_keys=list(kpi_dict.keys()))
-            save_snapshot(output_dir, "traffic", kpi_dict, generated_at=ts)
-            if prev:
-                result.module_results["_trend_deltas"] = compute_deltas(kpi_dict, prev)
-            # Baseline drift: compare this run's flow signatures vs last run, then archive.
-            from src.report.flow_history import build_signatures, load_previous_signatures, save_signatures
-            from src.report.analysis.mod_drift import baseline_drift
-            if result.dataframe is not None and not result.dataframe.empty:
-                _prev_sigs, _prev_ts = load_previous_signatures(output_dir, "traffic")
-                result.module_results["mod_drift"] = baseline_drift(
-                    result.dataframe, prev_signatures=_prev_sigs, prev_generated_at=_prev_ts)
-                save_signatures(output_dir, "traffic", build_signatures(result.dataframe), generated_at=ts)
-        except Exception as e:
-            logger.warning(f"[ReportGenerator] Trend snapshot failed: {e}")
 
         # Snapshot store for Change Impact (snapshot_store, separate from trend_store)
         try:
