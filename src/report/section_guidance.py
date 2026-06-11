@@ -198,13 +198,24 @@ REGISTRY: dict[str, SectionGuidance] = {
 
 
 def get_guidance(module_id: str) -> Optional[SectionGuidance]:
-    """Return guidance for a module, or None if not registered."""
-    return REGISTRY.get(module_id)
+    """Return guidance for a module, or None if not registered.
+
+    Accepts either the full registry key ("mod02_policy_decisions") or the
+    short id the exporters use ("mod02") — short ids match by prefix.
+    """
+    g = REGISTRY.get(module_id)
+    if g is not None:
+        return g
+    prefix = module_id + "_"
+    for key, value in REGISTRY.items():
+        if key.startswith(prefix):
+            return value
+    return None
 
 
 def visible_in(module_id: str, profile: ProfileVisibility, detail_level: DetailLevel = "full") -> bool:
     """Return True if the section should render in the given profile."""
-    g = REGISTRY.get(module_id)
+    g = get_guidance(module_id)
     if g is None:
         return True  # unregistered modules render by default
     return profile in g.profile_visibility
