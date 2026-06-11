@@ -2891,7 +2891,7 @@
   "rpt_guidance_mod_drift_actions": "逐一與應用負責人確認新配對；優先調查通往資料庫或身分服務的非預期新路徑；確認消失的配對屬計畫性下線。",
   "rpt_guidance_mod_drift_how": "新配對依連線量排序。「(unlabeled)」表示該端點當期沒有 App Label。",
   "rpt_guidance_mod_drift_purpose": "偵測兩次報表之間 App 對 App 連線基準的變化 — 入侵、影子變更與漂移的最早訊號。",
-  "rpt_guidance_mod_drift_signals": "觸及資料庫、身分基礎設施或高風險 Port 的新配對；政策變更後大量消失的配對。",
+  "rpt_guidance_mod_drift_signals": "觸及資料庫、身分基礎設施或高風險 Ports 的新配對；Policy 變更後大量消失的配對。",
   "rpt_guidance_mod_ringfence_actions": "建立候選 Allow 規則；為跨環境例外新增邊界拒絕；解決非 Managed 依賴關係。",
   "rpt_guidance_mod_ringfence_how": "每條候選規則為 src_label → dst_label → 通訊埠三元組，可直接審查。",
   "rpt_guidance_mod_ringfence_purpose": "對應每個應用程式的依賴關係，並提出 Label 式圍欄規則建議。",
