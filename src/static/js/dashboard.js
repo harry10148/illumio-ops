@@ -891,6 +891,7 @@ async function _doGenerateTraffic() {
         _hideGenProgress(true, msg);
         toast((_t('gui_toast_traffic_done')).replace('{msg}', msg));
         loadReports();
+        if (typeof loadRcardMeta === 'function') loadRcardMeta();
       } else {
         const fail = _t('gui_toast_traffic_fail');
         _hideGenProgress(false, r.error || fail);
@@ -931,6 +932,7 @@ async function _doGenerateTraffic() {
         _hideGenProgress(true, msg);
         toast((_t('gui_toast_traffic_done')).replace('{msg}', msg));
         loadReports();
+        if (typeof loadRcardMeta === 'function') loadRcardMeta();
       } else {
         const fail = _t('gui_toast_traffic_fail');
         _hideGenProgress(false, r.error || fail);
@@ -966,6 +968,7 @@ async function _doGenerateAudit() {
       _hideGenProgress(true, msg);
       toast((_t('gui_toast_audit_done')).replace('{msg}', msg));
       loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
     } else {
       const fail = _t('gui_toast_audit_fail');
       _hideGenProgress(false, r.error || fail);
@@ -992,6 +995,7 @@ async function _doGenerateVen() {
         : (_t('gui_toast_ven_done'));
       toast(doneMsg);
       loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
     } else {
       const fail = _t('gui_toast_ven_fail');
       _hideGenProgress(false, r.error || fail);
@@ -1015,6 +1019,7 @@ async function _doGeneratePolicyUsage() {
       _hideGenProgress(true, kpiText || (_t('gui_gen_done')));
       toast((_t('gui_toast_pu_done')).replace('{count}', r.record_count));
       loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
     } else {
       const fail = _t('gui_toast_pu_fail');
       _hideGenProgress(false, r.error || fail);
@@ -1053,6 +1058,7 @@ async function _doGeneratePolicyUsageClean() {
             .replace('{count}', r.record_count);
       toast(doneMsg);
       loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
     } else {
       const fail = _t('gui_toast_pu_fail');
       _hideGenProgress(false, r.error || fail);
