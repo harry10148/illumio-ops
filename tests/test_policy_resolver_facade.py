@@ -9,6 +9,7 @@ from src.report.policy_resolver_report import (
     build_iplist_to_cidrs,
     build_label_group_to_labels,
     build_service_to_ports,
+    build_service_to_names,
     PolicyResolverReport,
 )
 
@@ -96,3 +97,10 @@ def test_run_produces_module_results_per_ruleset():
     rows = results["rulesets"]["App-Tier"]
     assert {(r["src_ip"], r["dst_ip"], r["port"]) for r in rows} == {
         ("10.0.1.5", "10.0.2.7", 443)}
+
+
+def test_build_service_to_names_skips_nameless():
+    svcs = [{"href": "/services/2", "name": "HTTPS",
+             "service_ports": [{"port": 443, "proto": 6}]},
+            {"href": "/services/3"}]  # no name -> skipped
+    assert build_service_to_names(svcs) == {"/services/2": "HTTPS"}

@@ -105,8 +105,13 @@ def _side_ips(
     return out, kind
 
 
-def _services(rule: dict, service_to_ports: dict[str, list[dict]]) -> list[dict]:
-    """Resolve ingress_services to a list of {port, port_to?, protocol, name}."""
+def _services(rule: dict, service_to_ports: dict[str, list[dict]],
+              service_to_names: dict[str, str]) -> list[dict]:
+    """Resolve ingress_services to a list of {port, port_to?, protocol, name}.
+
+    For named services ({"href": ...}) the human-friendly service name is used
+    when available (via service_to_names), falling back to the raw href.
+    """
     out: list[dict] = []
     svcs = rule.get("ingress_services") or []
     if not svcs:
@@ -121,12 +126,13 @@ def _services(rule: dict, service_to_ports: dict[str, list[dict]]) -> list[dict]
             out.append(entry)
         elif "href" in s:
             href = s["href"]
+            svc_name = service_to_names.get(href, href)
             ports = service_to_ports.get(href, [])
             if not ports:
-                out.append({"port": _ANY, "protocol": _ANY, "name": href})
+                out.append({"port": _ANY, "protocol": _ANY, "name": svc_name})
             for p in ports:
                 entry = {"port": p.get("port", _ANY),
-                         "protocol": _proto_name(p.get("proto")), "name": href}
+                         "protocol": _proto_name(p.get("proto")), "name": svc_name}
                 if p.get("to_port"):
                     entry["port_to"] = p["to_port"]
                 out.append(entry)
@@ -141,8 +147,16 @@ def resolve_ruleset(
     label_group_to_labels: dict[str, list[str]],
     workload_to_ips: dict[str, list[str]],
     service_to_ports: dict[str, list[dict]] | None = None,
+    service_to_names: dict[str, str] | None = None,
 ) -> list[dict]:
-    """Expand a single ruleset's rules into flat src/dst/port/proto rows."""
+    """Expand a single ruleset's rules into flat src/dst/port/proto rows.
+
+    Disabled rulesets (and disabled rules) are skipped — the report describes
+    policy that is actually enforced, so non-enforced entries are excluded.
+    """
+    # A disabled ruleset is not enforced: nothing to resolve.
+    if not ruleset.get("enabled", True):
+        return []
     lookups = dict(
         label_to_ips=label_to_ips,
         iplist_to_cidrs=iplist_to_cidrs,
@@ -150,12 +164,15 @@ def resolve_ruleset(
         workload_to_ips=workload_to_ips,
     )
     service_to_ports = service_to_ports or {}
+    service_to_names = service_to_names or {}
     rs_name = ruleset.get("name", "")
     scope_hrefs = _scope_label_hrefs(ruleset.get("scopes") or [])
 
     rows: list[dict] = []
     seen: set[tuple] = set()
     for rule in ruleset.get("rules") or []:
+        if not rule.get("enabled", True):
+            continue
         rule_href = rule.get("href", "")
         srcs, src_kind = _side_ips(rule.get("consumers") or [], lookups)
         dsts, dst_kind = _side_ips(rule.get("providers") or [], lookups,
@@ -164,7 +181,7 @@ def resolve_ruleset(
         # scoped out, or empty after scope filtering).
         if not srcs or not dsts:
             continue
-        for svc in _services(rule, service_to_ports):
+        for svc in _services(rule, service_to_ports, service_to_names):
             for s_ip in srcs:
                 for d_ip in dsts:
                     key = (rule_href, s_ip, d_ip, svc["port"],

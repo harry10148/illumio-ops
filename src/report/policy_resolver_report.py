@@ -104,6 +104,16 @@ def build_service_to_ports(services: list[dict]) -> dict[str, list[dict]]:
     return out
 
 
+def build_service_to_names(services: list[dict]) -> dict[str, str]:
+    """Map service href -> human-friendly name (e.g. 'HTTPS') for labelling."""
+    out: dict[str, str] = {}
+    for s in services:
+        href, name = s.get("href"), s.get("name")
+        if href and name:
+            out[href] = name
+    return out
+
+
 class PolicyResolverReport:
     def __init__(self, cm, api_client=None, config_dir: str = "config",
                  cache_reader=None):
@@ -129,6 +139,7 @@ class PolicyResolverReport:
             label_group_to_labels=build_label_group_to_labels(groups),
             workload_to_ips=build_workload_to_ips(workloads),
             service_to_ports=build_service_to_ports(services),
+            service_to_names=build_service_to_names(services),
         )
 
         per_ruleset: dict[str, list[dict]] = {}

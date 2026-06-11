@@ -164,3 +164,45 @@ def test_scope_narrows_providers():
     )
     rows = resolve_ruleset(rs, **_lookups())
     assert rows == []
+
+
+def test_disabled_ruleset_yields_no_rows():
+    rs = _ruleset([{
+        "href": "/sec_rules/d1",
+        "consumers": [{"label": {"href": "/labels/web"}}],
+        "providers": [{"label": {"href": "/labels/db"}}],
+        "ingress_services": [{"port": 443, "proto": 6}],
+    }])
+    rs["enabled"] = False
+    assert resolve_ruleset(rs, **_lookups()) == []
+
+
+def test_disabled_rule_is_skipped():
+    rs = _ruleset([
+        {"href": "/sec_rules/on", "enabled": True,
+         "consumers": [{"label": {"href": "/labels/web"}}],
+         "providers": [{"label": {"href": "/labels/db"}}],
+         "ingress_services": [{"port": 443, "proto": 6}]},
+        {"href": "/sec_rules/off", "enabled": False,
+         "consumers": [{"label": {"href": "/labels/web"}}],
+         "providers": [{"label": {"href": "/labels/db"}}],
+         "ingress_services": [{"port": 22, "proto": 6}]},
+    ])
+    rows = resolve_ruleset(rs, **_lookups())
+    assert {r["port"] for r in rows} == {443}
+
+
+def test_service_name_uses_friendly_name():
+    rs = _ruleset([{
+        "href": "/sec_rules/6",
+        "consumers": [{"workload": {"href": "/wl/jump"}}],
+        "providers": [{"label": {"href": "/labels/db"}}],
+        "ingress_services": [{"href": "/services/https"}],
+    }])
+    rows = resolve_ruleset(
+        rs, **_lookups(),
+        service_to_ports={"/services/https": [{"port": 443, "proto": 6}]},
+        service_to_names={"/services/https": "HTTPS"},
+    )
+    assert rows[0]["service_name"] == "HTTPS"
+    assert rows[0]["port"] == 443
