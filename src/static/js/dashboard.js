@@ -626,9 +626,11 @@ let _genReportType = null;
 function syncReportLangToUi() {
   const el = document.getElementById('m-gen-lang');
   if (!el) return;
-  // window._uiLang is set in dashboard.js from /api/status; fallback to 'en'.
-  const uiLang = window._uiLang === 'zh_TW' ? 'zh_TW' : 'en';
-  el.value = uiLang;
+  // window._uiLang is set from /api/status; before it resolves, fall back to
+  // the server-rendered <html lang> so the default matches the visible UI.
+  const docLang = (document.documentElement.lang || '').replace('-', '_');
+  const lang = window._uiLang || docLang;
+  el.value = lang === 'zh_TW' ? 'zh_TW' : 'en';
 }
 
 function openReportGenModal(type) {
