@@ -152,13 +152,13 @@ def _progress_bar(pct: float) -> str:
         f'</div>'
     )
 
-def _format_evidence(evidence: dict) -> str:
+def _format_evidence(evidence: dict, lang: str | None = None) -> str:
     """Convert evidence dict to readable pills, parsing Python literal strings where possible."""
     if not evidence:
         return ''
     import ast
     pills = []
-    _sl = get_language()
+    _sl = lang or get_language()
     for k, v in evidence.items():
         full_key = f"rpt_col_{k}"
         entry = STRINGS.get(full_key, {})
@@ -1163,7 +1163,7 @@ class _TrafficReportBase:
             )
             for f in cat_findings:
                 _rule_title, rule_how = _RULE_DESCRIPTIONS.get(f.rule_id, (f.rule_name, ''))
-                evidence_html = _format_evidence(f.evidence)
+                evidence_html = _format_evidence(f.evidence, lang=self._lang)
                 rule_name_key = f'rpt_rule_{f.rule_id}_name'
                 rule_name = _s(rule_name_key) if rule_name_key in _S else f.rule_name
                 cards_html += (
