@@ -121,6 +121,41 @@ def compute_deltas(
 def build_kpi_dict_from_metadata(kpis: list[dict]) -> dict[str, Any]:
     """Convert the KPI list from metadata.json format to a flat dict.
 
-    Metadata KPIs look like: [{"label": "Total Flows", "value": "20,282"}, ...]
+    Keys prefer the stable i18n key (``label_key`` / ``i18n_key``) so that
+    snapshots written under different report languages stay comparable.
+    Falls back to the localized ``label`` for KPIs that carry no key.
     """
-    return {kpi["label"]: kpi["value"] for kpi in kpis if "label" in kpi and "value" in kpi}
+    out: dict[str, Any] = {}
+    for kpi in kpis:
+        if "value" not in kpi:
+            continue
+        key = kpi.get("label_key") or kpi.get("i18n_key") or kpi.get("label")
+        if key:
+            out[key] = kpi["value"]
+    return out
+
+
+def canonicalize_legacy_keys(
+    snapshot: dict[str, Any] | None,
+    candidate_keys: list[str],
+) -> dict[str, Any] | None:
+    """Migrate a legacy snapshot whose keys are localized labels.
+
+    Pre-fix snapshots used t(label_key, lang) display text as dict keys.
+    For each canonical candidate key, look up its en / zh_TW rendering and,
+    if the legacy snapshot used that text, rename it to the canonical key.
+    Canonical keys already present pass through untouched.
+    """
+    if not snapshot:
+        return snapshot
+    from src.i18n import t
+
+    label_to_key: dict[str, str] = {}
+    for key in candidate_keys:
+        if key.startswith("_"):
+            continue
+        for lang in ("en", "zh_TW"):
+            label = t(key, lang=lang, default="")
+            if label and label != key:
+                label_to_key[label] = key
+    return {label_to_key.get(k, k): v for k, v in snapshot.items()}

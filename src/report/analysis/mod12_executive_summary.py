@@ -190,7 +190,7 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
             count = enforcement_dist.get(mode, 0)
             if count > 0:
                 mode_label = t(f"mod12_kpi_enforce_mode_{mode}", default=mode.replace("_", " ").title(), lang=lang)
-                kpis.append({"label": t("mod12_kpi_enforcement_prefix", default="Enforcement:", lang=lang) + f" {mode_label}", "value": _fmt(count)})
+                kpis.append({"label_key": f"mod12_kpi_enforce_mode_{mode}", "label": t("mod12_kpi_enforcement_prefix", default="Enforcement:", lang=lang) + f" {mode_label}", "value": _fmt(count)})
 
     findings_summary: dict[str, int] = {}
     for f in findings:

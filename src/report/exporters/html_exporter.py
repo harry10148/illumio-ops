@@ -227,10 +227,12 @@ def _trend_deltas_section(deltas: list | None, lang: str = "en") -> str:
             '</div>'
         )
 
+    from src.i18n import t as _t
     rows = []
     for d in deltas:
+        _metric_key = d.get('metric', '')
         rows.append({
-            'Metric': d.get('metric', ''),
+            'Metric': _t(_metric_key, lang=lang, default=_metric_key),
             'Previous': d.get('previous', 0),
             'Current': d.get('current', 0),
             'Delta': d,  # carry the raw entry through; renderer formats as chip
