@@ -41,3 +41,16 @@ def test_no_changes_still_produces_report(tmp_path):
                          "total_changes": 0}}
     path = PolicyDiffHtmlExporter(empty, lang="en").export(str(tmp_path))
     assert os.path.isfile(path)
+
+
+def test_table_headers_are_localized(tmp_path):
+    """Diff-table <th> headers use i18n labels, not raw DataFrame column names."""
+    html = open(PolicyDiffHtmlExporter(_diff(), lang="en").export(str(tmp_path)),
+                encoding="utf-8").read()
+    for label in ("Change", "Field", "DRAFT value", "ACTIVE value",
+                  "Operator", "Ruleset"):
+        assert f"<th>{label}</th>" in html, label
+    for raw in ("change_type", "draft_value", "active_value", "last_actor",
+                "last_changed", "ruleset_name"):
+        assert f"<th>{raw}</th>" not in html, raw
+    assert "[MISSING" not in html

@@ -44,13 +44,30 @@ class PolicyDiffHtmlExporter:
         self._r = results
         self._lang = lang
 
+    # DataFrame column name -> i18n key for the localized <th> header.
+    _COL_I18N = {
+        "change_type": "rpt_policy_diff_col_change_type",
+        "ruleset_name": "rpt_policy_diff_col_ruleset",
+        "ruleset_id": "rpt_policy_diff_col_ruleset_id",
+        "rule_id": "rpt_policy_diff_col_rule_id",
+        "field": "rpt_policy_diff_col_field",
+        "draft_value": "rpt_policy_diff_col_draft",
+        "active_value": "rpt_policy_diff_col_active",
+        "last_actor": "rpt_policy_diff_col_actor",
+        "last_changed": "rpt_policy_diff_col_changed",
+    }
+
+    def _header(self, col: str) -> str:
+        key = self._COL_I18N.get(col)
+        return _esc(t(key, lang=self._lang)) if key else _esc(col)
+
     def _table(self, df: pd.DataFrame, id_col: str) -> str:
         if df is None or df.empty:
             return f'<p>{_esc(t("rpt_policy_diff_no_changes", lang=self._lang))}</p>'
         cols = ["change_type", "ruleset_name", id_col, "field",
                 "draft_value", "active_value", "last_actor", "last_changed"]
         cols = [c for c in cols if c in df.columns]
-        head = "".join(f"<th>{_esc(c)}</th>" for c in cols)
+        head = "".join(f"<th>{self._header(c)}</th>" for c in cols)
         body = []
         for _, row in df.iterrows():
             cls = _ROW_CLASS.get(str(row.get("change_type", "")), "")
