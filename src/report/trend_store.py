@@ -158,4 +158,7 @@ def canonicalize_legacy_keys(
             label = t(key, lang=lang, default="")
             if label and label != key:
                 label_to_key[label] = key
+                if key.startswith("mod12_kpi_enforce_mode_"):
+                    prefix = t("mod12_kpi_enforcement_prefix", lang=lang, default="Enforcement:")
+                    label_to_key[f"{prefix} {label}"] = key
     return {label_to_key.get(k, k): v for k, v in snapshot.items()}

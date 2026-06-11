@@ -36,6 +36,12 @@ def test_canonicalize_legacy_keys_maps_zh_and_en_labels():
     assert canon["_generated_at"] == "x"
 
 
+def test_canonicalize_legacy_enforcement_mode_composed_label():
+    legacy = {"Enforcement: Full": 7}
+    canon = canonicalize_legacy_keys(legacy, candidate_keys=["mod12_kpi_enforce_mode_full"])
+    assert canon == {"mod12_kpi_enforce_mode_full": 7}
+
+
 def test_cross_language_snapshots_now_produce_deltas(tmp_path):
     out = str(tmp_path)
     # 模擬：前一份報表以 zh_TW 產生（舊格式：本地化 key）
