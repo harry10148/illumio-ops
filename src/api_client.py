@@ -757,10 +757,15 @@ class ApiClient:
         return []
 
     def get_ip_lists(self) -> list[dict[str, Any]]:
-        """Get all IP Lists with their ip_ranges/fqdns (draft definitions)."""
+        """Get all IP Lists with their ip_ranges/fqdns (active definitions).
+
+        Fetched from ACTIVE (not draft) so the returned hrefs
+        (/sec_policy/active/ip_lists/...) match the actor references inside
+        active rulesets; draft hrefs would never match the active rule graph.
+        """
         org = self.api_cfg['org_id']
         status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/draft/ip_lists?max_results=10000"
+            f"/orgs/{org}/sec_policy/active/ip_lists?max_results=10000"
         )
         if status == 200 and data:
             return data
@@ -768,10 +773,13 @@ class ApiClient:
         return []
 
     def get_label_groups(self) -> list[dict[str, Any]]:
-        """Get all Label Groups with their member labels + sub_groups (draft)."""
+        """Get all Label Groups with their member labels + sub_groups (active).
+
+        ACTIVE so hrefs align with active-ruleset actor references.
+        """
         org = self.api_cfg['org_id']
         status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/draft/label_groups?max_results=10000"
+            f"/orgs/{org}/sec_policy/active/label_groups?max_results=10000"
         )
         if status == 200 and data:
             return data
@@ -779,10 +787,13 @@ class ApiClient:
         return []
 
     def get_services(self) -> list[dict[str, Any]]:
-        """Get all Service definitions with their service_ports (draft)."""
+        """Get all Service definitions with their service_ports (active).
+
+        ACTIVE so hrefs align with active-ruleset ingress_services references.
+        """
         org = self.api_cfg['org_id']
         status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/draft/services?max_results=10000"
+            f"/orgs/{org}/sec_policy/active/services?max_results=10000"
         )
         if status == 200 and data:
             return data
