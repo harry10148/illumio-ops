@@ -30,7 +30,7 @@ from .report_i18n import (
 from .report_css import build_css, TABLE_JS
 from src.report.exporters._exec_summary import render_exec_summary_html
 from .table_renderer import render_df_table
-from .chart_renderer import render_plotly_html, FirstChartTracker
+from .chart_renderer import render_matplotlib_svg
 from .code_highlighter import get_highlight_css
 from src.humanize_ext import human_number
 from src.report.section_guidance import get_guidance, visible_in
@@ -85,17 +85,17 @@ def render_appendix(title: str, body_html: str, *, detail_level: str, lang: str 
     )
 
 
-def _render_chart_for_html(chart_spec: dict | None, include_js: bool = True) -> str:
-    """Emit plotly interactive div. Matplotlib PNG is Excel-only; never shown in HTML."""
-    if not chart_spec:
-        return ''
+def _render_chart_for_html(spec: dict | None, lang: str = "en", include_js: bool = False) -> str:
+    """Render a chart spec as inline static SVG. ``include_js`` is accepted
+    for backward compatibility and ignored (plotly.js is no longer embedded)."""
+    if not spec:
+        return ""
     try:
-        plotly_div = render_plotly_html(chart_spec, include_js=include_js)
-        if plotly_div:
-            return f'<div class="chart-container">{plotly_div}</div>'
-    except Exception as exc:
-        logger.warning('plotly render failed: {}', exc)
-    return ''
+        svg = render_matplotlib_svg(spec, lang=lang)
+    except Exception as exc:  # noqa: BLE001 — a bad chart must not kill the report
+        logger.warning("[HtmlExporter] chart render failed (skipped): {}", exc)
+        return ""
+    return f'<figure class="chart-static">{svg}</figure>'
 
 def _fmt_bytes(b) -> str:
     """Convert raw byte count to human-readable string (B / KB / MB / GB / TB)."""
@@ -440,7 +440,6 @@ class _TrafficReportBase:
     def _build(self, profile: str = "", detail_level: str = "") -> str:
         profile = profile or self._profile
         detail_level = _REPORT_DETAIL_LEVEL
-        self._chart_tracker = FirstChartTracker()
         _sl = self._lang
         _s = lambda k: STRINGS[k].get(_sl) or STRINGS[k]["en"]
         self._s = _s
@@ -842,7 +841,7 @@ class _TrafficReportBase:
         m = self._r.get('mod02', {})
         intro_text = t('rpt_tr_sec_policy_intro', lang=_lang,
                        default='Break down the ratios and details of Allowed, Blocked, and Potentially Blocked to gauge how Policy is actually landing.')
-        chart_html = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+        chart_html = _render_chart_for_html(m.get('chart_spec'), lang=self._lang)
         table_html = self._subnote('rpt_tr_mod02_intro') + _df_to_html(m.get('summary'), lang=_lang)
         pc = m.get('port_coverage')
         if pc is not None and hasattr(pc, 'empty') and not pc.empty:
@@ -1007,7 +1006,7 @@ class _TrafficReportBase:
         _s = self._s
         _lang = self._lang
         m = self._r.get('mod07', {})
-        out = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+        out = _render_chart_for_html(m.get('chart_spec'), lang=self._lang)
         for key, data in m.get('matrices', {}).items():
             out += f'<h3>{_s("rpt_tr_label_key")} {key.upper()}</h3>'
             if 'note' in data:
@@ -1064,7 +1063,7 @@ class _TrafficReportBase:
         m = self._r.get('mod10', {})
         if m.get('note'):
             return f'<p class="note">{m["note"]}</p>'
-        chart_html = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+        chart_html = _render_chart_for_html(m.get('chart_spec'), lang=self._lang)
         return (
             '<div class="section-body">'
             + self._subnote('rpt_tr_allowed_flows_subnote')
@@ -1396,7 +1395,7 @@ class _TrafficReportBase:
         html = (
             self._subnote('rpt_tr_lateral_intro', 'Covers all lateral-movement analysis including IP-level host connection patterns and App(Env)-level graph risk scoring.')
             + f'<p>{_s("rpt_tr_lateral_flows")} <b>{total:,}</b> ({pct}% {_s("rpt_tr_lateral_pct")})</p>'
-            + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+            + _render_chart_for_html(m.get('chart_spec'), lang=self._lang)
         )
         service_summary = m.get('service_summary')
         if service_summary is not None and not service_summary.empty:

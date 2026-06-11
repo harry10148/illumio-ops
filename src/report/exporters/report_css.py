@@ -257,6 +257,7 @@ BASE_CSS = """\
   }
   .chart-container > div { width: 100% !important; }
   .chart-img { width: 100%; height: auto; display: block; }
+  .chart-static svg{max-width:100%;height:auto;}
 
   /* R5 Bug 6: landscape A4 for print so 17+ column wide tables fit
      without the print engine clipping rightmost columns. */
