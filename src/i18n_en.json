@@ -2362,7 +2362,7 @@
   "report_select_prompt": "Please select report type",
   "report_start_date": "Start date [{date}]",
   "report_type": "Report Type",
-  "rpt_actmtx_data_volume_msg": "Total data volume: {mb:.0f} MB across the analysis period.",
+  "rpt_actmtx_data_volume_msg": "Total data volume: {vol} across the analysis period.",
   "rpt_actmtx_data_volume_reco": "Review high-volume flows for data exfiltration patterns.",
   "rpt_actmtx_lateral_msg": "{n} remote access / lateral movement flows found.",
   "rpt_actmtx_lateral_reco": "Apply micro-segmentation controls for RDP/SSH/SMB lateral paths.",
