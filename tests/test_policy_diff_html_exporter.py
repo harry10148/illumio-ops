@@ -54,3 +54,23 @@ def test_table_headers_are_localized(tmp_path):
                 "last_changed", "ruleset_name"):
         assert f"<th>{raw}</th>" not in html, raw
     assert "[MISSING" not in html
+
+
+def test_blank_attribution_renders_em_dash_with_tooltip(tmp_path):
+    """Empty last_actor / last_changed cells render — with explanatory tooltip."""
+    rs = pd.DataFrame([{
+        "change_type": "added", "ruleset_name": "RS-B", "ruleset_id": "2",
+        "field": "name", "draft_value": "RS-B", "active_value": "",
+        "last_actor": "", "last_changed": "",
+        "last_event": "",
+    }])
+    diff = {"ruleset_changes": rs, "rule_changes": pd.DataFrame(),
+            "summary": {"rulesets_added": 1, "rulesets_removed": 0, "rulesets_modified": 0,
+                        "rules_added": 0, "rules_removed": 0, "rules_modified": 0,
+                        "total_changes": 1}}
+    html = open(PolicyDiffHtmlExporter(diff, lang="en").export(str(tmp_path)),
+                encoding="utf-8").read()
+    assert "—" in html
+    assert 'title="' in html
+    # tooltip should contain the attribution note text
+    assert "Attribution" in html or "attribution" in html.lower()

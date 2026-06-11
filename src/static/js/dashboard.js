@@ -238,7 +238,9 @@ async function loadRcardMeta() {
   // Build per-type maps: latest mtime, schedule entry
   const latestByType = {};
   reports.forEach(rp => {
-    const t = rp.report_type || '';
+    let t = rp.report_type || '';
+    // Policy Diff reports carry no metadata sidecar — derive type from filename prefix.
+    if (!t && rp.filename && rp.filename.startsWith('Illumio_Policy_Diff_Report_')) t = 'policy_diff';
     if (!t) return;
     if (!latestByType[t] || rp.mtime > latestByType[t]) latestByType[t] = rp.mtime;
   });
@@ -626,9 +628,11 @@ let _genReportType = null;
 function syncReportLangToUi() {
   const el = document.getElementById('m-gen-lang');
   if (!el) return;
-  // window._uiLang is set in dashboard.js from /api/status; fallback to 'en'.
-  const uiLang = window._uiLang === 'zh_TW' ? 'zh_TW' : 'en';
-  el.value = uiLang;
+  // window._uiLang is set from /api/status; before it resolves, fall back to
+  // the server-rendered <html lang> so the default matches the visible UI.
+  const docLang = (document.documentElement.lang || '').replace('-', '_');
+  const lang = window._uiLang || docLang;
+  el.value = lang === 'zh_TW' ? 'zh_TW' : 'en';
 }
 
 function openReportGenModal(type) {
@@ -638,6 +642,7 @@ function openReportGenModal(type) {
     audit:        { titleKey: 'gui_gen_audit_title',   icon: '#icon-shield', dates: true  },
     ven:          { titleKey: 'gui_gen_ven_title',     icon: '#icon-cpu',    dates: false },
     policy_usage: { titleKey: 'gui_gen_pu_title',      icon: '#icon-shield', dates: true  },
+    policy_diff:  { titleKey: 'gui_gen_policy_diff_title', icon: '#icon-shield', dates: false },
   };
   const m = meta[type] || meta.traffic;
   $('m-gen-title').innerHTML =
@@ -698,6 +703,7 @@ async function confirmReportGen() {
     audit:        _t('gui_gen_audit_title'),
     ven:          _t('gui_gen_ven_title'),
     policy_usage: _t('gui_gen_pu_title'),
+    policy_diff:  _t('gui_gen_policy_diff_title'),
   };
   _showGenProgress(typeLabels[_genReportType] || _t('gui_gen_fallback_title'));
   closeModal('m-gen-report');
@@ -705,6 +711,7 @@ async function confirmReportGen() {
   else if (_genReportType === 'audit')        await _doGenerateAudit();
   else if (_genReportType === 'ven')          await _doGenerateVen();
   else if (_genReportType === 'policy_usage') await _doGeneratePolicyUsageClean();
+  else if (_genReportType === 'policy_diff')  await _doGeneratePolicyDiff();
 }
 
 function _collectReportFilters() {
@@ -891,6 +898,7 @@ async function _doGenerateTraffic() {
         _hideGenProgress(true, msg);
         toast((_t('gui_toast_traffic_done')).replace('{msg}', msg));
         loadReports();
+        if (typeof loadRcardMeta === 'function') loadRcardMeta();
       } else {
         const fail = _t('gui_toast_traffic_fail');
         _hideGenProgress(false, r.error || fail);
@@ -931,6 +939,7 @@ async function _doGenerateTraffic() {
         _hideGenProgress(true, msg);
         toast((_t('gui_toast_traffic_done')).replace('{msg}', msg));
         loadReports();
+        if (typeof loadRcardMeta === 'function') loadRcardMeta();
       } else {
         const fail = _t('gui_toast_traffic_fail');
         _hideGenProgress(false, r.error || fail);
@@ -966,6 +975,7 @@ async function _doGenerateAudit() {
       _hideGenProgress(true, msg);
       toast((_t('gui_toast_audit_done')).replace('{msg}', msg));
       loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
     } else {
       const fail = _t('gui_toast_audit_fail');
       _hideGenProgress(false, r.error || fail);
@@ -992,6 +1002,7 @@ async function _doGenerateVen() {
         : (_t('gui_toast_ven_done'));
       toast(doneMsg);
       loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
     } else {
       const fail = _t('gui_toast_ven_fail');
       _hideGenProgress(false, r.error || fail);
@@ -1000,6 +1011,29 @@ async function _doGenerateVen() {
   } catch(e) {
     _hideGenProgress(false, e.message);
     toast((_t('gui_toast_ven_error')).replace('{error}', e.message), 'err');
+  }
+}
+
+async function _doGeneratePolicyDiff() {
+  const fmtEl = document.getElementById('m-gen-format');
+  const fmt = (fmtEl && fmtEl.value === 'csv') ? 'csv' : 'html';
+  const langElPd = document.getElementById('m-gen-lang');
+  _updateGenStep(_t('gui_gen_step_fetching'));
+  try {
+    const r = await post('/api/policy_diff_report/generate', { format: fmt, lang: langElPd ? langElPd.value : 'en' });
+    if (r.ok) {
+      _hideGenProgress(true, _t('gui_gen_done'));
+      toast(_t('gui_toast_policy_diff_done'));
+      loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
+    } else {
+      const fail = _t('gui_toast_policy_diff_fail');
+      _hideGenProgress(false, r.error || fail);
+      toast(r.error || fail, 'err');
+    }
+  } catch(e) {
+    _hideGenProgress(false, e.message);
+    toast(e.message || _t('gui_toast_policy_diff_fail'), 'err');
   }
 }
 
@@ -1015,6 +1049,7 @@ async function _doGeneratePolicyUsage() {
       _hideGenProgress(true, kpiText || (_t('gui_gen_done')));
       toast((_t('gui_toast_pu_done')).replace('{count}', r.record_count));
       loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
     } else {
       const fail = _t('gui_toast_pu_fail');
       _hideGenProgress(false, r.error || fail);
@@ -1053,6 +1088,7 @@ async function _doGeneratePolicyUsageClean() {
             .replace('{count}', r.record_count);
       toast(doneMsg);
       loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
     } else {
       const fail = _t('gui_toast_pu_fail');
       _hideGenProgress(false, r.error || fail);

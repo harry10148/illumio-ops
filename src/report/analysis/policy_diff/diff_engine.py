@@ -24,8 +24,17 @@ def _id_from_href(href: str) -> str:
     return str(href or "").rstrip("/").split("/")[-1]
 
 
-def _summarize_actors(items: list) -> str:
-    """Order-stable string summary of a providers/consumers/services list."""
+def _summarize_actors(items: list, names: dict[str, str] | None = None) -> str:
+    """Order-stable string summary of a providers/consumers/services list.
+
+    ``names`` maps an object href to its display name; unknown hrefs fall
+    back to the raw href so the diff stays unambiguous.
+    """
+    names = names or {}
+
+    def _nm(href: str) -> str:
+        return names.get(href, href)
+
     if not items:
         return "(any)"
     tokens = []
@@ -36,15 +45,17 @@ def _summarize_actors(items: list) -> str:
         if it.get("actors"):
             tokens.append(f"actors:{it['actors']}")
         elif isinstance(it.get("label"), dict) and it["label"].get("href"):
-            tokens.append(f"label:{it['label']['href']}")
+            tokens.append(f"label:{_nm(it['label']['href'])}")
+        elif isinstance(it.get("label_group"), dict) and it["label_group"].get("href"):
+            tokens.append(f"label_group:{_nm(it['label_group']['href'])}")
         elif isinstance(it.get("ip_list"), dict) and it["ip_list"].get("href"):
-            tokens.append(f"ip_list:{it['ip_list']['href']}")
+            tokens.append(f"ip_list:{_nm(it['ip_list']['href'])}")
         elif isinstance(it.get("workload"), dict) and it["workload"].get("href"):
-            tokens.append(f"workload:{it['workload']['href']}")
+            tokens.append(f"workload:{_nm(it['workload']['href'])}")
         elif it.get("proto") is not None or it.get("port") is not None:
             tokens.append(f"svc:{it.get('proto')}/{it.get('port')}")
         elif isinstance(it.get("href"), str):
-            tokens.append(f"svc:{it['href']}")
+            tokens.append(f"svc:{_nm(it['href'])}")
         else:
             tokens.append(str(sorted(it.items())))
     return ", ".join(sorted(tokens))
@@ -59,12 +70,12 @@ def _ruleset_fields(rs: dict) -> dict:
     }
 
 
-def _rule_fields(rule: dict) -> dict:
+def _rule_fields(rule: dict, names: dict[str, str] | None = None) -> dict:
     return {
         "enabled": str(rule.get("enabled", True)),
-        "providers": _summarize_actors(rule.get("providers", []) or []),
-        "consumers": _summarize_actors(rule.get("consumers", []) or []),
-        "ingress_services": _summarize_actors(rule.get("ingress_services", []) or []),
+        "providers": _summarize_actors(rule.get("providers", []) or [], names=names),
+        "consumers": _summarize_actors(rule.get("consumers", []) or [], names=names),
+        "ingress_services": _summarize_actors(rule.get("ingress_services", []) or [], names=names),
     }
 
 
@@ -80,7 +91,8 @@ def _index_rules(rs: dict) -> dict:
     return out
 
 
-def diff_rulesets(draft: list[dict], active: list[dict]) -> dict:
+def diff_rulesets(draft: list[dict], active: list[dict],
+                  names: dict[str, str] | None = None) -> dict:
     draft_idx = _index_by_id(draft)
     active_idx = _index_by_id(active)
 
@@ -136,7 +148,8 @@ def diff_rulesets(draft: list[dict], active: list[dict]) -> dict:
                               "rule_id": rid, "field": "*",
                               "draft_value": "", "active_value": "rule", **_blank()})
         for rid in d_rules.keys() & a_rules.keys():
-            df_r, af_r = _rule_fields(d_rules[rid]), _rule_fields(a_rules[rid])
+            df_r, af_r = (_rule_fields(d_rules[rid], names=names),
+                          _rule_fields(a_rules[rid], names=names))
             rule_modified = False
             for field in df_r:
                 if df_r[field] != af_r[field]:

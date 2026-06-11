@@ -87,3 +87,6 @@ config/rule_schedules.json
 
 # UX review raw screenshots (large binaries, may contain internal hostnames/IPs)
 docs/ux-review-*/screenshots/
+
+# Limiter runtime snapshot state (auto-created by GUI rate limiter)
+config/limiter/

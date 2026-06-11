@@ -328,6 +328,7 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
                         for k, v in self.storage.items()
                         if self.expirations.get(k, 0) > now
                     }
+                    self._snapshot_path.parent.mkdir(parents=True, exist_ok=True)
                     tmp = self._snapshot_path.with_suffix(".tmp")
                     with tmp.open("w") as fh:
                         _json.dump(data, fh)

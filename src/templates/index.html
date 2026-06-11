@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#0F172A">
   <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Illumio PCE Ops</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23FF5500' d='M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6z'/%3E%3C/svg%3E">
   <link rel="preload" href="/static/css/app.css" as="style">
   <link rel="stylesheet" href="/static/css/app.css">
   <link rel="stylesheet" href="/static/pygments.css">
@@ -1394,6 +1395,19 @@
             <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-pu" data-action="openReportGenModal" data-args='["policy_usage"]'>
+                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="rcard" data-rtype="policy_diff">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_rcard_policy_diff_title">Policy Diff Report</h3>
+            <p data-i18n="gui_rcard_policy_diff_desc">DRAFT vs ACTIVE ruleset drift, with operator attribution and risk grading</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-pd" data-action="openReportGenModal" data-args='["policy_diff"]'>
                 <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
               </button>
             </div>
@@ -3023,8 +3037,8 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script defer src="/static/js/utils.js"></script>
-  <script defer src="{{ url_for('static', filename='js/integrations.js') }}"></script>
   <script defer src="/static/js/tabs.js"></script>
+  <script defer src="{{ url_for('static', filename='js/integrations.js') }}"></script>
   <script defer src="/static/js/dashboard.js"></script>
   <script defer src="/static/js/events.js"></script>
   <script defer src="/static/js/rules.js"></script>

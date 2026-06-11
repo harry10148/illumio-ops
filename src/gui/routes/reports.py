@@ -321,6 +321,53 @@ def make_reports_blueprint(
                 pass  # intentional fallback: ModuleLog write is best-effort
             return _err_with_log("report_audit_generate", e, lang=lang)
 
+    # ── API: Policy Diff Report ──────────────────────────────────────────────
+    @bp.route('/api/policy_diff_report/generate', methods=['POST'])
+    @limiter.limit("10 per hour")
+    def api_generate_policy_diff_report():
+        d = request.json or {}
+        _pdlog = None
+        lang = d.get('lang', 'en')
+        if lang not in ('en', 'zh_TW'):
+            lang = 'en'
+        try:
+            from src.report.policy_diff_report import PolicyDiffReport
+            from src.api_client import ApiClient
+            try:
+                from src.module_log import ModuleLog as _ML
+                _pdlog = _ML.get("reports")
+                _pdlog.separator(f"Policy Diff Report {datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')} UTC")
+                _pdlog.info(f"format={d.get('format')} lang={lang}")
+            except Exception:
+                pass  # intentional fallback: ModuleLog is optional; policy diff report must not fail if logging setup fails
+
+            cm.load()
+            config_dir = _resolve_config_dir()
+            api = ApiClient(cm)
+            from src.main import _make_cache_reader
+            rep = PolicyDiffReport(cm, api_client=api, config_dir=config_dir,
+                                   cache_reader=_make_cache_reader(cm))
+
+            fmt = d.get('format', 'html')
+            fmt = fmt if fmt in ('html', 'csv') else 'html'
+            output_dir = _resolve_reports_dir(cm)
+            path = rep.run(output_dir=output_dir, lang=lang, fmt=fmt)
+            paths = path if isinstance(path, list) else [path]
+            filenames = [os.path.basename(p) for p in paths]
+            try:
+                if _pdlog:
+                    _pdlog.info(f"Saved: {filenames}")
+            except Exception:
+                pass  # intentional fallback: ModuleLog write is best-effort
+            return jsonify({"ok": True, "files": filenames})
+        except Exception as e:
+            try:
+                if _pdlog:
+                    _pdlog.error(f"Policy diff report generation failed: {e}")
+            except Exception:
+                pass  # intentional fallback: ModuleLog write is best-effort
+            return _err_with_log("report_policy_diff_generate", e, lang=lang)
+
     # ── API: VEN Status Report ────────────────────────────────────────────────
     @bp.route('/api/ven_status_report/generate', methods=['POST'])
     @limiter.limit("10 per hour")

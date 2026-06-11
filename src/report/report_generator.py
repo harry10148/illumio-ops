@@ -451,11 +451,12 @@ class ReportGenerator:
 
         # Trend analysis: archive snapshot and compute deltas
         try:
-            from src.report.trend_store import save_snapshot, load_previous, compute_deltas, build_kpi_dict_from_metadata
+            from src.report.trend_store import save_snapshot, load_previous, compute_deltas, build_kpi_dict_from_metadata, canonicalize_legacy_keys
             meta = self._build_report_metadata(result, file_format="snapshot")
             kpi_dict = build_kpi_dict_from_metadata(meta.get("kpis", []))
             ts = meta.get("generated_at", "")
             prev = load_previous(output_dir, "traffic")
+            prev = canonicalize_legacy_keys(prev, candidate_keys=list(kpi_dict.keys()))
             save_snapshot(output_dir, "traffic", kpi_dict, generated_at=ts)
             if prev:
                 result.module_results["_trend_deltas"] = compute_deltas(kpi_dict, prev)
