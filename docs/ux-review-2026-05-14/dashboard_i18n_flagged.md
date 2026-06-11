@@ -1,9 +1,9 @@
 # Dashboard i18n Audit
 
-**Scope keys:** 228
-**Findings:** 101
+**Scope keys:** 231
+**Findings:** 107
 
-## Rule: mixed_language (34)
+## Rule: mixed_language (37)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
@@ -14,6 +14,7 @@
 | `gui_csv_required` | CSV file required | 請先選擇 CSV 檔案 | non-glossary Latin tokens: ['CSV'] |
 | `gui_detailed_kpis_label` | Detailed metrics (12 KPIs) | 詳細指標（12 KPI） | non-glossary Latin tokens: ['KPI'] |
 | `gui_err_no_csv` | No CSV file uploaded. | 未上傳 CSV 檔案。 | non-glossary Latin tokens: ['CSV'] |
+| `gui_gen_policy_diff_title` | Generate Policy Diff Report | 產生 Policy Diff 報表 | non-glossary Latin tokens: ['Diff'] |
 | `gui_gen_step_parsing` | Parsing CSV data... | 正在解析 CSV 資料... | non-glossary Latin tokens: ['CSV'] |
 | `gui_ip_address` | IP Address | IP 位址 | non-glossary Latin tokens: ['IP'] |
 | `gui_ov_eyebrow_security` | Security Posture | 安全體質 · Security Posture | non-glossary Latin tokens: ['Security', 'Posture'] |
@@ -29,6 +30,8 @@
 | `gui_source_badge_api` | Data fetched live from the PCE API. | 資料即時來自 PCE API。 | non-glossary Latin tokens: ['API'] |
 | `gui_source_badge_mixed` | Hybrid: API filled the gap before the cache window started; cache served the res | 混合:API 補快取區間之前的空檔,快取提供其後的部分。 | non-glossary Latin tokens: ['API'] |
 | `gui_ta_query` | Traffic Analysis Query | 查詢 Flow | non-glossary Latin tokens: ['Flow'] |
+| `gui_toast_policy_diff_done` | Policy Diff report generated. | Policy Diff 報表已產生。 | non-glossary Latin tokens: ['Diff'] |
+| `gui_toast_policy_diff_fail` | Policy Diff report failed. | Policy Diff 報表產生失敗。 | non-glossary Latin tokens: ['Diff'] |
 | `gui_top10_error` | Error querying data. | Top 10 查詢失敗 | non-glossary Latin tokens: ['Top'] |
 | `gui_top10_loading` | Loading... | 正在載入 Top 10... | non-glossary Latin tokens: ['Top'] |
 | `gui_top10_querying` | Querying... | 正在查詢 Top 10... | non-glossary Latin tokens: ['Top'] |
@@ -42,13 +45,14 @@
 | `pd_potentially_blocked_by_boundary` | Potentially Blocked by Boundary | Potentially Blocked by Boundary（潛在邊界 Block） | non-glossary Latin tokens: ['Potentially', 'by', 'Boundary'] |
 | `pd_potentially_blocked_by_override_deny` | Potentially Blocked by Override Deny | Potentially Blocked by Override Deny（潛在強制拒絕 Block） | non-glossary Latin tokens: ['Potentially', 'by', 'Override', 'Deny'] |
 
-## Rule: low_han_ratio (24)
+## Rule: low_han_ratio (27)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
 | `actmtx_staged_enforcement_reco` | Move workloads from test/visibility to selective or full enforcement. | 將 workload 從 test/visibility 模式移至 selective 或 full enforcement。 | han_ratio=0.13 |
 | `gui_attack_summary_title` | Attack Summary | 攻擊摘要（Boundary/Pivot/Blast Radius/Blind Spots/行動） | han_ratio=0.15 |
 | `gui_card_health` | PCE Health | PCE 健康 | han_ratio=0.40 |
+| `gui_gen_policy_diff_title` | Generate Policy Diff Report | 產生 Policy Diff 報表 | han_ratio=0.29 |
 | `gui_ov_enforcement_modes` | Enforcement Modes | Enforcement 模式 | han_ratio=0.15 |
 | `gui_ov_eyebrow_security` | Security Posture | 安全體質 · Security Posture | han_ratio=0.21 |
 | `gui_ov_posture_unavailable` | Run a Security Posture report to populate this section. | 請執行 Security Posture 報表以載入此區塊。 | han_ratio=0.42 |
@@ -60,6 +64,8 @@
 | `gui_snap_policy_breakdown` | Policy Decision Breakdown | Policy 判定分布 | han_ratio=0.40 |
 | `gui_snap_top_ports` | Top 10 Ports (by flow count) | Top 10 Ports（依流量筆數） | han_ratio=0.38 |
 | `gui_ta_query` | Traffic Analysis Query | 查詢 Flow | han_ratio=0.33 |
+| `gui_toast_policy_diff_done` | Policy Diff report generated. | Policy Diff 報表已產生。 | han_ratio=0.33 |
+| `gui_toast_policy_diff_fail` | Policy Diff report failed. | Policy Diff 報表產生失敗。 | han_ratio=0.38 |
 | `gui_tw_trend_flagged_only` | Flagged only (hide Allowed) | 只看可疑（隱藏 Allowed） | han_ratio=0.46 |
 | `gui_workload_name` | Workload Name | Workload 名稱 | han_ratio=0.20 |
 | `gui_workload_search` | Workload Search | Workload 搜尋 | han_ratio=0.20 |
