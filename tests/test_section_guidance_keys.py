@@ -3,7 +3,7 @@
 import re
 from pathlib import Path
 
-from src.report.section_guidance import REGISTRY, get_guidance
+from src.report.section_guidance import get_guidance
 
 
 def _exporter_called_ids() -> set[str]:

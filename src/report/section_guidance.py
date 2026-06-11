@@ -207,10 +207,13 @@ def get_guidance(module_id: str) -> Optional[SectionGuidance]:
     if g is not None:
         return g
     prefix = module_id + "_"
-    for key, value in REGISTRY.items():
-        if key.startswith(prefix):
-            return value
-    return None
+    matches = [value for key, value in REGISTRY.items() if key.startswith(prefix)]
+    if len(matches) > 1:
+        raise ValueError(
+            f"ambiguous section-guidance id {module_id!r}: matches "
+            f"{[m.module_id for m in matches]}"
+        )
+    return matches[0] if matches else None
 
 
 def visible_in(module_id: str, profile: ProfileVisibility, detail_level: DetailLevel = "full") -> bool:
