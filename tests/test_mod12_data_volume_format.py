@@ -20,4 +20,4 @@ def test_data_volume_key_finding_is_humanized():
     assert vol_findings, "data-volume key finding should fire above 1000 MB"
     text = vol_findings[0]["finding"]
     assert "438821219" not in text          # raw MB 不得出現
-    assert "TB" in text or "PB" in text     # fmt_bytes_auto 換算後的單位
+    assert "TB" in text                     # fmt_bytes_auto 換算後的單位
