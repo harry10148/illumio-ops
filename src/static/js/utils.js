@@ -318,7 +318,7 @@ async function init() {
   await loadTranslations();
   const params = new URLSearchParams(window.location.search);
   const tab = params.get('tab');
-  const validTabs = ['dashboard', 'traffic-workload', 'events', 'rules', 'reports', 'settings', 'rule-scheduler'];
+  const validTabs = ['dashboard', 'traffic-workload', 'events', 'rules', 'reports', 'settings', 'rule-scheduler', 'integrations'];
   const initialTab = (tab && validTabs.includes(tab)) ? tab : 'dashboard';
   switchTab(initialTab, false);
   const qtab = params.get('qtab');
