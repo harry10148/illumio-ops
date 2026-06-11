@@ -3009,6 +3009,7 @@
   "rpt_policy_diff_col_draft": "DRAFT value",
   "rpt_policy_diff_col_field": "Field",
   "rpt_policy_diff_col_changed": "Last changed",
+  "rpt_policy_diff_col_risk": "Risk",
   "rpt_policy_diff_col_rule_id": "Rule ID",
   "rpt_policy_diff_col_ruleset": "Ruleset",
   "rpt_policy_diff_col_ruleset_id": "Ruleset ID",

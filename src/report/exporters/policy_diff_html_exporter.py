@@ -27,6 +27,7 @@ table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px;}
 th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left;vertical-align:top;}
 th{background:#f9fafb;}
 .pd-added{background:#ecfdf5;} .pd-removed{background:#fef2f2;} .pd-modified{background:#fffbeb;}
+.pd-risk-high{color:#b91c1c;font-weight:700;} .pd-risk-medium{color:#b45309;font-weight:600;}
 .note{font-size:12px;color:#6b7280;margin-top:24px;}
 """
 
@@ -46,6 +47,7 @@ class PolicyDiffHtmlExporter:
 
     # DataFrame column name -> i18n key for the localized <th> header.
     _COL_I18N = {
+        "risk": "rpt_policy_diff_col_risk",
         "change_type": "rpt_policy_diff_col_change_type",
         "ruleset_name": "rpt_policy_diff_col_ruleset",
         "ruleset_id": "rpt_policy_diff_col_ruleset_id",
@@ -61,18 +63,30 @@ class PolicyDiffHtmlExporter:
         key = self._COL_I18N.get(col)
         return _esc(t(key, lang=self._lang)) if key else _esc(col)
 
+    _RISK_RANK = {"HIGH": 0, "MEDIUM": 1}
+
     def _table(self, df: pd.DataFrame, id_col: str) -> str:
         if df is None or df.empty:
             return f'<p>{_esc(t("rpt_policy_diff_no_changes", lang=self._lang))}</p>'
-        cols = ["change_type", "ruleset_name", id_col, "field",
+        if "risk" in df.columns:
+            df = df.copy()
+            df["_rank"] = df["risk"].map(self._RISK_RANK).fillna(9)
+            df = df.sort_values("_rank", kind="stable").drop(columns="_rank")
+        cols = ["risk", "change_type", "ruleset_name", id_col, "field",
                 "draft_value", "active_value", "last_actor", "last_changed"]
         cols = [c for c in cols if c in df.columns]
         head = "".join(f"<th>{self._header(c)}</th>" for c in cols)
         body = []
         for _, row in df.iterrows():
             cls = _ROW_CLASS.get(str(row.get("change_type", "")), "")
-            cells = "".join(f"<td>{_esc(row.get(c, ''))}</td>" for c in cols)
-            body.append(f'<tr class="{cls}">{cells}</tr>')
+            cells = []
+            for c in cols:
+                v = row.get(c, "")
+                if c == "risk" and v:
+                    cells.append(f'<td class="pd-risk-{str(v).lower()}">{_esc(v)}</td>')
+                else:
+                    cells.append(f"<td>{_esc(v)}</td>")
+            body.append(f'<tr class="{cls}">{"".join(cells)}</tr>')
         return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody></table>"
 
     def export(self, output_dir: str = "reports") -> str:

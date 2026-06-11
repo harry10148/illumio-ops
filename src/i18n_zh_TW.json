@@ -3008,6 +3008,7 @@
   "rpt_policy_diff_col_draft": "DRAFT 值",
   "rpt_policy_diff_col_field": "欄位",
   "rpt_policy_diff_col_changed": "最後變更時間",
+  "rpt_policy_diff_col_risk": "風險",
   "rpt_policy_diff_col_rule_id": "Rule ID",
   "rpt_policy_diff_col_ruleset": "Ruleset",
   "rpt_policy_diff_col_ruleset_id": "Ruleset ID",

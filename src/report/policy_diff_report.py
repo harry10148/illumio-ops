@@ -13,6 +13,7 @@ from loguru import logger
 
 from src.report.analysis.policy_diff.diff_engine import diff_rulesets
 from src.report.analysis.policy_diff.attribution import attribute_changes
+from src.report.analysis.policy_diff.risk import grade_changes
 from src.report.exporters.policy_diff_html_exporter import PolicyDiffHtmlExporter
 
 _DEFAULT_WINDOW_DAYS = 30
@@ -52,6 +53,7 @@ class PolicyDiffReport:
         active = self.api.get_active_rulesets() if self.api else []
         diff = diff_rulesets(draft, active)
         diff = attribute_changes(diff, self._fetch_policy_events(lang))
+        diff = grade_changes(diff)
         return diff
 
     def run(self, output_dir: str = "reports", lang: str = "en", fmt: str = "html") -> str:
