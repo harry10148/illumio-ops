@@ -47,11 +47,34 @@ class PolicyDiffReport:
             logger.warning(f"PolicyDiffReport: attribution events unavailable ({exc})")
             return {"draft_events": None}
 
+    def _build_name_map(self) -> dict[str, str]:
+        """href -> display name, from ACTIVE object inventories (best-effort)."""
+        names: dict[str, str] = {}
+        if not self.api:
+            return names
+        try:
+            for obj in (self.api.get_ip_lists() or []):
+                if obj.get("href") and obj.get("name"):
+                    names[obj["href"]] = obj["name"]
+            for obj in (self.api.get_services() or []):
+                if obj.get("href") and obj.get("name"):
+                    names[obj["href"]] = obj["name"]
+            for obj in (self.api.get_label_groups() or []):
+                if obj.get("href") and obj.get("name"):
+                    names[obj["href"]] = obj["name"]
+        except Exception as exc:
+            logger.warning(f"PolicyDiffReport: name map unavailable ({exc})")
+        # ACTIVE inventories carry /active/ hrefs; draft-side rules reference
+        # the same objects via /draft/ hrefs — cover both.
+        names.update({h.replace("/active/", "/draft/"): n
+                      for h, n in names.items() if "/active/" in h})
+        return names
+
     def build(self, lang: str = "en") -> dict:
         """Return the attributed diff module_results (no export)."""
         draft = self.api.get_all_rulesets(force_refresh=True) if self.api else []
         active = self.api.get_active_rulesets() if self.api else []
-        diff = diff_rulesets(draft, active)
+        diff = diff_rulesets(draft, active, names=self._build_name_map())
         diff = attribute_changes(diff, self._fetch_policy_events(lang))
         diff = grade_changes(diff)
         return diff

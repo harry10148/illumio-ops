@@ -96,3 +96,27 @@ def test_ruleset_modified_and_rule_added_both_counted():
     out = diff_rulesets(draft, active)
     assert out["summary"]["rulesets_modified"] == 1
     assert out["summary"]["rules_added"] == 1
+
+
+def test_summarize_actors_uses_friendly_names():
+    from src.report.analysis.policy_diff.diff_engine import _summarize_actors
+
+    names = {
+        "/orgs/1/sec_policy/active/ip_lists/1": "Any (0.0.0.0/0)",
+        "/orgs/1/sec_policy/active/services/9": "HTTPS 443",
+    }
+    items = [
+        {"ip_list": {"href": "/orgs/1/sec_policy/active/ip_lists/1"}},
+        {"href": "/orgs/1/sec_policy/active/services/9"},
+    ]
+    out = _summarize_actors(items, names=names)
+    assert "Any (0.0.0.0/0)" in out
+    assert "HTTPS 443" in out
+    assert "/orgs/1/" not in out  # 不再出現原始 href
+
+
+def test_summarize_actors_falls_back_to_href_without_names():
+    from src.report.analysis.policy_diff.diff_engine import _summarize_actors
+
+    out = _summarize_actors([{"href": "/orgs/1/sec_policy/active/services/9"}])
+    assert "/orgs/1/sec_policy/active/services/9" in out
