@@ -21,7 +21,8 @@ def test_policy_diff_invokes_report(tmp_path):
         result = runner.invoke(report_group,
                                ["policy-diff", "--output-dir", str(tmp_path)])
     assert result.exit_code == 0, result.output
-    gen.assert_called_once_with(fmt="html", output_dir=str(tmp_path), email=False)
+    gen.assert_called_once_with(fmt="html", output_dir=str(tmp_path), email=False,
+                                attribution_days=30)
 
 
 def test_policy_diff_email_sends_report(tmp_path):
@@ -43,6 +44,18 @@ def test_policy_diff_email_sends_report(tmp_path):
 
     assert result.exit_code == 0, result.output
     MockReporter.return_value.send_report_email.assert_called_once()
+
+
+def test_policy_diff_attribution_days_flag(tmp_path):
+    runner = CliRunner()
+    with patch("src.cli.report.generate_policy_diff_report",
+               return_value=[str(tmp_path / "Illumio_Policy_Diff_Report_x.html")]) as gen:
+        result = runner.invoke(report_group,
+                               ["policy-diff", "--attribution-days", "90",
+                                "--output-dir", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    gen.assert_called_once_with(fmt="html", output_dir=str(tmp_path), email=False,
+                                attribution_days=90)
 
 
 def test_policy_diff_click_exception_maps_to_dataerr():

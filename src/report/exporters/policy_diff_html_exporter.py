@@ -84,6 +84,8 @@ class PolicyDiffHtmlExporter:
                 v = row.get(c, "")
                 if c == "risk" and v:
                     cells.append(f'<td class="pd-risk-{str(v).lower()}">{_esc(v)}</td>')
+                elif c in ("last_actor", "last_changed") and str(v).strip() in ("", "nan"):
+                    cells.append(f'<td title="{_esc(t("rpt_policy_diff_attribution_note", lang=self._lang))}">—</td>')
                 else:
                     cells.append(f"<td>{_esc(v)}</td>")
             body.append(f'<tr class="{cls}">{"".join(cells)}</tr>')

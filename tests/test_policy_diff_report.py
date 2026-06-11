@@ -56,3 +56,17 @@ def test_build_without_api_returns_empty_diff():
     assert diff["summary"]["total_changes"] == 0
     assert diff["ruleset_changes"].empty
     assert diff["rule_changes"].empty
+
+
+def test_attribution_window_is_configurable():
+    from src.report.policy_diff_report import PolicyDiffReport
+
+    r = PolicyDiffReport(cm=None, api_client=None, attribution_days=90)
+    assert r._attribution_days == 90
+
+
+def test_attribution_window_default_30():
+    from src.report.policy_diff_report import PolicyDiffReport
+
+    r = PolicyDiffReport(cm=None, api_client=None)
+    assert r._attribution_days == 30

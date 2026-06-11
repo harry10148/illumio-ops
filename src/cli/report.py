@@ -464,6 +464,7 @@ def generate_policy_diff_report(
     fmt: str = "html",
     output_dir: str | None = None,
     email: bool = False,
+    attribution_days: int = 30,
 ) -> list[str]:
     """Generate the Policy Diff (DRAFT vs ACTIVE) report."""
     from src.api_client import ApiClient
@@ -478,7 +479,8 @@ def generate_policy_diff_report(
     lang = _resolve_lang(cm)
 
     rpt = PolicyDiffReport(cm, api_client=api, config_dir=config_dir,
-                           cache_reader=_make_cache_reader(cm))
+                           cache_reader=_make_cache_reader(cm),
+                           attribution_days=attribution_days)
     paths: list[str] = []
     if fmt in ("html", "all"):
         paths.append(rpt.run(output_dir=out, lang=lang, fmt="html"))
@@ -555,11 +557,15 @@ def report_resolve(ctx: click.Context, fmt: str, output_dir) -> None:
 @click.option("--format", "fmt", type=click.Choice(["html", "csv", "all"]), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
 @click.option("--email", is_flag=True)
+@click.option("--attribution-days", type=int, default=30, show_default=True,
+              help="Audit-event lookback window for operator attribution.")
 @click.pass_context
-def report_policy_diff(ctx: click.Context, fmt: str, output_dir, email: bool) -> None:
+def report_policy_diff(ctx: click.Context, fmt: str, output_dir, email: bool,
+                       attribution_days: int) -> None:
     """Generate Policy Diff Report (DRAFT vs ACTIVE, Ruleset/Rule scope)."""
     try:
-        paths = generate_policy_diff_report(fmt=fmt, output_dir=output_dir, email=email)
+        paths = generate_policy_diff_report(fmt=fmt, output_dir=output_dir, email=email,
+                                            attribution_days=attribution_days)
     except click.ClickException as exc:
         echo_error(ctx, exc.format_message())
         ctx.exit(EXIT_DATAERR)
