@@ -117,3 +117,23 @@ def test_mod12_legacy_alias_present_for_one_release():
         f"staged_coverage alias not found for backward compatibility. "
         f"Available KPIs: {list(kpis_dict.keys())}, aliases: {out.get('kpi_aliases', {})}"
     )
+
+
+def test_mod03_flow_label_includes_protocol():
+    """Uncovered-flow labels must carry the protocol (443/TCP vs 443/UDP differ)."""
+    out = mod03_uncovered_flows.uncovered_flows(_flows_pb_only())
+    labels = out["top_flows"]["Flow"].tolist()
+    assert "web → db:443/TCP" in labels, labels
+    assert "web → api:80/TCP" in labels, labels
+    for s in labels:
+        dst = s.split("→", 1)[1]
+        assert "/" in dst, f"missing protocol in flow label: {s}"
+
+
+def test_mod03_flow_label_graceful_without_proto_column():
+    """No proto column -> bare port, no crash, no dangling slash."""
+    df = _flows_pb_only().drop(columns=["proto"])
+    out = mod03_uncovered_flows.uncovered_flows(df)
+    labels = out["top_flows"]["Flow"].tolist()
+    assert "web → db:443" in labels, labels
+    assert all(not s.endswith("/") for s in labels), labels

@@ -89,11 +89,16 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
     else:
         inbound_cov = outbound_cov = None
 
-    # Build flow key
+    # Build flow key — include the protocol so 443/TCP and 443/UDP (which both
+    # occur in real traffic) are not conflated into an ambiguous ":443".
+    _port_label = uncovered['port'].astype(str)
+    if 'proto' in uncovered.columns:
+        _proto = uncovered['proto'].fillna('').astype(str).str.strip()
+        _port_label = _port_label.mask(_proto != '', _port_label + '/' + _proto)
     uncovered['flow_key'] = (
         uncovered['src_app'].fillna('').astype(str) + ' → ' +
         uncovered['dst_app'].fillna('').astype(str) + ':' +
-        uncovered['port'].astype(str)
+        _port_label
     )
 
     # Classify each flow
