@@ -445,9 +445,18 @@ class AuditGenerator:
         if self._cache is not None:
             state = self._cache.cover_state("events", start, end)
             if state == "full":
-                logger.info("Audit report: events from cache ({} → {})", start, end)
-                return self._cache.read_events(start, end), "cache"
-            if state == "partial":
+                cached = self._cache.read_events(start, end)
+                if cached:
+                    logger.info("Audit report: events from cache ({} → {})", start, end)
+                    return cached, "cache"
+                # cover_state judges coverage by the *earliest* cached event only, so a
+                # stale cache (newest event older than `start`) reports "full" yet yields
+                # zero rows for this window. Fall back to live PCE rather than report no data.
+                logger.warning(
+                    "Audit report: cache stale/empty for window ({} → {}) — falling back to live API",
+                    start, end,
+                )
+            elif state == "partial":
                 cache_start = self._cache.earliest_data_timestamp("events")
                 if cache_start is not None and cache_start > start:
                     logger.info(
@@ -465,9 +474,15 @@ class AuditGenerator:
                         gap = None
                     if gap is not None:
                         cached = self._cache.read_events(cache_start, end)
-                        source = "mixed" if gap else "cache"
-                        return gap + cached, source
-            # partial+earliest-conflict, or miss: fall through to API
+                        if gap or cached:
+                            source = "mixed" if gap else "cache"
+                            return gap + cached, source
+                        # both halves empty → stale/empty cache; fall through to live API
+                        logger.warning(
+                            "Audit report: hybrid fetch empty for window ({} → {}) — falling back to live API",
+                            start, end,
+                        )
+            # partial+earliest-conflict, stale cache, or miss: fall through to API
         start_str = start.isoformat().replace("+00:00", "Z")
         return self.api.get_events(since=start_str), "api"
 
