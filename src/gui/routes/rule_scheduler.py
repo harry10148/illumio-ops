@@ -37,12 +37,41 @@ def make_rule_scheduler_blueprint(
     @bp.route('/api/rule_scheduler/status')
     def rs_status():
         rs_cfg = cm.config.get("rule_scheduler", {})
-        from src.rule_scheduler import ScheduleDB
+        from src.rule_scheduler import ScheduleDB, compute_next_trigger
         db = ScheduleDB(os.path.join(_resolve_config_dir(), "rule_schedules.json"))
         db.load()
+        schedules = db.get_all()
+        next_at = compute_next_trigger(schedules)
+
+        # timeline_24h: bucket [ACTION] toggles from the in-memory log deque into
+        # the last 24 hours by UTC hour. Empty list → frontend shows empty state.
+        import src.gui as _gui_module
+        with _gui_module._rs_log_lock:
+            history = list(_gui_module._rs_log_history)
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        cutoff = now_utc - datetime.timedelta(hours=24)
+        timeline_24h = []
+        for entry in history:
+            ts_raw = entry.get("timestamp")
+            if not ts_raw:
+                continue
+            try:
+                ts = datetime.datetime.strptime(ts_raw, "%Y-%m-%d %H:%M:%S").replace(
+                    tzinfo=datetime.timezone.utc
+                )
+            except (ValueError, TypeError):
+                continue
+            if ts < cutoff:
+                continue
+            count = sum(1 for line in entry.get("logs", []) if "[ACTION]" in line)
+            if count:
+                timeline_24h.append({"hour": ts.hour, "count": count})
+
         return jsonify({
             "check_interval_seconds": rs_cfg.get("check_interval_seconds", 300),
-            "schedule_count": len(db.get_all())
+            "schedule_count": len(schedules),
+            "next_trigger_at": next_at,
+            "timeline_24h": timeline_24h,
         })
 
     @bp.route('/api/rule_scheduler/rulesets')

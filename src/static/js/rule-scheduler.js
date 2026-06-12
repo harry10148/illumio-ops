@@ -677,45 +677,31 @@ async function rsRenderTimeline() {
 
   // Build 24 empty buckets (index 0 = 00:xx, 23 = 23:xx)
   const counts = new Array(24).fill(0);
-  const errors = new Array(24).fill(0);
   let total = 0;
   let dataAvailable = false;
 
   try {
-    const res = await fetch('/api/rule_scheduler/logs');
+    const res = await fetch('/api/rule_scheduler/status');
     const data = await res.json();
-    const history = data.history || [];
-    const now = Date.now();
-    const cutoff = now - 24 * 60 * 60 * 1000;
-
-    history.forEach(entry => {
-      if (!entry.timestamp) return;
-      const ts = new Date(entry.timestamp).getTime();
-      if (isNaN(ts) || ts < cutoff) return;
-      dataAvailable = true;
-      const actionCount = (entry.logs || []).filter(l => l.includes('[ACTION]')).length;
-      if (actionCount === 0) return;
-      const hour = new Date(ts).getHours();
-      counts[hour] += actionCount;
-      total += actionCount;
-      const hasErr = (entry.logs || []).some(l => /error|fail/i.test(l));
-      if (hasErr) errors[hour]++;
+    const buckets = data.timeline_24h || [];
+    dataAvailable = buckets.length > 0;
+    buckets.forEach(b => {
+      const hour = b.hour;
+      const c = b.count || 0;
+      if (hour == null || hour < 0 || hour > 23 || c <= 0) return;
+      counts[hour] += c;
+      total += c;
     });
   } catch (_) {
-    // Silently fall through — render placeholder bars
+    // Silently fall through — render empty-state below
   }
 
   const maxCount = Math.max(...counts, 1);
   while (row.firstChild) row.removeChild(row.firstChild);
   for (let h = 0; h < 24; h++) {
     const c = counts[h];
-    const hasErr = errors[h] > 0;
     let cls = '';
-    if (!dataAvailable) {
-      cls = ''; // muted placeholder
-    } else if (hasErr) {
-      cls = 'err';
-    } else if (c === 0) {
+    if (!dataAvailable || c === 0) {
       cls = '';
     } else if (c / maxCount > 0.66) {
       cls = 'lvl-3';
@@ -725,9 +711,9 @@ async function rsRenderTimeline() {
       cls = 'lvl-1';
     }
     const label = String(h).padStart(2, '0') + ':00';
-    const tip = dataAvailable
-      ? (c > 0 ? `${label}  ${c} ${_t('gui_rs_tl_action_unit')}${hasErr ? ' (err)' : ''}` : `${label}  ${_t('gui_rs_tl_no_toggles')}`)
-      : `${label}  loading`;
+    const tip = c > 0
+      ? `${label}  ${c} ${_t('gui_rs_tl_action_unit')}`
+      : `${label}  ${_t('gui_rs_tl_no_toggles')}`;
     const div = document.createElement('div');
     div.className = 'rs-tl-bucket' + (cls ? ' ' + cls : '');
     div.setAttribute('data-tip', tip);
@@ -737,7 +723,7 @@ async function rsRenderTimeline() {
   if (meta) {
     meta.textContent = dataAvailable
       ? `${total} ${_t('gui_rs_tl_action_unit')}`
-      : 'Loading...';
+      : _t('gui_rs_timeline_empty');
   }
 }
 
@@ -751,7 +737,6 @@ async function rsRenderKpi() {
     const logsData = await logsRes.json();
     const statusData = await statusRes.json();
     const history = logsData.history || [];
-    const intervalSec = statusData.check_interval_seconds || 300;
 
     // Total schedules
     const totalEl = $('rs-kpi-total');
@@ -810,21 +795,26 @@ async function rsRenderKpi() {
       }
     }
 
-    // Next trigger KPI (estimated from last run + interval)
+    // Next trigger KPI — read the actual computed schedule trigger from status.
     const nextEl = $('rs-kpi-next');
     const nextSub = $('rs-kpi-next-sub');
-    if (lastRunTs) {
-      const nextMs = lastRunTs + intervalSec * 1000;
-      const nowMs = Date.now();
-      if (nextMs > nowMs) {
-        const nd = new Date(nextMs);
-        if (nextEl) nextEl.textContent = String(nd.getHours()).padStart(2,'0') + ':' + String(nd.getMinutes()).padStart(2,'0');
-        const diffMin = Math.ceil((nextMs - nowMs) / 60000);
-        if (nextSub) nextSub.textContent = 'in ' + diffMin + 'm';
-      } else {
-        if (nextEl) nextEl.textContent = _t('gui_rs_kpi_soon');
-        if (nextSub) nextSub.textContent = '—';
+    const nextAt = statusData.next_trigger_at;  // ISO wall-clock string or null
+    if (nextAt) {
+      // Parse the ISO string's own date/time (do not re-interpret via browser tz).
+      const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(nextAt);
+      if (m) {
+        const [, y, mo, d, hh, mm] = m;
+        if (nextEl) nextEl.textContent = hh + ':' + mm;
+        // Sub line: blank if the trigger is today, else show the date.
+        const now = new Date();
+        const sameDay = Number(y) === now.getFullYear()
+          && Number(mo) === now.getMonth() + 1
+          && Number(d) === now.getDate();
+        if (nextSub) nextSub.textContent = sameDay ? '' : `${mo}-${d}`;
       }
+    } else {
+      if (nextEl) nextEl.textContent = '—';
+      if (nextSub) nextSub.textContent = _t('gui_rs_kpi_none_today');
     }
   } catch (_) {}
 }

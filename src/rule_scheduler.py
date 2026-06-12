@@ -25,6 +25,75 @@ def _now_in_tz(tz_str: str) -> datetime.datetime:
         return (now_utc + offset).replace(tzinfo=None)
     return _dt.datetime.now(_dt.timezone.utc)  # UTC-aware fallback
 
+_WEEKDAY_INDEX = {
+    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+    "friday": 4, "saturday": 5, "sunday": 6,
+}
+
+
+def compute_next_trigger(schedules, now=None):
+    """Return the nearest future trigger time across all schedules as an ISO
+    string, or None if nothing is upcoming.
+
+    Pure function — ``now`` (a naive wall-clock datetime) may be injected for
+    deterministic testing. When omitted, each schedule is evaluated against the
+    current wall-clock in its own timezone via ``_now_in_tz``.
+
+    - recurring: the earliest ``start`` (HH:MM) on one of its ``days`` within the
+      next 7 days (today-later counts; today-earlier rolls to next week).
+    - one_time: its ``expire_at`` if still in the future; past one-times
+      contribute nothing.
+    """
+    candidates = []
+    for conf in (schedules or {}).values():
+        stype = conf.get("type")
+        item_tz = conf.get("timezone", "local")
+        ref = now if now is not None else _now_in_tz(item_tz)
+        # Compare on naive wall-clock to match the engine's _now_in_tz semantics.
+        if ref.tzinfo is not None:
+            ref = ref.replace(tzinfo=None)
+
+        if stype == "recurring":
+            days = conf.get("days") or []
+            start = conf.get("start")
+            if not days or not start:
+                continue
+            try:
+                hh, mm = (int(x) for x in start.split(":"))
+            except (ValueError, AttributeError):
+                continue
+            day_indices = {
+                _WEEKDAY_INDEX[ScheduleEngine.normalize_day(d)]
+                for d in days
+                if ScheduleEngine.normalize_day(d) in _WEEKDAY_INDEX
+            }
+            if not day_indices:
+                continue
+            today = ref.replace(hour=hh, minute=mm, second=0, microsecond=0)
+            for delta in range(0, 8):
+                cand = today + datetime.timedelta(days=delta)
+                if cand.weekday() in day_indices and cand > ref:
+                    candidates.append(cand)
+                    break
+
+        elif stype == "one_time":
+            expire_raw = conf.get("expire_at")
+            if not expire_raw:
+                continue
+            try:
+                expire_dt = datetime.datetime.fromisoformat(expire_raw)
+            except (ValueError, TypeError):
+                continue
+            if expire_dt.tzinfo is not None:
+                expire_dt = expire_dt.replace(tzinfo=None)
+            if expire_dt > ref:
+                candidates.append(expire_dt)
+
+    if not candidates:
+        return None
+    return min(candidates).isoformat()
+
+
 def truncate(text, width):
     """Truncate text to width, stripping schedule tags."""
     if not text:
