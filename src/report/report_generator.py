@@ -214,7 +214,8 @@ class ReportGenerator:
                           traffic_report_profile: str = "security_risk",
                           detail_level: str = _REPORT_DETAIL_LEVEL,
                           lang: str = "en",
-                          clip_to_cache: bool = False) -> ReportResult:
+                          clip_to_cache: bool = False,
+                          vuln_csv_path: str | None = None) -> ReportResult:
         """Fetch traffic from PCE API and run the full analysis pipeline.
 
         filters: optional dict with traffic filter keys (src_labels, dst_labels,
@@ -288,6 +289,7 @@ class ReportGenerator:
         df = self._parse_api(records)
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
+        self._vuln_csv_path = vuln_csv_path
         return self._run_pipeline(
             df,
             source=traffic["source"],
@@ -304,12 +306,14 @@ class ReportGenerator:
     def generate_from_csv(self, csv_path: str,
                           traffic_report_profile: str = "security_risk",
                           detail_level: str = _REPORT_DETAIL_LEVEL,
-                          lang: str = "en") -> ReportResult:
+                          lang: str = "en",
+                          vuln_csv_path: str | None = None) -> ReportResult:
         """Parse a CSV file from the PCE UI export and run the analysis pipeline."""
         if traffic_report_profile not in ("security_risk", "network_inventory"):
             raise ValueError(f"invalid traffic_report_profile: {traffic_report_profile!r}")
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
+        self._vuln_csv_path = vuln_csv_path
         logger.info(f"[ReportGenerator] Starting CSV-source report from: {csv_path}")
         print(t("rpt_parsing_csv", path=csv_path, lang=lang))
         df = self._parse_csv(csv_path)
@@ -575,6 +579,16 @@ class ReportGenerator:
             logger.warning(f"[Report] label hygiene skipped: {exc}")
             results["mod_labels"] = {"workload_data_available": False,
                                      "managed_unlabeled_flow_count": 0}
+
+        # V-E lite: only when the operator supplies a vulnerability-scan CSV.
+        if getattr(self, "_vuln_csv_path", None):
+            try:
+                from src.report.parsers.vuln_csv import load_vulns
+                from src.report.analysis.mod_vuln import vuln_exposure
+                results["mod_vuln"] = vuln_exposure(df, load_vulns(self._vuln_csv_path), lang=lang)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"[Report] vuln exposure skipped: {exc}")
+                results["mod_vuln"] = {"available": False}
 
         # Override generated_at with configured timezone
         tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')

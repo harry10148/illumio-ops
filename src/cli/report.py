@@ -64,6 +64,7 @@ def generate_traffic_report(
     output_dir: str | None = None,
     email: bool = False,
     traffic_report_profile: str = "security_risk",
+    vuln_csv_path: str | None = None,
 ) -> list[str]:
     from src.api_client import ApiClient
     from src.config import ConfigManager
@@ -83,9 +84,11 @@ def generate_traffic_report(
     if source == "csv":
         if not file_path:
             raise click.ClickException("--file is required when --source csv is used")
-        result = gen.generate_from_csv(file_path, traffic_report_profile=traffic_report_profile, lang=lang)
+        result = gen.generate_from_csv(file_path, traffic_report_profile=traffic_report_profile, lang=lang,
+                                       vuln_csv_path=vuln_csv_path)
     else:
-        result = gen.generate_from_api(traffic_report_profile=traffic_report_profile, lang=lang)
+        result = gen.generate_from_api(traffic_report_profile=traffic_report_profile, lang=lang,
+                                       vuln_csv_path=vuln_csv_path)
 
     if result.record_count == 0:
         raise click.ClickException("No data for report")
@@ -271,8 +274,17 @@ def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_
 @click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
 @click.option("--email", is_flag=True)
+@click.option(
+    "--vuln-csv",
+    "vuln_csv_path",
+    type=click.Path(exists=True),
+    default=None,
+    help="Vulnerability-scan CSV (ip + cve columns; Qualys/Tenable exports accepted) "
+         "for the V-E exposure section.",
+)
 @click.pass_context
-def report_security(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool) -> None:
+def report_security(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool,
+                    vuln_csv_path) -> None:
     """Generate Security & Risk Report."""
     try:
         paths = generate_security_report(
@@ -281,6 +293,7 @@ def report_security(ctx: click.Context, source: str, file_path, fmt: str, output
             fmt=fmt,
             output_dir=output_dir,
             email=email,
+            vuln_csv_path=vuln_csv_path,
         )
     except click.ClickException as exc:
         echo_error(ctx, exc.format_message())

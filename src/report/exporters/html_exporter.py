@@ -580,6 +580,8 @@ class _TrafficReportBase:
             'policy':         _nav_link('policy', 'rpt_tr_nav_policy', '2 Policy Decisions'),
             'uncovered':      _nav_link('uncovered', 'rpt_tr_nav_uncovered', '3 Uncovered Flows'),
             'drift':          _nav_link('drift', 'rpt_tr_nav_drift', 'Baseline Drift'),
+            'vuln':           (_nav_link('vuln', 'rpt_tr_nav_vuln', 'Vuln Exposure')
+                               if (self._r.get('mod_vuln') or {}).get('available') else ''),
             'labels':         _nav_link('labels', 'rpt_tr_nav_labels', 'Label Hygiene'),
             'ransomware':     _nav_link('ransomware', 'rpt_tr_nav_ransomware', '4 Ransomware Exposure'),
             'user':           (_nav_link('user', 'rpt_tr_nav_user', '6 User & Process') if _mod06_has_data else ''),
@@ -649,6 +651,10 @@ class _TrafficReportBase:
             'ransomware': self._section('ransomware', 'rpt_tr_sec_ransomware', 'Ransomware Exposure',
                           render_section_guidance('mod04', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod04_html(),
                           'rpt_tr_sec_ransomware_intro', 'Check high-risk Ports, Allowed flows, and host exposure commonly tied to ransomware attack chains.') + '\n',
+            'vuln': ('' if not (self._r.get('mod_vuln') or {}).get('available') else
+                     self._section('vuln', 'rpt_tr_sec_vuln', 'Vulnerability Exposure (V-E lite)',
+                          render_section_guidance('mod_vuln', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod_vuln_html(),
+                          'rpt_tr_sec_vuln_intro', 'Rank patching by real east-west reachability: which scanned vulnerabilities sit on hosts that non-blocked traffic can actually reach.') + '\n'),
             'user': _mod06_block,
             'matrix': _mod07_block,
             'unmanaged': self._section('unmanaged', 'rpt_tr_sec_unmanaged', 'Unmanaged Hosts',
@@ -1087,6 +1093,21 @@ class _TrafficReportBase:
             + _df_to_html(m.get('new_pairs'), lang=_lang)
             + f'<h3>{t("rpt_drift_disappeared", lang=_lang)} ({m.get("disappeared_count", 0)})</h3>'
             + _df_to_html(m.get('disappeared_pairs'), lang=_lang)
+        )
+
+    def _mod_vuln_html(self):
+        _lang = self._lang
+        m = self._r.get('mod_vuln', {})
+        if not m.get('available'):
+            return ''
+        total = m.get('total_vulns', 0)
+        exposed = m.get('exposed_count', 0)
+        summary = t("rpt_vuln_summary", exposed=exposed, total=total, lang=_lang)
+        return (
+            f'<p class="section-intro">{summary}</p>'
+            + _render_chart_for_html(m.get('chart_spec'), lang=_lang)
+            + f'<h3>{t("rpt_vuln_exposed_table", lang=_lang)} ({exposed})</h3>'
+            + _df_to_html(m.get('exposed'), severity_col='Severity', lang=_lang)
         )
 
     def _mod_labels_html(self):
@@ -1555,7 +1576,7 @@ class SecurityRiskHtmlExporter(_TrafficReportBase):
 
     def _ordered_section_keys(self) -> list[str]:
         return ['summary', 'drift', 'overview', 'policy', 'uncovered', 'ransomware',
-                'user', 'readiness', 'infrastructure', 'lateral', 'findings']
+                'vuln', 'user', 'readiness', 'infrastructure', 'lateral', 'findings']
 
 
 class NetworkInventoryHtmlExporter(_TrafficReportBase):

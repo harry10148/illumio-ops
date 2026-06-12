@@ -61,3 +61,48 @@ def test_chart_labels_localized_zh():
     spec = res["chart_spec"]
     assert spec["data"]["labels"] == ["可達", "不可達"]
     assert spec["title"] == "可達 vs 不可達弱點"
+
+
+def _pipeline_df():
+    return pd.DataFrame([
+        {"src_ip": "10.0.0.1", "src_app": "Web", "dst_ip": "10.0.0.5", "dst_app": "DB",
+         "port": 3306, "proto": "TCP", "policy_decision": "allowed", "num_connections": 9},
+        {"src_ip": "10.0.0.2", "src_app": "Batch", "dst_ip": "10.0.0.5", "dst_app": "DB",
+         "port": 3306, "proto": "TCP", "policy_decision": "potentially_blocked", "num_connections": 3},
+    ])
+
+
+def test_vuln_section_reaches_html_output(tmp_path, monkeypatch):
+    """--vuln-csv must inject mod_vuln in _run_pipeline so the exporter renders
+    the V-E section; without a CSV the section must not appear at all."""
+    from unittest.mock import MagicMock
+    from src.report.report_generator import ReportGenerator
+
+    # Keep the post-export dashboard refresh from touching repo-level state.
+    monkeypatch.setattr("src.scheduler.jobs.run_posture_summary", lambda cm: None)
+
+    csv = tmp_path / "vulns.csv"
+    csv.write_text("ip,cve,severity,cvss\n10.0.0.5,CVE-2024-1,Critical,9.8\n",
+                   encoding="utf-8")
+
+    cm = MagicMock()
+    cm.config = {"api": {"url": "https://pce.test", "org_id": "1", "key": "k",
+                         "secret": "s", "verify_ssl": False}}
+
+    def _export(vuln_csv_path):
+        gen = ReportGenerator(cm, api_client=MagicMock())
+        gen._lang = "en"
+        gen._vuln_csv_path = vuln_csv_path
+        result = gen._run_pipeline(_pipeline_df(), source="csv",
+                                   traffic_report_profile="security_risk")
+        paths = gen.export(result, fmt="html", output_dir=str(tmp_path), lang="en")
+        html_path = next(p for p in paths if p.endswith(".html"))
+        with open(html_path, encoding="utf-8") as fh:
+            return fh.read()
+
+    html_with = _export(str(csv))
+    assert 'id="vuln"' in html_with
+    assert "CVE-2024-1" in html_with
+
+    html_without = _export(None)
+    assert 'id="vuln"' not in html_without
