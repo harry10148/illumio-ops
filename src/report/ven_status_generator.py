@@ -254,6 +254,12 @@ class VenStatusGenerator:
         tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
         return parse_tz(tz_str)
 
+    @staticmethod
+    def _by_version(df) -> dict:
+        """Distribution of VEN agent versions; blank → (unknown)."""
+        s = df["ven_version"].fillna("").astype(str).replace("", "(unknown)")
+        return s.value_counts().to_dict()
+
     def _analyze(self, df: pd.DataFrame) -> dict:
         now = datetime.datetime.now(self._parse_tz())
         cutoff_24h = now - datetime.timedelta(hours=24)
@@ -398,6 +404,7 @@ class VenStatusGenerator:
             'lost_yesterday': _clean(df_lost_yest),
             'status_chart_spec': status_chart_spec,
             'os_chart_spec': os_chart_spec,
+            'by_version': self._by_version(df),
         }
 
 

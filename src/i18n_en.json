@@ -3448,6 +3448,7 @@
   "rpt_tr_what_it_measures": "What it measures",
   "rpt_user": "User",
   "rpt_ven_analysis_done": "VEN status analysis complete.",
+  "rpt_ven_by_version": "VEN Version Distribution",
   "rpt_ven_csv_saved": "VEN CSV saved: {path}",
   "rpt_ven_fetching": "Fetching VEN data...",
   "rpt_ven_footer": "Illumio PCE Ops VEN Status Report",

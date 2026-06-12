@@ -250,8 +250,9 @@ class VenHtmlExporter:
         os_dist = self._r.get("os_distribution")
         enf_dist = self._r.get("enforcement_distribution")
         enf_net = self._r.get("enforcement_by_network")
+        by_version = self._r.get("by_version")
         # Guard: older snapshots may not have these keys
-        if not any([os_dist, enf_dist, enf_net]):
+        if not any([os_dist, enf_dist, enf_net, by_version]):
             return ""
 
         _s = self._s
@@ -280,6 +281,23 @@ class VenHtmlExporter:
                 )
             else:
                 parts.append(f'<p>{t("rpt_no_records", lang=self._lang)}</p>')
+
+        # -- VEN Version Distribution sub-block (upgrade planning) --
+        if by_version:
+            parts.append(f'<h3>{t("rpt_ven_by_version", lang=self._lang)}</h3>')
+            ver_total = sum(by_version.values())
+            rows = "".join(
+                f"<tr><td>{html.escape(str(ver))}</td><td>{cnt}</td></tr>"
+                for ver, cnt in sorted(by_version.items(), key=lambda kv: kv[1], reverse=True)
+            )
+            parts.append(
+                f'<table class="data-table"><thead><tr>'
+                f'<th>{t("rpt_col_ven_version", lang=self._lang)}</th>'
+                f'<th>{t("rpt_ei_count", lang=self._lang)}</th>'
+                f'</tr></thead><tbody>{rows}</tbody>'
+                f'<tfoot><tr><td><strong>{t("rpt_ei_total", lang=self._lang)}</strong></td>'
+                f'<td><strong>{ver_total}</strong></td></tr></tfoot></table>'
+            )
 
         # -- Enforcement Posture sub-block --
         if enf_dist:
