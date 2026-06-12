@@ -191,7 +191,9 @@ def api_cache_health():
         except AttributeError:
             _max_lag = 300
         lag = check_cache_lag(sf, max_lag_seconds=_max_lag)
-        levels = [r["level"] for r in lag]
+        cache_lag = [{"source": r["source"], "lag_s": int(r["lag_seconds"]),
+                      "level": r["level"]} for r in lag]
+        levels = [c["level"] for c in cache_lag]
 
         with sf() as s:
             totals = _siem_window_totals(s)
@@ -209,6 +211,7 @@ def api_cache_health():
         return jsonify({
             "verdict": verdict,
             "lag_levels": levels,
+            "cache_lag": cache_lag,
             "siem_success_1h": success_1h,
             "dlq": totals["dlq"],
         })

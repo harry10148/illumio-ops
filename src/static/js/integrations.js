@@ -1340,15 +1340,37 @@ window.dlqExport = dlqExport;
 window.dlqView = dlqView;
 
 // ── Overview sub-tab ─────────────────────────────────────────────────────────
+function _pipelineReasons(p) {
+  var out = [];
+  (p.cache_lag || []).forEach(function(l) {
+    if (l.level === 'error' || l.level === 'warning') {
+      out.push(_t('gui_pl_reason_lag')
+        .replace('{source}', l.source).replace('{hours}', Math.round(l.lag_s / 3600)));
+    }
+  });
+  if (p.siem_success_1h != null && p.siem_success_1h < 95) {
+    out.push(_t('gui_pl_reason_siem').replace('{pct}', p.siem_success_1h));
+  }
+  if (p.dlq > 0) out.push(_t('gui_pl_reason_dlq').replace('{n}', p.dlq));
+  return out;
+}
+
 function _buildOvPipelineHealth(health) {
   var verdict = (health && health.verdict) || 'ok';
   var colorMap = {ok: 'var(--color-success,#22c55e)', warn: 'var(--color-warning,#f59e0b)', error: 'var(--color-danger,#f43f5e)'};
   var cardClass = verdict === 'error' ? 'card-err' : verdict === 'warn' ? 'card-warn' : 'card-ok';
   var color = colorMap[verdict] || colorMap.ok;
+  var reasons = _pipelineReasons(health || {});
+  var reasonHtml = reasons.length
+    ? '<div style="font-size:.7rem;color:var(--dim);margin-top:4px;line-height:1.6;">'
+      + reasons.map(function(r) { return escapeHtml(r); }).join('<br>')
+      + '</div>'
+    : '';
   return '<div class="cards" style="margin-bottom:8px;">'
     + '<div class="card ' + cardClass + '" style="flex:0 0 auto;min-width:160px;">'
     + '<div class="label" data-i18n="gui_ov_pipeline_health">Pipeline Health</div>'
     + '<div class="value" style="color:' + color + ';font-size:1.1rem;font-weight:700;">' + verdict.toUpperCase() + '</div>'
+    + reasonHtml
     + '</div>'
     + '</div>';
 }
