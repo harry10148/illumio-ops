@@ -514,6 +514,72 @@ def generate_policy_diff_report(
     return paths
 
 
+def generate_app_summary_report(
+    *,
+    app: str,
+    env: str | None = None,
+    days: int = 7,
+    output_dir: str | None = None,
+) -> list[str]:
+    """Generate the single-App Summary report (HTML)."""
+    from src.api_client import ApiClient
+    from src.config import ConfigManager
+    from src.report.app_summary_report import AppSummaryReport
+    from src.main import _make_cache_reader
+
+    cm = ConfigManager()
+    api = ApiClient(cm)
+    _root_dir, config_dir = _resolve_paths(output_dir)
+    out = _resolve_output_dir(cm, output_dir)
+    lang = _resolve_lang(cm)
+
+    now = dt.datetime.now(dt.timezone.utc)
+    start = (now - dt.timedelta(days=days)).strftime("%Y-%m-%dT00:00:00Z")
+    end = now.strftime("%Y-%m-%dT23:59:59Z")
+
+    rpt = AppSummaryReport(cm, api_client=api, config_dir=config_dir,
+                           cache_reader=_make_cache_reader(cm))
+    path = rpt.run(app=app, env=env, output_dir=out, lang=lang,
+                   start_date=start, end_date=end)
+    return [path]
+
+
+@report_group.command("app-summary")
+@click.option("--app", required=True, help="App Label value to scope the report to.")
+@click.option("--env", default=None, help="Optional Env Label refinement.")
+@click.option("--days", type=int, default=7, show_default=True,
+              help="Lookback window (days) for traffic flows.")
+@click.option("--output-dir", type=click.Path(), default=None)
+@click.pass_context
+def report_app_summary(ctx: click.Context, app: str, env: str | None, days: int,
+                       output_dir) -> None:
+    """Generate App Summary Report (single App Label, inbound/outbound view)."""
+    try:
+        paths = generate_app_summary_report(
+            app=app, env=env, days=days, output_dir=output_dir,
+        )
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, f"Connection failed: {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
+    except Exception as exc:
+        log.exception("app-summary report failed")
+        echo_error(ctx, f"Unexpected error: {exc}")
+        ctx.exit(EXIT_SOFTWARE)
+        return
+    _emit_paths(ctx, paths, "html")
+
+
 def generate_policy_resolver_report(
     *,
     fmt: str = "json",
@@ -622,3 +688,4 @@ report_group.add_command(_alias(report_inventory,    "inventory"),    name="gene
 report_group.add_command(_alias(report_audit,        "audit"),        name="generate-audit")
 report_group.add_command(_alias(report_ven_status,   "ven-status"),   name="generate-ven-status")
 report_group.add_command(_alias(report_policy_usage, "policy-usage"), name="generate-policy-usage")
+report_group.add_command(_alias(report_app_summary,  "app-summary"),  name="generate-app-summary")

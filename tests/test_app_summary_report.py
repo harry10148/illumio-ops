@@ -2,6 +2,9 @@
 import pandas as pd
 from unittest.mock import MagicMock, patch
 
+from click.testing import CliRunner
+
+from src.cli.report import report_group
 from src.report.app_summary_report import AppSummaryReport, _safe_filename_token
 
 
@@ -55,3 +58,39 @@ def test_export_writes_html(tmp_path):
     assert "App Summary" in html or "App 摘要" in html
     assert 'id="inbound"' in html and 'id="outbound"' in html
     assert "Illumio_App_Summary_DB_" in path
+
+
+# --- CLI subcommand tests (mirror tests/test_cli_report_policy_diff.py) -------
+
+
+def test_app_summary_command_registered():
+    assert "app-summary" in report_group.commands
+
+
+def test_app_summary_invokes_run(tmp_path):
+    runner = CliRunner()
+    mock_cm = MagicMock()
+    mock_cm.config = {"settings": {"language": "en"},
+                      "report": {"output_dir": str(tmp_path)}}
+    with patch("src.config.ConfigManager", return_value=mock_cm), \
+         patch("src.api_client.ApiClient"), \
+         patch("src.main._make_cache_reader", return_value=MagicMock()), \
+         patch("src.report.app_summary_report.AppSummaryReport") as MockReport:
+        MockReport.return_value.run.return_value = str(
+            tmp_path / "Illumio_App_Summary_DB_x.html")
+        result = runner.invoke(
+            report_group,
+            ["app-summary", "--app", "DB", "--env", "Prod",
+             "--output-dir", str(tmp_path)],
+        )
+    assert result.exit_code == 0, result.output
+    _, kwargs = MockReport.return_value.run.call_args
+    assert kwargs["app"] == "DB"
+    assert kwargs["env"] == "Prod"
+    assert kwargs["output_dir"] == str(tmp_path)
+
+
+def test_app_summary_requires_app():
+    runner = CliRunner()
+    result = runner.invoke(report_group, ["app-summary"])
+    assert result.exit_code != 0
