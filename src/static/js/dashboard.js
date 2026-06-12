@@ -241,6 +241,7 @@ async function loadRcardMeta() {
     let t = rp.report_type || '';
     // Policy Diff reports carry no metadata sidecar — derive type from filename prefix.
     if (!t && rp.filename && rp.filename.startsWith('Illumio_Policy_Diff_Report_')) t = 'policy_diff';
+    if (!t && rp.filename && rp.filename.startsWith('Illumio_Policy_Resolver_')) t = 'policy_resolver';
     if (!t) return;
     if (!latestByType[t] || rp.mtime > latestByType[t]) latestByType[t] = rp.mtime;
   });
@@ -643,6 +644,7 @@ function openReportGenModal(type) {
     ven:          { titleKey: 'gui_gen_ven_title',     icon: '#icon-cpu',    dates: false },
     policy_usage: { titleKey: 'gui_gen_pu_title',      icon: '#icon-shield', dates: true  },
     policy_diff:  { titleKey: 'gui_gen_policy_diff_title', icon: '#icon-shield', dates: false },
+    policy_resolver: { titleKey: 'gui_gen_policy_resolver_title', icon: '#icon-shield', dates: false },
   };
   const m = meta[type] || meta.traffic;
   $('m-gen-title').innerHTML =
@@ -704,6 +706,7 @@ async function confirmReportGen() {
     ven:          _t('gui_gen_ven_title'),
     policy_usage: _t('gui_gen_pu_title'),
     policy_diff:  _t('gui_gen_policy_diff_title'),
+    policy_resolver: _t('gui_gen_policy_resolver_title'),
   };
   _showGenProgress(typeLabels[_genReportType] || _t('gui_gen_fallback_title'));
   closeModal('m-gen-report');
@@ -712,6 +715,7 @@ async function confirmReportGen() {
   else if (_genReportType === 'ven')          await _doGenerateVen();
   else if (_genReportType === 'policy_usage') await _doGeneratePolicyUsageClean();
   else if (_genReportType === 'policy_diff')  await _doGeneratePolicyDiff();
+  else if (_genReportType === 'policy_resolver') await _doGeneratePolicyResolver();
 }
 
 function _collectReportFilters() {
@@ -1034,6 +1038,27 @@ async function _doGeneratePolicyDiff() {
   } catch(e) {
     _hideGenProgress(false, e.message);
     toast(e.message || _t('gui_toast_policy_diff_fail'), 'err');
+  }
+}
+
+async function _doGeneratePolicyResolver() {
+  const langElPr = document.getElementById('m-gen-lang');
+  _updateGenStep(_t('gui_gen_step_fetching'));
+  try {
+    const r = await post('/api/policy_resolver_report/generate', { format: 'all', lang: langElPr ? langElPr.value : 'en' });
+    if (r.ok) {
+      _hideGenProgress(true, _t('gui_gen_done'));
+      toast(_t('gui_toast_policy_resolver_done'));
+      loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
+    } else {
+      const fail = _t('gui_toast_policy_resolver_fail');
+      _hideGenProgress(false, r.error || fail);
+      toast(r.error || fail, 'err');
+    }
+  } catch(e) {
+    _hideGenProgress(false, e.message);
+    toast(e.message || _t('gui_toast_policy_resolver_fail'), 'err');
   }
 }
 

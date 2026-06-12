@@ -368,6 +368,30 @@ def make_reports_blueprint(
                 pass  # intentional fallback: ModuleLog write is best-effort
             return _err_with_log("report_policy_diff_generate", e, lang=lang)
 
+    # ── API: Policy Resolver Report ──────────────────────────────────────────
+    @bp.route('/api/policy_resolver_report/generate', methods=['POST'])
+    @limiter.limit("10 per hour")
+    def api_generate_policy_resolver_report():
+        d = request.json or {}
+        lang = d.get('lang', 'en')
+        if lang not in ('en', 'zh_TW'):
+            lang = 'en'
+        try:
+            from src.report.policy_resolver_report import PolicyResolverReport
+            from src.api_client import ApiClient
+            cm.load()
+            config_dir = _resolve_config_dir()
+            from src.main import _make_cache_reader
+            rep = PolicyResolverReport(cm, api_client=ApiClient(cm), config_dir=config_dir,
+                                       cache_reader=_make_cache_reader(cm))
+            fmt = d.get('format', 'all')
+            fmt = fmt if fmt in ('json', 'csv', 'all') else 'all'
+            output_dir = _resolve_reports_dir(cm)
+            paths = rep.run(output_dir=output_dir, lang=lang, fmt=fmt)
+            return jsonify({"ok": True, "files": [os.path.basename(p) for p in paths]})
+        except Exception as e:
+            return _err_with_log("report_policy_resolver_generate", e, lang=lang)
+
     # ── API: VEN Status Report ────────────────────────────────────────────────
     @bp.route('/api/ven_status_report/generate', methods=['POST'])
     @limiter.limit("10 per hour")

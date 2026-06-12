@@ -1413,6 +1413,19 @@
             </div>
           </div>
         </div>
+        <div class="rcard" data-rtype="policy_resolver">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_rcard_policy_resolver_title">Policy Resolver Report</h3>
+            <p data-i18n="gui_rcard_policy_resolver_desc">Expand ACTIVE label-based Policy into IP-level rows (JSON + CSV)</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-pr" data-action="openReportGenModal" data-args='["policy_resolver"]'>
+                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- History table -->
