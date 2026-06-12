@@ -287,6 +287,8 @@
   "rpt_guidance_mod_labels_how": "Coverage counts Workloads carrying all four keys (app/env/loc/role). Flow gap counts flows where a managed endpoint has no App Label. Conflicts list IPs observed with more than one label set.",
   "rpt_guidance_mod_labels_purpose": "Measure labeling quality — incomplete or conflicting Labels make Policy unreliable and block enforcement progress.",
   "rpt_guidance_mod_labels_signals": "Coverage below 90%; any conflict rows; a rising flow gap after onboarding new Workloads.",
+  "rpt_labels_chart_fully": "Fully labeled",
+  "rpt_labels_chart_missing": "Missing labels",
   "rpt_labels_chart_title": "Label Coverage",
   "rpt_labels_conflicts": "Conflicting Label Sets per IP",
   "rpt_labels_coverage": "Fully-labeled Workloads",

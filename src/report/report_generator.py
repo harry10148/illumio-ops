@@ -570,7 +570,7 @@ class ReportGenerator:
             _workloads = None
             if source != 'csv' and self.api is not None:
                 _workloads = self.api.fetch_managed_workloads()
-            results["mod_labels"] = label_hygiene(df, _workloads)
+            results["mod_labels"] = label_hygiene(df, _workloads, lang=lang)
         except Exception as exc:  # noqa: BLE001 — hygiene must not break the report
             logger.warning(f"[Report] label hygiene skipped: {exc}")
             results["mod_labels"] = {"workload_data_available": False,

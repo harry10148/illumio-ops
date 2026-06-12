@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pandas as pd
 
+from src.i18n import t
+
 LABEL_KEYS = ("app", "env", "loc", "role")
 
 
@@ -21,7 +23,7 @@ def _workload_labels(wl: dict) -> dict[str, str]:
     return out
 
 
-def _workload_metrics(workloads: list | None, top_n: int) -> dict:
+def _workload_metrics(workloads: list | None, top_n: int, lang: str = "en") -> dict:
     if not workloads:
         return {"workload_data_available": False}
     rows = []
@@ -46,7 +48,8 @@ def _workload_metrics(workloads: list | None, top_n: int) -> dict:
             "type": "bar",
             "title_key": "rpt_labels_chart_title",
             "title": "Label Coverage",
-            "data": {"labels": ["Fully labeled", "Missing labels"],
+            "data": {"labels": [t("rpt_labels_chart_fully", default="Fully labeled", lang=lang),
+                                t("rpt_labels_chart_missing", default="Missing labels", lang=lang)],
                      "values": [fully, len(rows)]},
         },
     }
@@ -67,14 +70,14 @@ def _flow_metrics(df: pd.DataFrame, top_n: int) -> dict:
         if sub.empty:
             continue
         cols = [f"{side}_ip"] + [f"{side}_{k}" for k in LABEL_KEYS]
-        part = sub[cols].copy()
+        part = sub[cols].copy().fillna("")
         part.columns = ["IP"] + list(LABEL_KEYS)
         frames.append(part)
     conflicts = pd.DataFrame(columns=["IP", "Distinct Label Sets"])
     if frames:
         seen = pd.concat(frames, ignore_index=True).drop_duplicates()
         counts = seen.groupby("IP").size()
-        bad_ips = counts[counts > 1]
+        bad_ips = counts[counts > 1].sort_values(ascending=False)
         conflicts = pd.DataFrame({
             "IP": bad_ips.index.tolist(),
             "Distinct Label Sets": bad_ips.values.tolist(),
@@ -82,7 +85,8 @@ def _flow_metrics(df: pd.DataFrame, top_n: int) -> dict:
     return {"managed_unlabeled_flow_count": gap_count, "label_conflicts": conflicts}
 
 
-def label_hygiene(df: pd.DataFrame, workloads: list | None, top_n: int = 20) -> dict:
-    out = _workload_metrics(workloads, top_n)
+def label_hygiene(df: pd.DataFrame, workloads: list | None, top_n: int = 20,
+                  lang: str = "en") -> dict:
+    out = _workload_metrics(workloads, top_n, lang=lang)
     out.update(_flow_metrics(df, top_n))
     return out

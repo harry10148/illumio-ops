@@ -287,6 +287,8 @@
   "rpt_guidance_mod_labels_how": "覆蓋率計算同時具備四個 keys（app/env/loc/role）的 Workloads。流量缺口計算 managed 端點缺 App Label 的流量。衝突清單列出被觀察到多組 label sets 的 IPs。",
   "rpt_guidance_mod_labels_purpose": "度量 Label 品質 — 不完整或互相衝突的 Labels 會讓 Policy 不可靠並阻礙 enforcement 推進。",
   "rpt_guidance_mod_labels_signals": "覆蓋率低於 90%；任何衝突列；新 Workloads 上線後流量缺口上升。",
+  "rpt_labels_chart_fully": "Label 完整",
+  "rpt_labels_chart_missing": "Label 缺漏",
   "rpt_labels_chart_title": "Label 覆蓋率",
   "rpt_labels_conflicts": "同一 IP 的衝突 Label Sets",
   "rpt_labels_coverage": "完整標籤的 Workloads",
