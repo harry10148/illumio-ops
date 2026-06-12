@@ -1889,6 +1889,8 @@
   "gui_sched_report_type": "報表類型",
   "gui_sched_rt_app_summary": "App 摘要報表",
   "gui_sched_rt_audit": "稽核報表",
+  "gui_sched_rt_policy_diff": "Policy Diff 報表",
+  "gui_sched_rt_policy_resolver": "Policy Resolver 報表",
   "gui_sched_rt_pu": "Policy 使用報表",
   "gui_sched_rt_traffic": "流量報表",
   "gui_sched_rt_ven": "VEN 狀態報表",

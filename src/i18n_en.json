@@ -1889,6 +1889,8 @@
   "gui_sched_report_type": "Report Type",
   "gui_sched_rt_app_summary": "App Summary",
   "gui_sched_rt_audit": "Audit",
+  "gui_sched_rt_policy_diff": "Policy Diff Report",
+  "gui_sched_rt_policy_resolver": "Policy Resolver Report",
   "gui_sched_rt_pu": "Policy Usage",
   "gui_sched_rt_traffic": "Traffic",
   "gui_sched_rt_ven": "VEN Status",

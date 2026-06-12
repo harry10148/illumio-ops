@@ -311,6 +311,8 @@ function renderSchedules() {
     audit: _t('gui_sched_rt_audit'),
     ven_status: _t('gui_sched_rt_ven'),
     policy_usage: _t('gui_sched_rt_pu'),
+    policy_diff: _t('gui_sched_rt_policy_diff'),
+    policy_resolver: _t('gui_sched_rt_policy_resolver'),
     app_summary: _t('gui_sched_rt_app_summary'),
   };
   tbody.innerHTML = _schedules.map(s => {
