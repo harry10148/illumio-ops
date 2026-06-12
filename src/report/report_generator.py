@@ -563,6 +563,19 @@ class ReportGenerator:
         results = self._run_modules(df, findings, traffic_report_profile=traffic_report_profile,
                                     lang=lang)
 
+        # Label hygiene (Inventory profile section): workloads fetch is best-effort.
+        # CSV-sourced reports have no inventory — flow-derived metrics only.
+        try:
+            from src.report.analysis.mod_labels import label_hygiene
+            _workloads = None
+            if source != 'csv' and self.api is not None:
+                _workloads = self.api.fetch_managed_workloads()
+            results["mod_labels"] = label_hygiene(df, _workloads)
+        except Exception as exc:  # noqa: BLE001 — hygiene must not break the report
+            logger.warning(f"[Report] label hygiene skipped: {exc}")
+            results["mod_labels"] = {"workload_data_available": False,
+                                     "managed_unlabeled_flow_count": 0}
+
         # Override generated_at with configured timezone
         tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
         try:

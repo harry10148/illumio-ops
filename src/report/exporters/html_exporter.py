@@ -579,6 +579,7 @@ class _TrafficReportBase:
             'policy':         _nav_link('policy', 'rpt_tr_nav_policy', '2 Policy Decisions'),
             'uncovered':      _nav_link('uncovered', 'rpt_tr_nav_uncovered', '3 Uncovered Flows'),
             'drift':          _nav_link('drift', 'rpt_tr_nav_drift', 'Baseline Drift'),
+            'labels':         _nav_link('labels', 'rpt_tr_nav_labels', 'Label Hygiene'),
             'ransomware':     _nav_link('ransomware', 'rpt_tr_nav_ransomware', '4 Ransomware Exposure'),
             'user':           (_nav_link('user', 'rpt_tr_nav_user', '6 User & Process') if _mod06_has_data else ''),
             'matrix':         (_nav_link('matrix', 'rpt_tr_nav_matrix', '7 Cross-Label Matrix') if _mod07_block else ''),
@@ -639,6 +640,9 @@ class _TrafficReportBase:
             'uncovered': self._section('uncovered', 'rpt_tr_sec_uncovered', 'Uncovered Flows',
                           render_section_guidance('mod03', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod03_html(),
                           'rpt_tr_sec_uncovered_intro', 'Focus on traffic not yet covered by effective Policy, helping prioritise which Services and directions to tighten first.') + '\n',
+            'labels': self._section('labels', 'rpt_tr_sec_labels', 'Label Hygiene',
+                          render_section_guidance('mod_labels', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod_labels_html(),
+                          'rpt_tr_sec_labels_intro', 'Measure Label coverage and conflicts — labeling quality determines Policy quality.') + '\n',
             'drift': self._section('drift', 'rpt_tr_sec_drift', 'Baseline Drift',
                           render_section_guidance('mod_drift', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod_drift_html(),
                           'rpt_tr_sec_drift_intro', 'Compare this period\'s app-to-app connections against the previous report to spot new paths and disappeared baselines.') + '\n',
@@ -1096,6 +1100,29 @@ class _TrafficReportBase:
             + _df_to_html(m.get('disappeared_pairs'), lang=_lang)
         )
 
+    def _mod_labels_html(self):
+        _lang = self._lang
+        m = self._r.get('mod_labels', {})
+        parts = []
+        if m.get('workload_data_available'):
+            parts.append(
+                f'<p class="section-intro">{t("rpt_labels_coverage", lang=_lang)}: '
+                f'<b>{m.get("fully_labeled_pct", 0)}%</b> '
+                f'({m.get("fully_labeled_count", 0)}/{m.get("total_workloads", 0)})</p>')
+            parts.append(_render_chart_for_html(m.get('chart_spec'), lang=_lang))
+            parts.append(f'<h3>{t("rpt_labels_unlabeled_workloads", lang=_lang)} '
+                         f'({m.get("unlabeled_workload_count", 0)})</h3>')
+            parts.append(_df_to_html(m.get('unlabeled_workloads'), lang=_lang))
+        else:
+            parts.append(f'<p class="note">{t("rpt_labels_no_inventory", lang=_lang)}</p>')
+        parts.append(f'<h3>{t("rpt_labels_flow_gap", lang=_lang)}: '
+                     f'{m.get("managed_unlabeled_flow_count", 0)}</h3>')
+        conflicts = m.get('label_conflicts')
+        if conflicts is not None and hasattr(conflicts, 'empty') and not conflicts.empty:
+            parts.append(f'<h3>{t("rpt_labels_conflicts", lang=_lang)} ({len(conflicts)})</h3>')
+            parts.append(_df_to_html(conflicts, lang=_lang))
+        return ''.join(parts)
+
     def _mod11_html(self):
         m = self._r.get('mod11', {})
         if not m.get('bytes_data_available', False):
@@ -1544,7 +1571,7 @@ class NetworkInventoryHtmlExporter(_TrafficReportBase):
         return False
 
     def _ordered_section_keys(self) -> list[str]:
-        return ['summary', 'overview', 'policy', 'matrix', 'unmanaged',
+        return ['summary', 'overview', 'labels', 'policy', 'matrix', 'unmanaged',
                 'distribution', 'bandwidth', 'ringfence', 'change_impact']
 
 
