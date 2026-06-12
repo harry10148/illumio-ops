@@ -1887,6 +1887,7 @@
   "gui_sched_recipients_hint": "One email per line.",
   "gui_sched_recipients_placeholder": "one@example.com\ntwo@example.com",
   "gui_sched_report_type": "Report Type",
+  "gui_sched_rt_app_summary": "App Summary",
   "gui_sched_rt_audit": "Audit",
   "gui_sched_rt_pu": "Policy Usage",
   "gui_sched_rt_traffic": "Traffic",

@@ -1540,6 +1540,7 @@
             <option value="audit" data-i18n="gui_sched_rt_audit">Audit Report</option>
             <option value="ven_status" data-i18n="gui_sched_rt_ven">VEN Status Report</option>
             <option value="policy_usage" data-i18n="gui_sched_rt_pu">Policy Usage Report</option>
+            <option value="app_summary" data-i18n="gui_sched_rt_app_summary">App Summary Report</option>
           </select>
         </div>
         <div class="form-group">
@@ -1550,6 +1551,17 @@
             <option value="xlsx" data-i18n="gui_sched_fmt_xlsx">Excel (XLSX)</option>
             <option value="all" data-i18n="gui_sched_fmt_all">HTML + CSV</option>
           </select>
+        </div>
+      </div>
+
+      <div class="form-row" id="sched-app-row" style="display:none;">
+        <div class="form-group">
+          <label for="sched-app" data-i18n="gui_app_label_field">App Label</label>
+          <input type="text" id="sched-app" style="width:100%;">
+        </div>
+        <div class="form-group">
+          <label for="sched-env" data-i18n="gui_env_label_field">Env Label (optional)</label>
+          <input type="text" id="sched-env" style="width:100%;">
         </div>
       </div>
 

@@ -311,6 +311,7 @@ function renderSchedules() {
     audit: _t('gui_sched_rt_audit'),
     ven_status: _t('gui_sched_rt_ven'),
     policy_usage: _t('gui_sched_rt_pu'),
+    app_summary: _t('gui_sched_rt_app_summary'),
   };
   tbody.innerHTML = _schedules.map(s => {
     const typeLabel = typeLabels[s.report_type] || s.report_type;
@@ -366,8 +367,10 @@ function onSchedFreqChange() {
 }
 
 function onSchedReportTypeChange() {
-  const isTraffic = $('sched-report-type').value === 'traffic';
-  $('sched-filter-section').style.display = isTraffic ? '' : 'none';
+  const rt = $('sched-report-type').value;
+  $('sched-filter-section').style.display = rt === 'traffic' ? '' : 'none';
+  const appRow = $('sched-app-row');
+  if (appRow) appRow.style.display = rt === 'app_summary' ? '' : 'none';
 }
 
 function onSchedEmailChange() {
@@ -402,8 +405,12 @@ function openSchedModal(sched) {
   $('row-recipients').style.display = emailOn ? '' : 'none';
 
   // Show filter section only for traffic reports; reset then populate from saved schedule
-  const isTraffic = (sched ? (sched.report_type || 'traffic') : 'traffic') === 'traffic';
+  const rt = sched ? (sched.report_type || 'traffic') : 'traffic';
+  const isTraffic = rt === 'traffic';
   $('sched-filter-section').style.display = isTraffic ? '' : 'none';
+  if ($('sched-app'))     $('sched-app').value = sched ? (sched.app || '') : '';
+  if ($('sched-env'))     $('sched-env').value = sched ? (sched.env || '') : '';
+  if ($('sched-app-row')) $('sched-app-row').style.display = rt === 'app_summary' ? '' : 'none';
   ['sched-pd-blocked','sched-pd-potential','sched-pd-allowed'].forEach(id => {
     const el = document.getElementById(id); if (el) el.checked = false;
   });
@@ -430,10 +437,14 @@ async function saveSchedule() {
   const recipsRaw = $('sched-recipients').value.trim();
   const recipients = recipsRaw ? recipsRaw.split('\n').map(r => r.trim()).filter(Boolean) : [];
 
-  const schedFilters = $('sched-report-type').value === 'traffic' ? _collectSchedFilters() : null;
+  const reportType = $('sched-report-type').value;
+  const schedFilters = reportType === 'traffic' ? _collectSchedFilters() : null;
+  if (reportType === 'app_summary' && !($('sched-app') && $('sched-app').value.trim())) {
+    toast(_t('gui_app_required'), true); return;
+  }
   const payload = {
     name,
-    report_type: $('sched-report-type').value,
+    report_type: reportType,
     schedule_type: $('sched-freq').value,
     day_of_week: $('sched-dow').value,
     day_of_month: parseInt($('sched-dom').value) || 1,
@@ -447,6 +458,10 @@ async function saveSchedule() {
     email_recipients: recipients,
     enabled: true,
     ...(schedFilters ? { filters: schedFilters } : {}),
+    ...(reportType === 'app_summary' ? {
+      app: ($('sched-app') ? $('sched-app').value.trim() : ''),
+      env: ($('sched-env') ? $('sched-env').value.trim() : ''),
+    } : {}),
     ...($('sched-cron-expr').value.trim() ? { cron_expr: $('sched-cron-expr').value.trim() } : {}),
   };
 
