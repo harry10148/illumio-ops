@@ -2141,6 +2141,7 @@
   "gui_toast_policy_diff_done": "Policy Diff 報表已產生。",
   "gui_toast_policy_diff_fail": "Policy Diff 報表產生失敗。",
   "gui_toast_policy_resolver_done": "Policy Resolver 報表已產生。",
+  "gui_toast_policy_resolver_empty": "找不到可解析的 ACTIVE Policy — 沒有可產生的內容。",
   "gui_toast_policy_resolver_fail": "Policy Resolver 報表產生失敗。",
   "gui_toast_pu_done": "Policy 使用報表已產生：{count} 筆",
   "gui_toast_pu_done_detail": "Policy 使用報表已產生：{count} 筆（{detail}）",

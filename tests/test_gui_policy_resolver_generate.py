@@ -29,6 +29,24 @@ def test_policy_resolver_generate_returns_files(client):
     assert body["files"] == ["a.json", "b.csv"]
 
 
+def test_policy_resolver_generate_empty_signals_empty(client):
+    """0 resolvable rules -> run() returns [] -> response signals empty, not fake success."""
+    csrf_token = _login(client)
+    with patch("src.report.policy_resolver_report.PolicyResolverReport") as MockRep:
+        MockRep.return_value.run.return_value = []
+        r = client.post(
+            "/api/policy_resolver_report/generate",
+            json={"lang": "zh_TW", "format": "all"},
+            headers={"X-CSRF-Token": csrf_token},
+            environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+        )
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["ok"] is True
+    assert body["files"] == []
+    assert body.get("empty") is True
+
+
 def test_policy_resolver_generate_rejects_bad_lang(client):
     csrf_token = _login(client)
     with patch("src.report.policy_resolver_report.PolicyResolverReport") as MockRep:

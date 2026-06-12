@@ -489,6 +489,8 @@ def make_reports_blueprint(
             fmt = fmt if fmt in ('json', 'csv', 'all') else 'all'
             output_dir = _resolve_reports_dir(cm)
             paths = rep.run(output_dir=output_dir, lang=lang, fmt=fmt)
+            if not paths:
+                return jsonify({"ok": True, "files": [], "empty": True})
             return jsonify({"ok": True, "files": [os.path.basename(p) for p in paths]})
         except Exception as e:
             return _err_with_log("report_policy_resolver_generate", e, lang=lang)

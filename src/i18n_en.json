@@ -2141,6 +2141,7 @@
   "gui_toast_policy_diff_done": "Policy Diff report generated.",
   "gui_toast_policy_diff_fail": "Policy Diff report failed.",
   "gui_toast_policy_resolver_done": "Policy Resolver report generated.",
+  "gui_toast_policy_resolver_empty": "No resolvable ACTIVE Policy found — nothing to generate.",
   "gui_toast_policy_resolver_fail": "Policy Resolver report failed.",
   "gui_toast_pu_done": "Policy Usage report generated: {count} records",
   "gui_toast_pu_done_detail": "Policy Usage report generated: {count} records ({detail})",

@@ -1101,11 +1101,14 @@ async function _doGeneratePolicyResolver() {
   _updateGenStep(_t('gui_gen_step_fetching'));
   try {
     const r = await post('/api/policy_resolver_report/generate', { format: 'all', lang: langElPr ? langElPr.value : 'en' });
-    if (r.ok) {
+    if (r.ok && r.files && r.files.length > 0) {
       _hideGenProgress(true, _t('gui_gen_done'));
       toast(_t('gui_toast_policy_resolver_done'));
       loadReports();
       if (typeof loadRcardMeta === 'function') loadRcardMeta();
+    } else if (r.ok) {
+      _hideGenProgress(true, _t('gui_gen_done'));
+      toast(_t('gui_toast_policy_resolver_empty'), 'info');
     } else {
       const fail = _t('gui_toast_policy_resolver_fail');
       _hideGenProgress(false, r.error || fail);
