@@ -1,8 +1,8 @@
-"""Dual-engine chart renderer for illumio_ops reports.
+"""Matplotlib chart renderer for illumio_ops reports.
 
-Single chart_spec dict feeds both engines:
-  - render_plotly_html(spec) -> str (HTML div, fully self-contained for offline use)
+Single chart_spec dict drives the renderer:
   - render_matplotlib_png(spec) -> bytes (PNG for Excel embedding)
+  - render_matplotlib_svg(spec) -> str (inline SVG for HTML reports)
 
 chart_spec shape:
   {
@@ -35,8 +35,6 @@ if matplotlib.get_backend().lower() != "agg":
     matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib import font_manager, rcParams
-import plotly.graph_objects as go
-import plotly.offline as plotly_offline
 
 # Bundle a CJK-capable font so offline-isolated deployments don't depend on
 # an OS-level font install. Loaded before rcParams so the family lookup
@@ -93,12 +91,6 @@ VERDICT_COLORS = {
     'Unknown':              SIGNAL_COLORS['info'],
 }
 
-_PALETTE = [
-    "#FF5500", "#FFA22F", "#299B65", "#375379", "#857ad6",
-    "#38BDF8", "#F43F51", "#10B981", "#F59E0B", "#6366F1",
-]
-
-
 def _resolve_chart_text(spec: dict[str, Any], field: str, *, lang: str = "en") -> str:
     """Resolve a chart_spec text field, preferring `<field>_key` i18n lookup.
 
@@ -141,179 +133,6 @@ def _pie_autopct(pct: float, *, threshold: float = 0.0) -> str:
     """
     return f"{pct:.1f}%" if pct > threshold else ""
 
-_BASE_LAYOUT = dict(
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Montserrat, -apple-system, sans-serif", size=13, color="#313638"),
-    title_font=dict(size=16, color="#1A2C32", family="Montserrat, sans-serif"),
-    margin=dict(l=48, r=24, t=52, b=48),
-    legend=dict(
-        bgcolor="rgba(247,244,238,0.88)",
-        bordercolor="#D6D7D7",
-        borderwidth=1,
-        font=dict(size=12),
-    ),
-    hoverlabel=dict(
-        bgcolor="#1A2C32",
-        font=dict(color="#fff", size=12),
-        bordercolor="#2D454C",
-    ),
-)
-
-
-def _apply_base_layout(fig, title: str, x_label: str = "", y_label: str = "") -> None:
-    updates = dict(**_BASE_LAYOUT, title=dict(text=title, x=0.04, xanchor="left"))
-    if x_label or y_label:
-        updates["xaxis"] = dict(
-            title=x_label,
-            gridcolor="rgba(50,81,88,0.10)",
-            linecolor="rgba(50,81,88,0.18)",
-            tickfont=dict(size=13),
-        )
-        updates["yaxis"] = dict(
-            title=y_label,
-            gridcolor="rgba(50,81,88,0.10)",
-            linecolor="rgba(50,81,88,0.18)",
-            tickfont=dict(size=13),
-        )
-    fig.update_layout(**updates)
-
-
-class FirstChartTracker:
-    """One instance per document. First call to consume() returns True; subsequent False."""
-
-    def __init__(self):
-        self._first = True
-
-    def consume(self) -> bool:
-        v = self._first
-        self._first = False
-        return v
-
-
-def render_plotly_html(spec: dict[str, Any], *, include_js: bool = True) -> str:
-    """Render chart spec as a styled plotly HTML div (offline, self-contained).
-
-    Args:
-        spec: Chart specification dict.
-        include_js: If True (default), embeds the full Plotly JS bundle (~3 MB) inline.
-            Set to False for subsequent charts in the same document to avoid repeating
-            the bundle — Plotly reuses the already-loaded runtime from the first chart.
-
-    Title and axis labels are resolved through `_resolve_chart_text` so that
-    chart_specs carrying `title_key` / `x_label_key` / `y_label_key` render
-    in the active language — matching the matplotlib renderer's behaviour.
-    """
-    from src.i18n import get_language
-    _lang = get_language()
-    chart_type = spec.get("type")
-    data = spec.get("data", {})
-    title = _resolve_chart_text(spec, "title", lang=_lang)
-    x_label = _resolve_chart_text(spec, "x_label", lang=_lang)
-    y_label = _resolve_chart_text(spec, "y_label", lang=_lang)
-
-    if chart_type == "bar":
-        labels = data.get("labels", [])
-        values = data.get("values", [])
-        colors = [_PALETTE[i % len(_PALETTE)] for i in range(len(labels))]
-        fig = go.Figure(go.Bar(
-            x=labels,
-            y=values,
-            marker=dict(color=colors, line=dict(color="rgba(0,0,0,0.08)", width=1)),
-            hovertemplate="%{x}<br><b>%{y:,}</b><extra></extra>",
-        ))
-        _apply_base_layout(fig, title, x_label, y_label)
-        fig.update_layout(bargap=0.28)
-    elif chart_type == "pie":
-        labels = data.get("labels", [])
-        values = data.get("values", [])
-        fig = go.Figure(go.Pie(
-            labels=labels,
-            values=values,
-            hole=0.38,
-            marker=dict(
-                colors=_PALETTE[:len(labels)],
-                line=dict(color="#ffffff", width=2),
-            ),
-            textfont=dict(size=12, family="Montserrat, sans-serif"),
-            hovertemplate="<b>%{label}</b><br>%{value:,} (%{percent})<extra></extra>",
-            pull=[0.04] + [0] * max(0, len(labels) - 1),
-        ))
-        _apply_base_layout(fig, title)
-        fig.update_layout(
-            legend=dict(**_BASE_LAYOUT["legend"], orientation="v", x=1.02, y=0.5),
-            margin=dict(l=24, r=160, t=52, b=24),
-        )
-    elif chart_type == "line":
-        fig = go.Figure(go.Scatter(
-            x=data.get("x", []),
-            y=data.get("y", []),
-            mode="lines+markers",
-            line=dict(color=_PALETTE[0], width=2.5),
-            marker=dict(size=7, color=_PALETTE[0], line=dict(color="#fff", width=1.5)),
-            hovertemplate="%{x}<br><b>%{y:,}</b><extra></extra>",
-        ))
-        _apply_base_layout(fig, title, x_label, y_label)
-    elif chart_type == "heatmap":
-        fig = go.Figure(go.Heatmap(
-            z=data.get("matrix", []),
-            x=data.get("labels", []),
-            y=data.get("ylabels", data.get("labels", [])),
-            colorscale=[[0, "#F7F4EE"], [0.5, "#FFA22F"], [1, "#1A2C32"]],
-            hovertemplate="x: %{x}<br>y: %{y}<br><b>%{z:,}</b><extra></extra>",
-        ))
-        _apply_base_layout(fig, title)
-        fig.update_layout(
-            xaxis=dict(tickfont=dict(size=13), gridcolor="rgba(0,0,0,0)"),
-            yaxis=dict(tickfont=dict(size=13), gridcolor="rgba(0,0,0,0)"),
-        )
-    elif chart_type == "network":
-        nodes = data.get("nodes", [])
-        edges = data.get("edges", [])
-        n = len(nodes) or 1
-        node_x = [math.cos(2 * math.pi * i / n) for i in range(n)]
-        node_y = [math.sin(2 * math.pi * i / n) for i in range(n)]
-        edge_x, edge_y = [], []
-        name_to_idx = {node.get("id") or node.get("name"): i for i, node in enumerate(nodes)}
-        for src, dst in edges:
-            i, j = name_to_idx.get(src), name_to_idx.get(dst)
-            if i is None or j is None:
-                continue
-            edge_x += [node_x[i], node_x[j], None]
-            edge_y += [node_y[i], node_y[j], None]
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=edge_x, y=edge_y, mode="lines",
-            line=dict(color="rgba(50,81,88,0.30)", width=1.5),
-            hoverinfo="none",
-        ))
-        fig.add_trace(go.Scatter(
-            x=node_x, y=node_y, mode="markers+text",
-            text=[nd.get("label", nd.get("id", "")) for nd in nodes],
-            marker=dict(
-                size=24,
-                color=_PALETTE[3],
-                line=dict(color="#fff", width=2),
-            ),
-            textposition="bottom center",
-            textfont=dict(size=13),
-            hovertemplate="%{text}<extra></extra>",
-        ))
-        _apply_base_layout(fig, title)
-        fig.update_layout(
-            showlegend=False,
-            xaxis=dict(showgrid=False, zeroline=False, visible=False),
-            yaxis=dict(showgrid=False, zeroline=False, visible=False),
-        )
-    else:
-        raise ValueError(f"unsupported chart type: {chart_type!r}")
-
-    return plotly_offline.plot(
-        fig,
-        output_type="div",
-        include_plotlyjs="inline" if include_js else False,
-        show_link=False,
-    )
 
 def _build_matplotlib_figure(spec: dict[str, Any], *, lang: str = "en"):
     """Build a matplotlib Figure from a chart spec (shared by PNG/SVG output).
