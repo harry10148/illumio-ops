@@ -585,7 +585,6 @@ class _TrafficReportBase:
             'matrix':         (_nav_link('matrix', 'rpt_tr_nav_matrix', '7 Cross-Label Matrix') if _mod07_block else ''),
             'unmanaged':      _nav_link('unmanaged', 'rpt_tr_nav_unmanaged', '8 Unmanaged Hosts'),
             'distribution':   _nav_link('distribution', 'rpt_tr_nav_distribution', '9 Traffic Distribution'),
-            'allowed':        _nav_link('allowed', 'rpt_tr_nav_allowed', '10 Allowed Traffic'),
             'bandwidth':      _nav_link('bandwidth', 'rpt_tr_nav_bandwidth', '11 Bandwidth & Volume'),
             'readiness':      _nav_link('readiness', 'rpt_tr_nav_readiness', '13 Enforcement Readiness'),
             'infrastructure': _nav_link('infrastructure', 'rpt_tr_nav_infrastructure', '14 Infrastructure Scoring'),
@@ -656,9 +655,6 @@ class _TrafficReportBase:
                           'rpt_tr_sec_unmanaged_intro', 'Inventory traffic involving hosts not managed by VEN; these typically sit outside the visibility and control boundary.') + '\n',
             'distribution': self._section('distribution', 'rpt_tr_sec_distribution', 'Traffic Distribution',
                           render_section_guidance('mod09', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod09_html()) + '\n',
-            'allowed': self._section('allowed', 'rpt_tr_sec_allowed', 'Allowed Traffic',
-                          render_section_guidance('mod10', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod10_html(),
-                          'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.') + '\n',
             'bandwidth': self._section('bandwidth', 'rpt_tr_sec_bandwidth', 'Bandwidth &amp; Volume',
                           render_section_guidance('mod11', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod11_html(),
                           'rpt_tr_sec_bandwidth_intro', 'Review high-volume flows by bandwidth and data volume to identify large backups, batch jobs, or suspected exfiltration.') + '\n',
@@ -878,6 +874,16 @@ class _TrafficReportBase:
                 f'<h4>{_s("rpt_mod02_top_outbound_ports")} ({status})</h4>',
                 _df_to_html(dm.get('top_outbound_ports'), lang=_lang),
             )
+        # Folded in from the former standalone "Allowed Traffic" section:
+        # allowed-from-unmanaged audit flags are the security-relevant remainder.
+        m10 = self._r.get('mod10', {})
+        flags = m10.get('audit_flags')
+        if flags is not None and hasattr(flags, 'empty') and not flags.empty:
+            table_html += (
+                self._subnote('rpt_tr_audit_flags_subnote')
+                + f'<h3>{_s("rpt_tr_audit_flags")} ({m10.get("audit_flag_count", 0)})</h3>'
+                + _df_to_html(flags, lang=_lang)
+            )
         return (
             '<div class="section-top">'
             + f'<p class="section-intro">{intro_text}</p>'
@@ -1063,24 +1069,6 @@ class _TrafficReportBase:
             + _df_to_html(m.get('port_distribution'), lang=_lang) +
             f'<h3>{_s("rpt_tr_proto_dist")}</h3>'
             + _df_to_html(m.get('proto_distribution'), lang=_lang)
-        )
-
-    def _mod10_html(self):
-        _s = self._s
-        _lang = self._lang
-        m = self._r.get('mod10', {})
-        if m.get('note'):
-            return f'<p class="note">{m["note"]}</p>'
-        chart_html = _render_chart_for_html(m.get('chart_spec'), lang=self._lang)
-        return (
-            '<div class="section-body">'
-            + self._subnote('rpt_tr_allowed_flows_subnote')
-            + chart_html
-            + _df_to_html(m.get('top_app_flows'), lang=_lang)
-            + '</div>'
-            + self._subnote('rpt_tr_audit_flags_subnote')
-            + f'<h3>{_s("rpt_tr_audit_flags")} ({m.get("audit_flag_count", 0)})</h3>'
-            + _df_to_html(m.get('audit_flags'), lang=_lang)
         )
 
     def _mod_drift_html(self):
@@ -1557,7 +1545,7 @@ class SecurityRiskHtmlExporter(_TrafficReportBase):
 
     def _ordered_section_keys(self) -> list[str]:
         return ['summary', 'drift', 'overview', 'policy', 'uncovered', 'ransomware',
-                'user', 'allowed', 'readiness', 'infrastructure', 'lateral', 'findings']
+                'user', 'readiness', 'infrastructure', 'lateral', 'findings']
 
 
 class NetworkInventoryHtmlExporter(_TrafficReportBase):
