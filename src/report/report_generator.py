@@ -205,6 +205,35 @@ class ReportGenerator:
         )
         return {"raw": flows or [], "agg": None, "source": "api"}
 
+    def fetch_traffic_df(self, start_date: Optional[str] = None,
+                         end_date: Optional[str] = None,
+                         filters: Optional[dict] = None):
+        """Query the PCE (cache-aware) and return the parsed estate traffic df.
+
+        Thin reuse of the same fetch primitives generate_from_api uses
+        (_fetch_traffic + _parse_api). Returns an empty DataFrame when no
+        records are returned. Used by single-app facades that scope the estate
+        df post-fetch rather than re-querying per app.
+        """
+        import pandas as pd
+        if self.api is None:
+            raise RuntimeError("api_client is required for fetch_traffic_df()")
+        if not end_date:
+            end_date = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+        if not start_date:
+            start_date = (
+                datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
+            ).isoformat().replace("+00:00", "Z")
+        start_dt = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+        end_dt = datetime.datetime.fromisoformat(end_date.replace("Z", "+00:00"))
+        if ruleset_needs_draft_pd(DRAFT_PD_RULES):
+            filters = dict(filters or {})
+            filters.setdefault("requires_draft_pd", True)
+        records = self._fetch_traffic(start_dt, end_dt, filters)["raw"]
+        if not records:
+            return pd.DataFrame()
+        return self._parse_api(records)
+
     # ── public ───────────────────────────────────────────────────────────────
 
     def generate_from_api(self, start_date: Optional[str] = None,
