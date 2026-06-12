@@ -493,6 +493,35 @@ def make_reports_blueprint(
         except Exception as e:
             return _err_with_log("report_policy_resolver_generate", e, lang=lang)
 
+    # ── API: App Summary Report ───────────────────────────────────────────────
+    @bp.route('/api/app_report/generate', methods=['POST'])
+    @limiter.limit("10 per hour")
+    def api_generate_app_report():
+        d = request.json or {}
+        lang = d.get('lang', 'en')
+        if lang not in ('en', 'zh_TW'):
+            lang = 'en'
+
+        app = (d.get('app') or '').strip()
+        if not app:
+            return jsonify({"ok": False, "error": t("gui_app_required", lang=lang)}), 400
+
+        try:
+            from src.report.app_summary_report import AppSummaryReport
+            from src.api_client import ApiClient
+            cm.load()
+            config_dir = _resolve_config_dir()
+            from src.main import _make_cache_reader
+            rep = AppSummaryReport(cm, api_client=ApiClient(cm), config_dir=config_dir,
+                                   cache_reader=_make_cache_reader(cm))
+            output_dir = _resolve_reports_dir(cm)
+            path = rep.run(app=app, env=d.get('env') or None, output_dir=output_dir,
+                           lang=lang, start_date=d.get('start_date'), end_date=d.get('end_date'))
+            paths = path if isinstance(path, list) else [path]
+            return jsonify({"ok": True, "files": [os.path.basename(p) for p in paths]})
+        except Exception as e:
+            return _err_with_log("report_app_summary_generate", e, lang=lang)
+
     # ── API: VEN Status Report ────────────────────────────────────────────────
     @bp.route('/api/ven_status_report/generate', methods=['POST'])
     @limiter.limit("10 per hour")

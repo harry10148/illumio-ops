@@ -242,6 +242,7 @@ async function loadRcardMeta() {
     // Policy Diff reports carry no metadata sidecar — derive type from filename prefix.
     if (!t && rp.filename && rp.filename.startsWith('Illumio_Policy_Diff_Report_')) t = 'policy_diff';
     if (!t && rp.filename && rp.filename.startsWith('Illumio_Policy_Resolver_')) t = 'policy_resolver';
+    if (!t && rp.filename && rp.filename.startsWith('Illumio_App_Summary_')) t = 'app_summary';
     if (!t) return;
     if (!latestByType[t] || rp.mtime > latestByType[t]) latestByType[t] = rp.mtime;
   });
@@ -645,6 +646,7 @@ function openReportGenModal(type) {
     policy_usage: { titleKey: 'gui_gen_pu_title',      icon: '#icon-shield', dates: true  },
     policy_diff:  { titleKey: 'gui_gen_policy_diff_title', icon: '#icon-shield', dates: false },
     policy_resolver: { titleKey: 'gui_gen_policy_resolver_title', icon: '#icon-shield', dates: false },
+    app_summary:  { titleKey: 'gui_gen_app_title', icon: '#icon-shield', dates: true, appField: true },
   };
   const m = meta[type] || meta.traffic;
   $('m-gen-title').innerHTML =
@@ -671,6 +673,16 @@ function openReportGenModal(type) {
     $('m-gen-filters').style.display = 'none';
     $('m-gen-profile-row').style.display = 'none';
     $('m-gen-clip-row').style.display = 'none';
+  }
+
+  const appRow = $('m-gen-app-row');
+  if (appRow) {
+    appRow.style.display = m.appField ? '' : 'none';
+    if (m.appField) {
+      ['m-gen-app','m-gen-env'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.value = '';
+      });
+    }
   }
   
   $('m-gen-note').style.display  = m.dates ? 'none' : '';
@@ -707,6 +719,7 @@ async function confirmReportGen() {
     policy_usage: _t('gui_gen_pu_title'),
     policy_diff:  _t('gui_gen_policy_diff_title'),
     policy_resolver: _t('gui_gen_policy_resolver_title'),
+    app_summary:  _t('gui_gen_app_title'),
   };
   _showGenProgress(typeLabels[_genReportType] || _t('gui_gen_fallback_title'));
   closeModal('m-gen-report');
@@ -716,6 +729,7 @@ async function confirmReportGen() {
   else if (_genReportType === 'policy_usage') await _doGeneratePolicyUsageClean();
   else if (_genReportType === 'policy_diff')  await _doGeneratePolicyDiff();
   else if (_genReportType === 'policy_resolver') await _doGeneratePolicyResolver();
+  else if (_genReportType === 'app_summary')  await _doGenerateAppSummary();
 }
 
 function _collectReportFilters() {
@@ -1085,6 +1099,42 @@ async function _doGeneratePolicyResolver() {
   } catch(e) {
     _hideGenProgress(false, e.message);
     toast(e.message || _t('gui_toast_policy_resolver_fail'), 'err');
+  }
+}
+
+async function _doGenerateAppSummary() {
+  const appEl = document.getElementById('m-gen-app');
+  const envEl = document.getElementById('m-gen-env');
+  const langElApp = document.getElementById('m-gen-lang');
+  const app = appEl ? appEl.value.trim() : '';
+  if (!app) {
+    const msg = _t('gui_app_required');
+    _hideGenProgress(false, msg);
+    toast(msg, 'err');
+    return;
+  }
+  const start = $('m-gen-start') ? $('m-gen-start').value : null;
+  const end   = $('m-gen-end') ? $('m-gen-end').value : null;
+  _updateGenStep(_t('gui_gen_step_fetching'));
+  try {
+    const r = await post('/api/app_report/generate', {
+      app, env: envEl ? envEl.value.trim() : '',
+      lang: langElApp ? langElApp.value : 'en',
+      start_date: start, end_date: end,
+    });
+    if (r.ok) {
+      _hideGenProgress(true, _t('gui_gen_done'));
+      toast(_t('gui_toast_app_summary_done'));
+      loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
+    } else {
+      const fail = _t('gui_toast_app_summary_fail');
+      _hideGenProgress(false, r.error || fail);
+      toast(r.error || fail, 'err');
+    }
+  } catch(e) {
+    _hideGenProgress(false, e.message);
+    toast(e.message || _t('gui_toast_app_summary_fail'), 'err');
   }
 }
 

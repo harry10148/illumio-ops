@@ -1426,6 +1426,19 @@
             </div>
           </div>
         </div>
+        <div class="rcard" data-rtype="app_summary">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_rcard_app_title">App Summary Report</h3>
+            <p data-i18n="gui_rcard_app_desc">Single-App connection baseline + Policy coverage for app owners and audits</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-app" data-action="openReportGenModal" data-args='["app_summary"]'>
+                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- History table -->
@@ -2847,6 +2860,16 @@
       <div id="m-gen-csv-upload" style="display:none; margin-bottom:12px;">
         <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--dim);" data-i18n="gui_gen_select_csv_file">Select CSV File</label>
         <input type="file" id="m-gen-csv-file" accept=".csv" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; background:var(--bg2); color:var(--fg);">
+      </div>
+      <div id="m-gen-app-row" style="display:none; margin-bottom:12px;">
+        <div class="form-group">
+          <label for="m-gen-app" data-i18n="gui_app_label_field">App Label</label>
+          <input type="text" id="m-gen-app" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; background:var(--bg2); color:var(--fg);">
+        </div>
+        <div class="form-group" style="margin-top:8px;">
+          <label for="m-gen-env" data-i18n="gui_env_label_field">Env Label (optional)</label>
+          <input type="text" id="m-gen-env" style="width:100%; padding:8px; border:1px solid var(--border); border-radius:4px; background:var(--bg2); color:var(--fg);">
+        </div>
       </div>
       <div id="m-gen-dates">
         <div class="form-row">
