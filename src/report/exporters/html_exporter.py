@@ -30,7 +30,7 @@ from .report_i18n import (
 from .report_css import build_css, TABLE_JS
 from src.report.exporters._exec_summary import render_exec_summary_html
 from .table_renderer import render_df_table
-from .chart_renderer import render_plotly_html, FirstChartTracker
+from .chart_renderer import render_matplotlib_svg
 from .code_highlighter import get_highlight_css
 from src.humanize_ext import human_number
 from src.report.section_guidance import get_guidance, visible_in
@@ -85,17 +85,17 @@ def render_appendix(title: str, body_html: str, *, detail_level: str, lang: str 
     )
 
 
-def _render_chart_for_html(chart_spec: dict | None, include_js: bool = True) -> str:
-    """Emit plotly interactive div. Matplotlib PNG is Excel-only; never shown in HTML."""
-    if not chart_spec:
-        return ''
+def _render_chart_for_html(spec: dict | None, lang: str = "en", include_js: bool = False) -> str:
+    """Render a chart spec as inline static SVG. ``include_js`` is accepted
+    for backward compatibility and ignored (plotly.js is no longer embedded)."""
+    if not spec:
+        return ""
     try:
-        plotly_div = render_plotly_html(chart_spec, include_js=include_js)
-        if plotly_div:
-            return f'<div class="chart-container">{plotly_div}</div>'
-    except Exception as exc:
-        logger.warning('plotly render failed: {}', exc)
-    return ''
+        svg = render_matplotlib_svg(spec, lang=lang)
+    except Exception as exc:  # noqa: BLE001 — a bad chart must not kill the report
+        logger.warning("[HtmlExporter] chart render failed (skipped): {}", exc)
+        return ""
+    return f'<figure class="chart-static">{svg}</figure>'
 
 def _fmt_bytes(b) -> str:
     """Convert raw byte count to human-readable string (B / KB / MB / GB / TB)."""
@@ -440,7 +440,6 @@ class _TrafficReportBase:
     def _build(self, profile: str = "", detail_level: str = "") -> str:
         profile = profile or self._profile
         detail_level = _REPORT_DETAIL_LEVEL
-        self._chart_tracker = FirstChartTracker()
         _sl = self._lang
         _s = lambda k: STRINGS[k].get(_sl) or STRINGS[k]["en"]
         self._s = _s
@@ -579,12 +578,13 @@ class _TrafficReportBase:
             'overview':       _nav_link('overview', 'rpt_tr_nav_overview', '1 Traffic Overview'),
             'policy':         _nav_link('policy', 'rpt_tr_nav_policy', '2 Policy Decisions'),
             'uncovered':      _nav_link('uncovered', 'rpt_tr_nav_uncovered', '3 Uncovered Flows'),
+            'drift':          _nav_link('drift', 'rpt_tr_nav_drift', 'Baseline Drift'),
+            'labels':         _nav_link('labels', 'rpt_tr_nav_labels', 'Label Hygiene'),
             'ransomware':     _nav_link('ransomware', 'rpt_tr_nav_ransomware', '4 Ransomware Exposure'),
             'user':           (_nav_link('user', 'rpt_tr_nav_user', '6 User & Process') if _mod06_has_data else ''),
             'matrix':         (_nav_link('matrix', 'rpt_tr_nav_matrix', '7 Cross-Label Matrix') if _mod07_block else ''),
             'unmanaged':      _nav_link('unmanaged', 'rpt_tr_nav_unmanaged', '8 Unmanaged Hosts'),
             'distribution':   _nav_link('distribution', 'rpt_tr_nav_distribution', '9 Traffic Distribution'),
-            'allowed':        _nav_link('allowed', 'rpt_tr_nav_allowed', '10 Allowed Traffic'),
             'bandwidth':      _nav_link('bandwidth', 'rpt_tr_nav_bandwidth', '11 Bandwidth & Volume'),
             'readiness':      _nav_link('readiness', 'rpt_tr_nav_readiness', '13 Enforcement Readiness'),
             'infrastructure': _nav_link('infrastructure', 'rpt_tr_nav_infrastructure', '14 Infrastructure Scoring'),
@@ -639,6 +639,12 @@ class _TrafficReportBase:
             'uncovered': self._section('uncovered', 'rpt_tr_sec_uncovered', 'Uncovered Flows',
                           render_section_guidance('mod03', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod03_html(),
                           'rpt_tr_sec_uncovered_intro', 'Focus on traffic not yet covered by effective Policy, helping prioritise which Services and directions to tighten first.') + '\n',
+            'labels': self._section('labels', 'rpt_tr_sec_labels', 'Label Hygiene',
+                          render_section_guidance('mod_labels', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod_labels_html(),
+                          'rpt_tr_sec_labels_intro', 'Measure Label coverage and conflicts — labeling quality determines Policy quality.') + '\n',
+            'drift': self._section('drift', 'rpt_tr_sec_drift', 'Baseline Drift',
+                          render_section_guidance('mod_drift', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod_drift_html(),
+                          'rpt_tr_sec_drift_intro', 'Compare this period\'s app-to-app connections against the previous report to spot new paths and disappeared baselines.') + '\n',
             'ransomware': self._section('ransomware', 'rpt_tr_sec_ransomware', 'Ransomware Exposure',
                           render_section_guidance('mod04', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod04_html(),
                           'rpt_tr_sec_ransomware_intro', 'Check high-risk Ports, Allowed flows, and host exposure commonly tied to ransomware attack chains.') + '\n',
@@ -649,9 +655,6 @@ class _TrafficReportBase:
                           'rpt_tr_sec_unmanaged_intro', 'Inventory traffic involving hosts not managed by VEN; these typically sit outside the visibility and control boundary.') + '\n',
             'distribution': self._section('distribution', 'rpt_tr_sec_distribution', 'Traffic Distribution',
                           render_section_guidance('mod09', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod09_html()) + '\n',
-            'allowed': self._section('allowed', 'rpt_tr_sec_allowed', 'Allowed Traffic',
-                          render_section_guidance('mod10', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod10_html(),
-                          'rpt_tr_sec_allowed_intro', 'Focus on explicitly Allowed traffic to confirm which are required business paths and which still deserve an audit.') + '\n',
             'bandwidth': self._section('bandwidth', 'rpt_tr_sec_bandwidth', 'Bandwidth &amp; Volume',
                           render_section_guidance('mod11', profile=profile, detail_level=detail_level, lang=self._lang) + self._mod11_html(),
                           'rpt_tr_sec_bandwidth_intro', 'Review high-volume flows by bandwidth and data volume to identify large backups, batch jobs, or suspected exfiltration.') + '\n',
@@ -842,7 +845,7 @@ class _TrafficReportBase:
         m = self._r.get('mod02', {})
         intro_text = t('rpt_tr_sec_policy_intro', lang=_lang,
                        default='Break down the ratios and details of Allowed, Blocked, and Potentially Blocked to gauge how Policy is actually landing.')
-        chart_html = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+        chart_html = _render_chart_for_html(m.get('chart_spec'), lang=self._lang)
         table_html = self._subnote('rpt_tr_mod02_intro') + _df_to_html(m.get('summary'), lang=_lang)
         pc = m.get('port_coverage')
         if pc is not None and hasattr(pc, 'empty') and not pc.empty:
@@ -870,6 +873,16 @@ class _TrafficReportBase:
                 _df_to_html(dm.get('top_inbound_ports'), lang=_lang),
                 f'<h4>{_s("rpt_mod02_top_outbound_ports")} ({status})</h4>',
                 _df_to_html(dm.get('top_outbound_ports'), lang=_lang),
+            )
+        # Folded in from the former standalone "Allowed Traffic" section:
+        # allowed-from-unmanaged audit flags are the security-relevant remainder.
+        m10 = self._r.get('mod10', {})
+        flags = m10.get('audit_flags')
+        if flags is not None and hasattr(flags, 'empty') and not flags.empty:
+            table_html += (
+                self._subnote('rpt_tr_audit_flags_subnote')
+                + f'<h3>{_s("rpt_tr_audit_flags")} ({m10.get("audit_flag_count", 0)})</h3>'
+                + _df_to_html(flags, lang=_lang)
             )
         return (
             '<div class="section-top">'
@@ -1007,7 +1020,7 @@ class _TrafficReportBase:
         _s = self._s
         _lang = self._lang
         m = self._r.get('mod07', {})
-        out = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+        out = _render_chart_for_html(m.get('chart_spec'), lang=self._lang)
         for key, data in m.get('matrices', {}).items():
             out += f'<h3>{_s("rpt_tr_label_key")} {key.upper()}</h3>'
             if 'note' in data:
@@ -1058,23 +1071,45 @@ class _TrafficReportBase:
             + _df_to_html(m.get('proto_distribution'), lang=_lang)
         )
 
-    def _mod10_html(self):
-        _s = self._s
+    def _mod_drift_html(self):
         _lang = self._lang
-        m = self._r.get('mod10', {})
-        if m.get('note'):
-            return f'<p class="note">{m["note"]}</p>'
-        chart_html = _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
-        return (
-            '<div class="section-body">'
-            + self._subnote('rpt_tr_allowed_flows_subnote')
-            + chart_html
-            + _df_to_html(m.get('top_app_flows'), lang=_lang)
-            + '</div>'
-            + self._subnote('rpt_tr_audit_flags_subnote')
-            + f'<h3>{_s("rpt_tr_audit_flags")} ({m.get("audit_flag_count", 0)})</h3>'
-            + _df_to_html(m.get('audit_flags'), lang=_lang)
+        m = self._r.get('mod_drift', {})
+        if not m.get('available'):
+            return f'<p class="note">{t("rpt_drift_first_run", lang=_lang)}</p>'
+        head = (
+            f'<p class="section-intro">{t("rpt_drift_baseline_from", lang=_lang)}'
+            f' {(m.get("prev_generated_at") or "")[:16]}</p>'
         )
+        return (
+            head
+            + f'<h3>{t("rpt_drift_new_pairs", lang=_lang)} ({m.get("new_count", 0)})</h3>'
+            + _df_to_html(m.get('new_pairs'), lang=_lang)
+            + f'<h3>{t("rpt_drift_disappeared", lang=_lang)} ({m.get("disappeared_count", 0)})</h3>'
+            + _df_to_html(m.get('disappeared_pairs'), lang=_lang)
+        )
+
+    def _mod_labels_html(self):
+        _lang = self._lang
+        m = self._r.get('mod_labels', {})
+        parts = []
+        if m.get('workload_data_available'):
+            parts.append(
+                f'<p class="section-intro">{t("rpt_labels_coverage", lang=_lang)}: '
+                f'<b>{m.get("fully_labeled_pct", 0)}%</b> '
+                f'({m.get("fully_labeled_count", 0)}/{m.get("total_workloads", 0)})</p>')
+            parts.append(_render_chart_for_html(m.get('chart_spec'), lang=_lang))
+            parts.append(f'<h3>{t("rpt_labels_unlabeled_workloads", lang=_lang)} '
+                         f'({m.get("unlabeled_workload_count", 0)})</h3>')
+            parts.append(_df_to_html(m.get('unlabeled_workloads'), lang=_lang))
+        else:
+            parts.append(f'<p class="note">{t("rpt_labels_no_inventory", lang=_lang)}</p>')
+        parts.append(f'<h3>{t("rpt_labels_flow_gap", lang=_lang)}: '
+                     f'{m.get("managed_unlabeled_flow_count", 0)}</h3>')
+        conflicts = m.get('label_conflicts')
+        if conflicts is not None and hasattr(conflicts, 'empty') and not conflicts.empty:
+            parts.append(f'<h3>{t("rpt_labels_conflicts", lang=_lang)} ({len(conflicts)})</h3>')
+            parts.append(_df_to_html(conflicts, lang=_lang))
+        return ''.join(parts)
 
     def _mod11_html(self):
         m = self._r.get('mod11', {})
@@ -1396,7 +1431,7 @@ class _TrafficReportBase:
         html = (
             self._subnote('rpt_tr_lateral_intro', 'Covers all lateral-movement analysis including IP-level host connection patterns and App(Env)-level graph risk scoring.')
             + f'<p>{_s("rpt_tr_lateral_flows")} <b>{total:,}</b> ({pct}% {_s("rpt_tr_lateral_pct")})</p>'
-            + _render_chart_for_html(m.get('chart_spec'), include_js=self._chart_tracker.consume())
+            + _render_chart_for_html(m.get('chart_spec'), lang=self._lang)
         )
         service_summary = m.get('service_summary')
         if service_summary is not None and not service_summary.empty:
@@ -1509,8 +1544,8 @@ class SecurityRiskHtmlExporter(_TrafficReportBase):
         return True
 
     def _ordered_section_keys(self) -> list[str]:
-        return ['summary', 'overview', 'policy', 'uncovered', 'ransomware',
-                'user', 'allowed', 'readiness', 'infrastructure', 'lateral', 'findings']
+        return ['summary', 'drift', 'overview', 'policy', 'uncovered', 'ransomware',
+                'user', 'readiness', 'infrastructure', 'lateral', 'findings']
 
 
 class NetworkInventoryHtmlExporter(_TrafficReportBase):
@@ -1524,7 +1559,7 @@ class NetworkInventoryHtmlExporter(_TrafficReportBase):
         return False
 
     def _ordered_section_keys(self) -> list[str]:
-        return ['summary', 'overview', 'policy', 'matrix', 'unmanaged',
+        return ['summary', 'overview', 'labels', 'policy', 'matrix', 'unmanaged',
                 'distribution', 'bandwidth', 'ringfence', 'change_impact']
 
 

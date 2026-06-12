@@ -244,7 +244,7 @@ BASE_CSS = """\
 
   .mono, .report-table tbody td.mono { font-family: var(--font-mono); font-size: 11px; }
 
-  /* Chart container — constrains plotly divs to a readable width and adds a
+  /* Chart container — constrains chart containers to a readable width and adds a
      subtle card treatment so charts don't float on bare white. */
   .chart-container {
     margin: 16px 0 20px;
@@ -257,6 +257,7 @@ BASE_CSS = """\
   }
   .chart-container > div { width: 100% !important; }
   .chart-img { width: 100%; height: auto; display: block; }
+  .chart-static svg{max-width:100%;height:auto;}
 
   /* R5 Bug 6: landscape A4 for print so 17+ column wide tables fit
      without the print engine clipping rightmost columns. */
@@ -312,7 +313,7 @@ BASE_CSS = """\
     section.report-cover { page-break-before: avoid !important; page-break-after: always; }
     /* Cover: fills full A4 page. Explicit flex props since display:none in base CSS. */
     .report-cover { display: flex !important; flex-direction: column !important; justify-content: space-between !important; min-height: 100vh !important; padding: 40px 36px !important; margin: 0 !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-    /* Clip Plotly chart containers to prevent legend/axis overflow into adjacent content */
+    /* Clip Chart containers (legacy) to prevent legend/axis overflow into adjacent content */
     .chart-container { page-break-inside: avoid; overflow: hidden; }
     /* Hide expanded long-text body in print; only the summary (truncated text) shows */
     .cell-long > .cell-long-full { display: none; }

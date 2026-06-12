@@ -315,13 +315,13 @@ def render_plotly_html(spec: dict[str, Any], *, include_js: bool = True) -> str:
         show_link=False,
     )
 
-def render_matplotlib_png(spec: dict[str, Any], *, lang: str = "en") -> bytes:
-    """Render chart spec as a PNG byte string (for Excel embedding).
+def _build_matplotlib_figure(spec: dict[str, Any], *, lang: str = "en"):
+    """Build a matplotlib Figure from a chart spec (shared by PNG/SVG output).
 
     Title and axis labels are resolved through `_resolve_chart_text` so that
     chart_specs carrying `title_key` / `x_label_key` / `y_label_key` render in
-    the requested language. Specs without those keys fall back to the literal
-    `title` / `x_label` / `y_label` for backward compatibility.
+    the requested language. Raises ValueError for unsupported chart types.
+    Caller owns plt.close(fig).
     """
     chart_type = spec.get("type")
     data = spec.get("data", {})
@@ -396,8 +396,25 @@ def render_matplotlib_png(spec: dict[str, Any], *, lang: str = "en") -> bytes:
 
     ax.set_title(title)
     fig.tight_layout()
+    return fig
 
+
+def render_matplotlib_png(spec: dict[str, Any], *, lang: str = "en") -> bytes:
+    """Render chart spec as a PNG byte string (for Excel embedding)."""
+    fig = _build_matplotlib_figure(spec, lang=lang)
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=100)
     plt.close(fig)
     return buf.getvalue()
+
+
+def render_matplotlib_svg(spec: dict[str, Any], *, lang: str = "en") -> str:
+    """Render chart spec as inline-embeddable SVG markup (for HTML reports)."""
+    fig = _build_matplotlib_figure(spec, lang=lang)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="svg")
+    plt.close(fig)
+    svg = buf.getvalue().decode("utf-8")
+    # Strip XML declaration / DOCTYPE so the markup embeds directly in HTML.
+    idx = svg.find("<svg")
+    return svg[idx:] if idx != -1 else svg

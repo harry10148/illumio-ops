@@ -114,6 +114,26 @@ REGISTRY: dict[str, SectionGuidance] = {
         profile_visibility=("security_risk", "network_inventory"),
         min_detail_level="full",
     ),
+    "mod_drift": SectionGuidance(
+        module_id="mod_drift",
+        purpose_key="rpt_guidance_mod_drift_purpose",
+        watch_signals_key="rpt_guidance_mod_drift_signals",
+        how_to_read_key="rpt_guidance_mod_drift_how",
+        recommended_actions_key="rpt_guidance_mod_drift_actions",
+        primary_audience="security",
+        profile_visibility=("security_risk",),
+        min_detail_level="full",
+    ),
+    "mod_labels": SectionGuidance(
+        module_id="mod_labels",
+        purpose_key="rpt_guidance_mod_labels_purpose",
+        watch_signals_key="rpt_guidance_mod_labels_signals",
+        how_to_read_key="rpt_guidance_mod_labels_how",
+        recommended_actions_key="rpt_guidance_mod_labels_actions",
+        primary_audience="platform",
+        profile_visibility=("network_inventory",),
+        min_detail_level="full",
+    ),
     "mod_ringfence": SectionGuidance(
         module_id="mod_ringfence",
         purpose_key="rpt_guidance_mod_ringfence_purpose",
@@ -198,13 +218,27 @@ REGISTRY: dict[str, SectionGuidance] = {
 
 
 def get_guidance(module_id: str) -> Optional[SectionGuidance]:
-    """Return guidance for a module, or None if not registered."""
-    return REGISTRY.get(module_id)
+    """Return guidance for a module, or None if not registered.
+
+    Accepts either the full registry key ("mod02_policy_decisions") or the
+    short id the exporters use ("mod02") — short ids match by prefix.
+    """
+    g = REGISTRY.get(module_id)
+    if g is not None:
+        return g
+    prefix = module_id + "_"
+    matches = [value for key, value in REGISTRY.items() if key.startswith(prefix)]
+    if len(matches) > 1:
+        raise ValueError(
+            f"ambiguous section-guidance id {module_id!r}: matches "
+            f"{[m.module_id for m in matches]}"
+        )
+    return matches[0] if matches else None
 
 
 def visible_in(module_id: str, profile: ProfileVisibility, detail_level: DetailLevel = "full") -> bool:
     """Return True if the section should render in the given profile."""
-    g = REGISTRY.get(module_id)
+    g = get_guidance(module_id)
     if g is None:
         return True  # unregistered modules render by default
     return profile in g.profile_visibility

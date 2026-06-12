@@ -13,7 +13,7 @@ from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS
 from .table_renderer import render_df_table
-from .chart_renderer import render_plotly_html, FirstChartTracker
+from .chart_renderer import render_matplotlib_svg
 from .code_highlighter import get_highlight_css
 from .html_exporter import render_section_guidance
 from src.i18n import t
@@ -156,7 +156,6 @@ class PolicyUsageHtmlExporter:
     def _build(self, profile: str = "", detail_level: str = "") -> str:
         profile = profile or self._profile
         detail_level = _REPORT_DETAIL_LEVEL
-        self._chart_tracker = FirstChartTracker()
         _sl = self._lang
         _s = lambda k: STRINGS[k].get(_sl) or STRINGS[k]["en"]
         self._s = _s
@@ -442,9 +441,9 @@ class PolicyUsageHtmlExporter:
                         "values": [hit, unused],
                     },
                 }
-                div = render_plotly_html(spec, include_js=self._chart_tracker.consume())
-                if div:
-                    chart_html = f'<div class="chart-container">{div}</div>'
+                svg = render_matplotlib_svg(spec, lang=self._lang)
+                if svg:
+                    chart_html = f'<figure class="chart-static">{svg}</figure>'
             except Exception:
                 pass
         html_parts.append(stats + chart_html + _df_to_html(summary_df, lang=self._lang))
