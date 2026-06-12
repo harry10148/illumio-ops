@@ -23,6 +23,7 @@ class Finding:
     description: str
     recommendation: str
     evidence: dict = field(default_factory=dict)   # supporting data for the finding
+    technique_ids: tuple = ()                       # MITRE ATT&CK technique tuples
 
     @property
     def severity_rank(self) -> int:

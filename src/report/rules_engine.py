@@ -38,6 +38,14 @@ def _fmt_bytes(n: float) -> str:
     return f"{n:.1f} TB"
 
 
+def annotate_techniques(findings: list) -> list:
+    """Attach MITRE technique tuples to findings (pure, in-place safe)."""
+    from src.report.analysis.mitre_map import techniques_for
+    for f in findings:
+        f.technique_ids = techniques_for(f.rule_id)
+    return findings
+
+
 # Registry of standalone draft-PD rules (R01–R05)
 DRAFT_PD_RULES: list = [
     R01DraftDenyDetected,
@@ -83,7 +91,7 @@ class RulesEngine:
         findings.extend(self._eval_builtin(df))
         findings.sort(key=lambda f: f.severity_rank)
         logger.info(f"[RulesEngine] {len(findings)} findings generated")
-        return findings
+        return annotate_techniques(findings)
 
     # ── built-in rules ───────────────────────────────────────────────────────
 
