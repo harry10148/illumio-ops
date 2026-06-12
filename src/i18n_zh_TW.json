@@ -1614,6 +1614,7 @@
   "gui_ov_posture_modal_ransomware": "Ransomware 暴露",
   "gui_ov_posture_modal_uncovered": "未覆蓋流量",
   "gui_ov_posture_ransomware_apps": "Ransomware 風險流量",
+  "gui_ov_posture_run_now": "立即產生",
   "gui_ov_posture_score_label": "Posture Score",
   "gui_ov_posture_unavailable": "請執行 Security Posture 報表以載入此區塊。",
   "gui_ov_risk_feed_title": "Top 風險發現",

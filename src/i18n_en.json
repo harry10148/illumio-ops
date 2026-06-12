@@ -1540,6 +1540,7 @@
   "gui_ov_posture_modal_ransomware": "Ransomware exposure",
   "gui_ov_posture_modal_uncovered": "Uncovered flows",
   "gui_ov_posture_ransomware_apps": "Ransomware risk flows",
+  "gui_ov_posture_run_now": "Generate now",
   "gui_ov_posture_score_label": "Posture Score",
   "gui_ov_posture_unavailable": "Run a Security Posture report to populate this section.",
   "gui_ov_recent_events": "Recent dispatch events",

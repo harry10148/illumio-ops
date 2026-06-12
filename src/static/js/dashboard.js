@@ -1409,6 +1409,10 @@ function _renderRiskFeed(posture, T) {
   if (!posture || posture.available === false) {
     feedEl.innerHTML = '<div style="color:var(--dim);font-size:13px;">'
       + T('gui_ov_posture_unavailable', 'Run a Security Posture report to populate this section.')
+      + '<div style="margin-top:10px;">'
+      + '<button class="btn btn-primary btn-sm" data-action="openReportGenModal" data-args=\'["traffic"]\'>'
+      + T('gui_ov_posture_run_now', 'Generate now') + '</button>'
+      + '</div>'
       + '</div>';
     return;
   }
