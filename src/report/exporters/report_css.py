@@ -431,6 +431,28 @@ POLICY_USAGE_CSS = """\
   }
 """
 
+POLICY_DIFF_CSS = """\
+  /* ── Policy Diff: semantic row + risk coloring ──────────────────────────
+     Subtle row tints by change type (added=green, removed=red, modified=amber)
+     using shared signal tokens so the coloring tracks the report theme. The
+     tint sits behind the table's nth-child stripe / hover, so it's scoped to
+     the cells (higher specificity) to win over the base .report-table rules. */
+  .report-table tbody tr.pd-added td    { background: var(--green-10); }
+  .report-table tbody tr.pd-removed td  { background: var(--red-10); }
+  .report-table tbody tr.pd-modified td { background: #FEFCE8; }
+  .report-table tbody tr.pd-added:hover td    { background: #cdf3df; }
+  .report-table tbody tr.pd-removed:hover td  { background: #fbd5d5; }
+  .report-table tbody tr.pd-modified:hover td { background: #FBF1C7; }
+
+  /* Risk cell emphasis (suffix is the lower-cased risk value the data emits;
+     HIGH/MEDIUM are the ranked values today, the rest are defensive). */
+  .pd-risk-critical { color: var(--red); font-weight: 700; }
+  .pd-risk-high     { color: var(--red); font-weight: 700; }
+  .pd-risk-medium   { color: var(--gold-110); font-weight: 600; }
+  .pd-risk-low      { color: var(--green); font-weight: 600; }
+  .pd-risk-info     { color: var(--slate-50); font-weight: 600; }
+"""
+
 MODERN_SHELL_CSS = """\
 /* ── Batch D: Modern SaaS report shell ─────────────────────────────────── */
 /* R5 Bug 6: widen shell so wide audit/policy/VEN tables fit without
@@ -533,6 +555,7 @@ def build_css(exporter_type: str) -> str:
         "audit": AUDIT_CSS,
         "ven": VEN_CSS,
         "policy_usage": POLICY_USAGE_CSS,
+        "policy_diff": POLICY_DIFF_CSS,
     }.get(exporter_type, "")
     return (
         f"{FONT_LINK}\n"
