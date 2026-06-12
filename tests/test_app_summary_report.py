@@ -39,3 +39,19 @@ def test_build_unknown_app_flags_empty():
     with patch.object(rep, "_fetch_estate_df", return_value=pd.DataFrame()):
         result = rep.build(app="Nope", lang="en")
     assert result["empty"] is True
+
+
+def test_export_writes_html(tmp_path):
+    df = pd.DataFrame([
+        _row("Web", "DB", "b", 3306),
+        _row("Web", "Cache", "c", 6379),
+    ])
+    rep = AppSummaryReport(cm=MagicMock(), api_client=MagicMock())
+    with patch.object(rep, "_fetch_estate_df", return_value=df):
+        results = rep.build(app="DB", lang="zh_TW")
+    from src.report.exporters.app_summary_html_exporter import AppSummaryHtmlExporter
+    path = AppSummaryHtmlExporter(results, lang="zh_TW").export(str(tmp_path))
+    html = open(path, encoding="utf-8").read()
+    assert "App Summary" in html or "App 摘要" in html
+    assert 'id="inbound"' in html and 'id="outbound"' in html
+    assert "Illumio_App_Summary_DB_" in path
