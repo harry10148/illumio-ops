@@ -13,6 +13,7 @@ Features:
 from __future__ import annotations
 
 import datetime
+import html
 import os
 from loguru import logger
 import pandas as pd
@@ -1201,12 +1202,21 @@ class _TrafficReportBase:
                 evidence_html = _format_evidence(f.evidence, lang=self._lang)
                 rule_name_key = f'rpt_rule_{f.rule_id}_name'
                 rule_name = _s(rule_name_key) if rule_name_key in _S else f.rule_name
+                # MITRE ATT&CK technique chips — names are official English (not translated).
+                # Sub-technique ids (T1021.002) map to URL path .../techniques/T1021/002/.
+                tech_html = ''.join(
+                    f'<a class="mitre-chip" target="_blank" rel="noopener" '
+                    f'href="https://attack.mitre.org/techniques/{tid.replace(".", "/")}/" '
+                    f'title="{html.escape(name, quote=True)}">{tid}</a>'
+                    for tid, name in getattr(f, "technique_ids", ()) or ()
+                )
                 cards_html += (
                     f'<div class="finding-card sev-{f.severity}">'
                     f'<div class="finding-header">'
                     f'<span class="badge badge-{f.severity}">{f.severity}</span>'
                     f'<span class="finding-rule-id">{f.rule_id}</span>'
                     f'<span class="finding-title">{rule_name}</span>'
+                    f'{tech_html}'
                     f'</div>'
                 )
                 if rule_how:

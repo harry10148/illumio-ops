@@ -6,6 +6,8 @@ from unittest.mock import MagicMock
 import pandas as pd
 
 from src.report.exporters.html_exporter import _render_chart_for_html
+from src.report.exporters.html_exporter import SecurityRiskHtmlExporter
+from src.report.rules._base import Finding
 
 BAR_SPEC = {
     "type": "bar",
@@ -27,6 +29,34 @@ def test_none_spec_renders_empty():
 def test_invalid_spec_degrades_gracefully():
     # 不支援的 type 不得讓整份報表炸掉 — 回傳空字串並繼續
     assert _render_chart_for_html({"type": "sankey", "data": {}}, lang="en") == ""
+
+
+def test_finding_card_renders_mitre_technique_chips():
+    """Findings carrying technique_ids render clickable MITRE ATT&CK chips."""
+    finding = Finding(
+        rule_id="R01",
+        rule_name="Some Rule",
+        severity="HIGH",
+        category="LateralMovement",
+        description="desc",
+        recommendation="rec",
+        technique_ids=(("T1021", "Remote Services"), ("T1021.002", 'SMB "Admin$"')),
+    )
+    exporter = SecurityRiskHtmlExporter({"findings": [finding]}, lang="en")
+    # _s is normally wired up inside _build(); provide it for this focused call
+    from src.report.exporters.report_i18n import STRINGS
+    exporter._s = lambda k: STRINGS[k].get("en") or STRINGS[k]["en"]
+    html = exporter._findings_html()
+
+    # chip class + technique id text present
+    assert "mitre-chip" in html
+    assert "T1021" in html
+    # top-level technique link
+    assert 'href="https://attack.mitre.org/techniques/T1021/"' in html
+    # sub-technique: dot becomes a slash in the URL path
+    assert 'href="https://attack.mitre.org/techniques/T1021/002/"' in html
+    # technique name (with a quote) lands in an attribute and is escaped
+    assert "&quot;Admin$&quot;" in html
 
 
 def test_audit_flags_fold_into_policy_section(tmp_path, monkeypatch):

@@ -342,6 +342,7 @@ TRAFFIC_CSS = """\
   .finding-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .finding-title { font-weight: 600; font-size: 14px; color: var(--cyan-120); }
   .finding-rule-id { font-size: 11px; color: var(--slate-50); font-family: var(--font-mono); background: var(--slate-10); padding: 2px 6px; border-radius: 3px; }
+  .mitre-chip { display: inline-block; font-size: 10px; padding: 1px 6px; border: 1px solid var(--border, #d1d5db); border-radius: 9px; margin-left: 4px; text-decoration: none; color: inherit; }
   .finding-desc { font-size: 13px; margin-bottom: 10px; color: var(--slate); line-height: 1.5; }
   .finding-evidence { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
   .ev-pill { background: var(--tan); border: 1px solid var(--tan-120); border-radius: 4px; padding: 4px 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
