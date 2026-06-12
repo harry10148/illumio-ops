@@ -868,6 +868,44 @@ function _populateSchedFilters(filters) {
   setVal('sched-ex-any-ip',   filters.ex_any_ip || '');
 }
 
+// Poll an async ad-hoc traffic-report job until it finishes. The POST endpoint
+// now returns a job_id immediately (no more 408 on slow PCE); we GET the job
+// status every 2s and route done/error into the existing success/fail paths.
+async function _pollTrafficJob(jobId) {
+  const POLL_MS = 2000;
+  const MAX_MS = 15 * 60 * 1000; // 15-minute ceiling
+  const deadline = Date.now() + MAX_MS;
+  _updateGenStep(_t('gui_gen_step_running_bg'));
+  while (Date.now() < deadline) {
+    await new Promise(res => setTimeout(res, POLL_MS));
+    let s;
+    try {
+      s = await get('/api/reports/jobs/' + encodeURIComponent(jobId));
+    } catch (e) {
+      continue; // transient fetch error — keep polling until deadline
+    }
+    if (!s || !s.status) continue;
+    if (s.status === 'done') {
+      const msg = `${s.record_count} flows`;
+      _hideGenProgress(true, msg);
+      toast((_t('gui_toast_traffic_done')).replace('{msg}', msg));
+      loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
+      return;
+    }
+    if (s.status === 'error') {
+      const fail = _t('gui_toast_traffic_fail');
+      _hideGenProgress(false, s.error || fail);
+      toast(s.error || fail, 'err');
+      return;
+    }
+    // status still 'running' — keep the background-progress text and loop.
+  }
+  const timeoutMsg = _t('gui_toast_traffic_fail');
+  _hideGenProgress(false, timeoutMsg);
+  toast(timeoutMsg, 'err');
+}
+
 async function _doGenerateTraffic() {
   const src = document.querySelector('input[name="traffic-source"]:checked')?.value || 'api';
   try {
@@ -890,19 +928,15 @@ async function _doGenerateTraffic() {
       formData.append('lang', langElCsv ? langElCsv.value : 'en');
       formData.append('file', fileInput.files[0]);
 
-      _updateGenStep(_t('gui_gen_step_analysing'));
+      _updateGenStep(_t('gui_gen_step_running_bg'));
       const r = await fetch('/api/reports/generate', {
         method: 'POST',
         headers: { 'X-CSRF-Token': _csrfToken() },
         body: formData
       }).then(res => res.json());
 
-      if (r.ok) {
-        const msg = `${r.record_count} flows`;
-        _hideGenProgress(true, msg);
-        toast((_t('gui_toast_traffic_done')).replace('{msg}', msg));
-        loadReports();
-        if (typeof loadRcardMeta === 'function') loadRcardMeta();
+      if (r.ok && r.job_id) {
+        await _pollTrafficJob(r.job_id);
       } else {
         const fail = _t('gui_toast_traffic_fail');
         _hideGenProgress(false, r.error || fail);
@@ -920,9 +954,6 @@ async function _doGenerateTraffic() {
       const endDate   = new Date(endVal   + 'T23:59:59Z').toISOString();
 
       _updateGenStep(_t('gui_gen_step_fetching'));
-      // Simulate step progression for long-running API calls
-      const _stepTimer = setTimeout(() => _updateGenStep(_t('gui_gen_step_analysing')), 5000);
-
       const reportFilters = _collectReportFilters();
       const fmtEl2 = document.getElementById('m-gen-format');
       const profileEl = document.getElementById('m-gen-profile');
@@ -937,13 +968,8 @@ async function _doGenerateTraffic() {
         clip_to_cache: clipToCache,
         ...(reportFilters ? { filters: reportFilters } : {}),
       });
-      clearTimeout(_stepTimer);
-      if (r.ok) {
-        const msg = `${r.record_count} flows`;
-        _hideGenProgress(true, msg);
-        toast((_t('gui_toast_traffic_done')).replace('{msg}', msg));
-        loadReports();
-        if (typeof loadRcardMeta === 'function') loadRcardMeta();
+      if (r.ok && r.job_id) {
+        await _pollTrafficJob(r.job_id);
       } else {
         const fail = _t('gui_toast_traffic_fail');
         _hideGenProgress(false, r.error || fail);

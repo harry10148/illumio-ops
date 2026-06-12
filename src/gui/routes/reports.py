@@ -5,6 +5,7 @@ import datetime
 import json
 import os
 import threading
+import uuid
 
 from flask import Blueprint, jsonify, request, send_from_directory
 from loguru import logger
@@ -12,6 +13,7 @@ from werkzeug.utils import secure_filename
 
 from src.config import ConfigManager
 from src.i18n import t
+from src.state_store import load_state_file, update_state_file
 from src.gui._helpers import (
     _ALLOWED_REPORT_FORMATS,
     _resolve_reports_dir,
@@ -21,6 +23,36 @@ from src.gui._helpers import (
     _write_audit_dashboard_summary,
     _write_policy_usage_dashboard_summary,
 )
+
+# state.json key holding ad-hoc traffic-report job records (most recent 20 kept).
+_ADHOC_JOBS_KEY = "adhoc_report_jobs"
+_ADHOC_JOBS_MAX = 20
+
+
+def _load_adhoc_jobs() -> dict:
+    """Return the adhoc_report_jobs map from state.json ({} when absent)."""
+    return load_state_file(_resolve_state_file()).get(_ADHOC_JOBS_KEY, {}) or {}
+
+
+def _save_adhoc_job(job_id: str, record: dict) -> None:
+    """Merge a single job record into state.json under the shared state lock.
+
+    Pruning keeps only the _ADHOC_JOBS_MAX most-recent jobs by ``started_at``.
+    """
+    def _merge(existing):
+        data = dict(existing)
+        jobs = dict(data.get(_ADHOC_JOBS_KEY, {}) or {})
+        jobs[job_id] = record
+        if len(jobs) > _ADHOC_JOBS_MAX:
+            # Keep newest by started_at; missing/blank started_at sorts oldest.
+            ordered = sorted(jobs.items(),
+                             key=lambda kv: kv[1].get("started_at") or "",
+                             reverse=True)
+            jobs = dict(ordered[:_ADHOC_JOBS_MAX])
+        data[_ADHOC_JOBS_KEY] = jobs
+        return data
+
+    update_state_file(_resolve_state_file(), _merge)
 
 
 def make_reports_blueprint(
@@ -143,25 +175,26 @@ def make_reports_blueprint(
         as_download = request.args.get('download') == '1'
         return send_from_directory(reports_dir, filename, as_attachment=as_download)
 
-    @bp.route('/api/reports/generate', methods=['POST'])
-    @limiter.limit("30 per hour")
-    def api_generate_report():
-        if request.is_json:
-            d = request.json or {}
-        else:
-            d = request.form.to_dict()
+    def _run_adhoc(job_id: str, payload: dict):
+        """Generate the ad-hoc traffic report in a daemon thread.
 
+        Writes status running→done/error (with files/error/finished_at) into
+        state.json so the frontend can poll /api/reports/jobs/<job_id>. Runs
+        outside any Flask request context — uses only the captured ``payload``
+        and module-level path/config helpers (no ``request`` access here).
+        """
+        record = payload["record"]
+        lang = payload["lang"]
+        _rlog = None
         try:
             from src.report.report_generator import ReportGenerator
             from src.api_client import ApiClient
             from src.reporter import Reporter
-            import tempfile
-            _rlog = None
             try:
                 from src.module_log import ModuleLog as _ML
                 _rlog = _ML.get("reports")
                 _rlog.separator(f"Traffic Report {datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')} UTC")
-                _rlog.info(f"source={d.get('source')} format={d.get('format')} range={d.get('start_date')}~{d.get('end_date')}")
+                _rlog.info(f"source={payload['source']} format={payload['fmt']} range={payload.get('start_date')}~{payload.get('end_date')}")
             except Exception:
                 pass  # intentional fallback: ModuleLog is optional; report generation must not fail if logging setup fails
 
@@ -169,37 +202,13 @@ def make_reports_blueprint(
             config_dir = _resolve_config_dir()
             api = ApiClient(cm)
             reporter = Reporter(cm)
-
             from src.main import _make_cache_reader
             gen = ReportGenerator(cm, api_client=api, config_dir=config_dir,
                                   cache_reader=_make_cache_reader(cm))
 
-            source = d.get('source', 'api')
-            _VALID_PROFILES = ("security_risk", "network_inventory")
-            traffic_report_profile = d.get('traffic_report_profile', 'security_risk')
-            if traffic_report_profile not in _VALID_PROFILES:
-                traffic_report_profile = 'security_risk'
-
-            lang = d.get('lang', 'en')
-            if lang not in ('en', 'zh_TW'):
-                lang = 'en'
-
-            if source == 'csv':
-                if 'file' not in request.files:
-                    return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
-                csv_file = request.files['file']
-                if csv_file.filename == '':
-                    return jsonify({"ok": False, "error": t("gui_err_empty_csv", lang=lang)})
-                if csv_file.mimetype not in {
-                    'text/csv', 'application/vnd.ms-excel',
-                    'text/plain', 'application/octet-stream',
-                }:
-                    return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
-
-                import uuid as _uuid
-                safe_filename = secure_filename(csv_file.filename) or 'upload.csv'
-                temp_path = os.path.join(tempfile.gettempdir(), f"{_uuid.uuid4().hex}_{safe_filename}")
-                csv_file.save(temp_path)
+            traffic_report_profile = payload['traffic_report_profile']
+            if payload['source'] == 'csv':
+                temp_path = payload['temp_path']
                 try:
                     result = gen.generate_from_csv(temp_path, traffic_report_profile=traffic_report_profile, lang=lang)
                 finally:
@@ -208,44 +217,22 @@ def make_reports_blueprint(
                     except OSError:
                         pass  # intentional fallback: temp file cleanup is best-effort
             else:
-                start_date = d.get('start_date')
-                end_date = d.get('end_date')
-
-                # Extract optional traffic filters (API source only)
-                report_filters = None
-                raw_filters = d.get('filters') or {}
-                if raw_filters:
-                    report_filters = {
-                        'policy_decisions': raw_filters.get('policy_decisions') or None,
-                        'src_labels': [s for s in (raw_filters.get('src_labels') or []) if s],
-                        'dst_labels': [s for s in (raw_filters.get('dst_labels') or []) if s],
-                        'src_ip': (raw_filters.get('src_ip') or '').strip(),
-                        'dst_ip': (raw_filters.get('dst_ip') or '').strip(),
-                        'port': (raw_filters.get('port') or '').strip(),
-                        'proto': raw_filters.get('proto'),
-                        'ex_src_labels': [s for s in (raw_filters.get('ex_src_labels') or []) if s],
-                        'ex_dst_labels': [s for s in (raw_filters.get('ex_dst_labels') or []) if s],
-                        'ex_src_ip': (raw_filters.get('ex_src_ip') or '').strip(),
-                        'ex_dst_ip': (raw_filters.get('ex_dst_ip') or '').strip(),
-                        'ex_port': (raw_filters.get('ex_port') or '').strip(),
-                    }
-                    # Discard if all values are empty/falsy
-                    if not any(v for v in report_filters.values() if v):
-                        report_filters = None
-
-                clip_to_cache = str(d.get('clip_to_cache', '')).lower() in ('true', '1', 'on')
-                result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=report_filters, traffic_report_profile=traffic_report_profile, lang=lang, clip_to_cache=clip_to_cache)
+                result = gen.generate_from_api(
+                    start_date=payload.get('start_date'), end_date=payload.get('end_date'),
+                    filters=payload.get('filters'), traffic_report_profile=traffic_report_profile,
+                    lang=lang, clip_to_cache=payload.get('clip_to_cache', False))
 
             if result.record_count == 0:
-                return jsonify({"ok": False, "error": t("gui_no_traffic_data", lang=lang)})
+                record.update({"status": "error", "error": t("gui_no_traffic_data", lang=lang),
+                               "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
+                _save_adhoc_job(job_id, record)
+                return
 
-            fmt = d.get('format', 'all')
-            fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'all'
             output_dir = _resolve_reports_dir(cm)
-
-            paths = gen.export(result, fmt=fmt, output_dir=output_dir, send_email=str(d.get('send_email', '')).lower() == 'true', reporter=reporter, traffic_report_profile=traffic_report_profile, lang=lang)
+            paths = gen.export(result, fmt=payload['fmt'], output_dir=output_dir,
+                               send_email=payload['send_email'], reporter=reporter,
+                               traffic_report_profile=traffic_report_profile, lang=lang)
             export_errors = getattr(gen, 'last_export_errors', {}) or {}
-
             filenames = [os.path.basename(p) for p in paths]
             try:
                 if _rlog:
@@ -253,19 +240,133 @@ def make_reports_blueprint(
                                + (f" errors={export_errors}" if export_errors else ""))
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            ok = bool(filenames) and not export_errors
-            resp = {"ok": ok, "files": filenames, "record_count": result.record_count}
-            if export_errors:
-                resp["errors"] = export_errors
-                resp["error"] = "; ".join(f"{k}: {v}" for k, v in export_errors.items())
-            return jsonify(resp)
+
+            record.update({
+                "files": filenames,
+                "record_count": result.record_count,
+                "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            })
+            if export_errors or not filenames:
+                record["status"] = "error"
+                record["errors"] = export_errors
+                record["error"] = "; ".join(f"{k}: {v}" for k, v in export_errors.items()) or "export produced no files"
+            else:
+                record["status"] = "done"
+            _save_adhoc_job(job_id, record)
         except Exception as e:
             try:
                 if _rlog:
                     _rlog.error(f"Traffic report failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
+            logger.error(f"Ad-hoc traffic report job {job_id} failed: {e}", exc_info=True)
+            record.update({"status": "error", "error": str(e),
+                           "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
+            try:
+                _save_adhoc_job(job_id, record)
+            except Exception:
+                logger.error(f"Could not persist failure for job {job_id}")
+
+    @bp.route('/api/reports/generate', methods=['POST'])
+    @limiter.limit("30 per hour")
+    def api_generate_report():
+        if request.is_json:
+            d = request.json or {}
+        else:
+            d = request.form.to_dict()
+
+        cm.load()
+
+        source = d.get('source', 'api')
+        _VALID_PROFILES = ("security_risk", "network_inventory")
+        traffic_report_profile = d.get('traffic_report_profile', 'security_risk')
+        if traffic_report_profile not in _VALID_PROFILES:
+            traffic_report_profile = 'security_risk'
+
+        lang = d.get('lang', 'en')
+        if lang not in ('en', 'zh_TW'):
+            lang = 'en'
+
+        fmt = d.get('format', 'all')
+        fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'all'
+
+        # ── Synchronous validation (still returns 400/415 for bad input) ──
+        payload = {
+            "source": source,
+            "fmt": fmt,
+            "lang": lang,
+            "traffic_report_profile": traffic_report_profile,
+            "send_email": str(d.get('send_email', '')).lower() == 'true',
+        }
+
+        if source == 'csv':
+            import tempfile
+            if 'file' not in request.files:
+                return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
+            csv_file = request.files['file']
+            if csv_file.filename == '':
+                return jsonify({"ok": False, "error": t("gui_err_empty_csv", lang=lang)})
+            if csv_file.mimetype not in {
+                'text/csv', 'application/vnd.ms-excel',
+                'text/plain', 'application/octet-stream',
+            }:
+                return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
+            # Persist the upload now (request-scoped) so the worker thread can read it.
+            safe_filename = secure_filename(csv_file.filename) or 'upload.csv'
+            temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}_{safe_filename}")
+            csv_file.save(temp_path)
+            payload["temp_path"] = temp_path
+        else:
+            payload["start_date"] = d.get('start_date')
+            payload["end_date"] = d.get('end_date')
+
+            # Extract optional traffic filters (API source only)
+            report_filters = None
+            raw_filters = d.get('filters') or {}
+            if raw_filters:
+                report_filters = {
+                    'policy_decisions': raw_filters.get('policy_decisions') or None,
+                    'src_labels': [s for s in (raw_filters.get('src_labels') or []) if s],
+                    'dst_labels': [s for s in (raw_filters.get('dst_labels') or []) if s],
+                    'src_ip': (raw_filters.get('src_ip') or '').strip(),
+                    'dst_ip': (raw_filters.get('dst_ip') or '').strip(),
+                    'port': (raw_filters.get('port') or '').strip(),
+                    'proto': raw_filters.get('proto'),
+                    'ex_src_labels': [s for s in (raw_filters.get('ex_src_labels') or []) if s],
+                    'ex_dst_labels': [s for s in (raw_filters.get('ex_dst_labels') or []) if s],
+                    'ex_src_ip': (raw_filters.get('ex_src_ip') or '').strip(),
+                    'ex_dst_ip': (raw_filters.get('ex_dst_ip') or '').strip(),
+                    'ex_port': (raw_filters.get('ex_port') or '').strip(),
+                }
+                if not any(v for v in report_filters.values() if v):
+                    report_filters = None
+            payload["filters"] = report_filters
+            payload["clip_to_cache"] = str(d.get('clip_to_cache', '')).lower() in ('true', '1', 'on')
+
+        # ── Validation passed: create job, spawn worker, return job_id ──
+        job_id = uuid.uuid4().hex[:12]
+        record = {
+            "status": "running",
+            "files": [],
+            "error": "",
+            "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "finished_at": None,
+        }
+        payload["record"] = record
+        try:
+            _save_adhoc_job(job_id, record)
+        except Exception as e:
             return _err_with_log("report_traffic_generate", e, lang=lang)
+
+        threading.Thread(target=_run_adhoc, args=(job_id, payload), daemon=True).start()
+        return jsonify({"ok": True, "job_id": job_id})
+
+    @bp.route('/api/reports/jobs/<job_id>', methods=['GET'])
+    def api_report_job_status(job_id):
+        jobs = _load_adhoc_jobs()
+        if job_id not in jobs:
+            return jsonify({"ok": False, "error": "unknown job"}), 404
+        return jsonify({"ok": True, **jobs[job_id]})
 
     @bp.route('/api/audit_report/generate', methods=['POST'])
     @limiter.limit("10 per hour")

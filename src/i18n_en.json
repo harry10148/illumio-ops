@@ -1395,6 +1395,7 @@
   "gui_gen_step_analysing": "Running analysis modules...",
   "gui_gen_step_fetching": "Fetching data from PCE...",
   "gui_gen_step_parsing": "Parsing CSV data...",
+  "gui_gen_step_running_bg": "Generating in background…",
   "gui_gen_traffic_title": "Generate Traffic Report",
   "gui_gen_ven_title": "Generate VEN Status Report",
   "gui_hdr_chip_aria": "PCE connection status, {rules} rules, {schedules} schedules, loaded {loaded}",

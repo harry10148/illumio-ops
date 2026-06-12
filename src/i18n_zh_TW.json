@@ -1395,6 +1395,7 @@
   "gui_gen_step_analysing": "正在整理與分析報表內容...",
   "gui_gen_step_fetching": "正在向 PCE 取得資料...",
   "gui_gen_step_parsing": "正在解析 CSV 資料...",
+  "gui_gen_step_running_bg": "背景產生中…",
   "gui_gen_traffic_title": "產生流量分析報表",
   "gui_gen_ven_title": "產生 VEN 狀態報表",
   "gui_hdr_chip_aria": "PCE 連線狀態，{rules} 條規則，{schedules} 個排程，載入於 {loaded}",
