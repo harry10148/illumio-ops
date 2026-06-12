@@ -274,6 +274,8 @@ for suffix, entry in {
     "dst_role": ("Dst Role", "目的 Role"),
     "src_loc": ("Src Loc", "來源位置"),
     "dst_loc": ("Dst Loc", "目的位置"),
+    "missing_keys": ("Missing Keys", "缺少的 Label Keys"),
+    "distinct_label_sets": ("Distinct Label Sets", "相異 Label Sets 數"),
     # evidence pill label keys (used by _format_evidence in html_exporter.py)
     "allowed_ratio": ("Allowed Ratio", "Allowed 比率"),
     "blocked_ratio": ("Blocked Ratio", "Blocked 比率"),
