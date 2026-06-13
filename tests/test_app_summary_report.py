@@ -98,6 +98,26 @@ def test_export_writes_html(tmp_path):
     assert "Illumio_App_Summary_DB_" in path
 
 
+def test_export_renders_policy_impact_and_enforcement_sections(tmp_path):
+    df = pd.DataFrame([
+        _row_decision("Web", "DB", "10.0.0.5", 3306, "allowed", 5),
+        _row_decision("Batch", "DB", "10.0.0.5", 3306, "potentially_blocked", 2),
+    ])
+    api = MagicMock()
+    api.fetch_managed_workloads.return_value = [
+        {"hostname": "db1", "enforcement_mode": "full",
+         "labels": [{"key": "app", "value": "DB"}]},
+    ]
+    rep = AppSummaryReport(cm=MagicMock(), api_client=api)
+    with patch.object(rep, "_fetch_estate_df", return_value=df):
+        res = rep.build(app="DB", lang="en")
+    from src.report.exporters.app_summary_html_exporter import AppSummaryHtmlExporter
+    html = AppSummaryHtmlExporter(res, lang="en")._render_html()
+    assert 'id="policy-impact"' in html and 'id="enforcement"' in html
+    assert "db1" in html
+    assert "report-shell" in html
+
+
 # --- CLI subcommand tests (mirror tests/test_cli_report_policy_diff.py) -------
 
 

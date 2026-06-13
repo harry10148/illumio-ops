@@ -67,6 +67,28 @@ class AppSummaryHtmlExporter:
         top = render_df_table(mod03.get("top_flows"), col_i18n={}, lang=self._lang)
         return f'<div class="kpi-grid">{cards}</div>{top}'
 
+    def _policy_impact_section(self) -> str:
+        pi = self._r.get("policy_impact") or {}
+        if not pi.get("available"):
+            return f'<p class="note">{_esc(t("rpt_app_no_policy_impact", lang=self._lang))}</p>'
+        cards = (
+            _kpi(f'{pi["coverage_pct"]}%', t("rpt_app_pi_coverage", lang=self._lang))
+            + _kpi(str(pi["would_be_blocked"]), t("rpt_app_pi_would_block", lang=self._lang))
+            + _kpi(str(pi["allowed"]), t("rpt_app_pi_allowed", lang=self._lang))
+            + _kpi(str(pi["blocked"]), t("rpt_app_pi_blocked", lang=self._lang))
+        )
+        note = _esc(t("rpt_app_pi_note", lang=self._lang)).replace("{n}", str(pi["would_be_blocked"]))
+        return f'<div class="kpi-grid">{cards}</div><p class="note">{note}</p>'
+
+    def _enforcement_section(self) -> str:
+        en = self._r.get("enforcement") or {}
+        if not en.get("available"):
+            return f'<p class="note">{_esc(t("rpt_app_enf_unavailable", lang=self._lang))}</p>'
+        summary = _esc(t("rpt_app_enf_summary", lang=self._lang)) \
+            .replace("{enforced}", str(en["enforced"])).replace("{total}", str(en["total"]))
+        table = render_df_table(en.get("table"), col_i18n={}, lang=self._lang)
+        return f'<p class="note">{summary}</p>{table}'
+
     def _findings_section(self) -> str:
         findings = self._r.get("findings", []) or []
         if not findings:
@@ -116,6 +138,8 @@ class AppSummaryHtmlExporter:
                 + self._section("inbound", _esc(t("rpt_app_inbound", lang=lang)), inbound)
                 + self._section("outbound", _esc(t("rpt_app_outbound", lang=lang)), outbound)
                 + self._section("coverage", _esc(t("rpt_app_coverage", lang=lang)), self._coverage_section())
+                + self._section("policy-impact", _esc(t("rpt_app_policy_impact", lang=lang)), self._policy_impact_section())
+                + self._section("enforcement", _esc(t("rpt_app_enforcement", lang=lang)), self._enforcement_section())
                 + self._section("findings", _esc(t("rpt_app_findings", lang=lang)), self._findings_section())
             )
 
