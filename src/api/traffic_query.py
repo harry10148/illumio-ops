@@ -27,6 +27,13 @@ from src.i18n import t
 
 MAX_TRAFFIC_RESULTS = 200000
 
+# Max wall-clock seconds to wait for the PCE to finish computing an async traffic
+# query before giving up. A full-estate, unfiltered query can take a couple of
+# minutes on the PCE; the previous fixed 60×2s (120s) budget silently returned
+# NO data once compute exceeded it. 15 minutes covers the worst case observed
+# while still bounding a genuine hang.
+_ASYNC_QUERY_MAX_WAIT_SECONDS = 900
+
 _TRAFFIC_FILTER_CAPABILITIES = {
     "src_label": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to label href and pushed to sources.include."},
     "src_labels": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to label hrefs and pushed to sources.include."},
@@ -462,8 +469,15 @@ class TrafficQueryBuilder:
         print(t('waiting_traffic', default='Waiting for traffic calculation...'), end="", flush=True)
 
         poll_url = f"{c.api_cfg['url']}/api/v2{job_url}"
-        for _ in range(60):
-            time.sleep(2)
+        # Poll on a wall-clock deadline (not a fixed iteration count): a large
+        # unfiltered query can take minutes on the PCE, and the old 120s budget
+        # silently dropped its data. Back off the interval (2s→10s) so a slow
+        # query isn't polled hundreds of times.
+        deadline = time.monotonic() + _ASYNC_QUERY_MAX_WAIT_SECONDS
+        interval = 2
+        completed = False
+        while time.monotonic() < deadline:
+            time.sleep(interval)
             poll_status, poll_body = c._request(poll_url, timeout=15)
             if poll_status != 200:
                 continue
@@ -472,15 +486,20 @@ class TrafficQueryBuilder:
             if state == "completed":
                 print(f" {t('done')}")
                 logger.info("Traffic query completed.")
+                completed = True
                 break
             if state == "failed":
                 print(f" {t('query_failed', default='Failed.')}")
                 logger.error("Traffic query failed.")
                 return
             print(".", end="", flush=True)
-        else:
+            interval = min(interval + 1, 10)
+        if not completed:
             print(f" {t('api_timeout')}")
-            logger.error("Traffic query timed out.")
+            logger.error(
+                "Traffic query timed out after {}s (PCE still computing).",
+                _ASYNC_QUERY_MAX_WAIT_SECONDS,
+            )
             return
 
         if compute_draft:
