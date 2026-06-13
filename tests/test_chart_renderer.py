@@ -126,3 +126,23 @@ def test_render_matplotlib_falls_back_to_literal_when_key_missing():
     from src.report.exporters import chart_renderer
     spec = {"type": "bar", "title": "Plain Title", "data": {"labels": [], "values": []}}
     assert chart_renderer._resolve_chart_text(spec, "title", lang="zh_TW") == "Plain Title"
+
+
+def test_bar_many_labels_rotates_xticks():
+    """>6 categories must angle x tick labels so they don't collide (audit
+    event-type ranking regression). Few-label charts stay horizontal."""
+    import matplotlib
+    matplotlib.use("Agg")
+    from src.report.exporters.chart_renderer import _build_matplotlib_figure
+    many = {"type": "bar", "title": "T", "x_label": "x", "y_label": "y",
+            "data": {"labels": [f"event_type_{i}" for i in range(10)],
+                     "values": list(range(10))}, "i18n": {"lang": "en"}}
+    fig = _build_matplotlib_figure(many)
+    rot = {round(lbl.get_rotation()) for lbl in fig.axes[0].get_xticklabels()}
+    matplotlib.pyplot.close(fig)
+    assert 30 in rot
+
+    fig2 = _build_matplotlib_figure(SAMPLE_BAR_SPEC)  # 5 labels
+    rot2 = {round(lbl.get_rotation()) for lbl in fig2.axes[0].get_xticklabels()}
+    matplotlib.pyplot.close(fig2)
+    assert rot2 == {0}

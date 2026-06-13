@@ -151,9 +151,17 @@ def _build_matplotlib_figure(spec: dict[str, Any], *, lang: str = "en"):
     fig, ax = plt.subplots(figsize=(8, 5), dpi=100)
 
     if chart_type == "bar":
-        ax.bar(data.get("labels", []), data.get("values", []), color="#375379")
+        labels = data.get("labels", [])
+        ax.bar(labels, data.get("values", []), color="#375379")
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
+        # Many categories collide when drawn horizontally (e.g. the audit
+        # event-type ranking). Angle the tick labels so they stay legible;
+        # tight_layout() below reflows the figure to fit them. Few-label charts
+        # keep horizontal labels.
+        if len(labels) > 6:
+            ax.set_xticks(range(len(labels)))
+            ax.set_xticklabels(labels, rotation=30, ha="right")
     elif chart_type == "pie":
         ax.pie(
             data.get("values", []),
