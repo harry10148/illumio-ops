@@ -495,6 +495,22 @@ def make_reports_blueprint(
         except Exception as e:
             return _err_with_log("report_policy_resolver_generate", e, lang=lang)
 
+    # ── API: Labels (for App Summary app/env dropdowns) ──────────────────────
+    @bp.route('/api/labels', methods=['GET'])
+    @limiter.limit("60 per hour")
+    def api_list_labels():
+        key = request.args.get('key', 'app')
+        if key not in ('app', 'env', 'role', 'loc'):
+            return jsonify({"ok": False, "error": "invalid key"}), 400
+        try:
+            from src.api_client import ApiClient
+            cm.load()
+            labels = ApiClient(cm).get_labels(key)
+            values = sorted({l.get('value', '') for l in labels if l.get('value')})
+            return jsonify({"ok": True, "labels": values})
+        except Exception as e:
+            return _err_with_log("list_labels", e)
+
     # ── API: App Summary Report ───────────────────────────────────────────────
     @bp.route('/api/app_report/generate', methods=['POST'])
     @limiter.limit("10 per hour")

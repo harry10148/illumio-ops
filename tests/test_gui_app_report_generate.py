@@ -47,6 +47,23 @@ def test_app_report_generate_requires_app(client):
     MockRep.return_value.run.assert_not_called()
 
 
+def test_labels_endpoint_returns_app_labels(client):
+    _login(client)
+    with patch("src.api_client.ApiClient.get_labels", return_value=[
+        {"key": "app", "value": "DB"}, {"key": "app", "value": "Web"}]):
+        r = client.get("/api/labels?key=app",
+                       environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    body = r.get_json()
+    assert body["ok"] is True
+    assert body["labels"] == ["DB", "Web"]
+
+
+def test_labels_endpoint_bad_key_400(client):
+    _login(client)
+    assert client.get("/api/labels?key=evil",
+                      environ_overrides={'REMOTE_ADDR': '127.0.0.1'}).status_code == 400
+
+
 def test_app_report_generate_rejects_bad_lang(client):
     csrf_token = _login(client)
     with patch("src.report.app_summary_report.AppSummaryReport") as MockRep:

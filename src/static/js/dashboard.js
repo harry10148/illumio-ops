@@ -695,11 +695,7 @@ function openReportGenModal(type) {
   const appRow = $('m-gen-app-row');
   if (appRow) {
     appRow.style.display = m.appField ? '' : 'none';
-    if (m.appField) {
-      ['m-gen-app','m-gen-env'].forEach(id => {
-        const el = document.getElementById(id); if (el) el.value = '';
-      });
-    }
+    if (m.appField) _populateAppLabelSelects();
   }
   
   $('m-gen-note').style.display  = m.dates ? 'none' : '';
@@ -713,6 +709,21 @@ function openReportGenModal(type) {
   }
   $('m-gen-report').classList.add('show');
   syncReportLangToUi();
+}
+
+async function _populateAppLabelSelects() {
+  const appSel = document.getElementById('m-gen-app');
+  const envSel = document.getElementById('m-gen-env');
+  if (!appSel) return;
+  appSel.innerHTML = `<option value="">${_t('gui_app_loading') || 'Loading…'}</option>`;
+  try {
+    const [apps, envs] = await Promise.all([api('/api/labels?key=app'), api('/api/labels?key=env')]);
+    appSel.innerHTML = ((apps && apps.labels) || []).map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+    if (envSel) envSel.innerHTML = `<option value="">${_t('gui_env_any') || '(any)'}</option>`
+      + ((envs && envs.labels) || []).map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+  } catch (_) {
+    appSel.innerHTML = '<option value=""></option>';
+  }
 }
 
 function toggleTrafficSource() {
