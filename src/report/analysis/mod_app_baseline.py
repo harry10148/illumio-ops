@@ -46,3 +46,59 @@ def app_baseline(df: pd.DataFrame, app: str, env: str | None = None, top_n: int 
         "inbound": _grouped(inbound, "src_app", top_n),
         "outbound": _grouped(outbound, "dst_app", top_n),
     }
+
+
+_ENFORCED_MODES = ("full", "selective")
+
+
+def policy_impact(mod02: dict) -> dict:
+    """Derive the app's Security Policy Impact from the mod02 policy-decision result.
+
+    coverage_pct = allowed / total; would_be_blocked = potentially_blocked count
+    (flows allowed today only because the workload is in visibility/test mode —
+    they have no rule and would drop under Full Enforcement).
+    """
+    if not mod02 or mod02.get("error"):
+        return {"available": False}
+    counts = {d: int(mod02.get(d, {}).get("count", 0))
+              for d in ("allowed", "blocked", "potentially_blocked", "unknown")}
+    total = sum(counts.values())
+    if total == 0:
+        return {"available": False}
+    return {
+        "available": True,
+        "allowed": counts["allowed"],
+        "blocked": counts["blocked"],
+        "potentially_blocked": counts["potentially_blocked"],
+        "unknown": counts["unknown"],
+        "total": total,
+        "coverage_pct": round(counts["allowed"] / total * 100, 1),
+        "would_be_blocked": counts["potentially_blocked"],
+    }
+
+
+def _workload_has_label(wl: dict, key: str, value: str) -> bool:
+    return any(l.get("key") == key and l.get("value") == value
+              for l in (wl.get("labels") or []))
+
+
+def enforcement_summary(workloads, app: str, env: str | None = None) -> dict:
+    """Per-workload enforcement-mode summary for one app (optional env refine)."""
+    if not workloads:
+        return {"available": False}
+    scoped = [w for w in workloads if _workload_has_label(w, "app", app)
+              and (not env or _workload_has_label(w, "env", env))]
+    by_mode: dict[str, int] = {}
+    rows = []
+    for w in scoped:
+        mode = w.get("enforcement_mode", "") or "(unknown)"
+        by_mode[mode] = by_mode.get(mode, 0) + 1
+        rows.append({"Workload": w.get("hostname", w.get("href", "")), "Enforcement": mode})
+    enforced = sum(by_mode.get(m, 0) for m in _ENFORCED_MODES)
+    return {
+        "available": True,
+        "total": len(scoped),
+        "by_mode": by_mode,
+        "enforced": enforced,
+        "table": pd.DataFrame(rows, columns=["Workload", "Enforcement"]),
+    }
