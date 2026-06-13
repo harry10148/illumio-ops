@@ -51,6 +51,16 @@ class AppSummaryReport:
         results["mod03"] = uncovered_flows(scoped, top_n=10, lang=lang)
         engine = RulesEngine(self._report_cfg(), config_dir=self._config_dir, lang=lang)
         results["findings"] = engine.evaluate(scoped)
+
+        from loguru import logger
+        from src.report.analysis.mod_app_baseline import policy_impact, enforcement_summary
+        results["policy_impact"] = policy_impact(results["mod02"])
+        try:
+            workloads = self.api.fetch_managed_workloads() if self.api else None
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[AppSummary] workloads fetch failed: {exc}")
+            workloads = None
+        results["enforcement"] = enforcement_summary(workloads, app, env)
         return results
 
     def _report_cfg(self) -> dict:

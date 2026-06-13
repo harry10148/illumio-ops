@@ -19,8 +19,46 @@ def _row(src_app, dst_app, dst_ip, port):
     }
 
 
+def _row_decision(src_app, dst_app, dst_ip, port, decision, conns):
+    r = _row(src_app, dst_app, dst_ip, port)
+    r["policy_decision"] = decision
+    r["num_connections"] = conns
+    return r
+
+
 def test_safe_filename_token():
     assert _safe_filename_token("My App/v2 (Prod)") == "My_App_v2_Prod"
+
+
+def test_build_adds_policy_impact_and_enforcement(monkeypatch):
+    df = pd.DataFrame([
+        _row_decision("Web", "DB", "b", 3306, "allowed", 5),
+        _row_decision("Batch", "DB", "b", 3306, "potentially_blocked", 2),
+    ])
+    api = MagicMock()
+    api.fetch_managed_workloads.return_value = [
+        {"hostname": "db1", "enforcement_mode": "full",
+         "labels": [{"key": "app", "value": "DB"}]},
+    ]
+    rep = AppSummaryReport(cm=MagicMock(), api_client=api)
+    with patch.object(rep, "_fetch_estate_df", return_value=df):
+        res = rep.build(app="DB", lang="en")
+    assert res["policy_impact"]["available"] is True
+    assert res["policy_impact"]["would_be_blocked"] == 1
+    assert res["enforcement"]["available"] is True
+    assert res["enforcement"]["total"] == 1
+    api.fetch_managed_workloads.assert_called_once()
+
+
+def test_build_enforcement_unavailable_when_workloads_fetch_fails(monkeypatch):
+    df = pd.DataFrame([_row_decision("Web", "DB", "b", 3306, "allowed", 5)])
+    api = MagicMock()
+    api.fetch_managed_workloads.side_effect = Exception("boom")
+    rep = AppSummaryReport(cm=MagicMock(), api_client=api)
+    with patch.object(rep, "_fetch_estate_df", return_value=df):
+        res = rep.build(app="DB", lang="en")
+    assert res["enforcement"]["available"] is False
+    assert res["empty"] is False
 
 
 def test_build_scopes_and_runs_modules():
