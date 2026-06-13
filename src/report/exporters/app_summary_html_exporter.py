@@ -103,11 +103,11 @@ class AppSummaryHtmlExporter:
                 f"<td>{_esc(getattr(f, 'description', ''))}</td></tr>"
             )
         return (
-            "<table class='report-table'><thead><tr>"
+            "<div class='report-table-wrap'><table class='report-table'><thead><tr>"
             f"<th>{_esc(t('rpt_col_severity', lang=self._lang))}</th>"
             f"<th>{_esc(t('rpt_col_rule_name', lang=self._lang))}</th>"
             f"<th>{_esc(t('rpt_col_description', lang=self._lang))}</th>"
-            f"</tr></thead><tbody>{''.join(rows)}</tbody></table>"
+            f"</tr></thead><tbody>{''.join(rows)}</tbody></table></div>"
         )
 
     def _render_html(self) -> str:

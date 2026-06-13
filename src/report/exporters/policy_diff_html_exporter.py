@@ -91,8 +91,8 @@ class PolicyDiffHtmlExporter:
                     cells.append(f"<td>{_esc(v)}</td>")
             body.append(f'<tr class="{cls}">{"".join(cells)}</tr>')
         return (
-            '<table class="report-table"><thead><tr>'
-            f"{head}</tr></thead><tbody>{''.join(body)}</tbody></table>"
+            '<div class="report-table-wrap"><table class="report-table"><thead><tr>'
+            f"{head}</tr></thead><tbody>{''.join(body)}</tbody></table></div>"
         )
 
     def _kpi_row(self) -> str:

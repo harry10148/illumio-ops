@@ -69,6 +69,15 @@ def test_no_toc_shell_main_spans_full_width(tmp_path):
     assert ".report-shell > .report-main:only-child { grid-column: 1 / -1; }" in html
 
 
+def test_wide_table_wrapped_for_horizontal_scroll(tmp_path):
+    """Regression: the 9-column diff table must sit inside .report-table-wrap
+    (overflow:auto) so a wide table scrolls internally instead of pushing the
+    whole page into horizontal scroll. Also lets TABLE_JS find its wrapper."""
+    html = open(PolicyDiffHtmlExporter(_diff(), lang="en").export(str(tmp_path)),
+                encoding="utf-8").read()
+    assert '<div class="report-table-wrap"><table class="report-table">' in html
+
+
 def test_blank_attribution_renders_em_dash_with_tooltip(tmp_path):
     """Empty last_actor / last_changed cells render — with explanatory tooltip."""
     rs = pd.DataFrame([{
