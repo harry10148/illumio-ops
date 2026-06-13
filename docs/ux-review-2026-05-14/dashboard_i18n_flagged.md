@@ -1,9 +1,9 @@
 # Dashboard i18n Audit
 
-**Scope keys:** 231
-**Findings:** 107
+**Scope keys:** 245
+**Findings:** 120
 
-## Rule: mixed_language (37)
+## Rule: mixed_language (43)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
@@ -15,6 +15,7 @@
 | `gui_detailed_kpis_label` | Detailed metrics (12 KPIs) | 詳細指標（12 KPI） | non-glossary Latin tokens: ['KPI'] |
 | `gui_err_no_csv` | No CSV file uploaded. | 未上傳 CSV 檔案。 | non-glossary Latin tokens: ['CSV'] |
 | `gui_gen_policy_diff_title` | Generate Policy Diff Report | 產生 Policy Diff 報表 | non-glossary Latin tokens: ['Diff'] |
+| `gui_gen_policy_resolver_title` | Generate Policy Resolver Report | 產生 Policy Resolver 報表 | non-glossary Latin tokens: ['Resolver'] |
 | `gui_gen_step_parsing` | Parsing CSV data... | 正在解析 CSV 資料... | non-glossary Latin tokens: ['CSV'] |
 | `gui_ip_address` | IP Address | IP 位址 | non-glossary Latin tokens: ['IP'] |
 | `gui_ov_eyebrow_security` | Security Posture | 安全體質 · Security Posture | non-glossary Latin tokens: ['Security', 'Posture'] |
@@ -23,6 +24,8 @@
 | `gui_ov_risk_feed_title` | Top Risk Findings | Top 風險發現 | non-glossary Latin tokens: ['Top'] |
 | `gui_query_flow` | Query Flow | 查詢 Flow | non-glossary Latin tokens: ['Flow'] |
 | `gui_rank_bw` | Max Bandwidth (Mbps) | 最大頻寬（Mbps） | non-glossary Latin tokens: ['Mbps'] |
+| `gui_sched_rt_policy_diff` | Policy Diff Report | Policy Diff 報表 | non-glossary Latin tokens: ['Diff'] |
+| `gui_sched_rt_policy_resolver` | Policy Resolver Report | Policy Resolver 報表 | non-glossary Latin tokens: ['Resolver'] |
 | `gui_snap_col_dst_ip` | Destination IP | 目的端 IP | non-glossary Latin tokens: ['IP'] |
 | `gui_snap_col_flow_count` | Flow Count | Flow 數 | non-glossary Latin tokens: ['Flow'] |
 | `gui_snap_col_src_ip` | Source IP | 來源 IP | non-glossary Latin tokens: ['IP'] |
@@ -32,6 +35,9 @@
 | `gui_ta_query` | Traffic Analysis Query | 查詢 Flow | non-glossary Latin tokens: ['Flow'] |
 | `gui_toast_policy_diff_done` | Policy Diff report generated. | Policy Diff 報表已產生。 | non-glossary Latin tokens: ['Diff'] |
 | `gui_toast_policy_diff_fail` | Policy Diff report failed. | Policy Diff 報表產生失敗。 | non-glossary Latin tokens: ['Diff'] |
+| `gui_toast_policy_resolver_done` | Policy Resolver report generated. | Policy Resolver 報表已產生。 | non-glossary Latin tokens: ['Resolver'] |
+| `gui_toast_policy_resolver_empty` | No resolvable ACTIVE Policy found — nothing to generate. | 找不到可解析的 ACTIVE Policy — 沒有可產生的內容。 | non-glossary Latin tokens: ['ACTIVE'] |
+| `gui_toast_policy_resolver_fail` | Policy Resolver report failed. | Policy Resolver 報表產生失敗。 | non-glossary Latin tokens: ['Resolver'] |
 | `gui_top10_error` | Error querying data. | Top 10 查詢失敗 | non-glossary Latin tokens: ['Top'] |
 | `gui_top10_loading` | Loading... | 正在載入 Top 10... | non-glossary Latin tokens: ['Top'] |
 | `gui_top10_querying` | Querying... | 正在查詢 Top 10... | non-glossary Latin tokens: ['Top'] |
@@ -45,20 +51,24 @@
 | `pd_potentially_blocked_by_boundary` | Potentially Blocked by Boundary | Potentially Blocked by Boundary（潛在邊界 Block） | non-glossary Latin tokens: ['Potentially', 'by', 'Boundary'] |
 | `pd_potentially_blocked_by_override_deny` | Potentially Blocked by Override Deny | Potentially Blocked by Override Deny（潛在強制拒絕 Block） | non-glossary Latin tokens: ['Potentially', 'by', 'Override', 'Deny'] |
 
-## Rule: low_han_ratio (27)
+## Rule: low_han_ratio (33)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
 | `actmtx_staged_enforcement_reco` | Move workloads from test/visibility to selective or full enforcement. | 將 workload 從 test/visibility 模式移至 selective 或 full enforcement。 | han_ratio=0.13 |
+| `gui_app_required` | App Label is required. | 必須指定 App Label。 | han_ratio=0.33 |
 | `gui_attack_summary_title` | Attack Summary | 攻擊摘要（Boundary/Pivot/Blast Radius/Blind Spots/行動） | han_ratio=0.15 |
 | `gui_card_health` | PCE Health | PCE 健康 | han_ratio=0.40 |
 | `gui_gen_policy_diff_title` | Generate Policy Diff Report | 產生 Policy Diff 報表 | han_ratio=0.29 |
+| `gui_gen_policy_resolver_title` | Generate Policy Resolver Report | 產生 Policy Resolver 報表 | han_ratio=0.22 |
 | `gui_ov_enforcement_modes` | Enforcement Modes | Enforcement 模式 | han_ratio=0.15 |
 | `gui_ov_eyebrow_security` | Security Posture | 安全體質 · Security Posture | han_ratio=0.21 |
 | `gui_ov_posture_unavailable` | Run a Security Posture report to populate this section. | 請執行 Security Posture 報表以載入此區塊。 | han_ratio=0.42 |
 | `gui_ov_ven_title` | VEN Health | VEN 健康 | han_ratio=0.40 |
 | `gui_policy_dec` | Policy Decision | Policy 判定 | han_ratio=0.25 |
 | `gui_query_flow` | Query Flow | 查詢 Flow | han_ratio=0.33 |
+| `gui_sched_rt_policy_diff` | Policy Diff Report | Policy Diff 報表 | han_ratio=0.17 |
+| `gui_sched_rt_policy_resolver` | Policy Resolver Report | Policy Resolver 報表 | han_ratio=0.12 |
 | `gui_sched_rt_pu` | Policy Usage | Policy 使用報表 | han_ratio=0.40 |
 | `gui_snap_col_flow_count` | Flow Count | Flow 數 | han_ratio=0.20 |
 | `gui_snap_policy_breakdown` | Policy Decision Breakdown | Policy 判定分布 | han_ratio=0.40 |
@@ -66,6 +76,8 @@
 | `gui_ta_query` | Traffic Analysis Query | 查詢 Flow | han_ratio=0.33 |
 | `gui_toast_policy_diff_done` | Policy Diff report generated. | Policy Diff 報表已產生。 | han_ratio=0.33 |
 | `gui_toast_policy_diff_fail` | Policy Diff report failed. | Policy Diff 報表產生失敗。 | han_ratio=0.38 |
+| `gui_toast_policy_resolver_done` | Policy Resolver report generated. | Policy Resolver 報表已產生。 | han_ratio=0.26 |
+| `gui_toast_policy_resolver_fail` | Policy Resolver report failed. | Policy Resolver 報表產生失敗。 | han_ratio=0.30 |
 | `gui_tw_trend_flagged_only` | Flagged only (hide Allowed) | 只看可疑（隱藏 Allowed） | han_ratio=0.46 |
 | `gui_workload_name` | Workload Name | Workload 名稱 | han_ratio=0.20 |
 | `gui_workload_search` | Workload Search | Workload 搜尋 | han_ratio=0.20 |
@@ -77,7 +89,7 @@
 | `pd_potentially_blocked_by_boundary` | Potentially Blocked by Boundary | Potentially Blocked by Boundary（潛在邊界 Block） | han_ratio=0.11 |
 | `pd_potentially_blocked_by_override_deny` | Potentially Blocked by Override Deny | Potentially Blocked by Override Deny（潛在強制拒絕 Block） | han_ratio=0.14 |
 
-## Rule: too_short_vs_english (33)
+## Rule: too_short_vs_english (34)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
@@ -88,6 +100,7 @@
 | `gui_filter_settings` | Filter Settings | 篩選條件 | en_len=15 zh_len=4 |
 | `gui_gen_audit_title` | Generate Audit Report | 產生稽核報表 | en_len=21 zh_len=6 |
 | `gui_gen_fallback_title` | Generate report | 產生報表 | en_len=15 zh_len=4 |
+| `gui_gen_step_running_bg` | Generating in background… | 背景產生中… | en_len=25 zh_len=6 |
 | `gui_opt_connections` | Connections | 連線數 | en_len=11 zh_len=3 |
 | `gui_opt_volume` | Total Volume | 總流量 | en_len=12 zh_len=3 |
 | `gui_ov_eyebrow_ops` | Operations & Estate | 營運與估產 | en_len=19 zh_len=5 |
