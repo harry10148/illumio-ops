@@ -910,10 +910,12 @@ function _populateSchedFilters(filters) {
   setVal('sched-ex-any-ip',   filters.ex_any_ip || '');
 }
 
-// Poll an async ad-hoc traffic-report job until it finishes. The POST endpoint
-// now returns a job_id immediately (no more 408 on slow PCE); we GET the job
-// status every 2s and route done/error into the existing success/fail paths.
-async function _pollTrafficJob(jobId) {
+// Poll an async ad-hoc report job until it finishes. The POST endpoints now
+// return a job_id immediately (no more timeout on slow PCE); we GET the shared
+// job status every 2s and route done/error into the existing success/fail paths.
+// ``opts.onDone(s)`` builds the success toast from the job record; ``opts.failToast``
+// is the fallback message for error/timeout. Used by traffic + app-summary.
+async function _pollReportJob(jobId, opts) {
   const POLL_MS = 2000;
   const MAX_MS = 15 * 60 * 1000; // 15-minute ceiling
   const deadline = Date.now() + MAX_MS;
@@ -928,24 +930,32 @@ async function _pollTrafficJob(jobId) {
     }
     if (!s || !s.status) continue;
     if (s.status === 'done') {
-      const msg = `${s.record_count} flows`;
-      _hideGenProgress(true, msg);
-      toast((_t('gui_toast_traffic_done')).replace('{msg}', msg));
+      opts.onDone(s);
       loadReports();
       if (typeof loadRcardMeta === 'function') loadRcardMeta();
       return;
     }
     if (s.status === 'error') {
-      const fail = _t('gui_toast_traffic_fail');
-      _hideGenProgress(false, s.error || fail);
-      toast(s.error || fail, 'err');
+      _hideGenProgress(false, s.error || opts.failToast);
+      toast(s.error || opts.failToast, 'err');
       return;
     }
     // status still 'running' — keep the background-progress text and loop.
   }
-  const timeoutMsg = _t('gui_toast_traffic_fail');
-  _hideGenProgress(false, timeoutMsg);
-  toast(timeoutMsg, 'err');
+  _hideGenProgress(false, opts.failToast);
+  toast(opts.failToast, 'err');
+}
+
+// Traffic-report polling: success toast embeds the flow record_count.
+async function _pollTrafficJob(jobId) {
+  await _pollReportJob(jobId, {
+    failToast: _t('gui_toast_traffic_fail'),
+    onDone: (s) => {
+      const msg = `${s.record_count} flows`;
+      _hideGenProgress(true, msg);
+      toast((_t('gui_toast_traffic_done')).replace('{msg}', msg));
+    },
+  });
 }
 
 async function _doGenerateTraffic() {
@@ -1153,11 +1163,14 @@ async function _doGenerateAppSummary() {
       lang: langElApp ? langElApp.value : 'en',
       start_date: start, end_date: end,
     });
-    if (r.ok) {
-      _hideGenProgress(true, _t('gui_gen_done'));
-      toast(_t('gui_toast_app_summary_done'));
-      loadReports();
-      if (typeof loadRcardMeta === 'function') loadRcardMeta();
+    if (r.ok && r.job_id) {
+      await _pollReportJob(r.job_id, {
+        failToast: _t('gui_toast_app_summary_fail'),
+        onDone: () => {
+          _hideGenProgress(true, _t('gui_gen_done'));
+          toast(_t('gui_toast_app_summary_done'));
+        },
+      });
     } else {
       const fail = _t('gui_toast_app_summary_fail');
       _hideGenProgress(false, r.error || fail);

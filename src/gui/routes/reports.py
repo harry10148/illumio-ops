@@ -524,21 +524,49 @@ def make_reports_blueprint(
         if not app:
             return jsonify({"ok": False, "error": t("gui_app_required", lang=lang)}), 400
 
+        # ── Validation passed: create job, spawn worker, return job_id ──
+        payload = {"app": app, "env": d.get('env') or None, "lang": lang,
+                   "start_date": d.get('start_date'), "end_date": d.get('end_date')}
+        job_id = uuid.uuid4().hex[:12]
+        record = {
+            "status": "running",
+            "files": [],
+            "error": "",
+            "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "finished_at": None,
+        }
         try:
-            from src.report.app_summary_report import AppSummaryReport
-            from src.api_client import ApiClient
-            cm.load()
-            config_dir = _resolve_config_dir()
-            from src.main import _make_cache_reader
-            rep = AppSummaryReport(cm, api_client=ApiClient(cm), config_dir=config_dir,
-                                   cache_reader=_make_cache_reader(cm))
-            output_dir = _resolve_reports_dir(cm)
-            path = rep.run(app=app, env=d.get('env') or None, output_dir=output_dir,
-                           lang=lang, start_date=d.get('start_date'), end_date=d.get('end_date'))
-            paths = path if isinstance(path, list) else [path]
-            return jsonify({"ok": True, "files": [os.path.basename(p) for p in paths]})
+            _save_adhoc_job(job_id, record)
         except Exception as e:
             return _err_with_log("report_app_summary_generate", e, lang=lang)
+
+        def _run_app_summary(jid, p):
+            try:
+                from src.report.app_summary_report import AppSummaryReport
+                from src.api_client import ApiClient
+                cm.load()
+                from src.main import _make_cache_reader
+                rep = AppSummaryReport(cm, api_client=ApiClient(cm),
+                                       config_dir=_resolve_config_dir(),
+                                       cache_reader=_make_cache_reader(cm))
+                path = rep.run(app=p["app"], env=p["env"], output_dir=_resolve_reports_dir(cm),
+                               lang=p["lang"], start_date=p["start_date"], end_date=p["end_date"])
+                paths = path if isinstance(path, list) else [path]
+                record.update({"status": "done",
+                               "files": [os.path.basename(pp) for pp in paths],
+                               "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
+                _save_adhoc_job(jid, record)
+            except Exception as e:  # noqa: BLE001
+                logger.error(f"App summary job {jid} failed: {e}", exc_info=True)
+                record.update({"status": "error", "error": str(e),
+                               "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
+                try:
+                    _save_adhoc_job(jid, record)
+                except Exception:
+                    logger.error(f"Could not persist failure for job {jid}")
+
+        threading.Thread(target=_run_app_summary, args=(job_id, payload), daemon=True).start()
+        return jsonify({"ok": True, "job_id": job_id})
 
     # ── API: VEN Status Report ────────────────────────────────────────────────
     @bp.route('/api/ven_status_report/generate', methods=['POST'])
