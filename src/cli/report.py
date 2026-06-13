@@ -533,6 +533,15 @@ def generate_app_summary_report(
     out = _resolve_output_dir(cm, output_dir)
     lang = _resolve_lang(cm)
 
+    try:
+        known = {l.get("value") for l in api.get_labels("app") if l.get("value")}
+        if app not in known:
+            close = ", ".join(sorted(k for k in known if app.lower() in k.lower())[:5]) \
+                or ", ".join(sorted(known)[:8])
+            click.echo(f"Warning: App Label '{app}' not found on the PCE. Known: {close}")
+    except Exception:
+        pass  # best-effort; never block generation
+
     now = dt.datetime.now(dt.timezone.utc)
     start = (now - dt.timedelta(days=days)).strftime("%Y-%m-%dT00:00:00Z")
     end = now.strftime("%Y-%m-%dT23:59:59Z")
