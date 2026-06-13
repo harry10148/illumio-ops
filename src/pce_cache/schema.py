@@ -10,6 +10,23 @@ def init_schema(engine: Engine) -> None:
     """Create all tables + indexes if missing. Idempotent."""
     _enable_wal_pragma(engine)
     Base.metadata.create_all(engine)
+    _ensure_added_indexes(engine)
+
+
+# Indexes added after a table first shipped. metadata.create_all() only creates
+# indexes when it creates the table itself, so a new index on an already-existing
+# table must be created explicitly (idempotently) here.
+_ADDED_INDEXES = (
+    ("ix_dispatch_source", "siem_dispatch", "source_table, source_id"),
+)
+
+
+def _ensure_added_indexes(engine: Engine) -> None:
+    with engine.begin() as conn:
+        for name, table, cols in _ADDED_INDEXES:
+            conn.execute(text(
+                f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({cols})"
+            ))
 
 
 def _enable_wal_pragma(engine: Engine) -> None:
