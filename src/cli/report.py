@@ -638,6 +638,14 @@ def report_resolve(ctx: click.Context, fmt: str, output_dir) -> None:
         echo_error(ctx, f"Unexpected error: {exc}")
         ctx.exit(EXIT_SOFTWARE)
         return
+    if not paths and not is_json(ctx):
+        # Empty ACTIVE policy resolves to 0 rows → no files written. Say so
+        # explicitly (mirrors the GUI empty-state toast) so a clean empty run
+        # is distinguishable from a silent failure.
+        from src.config import ConfigManager
+        from src.i18n import t as _t
+        click.echo(_t("gui_toast_policy_resolver_empty",
+                      lang=_resolve_lang(ConfigManager())), err=True)
     _emit_paths(ctx, paths, fmt)
 
 
