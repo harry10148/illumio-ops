@@ -917,7 +917,7 @@ function _populateSchedFilters(filters) {
 // is the fallback message for error/timeout. Used by traffic + app-summary.
 async function _pollReportJob(jobId, opts) {
   const POLL_MS = 2000;
-  const MAX_MS = 15 * 60 * 1000; // 15-minute ceiling
+  const MAX_MS = 30 * 60 * 1000; // 30-minute ceiling (App Summary on large estates can take ~15-20 min)
   const deadline = Date.now() + MAX_MS;
   _updateGenStep(_t('gui_gen_step_running_bg'));
   while (Date.now() < deadline) {

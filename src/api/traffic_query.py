@@ -573,7 +573,7 @@ class TrafficQueryBuilder:
             )
             c.last_traffic_query_diagnostics = dict(effective_spec.diagnostics)
             logger.info(
-                "Traffic query mode: native=%s native_filters=%s fallback_filters=%s report_only_filters=%s unresolved_native=%s",
+                "Traffic query mode: native={} native_filters={} fallback_filters={} report_only_filters={} unresolved_native={}",
                 effective_spec.diagnostics.get("native_query_used", False),
                 sorted(effective_spec.native_filters.keys()),
                 sorted(effective_spec.fallback_filters.keys()),
