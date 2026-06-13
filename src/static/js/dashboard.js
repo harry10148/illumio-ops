@@ -697,6 +697,14 @@ function openReportGenModal(type) {
     appRow.style.display = m.appField ? '' : 'none';
     if (m.appField) _populateAppLabelSelects();
   }
+
+  // Data-source (cache vs live API) applies only to traffic-fetch reports.
+  const cacheRow = $('m-gen-cache-row');
+  if (cacheRow) {
+    cacheRow.style.display = (type === 'traffic' || type === 'app_summary') ? '' : 'none';
+    const modeSel = $('m-gen-cache-mode');
+    if (modeSel) modeSel.value = 'cache';  // default each open
+  }
   
   $('m-gen-note').style.display  = m.dates ? 'none' : '';
 
@@ -1012,12 +1020,15 @@ async function _doGenerateTraffic() {
       const langEl = document.getElementById('m-gen-lang');
       const clipEl = document.getElementById('m-gen-clip-to-cache');
       const clipToCache = !!(clipEl && clipEl.checked);
+      const cacheModeEl = document.getElementById('m-gen-cache-mode');
+      const useCache = !cacheModeEl || cacheModeEl.value !== 'api';
       const r = await post('/api/reports/generate', {
         source: 'api', format: fmtEl2 ? fmtEl2.value : 'all',
         start_date: startDate, end_date: endDate,
         traffic_report_profile: profileEl ? profileEl.value : 'security_risk',
         lang: langEl ? langEl.value : 'en',
         clip_to_cache: clipToCache,
+        use_cache: useCache,
         ...(reportFilters ? { filters: reportFilters } : {}),
       });
       if (r.ok && r.job_id) {
@@ -1156,12 +1167,15 @@ async function _doGenerateAppSummary() {
   }
   const start = $('m-gen-start') ? $('m-gen-start').value : null;
   const end   = $('m-gen-end') ? $('m-gen-end').value : null;
+  const cacheModeElApp = document.getElementById('m-gen-cache-mode');
+  const useCacheApp = !cacheModeElApp || cacheModeElApp.value !== 'api';
   _updateGenStep(_t('gui_gen_step_fetching'));
   try {
     const r = await post('/api/app_report/generate', {
       app, env: envEl ? envEl.value.trim() : '',
       lang: langElApp ? langElApp.value : 'en',
       start_date: start, end_date: end,
+      use_cache: useCacheApp,
     });
     if (r.ok && r.job_id) {
       await _pollReportJob(r.job_id, {

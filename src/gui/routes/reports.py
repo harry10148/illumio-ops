@@ -220,7 +220,8 @@ def make_reports_blueprint(
                 result = gen.generate_from_api(
                     start_date=payload.get('start_date'), end_date=payload.get('end_date'),
                     filters=payload.get('filters'), traffic_report_profile=traffic_report_profile,
-                    lang=lang, clip_to_cache=payload.get('clip_to_cache', False))
+                    lang=lang, clip_to_cache=payload.get('clip_to_cache', False),
+                    use_cache=payload.get('use_cache', True))
 
             if result.record_count == 0:
                 record.update({"status": "error", "error": t("gui_no_traffic_data", lang=lang),
@@ -342,6 +343,8 @@ def make_reports_blueprint(
                     report_filters = None
             payload["filters"] = report_filters
             payload["clip_to_cache"] = str(d.get('clip_to_cache', '')).lower() in ('true', '1', 'on')
+            # Data source: default cache; 'api'/false → live PCE query (no cache).
+            payload["use_cache"] = str(d.get('use_cache', 'true')).lower() not in ('false', '0', 'off', 'no')
 
         # ── Validation passed: create job, spawn worker, return job_id ──
         job_id = uuid.uuid4().hex[:12]
@@ -526,7 +529,8 @@ def make_reports_blueprint(
 
         # ── Validation passed: create job, spawn worker, return job_id ──
         payload = {"app": app, "env": d.get('env') or None, "lang": lang,
-                   "start_date": d.get('start_date'), "end_date": d.get('end_date')}
+                   "start_date": d.get('start_date'), "end_date": d.get('end_date'),
+                   "use_cache": str(d.get('use_cache', 'true')).lower() not in ('false', '0', 'off', 'no')}
         job_id = uuid.uuid4().hex[:12]
         record = {
             "status": "running",
@@ -550,7 +554,8 @@ def make_reports_blueprint(
                                        config_dir=_resolve_config_dir(),
                                        cache_reader=_make_cache_reader(cm))
                 path = rep.run(app=p["app"], env=p["env"], output_dir=_resolve_reports_dir(cm),
-                               lang=p["lang"], start_date=p["start_date"], end_date=p["end_date"])
+                               lang=p["lang"], start_date=p["start_date"], end_date=p["end_date"],
+                               use_cache=p.get("use_cache", True))
                 paths = path if isinstance(path, list) else [path]
                 record.update({"status": "done",
                                "files": [os.path.basename(pp) for pp in paths],

@@ -82,7 +82,7 @@ def test_build_pushes_app_scope_filters_to_fetch():
     api.fetch_managed_workloads.return_value = []
     rep = AppSummaryReport(cm=MagicMock(), api_client=api)
 
-    def _spy(start_date=None, end_date=None, filters=None):
+    def _spy(start_date=None, end_date=None, filters=None, use_cache=True):
         captured["filters"] = filters
         return df
 
@@ -102,7 +102,7 @@ def test_build_scope_filters_app_only_when_no_env():
     api.fetch_managed_workloads.return_value = []
     rep = AppSummaryReport(cm=MagicMock(), api_client=api)
 
-    def _spy(start_date=None, end_date=None, filters=None):
+    def _spy(start_date=None, end_date=None, filters=None, use_cache=True):
         captured["filters"] = filters
         return df
 

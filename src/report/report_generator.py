@@ -167,13 +167,17 @@ class ReportGenerator:
     # ── cache-aware traffic fetch ────────────────────────────────────────────
 
     def _fetch_traffic(self, start: datetime.datetime, end: datetime.datetime,
-                       filters: Optional[dict] = None) -> dict:
+                       filters: Optional[dict] = None,
+                       use_cache: bool = True) -> dict:
         """Return traffic flows with metadata. Uses cache when fully covered.
         On partial coverage where cache_start > request start, merges API gap
         with cached data; tags source as 'mixed' when the gap is non-empty,
         or 'cache' when the API returns zero rows for the gap.
+
+        use_cache=False forces a pure live PCE query for the whole window
+        (freshest data, no local cache), ignoring any wired cache reader.
         """
-        if self._cache is not None:
+        if use_cache and self._cache is not None:
             state = self._cache.cover_state("traffic", start, end)
             if state == "full":
                 logger.info("Traffic report: flows from cache ({} → {})", start, end)
@@ -207,7 +211,8 @@ class ReportGenerator:
 
     def fetch_traffic_df(self, start_date: Optional[str] = None,
                          end_date: Optional[str] = None,
-                         filters: Optional[dict] = None):
+                         filters: Optional[dict] = None,
+                         use_cache: bool = True):
         """Query the PCE (cache-aware) and return the parsed estate traffic df.
 
         Thin reuse of the same fetch primitives generate_from_api uses
@@ -229,7 +234,7 @@ class ReportGenerator:
         if ruleset_needs_draft_pd(DRAFT_PD_RULES):
             filters = dict(filters or {})
             filters.setdefault("requires_draft_pd", True)
-        records = self._fetch_traffic(start_dt, end_dt, filters)["raw"]
+        records = self._fetch_traffic(start_dt, end_dt, filters, use_cache=use_cache)["raw"]
         if not records:
             return pd.DataFrame()
         return self._parse_api(records)
@@ -244,6 +249,7 @@ class ReportGenerator:
                           detail_level: str = _REPORT_DETAIL_LEVEL,
                           lang: str = "en",
                           clip_to_cache: bool = False,
+                          use_cache: bool = True,
                           vuln_csv_path: str | None = None) -> ReportResult:
         """Fetch traffic from PCE API and run the full analysis pipeline.
 
@@ -296,7 +302,7 @@ class ReportGenerator:
         if ruleset_needs_draft_pd(DRAFT_PD_RULES):
             filters = dict(filters or {})
             filters["requires_draft_pd"] = True
-        traffic = self._fetch_traffic(start_dt, end_dt, filters)
+        traffic = self._fetch_traffic(start_dt, end_dt, filters, use_cache=use_cache)
         records = traffic["raw"]
 
         if not records:

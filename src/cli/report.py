@@ -65,6 +65,7 @@ def generate_traffic_report(
     email: bool = False,
     traffic_report_profile: str = "security_risk",
     vuln_csv_path: str | None = None,
+    use_cache: bool = True,
 ) -> list[str]:
     from src.api_client import ApiClient
     from src.config import ConfigManager
@@ -88,7 +89,7 @@ def generate_traffic_report(
                                        vuln_csv_path=vuln_csv_path)
     else:
         result = gen.generate_from_api(traffic_report_profile=traffic_report_profile, lang=lang,
-                                       vuln_csv_path=vuln_csv_path)
+                                       vuln_csv_path=vuln_csv_path, use_cache=use_cache)
 
     if result.record_count == 0:
         raise click.ClickException("No data for report")
@@ -232,8 +233,10 @@ def report_group() -> None:
     default="security_risk",
     help="Traffic report profile (security_risk or network_inventory)",
 )
+@click.option("--cache/--no-cache", "use_cache", default=True,
+              help="Use the local PCE cache (default) or query the PCE live for the whole window (--no-cache).")
 @click.pass_context
-def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool, traffic_report_profile: str) -> None:
+def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool, traffic_report_profile: str, use_cache: bool) -> None:
     """Generate Traffic Flow Report."""
     if ctx.get_parameter_source("traffic_report_profile") == click.core.ParameterSource.COMMANDLINE:
         click.echo("note: 'report traffic --profile' is deprecated; use 'report security' / 'report inventory'", err=True)
@@ -245,6 +248,7 @@ def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_
             output_dir=output_dir,
             email=email,
             traffic_report_profile=traffic_report_profile,
+            use_cache=use_cache,
         )
     except click.ClickException as exc:
         echo_error(ctx, exc.format_message())
@@ -282,9 +286,11 @@ def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_
     help="Vulnerability-scan CSV (ip + cve columns; Qualys/Tenable exports accepted) "
          "for the V-E exposure section.",
 )
+@click.option("--cache/--no-cache", "use_cache", default=True,
+              help="Use the local PCE cache (default) or query the PCE live for the whole window (--no-cache).")
 @click.pass_context
 def report_security(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool,
-                    vuln_csv_path) -> None:
+                    vuln_csv_path, use_cache: bool) -> None:
     """Generate Security & Risk Report."""
     try:
         paths = generate_security_report(
@@ -294,6 +300,7 @@ def report_security(ctx: click.Context, source: str, file_path, fmt: str, output
             output_dir=output_dir,
             email=email,
             vuln_csv_path=vuln_csv_path,
+            use_cache=use_cache,
         )
     except click.ClickException as exc:
         echo_error(ctx, exc.format_message())
@@ -323,8 +330,10 @@ def report_security(ctx: click.Context, source: str, file_path, fmt: str, output
 @click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
 @click.option("--email", is_flag=True)
+@click.option("--cache/--no-cache", "use_cache", default=True,
+              help="Use the local PCE cache (default) or query the PCE live for the whole window (--no-cache).")
 @click.pass_context
-def report_inventory(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool) -> None:
+def report_inventory(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool, use_cache: bool) -> None:
     """Generate Network & Traffic Inventory Report."""
     try:
         paths = generate_inventory_report(
@@ -333,6 +342,7 @@ def report_inventory(ctx: click.Context, source: str, file_path, fmt: str, outpu
             fmt=fmt,
             output_dir=output_dir,
             email=email,
+            use_cache=use_cache,
         )
     except click.ClickException as exc:
         echo_error(ctx, exc.format_message())
@@ -520,6 +530,7 @@ def generate_app_summary_report(
     env: str | None = None,
     days: int = 7,
     output_dir: str | None = None,
+    use_cache: bool = True,
 ) -> list[str]:
     """Generate the single-App Summary report (HTML)."""
     from src.api_client import ApiClient
@@ -549,7 +560,7 @@ def generate_app_summary_report(
     rpt = AppSummaryReport(cm, api_client=api, config_dir=config_dir,
                            cache_reader=_make_cache_reader(cm))
     path = rpt.run(app=app, env=env, output_dir=out, lang=lang,
-                   start_date=start, end_date=end)
+                   start_date=start, end_date=end, use_cache=use_cache)
     return [path]
 
 
@@ -559,13 +570,15 @@ def generate_app_summary_report(
 @click.option("--days", type=int, default=7, show_default=True,
               help="Lookback window (days) for traffic flows.")
 @click.option("--output-dir", type=click.Path(), default=None)
+@click.option("--cache/--no-cache", "use_cache", default=True,
+              help="Use the local PCE cache (default) or query the PCE live for the whole window (--no-cache).")
 @click.pass_context
 def report_app_summary(ctx: click.Context, app: str, env: str | None, days: int,
-                       output_dir) -> None:
+                       output_dir, use_cache: bool) -> None:
     """Generate App Summary Report (single App Label, inbound/outbound view)."""
     try:
         paths = generate_app_summary_report(
-            app=app, env=env, days=days, output_dir=output_dir,
+            app=app, env=env, days=days, output_dir=output_dir, use_cache=use_cache,
         )
     except click.ClickException as exc:
         echo_error(ctx, exc.format_message())
