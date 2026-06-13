@@ -467,6 +467,10 @@ MODERN_SHELL_CSS = """\
 .report-toc a::before { content: counter(chap, decimal-leading-zero); font-family: var(--font-mono); font-size: 11px; color: #a8a8a8; margin-right: 6px; }
 .report-toc a:hover { color: var(--slate); background: var(--slate-10); }
 .report-main { margin-left: 0; padding: 48px 56px 96px; max-width: 1300px; }
+/* Exporters without a TOC sidebar (app_summary, policy_diff) render <main> as the
+   only shell child; span both grid columns so it isn't squished into the 240px
+   TOC track. No effect on TOC exporters, whose <main> is not :only-child. */
+.report-shell > .report-main:only-child { grid-column: 1 / -1; }
 .report-cover-block { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
 .report-cover-block .eyebrow { font-size: 12px; color: var(--slate-50); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 8px; }
 .report-cover-block h1 { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; margin: 0 0 8px; color: var(--slate); }

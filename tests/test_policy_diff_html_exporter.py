@@ -56,6 +56,19 @@ def test_table_headers_are_localized(tmp_path):
     assert "[MISSING" not in html
 
 
+def test_no_toc_shell_main_spans_full_width(tmp_path):
+    """Regression: exporters without a TOC sidebar render <main> as the only
+    shell child, so it lands in the 240px TOC grid track and gets squished.
+    The shared CSS must carry the :only-child full-span rule that fixes it."""
+    html = open(PolicyDiffHtmlExporter(_diff(), lang="en").export(str(tmp_path)),
+                encoding="utf-8").read()
+    # main is the only child of the shell (no <aside class="report-toc">)
+    assert '<div class="report-shell"><main class="report-main">' in html
+    assert 'class="report-toc"' not in html
+    # the CSS rule that un-squishes a TOC-less main must be present
+    assert ".report-shell > .report-main:only-child { grid-column: 1 / -1; }" in html
+
+
 def test_blank_attribution_renders_em_dash_with_tooltip(tmp_path):
     """Empty last_actor / last_changed cells render — with explanatory tooltip."""
     rs = pd.DataFrame([{
