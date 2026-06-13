@@ -50,7 +50,7 @@ class AppSummaryHtmlExporter:
         mod03 = self._r.get("mod03", {})
         coverage = mod03.get("enforced_coverage_pct", 0.0)
         return (
-            _kpi(base.get("flow_count", 0), t("rpt_app_count", lang=self._lang))
+            _kpi(base.get("flow_count", 0), t("rpt_flow_count", lang=self._lang))
             + _kpi(base.get("inbound_count", 0), t("rpt_app_inbound", lang=self._lang))
             + _kpi(base.get("outbound_count", 0), t("rpt_app_outbound", lang=self._lang))
             + _kpi(f"{coverage}%", t("rpt_app_coverage", lang=self._lang))
