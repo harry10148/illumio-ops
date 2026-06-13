@@ -259,21 +259,24 @@ def enqueue_new_records(
     ]
     for source_table, model in pairs:
         with session_factory() as s:
-            already = set(
-                s.execute(
-                    select(SiemDispatch.source_id).where(
-                        SiemDispatch.source_table == source_table
-                    )
-                ).scalars().all()
+            # SQL anti-join: cache rows that have no SiemDispatch row yet.
+            # Previously this loaded the entire dispatched-id set into Python and
+            # built `id NOT IN (... one bind per id ...)`, which on a large cache
+            # blew past SQLite's variable cap (`too many SQL variables`) — the
+            # job then failed every tick, hammering the DB. A correlated
+            # NOT EXISTS lets SQLite do the anti-join with the
+            # (source_table, source_id) index and no per-id binds.
+            dispatched = (
+                select(SiemDispatch.id)
+                .where(
+                    SiemDispatch.source_table == source_table,
+                    SiemDispatch.source_id == model.id,
+                )
+                .exists()
             )
-            if already:
-                new_ids = s.execute(
-                    select(model.id).where(model.id.not_in(already))
-                ).scalars().all()
-            else:
-                new_ids = s.execute(
-                    select(model.id)
-                ).scalars().all()
+            new_ids = s.execute(
+                select(model.id).where(~dispatched)
+            ).scalars().all()
         for source_id in new_ids:
             enqueue(session_factory, source_table, source_id, destinations)
             total += 1

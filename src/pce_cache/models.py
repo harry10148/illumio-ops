@@ -119,6 +119,8 @@ class SiemDispatch(Base):
         Index("ix_dispatch_pending", "status", "next_attempt_at"),
         Index("ix_dispatch_queued_at", "queued_at"),
         Index("ix_dispatch_sent_at", "sent_at"),
+        # Backs the enqueue_new_records anti-join (NOT EXISTS on source rows).
+        Index("ix_dispatch_source", "source_table", "source_id"),
     )
 
 

@@ -134,3 +134,31 @@ def test_transport_for_hec_constructs_url():
     t = _transport_for(cfg)
     from src.siem.transports.splunk_hec import SplunkHECTransport
     assert isinstance(t, SplunkHECTransport)
+
+
+def test_enqueue_new_records_anti_join_only_undispatched(sf):
+    """Regression: enqueue_new_records must use a SQL anti-join (NOT EXISTS),
+    not load the dispatched-id set + `id NOT IN (...)` which blew SQLite's
+    variable cap on a large cache. Functionally: only rows lacking a dispatch
+    row get enqueued, and a second run is a no-op."""
+    from src.siem.dispatcher import enqueue_new_records
+    from src.pce_cache.models import PceEvent, SiemDispatch
+
+    _seed_event(sf, 1)   # already dispatched (has a SiemDispatch row)
+    _seed_event(sf, 2)
+    now = datetime.now(timezone.utc)
+    with sf.begin() as s:  # event 3: NO dispatch row yet
+        s.add(PceEvent(
+            pce_href="/orgs/1/events/3", pce_event_id="uuid-3", timestamp=now,
+            event_type="policy.update", severity="info", status="success",
+            pce_fqdn="pce.test", raw_json="{}", ingested_at=now,
+        ))
+
+    assert enqueue_new_records(sf, ["test-dest"]) == 1   # only event 3
+    assert enqueue_new_records(sf, ["test-dest"]) == 0   # idempotent
+
+    with sf() as s:
+        rows = s.execute(
+            select(SiemDispatch).where(SiemDispatch.source_id == 3)
+        ).scalars().all()
+    assert len(rows) == 1
