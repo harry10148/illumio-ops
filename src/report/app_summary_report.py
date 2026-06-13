@@ -25,16 +25,18 @@ class AppSummaryReport:
         self._config_dir = config_dir
         self._cache = cache_reader
 
-    def _fetch_estate_df(self, start_date=None, end_date=None):
-        """Fetch the estate traffic DataFrame via ReportGenerator's API path."""
+    def _fetch_estate_df(self, start_date=None, end_date=None, filters=None):
+        """Fetch the (optionally PCE-scoped) traffic DataFrame via ReportGenerator."""
         from src.report.report_generator import ReportGenerator
         gen = ReportGenerator(config_manager=self.cm, api_client=self.api,
                               config_dir=self._config_dir, cache_reader=self._cache)
-        return gen.fetch_traffic_df(start_date=start_date, end_date=end_date)
+        return gen.fetch_traffic_df(start_date=start_date, end_date=end_date, filters=filters)
 
     def build(self, app: str, env: str | None = None, lang: str = "en",
               start_date=None, end_date=None) -> dict:
-        df = self._fetch_estate_df(start_date=start_date, end_date=end_date)
+        labels = [f"app={app}"] + ([f"env={env}"] if env else [])
+        scope_filters = {"src_labels": labels, "dst_labels": labels, "query_operator": "or"}
+        df = self._fetch_estate_df(start_date=start_date, end_date=end_date, filters=scope_filters)
         scoped = filter_app_flows(df, app, env)
         if scoped.empty:
             return {"app": app, "env": env or "", "empty": True}

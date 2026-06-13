@@ -75,6 +75,43 @@ def test_build_scopes_and_runs_modules():
     assert "findings" in result
 
 
+def test_build_pushes_app_scope_filters_to_fetch():
+    captured = {}
+    df = pd.DataFrame([_row_decision("Web", "DB", "10.0.0.5", 3306, "allowed", 5)])
+    api = MagicMock()
+    api.fetch_managed_workloads.return_value = []
+    rep = AppSummaryReport(cm=MagicMock(), api_client=api)
+
+    def _spy(start_date=None, end_date=None, filters=None):
+        captured["filters"] = filters
+        return df
+
+    with patch.object(rep, "_fetch_estate_df", side_effect=_spy):
+        rep.build(app="DB", env="Prod", lang="en")
+    f = captured["filters"]
+    assert f is not None
+    assert f["src_labels"] == ["app=DB", "env=Prod"]
+    assert f["dst_labels"] == ["app=DB", "env=Prod"]
+    assert f["query_operator"] == "or"
+
+
+def test_build_scope_filters_app_only_when_no_env():
+    captured = {}
+    df = pd.DataFrame([_row_decision("Web", "DB", "10.0.0.5", 3306, "allowed", 5)])
+    api = MagicMock()
+    api.fetch_managed_workloads.return_value = []
+    rep = AppSummaryReport(cm=MagicMock(), api_client=api)
+
+    def _spy(start_date=None, end_date=None, filters=None):
+        captured["filters"] = filters
+        return df
+
+    with patch.object(rep, "_fetch_estate_df", side_effect=_spy):
+        rep.build(app="DB", lang="en")
+    assert captured["filters"]["src_labels"] == ["app=DB"]
+    assert captured["filters"]["query_operator"] == "or"
+
+
 def test_build_unknown_app_flags_empty():
     rep = AppSummaryReport(cm=MagicMock(), api_client=MagicMock())
     with patch.object(rep, "_fetch_estate_df", return_value=pd.DataFrame()):
