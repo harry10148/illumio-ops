@@ -107,3 +107,26 @@ def test_read_flows_df_policy_decision_pushdown(tmp_path):
     df = rd.read_flows_df(start, end, policy_decisions=["allowed"])
     assert len(df) == 1 and df["policy_decision"].tolist() == ["allowed"]
     assert len(rd.read_flows_df(start, end, policy_decisions=["allowed", "blocked"])) == 2
+
+
+def test_fetch_traffic_df_applies_filters_to_cache():
+    """_fetch_traffic_df re-applies the report's label/port filters on the cache
+    df (the cache read doesn't filter beyond decision/workload)."""
+    from unittest.mock import MagicMock
+    import pandas as pd
+    from src.report.report_generator import ReportGenerator
+    cache = MagicMock()
+    cache.cover_state.return_value = "full"
+    cache.read_flows_df.return_value = pd.DataFrame([
+        {"src_app": "Web", "dst_app": "DB", "port": 443, "proto": "TCP",
+         "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "src_extra_labels": {}, "dst_extra_labels": {}},
+        {"src_app": "ERP", "dst_app": "DB", "port": 22, "proto": "TCP",
+         "src_ip": "10.0.0.3", "dst_ip": "10.0.0.4", "src_extra_labels": {}, "dst_extra_labels": {}},
+    ])
+    gen = ReportGenerator(config_manager=MagicMock(), api_client=MagicMock(), cache_reader=cache)
+    import datetime
+    s = datetime.datetime(2026, 6, 1, tzinfo=datetime.timezone.utc)
+    e = datetime.datetime(2026, 6, 8, tzinfo=datetime.timezone.utc)
+    df, src = gen._fetch_traffic_df(s, e, {"src_labels": ["app=Web"]}, use_cache=True)
+    assert src == "cache"
+    assert df["src_app"].tolist() == ["Web"]  # ERP row filtered out post-read

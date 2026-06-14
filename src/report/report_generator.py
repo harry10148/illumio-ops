@@ -218,15 +218,18 @@ class ReportGenerator:
         per-row re-flatten); API portions go through _parse_api. The cache and
         API frames are assembled identically so output matches either source."""
         import pandas as pd
+        from src.report.df_filter import apply_df_traffic_filters
         # Push the report's policy-decision filter into the cache read — the live
         # API applies it server-side, so the cache must too (correctness) and it
-        # reads far fewer rows (perf).
+        # reads far fewer rows (perf). The remaining filters (labels/ip/port) the
+        # API applies server-side too, so re-apply them on the cache df.
         pds = (filters or {}).get("policy_decisions") or None
         if use_cache and self._cache is not None:
             state = self._cache.cover_state("traffic", start, end)
             if state == "full":
                 df = self._cache.read_flows_df(start, end, workload_hrefs=cache_workload_hrefs,
                                                policy_decisions=pds)
+                df = apply_df_traffic_filters(df, filters)
                 logger.info("Traffic report: flows from cache ({} → {}) [vectorized]", start, end)
                 return df, "cache"
             if state == "partial":
@@ -245,6 +248,7 @@ class ReportGenerator:
                     df_cache = self._cache.read_flows_df(cache_start, end,
                                                          workload_hrefs=cache_workload_hrefs,
                                                          policy_decisions=pds)
+                    df_cache = apply_df_traffic_filters(df_cache, filters)
                     parts = [d for d in (df_gap, df_cache) if not d.empty]
                     df = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
                     return df, ("mixed" if not df_gap.empty else "cache")
