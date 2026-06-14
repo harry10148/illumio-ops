@@ -103,6 +103,26 @@ def test_schema_prunes_deprecated_raw_indexes():
             assert gone not in idx_cols, f"{gone} should not have a single-column index"
 
 
+def test_schema_creates_report_json_null_partial_index():
+    """Partial index on (last_detected) WHERE report_json IS NULL makes
+    read_flows_df's 0-row fallback query hit an empty index instead of
+    full-scanning the last_detected range. Must be created idempotently and be
+    an actual PARTIAL index (carries the WHERE predicate)."""
+    from sqlalchemy import text
+    from src.pce_cache.schema import init_schema
+
+    with tempfile.TemporaryDirectory() as tmp:
+        engine = create_engine(f"sqlite:///{os.path.join(tmp,'c.sqlite')}")
+        init_schema(engine)
+        init_schema(engine)  # idempotent
+        with engine.connect() as conn:
+            sql = conn.execute(text(
+                "SELECT sql FROM sqlite_master WHERE type='index' "
+                "AND name='ix_raw_report_json_null'")).scalar()
+        assert sql is not None, "partial index missing"
+        assert "report_json IS NULL" in sql, f"index is not partial: {sql}"
+
+
 def test_schema_sets_read_perf_pragmas():
     """cache_size (64MB) + mmap_size (256MB) speed up large 240k-row scans."""
     from sqlalchemy import text

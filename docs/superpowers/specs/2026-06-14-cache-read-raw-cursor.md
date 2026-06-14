@@ -1,56 +1,66 @@
-# Spec — `read_flows_df` raw-cursor fetch (supersedes Route 2)
+# Spec — `read_flows_df` fallback-scan fix (supersedes Route 2)
 
-**Date** 2026-06-14 · **Status** approved, implementing · **Scope** `src/pce_cache/reader.py`
+**Date** 2026-06-14 · **Status** done · **Scope** `src/pce_cache/schema.py`
+
+> Title kept for history. The investigated lever (raw cursor) was **refuted by
+> measurement**; the shipped fix is a **partial index**. See the journey below —
+> it documents two dead ends so they aren't re-attempted.
 
 ## Problem
 
-Full unfiltered traffic report (7-day window, 242,459 rows) reads the cache in
-**~20s** (handoff reported ~23s cold). The parked "Route 2" plan attributed this
-to per-row Python in `read_flows_df` and proposed denormalizing the 4 standard
-labels into columns + `pandas.read_sql`.
+Full unfiltered traffic report (7-day window, ~242k rows) read the cache in
+~16s clean (~20s under live-service contention). Parked "Route 2" blamed per-row
+Python and proposed denormalizing labels + `pandas.read_sql`.
 
-## Measurement (test machine, 242,459 rows, warm cache)
+## What measurement showed (test machine, ~242k rows)
 
-Profiling **refuted Route 2's premise**:
+Each hypothesis was tested and **two were refuted**:
 
-| Path | Time |
-|------|------|
-| **Actual `read_flows_df`** (SQLAlchemy ORM session) | **19.81s** |
-| Raw sqlite3: blob fetch + orjson + `build_unified_df` | 12.04s |
-| Route 2 (`read_sql` of 41 denormalized columns) | 11.70s |
-| Decomposition (raw): fetch 5.66s · orjson 3.79s · build 3.27s | |
+1. **Route 2 (denormalize + read_sql): refuted.** `read_sql` of 41 columns
+   (11.70s) beat the raw blob+orjson+build path (12.04s) by only 3% — it trades
+   the orjson parse (3.79s) for a 41-column fetch (7.01s vs the 1-blob 5.66s).
+   Not worth a 16-column schema change + 242k backfill. Cost is the sqlite3
+   driver's per-row × per-column object build (CPU, not I/O: `ORDER BY` made no
+   difference).
 
-- **Not I/O**: blob fetch with vs without `ORDER BY` = 5.66s vs 6.26s → data is
-  cached; cost is the sqlite3 driver's per-row × per-column Python object build.
-- **Route 2 ≈ 0 gain**: `read_sql` removes orjson (3.79s) but pays it back
-  fetching 41 columns instead of 1 blob (7.01s vs 5.66s). 11.70s vs raw 12.04s =
-  3% — for a 16-column schema change + 242k-row backfill + 41-column maintenance.
-- **The real tax is SQLAlchemy**: the ORM-session result wrapping adds ~7.8s
-  (~40%) over the identical raw-sqlite3 logic.
+2. **"SQLAlchemy ORM adds ~40%": refuted.** That gap was an artifact of (a) the
+   fallback double-scan below and (b) live-service contention. Clean, with the
+   fix in place: SQLAlchemy path **7.26s** vs a raw DBAPI cursor **11.41s** — the
+   raw cursor was *slower*. Reverted.
 
-## Decision
+3. **The real cause: the fallback query.** `read_flows_df` runs two queries —
+   `report_json IS NOT NULL` (fast path) then `report_json IS NULL` (fallback for
+   pre-Tier-2a rows). On a backfilled DB the fallback matches **0 rows**, but
+   `report_json` is in no index, so it **full-scanned the 242k-row last_detected
+   range** checking each row — ~8s for nothing.
 
-Do **not** do Route 2. Replace the SQLAlchemy session fetch in `read_flows_df`
-with a raw DBAPI cursor obtained from the same engine (so the connect-listener
-PRAGMAs — `cache_size`, `mmap_size`, `busy_timeout`, WAL — still apply).
+## Fix (shipped)
 
-- Keep `report_json`, `orjson`, `build_unified_df`, the NULL→raw_json fallback,
-  and the report_json-not-null / is-null two-query split **unchanged**.
-- Push the same filters to SQL as today: `last_detected` window, `workload_hrefs`
-  (src OR dst IN), `policy_decisions` (action IN), `ORDER BY last_detected`.
-- Datetime bounds are formatted to the exact string SQLite stores
-  (`%Y-%m-%d %H:%M:%S.%f`, UTC-naive) so string comparison matches what
-  SQLAlchemy bound before. (Bonus: avoids the Python 3.12 sqlite3
-  datetime-adapter deprecation, since we pass strings not datetimes.)
+Add a **partial index**:
+`ix_raw_report_json_null ON pce_traffic_flows_raw(last_detected) WHERE report_json IS NULL`.
 
-**Expected**: ~20s → ~12s (~40%). Zero schema change, zero backfill, zero
-offline-bundle impact, identical output DataFrame.
+The fallback query now hits this index, which contains only null-`report_json`
+rows (none, on a backfilled DB) → returns instantly. **Zero write cost**: ingest
+always sets `report_json`, so new rows never enter the partial index. Created
+idempotently in `init_schema` (`CREATE INDEX IF NOT EXISTS … WHERE …`), so it
+appears on the next service restart with no manual migration.
+
+**Result: ~16s → ~7s clean (~2.3×).** No schema/column change, no backfill, no
+offline-bundle impact, `read_flows_df` logic and output unchanged.
 
 ## Verification
 
-1. New equivalence test: `read_flows_df` (mixed report_json/NULL rows, with
-   window + workload + decision filters) produces a frame equal (`check_like`)
-   to `APIParser().parse()` of the matching flows.
-2. Existing `test_cache_flatten_vectorized.py` read_flows_df tests stay green
-   (report_json path, raw_json fallback, decision pushdown).
-3. Re-profile actual `read_flows_df` on the test machine; confirm ~12s.
+1. `test_schema_creates_report_json_null_partial_index` — index exists and is
+   partial (carries the `report_json IS NULL` predicate).
+2. `test_read_flows_df_matches_apiparser_with_filters` — read_flows_df output
+   equals `APIParser().parse()` across report_json + raw_json-fallback rows with
+   window + workload + decision filters (regression guard; added this session).
+3. Re-profile on the test machine, service stopped: ~7s confirmed.
+
+## Floor / not pursued
+
+~7s for materializing 242k rows × 41 cols into a pandas DataFrame is near the
+SQLite+pandas floor. The painful case is the *unfiltered* full report (242k rows
+inherent — the 6/12 weak-scan burst), so row-reducing pushdown can't help it.
+Further wins would need a columnar engine (DuckDB) — parked, see the architecture
+decision in the session handoff.

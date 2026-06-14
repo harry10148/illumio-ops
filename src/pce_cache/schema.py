@@ -46,6 +46,16 @@ _ADDED_INDEXES = (
     # Backs the common report query: last_detected range + policy-decision
     # (action) filter pushed down in read_flows_df (Tier-2b).
     ("ix_raw_last_action", "pce_traffic_flows_raw", "last_detected, action"),
+    # Partial index for read_flows_df's report_json-IS-NULL fallback query. On a
+    # backfilled DB every row has report_json, so the fallback matches 0 rows —
+    # but without this it still full-scanned the 242k-row last_detected range
+    # checking each row (report_json isn't in any other index), costing ~8s per
+    # report. This index contains ONLY null-report_json rows (none, normally), so
+    # the fallback hits an empty index and returns instantly. Zero write cost:
+    # ingest always sets report_json, so new rows never enter this index.
+    # (4th element = partial-index WHERE predicate.)
+    ("ix_raw_report_json_null", "pce_traffic_flows_raw", "last_detected",
+     "report_json IS NULL"),
 )
 
 # Single-column indexes removed because no query filters/sorts by them — they
@@ -62,9 +72,11 @@ _DEPRECATED_INDEXES = (
 
 def _ensure_added_indexes(engine: Engine) -> None:
     with engine.begin() as conn:
-        for name, table, cols in _ADDED_INDEXES:
+        for spec in _ADDED_INDEXES:
+            name, table, cols = spec[0], spec[1], spec[2]
+            where = f" WHERE {spec[3]}" if len(spec) > 3 else ""
             conn.execute(text(
-                f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({cols})"
+                f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({cols}){where}"
             ))
 
 
