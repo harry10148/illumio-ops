@@ -43,6 +43,9 @@ def _ensure_added_columns(engine: Engine) -> None:
 # table must be created explicitly (idempotently) here.
 _ADDED_INDEXES = (
     ("ix_dispatch_source", "siem_dispatch", "source_table, source_id"),
+    # Backs the common report query: last_detected range + policy-decision
+    # (action) filter pushed down in read_flows_df (Tier-2b).
+    ("ix_raw_last_action", "pce_traffic_flows_raw", "last_detected, action"),
 )
 
 # Single-column indexes removed because no query filters/sorts by them — they
