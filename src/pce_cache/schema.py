@@ -11,6 +11,7 @@ def init_schema(engine: Engine) -> None:
     _enable_wal_pragma(engine)
     Base.metadata.create_all(engine)
     _ensure_added_indexes(engine)
+    _drop_deprecated_indexes(engine)
 
 
 # Indexes added after a table first shipped. metadata.create_all() only creates
@@ -20,6 +21,17 @@ _ADDED_INDEXES = (
     ("ix_dispatch_source", "siem_dispatch", "source_table, source_id"),
 )
 
+# Single-column indexes removed because no query filters/sorts by them — they
+# only added write amplification on every ingest. create_all never drops
+# indexes, so drop them explicitly (idempotently) on existing DBs.
+_DEPRECATED_INDEXES = (
+    "ix_pce_traffic_flows_raw_first_detected",
+    "ix_pce_traffic_flows_raw_src_ip",
+    "ix_pce_traffic_flows_raw_dst_ip",
+    "ix_pce_traffic_flows_raw_port",
+    "ix_pce_traffic_flows_raw_action",
+)
+
 
 def _ensure_added_indexes(engine: Engine) -> None:
     with engine.begin() as conn:
@@ -27,6 +39,12 @@ def _ensure_added_indexes(engine: Engine) -> None:
             conn.execute(text(
                 f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({cols})"
             ))
+
+
+def _drop_deprecated_indexes(engine: Engine) -> None:
+    with engine.begin() as conn:
+        for name in _DEPRECATED_INDEXES:
+            conn.execute(text(f"DROP INDEX IF EXISTS {name}"))
 
 
 def _enable_wal_pragma(engine: Engine) -> None:

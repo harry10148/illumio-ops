@@ -35,15 +35,20 @@ class PceTrafficFlowRaw(Base):
 
     id:             Mapped[int]      = mapped_column(Integer, primary_key=True, autoincrement=True)
     flow_hash:      Mapped[str]      = mapped_column(String(64), unique=True, index=True)
-    first_detected: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    # first_detected / src_ip / dst_ip / port / action are intentionally NOT
+    # indexed: no query filters/sorts by them (reports + top10 read by
+    # last_detected range then filter the rest in Python; the aggregator does a
+    # full-table GROUP BY). Each index only added write amplification per insert.
+    # Add purpose-built (composite) indexes if filters are ever pushed to SQL.
+    first_detected: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_detected:  Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
-    src_ip:         Mapped[str]      = mapped_column(String(45), index=True)
+    src_ip:         Mapped[str]      = mapped_column(String(45))
     src_workload:   Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
-    dst_ip:         Mapped[str]      = mapped_column(String(45), index=True)
+    dst_ip:         Mapped[str]      = mapped_column(String(45))
     dst_workload:   Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
-    port:           Mapped[int]      = mapped_column(Integer, index=True)
+    port:           Mapped[int]      = mapped_column(Integer)
     protocol:       Mapped[str]      = mapped_column(String(8))
-    action:         Mapped[str]      = mapped_column(String(32), index=True)
+    action:         Mapped[str]      = mapped_column(String(32))
     flow_count:     Mapped[int]      = mapped_column(Integer, default=1)
     bytes_in:       Mapped[int]      = mapped_column(BigInteger, default=0)
     bytes_out:      Mapped[int]      = mapped_column(BigInteger, default=0)

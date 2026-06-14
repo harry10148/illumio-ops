@@ -76,3 +76,26 @@ def test_schema_sets_busy_timeout():
         init_schema(engine)
         with engine.connect() as conn:
             assert conn.execute(text("PRAGMA busy_timeout")).scalar() == 30000
+
+
+def test_schema_prunes_deprecated_raw_indexes():
+    """src_ip/dst_ip/port/action/first_detected indexes are dropped (no query
+    uses them; they only slowed ingest). Kept: last_detected, src/dst_workload,
+    flow_hash, ingested_at. DROP must also apply idempotently to existing DBs."""
+    from sqlalchemy import create_engine, inspect
+    from src.pce_cache.schema import init_schema
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "cache.sqlite")
+        engine = create_engine(f"sqlite:///{path}")
+        init_schema(engine)
+        init_schema(engine)  # idempotent
+        idx_cols = {tuple(i["column_names"]) for i in
+                    inspect(engine).get_indexes("pce_traffic_flows_raw")}
+        flat = {c for cols in idx_cols for c in cols}
+        assert ("last_detected",) in idx_cols
+        assert ("src_workload",) in idx_cols
+        assert ("dst_workload",) in idx_cols
+        # dropped columns must have no index
+        for gone in ("src_ip", "dst_ip", "port", "action", "first_detected"):
+            assert gone not in flat, f"{gone} should not be indexed"

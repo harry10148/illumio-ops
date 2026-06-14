@@ -5,7 +5,7 @@ from typing import Optional
 
 import orjson
 from loguru import logger
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import PceEvent, SiemDispatch
@@ -72,39 +72,59 @@ class EventsIngestor:
             last = last.replace(tzinfo=timezone.utc)
         return last.replace(microsecond=0).isoformat()
 
+    _CHUNK = 500
+
     def _insert_batch(self, events: list[dict]) -> int:
+        """Bulk-insert events in chunks with ON CONFLICT DO NOTHING (dedup by
+        pce_href) — one transaction per chunk, not per row. RETURNING yields the
+        newly-inserted ids that drive the per-event SIEM enqueue."""
         now = datetime.now(timezone.utc)
-        count = 0
+        rows: list[dict] = []
+        seen: set[str] = set()
         for ev in events:
-            try:
-                with self._sf.begin() as s:
-                    row = PceEvent(
-                        pce_href=ev.get("href", ""),
-                        pce_event_id=ev.get("uuid", ev.get("href", ""))[-64:],
-                        timestamp=_parse_iso(ev["timestamp"]),
-                        event_type=ev.get("event_type", "unknown"),
-                        severity=ev.get("severity", "info"),
-                        status=ev.get("status", "success"),
-                        pce_fqdn=ev.get("pce_fqdn", ""),
-                        raw_json=orjson.dumps(ev).decode("utf-8"),
-                        ingested_at=now,
-                    )
-                    s.add(row)
-                    if self._siem_dests:
-                        s.flush()
-                        for dest in self._siem_dests:
-                            s.add(SiemDispatch(
-                                source_table="pce_events",
-                                source_id=row.id,
-                                destination=dest,
-                                status="pending",
-                                retries=0,
-                                queued_at=now,
-                            ))
-            except IntegrityError:
+            href = ev.get("href", "")
+            if href in seen:        # collapse duplicates within this batch
                 continue
-            count += 1
-        return count
+            seen.add(href)
+            rows.append({
+                "pce_href": href,
+                "pce_event_id": ev.get("uuid", ev.get("href", ""))[-64:],
+                "timestamp": _parse_iso(ev["timestamp"]),
+                "event_type": ev.get("event_type", "unknown"),
+                "severity": ev.get("severity", "info"),
+                "status": ev.get("status", "success"),
+                "pce_fqdn": ev.get("pce_fqdn", ""),
+                "raw_json": orjson.dumps(ev).decode("utf-8"),
+                "ingested_at": now,
+            })
+        inserted = 0
+        for i in range(0, len(rows), self._CHUNK):
+            chunk = rows[i:i + self._CHUNK]
+            with self._sf.begin() as s:
+                stmt = (
+                    sqlite_insert(PceEvent)
+                    .values(chunk)
+                    .on_conflict_do_nothing(index_elements=["pce_href"])
+                    .returning(PceEvent.id)
+                )
+                new_ids = [r[0] for r in s.execute(stmt)]
+                inserted += len(new_ids)
+                if self._siem_dests and new_ids:
+                    s.execute(
+                        sqlite_insert(SiemDispatch),
+                        [
+                            {
+                                "source_table": "pce_events",
+                                "source_id": rid,
+                                "destination": dest,
+                                "status": "pending",
+                                "retries": 0,
+                                "queued_at": now,
+                            }
+                            for rid in new_ids for dest in self._siem_dests
+                        ],
+                    )
+        return inserted
 
 
 def _parse_iso(s: str) -> datetime:

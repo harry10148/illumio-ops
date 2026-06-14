@@ -6,7 +6,7 @@ from typing import Optional
 
 import orjson
 from loguru import logger
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import PceTrafficFlowRaw, SiemDispatch
@@ -72,9 +72,18 @@ class TrafficIngestor:
             return grace.isoformat()
         return None
 
+    _CHUNK = 500
+
     def _insert_batch(self, flows: list[dict]) -> int:
+        """Bulk-insert flows in chunks with ON CONFLICT DO NOTHING (dedup by
+        flow_hash). One transaction per chunk instead of one per row — at
+        100k+ flows the per-row commit/fsync was the dominant ingest cost and a
+        major source of SQLite write-lock contention. RETURNING yields only the
+        newly-inserted ids, which drive the per-flow SIEM enqueue.
+        """
         now = datetime.now(timezone.utc)
-        count = 0
+        rows: list[dict] = []
+        seen: set[str] = set()
         for flow in flows:
             flat = _flatten_flow(flow)
             if not self._filter.passes(flat):
@@ -82,6 +91,9 @@ class TrafficIngestor:
             if not self._sampler.keep(flat):
                 continue
             fh = _flow_hash(flow)
+            if fh in seen:          # collapse duplicates within this batch
+                continue
+            seen.add(fh)
             src_wl = (flow.get("src") or {}).get("workload") or {}
             dst_wl = (flow.get("dst") or {}).get("workload") or {}
             svc = flow.get("service") or {}
@@ -93,41 +105,51 @@ class TrafficIngestor:
             flow_count = flow.get("flow_count") or flow.get("num_connections", 1)
             first_raw = _ts(flow, "first_detected")
             last_raw = _ts(flow, "last_detected")
-            try:
-                with self._sf.begin() as s:
-                    row = PceTrafficFlowRaw(
-                        flow_hash=fh,
-                        first_detected=_parse_iso(first_raw) if first_raw else now,
-                        last_detected=_parse_iso(last_raw) if last_raw else now,
-                        src_ip=src_ip,
-                        src_workload=src_wl.get("href") or flow.get("src_workload"),
-                        dst_ip=dst_ip,
-                        dst_workload=dst_wl.get("href") or flow.get("dst_workload"),
-                        port=port or 0,
-                        protocol=protocol,
-                        action=action,
-                        flow_count=flow_count,
-                        bytes_in=flow.get("bytes_in") or flow.get("dst_bi", 0),
-                        bytes_out=flow.get("bytes_out") or flow.get("dst_bo", 0),
-                        raw_json=orjson.dumps(flow).decode("utf-8"),
-                        ingested_at=now,
+            rows.append({
+                "flow_hash": fh,
+                "first_detected": _parse_iso(first_raw) if first_raw else now,
+                "last_detected": _parse_iso(last_raw) if last_raw else now,
+                "src_ip": src_ip,
+                "src_workload": src_wl.get("href") or flow.get("src_workload"),
+                "dst_ip": dst_ip,
+                "dst_workload": dst_wl.get("href") or flow.get("dst_workload"),
+                "port": port or 0,
+                "protocol": protocol,
+                "action": action,
+                "flow_count": flow_count,
+                "bytes_in": flow.get("bytes_in") or flow.get("dst_bi", 0),
+                "bytes_out": flow.get("bytes_out") or flow.get("dst_bo", 0),
+                "raw_json": orjson.dumps(flow).decode("utf-8"),
+                "ingested_at": now,
+            })
+        inserted = 0
+        for i in range(0, len(rows), self._CHUNK):
+            chunk = rows[i:i + self._CHUNK]
+            with self._sf.begin() as s:
+                stmt = (
+                    sqlite_insert(PceTrafficFlowRaw)
+                    .values(chunk)
+                    .on_conflict_do_nothing(index_elements=["flow_hash"])
+                    .returning(PceTrafficFlowRaw.id)
+                )
+                new_ids = [r[0] for r in s.execute(stmt)]
+                inserted += len(new_ids)
+                if self._siem_dests and new_ids:
+                    s.execute(
+                        sqlite_insert(SiemDispatch),
+                        [
+                            {
+                                "source_table": "pce_traffic_flows_raw",
+                                "source_id": rid,
+                                "destination": dest,
+                                "status": "pending",
+                                "retries": 0,
+                                "queued_at": now,
+                            }
+                            for rid in new_ids for dest in self._siem_dests
+                        ],
                     )
-                    s.add(row)
-                    if self._siem_dests:
-                        s.flush()
-                        for dest in self._siem_dests:
-                            s.add(SiemDispatch(
-                                source_table="pce_traffic_flows_raw",
-                                source_id=row.id,
-                                destination=dest,
-                                status="pending",
-                                retries=0,
-                                queued_at=now,
-                            ))
-            except IntegrityError:
-                continue
-            count += 1
-        return count
+        return inserted
 
 
 def _flow_hash(flow: dict) -> str:
