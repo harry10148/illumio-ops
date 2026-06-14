@@ -85,6 +85,11 @@ def _enable_wal_pragma(engine: Engine) -> None:
         # concurrent writer fails immediately with "database is locked". Wait
         # for the lock instead (ingestor + aggregator + SIEM all write here).
         cur.execute("PRAGMA busy_timeout = 30000")
+        # Read perf: default page cache is ~2MB — tiny for 240k-row scans. Give
+        # it 64MB (negative = KiB) and 256MB memory-map so report reads hit RAM,
+        # not repeated disk reads. Per-connection; cheap, no offline impact.
+        cur.execute("PRAGMA cache_size = -65536")
+        cur.execute("PRAGMA mmap_size = 268435456")
         cur.close()
 
     with engine.connect() as conn:

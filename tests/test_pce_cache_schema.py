@@ -101,3 +101,15 @@ def test_schema_prunes_deprecated_raw_indexes():
         # inside the composite above, not on its own)
         for gone in (("src_ip",), ("dst_ip",), ("port",), ("action",), ("first_detected",)):
             assert gone not in idx_cols, f"{gone} should not have a single-column index"
+
+
+def test_schema_sets_read_perf_pragmas():
+    """cache_size (64MB) + mmap_size (256MB) speed up large 240k-row scans."""
+    from sqlalchemy import text
+    from src.pce_cache.schema import init_schema
+    with tempfile.TemporaryDirectory() as tmp:
+        engine = create_engine(f"sqlite:///{os.path.join(tmp,'c.sqlite')}")
+        init_schema(engine)
+        with engine.connect() as conn:
+            assert conn.execute(text("PRAGMA cache_size")).scalar() == -65536
+            assert conn.execute(text("PRAGMA mmap_size")).scalar() == 268435456
