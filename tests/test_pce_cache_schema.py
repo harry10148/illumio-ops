@@ -92,10 +92,12 @@ def test_schema_prunes_deprecated_raw_indexes():
         init_schema(engine)  # idempotent
         idx_cols = {tuple(i["column_names"]) for i in
                     inspect(engine).get_indexes("pce_traffic_flows_raw")}
-        flat = {c for cols in idx_cols for c in cols}
         assert ("last_detected",) in idx_cols
         assert ("src_workload",) in idx_cols
         assert ("dst_workload",) in idx_cols
-        # dropped columns must have no index
-        for gone in ("src_ip", "dst_ip", "port", "action", "first_detected"):
-            assert gone not in flat, f"{gone} should not be indexed"
+        # composite (last_detected, action) backs decision-filtered reads (Tier-2b)
+        assert ("last_detected", "action") in idx_cols
+        # the deprecated SINGLE-column indexes must be gone (action only survives
+        # inside the composite above, not on its own)
+        for gone in (("src_ip",), ("dst_ip",), ("port",), ("action",), ("first_detected",)):
+            assert gone not in idx_cols, f"{gone} should not have a single-column index"
