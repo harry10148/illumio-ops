@@ -109,6 +109,62 @@ def test_read_flows_df_policy_decision_pushdown(tmp_path):
     assert len(rd.read_flows_df(start, end, policy_decisions=["allowed", "blocked"])) == 2
 
 
+def test_read_flows_df_matches_apiparser_with_filters(tmp_path):
+    """read_flows_df (raw-cursor fetch) returns a frame identical to the live
+    APIParser for the matching flows — across report_json + raw_json-fallback
+    rows and with window + workload-href + policy-decision filters pushed to SQL.
+    Pins the read contract for the SQLAlchemy→raw-cursor refactor."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.models import PceTrafficFlowRaw
+    from src.pce_cache.reader import CacheReader
+
+    eng = create_engine(f"sqlite:///{tmp_path/'c.sqlite'}")
+    init_schema(eng); sf = sessionmaker(eng)
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    # In-window, /w/1↔/w/2, allowed — WITH report_json (fast path)
+    f_keep = _flow("DB", "DB", 3306, "allowed")
+    # In-window, /w/1↔/w/2, allowed — WITHOUT report_json (raw_json fallback)
+    f_keep_fb = _flow("Web", "DB", 8080, "allowed", dbi=10, dbo=20)
+    # In-window but decision filtered out
+    f_drop_dec = _flow("DB", "DB", 443, "potentially_blocked")
+    # In-window but different workloads (scoped out)
+    f_drop_wl = _flow("DB", "DB", 22, "allowed")
+
+    def add(h, f, src_wl, dst_wl, act, port, with_rj):
+        with sf.begin() as s:
+            s.add(PceTrafficFlowRaw(
+                flow_hash=h, first_detected=now, last_detected=now,
+                src_ip="10.0.0.1", src_workload=src_wl, dst_ip="10.0.0.2",
+                dst_workload=dst_wl, port=port, protocol="TCP", action=act,
+                flow_count=5, bytes_in=0, bytes_out=0,
+                raw_json=orjson.dumps(f).decode(),
+                report_json=(orjson.dumps(flatten_flow_record(f)).decode()
+                             if with_rj else None),
+                ingested_at=now))
+
+    add("h1", f_keep, "/w/1", "/w/2", "allowed", 3306, True)
+    add("h2", f_keep_fb, "/w/1", "/w/2", "allowed", 8080, False)
+    add("h3", f_drop_dec, "/w/1", "/w/2", "potentially_blocked", 443, True)
+    add("h4", f_drop_wl, "/w/8", "/w/9", "allowed", 22, True)
+
+    rd = CacheReader(sf, 30, 30)
+    start = now - datetime.timedelta(hours=1); end = now + datetime.timedelta(hours=1)
+    df = rd.read_flows_df(start, end, workload_hrefs=["/w/1", "/w/2"],
+                          policy_decisions=["allowed"])
+
+    # ground truth: APIParser frame of just the two kept flows
+    df_api = APIParser().parse([f_keep, f_keep_fb])
+    sort_cols = ["src_app", "port"]
+    pd.testing.assert_frame_equal(
+        df.drop(columns=["data_source"]).sort_values(sort_cols).reset_index(drop=True),
+        df_api.drop(columns=["data_source"]).sort_values(sort_cols).reset_index(drop=True),
+        check_like=True,
+    )
+
+
 def test_fetch_traffic_df_applies_filters_to_cache():
     """_fetch_traffic_df re-applies the report's label/port filters on the cache
     df (the cache read doesn't filter beyond decision/workload)."""
