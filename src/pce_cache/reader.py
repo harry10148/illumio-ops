@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 import orjson
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import PceEvent, PceTrafficFlowAgg, PceTrafficFlowRaw
@@ -75,7 +75,15 @@ class CacheReader:
             )
             return [orjson.loads(r.raw_json) for r in s.execute(q).scalars()]
 
-    def read_flows_raw(self, start: datetime, end: datetime) -> list[dict]:
+    def read_flows_raw(self, start: datetime, end: datetime,
+                       workload_hrefs: list[str] | None = None) -> list[dict]:
+        """Read raw flows in [start, end].
+
+        workload_hrefs: when given, return only flows where src OR dst workload
+        is in the set (indexed columns). Lets app-scoped reports read just the
+        app's flows instead of the whole estate. The src/dst columns are
+        indexed, so this is a fast index scan, not a full-table read.
+        """
         with self._sf() as s:
             q = (
                 select(PceTrafficFlowRaw)
@@ -83,8 +91,14 @@ class CacheReader:
                     PceTrafficFlowRaw.last_detected >= start,
                     PceTrafficFlowRaw.last_detected <= end,
                 )
-                .order_by(PceTrafficFlowRaw.last_detected)
             )
+            if workload_hrefs:
+                hrefs = list(workload_hrefs)
+                q = q.where(or_(
+                    PceTrafficFlowRaw.src_workload.in_(hrefs),
+                    PceTrafficFlowRaw.dst_workload.in_(hrefs),
+                ))
+            q = q.order_by(PceTrafficFlowRaw.last_detected)
             return [orjson.loads(r.raw_json) for r in s.execute(q).scalars()]
 
     def read_flows_agg(self, start: datetime, end: datetime) -> list[dict]:

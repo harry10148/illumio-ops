@@ -14,13 +14,22 @@ class TrafficAggregator:
         self._sf = session_factory
 
     def run_once(self) -> int:
-        """Rollup raw flows into daily agg. Idempotent via ON CONFLICT DO UPDATE."""
+        """Rollup raw flows into daily agg. Idempotent via ON CONFLICT DO UPDATE.
+
+        src/dst_workload are coalesced to '' because the dedup unique index
+        (ix_agg_unique) spans them and SQLite treats NULL as DISTINCT — so
+        unmanaged endpoints (NULL workload) would never collide, and every run
+        would re-insert them, ballooning the table. '' is a single value that
+        dedups correctly.
+        """
+        src_wl = func.coalesce(PceTrafficFlowRaw.src_workload, "")
+        dst_wl = func.coalesce(PceTrafficFlowRaw.dst_workload, "")
         day_col = func.date(PceTrafficFlowRaw.last_detected)
         q = (
             select(
                 day_col.label("bucket_day"),
-                PceTrafficFlowRaw.src_workload,
-                PceTrafficFlowRaw.dst_workload,
+                src_wl.label("src_workload"),
+                dst_wl.label("dst_workload"),
                 PceTrafficFlowRaw.port,
                 PceTrafficFlowRaw.protocol,
                 PceTrafficFlowRaw.action,
@@ -31,8 +40,8 @@ class TrafficAggregator:
             )
             .group_by(
                 day_col,
-                PceTrafficFlowRaw.src_workload,
-                PceTrafficFlowRaw.dst_workload,
+                src_wl,
+                dst_wl,
                 PceTrafficFlowRaw.port,
                 PceTrafficFlowRaw.protocol,
                 PceTrafficFlowRaw.action,

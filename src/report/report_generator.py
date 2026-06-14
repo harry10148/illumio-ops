@@ -168,7 +168,8 @@ class ReportGenerator:
 
     def _fetch_traffic(self, start: datetime.datetime, end: datetime.datetime,
                        filters: Optional[dict] = None,
-                       use_cache: bool = True) -> dict:
+                       use_cache: bool = True,
+                       cache_workload_hrefs: Optional[list] = None) -> dict:
         """Return traffic flows with metadata. Uses cache when fully covered.
         On partial coverage where cache_start > request start, merges API gap
         with cached data; tags source as 'mixed' when the gap is non-empty,
@@ -182,7 +183,7 @@ class ReportGenerator:
             if state == "full":
                 logger.info("Traffic report: flows from cache ({} → {})", start, end)
                 return {
-                    "raw": self._cache.read_flows_raw(start, end),
+                    "raw": self._cache.read_flows_raw(start, end, workload_hrefs=cache_workload_hrefs),
                     "agg": self._cache.read_flows_agg(start, end),
                     "source": "cache",
                 }
@@ -198,7 +199,7 @@ class ReportGenerator:
                         end_time_str=_fmt_iso(cache_start),
                         filters=filters,
                     ) or []
-                    cached = self._cache.read_flows_raw(cache_start, end)
+                    cached = self._cache.read_flows_raw(cache_start, end, workload_hrefs=cache_workload_hrefs)
                     # agg data not available for hybrid results
                     source = "mixed" if gap else "cache"
                     return {"raw": gap + cached, "agg": None, "source": source}
@@ -212,7 +213,8 @@ class ReportGenerator:
     def fetch_traffic_df(self, start_date: Optional[str] = None,
                          end_date: Optional[str] = None,
                          filters: Optional[dict] = None,
-                         use_cache: bool = True):
+                         use_cache: bool = True,
+                         cache_workload_hrefs: Optional[list] = None):
         """Query the PCE (cache-aware) and return the parsed estate traffic df.
 
         Thin reuse of the same fetch primitives generate_from_api uses
@@ -234,7 +236,8 @@ class ReportGenerator:
         if ruleset_needs_draft_pd(DRAFT_PD_RULES):
             filters = dict(filters or {})
             filters.setdefault("requires_draft_pd", True)
-        records = self._fetch_traffic(start_dt, end_dt, filters, use_cache=use_cache)["raw"]
+        records = self._fetch_traffic(start_dt, end_dt, filters, use_cache=use_cache,
+                                      cache_workload_hrefs=cache_workload_hrefs)["raw"]
         if not records:
             return pd.DataFrame()
         return self._parse_api(records)

@@ -53,3 +53,30 @@ def test_aggregator_is_idempotent(session_factory):
         rows = s.execute(select(PceTrafficFlowAgg)).scalars().all()
     assert len(rows) == 1
     assert rows[0].flow_count == 5
+
+
+def test_aggregator_dedups_null_workload_rows(session_factory):
+    """Regression: rows with NULL src/dst_workload (unmanaged endpoints) must
+    still dedup. SQLite treats NULL as DISTINCT in the unique index, so the
+    aggregator coalesces NULL→'' — otherwise every run re-inserts them and the
+    agg table balloons (observed 4.5M rows in prod)."""
+    from src.pce_cache.aggregator import TrafficAggregator
+    now = datetime.now(timezone.utc)
+    with session_factory.begin() as s:
+        for i in range(5):  # same group, NULL src_workload (unmanaged scanner)
+            s.add(PceTrafficFlowRaw(
+                flow_hash=f"null-{i}", first_detected=now, last_detected=now,
+                src_ip="172.16.15.142", src_workload=None,
+                dst_ip="10.0.0.9", dst_workload="db",
+                port=443, protocol="tcp", action="potentially_blocked",
+                flow_count=1, bytes_in=0, bytes_out=0, raw_json="{}", ingested_at=now,
+            ))
+    agg = TrafficAggregator(session_factory)
+    agg.run_once()
+    agg.run_once()  # second run must NOT duplicate
+    with session_factory() as s:
+        rows = s.execute(select(PceTrafficFlowAgg)).scalars().all()
+    null_group = [r for r in rows if r.dst_workload == "db" and r.port == 443]
+    assert len(null_group) == 1, f"expected 1 deduped row, got {len(null_group)}"
+    assert null_group[0].src_workload == ""        # NULL coalesced to sentinel
+    assert null_group[0].flow_count == 5           # summed
