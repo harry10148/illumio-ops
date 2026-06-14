@@ -102,13 +102,18 @@ class CacheReader:
             return [orjson.loads(r.raw_json) for r in s.execute(q).scalars()]
 
     def read_flows_df(self, start: datetime, end: datetime,
-                      workload_hrefs: list[str] | None = None):
+                      workload_hrefs: list[str] | None = None,
+                      policy_decisions: list[str] | None = None):
         """Build the unified report DataFrame directly from the cache.
 
         Uses the precomputed report_json (flatten cached at ingest) to skip the
         per-row re-flatten; rows ingested before report_json existed fall back to
         flattening their raw_json. Same assembly (build_unified_df) as the live
         APIParser, so the frame is identical regardless of source.
+
+        policy_decisions: when given, filter to those action/policy-decision
+        values in SQL — both correctness (cache must honour the report's decision
+        filter like the live API does) and perf (read only matching rows).
         """
         from src.report.parsers.api_parser import flatten_flow_record, build_unified_df
 
@@ -123,6 +128,8 @@ class CacheReader:
                     PceTrafficFlowRaw.src_workload.in_(hrefs),
                     PceTrafficFlowRaw.dst_workload.in_(hrefs),
                 ))
+            if policy_decisions:
+                q = q.where(PceTrafficFlowRaw.action.in_(list(policy_decisions)))
             return q.order_by(PceTrafficFlowRaw.last_detected)
 
         rows = []

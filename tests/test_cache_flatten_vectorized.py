@@ -77,3 +77,33 @@ def test_read_flows_df_uses_report_json_and_falls_back(tmp_path):
     assert set(df["src_app"]) == {"DB", "Web"}
     assert set(df["proto"]) == {"TCP"}
     assert df["data_source"].unique().tolist() == ["cache"]
+
+
+def test_read_flows_df_policy_decision_pushdown(tmp_path):
+    """policy_decisions filters at the SQL layer — correctness (cache honours the
+    report's decision filter) + perf (reads only matching rows)."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.models import PceTrafficFlowRaw
+    from src.pce_cache.reader import CacheReader
+    import orjson as _oj
+
+    eng = create_engine(f"sqlite:///{tmp_path/'c.sqlite'}")
+    init_schema(eng); sf = sessionmaker(eng)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    with sf.begin() as s:
+        for i, act in enumerate(["allowed", "potentially_blocked", "potentially_blocked", "blocked"]):
+            f = _flow("DB", "DB", 443, act)
+            s.add(PceTrafficFlowRaw(
+                flow_hash=f"h{i}", first_detected=now, last_detected=now,
+                src_ip="10.0.0.1", src_workload="/w/1", dst_ip="10.0.0.2", dst_workload="/w/2",
+                port=443, protocol="TCP", action=act, flow_count=1, bytes_in=0, bytes_out=0,
+                raw_json=_oj.dumps(f).decode(),
+                report_json=_oj.dumps(flatten_flow_record(f)).decode(), ingested_at=now))
+    rd = CacheReader(sf, 30, 30)
+    start = now - datetime.timedelta(hours=1); end = now + datetime.timedelta(hours=1)
+    assert len(rd.read_flows_df(start, end)) == 4                                   # no filter
+    df = rd.read_flows_df(start, end, policy_decisions=["allowed"])
+    assert len(df) == 1 and df["policy_decision"].tolist() == ["allowed"]
+    assert len(rd.read_flows_df(start, end, policy_decisions=["allowed", "blocked"])) == 2
