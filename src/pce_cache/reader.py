@@ -111,13 +111,11 @@ class CacheReader:
         APIParser, so the frame is identical regardless of source.
         """
         from src.report.parsers.api_parser import flatten_flow_record, build_unified_df
-        with self._sf() as s:
-            q = (
-                select(PceTrafficFlowRaw.report_json, PceTrafficFlowRaw.raw_json)
-                .where(
-                    PceTrafficFlowRaw.last_detected >= start,
-                    PceTrafficFlowRaw.last_detected <= end,
-                )
+
+        def _window(col):
+            q = select(col).where(
+                PceTrafficFlowRaw.last_detected >= start,
+                PceTrafficFlowRaw.last_detected <= end,
             )
             if workload_hrefs:
                 hrefs = list(workload_hrefs)
@@ -125,13 +123,23 @@ class CacheReader:
                     PceTrafficFlowRaw.src_workload.in_(hrefs),
                     PceTrafficFlowRaw.dst_workload.in_(hrefs),
                 ))
-            q = q.order_by(PceTrafficFlowRaw.last_detected)
-            rows = []
-            for report_json, raw_json in s.execute(q):
-                if report_json:
-                    rows.append(orjson.loads(report_json))
-                else:  # transition / pre-Tier-2a row
-                    rows.append(flatten_flow_record(orjson.loads(raw_json)))
+            return q.order_by(PceTrafficFlowRaw.last_detected)
+
+        rows = []
+        with self._sf() as s:
+            # Fast path: only read report_json (avoids transferring the ~1.2KB
+            # raw_json blob per row when the flatten is already cached).
+            for (rj,) in s.execute(
+                _window(PceTrafficFlowRaw.report_json).where(
+                    PceTrafficFlowRaw.report_json.is_not(None))
+            ):
+                rows.append(orjson.loads(rj))
+            # Fallback: pre-Tier-2a rows without report_json → flatten raw_json.
+            for (raw,) in s.execute(
+                _window(PceTrafficFlowRaw.raw_json).where(
+                    PceTrafficFlowRaw.report_json.is_(None))
+            ):
+                rows.append(flatten_flow_record(orjson.loads(raw)))
         return build_unified_df(rows, "cache")
 
     def read_flows_agg(self, start: datetime, end: datetime) -> list[dict]:
