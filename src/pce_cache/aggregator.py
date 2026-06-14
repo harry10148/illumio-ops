@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import sessionmaker
@@ -14,7 +12,10 @@ class TrafficAggregator:
         self._sf = session_factory
 
     def run_once(self) -> int:
-        """Rollup raw flows into daily agg. Idempotent via ON CONFLICT DO UPDATE.
+        """Rollup raw flows into daily agg in a single set-based statement.
+
+        One INSERT…SELECT…GROUP BY…ON CONFLICT DO UPDATE — not a per-group Python
+        loop (which was O(groups) round-trips and timed out on a large cache).
 
         src/dst_workload are coalesced to '' because the dedup unique index
         (ix_agg_unique) spans them and SQLite treats NULL as DISTINCT — so
@@ -24,19 +25,19 @@ class TrafficAggregator:
         """
         src_wl = func.coalesce(PceTrafficFlowRaw.src_workload, "")
         dst_wl = func.coalesce(PceTrafficFlowRaw.dst_workload, "")
-        day_col = func.date(PceTrafficFlowRaw.last_detected)
-        q = (
+        # 'start of day' yields a parseable "YYYY-MM-DD 00:00:00" datetime string
+        # in pure SQL, avoiding a Python date→datetime conversion per row.
+        day_col = func.datetime(PceTrafficFlowRaw.last_detected, "start of day")
+        sel = (
             select(
-                day_col.label("bucket_day"),
-                src_wl.label("src_workload"),
-                dst_wl.label("dst_workload"),
+                day_col,
+                src_wl,
+                dst_wl,
                 PceTrafficFlowRaw.port,
                 PceTrafficFlowRaw.protocol,
                 PceTrafficFlowRaw.action,
-                func.sum(PceTrafficFlowRaw.flow_count).label("flow_count"),
-                func.sum(
-                    PceTrafficFlowRaw.bytes_in + PceTrafficFlowRaw.bytes_out
-                ).label("bytes_total"),
+                func.sum(PceTrafficFlowRaw.flow_count),
+                func.sum(PceTrafficFlowRaw.bytes_in + PceTrafficFlowRaw.bytes_out),
             )
             .group_by(
                 day_col,
@@ -47,31 +48,21 @@ class TrafficAggregator:
                 PceTrafficFlowRaw.action,
             )
         )
-        count = 0
+        stmt = sqlite_insert(PceTrafficFlowAgg.__table__).from_select(
+            ["bucket_day", "src_workload", "dst_workload", "port",
+             "protocol", "action", "flow_count", "bytes_total"],
+            sel,
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=[
+                "bucket_day", "src_workload", "dst_workload",
+                "port", "protocol", "action",
+            ],
+            set_={
+                "flow_count": stmt.excluded.flow_count,
+                "bytes_total": stmt.excluded.bytes_total,
+            },
+        )
         with self._sf.begin() as s:
-            for row in s.execute(q):
-                # Convert date string back to datetime at midnight UTC
-                bucket_day = datetime.strptime(row.bucket_day, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                stmt = sqlite_insert(PceTrafficFlowAgg.__table__).values(
-                    bucket_day=bucket_day,
-                    src_workload=row.src_workload,
-                    dst_workload=row.dst_workload,
-                    port=row.port,
-                    protocol=row.protocol,
-                    action=row.action,
-                    flow_count=int(row.flow_count),
-                    bytes_total=int(row.bytes_total),
-                )
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=[
-                        "bucket_day", "src_workload", "dst_workload",
-                        "port", "protocol", "action",
-                    ],
-                    set_={
-                        "flow_count": stmt.excluded.flow_count,
-                        "bytes_total": stmt.excluded.bytes_total,
-                    },
-                )
-                s.execute(stmt)
-                count += 1
-        return count
+            result = s.execute(stmt)
+            return result.rowcount or 0
