@@ -36,6 +36,10 @@ def _enable_wal_pragma(engine: Engine) -> None:
         cur.execute("PRAGMA journal_mode = WAL")
         cur.execute("PRAGMA foreign_keys = ON")
         cur.execute("PRAGMA synchronous = NORMAL")
+        # SQLite serialises writers; without busy_timeout a write that meets a
+        # concurrent writer fails immediately with "database is locked". Wait
+        # for the lock instead (ingestor + aggregator + SIEM all write here).
+        cur.execute("PRAGMA busy_timeout = 30000")
         cur.close()
 
     with engine.connect() as conn:

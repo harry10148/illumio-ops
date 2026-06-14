@@ -61,3 +61,18 @@ def test_schema_creates_dispatch_source_anti_join_index():
         init_schema(engine)  # idempotent: CREATE INDEX IF NOT EXISTS
         idx = {i["name"] for i in inspect(engine).get_indexes("siem_dispatch")}
         assert "ix_dispatch_source" in idx
+
+
+def test_schema_sets_busy_timeout():
+    """busy_timeout must be set so concurrent writers wait for the lock instead
+    of failing immediately with 'database is locked' (SQLite serialises writers;
+    ingestor + aggregator + SIEM all write the same DB)."""
+    from sqlalchemy import text
+    from src.pce_cache.schema import init_schema
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "cache.sqlite")
+        engine = create_engine(f"sqlite:///{path}")
+        init_schema(engine)
+        with engine.connect() as conn:
+            assert conn.execute(text("PRAGMA busy_timeout")).scalar() == 30000
