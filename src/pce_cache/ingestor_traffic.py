@@ -81,6 +81,7 @@ class TrafficIngestor:
         major source of SQLite write-lock contention. RETURNING yields only the
         newly-inserted ids, which drive the per-flow SIEM enqueue.
         """
+        from src.report.parsers.api_parser import flatten_flow_record
         now = datetime.now(timezone.utc)
         rows: list[dict] = []
         seen: set[str] = set()
@@ -94,6 +95,12 @@ class TrafficIngestor:
             if fh in seen:          # collapse duplicates within this batch
                 continue
             seen.add(fh)
+            # Precompute the report-ready flatten once, store verbatim so reports
+            # skip the per-row re-flatten. Best-effort: never block ingest on it.
+            try:
+                report_json = orjson.dumps(flatten_flow_record(flow)).decode("utf-8")
+            except Exception:  # noqa: BLE001
+                report_json = None
             src_wl = (flow.get("src") or {}).get("workload") or {}
             dst_wl = (flow.get("dst") or {}).get("workload") or {}
             svc = flow.get("service") or {}
@@ -120,6 +127,7 @@ class TrafficIngestor:
                 "bytes_in": flow.get("bytes_in") or flow.get("dst_bi", 0),
                 "bytes_out": flow.get("bytes_out") or flow.get("dst_bo", 0),
                 "raw_json": orjson.dumps(flow).decode("utf-8"),
+                "report_json": report_json,
                 "ingested_at": now,
             })
         inserted = 0

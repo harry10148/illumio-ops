@@ -55,6 +55,14 @@ class PceTrafficFlowRaw(Base):
     raw_json:       Mapped[str]      = mapped_column(Text)
     ingested_at:    Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
+    # ── Report-ready flattened record (Tier-2a) ──────────────────────────────
+    # The unified-schema dict (api_parser flatten output) computed ONCE at
+    # ingest and stored verbatim as compact JSON, so reports skip the expensive
+    # per-row re-flatten (label extraction + bandwidth/volume math). Nullable:
+    # rows ingested before this shipped fall back to parsing raw_json. raw_json
+    # stays the source of truth.
+    report_json:    Mapped[str | None] = mapped_column(Text, nullable=True)
+
 
 class PceTrafficFlowAgg(Base):
     __tablename__ = "pce_traffic_flows_agg"

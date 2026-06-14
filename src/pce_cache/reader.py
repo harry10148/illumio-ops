@@ -101,6 +101,39 @@ class CacheReader:
             q = q.order_by(PceTrafficFlowRaw.last_detected)
             return [orjson.loads(r.raw_json) for r in s.execute(q).scalars()]
 
+    def read_flows_df(self, start: datetime, end: datetime,
+                      workload_hrefs: list[str] | None = None):
+        """Build the unified report DataFrame directly from the cache.
+
+        Uses the precomputed report_json (flatten cached at ingest) to skip the
+        per-row re-flatten; rows ingested before report_json existed fall back to
+        flattening their raw_json. Same assembly (build_unified_df) as the live
+        APIParser, so the frame is identical regardless of source.
+        """
+        from src.report.parsers.api_parser import flatten_flow_record, build_unified_df
+        with self._sf() as s:
+            q = (
+                select(PceTrafficFlowRaw.report_json, PceTrafficFlowRaw.raw_json)
+                .where(
+                    PceTrafficFlowRaw.last_detected >= start,
+                    PceTrafficFlowRaw.last_detected <= end,
+                )
+            )
+            if workload_hrefs:
+                hrefs = list(workload_hrefs)
+                q = q.where(or_(
+                    PceTrafficFlowRaw.src_workload.in_(hrefs),
+                    PceTrafficFlowRaw.dst_workload.in_(hrefs),
+                ))
+            q = q.order_by(PceTrafficFlowRaw.last_detected)
+            rows = []
+            for report_json, raw_json in s.execute(q):
+                if report_json:
+                    rows.append(orjson.loads(report_json))
+                else:  # transition / pre-Tier-2a row
+                    rows.append(flatten_flow_record(orjson.loads(raw_json)))
+        return build_unified_df(rows, "cache")
+
     def read_flows_agg(self, start: datetime, end: datetime) -> list[dict]:
         with self._sf() as s:
             q = (

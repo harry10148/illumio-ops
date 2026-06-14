@@ -10,8 +10,32 @@ def init_schema(engine: Engine) -> None:
     """Create all tables + indexes if missing. Idempotent."""
     _enable_wal_pragma(engine)
     Base.metadata.create_all(engine)
+    _ensure_added_columns(engine)
     _ensure_added_indexes(engine)
     _drop_deprecated_indexes(engine)
+
+
+# Columns added to pce_traffic_flows_raw after it first shipped (Tier-2a
+# report-ready flatten cache). create_all() never ALTERs an existing table, so
+# add missing columns explicitly (idempotently). SQLite ADD COLUMN is a cheap
+# metadata-only op.
+_ADDED_COLUMNS = (
+    ("report_json", "TEXT"),
+)
+
+
+def _ensure_added_columns(engine: Engine) -> None:
+    with engine.begin() as conn:
+        existing = {
+            r[1] for r in conn.execute(
+                text("PRAGMA table_info(pce_traffic_flows_raw)")
+            )
+        }
+        for name, sqltype in _ADDED_COLUMNS:
+            if name not in existing:
+                conn.execute(text(
+                    f"ALTER TABLE pce_traffic_flows_raw ADD COLUMN {name} {sqltype}"
+                ))
 
 
 # Indexes added after a table first shipped. metadata.create_all() only creates

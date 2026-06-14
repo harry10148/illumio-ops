@@ -210,6 +210,45 @@ class ReportGenerator:
         )
         return {"raw": flows or [], "agg": None, "source": "api"}
 
+    def _fetch_traffic_df(self, start: datetime.datetime, end: datetime.datetime,
+                          filters: Optional[dict] = None, use_cache: bool = True,
+                          cache_workload_hrefs: Optional[list] = None):
+        """Return (DataFrame, source). Same cover-state logic as _fetch_traffic
+        but the cache portion is built via the vectorized read_flows_df (no
+        per-row re-flatten); API portions go through _parse_api. The cache and
+        API frames are assembled identically so output matches either source."""
+        import pandas as pd
+        if use_cache and self._cache is not None:
+            state = self._cache.cover_state("traffic", start, end)
+            if state == "full":
+                df = self._cache.read_flows_df(start, end, workload_hrefs=cache_workload_hrefs)
+                logger.info("Traffic report: flows from cache ({} → {}) [vectorized]", start, end)
+                return df, "cache"
+            if state == "partial":
+                cache_start = self._cache.earliest_data_timestamp("traffic")
+                if cache_start is not None and cache_start > start:
+                    logger.info(
+                        "Traffic report: hybrid fetch — API gap [{} → {}), cache [{} → {}]",
+                        start, cache_start, cache_start, end,
+                    )
+                    gap = self.api.fetch_traffic_for_report(
+                        start_time_str=_fmt_iso(start),
+                        end_time_str=_fmt_iso(cache_start),
+                        filters=filters,
+                    ) or []
+                    df_gap = self._parse_api(gap)
+                    df_cache = self._cache.read_flows_df(cache_start, end,
+                                                         workload_hrefs=cache_workload_hrefs)
+                    parts = [d for d in (df_gap, df_cache) if not d.empty]
+                    df = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+                    return df, ("mixed" if not df_gap.empty else "cache")
+        flows = self.api.fetch_traffic_for_report(
+            start_time_str=_fmt_iso(start),
+            end_time_str=_fmt_iso(end),
+            filters=filters,
+        )
+        return self._parse_api(flows or []), "api"
+
     def fetch_traffic_df(self, start_date: Optional[str] = None,
                          end_date: Optional[str] = None,
                          filters: Optional[dict] = None,
@@ -236,11 +275,9 @@ class ReportGenerator:
         if ruleset_needs_draft_pd(DRAFT_PD_RULES):
             filters = dict(filters or {})
             filters.setdefault("requires_draft_pd", True)
-        records = self._fetch_traffic(start_dt, end_dt, filters, use_cache=use_cache,
-                                      cache_workload_hrefs=cache_workload_hrefs)["raw"]
-        if not records:
-            return pd.DataFrame()
-        return self._parse_api(records)
+        df, _ = self._fetch_traffic_df(start_dt, end_dt, filters, use_cache=use_cache,
+                                       cache_workload_hrefs=cache_workload_hrefs)
+        return df
 
     # ── public ───────────────────────────────────────────────────────────────
 
@@ -305,14 +342,13 @@ class ReportGenerator:
         if ruleset_needs_draft_pd(DRAFT_PD_RULES):
             filters = dict(filters or {})
             filters["requires_draft_pd"] = True
-        traffic = self._fetch_traffic(start_dt, end_dt, filters, use_cache=use_cache)
-        records = traffic["raw"]
+        df, _source = self._fetch_traffic_df(start_dt, end_dt, filters, use_cache=use_cache)
 
-        if not records:
+        if df.empty:
             logger.warning("[ReportGenerator] No records returned from API")
             print(t("rpt_no_traffic_data", lang=lang))
             return ReportResult(
-                data_source=traffic["source"],
+                data_source=_source,
                 record_count=0,
                 query_context={
                     "start_date": start_date,
@@ -323,14 +359,13 @@ class ReportGenerator:
                 },
             )
 
-        print(t("rpt_records_received", count=f"{len(records):,}", lang=lang))
-        df = self._parse_api(records)
+        print(t("rpt_records_received", count=f"{len(df):,}", lang=lang))
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
         self._vuln_csv_path = vuln_csv_path
         return self._run_pipeline(
             df,
-            source=traffic["source"],
+            source=_source,
             query_context={
                 "start_date": start_date,
                 "end_date": end_date,
