@@ -37,8 +37,16 @@
 - **DuckDB**:額外 per-arch binary wheel(~20-40MB×2)+ `sqlite_scanner` 擴充**會連網下載→破氣隙**(要改 Parquet 或預打包);且若仍用 pandas 分析,對「單報表延遲」贏 Route 2 不多。**觸發點:願意把分析層改寫成欄式 SQL。**
 - **Postgres+Timescale**:解規模/併發/HA,不是單查詢延遲;氣隙下要**運維一台 server**,打破嵌入式部署模型。**觸發點:多實例/HA 或持續百萬/日。**
 
+## Route 2 結案(2026-06-14 後續 session,HEAD `fa64493`)
+**Route 2 不做了 —— 量測推翻前提。** 詳見 `docs/superpowers/specs/2026-06-14-cache-read-raw-cursor.md`。
+- 在測試機 242k 列實測:read_sql 反正規化 41 欄(11.70s)只比 raw blob+orjson+build(12.04s)快 3% —— 它用「撈 41 欄」換掉「撈 1 blob」又吐回去。瓶頸是 sqlite3 driver 的 per-row×per-column 物件建構(CPU,非 I/O:`ORDER BY` 有無一樣)。反正規化沒價值。
+- 「SQLAlchemy 多吃 40%」也被推翻:那是 fallback double-scan + 服務搶資源的假象。乾淨量測:SQLAlchemy 7.26s vs raw cursor 11.41s(raw 反而慢)→ raw cursor 已 revert(原 `bde3b52` 撤回)。
+- **真正瓶頸**:`read_flows_df` 第二段 `report_json IS NULL` fallback,在已 backfill 的庫對到 0 列,但 report_json 不在任何索引 → 全掃 242k 列 last_detected range 每列查一次,~8s 做白工。
+- **修法(已上)**:`cf fa64493` 加 partial index `ix_raw_report_json_null ON (last_detected) WHERE report_json IS NULL`。fallback 改吃這個(正常為空的)索引 → 瞬回。**零寫入成本**(ingest 一律設 report_json,新列永不進此索引),`init_schema` 冪等建立,重啟即生效免遷移。
+- **結果**:全量 7 天報表乾淨讀 ~16s → ~8-11s(~1.5-2×,視 cache 暖度;測試機有量測變異)。read_flows_df 邏輯/輸出不變(新增 APIParser 對等測試 pin 住)。
+
 ## 待執行(parked,可隨時做)
-- **Route 2(留 SQLite 內的最後延遲優化)**:反正規化 4 標準標籤(+ip/port 本就是欄)成欄位 + `pandas.read_sql` 直讀 → 拿掉 read_flows_df 那 23s 的 per-row Python(預估 23s→~3-6s)+ 可下推 label/port 再減列。低風險、零 offline 衝擊、schema 可前向相容 Postgres。**只有覺得全量報表 23s 還痛才做。**
+- ~~Route 2~~ → 已結案(見上)。再要壓延遲只剩換欄式引擎(DuckDB),已在架構決策 parked。
 - top10/analyzer `query_flows` 仍是 dict-based、未吃 Tier-2a 向量化(要改 df-based,中等工程、價值窄:1 天窗+爆量)。
 - report_json 讓每列存 raw_json+report_json≈2.4KB(7 天 retention 下有界;要省可壓縮)。
 
