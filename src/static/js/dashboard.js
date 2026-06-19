@@ -739,11 +739,11 @@ function toggleTrafficSource() {
   if (src === 'csv') {
     $('m-gen-dates').style.display = 'none';
     $('m-gen-csv-upload').style.display = '';
-    $('m-gen-clip-row').style.display = 'none';
+    $('m-gen-data-source-row').style.display = 'none';
   } else {
     $('m-gen-dates').style.display = '';
     $('m-gen-csv-upload').style.display = 'none';
-    $('m-gen-clip-row').style.display = '';
+    $('m-gen-data-source-row').style.display = window._CACHE_AVAILABLE ? '' : 'none';
   }
 }
 
