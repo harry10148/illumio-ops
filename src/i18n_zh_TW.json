@@ -2413,6 +2413,7 @@
   "report_saved": "報表已成功儲存。",
   "report_schedule_states": "報表排程狀態",
   "report_select_prompt": "請選擇報表類型",
+  "rpt_ds_prompt": "資料來源（1=Hybrid 快取+即時, 2=純 Live PCE, 3=僅快取）",
   "report_start_date": "開始日期 [{date}]",
   "report_type": "報表類型",
   "rpt_actmtx_data_volume_msg": "分析期間總資料量：{vol}。",

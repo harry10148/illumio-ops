@@ -439,7 +439,16 @@ def _run_report_menu(cm):
                                       cache_reader=_make_cache_reader(cm))
 
                 if sel == 1:
-                    result = gen.generate_from_api(start_date=api_start_date, end_date=api_end_date, filters=api_filters)
+                    from src.report.cache_support import resolve_data_source, cache_available
+                    _ds = "hybrid"
+                    if cache_available(cm):
+                        _ds_sel = safe_input(t("rpt_ds_prompt"), int, range(1, 4), allow_cancel=True) or 1
+                        _ds = {1: "hybrid", 2: "live", 3: "cache-only"}[_ds_sel]
+                    _uc, _clip, _ds_warn = resolve_data_source(_ds, cache_available(cm))
+                    if _ds_warn:
+                        print(_ds_warn)
+                    result = gen.generate_from_api(start_date=api_start_date, end_date=api_end_date,
+                                                   filters=api_filters, use_cache=_uc, clip_to_cache=_clip)
                 else:
                     _csv_raw = safe_input(t("csv_path_prompt"), str)
                     csv_path = _csv_raw.strip() if _csv_raw else ''
