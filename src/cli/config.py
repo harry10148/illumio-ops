@@ -45,6 +45,13 @@ def validate(ctx: click.Context, config_file: str | None) -> None:
             ctx.exit(EXIT_DATAERR)
             return
 
+    # Drop keys removed in newer versions before validating, so `config validate`
+    # matches what ConfigManager.load() actually accepts at runtime (it strips
+    # the same deprecated keys). Without this, a deployed config that loads fine
+    # would be falsely reported invalid (e.g. web_gui.tls.http_redirect_port).
+    from src.config import _strip_deprecated_keys
+    _strip_deprecated_keys(raw)
+
     try:
         ConfigSchema.model_validate(raw)
     except ValidationError as e:

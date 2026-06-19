@@ -116,21 +116,27 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 # Removed config keys that may still exist in older deployed config.json files.
 # The schema uses extra="forbid", so leaving them in would fail validation. Each
-# entry is the (section, key) path to drop before validation.
+# entry is a dotted path to the removed key (any nesting depth).
 #   - report.attack_surface: removed with mod16 (Open-Ports Attack Surface).
-_DEPRECATED_KEY_PATHS: tuple[tuple[str, str], ...] = (
-    ("report", "attack_surface"),
+#   - web_gui.tls.http_redirect_port: removed with the HTTP→HTTPS auto-redirect
+#     server (commit 24fe5ff); the GUI is HTTPS-only now.
+_DEPRECATED_KEY_PATHS: tuple[str, ...] = (
+    "report.attack_surface",
+    "web_gui.tls.http_redirect_port",
 )
 
 
 def _strip_deprecated_keys(merged: dict) -> list[str]:
-    """Drop known-removed keys from *merged* in place; return dotted paths dropped."""
+    """Drop known-removed keys (dotted paths) from *merged* in place; return paths dropped."""
     dropped: list[str] = []
-    for section, key in _DEPRECATED_KEY_PATHS:
-        sect = merged.get(section)
-        if isinstance(sect, dict) and key in sect:
-            sect.pop(key, None)
-            dropped.append(f"{section}.{key}")
+    for path in _DEPRECATED_KEY_PATHS:
+        *parents, leaf = path.split(".")
+        node = merged
+        for parent in parents:
+            node = node.get(parent) if isinstance(node, dict) else None
+        if isinstance(node, dict) and leaf in node:
+            node.pop(leaf, None)
+            dropped.append(path)
     return dropped
 
 class ConfigManager:
@@ -356,15 +362,15 @@ class ConfigManager:
             changed = True
 
         if not gui.get("password") and not gui.get("_initial_password"):
-            # Default initial password is the well-known "illumio". The
-            # must_change_password gate (M4) forces a change on first login,
-            # so this fixed default is only ever valid for the very first
-            # session. _initial_password is also cleared on first successful
-            # login so the password ceases to be discoverable from disk.
+            # Default initial password is the well-known "illumio". The forced
+            # first-login password change (M4 must_change_password gate) is
+            # DISABLED by operator request — the default stays valid until the
+            # admin changes it manually in Settings. _initial_password is still
+            # cleared on first successful login (cosmetic).
             initial = "illumio"
             gui["password"] = hash_password(initial)
             gui["_initial_password"] = initial
-            gui["must_change_password"] = True
+            gui["must_change_password"] = False
             changed = True
         elif gui.get("password") and not gui["password"].startswith("$argon2"):
             gui["password"] = hash_password(gui["password"])
