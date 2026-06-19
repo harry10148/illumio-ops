@@ -345,6 +345,11 @@ async function loadTranslations() {
   const init = window._INIT_TRANSLATIONS;
   if (init && 'sched_enabled_short' in init && 'status_ok' in init) {
     _translations = init;
+    // Consume the server-injected bootstrap dict only once. It's fixed to the
+    // language at page-render time and never updates, so a later call (e.g. right
+    // after switching language in Settings) must re-fetch fresh — otherwise the
+    // stale dict masks the new language and the UI appears not to change.
+    window._INIT_TRANSLATIONS = null;
   } else {
     _translations = await api('/api/ui_translations');
   }
