@@ -25,6 +25,8 @@ _ADDED_COLUMNS = (
 
 
 def _ensure_added_columns(engine: Engine) -> None:
+    from sqlalchemy.exc import OperationalError
+
     with engine.begin() as conn:
         existing = {
             r[1] for r in conn.execute(
@@ -33,9 +35,18 @@ def _ensure_added_columns(engine: Engine) -> None:
         }
         for name, sqltype in _ADDED_COLUMNS:
             if name not in existing:
-                conn.execute(text(
-                    f"ALTER TABLE pce_traffic_flows_raw ADD COLUMN {name} {sqltype}"
-                ))
+                try:
+                    conn.execute(text(
+                        f"ALTER TABLE pce_traffic_flows_raw ADD COLUMN {name} {sqltype}"
+                    ))
+                except OperationalError as exc:
+                    # SQLite has no "ADD COLUMN IF NOT EXISTS". When init_schema runs
+                    # concurrently from two threads (daemon ingestion + a web request
+                    # under monitor-gui), both can pass the PRAGMA check above before
+                    # either ALTERs, so the loser hits "duplicate column name". The
+                    # column exists either way — swallow only that race, re-raise else.
+                    if "duplicate column name" not in str(exc).lower():
+                        raise
 
 
 # Indexes added after a table first shipped. metadata.create_all() only creates
