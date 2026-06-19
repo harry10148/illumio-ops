@@ -37,7 +37,7 @@ def alert_settings_menu(cm: ConfigManager) -> None:
             t("ssl_status_on") if "teams" in active_alerts else t("ssl_status_off")
         )
 
-        print(t("change_language", lang=current_lang))
+        print(t("change_language", current=current_lang))
         print(t("toggle_mail_alert", status=mail_status))
         print(t("toggle_line_alert", status=line_status))
         print(t("toggle_webhook_alert", status=webhook_status))

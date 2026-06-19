@@ -214,7 +214,7 @@
   "cat_policy": "Policy",
   "cat_system": "System",
   "cat_user_access": "User Access",
-  "change_language": "1. Change Language (Current: {lang})",
+  "change_language": "1. Change Language (Current: {current})",
   "change_verify_to": "Change to? (1. Verify, 2. Ignore)",
   "chart_ven_lost": "Lost",
   "chart_ven_lost_24h": "Lost <24h",

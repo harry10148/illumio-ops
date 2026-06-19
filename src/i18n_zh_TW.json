@@ -214,7 +214,7 @@
   "cat_policy": "Policy",
   "cat_system": "系統",
   "cat_user_access": "使用者存取",
-  "change_language": "1. 變更語言（目前：{lang}）",
+  "change_language": "1. 變更語言（目前：{current}）",
   "change_verify_to": "變更驗證To",
   "chart_ven_lost": "Lost",
   "chart_ven_lost_24h": "Lost <24h",
