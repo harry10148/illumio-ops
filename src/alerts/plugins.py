@@ -89,12 +89,12 @@ class MailAlertPlugin(AlertOutputPlugin):
         except (smtplib.SMTPConnectError, smtplib.SMTPServerDisconnected, ConnectionError, OSError, socket.timeout) as exc:
             print(f"{Colors.FAIL}{t('mail_failed', lang=lang, error=exc)}{Colors.ENDC}")
             from loguru import logger
-            logger.warning(f"SMTP transient failure: {exc}")
+            logger.warning(f"SMTP transient failure connecting to {host}:{port}: {exc}")
             return {"channel": "mail", "status": "failed", "target": ",".join(cfg.get("recipients", [])), "error": str(exc)}
         except smtplib.SMTPException as exc:
             print(f"{Colors.FAIL}{t('mail_failed', lang=lang, error=exc)}{Colors.ENDC}")
             from loguru import logger
-            logger.error(f"SMTP error: {exc}")
+            logger.error(f"SMTP error ({host}:{port}): {exc}")
             return {"channel": "mail", "status": "failed", "target": ",".join(cfg.get("recipients", [])), "error": str(exc)}
 
 class LineAlertPlugin(AlertOutputPlugin):

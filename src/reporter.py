@@ -37,28 +37,47 @@ class Reporter:
         self.metric_alerts: list[dict[str, Any]] = []
         self.last_dispatch_results: list[dict[str, Any]] = []
 
+    def _resolve_tz(self) -> tuple[datetime.tzinfo, str]:
+        """Return (tzinfo, label) for the configured timezone (settings.timezone)."""
+        tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
+        if not tz_str or tz_str == 'local':
+            offset = datetime.datetime.now(datetime.timezone.utc).astimezone().utcoffset()
+            tz: datetime.tzinfo = datetime.timezone(offset)  # type: ignore[arg-type]
+        elif tz_str == 'UTC':
+            tz = datetime.timezone.utc
+        elif tz_str.startswith('UTC+') or tz_str.startswith('UTC-'):
+            sign = 1 if tz_str[3] == '+' else -1
+            total_minutes = int(sign * float(tz_str[4:]) * 60)
+            tz = datetime.timezone(datetime.timedelta(minutes=total_minutes))
+        else:
+            tz = datetime.timezone.utc
+        offset_s = datetime.datetime.now(tz).strftime('%z')
+        sign_ch = offset_s[0]; hh = offset_s[1:3]; mm = offset_s[3:5]
+        label = f"UTC{sign_ch}{hh}:{mm}" if mm != '00' else f"UTC{sign_ch}{hh}"
+        return tz, label
+
     def _now_str(self) -> str:
         """Return current time formatted in the configured timezone."""
-        tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
         try:
-            if not tz_str or tz_str == 'local':
-                offset = datetime.datetime.now(datetime.timezone.utc).astimezone().utcoffset()
-                tz = datetime.timezone(offset)  # type: ignore[arg-type]
-            elif tz_str == 'UTC':
-                tz = datetime.timezone.utc
-            elif tz_str.startswith('UTC+') or tz_str.startswith('UTC-'):
-                sign = 1 if tz_str[3] == '+' else -1
-                total_minutes = int(sign * float(tz_str[4:]) * 60)
-                tz = datetime.timezone(datetime.timedelta(minutes=total_minutes))
-            else:
-                tz = datetime.timezone.utc
-            now = datetime.datetime.now(tz)
-            offset_s = now.strftime('%z')
-            sign_ch = offset_s[0]; hh = offset_s[1:3]; mm = offset_s[3:5]
-            tz_label = f"UTC{sign_ch}{hh}:{mm}" if mm != '00' else f"UTC{sign_ch}{hh}"
-            return now.strftime('%Y-%m-%d %H:%M') + f' ({tz_label})'
+            tz, label = self._resolve_tz()
+            return datetime.datetime.now(tz).strftime('%Y-%m-%d %H:%M') + f' ({label})'
         except Exception:
             return datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')  # intentional fallback: return UTC time if timezone offset calculation fails
+
+    def _fmt_event_ts(self, raw: str) -> str:
+        """Format a PCE event timestamp (UTC ISO-8601, e.g. '2026-06-19T13:17:43.552Z')
+        in the configured timezone. Returns the original string unchanged if it
+        can't be parsed, so non-timestamp values pass through harmlessly."""
+        if not raw or not isinstance(raw, str):
+            return raw or ""
+        try:
+            dt = datetime.datetime.fromisoformat(raw.strip().replace('Z', '+00:00'))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=datetime.timezone.utc)
+            tz, label = self._resolve_tz()
+            return dt.astimezone(tz).strftime('%Y-%m-%d %H:%M') + f' ({label})'
+        except Exception:
+            return raw
 
     def add_health_alert(self, alert: dict[str, Any]) -> None:
         self.health_alerts.append(alert)
@@ -773,6 +792,14 @@ class Reporter:
             requested = [str(channel).strip() for channel in channels if str(channel).strip()]
             active_channels = [channel for channel in requested if channel in active_channels or force_test]
 
+        # Localize event timestamps to the configured timezone (settings.timezone)
+        # once, before any channel renders them. PCE returns event times in UTC;
+        # without this the alert shows raw UTC instead of the operator's local time.
+        for _bucket in (self.health_alerts, self.event_alerts, self.traffic_alerts, self.metric_alerts):
+            for _a in _bucket:
+                if isinstance(_a, dict) and _a.get("time"):
+                    _a["time"] = self._fmt_event_ts(_a["time"])
+
         total_issues = (
             len(self.health_alerts)
             + len(self.event_alerts)
@@ -791,14 +818,25 @@ class Reporter:
             sev = self._highest_severity(all_issues)
             sev_label = t(f"mail_severity_{sev}")
             primary = all_issues[0] if all_issues else {}
+            # Lead the subject with the human-meaningful rule/event name (e.g.
+            # "Agent Suspended") rather than the raw event actor + API action, so
+            # the recipient sees WHAT happened at a glance. Actor/source becomes
+            # the secondary detail.
             obj = (
-                primary.get("source")
+                primary.get("rule")
+                or primary.get("source")
                 or primary.get("resource_name")
-                or primary.get("rule")
                 or t("mail_object_default")
             )
-            action = primary.get("action") or primary.get("desc") or t("mail_action_default")
-            subj = t("mail_subject_structured", severity=sev_label, object=obj, action=action)
+            detail = (
+                primary.get("source")
+                or primary.get("desc")
+                or primary.get("action")
+                or t("mail_action_default")
+            )
+            if detail == obj:
+                detail = primary.get("desc") or primary.get("action") or t("mail_action_default")
+            subj = t("mail_subject_structured", severity=sev_label, object=obj, action=detail)
         else:
             subj = t("mail_subject", count=total_issues)
         results = []
