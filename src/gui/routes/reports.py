@@ -29,6 +29,26 @@ _ADHOC_JOBS_KEY = "adhoc_report_jobs"
 _ADHOC_JOBS_MAX = 20
 
 
+from src.report.cache_support import resolve_data_source, cache_available
+
+
+def _data_source_from_payload(payload: dict, cache_ok: bool) -> tuple[bool, bool, str | None]:
+    """Resolve (use_cache, clip_to_cache, warning) from a report request payload.
+
+    Prefers explicit 'data_source'; falls back to legacy use_cache/clip_to_cache
+    so older GUI clients keep working. Values may be strings (from JSON form).
+    """
+    ds = payload.get("data_source")
+    if ds is None:
+        if str(payload.get("use_cache", "true")).lower() in ("false", "0", "off", "no"):
+            ds = "live"
+        elif str(payload.get("clip_to_cache", "")).lower() in ("true", "1", "on"):
+            ds = "cache-only"
+        else:
+            ds = "hybrid"
+    return resolve_data_source(ds, cache_ok)
+
+
 def _load_adhoc_jobs() -> dict:
     """Return the adhoc_report_jobs map from state.json ({} when absent)."""
     return load_state_file(_resolve_state_file()).get(_ADHOC_JOBS_KEY, {}) or {}
@@ -342,9 +362,11 @@ def make_reports_blueprint(
                 if not any(v for v in report_filters.values() if v):
                     report_filters = None
             payload["filters"] = report_filters
-            payload["clip_to_cache"] = str(d.get('clip_to_cache', '')).lower() in ('true', '1', 'on')
-            # Data source: default cache; 'api'/false → live PCE query (no cache).
-            payload["use_cache"] = str(d.get('use_cache', 'true')).lower() not in ('false', '0', 'off', 'no')
+            # Resolve the 3-mode data_source (falls back to legacy use_cache/clip_to_cache).
+            _uc, _clip, _ds_warn = _data_source_from_payload(d, cache_available(cm))
+            payload["use_cache"], payload["clip_to_cache"] = _uc, _clip
+            if _ds_warn:
+                logger.warning("Report data-source fallback: {}", _ds_warn)
 
         # ── Validation passed: create job, spawn worker, return job_id ──
         job_id = uuid.uuid4().hex[:12]
@@ -528,9 +550,12 @@ def make_reports_blueprint(
             return jsonify({"ok": False, "error": t("gui_app_required", lang=lang)}), 400
 
         # ── Validation passed: create job, spawn worker, return job_id ──
+        _uc, _clip, _ds_warn = _data_source_from_payload(d, cache_available(cm))
+        if _ds_warn:
+            logger.warning("App report data-source fallback: {}", _ds_warn)
         payload = {"app": app, "env": d.get('env') or None, "lang": lang,
                    "start_date": d.get('start_date'), "end_date": d.get('end_date'),
-                   "use_cache": str(d.get('use_cache', 'true')).lower() not in ('false', '0', 'off', 'no')}
+                   "use_cache": _uc}
         job_id = uuid.uuid4().hex[:12]
         record = {
             "status": "running",
