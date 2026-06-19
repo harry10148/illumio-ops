@@ -673,7 +673,6 @@ function openReportGenModal(type) {
     $('m-gen-source-row').style.display = '';
     $('m-gen-filters').style.display = '';
     $('m-gen-profile-row').style.display = '';
-    $('m-gen-clip-row').style.display = '';
     toggleTrafficSource();
     // Reset filter fields
     ['rpt-pd-blocked','rpt-pd-potential','rpt-pd-allowed'].forEach(id => {
@@ -689,7 +688,6 @@ function openReportGenModal(type) {
     $('m-gen-dates').style.display = m.dates ? '' : 'none';
     $('m-gen-filters').style.display = 'none';
     $('m-gen-profile-row').style.display = 'none';
-    $('m-gen-clip-row').style.display = 'none';
   }
 
   const appRow = $('m-gen-app-row');
