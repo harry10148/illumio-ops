@@ -43,6 +43,7 @@ def make_auth_blueprint(
         config_loaded_at = _dt.datetime.fromtimestamp(cm.last_loaded_at)
         lang = cm.config.get("settings", {}).get("language", "en")
         ui_translations = _ui_translation_dict(lang)
+        from src.report.cache_support import cache_available
         return render_template(
             "index.html",
             pce_url=pce_url,
@@ -50,6 +51,7 @@ def make_auth_blueprint(
             schedules_count=schedules_count,
             config_loaded_at=config_loaded_at,
             html_lang=lang.replace("_", "-"),
+            cache_available=cache_available(cm),
             ui_translations_json=_json.dumps(
                 ui_translations, ensure_ascii=False
             ).replace("</", "<\\/"),

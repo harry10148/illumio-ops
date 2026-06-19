@@ -12,7 +12,8 @@
   <link rel="stylesheet" href="/static/css/app.css">
   <link rel="stylesheet" href="/static/pygments.css">
   <script id="i18n-data" type="application/json">{{ ui_translations_json | safe }}</script>
-  <script nonce="{{ csp_nonce() }}">window._INIT_TRANSLATIONS = JSON.parse(document.getElementById('i18n-data').textContent);</script>
+  <script nonce="{{ csp_nonce() }}">window._INIT_TRANSLATIONS = JSON.parse(document.getElementById('i18n-data').textContent);
+    window._CACHE_AVAILABLE = {{ 'true' if cache_available else 'false' }};</script>
   <script defer src="{{ url_for('static', filename='js/_event_dispatcher.js') }}"></script>
 </head>
 
@@ -2977,20 +2978,14 @@
           <option value="network_inventory" data-i18n="gui_report_profile_network_inventory">Network Inventory</option>
         </select>
       </div>
-      <div id="m-gen-cache-row" style="margin-top:10px; display:none;">
-        <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--dim);" data-i18n="gui_data_source_label">Data Source</label>
-        <select id="m-gen-cache-mode" style="width:100%; padding:6px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px;">
-          <option value="cache" data-i18n="gui_data_source_cache" selected>Local cache (fast)</option>
-          <option value="api" data-i18n="gui_data_source_api">Live PCE query (freshest, slower)</option>
+      <div id="m-gen-data-source-row" style="margin-top:10px; display:none;">
+        <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--dim);" data-i18n="gui_rpt_data_source">Data source</label>
+        <select id="m-gen-data-source" style="width:100%; padding:6px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px;">
+          <option value="hybrid" data-i18n="gui_rpt_ds_hybrid" selected>Cache + live gap-fill (recommended)</option>
+          <option value="live" data-i18n="gui_rpt_ds_live">Live PCE only (freshest, slower)</option>
+          <option value="cache-only" data-i18n="gui_rpt_ds_cache_only">Cache only (fastest, cached range)</option>
         </select>
-        <p style="font-size:11px;color:var(--dim);margin:4px 0 0 0;" data-i18n="gui_data_source_hint">Cache reuses already-collected flows; Live queries the PCE for the whole window.</p>
-      </div>
-      <div id="m-gen-clip-row" style="margin-top:10px;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:var(--dim);cursor:pointer;">
-          <input type="checkbox" id="m-gen-clip-to-cache" style="margin:0;">
-          <span data-i18n="gui_clip_to_cache_label">Clip to cache range (skip API gap)</span>
-        </label>
-        <p style="font-size:11px;color:var(--dim);margin:4px 0 0 22px;" data-i18n="gui_clip_to_cache_hint">When on, the report start/end is silently clipped to what the local cache actually has.</p>
+        <p style="font-size:11px;color:var(--dim);margin:4px 0 0 0;" data-i18n="gui_rpt_ds_hint">Hybrid reuses cached flows and queries the PCE only for the gap; Live ignores the cache; Cache only never calls the PCE (limited to cached range).</p>
       </div>
       <div id="m-gen-format-row" style="margin-top:10px;">
         <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--dim);" data-i18n="gui_sched_format">Output Format</label>

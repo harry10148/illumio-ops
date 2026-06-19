@@ -698,12 +698,14 @@ function openReportGenModal(type) {
     if (m.appField) _populateAppLabelSelects();
   }
 
-  // Data-source (cache vs live API) applies only to traffic-fetch reports.
-  const cacheRow = $('m-gen-cache-row');
-  if (cacheRow) {
-    cacheRow.style.display = (type === 'traffic' || type === 'app_summary') ? '' : 'none';
-    const modeSel = $('m-gen-cache-mode');
-    if (modeSel) modeSel.value = 'cache';  // default each open
+  // Data-source (hybrid/live/cache-only) applies only to cache-capable reports,
+  // and only when the PCE cache is actually available.
+  const dsRow = $('m-gen-data-source-row');
+  if (dsRow) {
+    const supportsCache = (type === 'traffic' || type === 'app_summary');
+    dsRow.style.display = (supportsCache && window._CACHE_AVAILABLE) ? '' : 'none';
+    const dsSel = $('m-gen-data-source');
+    if (dsSel) dsSel.value = 'hybrid';  // default each open
   }
   
   $('m-gen-note').style.display  = m.dates ? 'none' : '';
@@ -1018,17 +1020,14 @@ async function _doGenerateTraffic() {
       const fmtEl2 = document.getElementById('m-gen-format');
       const profileEl = document.getElementById('m-gen-profile');
       const langEl = document.getElementById('m-gen-lang');
-      const clipEl = document.getElementById('m-gen-clip-to-cache');
-      const clipToCache = !!(clipEl && clipEl.checked);
-      const cacheModeEl = document.getElementById('m-gen-cache-mode');
-      const useCache = !cacheModeEl || cacheModeEl.value !== 'api';
+      const dsEl = document.getElementById('m-gen-data-source');
+      const dataSource = (window._CACHE_AVAILABLE && dsEl) ? dsEl.value : 'live';
       const r = await post('/api/reports/generate', {
         source: 'api', format: fmtEl2 ? fmtEl2.value : 'all',
         start_date: startDate, end_date: endDate,
         traffic_report_profile: profileEl ? profileEl.value : 'security_risk',
         lang: langEl ? langEl.value : 'en',
-        clip_to_cache: clipToCache,
-        use_cache: useCache,
+        data_source: dataSource,
         ...(reportFilters ? { filters: reportFilters } : {}),
       });
       if (r.ok && r.job_id) {
@@ -1167,15 +1166,15 @@ async function _doGenerateAppSummary() {
   }
   const start = $('m-gen-start') ? $('m-gen-start').value : null;
   const end   = $('m-gen-end') ? $('m-gen-end').value : null;
-  const cacheModeElApp = document.getElementById('m-gen-cache-mode');
-  const useCacheApp = !cacheModeElApp || cacheModeElApp.value !== 'api';
+  const dsElApp = document.getElementById('m-gen-data-source');
+  const dataSourceApp = (window._CACHE_AVAILABLE && dsElApp) ? dsElApp.value : 'live';
   _updateGenStep(_t('gui_gen_step_fetching'));
   try {
     const r = await post('/api/app_report/generate', {
       app, env: envEl ? envEl.value.trim() : '',
       lang: langElApp ? langElApp.value : 'en',
       start_date: start, end_date: end,
-      use_cache: useCacheApp,
+      data_source: dataSourceApp,
     });
     if (r.ok && r.job_id) {
       await _pollReportJob(r.job_id, {
