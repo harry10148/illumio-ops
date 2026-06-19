@@ -1516,13 +1516,18 @@ class _TrafficReportBase:
         top_apps = m.get('top_apps', [])
         if not top_apps:
             return f'<p class="note">{_s("rpt_mod_ringfence_no_apps")}</p>'
-        html = (f'<h4>{_s("rpt_mod_ringfence_top_apps_h4")}</h4>'
-                f'<table><tr><th>{_s("rpt_col_app")}</th><th>{_s("rpt_col_flows")}</th></tr>')
+        rows = ""
         for a in top_apps[:10]:
             app_name = a.get('app', a.get('index', ''))
             flows = a.get('flows', a.get(0, ''))
-            html += f'<tr><td>{app_name}</td><td>{flows}</td></tr>'
-        html += '</table>'
+            rows += f'<tr><td>{app_name}</td><td>{flows}</td></tr>'
+        html = (
+            f'<h4>{_s("rpt_mod_ringfence_top_apps_h4")}</h4>'
+            '<div class="report-table-panel report-table-panel--compact">'
+            '<div class="report-table-wrap"><table class="report-table"><thead>'
+            f'<tr><th>{_s("rpt_col_app")}</th><th>{_s("rpt_col_flows")}</th></tr></thead>'
+            f'<tbody>{rows}</tbody></table></div></div>'
+        )
         return html
 
     def _mod_change_impact_html(self) -> str:
@@ -1550,17 +1555,21 @@ class _TrafficReportBase:
                 f' (vs {(impact.get("previous_snapshot_at") or "")[:10]})</p>')
         deltas = impact.get('deltas', {})
         if deltas:
-            html += (f'<table><tr>'
-                     f'<th>{_s("rpt_col_kpi")}</th><th>{_s("rpt_col_previous")}</th>'
-                     f'<th>{_s("rpt_col_current")}</th><th>{_s("rpt_col_delta")}</th>'
-                     f'<th>{_s("rpt_col_direction")}</th></tr>')
             dir_color = {'improved': '#22C55E', 'regressed': '#EF4444', 'unchanged': '#6B7280', 'neutral': '#6B7280'}
+            rows = ""
             for kpi, d in deltas.items():
                 col = dir_color.get(d['direction'], '#6B7280')
-                html += (f'<tr><td>{kpi}</td><td>{d["previous"]}</td><td>{d["current"]}</td>'
+                rows += (f'<tr><td>{kpi}</td><td>{d["previous"]}</td><td>{d["current"]}</td>'
                          f'<td>{d["delta"]:+}</td>'
                          f'<td style="color:{col};font-weight:600">{dir_label.get(d["direction"], d["direction"])}</td></tr>')
-            html += '</table>'
+            html += (
+                '<div class="report-table-panel"><div class="report-table-wrap">'
+                '<table class="report-table"><thead><tr>'
+                f'<th>{_s("rpt_col_kpi")}</th><th>{_s("rpt_col_previous")}</th>'
+                f'<th>{_s("rpt_col_current")}</th><th>{_s("rpt_col_delta")}</th>'
+                f'<th>{_s("rpt_col_direction")}</th></tr></thead>'
+                f'<tbody>{rows}</tbody></table></div></div>'
+            )
         return html
 
 

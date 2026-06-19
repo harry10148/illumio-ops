@@ -261,6 +261,15 @@ class VenHtmlExporter:
             f'<h2>{t("rpt_ei_section", lang=self._lang)}</h2>'
         ]
 
+        def _panel(tbl_html: str) -> str:
+            # Wrap a <table class="report-table"> in the same styled container the
+            # rest of the report uses (render_df_table), so these estate tables
+            # render with proper borders/headers instead of looking like raw text.
+            return (
+                '<div class="report-table-panel report-table-panel--compact">'
+                f'<div class="report-table-wrap">{tbl_html}</div></div>'
+            )
+
         # -- OS Distribution sub-block --
         if os_dist:
             by_family = os_dist.get("by_family", {})
@@ -271,14 +280,14 @@ class VenHtmlExporter:
                     f"<tr><td>{html.escape(str(fam))}</td><td>{cnt}</td></tr>"
                     for fam, cnt in sorted(by_family.items(), key=lambda kv: kv[1], reverse=True)
                 )
-                parts.append(
-                    f'<table class="data-table"><thead><tr>'
+                parts.append(_panel(
+                    f'<table class="report-table"><thead><tr>'
                     f'<th>{t("rpt_ei_family", lang=self._lang)}</th>'
                     f'<th>{t("rpt_ei_count", lang=self._lang)}</th>'
                     f'</tr></thead><tbody>{rows}</tbody>'
                     f'<tfoot><tr><td><strong>{t("rpt_ei_total", lang=self._lang)}</strong></td>'
                     f'<td><strong>{total}</strong></td></tr></tfoot></table>'
-                )
+                ))
             else:
                 parts.append(f'<p>{t("rpt_no_records", lang=self._lang)}</p>')
 
@@ -290,14 +299,14 @@ class VenHtmlExporter:
                 f"<tr><td>{html.escape(str(ver))}</td><td>{cnt}</td></tr>"
                 for ver, cnt in sorted(by_version.items(), key=lambda kv: kv[1], reverse=True)
             )
-            parts.append(
-                f'<table class="data-table"><thead><tr>'
+            parts.append(_panel(
+                f'<table class="report-table"><thead><tr>'
                 f'<th>{t("rpt_col_ven_version", lang=self._lang)}</th>'
                 f'<th>{t("rpt_ei_count", lang=self._lang)}</th>'
                 f'</tr></thead><tbody>{rows}</tbody>'
                 f'<tfoot><tr><td><strong>{t("rpt_ei_total", lang=self._lang)}</strong></td>'
                 f'<td><strong>{ver_total}</strong></td></tr></tfoot></table>'
-            )
+            ))
 
         # -- Enforcement Posture sub-block --
         if enf_dist:
@@ -309,14 +318,14 @@ class VenHtmlExporter:
                     f"<tr><td>{html.escape(str(mode))}</td><td>{cnt}</td></tr>"
                     for mode, cnt in by_mode.items()
                 )
-                parts.append(
-                    f'<table class="data-table"><thead><tr>'
+                parts.append(_panel(
+                    f'<table class="report-table"><thead><tr>'
                     f'<th>{t("rpt_ei_mode", lang=self._lang)}</th>'
                     f'<th>{t("rpt_ei_count", lang=self._lang)}</th>'
                     f'</tr></thead><tbody>{rows}</tbody>'
                     f'<tfoot><tr><td><strong>{t("rpt_ei_total", lang=self._lang)}</strong></td>'
                     f'<td><strong>{total}</strong></td></tr></tfoot></table>'
-                )
+                ))
             else:
                 parts.append(f'<p>{t("rpt_no_records", lang=self._lang)}</p>')
 
@@ -347,10 +356,10 @@ class VenHtmlExporter:
                     f"<td>{entry.get('by_mode', {}).get(m, 0)}</td>" for m in all_modes
                 )
                 rows_html += f"<tr><td>{net_name}</td><td>{total}</td>{mode_cells}</tr>"
-            parts.append(
-                f'<table class="data-table"><thead>{header}</thead>'
+            parts.append(_panel(
+                f'<table class="report-table"><thead>{header}</thead>'
                 f'<tbody>{rows_html}</tbody></table>'
-            )
+            ))
 
         parts.append("</section>\n")
         return "".join(parts)
