@@ -114,23 +114,28 @@ def run_daemon_with_gui(cm, interval: int = 10, port: int = 5001, host: str = "0
     """Headless monitoring loop running in background thread + Flask GUI in main thread."""
     logger.info(f"Starting daemon loop with Web GUI (interval={interval}m, port={port})")
 
-    # Register signals here (main thread) — run_daemon_loop skips them when threaded
-    _register_signals()
-
-    # Start daemon in background thread
-    t_daemon = threading.Thread(target=run_daemon_loop, args=(cm, interval), daemon=True)
-    t_daemon.start()
-
-    # Start Flask blocking in main thread
+    # Import the GUI + scheduler module graphs in the MAIN thread BEFORE spawning
+    # the daemon thread. The daemon thread pulls in src.scheduler.jobs (→
+    # src.gui._helpers) while this thread pulls in src.gui (→ src.gui._helpers);
+    # importing the shared graph concurrently from two threads makes CPython's
+    # import lock raise _DeadlockError on the cross-thread import cycle. Doing the
+    # imports single-threaded here populates sys.modules so the daemon thread only
+    # ever finds already-imported modules.
     from src.gui import launch_gui, HAS_FLASK
+    import src.gui as _gui
+    from src.scheduler import build_scheduler  # noqa: F401  (also imports src.scheduler.jobs)
+
     if not HAS_FLASK:
         print(t("report_requires_flask"))
         print(t("cli_pip_install_hint", pkg="flask"))
         sys.exit(1)
 
-    # Install restart hook so the GUI can restart the daemon scheduler.
-    import src.gui as _gui
-    from src.scheduler import build_scheduler
+    # Register signals here (main thread) — run_daemon_loop skips them when threaded
+    _register_signals()
+
+    # Start daemon in background thread (module graph already imported above)
+    t_daemon = threading.Thread(target=run_daemon_loop, args=(cm, interval), daemon=True)
+    t_daemon.start()
 
     def _restart():
         if _gui._DAEMON_SCHEDULER is not None and getattr(_gui._DAEMON_SCHEDULER, "running", False):
