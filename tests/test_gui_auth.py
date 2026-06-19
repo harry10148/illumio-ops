@@ -55,10 +55,10 @@ def test_frontend_api_helper_refreshes_expired_csrf_token():
     assert "_setCsrfToken" in js
 
 
-def test_login_response_carries_must_change_flag_for_default_install():
-    """Default-fresh-install: /api/login surfaces must_change_password=True
-    so login.html can show the inline change-password form before
-    redirecting to the dashboard."""
+def test_login_default_install_does_not_force_change():
+    """Forced first-login password change is DISABLED (operator request): a
+    default install logs in with illumio/illumio and /api/login reports
+    must_change_password=False (no inline change-password gate)."""
     import json, tempfile, os
     from src.config import ConfigManager
     from src.gui import build_app as _create_app
@@ -74,22 +74,29 @@ def test_login_response_carries_must_change_flag_for_default_install():
     assert r.status_code == 200
     body = r.get_json()
     assert body["ok"] is True
-    assert body["must_change_password"] is True
+    assert body["must_change_password"] is False
     assert "csrf_token" in body
 
 
 def test_login_then_change_password_flow_clears_must_change(temp_config_file):
-    """End-to-end: login with default illumio/illumio → POST /api/security
-    with new_password → must_change_password and _initial_password are
-    cleared and subsequent dashboard calls work."""
+    """End-to-end gate flow with an EXPLICITLY-armed must_change gate (first-boot
+    auto-arming is disabled by operator request, so the admin arms it manually):
+    login with illumio/illumio → POST /api/security with new_password →
+    must_change_password and _initial_password are cleared and dashboard calls work."""
     import os
-    from src.config import ConfigManager
+    from src.config import ConfigManager, hash_password
     from src.gui import build_app as _create_app
-    # Reset to a fresh default-install state (illumio/illumio + must-change)
+    # Explicitly arm the must-change gate (no longer auto-armed on first boot).
     with open(temp_config_file, "w") as f:
         json.dump({
             "api": {"url": "https://x", "org_id": "1", "key": "k", "secret": "s"},
             "rules": [],
+            "web_gui": {
+                "username": "illumio",
+                "password": hash_password("illumio"),
+                "_initial_password": "illumio",
+                "must_change_password": True,
+            },
         }, f)
     cm = ConfigManager(temp_config_file, alerts_file=temp_config_file + ".alerts")
     assert cm.config["web_gui"]["_initial_password"] == "illumio"

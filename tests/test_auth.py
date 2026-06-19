@@ -30,7 +30,9 @@ def test_default_config_no_default_password(tmp_path):
     cm = ConfigManager(config_file=config_file)
     gui = cm.config.get("web_gui", {})
     assert gui["password"].startswith("$argon2"), "Password must be an argon2 hash"
-    assert gui.get("must_change_password") is True, "must_change_password must be set on first boot"
+    # Forced first-login password change is DISABLED by operator request — the
+    # default illumio credential stays valid until changed manually.
+    assert gui.get("must_change_password") is False, "forced password change is disabled on first boot"
 
 
 def test_legacy_plaintext_migration(tmp_path):

@@ -225,10 +225,10 @@ def test_alerts_corrupt_file_keeps_app_running(tmp_path, caplog):
     assert "alerts" in combined.lower() or "Error reading alerts" in combined
 
 
-def test_first_run_uses_illumio_default_password_with_must_change(tmp_path):
-    """Default initial password is the well-known 'illumio' with the
-    must_change_password gate set. Banner / login flow rely on these
-    invariants — keep them locked in."""
+def test_first_run_uses_illumio_default_password_no_forced_change(tmp_path):
+    """Default initial password is the well-known 'illumio'. Forced first-login
+    password change is DISABLED by operator request, so must_change_password is
+    NOT armed on first boot (the default stays valid until changed manually)."""
     from src.config import ConfigManager, hash_password
     cfg = tmp_path / "config.json"
     alerts = tmp_path / "alerts.json"
@@ -239,7 +239,7 @@ def test_first_run_uses_illumio_default_password_with_must_change(tmp_path):
     cm = ConfigManager(str(cfg), alerts_file=str(alerts))
     gui = cm.config["web_gui"]
     assert gui["_initial_password"] == "illumio"
-    assert gui["must_change_password"] is True
+    assert gui["must_change_password"] is False
     # password is argon2id-hashed, not stored in plaintext
     assert gui["password"].startswith("$argon2")
     # The hash verifies against "illumio"
