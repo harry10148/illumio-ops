@@ -65,6 +65,12 @@ stage_app() {
         "$REPO_ROOT/config/" "$dest/app/config/"
     rsync -a "$REPO_ROOT/scripts/" "$dest/app/scripts/"
     cp "$REPO_ROOT/requirements-offline.txt" "$dest/app/"
+    # Runtime data read from outside src/: src/events/reference.py loads
+    # docs/_meta/illumio-event-reference.json (path resolved relative to repo
+    # root). It MUST be bundled or the Event Viewer 500s with FileNotFoundError
+    # on a fresh install.
+    mkdir -p "$dest/app/docs/_meta"
+    cp "$REPO_ROOT/docs/_meta/illumio-event-reference.json" "$dest/app/docs/_meta/"
     echo "$VERSION" > "$dest/VERSION"
 }
 
