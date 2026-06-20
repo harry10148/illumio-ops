@@ -625,6 +625,23 @@ class TrafficQueryBuilder:
                 sorted(effective_spec.report_only_filters.keys()),
                 sorted(effective_spec.diagnostics.get("unresolved_native_filters", {}).keys()),
             )
+            # Diagnostic: the resolved label hrefs + match operator actually sent
+            # to the PCE. Pinpoints intermittent 0-match queries where the native
+            # filter resolved to the wrong scope.
+            def _label_hrefs(side):
+                out = []
+                for grp in (payload.get(side) or {}).get("include", []) or []:
+                    for entry in grp:
+                        lbl = (entry or {}).get("label") or {}
+                        if lbl.get("href"):
+                            out.append(str(lbl["href"]).rsplit("/", 1)[-1])
+                return out
+            logger.info(
+                "Traffic query payload: src_labels={} dst_labels={} op={} pds={}",
+                _label_hrefs("sources"), _label_hrefs("destinations"),
+                payload.get("sources_destinations_query_op"),
+                payload.get("policy_decisions"),
+            )
             yield from self._submit_and_stream_async_query(payload, compute_draft=compute_draft)
         except Exception as e:
             logger.error(f"Query Exception: {e}")
