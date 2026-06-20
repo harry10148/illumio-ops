@@ -651,7 +651,7 @@ def make_reports_blueprint(
     @bp.route('/api/policy_usage_report/generate', methods=['POST'])
     @limiter.limit("10 per hour")
     def api_generate_policy_usage_report():
-        d = request.json or {}
+        d = request.get_json(silent=True) or request.form.to_dict() or {}
         _pulog = None
         try:
             from src.report.policy_usage_generator import PolicyUsageGenerator
@@ -675,7 +675,24 @@ def make_reports_blueprint(
             if lang not in ('en', 'zh_TW'):
                 lang = 'en'
 
-            result = gen.generate_from_api(start_date=start_date, end_date=end_date, lang=lang)
+            source = d.get('source', 'api')
+            if source == 'csv':
+                import tempfile
+                if 'file' not in request.files or request.files['file'].filename == '':
+                    return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
+                csv_file = request.files['file']
+                safe_name = secure_filename(csv_file.filename) or 'upload.csv'
+                temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}_{safe_name}")
+                csv_file.save(temp_path)
+                try:
+                    result = gen.generate_from_csv(temp_path, lang=lang)
+                finally:
+                    try:
+                        os.unlink(temp_path)
+                    except OSError:
+                        pass
+            else:
+                result = gen.generate_from_api(start_date=start_date, end_date=end_date, lang=lang)
 
             if result.record_count == 0:
                 return jsonify({"ok": False, "error": t("gui_no_pu_data", lang=lang)})

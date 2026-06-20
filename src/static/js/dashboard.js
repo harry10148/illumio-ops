@@ -682,6 +682,12 @@ function openReportGenModal(type) {
      'rpt-any-label','rpt-any-ip','rpt-ex-any-label','rpt-ex-any-ip'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
+  } else if (type === 'policy_usage') {
+    // Policy-usage supports api/csv source (no traffic filters/profile).
+    $('m-gen-source-row').style.display = '';
+    $('m-gen-filters').style.display = 'none';
+    $('m-gen-profile-row').style.display = 'none';
+    toggleTrafficSource();  // sets dates/csv-upload per the current source radio
   } else {
     $('m-gen-source-row').style.display = 'none';
     $('m-gen-csv-upload').style.display = 'none';
@@ -743,7 +749,9 @@ function toggleTrafficSource() {
   } else {
     $('m-gen-dates').style.display = '';
     $('m-gen-csv-upload').style.display = 'none';
-    $('m-gen-data-source-row').style.display = window._CACHE_AVAILABLE ? '' : 'none';
+    // Cache-mode selector only applies to cache-capable report types.
+    const supportsCache = (_genReportType === 'traffic' || _genReportType === 'app_summary');
+    $('m-gen-data-source-row').style.display = (supportsCache && window._CACHE_AVAILABLE) ? '' : 'none';
   }
 }
 
@@ -1225,7 +1233,27 @@ async function _doGeneratePolicyUsageClean() {
     const start = $('m-gen-start') ? $('m-gen-start').value : null;
     const end   = $('m-gen-end')   ? $('m-gen-end').value   : null;
     const langElPuClean = document.getElementById('m-gen-lang');
-    const r = await post('/api/policy_usage_report/generate', { start_date: start, end_date: end, format: fmt, lang: langElPuClean ? langElPuClean.value : 'en' });
+    const langPu = langElPuClean ? langElPuClean.value : 'en';
+    const srcPu = document.querySelector('input[name="traffic-source"]:checked')?.value || 'api';
+    let r;
+    if (srcPu === 'csv') {
+      const fileInput = $('m-gen-csv-file');
+      if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        _hideGenProgress(false, _t('gui_csv_required'));
+        toast(_t('gui_err_no_csv'), 'err');
+        return;
+      }
+      const fd = new FormData();
+      fd.append('source', 'csv');
+      fd.append('format', fmt);
+      fd.append('lang', langPu);
+      fd.append('file', fileInput.files[0]);
+      r = await fetch('/api/policy_usage_report/generate', {
+        method: 'POST', headers: { 'X-CSRF-Token': _csrfToken() }, body: fd
+      }).then(res => res.json());
+    } else {
+      r = await post('/api/policy_usage_report/generate', { source: 'api', start_date: start, end_date: end, format: fmt, lang: langPu });
+    }
     if (r.ok) {
       const kpiText = (r.kpis || []).map(k => `${k.label}: ${k.value}`).join(' | ');
       const execText = _formatPolicyUsageExecutionSummary(r.execution_stats, r.execution_notes);
