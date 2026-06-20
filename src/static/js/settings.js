@@ -350,7 +350,7 @@ function _renderPceSection(a, profiles, activePceId) {
       <td>${escapeHtml(p.name)}</td>
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(p.url)}">${escapeHtml(p.url)}</td>
       <td>${p.org_id || ''}</td>
-      <td>
+      <td style="white-space:nowrap;overflow:visible;text-overflow:clip">
         ${p.id !== activePceId ? `<button class="btn btn-primary btn-sm" onclick="activatePceProfile(${p.id})" data-i18n="gui_pce_activate">Activate</button>` : `<span style="color:var(--success);font-weight:600"><svg class="icon" aria-hidden="true" style="width:14px;height:14px;vertical-align:middle;"><use href="#icon-check"></use></svg></span>`}
         <button class="btn btn-sm" style="margin-left:4px" onclick="deletePceProfile(${p.id})" data-i18n="gui_pce_delete_profile">Delete</button>
       </td>
@@ -360,7 +360,7 @@ function _renderPceSection(a, profiles, activePceId) {
   ${profiles.length > 0 ? `
   <div style="overflow-x:auto;margin-bottom:12px">
     <table class="rule-table" style="width:100%">
-      <thead><tr><th data-i18n="gui_pce_name">Name</th><th data-i18n="gui_url">URL</th><th data-i18n="gui_org_id">Org ID</th><th style="width:160px"></th></tr></thead>
+      <thead><tr><th data-i18n="gui_pce_name">Name</th><th data-i18n="gui_url">URL</th><th data-i18n="gui_org_id">Org ID</th><th style="width:240px"></th></tr></thead>
       <tbody>${profileRows}</tbody>
     </table>
   </div>` : ''}
