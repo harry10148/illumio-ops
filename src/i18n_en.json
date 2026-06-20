@@ -2414,6 +2414,7 @@
   "report_schedule_states": "Report schedule states",
   "report_select_prompt": "Please select report type",
   "rpt_ds_prompt": "Data source (1=Hybrid cache+live, 2=Live PCE, 3=Cache only)",
+  "rpt_profile_prompt": "Profile (1=Security Risk, 2=Network Inventory)",
   "report_start_date": "Start date [{date}]",
   "report_type": "Report Type",
   "rpt_actmtx_data_volume_msg": "Total data volume: {vol} across the analysis period.",

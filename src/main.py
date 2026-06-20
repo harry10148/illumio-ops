@@ -440,6 +440,8 @@ def _run_report_menu(cm):
 
                 if sel == 1:
                     from src.report.cache_support import resolve_data_source, cache_available
+                    _prof_sel = safe_input(t("rpt_profile_prompt"), int, range(1, 3), allow_cancel=True) or 1
+                    _profile = {1: "security_risk", 2: "network_inventory"}[_prof_sel]
                     _ds = "hybrid"
                     if cache_available(cm):
                         _ds_sel = safe_input(t("rpt_ds_prompt"), int, range(1, 4), allow_cancel=True) or 1
@@ -448,7 +450,8 @@ def _run_report_menu(cm):
                     if _ds_warn:
                         print(_ds_warn)
                     result = gen.generate_from_api(start_date=api_start_date, end_date=api_end_date,
-                                                   filters=api_filters, use_cache=_uc, clip_to_cache=_clip)
+                                                   filters=api_filters, traffic_report_profile=_profile,
+                                                   use_cache=_uc, clip_to_cache=_clip)
                 else:
                     _csv_raw = safe_input(t("csv_path_prompt"), str)
                     csv_path = _csv_raw.strip() if _csv_raw else ''
