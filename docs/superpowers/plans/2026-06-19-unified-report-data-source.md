@@ -520,6 +520,17 @@ git commit -m "feat(shell): data-source + profile + source prompts for traffic r
 
 ### Task 8: GUI policy-usage — add `source` toggle (option alignment)
 
+> **NOT DONE — out of scope (decided 2026-06-20).** Investigation showed the GUI
+> policy-usage route (`api_generate_policy_usage_report`, src/gui/routes/reports.py)
+> is **API-only**: it reads JSON `start_date/end_date/lang` and calls
+> `generate_from_api` — it has no `source` param and no CSV file-upload handling at
+> all. Exposing a `source=csv` toggle would therefore require **adding a new CSV
+> capability** to the route (multipart upload → `generate_from_csv`), which is a
+> feature addition, not the agreed "align an already-supported option". The CLI
+> `report policy-usage --source csv` already covers the scripted CSV case. Left as
+> a possible future feature.
+
+
 **Files:**
 - Modify: `src/templates/index.html` (policy-usage form fields)
 - Modify: `src/static/js/dashboard.js` (`_doGeneratePolicyUsageClean` ~1223-1260)
