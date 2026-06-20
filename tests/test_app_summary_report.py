@@ -30,6 +30,31 @@ def test_safe_filename_token():
     assert _safe_filename_token("My App/v2 (Prod)") == "My_App_v2_Prod"
 
 
+def test_build_normalizes_date_only_window():
+    """Regression: the GUI date pickers send bare 'YYYY-MM-DD'; build() must expand
+    them to full ISO-8601 timestamps, else the PCE traffic query returns zero flows
+    and the App Summary report comes back silently empty."""
+    api = MagicMock()
+    api.fetch_managed_workloads.return_value = []
+    rep = AppSummaryReport(cm=MagicMock(), api_client=api)
+    captured = {}
+
+    def _capture(start_date=None, end_date=None, **kw):
+        captured["start"], captured["end"] = start_date, end_date
+        return pd.DataFrame()
+
+    with patch.object(rep, "_fetch_estate_df", side_effect=_capture):
+        rep.build(app="infra", env="prod", start_date="2026-06-13", end_date="2026-06-20")
+    assert captured["start"] == "2026-06-13T00:00:00Z"
+    assert captured["end"] == "2026-06-20T23:59:59Z"
+
+    # Already-normalized timestamps and None pass through untouched.
+    with patch.object(rep, "_fetch_estate_df", side_effect=_capture):
+        rep.build(app="infra", start_date="2026-06-13T08:00:00Z", end_date=None)
+    assert captured["start"] == "2026-06-13T08:00:00Z"
+    assert captured["end"] is None
+
+
 def test_build_adds_policy_impact_and_enforcement(monkeypatch):
     df = pd.DataFrame([
         _row_decision("Web", "DB", "b", 3306, "allowed", 5),

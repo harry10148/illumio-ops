@@ -49,6 +49,20 @@ class AppSummaryReport:
     def build(self, app: str, env: str | None = None, lang: str = "en",
               start_date=None, end_date=None, use_cache: bool = True) -> dict:
         from loguru import logger
+        import datetime as _dt
+        # The PCE traffic query needs full ISO-8601 timestamps; a bare 'YYYY-MM-DD'
+        # (which the GUI date pickers send) yields zero flows, which silently
+        # produced empty App Summary reports. Normalize date-only inputs here.
+        def _iso_window(value, *, end_of_day):
+            if not value or not isinstance(value, str) or "T" in value:
+                return value
+            try:
+                parsed = _dt.datetime.strptime(value.strip(), "%Y-%m-%d")
+            except ValueError:
+                return value
+            return parsed.strftime("%Y-%m-%dT" + ("23:59:59Z" if end_of_day else "00:00:00Z"))
+        start_date = _iso_window(start_date, end_of_day=False)
+        end_date = _iso_window(end_date, end_of_day=True)
         labels = [f"app={app}"] + ([f"env={env}"] if env else [])
         scope_filters = {"src_labels": labels, "dst_labels": labels, "query_operator": "or"}
         # Fetch the app's managed workloads once: their hrefs scope the CACHE read
