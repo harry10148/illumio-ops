@@ -383,6 +383,14 @@ class TestRunPostureSummaryJob:
 class TestOverviewPostureHelper:
     """_overview_posture(state) returns posture_summary or {available: False}."""
 
+    @pytest.fixture(autouse=True)
+    def _no_disk_snapshot(self):
+        """_overview_posture reads read_latest('traffic') from disk first; mock it
+        to None so these tests exercise the state-based logic deterministically
+        regardless of leftover report snapshots in reports/snapshots/."""
+        with patch("src.report.snapshot_store.read_latest", return_value=None):
+            yield
+
     def test_returns_posture_from_state(self):
         from src.gui.routes.dashboard import _overview_posture
         state = {"posture_summary": {"available": True, "score": 72, "components": []}}
