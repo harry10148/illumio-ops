@@ -90,6 +90,14 @@ async function runDebug() {
   toast(_t('gui_action_debug_completed'));
 }
 
+async function resetWatermark() {
+  if (!confirm(_t('gui_reset_watermark_confirm'))) return;
+  $('a-log').textContent = '[' + new Date().toLocaleTimeString() + '] ' + _t('gui_reset_watermark_label');
+  const r = await post('/api/actions/reset-watermark', {});
+  alog(r.output || _t('gui_action_done'));
+  toast(r.output || _t('gui_action_done'));
+}
+
 async function stopGui() {
   hdrMenuClose();
   if (!confirm(_t('gui_action_stop_gui_confirm'))) return;

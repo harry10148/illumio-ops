@@ -14,9 +14,11 @@ from src.gui._helpers import (
     _err_with_log,
     _is_workload_href,
     _normalize_quarantine_hrefs,
+    _resolve_state_file,
     _strip_ansi,
 )
 from src.i18n import t
+from src.state_store import update_state_file
 
 
 def make_actions_blueprint(
@@ -363,6 +365,37 @@ def make_actions_blueprint(
             "ok": True,
             "output": t("gui_test_alert_sent_summary", lang=lang, status_text=status_text),
             "results": results,
+        })
+
+    @bp.route('/api/actions/reset-watermark', methods=['POST'])
+    @limiter.limit("10 per hour")
+    def api_reset_watermark():
+        """Debug helper: clear the event watermark + alert cooldown (alert_history)
+        + seen-event dedup so the next analysis re-pulls events and re-fires alerts."""
+        data = request.json or {}
+        lang = data.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+        try:
+            from src.module_log import ModuleLog as _ML
+            _ML.get("actions").info("Debug: reset event_watermark + alert_history + event_seen")
+        except Exception:
+            pass  # intentional: audit-log best-effort, must not block primary action
+        cleared: list[str] = []
+
+        def _clear(state: dict) -> dict:
+            for key in ("event_watermark", "alert_history", "event_seen"):
+                if key in state:
+                    state.pop(key, None)
+                    cleared.append(key)
+            return state
+
+        try:
+            update_state_file(_resolve_state_file(), _clear)
+        except Exception as exc:
+            return _err_with_log("reset_watermark", exc, lang=lang)
+        return jsonify({
+            "ok": True,
+            "cleared": cleared,
+            "output": t("gui_reset_watermark_done", lang=lang, keys=", ".join(cleared) or "—"),
         })
 
     @bp.route('/api/actions/best-practices', methods=['POST'])
