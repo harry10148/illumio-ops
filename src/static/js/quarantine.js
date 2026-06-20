@@ -398,7 +398,7 @@ function renderQtPage() {
     let hasWorkloadTarget = !!(shref || dhref);
     let chkBox = hasWorkloadTarget
       ? `<input type="checkbox" class="qt-chk" data-src-href="${escapeHtml(shref || '')}" data-dst-href="${escapeHtml(dhref || '')}" value="${escapeHtml(shref || dhref || '')}">`
-      : `<span style="color:var(--dim);font-size:10px;">${_t('gui_q_workload_only')}</span>`;
+      : `<span title="${_t('gui_q_workload_only')}" style="color:var(--dim);font-size:13px;cursor:default;">—</span>`;
 
     const formatActor = (actor) => {
       let procStr = '';
@@ -468,8 +468,8 @@ function renderQtPage() {
     if (l_seen) l_seen = formatDateZ(l_seen);
 
     html += `<tr>
-          <td style="text-align:center;">${chkBox}</td>
-          <td><div style="font-weight:bold;color:var(--accent2);">${val_str}</div></td>
+          <td style="text-align:center;overflow:hidden;">${chkBox}</td>
+          <td><div style="font-weight:bold;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;">${val_str}</div></td>
           <td style="font-size:10px;"><div style="color:var(--dim);">F: ${f_seen}</div><div style="color:var(--dim);">L: ${l_seen}</div></td>
           <td>${formatActor(item.source)}</td>
           <td>${formatActor(item.destination)}</td>
