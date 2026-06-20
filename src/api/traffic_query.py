@@ -476,16 +476,26 @@ class TrafficQueryBuilder:
         deadline = time.monotonic() + _ASYNC_QUERY_MAX_WAIT_SECONDS
         interval = 2
         completed = False
+        expected_matches = 0
         while time.monotonic() < deadline:
             time.sleep(interval)
             poll_status, poll_body = c._request(poll_url, timeout=15)
             if poll_status != 200:
                 continue
 
-            state = orjson.loads(poll_body).get("status")
+            poll_obj = orjson.loads(poll_body)
+            state = poll_obj.get("status")
             if state == "completed":
+                # Largest *count* field tells us how many flows the PCE matched.
+                # Used below to detect a premature-download race (the PCE reports
+                # "completed" before the result file is materialized, so the
+                # first download streams 0 rows even though matches exist).
+                expected_matches = max(
+                    [v for k, v in poll_obj.items()
+                     if "count" in k.lower() and isinstance(v, int)] + [0]
+                )
                 print(f" {t('done')}")
-                logger.info("Traffic query completed.")
+                logger.info("Traffic query completed (matches={}).", expected_matches)
                 completed = True
                 break
             if state == "failed":
@@ -535,46 +545,62 @@ class TrafficQueryBuilder:
                 logger.warning(f"update_rules returned {ur_status}: {ur_text[:200]}, proceeding without draft policy data")
 
         dl_url = f"{c.api_cfg['url']}/api/v2{job_url}/download"
-        dl_status, dl_body = c._request(dl_url, timeout=60)
-        if dl_status != 200:
-            logger.error(f"Download failed: {dl_status}")
-            return
 
-        buffer = BytesIO(dl_body)
-        try:
-            with gzip.GzipFile(fileobj=buffer, mode='rb') as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        if line == b'[' or line == b']':
+        def _download_rows():
+            """Download + parse the gzipped result file into a list of flow dicts.
+            Returns None only when the HTTP download itself fails."""
+            dl_status, dl_body = c._request(dl_url, timeout=60)
+            if dl_status != 200:
+                logger.error(f"Download failed: {dl_status}")
+                return None
+            rows = []
+            buffer = BytesIO(dl_body)
+            try:
+                with gzip.GzipFile(fileobj=buffer, mode='rb') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line == b'[' or line == b']':
                             continue
                         if line.endswith(b','):
                             line = line[:-1]
+                        try:
+                            data = orjson.loads(line)
+                            rows.extend(data if isinstance(data, list) else [data])
+                        except json.JSONDecodeError as je:
+                            logger.debug(f"Skipping unparseable line: {je}")
+            except (gzip.BadGzipFile, OSError):
+                buffer.seek(0)
+                for line in buffer.read().decode('utf-8', errors='replace').splitlines():
+                    if not line.strip():
+                        continue
+                    try:
                         data = orjson.loads(line)
-                        if isinstance(data, list):
-                            for item in data:
-                                yield item
-                        else:
-                            yield data
+                        rows.extend(data if isinstance(data, list) else [data])
                     except json.JSONDecodeError as je:
                         logger.debug(f"Skipping unparseable line: {je}")
-        except (gzip.BadGzipFile, OSError):
-            buffer.seek(0)
-            text_data = buffer.read().decode('utf-8', errors='replace')
-            for line in text_data.splitlines():
-                if not line.strip():
-                    continue
-                try:
-                    data = orjson.loads(line)
-                    if isinstance(data, list):
-                        for item in data:
-                            yield item
-                    else:
-                        yield data
-                except json.JSONDecodeError as je:
-                    logger.debug(f"Skipping unparseable line: {je}")
+            return rows
+
+        rows = _download_rows()
+        if rows is None:
+            return
+        # Resilience: in a long-running service the PCE occasionally reports the
+        # query "completed" before its result file is materialized, so the first
+        # download streams 0 rows even though matches exist — re-download (backing
+        # off) before giving up. A genuinely empty query (expected_matches == 0)
+        # is left alone so reports for apps with no traffic stay fast.
+        attempt = 0
+        while not rows and expected_matches > 0 and attempt < 3:
+            attempt += 1
+            logger.warning(
+                "Async query completed with {} matches but download streamed 0 "
+                "rows; re-downloading (attempt {}/3).", expected_matches, attempt)
+            time.sleep(2 * attempt)
+            rows = _download_rows() or []
+        if attempt and rows:
+            logger.info("Async query recovered {} rows after {} re-download(s).",
+                        len(rows), attempt)
+        for item in rows:
+            yield item
 
     def execute_traffic_query_stream(self, start_time_str, end_time_str, policy_decisions, filters=None, compute_draft=False):
         """Executes an async traffic query and yields results row by row."""
