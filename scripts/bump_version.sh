@@ -49,7 +49,8 @@ awk -v sec="$section" '
 README_FILES=()
 for readme in "$REPO_ROOT/README.md" "$REPO_ROOT/README_zh.md"; do
     if [ -f "$readme" ]; then
-        sed -i.bak -E "s#(badge/Version-v)[^?]*(-blue)#\1${NEW_VERSION}\2#" "$readme" && rm -f "$readme.bak"
+        sed -i.bak -E "s#(badge/Version-v)[^?]*(-blue)#\1${NEW_VERSION}\2#" "$readme"
+        rm -f "$readme.bak"
         README_FILES+=("$readme")
     fi
 done

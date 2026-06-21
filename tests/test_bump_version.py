@@ -127,6 +127,19 @@ def test_bump_updates_readme_badges(tmp_path):
         assert "0.9.0--old--name" not in content, f"{fname} still has old badge"
 
 
+def test_bump_no_tag_updates_readme_badges(tmp_path):
+    """--no-tag mode also updates Version badges in both READMEs (no commit, no tag)."""
+    repo = _make_repo_with_readmes(tmp_path)
+    _bump(repo, "1.1.0", "--no-tag")
+    for fname in ("README.md", "README_zh.md"):
+        content = (repo / fname).read_text()
+        assert NEW_BADGE_FRAGMENT in content, f"{fname} missing new badge in --no-tag mode"
+        assert "0.9.0--old--name" not in content, f"{fname} still has old badge in --no-tag mode"
+    # no tag and no new commit beyond "add readmes"
+    assert "v1.1.0" not in _git(repo, "tag").stdout.split()
+    assert _git(repo, "log", "-1", "--pretty=%s").stdout.strip() == "add readmes"
+
+
 def test_bump_no_readme_still_succeeds(tmp_path):
     """Bumping works even when README files are absent (existing repo shape)."""
     repo = _make_repo(tmp_path)
