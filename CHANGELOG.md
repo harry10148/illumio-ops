@@ -3,8 +3,29 @@
 All notable changes to illumio-ops are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to a `<major>.<minor>.<patch>-<topic-slug>` versioning
-scheme aligned with the git tag conventions.
+and this project adheres to [Semantic Versioning](https://semver.org/) —
+a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
+`-topic-slug` codename suffix; the codename was retired in 4.1.0.)
+
+## [4.1.0] — 2026-06-21
+
+### Changed
+
+- Version management refactor: `src/__init__.py` `__version__` is now the
+  single source of truth; offline bundle names are clean semver
+  (`illumio-ops-<X.Y.Z>-offline-...`, or `<X.Y.Z>+<short-hash>` for dev builds)
+  via `scripts/resolve_version.sh` instead of `git describe`.
+- Added `scripts/bump_version.sh` to bump `__version__`, seed a CHANGELOG
+  section, commit, and tag in one step.
+- Retired the `-topic-slug` codename convention in favour of plain semver.
+
+## [4.0.0] — 2026-05-23
+
+### Changed
+
+- UI/UX Modern SaaS overhaul, security-audit remediation, and timezone-aware
+  datetime refactor. Tagged `v4.0.0-secure-modern-saas`; this entry backfills
+  the 3.27.0 → 4.0.0 gap. See the git tag and history for the full commit set.
 
 ## [3.27.0-docs-refactor] — 2026-05-15
 
