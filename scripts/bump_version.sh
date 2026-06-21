@@ -45,6 +45,15 @@ awk -v sec="$section" '
     { print }
 ' "$CHANGELOG" > "$CHANGELOG.tmp" && mv "$CHANGELOG.tmp" "$CHANGELOG"
 
+# 3. update Version badge in README.md and README_zh.md (skip if absent)
+README_FILES=()
+for readme in "$REPO_ROOT/README.md" "$REPO_ROOT/README_zh.md"; do
+    if [ -f "$readme" ]; then
+        sed -i.bak -E "s#(badge/Version-v)[^?]*(-blue)#\1${NEW_VERSION}\2#" "$readme" && rm -f "$readme.bak"
+        README_FILES+=("$readme")
+    fi
+done
+
 echo "==> Bumped to $NEW_VERSION"
 
 if [[ "$NO_TAG" -eq 1 ]]; then
@@ -55,6 +64,9 @@ if [[ "$NO_TAG" -eq 1 ]]; then
 fi
 
 git -C "$REPO_ROOT" add "$INIT_FILE" "$CHANGELOG"
+for readme in "${README_FILES[@]+"${README_FILES[@]}"}"; do
+    git -C "$REPO_ROOT" add "$readme"
+done
 git -C "$REPO_ROOT" commit -m "chore(release): $TAG"
 git -C "$REPO_ROOT" tag -a "$TAG" -m "$TAG"
 echo "    Committed and tagged $TAG."

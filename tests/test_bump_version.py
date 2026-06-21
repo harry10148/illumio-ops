@@ -101,3 +101,37 @@ def test_rejects_dirty_tree_in_tag_mode(tmp_path):
     _git(repo, "add", "dirty.txt")
     r = _bump(repo, "1.1.0", check=False)
     assert r.returncode != 0
+
+
+OLD_BADGE = "![Version](https://img.shields.io/badge/Version-v0.9.0--old--name-blue?style=flat-square)"
+NEW_BADGE_FRAGMENT = "Version-v1.1.0-blue"
+
+
+def _make_repo_with_readmes(tmp_path, version="1.0.0"):
+    """Like _make_repo but also seeds README.md and README_zh.md with old badges."""
+    repo = _make_repo(tmp_path, version)
+    for fname in ("README.md", "README_zh.md"):
+        (repo / fname).write_text(f"# Title\n\n{OLD_BADGE}\n\nSome content.\n")
+    _git(repo, "add", "README.md", "README_zh.md")
+    _git(repo, "commit", "-m", "add readmes")
+    return repo
+
+
+def test_bump_updates_readme_badges(tmp_path):
+    """Bumping updates the Version badge in both README.md and README_zh.md."""
+    repo = _make_repo_with_readmes(tmp_path)
+    _bump(repo, "1.1.0")
+    for fname in ("README.md", "README_zh.md"):
+        content = (repo / fname).read_text()
+        assert NEW_BADGE_FRAGMENT in content, f"{fname} missing new badge"
+        assert "0.9.0--old--name" not in content, f"{fname} still has old badge"
+
+
+def test_bump_no_readme_still_succeeds(tmp_path):
+    """Bumping works even when README files are absent (existing repo shape)."""
+    repo = _make_repo(tmp_path)
+    assert not (repo / "README.md").exists()
+    assert not (repo / "README_zh.md").exists()
+    r = _bump(repo, "1.1.0")
+    assert r.returncode == 0
+    assert '__version__ = "1.1.0"' in (repo / "src" / "__init__.py").read_text()
