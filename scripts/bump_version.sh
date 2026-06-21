@@ -39,9 +39,9 @@ rm -f "$INIT_FILE.bak"
 
 # 2. insert a new CHANGELOG section before the first existing "## [" heading
 today="$(date +%Y-%m-%d)"
-section="## [$NEW_VERSION] — $today\n\n### Changed\n\n- \n"
+section="$(printf '## [%s] — %s\n\n### Changed\n\n- ' "$NEW_VERSION" "$today")"
 awk -v sec="$section" '
-    !done && /^## \[/ { printf "%s\n", sec; done=1 }
+    !done && /^## \[/ { print sec; print ""; done=1 }
     { print }
 ' "$CHANGELOG" > "$CHANGELOG.tmp" && mv "$CHANGELOG.tmp" "$CHANGELOG"
 
