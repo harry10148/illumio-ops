@@ -532,7 +532,7 @@ with:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
-`-<topic-slug>` codename; the codename was retired in 4.1.0.)
+`-topic-slug` codename; the codename was retired in 4.1.0.)
 ```
 
 - [ ] **Step 4: Insert the 4.1.0 and 4.0.0 sections**
@@ -550,7 +550,7 @@ In `CHANGELOG.md`, immediately before the line `## [3.27.0-docs-refactor] — 20
   via `scripts/resolve_version.sh` instead of `git describe`.
 - Added `scripts/bump_version.sh` to bump `__version__`, seed a CHANGELOG
   section, commit, and tag in one step.
-- Retired the `-<topic-slug>` codename convention in favour of plain semver.
+- Retired the `-topic-slug` codename convention in favour of plain semver.
 
 ## [4.0.0] — 2026-05-23
 
