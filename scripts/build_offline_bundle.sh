@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DIST_DIR="$REPO_ROOT/dist"
 
-VERSION="${VERSION:-$(cd "$REPO_ROOT" && git describe --tags --always 2>/dev/null || echo "dev")}"
+VERSION="$("$SCRIPT_DIR/resolve_version.sh")"
 
 # python-build-standalone release — update these lines when upgrading Python.
 # After bumping PBS_TAG / PBS_PYTHON, refresh the SHA256 pins below from a
