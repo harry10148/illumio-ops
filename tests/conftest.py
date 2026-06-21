@@ -39,6 +39,22 @@ def _loguru_caplog_bridge(caplog):
         pass  # setup_loguru() may have already removed all handlers
 
 
+@pytest.fixture(autouse=True)
+def _reset_i18n_language():
+    """Restore the process-global i18n language after every test.
+
+    The i18n engine keeps a process-global language (src/i18n/engine.py). Tests
+    that call set_language("zh_TW") without restoring it leak that state into
+    later tests, so English-output assertions become order-dependent (e.g.
+    test_cli_rule_edit / test_cli_rule_list fail only depending on collection
+    order). Save/restore here keeps the suite order-independent for language.
+    """
+    from src.i18n import get_language, set_language
+    saved = get_language()
+    yield
+    set_language(saved)
+
+
 @pytest.fixture
 def header_client(tmp_path):
     """Minimal Flask test client for security-header contract tests.
