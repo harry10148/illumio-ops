@@ -40,6 +40,9 @@ def _install_main_test_env(monkeypatch, main_module):
         (["illumio_ops.py", "--gui"], False),
         (["illumio_ops.py", "--report"], False),
         (["illumio_ops.py"], False),
+        # A typo'd / unknown positional still routes to click (which then reports
+        # the error); it does NOT fall through to legacy argparse.
+        (["illumio_ops.py", "montior"], True),
     ],
 )
 def test_entrypoint_click_detection_matrix(argv, expected):
@@ -54,6 +57,23 @@ def test_entrypoint_click_detection_matrix(argv, expected):
     spec.loader.exec_module(illumio_ops)
 
     assert illumio_ops._looks_like_click_invocation(argv) is expected
+
+
+def test_entrypoint_has_no_dead_click_subcommands_constant():
+    """The unused _CLICK_SUBCOMMANDS set was dead code that contradicted the real
+    dispatch rule (_looks_like_click_invocation never consulted it). Guard against
+    it being reintroduced."""
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location(
+        "illumio_ops",
+        Path(__file__).resolve().parent.parent / "illumio-ops.py",
+    )
+    illumio_ops = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(illumio_ops)
+
+    assert not hasattr(illumio_ops, "_CLICK_SUBCOMMANDS")
 
 
 @pytest.mark.parametrize(

@@ -32,13 +32,39 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 $SRC = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # ── Migration: C:\illumio_ops → C:\illumio-ops ────────────────────────────────
+# Resolve nssm once: prefer the bundled deploy\nssm.exe (offline bundles ship it
+# there and it is NOT on PATH on air-gapped hosts — same precedence as
+# deploy\install_service.ps1), then fall back to PATH. Fail clearly if neither.
+function Resolve-Nssm {
+    $bundled = Join-Path $SRC "deploy\nssm.exe"
+    if (Test-Path $bundled) { return $bundled }
+    $cmd = Get-Command nssm -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    Write-Host "ERROR: NSSM not found (looked for $bundled, then PATH)." -ForegroundColor Red
+    Write-Host "       The offline bundle ships nssm.exe under deploy\nssm.exe — re-extract the bundle if it is missing." -ForegroundColor Red
+    exit 1
+}
+
 function Invoke-NssmSet {
     param([string[]]$NssmArgs)
-    & nssm set @NssmArgs
+    & $script:NSSM set @NssmArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: nssm set $NssmArgs failed (exit $LASTEXITCODE)" -ForegroundColor Red
         exit 1
     }
+}
+
+# Preserve operator-set service flags (e.g. a custom --interval) across the path
+# migration: read the existing AppParameters and only swap the old root prefix
+# for the new one, instead of overwriting with a fixed parameter string. Fall
+# back to the default when the value cannot be read.
+function Get-MigratedAppParameters {
+    param([string]$OldRoot, [string]$NewRoot)
+    $current = ((& $script:NSSM get IllumioOps AppParameters 2>$null) -join "").Trim()
+    if ([string]::IsNullOrWhiteSpace($current)) {
+        return "$NewRoot\illumio-ops.py --monitor --interval 10"
+    }
+    return $current.Replace($OldRoot, $NewRoot)
 }
 
 function Invoke-MigrateFromUnderscoreRoot {
@@ -50,14 +76,15 @@ function Invoke-MigrateFromUnderscoreRoot {
     # This means the script was killed after Move-Item but before nssm/marker.
     if (-not (Test-Path $OldRoot)) {
         if ((Test-Path $NewRoot) -and -not (Test-Path "$NewRoot\MIGRATED_FROM")) {
+            $script:NSSM = Resolve-Nssm
             # Fix I1: trim \r that nssm includes in its stdout on Windows
-            $currentAppDir = ((& nssm get IllumioOps AppDirectory 2>$null) -join "").Trim()
+            $currentAppDir = ((& $script:NSSM get IllumioOps AppDirectory 2>$null) -join "").Trim()
             if ($currentAppDir -eq $OldRoot) {
                 Write-Host "==> Detected partial migration: re-running nssm reconfiguration" -ForegroundColor Yellow
                 # Fix I3: check exit code on every nssm set via helper
                 Invoke-NssmSet IllumioOps,AppDirectory,$NewRoot
                 Invoke-NssmSet IllumioOps,Application,"$NewRoot\python\python.exe"
-                Invoke-NssmSet IllumioOps,AppParameters,"$NewRoot\illumio-ops.py --monitor --interval 10"
+                Invoke-NssmSet IllumioOps,AppParameters,(Get-MigratedAppParameters $OldRoot $NewRoot)
                 Invoke-NssmSet IllumioOps,AppStdout,"$NewRoot\logs\service_stdout.log"
                 Invoke-NssmSet IllumioOps,AppStderr,"$NewRoot\logs\service_stderr.log"
                 Set-Content "$NewRoot\MIGRATED_FROM" $OldRoot
@@ -92,6 +119,10 @@ function Invoke-MigrateFromUnderscoreRoot {
         exit 1
     }
 
+    # Resolve nssm before any irreversible mutation (Move-Item below) so a
+    # missing nssm fails fast instead of leaving a half-migrated install.
+    $script:NSSM = Resolve-Nssm
+
     # ── Step 5: Stop service with explicit failure handling ───────────────────
     if ($svc.Status -eq 'Running') {
         try {
@@ -121,7 +152,7 @@ function Invoke-MigrateFromUnderscoreRoot {
     # Fix I3: check exit code on every nssm set via helper
     Invoke-NssmSet IllumioOps,AppDirectory,$NewRoot
     Invoke-NssmSet IllumioOps,Application,"$NewRoot\python\python.exe"
-    Invoke-NssmSet IllumioOps,AppParameters,"$NewRoot\illumio-ops.py --monitor --interval 10"
+    Invoke-NssmSet IllumioOps,AppParameters,(Get-MigratedAppParameters $OldRoot $NewRoot)
     Invoke-NssmSet IllumioOps,AppStdout,"$NewRoot\logs\service_stdout.log"
     Invoke-NssmSet IllumioOps,AppStderr,"$NewRoot\logs\service_stderr.log"
 

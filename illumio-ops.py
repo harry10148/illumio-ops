@@ -5,9 +5,10 @@ Two parsers coexist:
 - click-based subcommands (preferred): illumio-ops monitor/gui/report/rule/workload/config/status/version
 - legacy argparse flags (backwards-compatible): --monitor, --gui, --report, -i, -p
 
-The dispatcher below picks which to use based on argv[1] — if it matches a
-known click subcommand name we delegate to click, otherwise argparse handles
-the classic flags.
+The dispatcher below routes to click when argv[1] is a help flag (-h/--help),
+a click global flag (--json/--quiet/-v/...), or any non-dash positional (a
+subcommand attempt — a bogus one errors inside click rather than falling
+through). Otherwise the legacy argparse parser handles the classic flags.
 
 Usage:
     python illumio_ops.py                       # interactive menu
@@ -21,9 +22,6 @@ from __future__ import annotations
 import sys
 
 import os as _os
-
-# Known click subcommand names; anything else falls back to argparse.
-_CLICK_SUBCOMMANDS = {"cache", "monitor", "monitor-gui", "gui", "report", "rule", "siem", "workload", "config", "status", "version", "shell", "completion", "-h", "--help"}
 
 # Click root-level global flags. If argv starts with one of these, dispatcher
 # should still route to click (rather than falling through to legacy argparse).
