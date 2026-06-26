@@ -12,7 +12,7 @@ verified_against:
   - tests/test_i18n_audit.py
   - commit 503f029
 related_docs:
-  - overview.md
+  - ../../README.md
   - ../contributing/i18n-workflow.md
   - glossary.md
   - ../_archive/user-guide/dashboard.md
@@ -356,7 +356,7 @@ silent drift in the translations most visible to operators on the dashboard.
 
 ## Related Docs
 
-- [Architecture Overview](overview.md) — bigger picture
+- [Architecture Overview](../../README.md) — bigger picture
 - [i18n Workflow](../contributing/i18n-workflow.md) — add a new translation key (B3 deliverable)
 - [Glossary](glossary.md) — Illumio terminology
 - [Dashboard](../_archive/user-guide/dashboard.md) — operator-level i18n behavior

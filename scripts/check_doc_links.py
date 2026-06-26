@@ -14,7 +14,7 @@ LINK_RE = re.compile(r"\[(?P<text>[^\]]+)\]\((?P<href>[^)]+)\)")
 
 INCLUDE_DIRS = ["docs"]
 INCLUDE_FILES = ["README.md", "README_zh.md", "Status.md", "Task.md"]
-EXCLUDE_PARTS = {"_notebooklm_excerpts", "superpowers"}
+EXCLUDE_PARTS = {"_notebooklm_excerpts", "superpowers", "_archive"}
 
 
 def iter_markdown() -> list[Path]:
