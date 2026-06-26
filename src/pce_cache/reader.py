@@ -24,15 +24,23 @@ class CacheReader:
         self._traffic_days = traffic_raw_retention_days
 
     def cover_state(self, source: str, start: datetime, end: datetime) -> CoverState:
-        days = self._events_days if source == "events" else self._traffic_days
-        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-        if end < cutoff:
-            return "miss"
-        if start < cutoff:
-            return "partial"
         earliest = self.earliest_data_timestamp(source)
-        if earliest is None or start < earliest:
-            return "partial"
+        if earliest is None:
+            # Empty cache: no stored data to consult, so fall back to the
+            # retention-day cutoff heuristic.
+            days = self._events_days if source == "events" else self._traffic_days
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+            return "miss" if end < cutoff else "partial"
+        # Non-empty cache: judge coverage by the ACTUAL earliest stored data
+        # timestamp, NOT the retention-day cutoff. Retention deletes rows by
+        # ingested_at, so a flow/event backfilled with an old data timestamp
+        # legitimately lives in the cache past the cutoff — the old day-cutoff
+        # short-circuit wrongly reported such backfilled windows as 'miss' and
+        # bypassed the cache, defeating the backfill workflow.
+        if end < earliest:
+            return "miss"      # request ends before any data we hold
+        if start < earliest:
+            return "partial"   # request reaches back before our earliest data
         return "full"
 
     def earliest_ingested_at(self, source: str) -> datetime | None:

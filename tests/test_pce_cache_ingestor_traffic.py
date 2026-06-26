@@ -132,6 +132,74 @@ def test_run_once_emits_poll_log_even_when_insert_batch_raises(session_factory, 
         f"expected poll log on insert failure; got: {[r.message for r in caplog.records]}"
 
 
+class BumpingApiClient:
+    """Returns the SAME flow on both polls (identical first_detected → identical
+    flow_hash), but with a later last_detected and higher byte/flow counters on
+    the 2nd pull — simulating a long-lived flow re-pulled inside the grace
+    window."""
+
+    _FIRST = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc).isoformat()
+
+    def __init__(self):
+        self.calls = 0
+
+    def _flow(self, last, fc, bi, bo):
+        return {
+            "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 443,
+            "protocol": "tcp", "action": "blocked", "flow_count": fc,
+            "bytes_in": bi, "bytes_out": bo,
+            "first_detected": self._FIRST, "last_detected": last,
+        }
+
+    def get_traffic_flows_async(self, max_results=200000, rate_limit=False, **kw):
+        self.calls += 1
+        if self.calls == 1:
+            last = datetime(2026, 5, 1, 12, 1, 0, tzinfo=timezone.utc).isoformat()
+            return [self._flow(last, fc=1, bi=100, bo=200)]
+        last = datetime(2026, 5, 1, 12, 6, 0, tzinfo=timezone.utc).isoformat()
+        return [self._flow(last, fc=5, bi=500, bo=600)]
+
+
+def test_repulled_flow_refreshes_volatile_counters(session_factory):
+    """ON CONFLICT must refresh (not freeze) last_detected/bytes/flow_count for
+    a re-pulled long-lived flow, taking GREATEST so counters never shrink."""
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    ing = TrafficIngestor(api=BumpingApiClient(), session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory))
+    assert ing.run_once() == 1   # genuinely new row
+    assert ing.run_once() == 0   # same flow_hash → update, not a new insert
+    with session_factory() as s:
+        rows = s.execute(select(PceTrafficFlowRaw)).scalars().all()
+    assert len(rows) == 1        # still one row (deduped on flow_hash)
+    row = rows[0]
+    assert row.bytes_in == 500
+    assert row.bytes_out == 600
+    assert row.flow_count == 5
+    # last_detected advanced to the later sighting (GREATEST), read back naive
+    assert row.last_detected.replace(tzinfo=timezone.utc) == \
+        datetime(2026, 5, 1, 12, 6, 0, tzinfo=timezone.utc)
+
+
+def test_repulled_flow_does_not_reenqueue_siem(session_factory):
+    """Refreshing a re-pulled flow must NOT re-enqueue it to SIEM — only the
+    first (genuinely new) insert enqueues. Otherwise every grace-window re-pull
+    floods destinations with duplicate dispatches."""
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+    from src.pce_cache.models import SiemDispatch
+
+    ing = TrafficIngestor(api=BumpingApiClient(), session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory),
+                          siem_destinations=["splunk"])
+    ing.run_once()
+    ing.run_once()
+    with session_factory() as s:
+        dispatches = s.execute(select(SiemDispatch)).scalars().all()
+    assert len(dispatches) == 1
+
+
 def test_since_cursor_attaches_utc_offset_to_naive_watermark(session_factory):
     """Regression: SQLite reads last_timestamp back NAIVE, so the emitted `since`
     had no tz offset and the PCE rejected it (HTTP 406 invalid_timestamp). The

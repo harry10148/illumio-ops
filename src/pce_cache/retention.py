@@ -6,7 +6,7 @@ from sqlalchemy import delete
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import (
-    DeadLetter, PceEvent, PceTrafficFlowAgg, PceTrafficFlowRaw,
+    DeadLetter, PceEvent, PceTrafficFlowAgg, PceTrafficFlowRaw, SiemDispatch,
 )
 
 
@@ -20,6 +20,7 @@ class RetentionWorker:
         traffic_raw_days: int = 7,
         traffic_agg_days: int = 90,
         dlq_days: int = 30,
+        dispatch_days: int = 14,
     ) -> dict[str, int]:
         now = datetime.now(timezone.utc)
         results: dict[str, int] = {}
@@ -43,5 +44,20 @@ class RetentionWorker:
             cutoff = now - timedelta(days=dlq_days)
             r = s.execute(delete(DeadLetter).where(DeadLetter.quarantined_at < cutoff))
             results["dead_letter"] = r.rowcount
+
+        with self._sf.begin() as s:
+            # siem_dispatch grows one row per record per destination and is never
+            # otherwise pruned — the dispatcher only flips status pending→sent. So
+            # delivered rows accumulate forever, long after the underlying raw
+            # flows are deleted at 7 days, bloating the DB and the dispatch
+            # indexes/COUNT queries. Purge delivered ('sent') rows past the
+            # cutoff; leave pending/failed (retry/DLQ candidates) untouched. Their
+            # NULL sent_at is excluded by the `< cutoff` comparison anyway.
+            cutoff = now - timedelta(days=dispatch_days)
+            r = s.execute(delete(SiemDispatch).where(
+                SiemDispatch.status == "sent",
+                SiemDispatch.sent_at < cutoff,
+            ))
+            results["siem_dispatch"] = r.rowcount
 
         return results

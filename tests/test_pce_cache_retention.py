@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import (
-    PceEvent, PceTrafficFlowRaw, PceTrafficFlowAgg, DeadLetter
+    PceEvent, PceTrafficFlowRaw, PceTrafficFlowAgg, DeadLetter, SiemDispatch
 )
 
 
@@ -108,3 +108,54 @@ def test_retention_purges_old_dlq(session_factory):
     with session_factory() as s:
         remaining = s.execute(select(DeadLetter)).scalars().all()
     assert len(remaining) == 1
+
+
+def _seed_dispatch(sf, sent_old, sent_new, pending, failed):
+    with sf.begin() as s:
+        for i in range(sent_old):
+            s.add(SiemDispatch(
+                source_table="pce_traffic_flows_raw", source_id=i, destination="splunk",
+                status="sent", retries=0, queued_at=_old(), sent_at=_old(),
+            ))
+        for i in range(sent_new):
+            s.add(SiemDispatch(
+                source_table="pce_traffic_flows_raw", source_id=1000 + i, destination="splunk",
+                status="sent", retries=0, queued_at=_now(), sent_at=_now(),
+            ))
+        for i in range(pending):
+            s.add(SiemDispatch(
+                source_table="pce_traffic_flows_raw", source_id=2000 + i, destination="splunk",
+                status="pending", retries=0, queued_at=_old(), sent_at=None,
+            ))
+        for i in range(failed):
+            s.add(SiemDispatch(
+                source_table="pce_traffic_flows_raw", source_id=3000 + i, destination="splunk",
+                status="failed", retries=5, queued_at=_old(), sent_at=None,
+            ))
+
+
+def test_retention_purges_old_sent_siem_dispatch(session_factory):
+    _seed_dispatch(session_factory, sent_old=6, sent_new=2, pending=3, failed=1)
+    from src.pce_cache.retention import RetentionWorker
+    worker = RetentionWorker(session_factory)
+    deleted = worker.run_once(events_days=90, traffic_raw_days=7, traffic_agg_days=90,
+                              dlq_days=30, dispatch_days=14)
+    assert deleted["siem_dispatch"] == 6
+    with session_factory() as s:
+        remaining = s.execute(select(SiemDispatch)).scalars().all()
+    # 2 recent 'sent' + 3 pending + 1 failed survive; 6 aged 'sent' purged
+    assert len(remaining) == 6
+    assert sorted(r.status for r in remaining) == \
+        ["failed", "pending", "pending", "pending", "sent", "sent"]
+
+
+def test_retention_keeps_pending_and_failed_siem_dispatch(session_factory):
+    """Only delivered ('sent') rows past the cutoff are purged. Pending/failed
+    rows (retry/DLQ candidates, NULL sent_at) must never be deleted by age."""
+    _seed_dispatch(session_factory, sent_old=0, sent_new=0, pending=4, failed=2)
+    from src.pce_cache.retention import RetentionWorker
+    worker = RetentionWorker(session_factory)
+    deleted = worker.run_once(dispatch_days=1)
+    assert deleted["siem_dispatch"] == 0
+    with session_factory() as s:
+        assert len(s.execute(select(SiemDispatch)).scalars().all()) == 6

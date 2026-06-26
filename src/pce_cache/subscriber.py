@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Callable, Optional
 
 import orjson
 from sqlalchemy import select, and_, or_
@@ -25,7 +26,20 @@ class CacheSubscriber:
         self._source = source_table
         self._model = _MODEL_MAP[source_table]
 
-    def poll_new_rows(self, limit: int = 1000) -> list[dict]:
+    def poll_new_rows(
+        self,
+        limit: int = 1000,
+        processor: Optional[Callable[[list[dict]], None]] = None,
+    ) -> list[dict]:
+        """Return rows newer than this consumer's cursor and advance it.
+
+        processor: optional at-least-once hook. When given, the batch is handed
+        to processor() FIRST and the cursor is advanced only after it returns
+        without raising — so a consumer crash mid-processing leaves the cursor
+        put and the rows are re-delivered next poll instead of being silently
+        skipped. When omitted, the cursor advances immediately (legacy
+        at-most-once behaviour, kept for existing callers).
+        """
         last_ts, last_id = self._read_cursor()
         with self._sf() as s:
             q = select(self._model).order_by(self._model.ingested_at, self._model.id).limit(limit)
@@ -40,8 +54,11 @@ class CacheSubscriber:
         if not rows:
             return []
         last_row = rows[-1]
+        dicts = [_row_to_dict(r) for r in rows]
+        if processor is not None:
+            processor(dicts)  # may raise → cursor below is not reached
         self._write_cursor(last_row.ingested_at, last_row.id)
-        return [_row_to_dict(r) for r in rows]
+        return dicts
 
     def _read_cursor(self) -> tuple[datetime | None, int | None]:
         with self._sf() as s:

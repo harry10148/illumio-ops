@@ -63,6 +63,37 @@ def test_independent_consumers_have_independent_cursors(session_factory):
               .poll_new_rows()) == 1
 
 
+def test_processor_failure_does_not_advance_cursor(session_factory):
+    """At-least-once: when the processor callback raises, the cursor must NOT
+    advance, so the same rows are re-delivered on the next poll instead of being
+    silently skipped on consumer failure."""
+    from src.pce_cache.subscriber import CacheSubscriber
+    _seed(session_factory, "a", datetime(2026, 4, 19, 10, 0, tzinfo=timezone.utc))
+    sub = CacheSubscriber(session_factory, "analyzer", "pce_events")
+
+    def boom(rows):
+        raise RuntimeError("consumer crashed")
+
+    with pytest.raises(RuntimeError):
+        sub.poll_new_rows(processor=boom)
+    # Cursor stayed put → row still pending on the next (plain) poll.
+    rows = sub.poll_new_rows()
+    assert len(rows) == 1
+    assert rows[0]["pce_event_id"] == "a"
+
+
+def test_processor_success_advances_cursor(session_factory):
+    """When the processor returns cleanly the batch is acknowledged and the
+    cursor advances, so the next poll is empty."""
+    from src.pce_cache.subscriber import CacheSubscriber
+    _seed(session_factory, "a", datetime(2026, 4, 19, 10, 0, tzinfo=timezone.utc))
+    sub = CacheSubscriber(session_factory, "analyzer", "pce_events")
+    seen = []
+    out = sub.poll_new_rows(processor=seen.extend)
+    assert len(out) == 1 and len(seen) == 1
+    assert sub.poll_new_rows() == []
+
+
 def test_ties_on_ingested_at_broken_by_row_id(session_factory):
     from src.pce_cache.subscriber import CacheSubscriber
     same_ts = datetime(2026, 4, 19, 10, 0, tzinfo=timezone.utc)

@@ -6,6 +6,7 @@ from typing import Optional
 
 import orjson
 from loguru import logger
+from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import sessionmaker
 
@@ -79,12 +80,25 @@ class TrafficIngestor:
 
     _CHUNK = 500
 
+    # Volatile columns refreshed when a re-pulled flow conflicts on flow_hash.
+    _VOLATILE = ("last_detected", "bytes_in", "bytes_out", "flow_count")
+
     def _insert_batch(self, flows: list[dict]) -> int:
-        """Bulk-insert flows in chunks with ON CONFLICT DO NOTHING (dedup by
-        flow_hash). One transaction per chunk instead of one per row — at
-        100k+ flows the per-row commit/fsync was the dominant ingest cost and a
-        major source of SQLite write-lock contention. RETURNING yields only the
-        newly-inserted ids, which drive the per-flow SIEM enqueue.
+        """Bulk-upsert flows in chunks (dedup by flow_hash). One transaction per
+        chunk instead of one per row — at 100k+ flows the per-row commit/fsync
+        was the dominant ingest cost and a major source of SQLite write-lock
+        contention.
+
+        flow_hash includes first_detected, and _since_cursor re-pulls a 5-minute
+        grace window, so an active long-lived flow re-appears with the SAME
+        flow_hash but a LARGER last_detected and higher byte/flow counters. The
+        previous ON CONFLICT DO NOTHING froze every flow at its first sighting —
+        undercounting bandwidth/volume and under-reporting recency. Instead,
+        refresh the volatile columns on conflict, taking GREATEST so an
+        out-of-order re-pull never shrinks a counter (MAX(x,x)=x stays
+        idempotent). The SIEM enqueue must still fire ONLY for genuinely new
+        rows, so a pre-upsert snapshot of existing flow_hashes splits new inserts
+        from refreshed re-pulls (an upsert's RETURNING covers both).
         """
         from src.report.parsers.api_parser import flatten_flow_record
         now = datetime.now(timezone.utc)
@@ -135,17 +149,30 @@ class TrafficIngestor:
                 "report_json": report_json,
                 "ingested_at": now,
             })
+        raw_cols = PceTrafficFlowRaw.__table__.c
         inserted = 0
         for i in range(0, len(rows), self._CHUNK):
             chunk = rows[i:i + self._CHUNK]
             with self._sf.begin() as s:
+                # Pre-upsert snapshot: which of these flow_hashes already exist?
+                # Used below to fire the SIEM enqueue only for genuinely new rows.
+                hashes = [r["flow_hash"] for r in chunk]
+                existing = set(s.execute(
+                    select(PceTrafficFlowRaw.flow_hash)
+                    .where(PceTrafficFlowRaw.flow_hash.in_(hashes))
+                ).scalars())
+                base = sqlite_insert(PceTrafficFlowRaw).values(chunk)
+                set_ = {c: func.max(raw_cols[c], base.excluded[c]) for c in self._VOLATILE}
+                # report_json reflects the (refreshed) counters; take the latest.
+                set_["report_json"] = base.excluded.report_json
                 stmt = (
-                    sqlite_insert(PceTrafficFlowRaw)
-                    .values(chunk)
-                    .on_conflict_do_nothing(index_elements=["flow_hash"])
-                    .returning(PceTrafficFlowRaw.id)
+                    base
+                    .on_conflict_do_update(index_elements=["flow_hash"], set_=set_)
+                    .returning(PceTrafficFlowRaw.id, PceTrafficFlowRaw.flow_hash)
                 )
-                new_ids = [r[0] for r in s.execute(stmt)]
+                # RETURNING covers inserts AND updates; new rows = those whose
+                # flow_hash was absent in the pre-upsert snapshot.
+                new_ids = [rid for rid, fh in s.execute(stmt) if fh not in existing]
                 inserted += len(new_ids)
                 if self._siem_dests and new_ids:
                     s.execute(

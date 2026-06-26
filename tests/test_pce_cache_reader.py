@@ -139,3 +139,26 @@ def test_cover_state_full_when_backfill_old_data_with_recent_ingested_at(session
     rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
     # Request 4 days back — start (4d) ≥ data_ts (5d ago); cache covers it
     assert rd.cover_state("events", now - timedelta(days=4), now) == "full"
+
+
+def test_cover_state_full_for_backfilled_window_beyond_retention_cutoff(session_factory):
+    """Regression: retention deletes raw flows by ingested_at, so a flow
+    backfilled with an OLD last_detected (beyond the 7-day raw cutoff) still
+    physically lives in the cache. cover_state must judge coverage by the
+    actual stored data extent, not the retention-day cutoff — otherwise the
+    old window is wrongly reported 'miss' and the cache is bypassed.
+    """
+    now = datetime.now(timezone.utc)
+    old_last = now - timedelta(days=30)          # 30d ago — past the 7d cutoff
+    with session_factory.begin() as s:
+        s.add(PceTrafficFlowRaw(
+            flow_hash="backfilled-old",
+            first_detected=old_last, last_detected=old_last,
+            src_ip="1.2.3.4", dst_ip="5.6.7.8", port=443, protocol="tcp",
+            action="allowed", flow_count=1, bytes_in=0, bytes_out=0,
+            raw_json="{}", ingested_at=now,       # backfilled just now
+        ))
+    rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
+    # Old window [30d, 20d] is fully spanned by the stored data → 'full',
+    # not 'miss' (the day-cutoff would have short-circuited to 'miss').
+    assert rd.cover_state("traffic", old_last, now - timedelta(days=20)) == "full"

@@ -139,6 +139,24 @@ def test_backfill_traffic_deduplicates(session_factory, tmp_path):
     assert len(count) == 1
 
 
+def test_backfill_traffic_populates_report_json(session_factory, tmp_path):
+    """Backfilled raw flows must carry the precomputed report_json like the live
+    ingestor, so reports hit the fast path (and the ix_raw_report_json_null
+    partial-index invariant in schema.py holds)."""
+    import orjson
+    from src.pce_cache.backfill import BackfillRunner
+    flows = [_flow(5)]
+    api = _make_mock_api_traffic(flows)
+    now = datetime.now(timezone.utc)
+    runner = BackfillRunner(api, session_factory, rate_limit_per_minute=400)
+    runner.run_traffic(now - timedelta(days=7), now)
+    with session_factory() as s:
+        row = s.execute(select(PceTrafficFlowRaw)).scalars().one()
+    assert row.report_json is not None
+    parsed = orjson.loads(row.report_json)
+    assert isinstance(parsed, dict) and parsed  # non-empty flatten dict
+
+
 def test_backfill_empty_api_returns_zero(session_factory, tmp_path):
     from src.pce_cache.backfill import BackfillRunner
     api = _make_mock_api_events([])

@@ -78,6 +78,7 @@ class BackfillRunner:
         return inserted, dups
 
     def _insert_traffic(self, flows: list[dict]) -> tuple[int, int]:
+        from src.report.parsers.api_parser import flatten_flow_record
         inserted = dups = 0
         now = datetime.now(timezone.utc)
         for fl in flows:
@@ -97,6 +98,14 @@ class BackfillRunner:
                     protocol = _proto_to_str(svc.get("proto") if svc else fl.get("protocol", "tcp"))
                     action = fl.get("action") or fl.get("policy_decision", "unknown")
                     flow_count = fl.get("flow_count") or fl.get("num_connections", 1)
+                    # Precompute the report-ready flatten like the live ingestor so
+                    # backfilled rows hit read_flows_df's fast path (and uphold the
+                    # ix_raw_report_json_null invariant documented in schema.py).
+                    # Best-effort: never block backfill on a flatten error.
+                    try:
+                        report_json = orjson.dumps(flatten_flow_record(fl)).decode("utf-8")
+                    except Exception:  # noqa: BLE001
+                        report_json = None
                     s.add(PceTrafficFlowRaw(
                         flow_hash=_backfill_flow_hash(fl),
                         src_ip=src_ip,
@@ -112,6 +121,7 @@ class BackfillRunner:
                         first_detected=first_detected,
                         last_detected=last_detected,
                         raw_json=orjson.dumps(fl).decode("utf-8"),
+                        report_json=report_json,
                         ingested_at=now,
                     ))
                 inserted += 1
