@@ -9,6 +9,7 @@ import os
 import re
 import smtplib
 import socket
+import weakref
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from src.alerts import build_output_plugin, get_output_registry, render_alert_template
@@ -26,6 +27,13 @@ SIGNAL_HEX = {
     'danger':  '#dc2626',
     'info':    '#2563eb',
 }
+
+# Alert output plugins are cached per ConfigManager (not per Reporter): the daemon
+# builds a fresh Reporter every monitor cycle but reuses one long-lived
+# ConfigManager, so stateful plugins (e.g. LineAlertPlugin's 3-strike cooldown)
+# must hang off cm to keep their counters across dispatches. Keyed weakly so the
+# cache does not pin a ConfigManager alive.
+_PLUGIN_CACHE: "weakref.WeakKeyDictionary[Any, dict[str, Any]]" = weakref.WeakKeyDictionary()
 
 class Reporter:
     def __init__(self, config_manager: Any) -> None:
@@ -92,11 +100,27 @@ class Reporter:
         self.metric_alerts.append(alert)
 
     def _get_output_plugin(self, name: str) -> Any:
+        # Reuse a cached plugin instance keyed by the long-lived ConfigManager so
+        # stateful plugins keep their state across dispatch cycles (see
+        # _PLUGIN_CACHE). A per-Reporter or per-call instance would reset
+        # LineAlertPlugin's cooldown counters on every dispatch.
         try:
-            return build_output_plugin(name, self.cm)
+            cache = _PLUGIN_CACHE.get(self.cm)
+            if cache is None:
+                cache = {}
+                _PLUGIN_CACHE[self.cm] = cache
+        except TypeError:
+            cache = None  # cm not hashable/weak-referenceable: fall back to per-call build
+        if cache is not None and name in cache:
+            return cache[name]
+        try:
+            plugin = build_output_plugin(name, self.cm)
         except KeyError:
             logger.warning("Unknown alert output plugin requested: {}", name)
             return None
+        if cache is not None:
+            cache[name] = plugin
+        return plugin
 
     def _active_pce_url(self) -> str:
         active_id = self.cm.config.get("active_pce_id")
@@ -406,7 +430,11 @@ class Reporter:
         summary = "\n".join(lines) if lines else t("mail_subject", count=total_issues)
 
         actions_fragment = ""
-        base_url = self.cm.config.get("gui_base_url", "")
+        # Resolve the deep-link base the same way the mail CTAs do
+        # (web_gui.public_url, else stripped PCE URL). The old flat 'gui_base_url'
+        # config key is defined nowhere in production, so the Teams action never
+        # rendered even when web_gui.public_url was configured.
+        base_url = self._gui_base_url()
         if base_url:
             action = {
                 "type": "Action.OpenUrl",
@@ -1100,7 +1128,16 @@ class Reporter:
         )
 
         if len(body) > 3500:
-            cut = body[:3300].rstrip()
+            # Cut on a line boundary so we never split an HTML tag or entity:
+            # Telegram sendMessage(parse_mode=HTML) rejects unbalanced/partial
+            # markup with HTTP 400 and drops the whole digest. Every digest line
+            # is self-contained (its <b>/<code>/<a> open and close on the same
+            # line), so truncating at the last newline keeps all markup balanced.
+            cut = body[:3300]
+            nl = cut.rfind("\n")
+            if nl != -1:
+                cut = cut[:nl]
+            cut = cut.rstrip()
             more = total_issues - kept_total
             footer = t("telegram_truncated_footer").format(more=max(more, 0))
             body = f"{cut}\n\n{footer}"

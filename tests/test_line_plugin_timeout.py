@@ -145,6 +145,27 @@ def test_line_cooldown_resets_counter_when_expired(monkeypatch):
     )
 
 
+def test_line_plugin_instance_reused_across_dispatch_cycles():
+    """The cooldown counters only work if the SAME plugin instance survives
+    across dispatches. The daemon builds a fresh Reporter every monitor cycle
+    (scheduler/jobs.run_monitor_cycle) but reuses one long-lived ConfigManager,
+    so Reporter must cache the plugin on cm — otherwise the 3-strike cooldown
+    resets every dispatch and never engages.
+    """
+    from src.reporter import Reporter
+
+    cm = MagicMock(spec=ConfigManager)
+    cm.config = {
+        "alerts": {"line_channel_access_token": "T", "line_target_id": "U"},
+        "settings": {"language": "en"},
+    }
+    # Two independent Reporters sharing one ConfigManager (== two dispatch cycles)
+    p1 = Reporter(cm)._get_output_plugin("line")
+    p2 = Reporter(cm)._get_output_plugin("line")
+    assert p1 is not None
+    assert p1 is p2, "Reporter must reuse the cached plugin instance across cycles"
+
+
 def test_line_cooldown_log_throttled(monkeypatch, capsys):
     """During cooldown, log should be emitted at most once per 60 seconds."""
     plugin = _make_line_plugin()

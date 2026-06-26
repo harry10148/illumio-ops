@@ -61,6 +61,44 @@ def test_build_telegram_message_truncates_above_3500_chars(monkeypatch):
     assert "more" in body.lower() or "…" in body
 
 
+def test_build_telegram_message_truncation_cuts_on_line_boundary_no_tag_split(monkeypatch):
+    """Oversized digests must truncate on a line boundary so an HTML tag is never
+    split. Telegram sendMessage(parse_mode=HTML) rejects unbalanced/partial markup
+    with HTTP 400 and drops the whole message. A single event whose PCE deep-link
+    is longer than the truncation budget would, under a naive byte-cut at offset
+    3300, leave a dangling <a href="..."> with no closing </a>.
+    """
+    from src.config import ConfigManager
+    from src.reporter import Reporter
+
+    cm = MagicMock(spec=ConfigManager)
+    cm.config = {
+        "alerts": {"active": ["telegram"], "telegram_bot_token": "T", "telegram_chat_id": "C"},
+        "settings": {"language": "en"},
+        "api": {"url": "https://pce.example.com"},
+    }
+    r = Reporter(cm)
+    # pce_link far exceeds the 3300-char cut budget -> its <a href="..."> opening
+    # tag straddles offset 3300, so a byte-offset cut would split the tag.
+    r.add_event_alert({
+        "rule": "Suspicious",
+        "desc": "d",
+        "severity": "info",
+        "count": 1,
+        "time": "t",
+        "raw_data": [{"href": "/x" + "a" * 5000, "event_type": "agent.tampering", "timestamp": "t"}],
+    })
+    body = r._build_telegram_message("Bulk")
+
+    # Truncation ran (the giant <a> line was dropped, not byte-sliced).
+    assert len(body) <= 3500
+    assert "a" * 100 not in body
+    # No split tag: every opened markup tag is also closed in the kept body.
+    assert body.count("<a ") == body.count("</a>"), "dangling <a> tag — truncation split a tag"
+    assert body.count("<b>") == body.count("</b>")
+    assert body.count("<code>") == body.count("</code>")
+
+
 def test_telegram_digest_template_renders_sections():
     rendered = render_alert_template(
         "telegram_digest.html.tmpl",

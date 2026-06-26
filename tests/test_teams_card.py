@@ -10,7 +10,10 @@ def _reporter(gui_base_url=""):
     cm.config = {
         "alerts": {"active": ["teams"], "teams_webhook_url": "https://x.logic.azure.com/…"},
         "settings": {"language": "en"},
-        "gui_base_url": gui_base_url,
+        # The Teams deep-link base resolves via web_gui.public_url (same as the
+        # mail CTAs), NOT the orphan flat 'gui_base_url' key that is set nowhere
+        # in production.
+        "web_gui": {"public_url": gui_base_url},
     }
     r = Reporter(cm)
     r.add_health_alert({

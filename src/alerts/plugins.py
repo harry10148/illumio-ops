@@ -187,6 +187,12 @@ class WebhookAlertPlugin(AlertOutputPlugin):
             print(f"{Colors.WARNING}{t('webhook_url_missing', lang=lang)}{Colors.ENDC}")
             return {"channel": "webhook", "status": "skipped", "target": "", "error": "missing configuration"}
 
+        # Generic webhook URLs (Slack/Discord/incoming connectors) embed a secret
+        # token in the path/query; it must never reach target/logs or state.json
+        # (README L-12), so report a redacted target everywhere. Keep the real
+        # webhook_url only for the actual urlopen() POST below.
+        safe_target = redact_webhook_url(webhook_url)
+
         payload = reporter._build_webhook_payload(subject)
         data = json.dumps(payload).encode("utf-8")
         headers = {"Content-Type": "application/json"}
@@ -196,22 +202,22 @@ class WebhookAlertPlugin(AlertOutputPlugin):
             with urllib.request.urlopen(req, timeout=10) as response:
                 if response.status in [200, 201, 202, 204]:
                     print(f"{Colors.GREEN}{t('webhook_alert_sent', lang=lang)}{Colors.ENDC}")
-                    return {"channel": "webhook", "status": "success", "target": webhook_url}
+                    return {"channel": "webhook", "status": "success", "target": safe_target}
                 print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error='', status=response.status)}{Colors.ENDC}")
-                return {"channel": "webhook", "status": "failed", "target": webhook_url, "error": f"status={response.status}"}
+                return {"channel": "webhook", "status": "failed", "target": safe_target, "error": f"status={response.status}"}
         except urllib.error.HTTPError as exc:
             try:
                 error_body = exc.read().decode("utf-8")
             except Exception:
                 error_body = "Could not read error body"
             print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=f'{exc} - {error_body}', status=exc.code)}{Colors.ENDC}")
-            return {"channel": "webhook", "status": "failed", "target": webhook_url, "error": f"{exc} - {error_body}"}
+            return {"channel": "webhook", "status": "failed", "target": safe_target, "error": f"{exc} - {error_body}"}
         except (urllib.error.URLError, TimeoutError) as exc:
             print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=f'Connection Error/Timeout: {exc}', status='')}{Colors.ENDC}")
-            return {"channel": "webhook", "status": "failed", "target": webhook_url, "error": f"Connection Error/Timeout: {exc}"}
+            return {"channel": "webhook", "status": "failed", "target": safe_target, "error": f"Connection Error/Timeout: {exc}"}
         except Exception as exc:
             print(f"{Colors.FAIL}{t('webhook_alert_failed', lang=lang, error=exc, status='')}{Colors.ENDC}")
-            return {"channel": "webhook", "status": "failed", "target": webhook_url, "error": str(exc)}
+            return {"channel": "webhook", "status": "failed", "target": safe_target, "error": str(exc)}
 
 
 class TelegramAlertPlugin(AlertOutputPlugin):
