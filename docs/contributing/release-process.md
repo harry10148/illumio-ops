@@ -267,4 +267,4 @@ After the service restarts, verify the deployment is healthy:
 - [Dev Setup](dev-setup.md) — local environment before tagging
 - [Getting Started (operator upgrade)](../getting-started.md) — what end-users do
 - [i18n Workflow](i18n-workflow.md) — pre-release i18n audit
-- [TLS & Certificates](../user-guide/tls-and-certificates.md) — cert rotation on release
+- [TLS & Certificates](../_archive/user-guide/tls-and-certificates.md) — cert rotation on release

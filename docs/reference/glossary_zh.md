@@ -67,7 +67,7 @@ related_docs:
 
 ## illumio-ops 專用術語
 
-**Action Matrix**（動作矩陣）— `config/config.json` 中的組態表，將告警規則的嚴重性與類別對應至通知渠道（電子郵件、Slack、syslog）。決定每則告警的觸發方式與路由目的地。
+**Action Matrix**（動作矩陣）— `config/config.json` 中的組態表，將告警規則的嚴重性與類別對應至通知渠道（Email、LINE、Webhook、Telegram、Teams）。決定每則告警的觸發方式與路由目的地。
 
 **Alert Rule**（告警規則）— illumio-ops 中的命名偵測定義，監控 PCE 事件或指標的特定模式。觸發時，告警引擎評估 Action Matrix 並派發通知。
 
@@ -150,6 +150,6 @@ related_docs:
 ## 相關文件
 
 - [INDEX](../INDEX.md) — 完整文件地圖
-- [i18n Contract](../architecture/i18n-contract.md) — 術語如何在執行期翻譯
-- [Dashboard](../user-guide/dashboard.md) — 許多術語的實際呈現介面
+- [i18n Contract](../_archive/architecture/i18n-contract.md) — 術語如何在執行期翻譯
+- [Dashboard](../_archive/user-guide/dashboard.md) — 許多術語的實際呈現介面
 - [i18n Workflow](../contributing/i18n-workflow.md) — 新增可翻譯術語的流程

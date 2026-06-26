@@ -39,8 +39,8 @@ illumio-ops 在呼叫 **PCE API** 時如何驗證 PCE 的 TLS 憑證。
 |---|---|
 | 憑證路徑 | `config/tls/self_signed.pem` |
 | 私鑰路徑 | `config/tls/self_signed_key.pem`（同目錄） |
-| 有效期 | 5 年 |
-| 演算法 | RSA（預設） |
+| 有效期 | 397 天 |
+| 演算法 | ECDSA-P256（RSA-2048 回退） |
 
 UI 透過 `GET /api/tls/status` 反映目前狀態。若尚未找到憑證檔案，狀態面板會顯示：
 

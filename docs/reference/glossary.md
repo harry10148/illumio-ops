@@ -67,7 +67,7 @@ This page is a quick reference for newcomers. Each entry is self-contained: read
 
 ## illumio-ops-specific terms
 
-**Action Matrix** — The configuration table in `config/config.json` that maps alert rule severities and categories to notification channels (email, Slack, syslog). Determines how each alert fires and where it is routed.
+**Action Matrix** — The configuration table in `config/config.json` that maps alert rule severities and categories to notification channels (Email, LINE, Webhook, Telegram, Teams). Determines how each alert fires and where it is routed.
 
 **Alert Rule** — A named detection definition in illumio-ops that watches PCE events or metrics for a pattern. When triggered, the alert engine evaluates the Action Matrix and dispatches notifications.
 
@@ -150,6 +150,6 @@ This page is a quick reference for newcomers. Each entry is self-contained: read
 ## Related Docs
 
 - [INDEX](../INDEX.md) — full doc map
-- [i18n Contract](../architecture/i18n-contract.md) — how terms get translated at runtime
-- [Dashboard](../user-guide/dashboard.md) — where many of these terms surface
+- [i18n Contract](../_archive/architecture/i18n-contract.md) — how terms get translated at runtime
+- [Dashboard](../_archive/user-guide/dashboard.md) — where many of these terms surface
 - [i18n Workflow](../contributing/i18n-workflow.md) — adding new translatable terms

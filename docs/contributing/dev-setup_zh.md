@@ -237,5 +237,5 @@ Co-Authored-By: ...
 
 - [i18n 工作流程](i18n-workflow.md) — 新增翻譯 Key（下一份文件）
 - [發布流程](release-process.md) — 建置與發佈版本
-- [架構概覽](../architecture/overview.md) — 了解你正在開發的系統
+- [架構概覽](../_archive/architecture/overview.md) — 了解你正在開發的系統
 - [INDEX](../INDEX.md) — 完整文件地圖

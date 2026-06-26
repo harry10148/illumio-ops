@@ -40,8 +40,8 @@ server start** if none already exists.
 |---|---|
 | Generated path | `config/tls/self_signed.pem` |
 | Key path | `config/tls/self_signed_key.pem` (same directory) |
-| Validity | 5 years |
-| Algorithm | RSA (default) |
+| Validity | 397 days |
+| Algorithm | ECDSA-P256 (RSA-2048 fallback) |
 
 The UI reflects the current state via `GET /api/tls/status`.  If no cert file is
 found yet the status panel shows:

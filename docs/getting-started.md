@@ -167,7 +167,7 @@ and fill in the `api` block:
 ```
 
 If you have multiple PCEs, add entries to `pce_profiles` and set `active_pce_id`.
-See [Multi-PCE](user-guide/multi-pce.md) for the full multi-PCE workflow.
+See [Multi-PCE](_archive/user-guide/multi-pce.md) for the full multi-PCE workflow.
 
 **Verify connectivity** by running the status command:
 
@@ -276,13 +276,13 @@ journalctl -u illumio-ops -f
 
 ## Where to go next
 
-- [Dashboard](user-guide/dashboard.md) — understand KPI cards, traffic queries, and alerts
-- [Multi-PCE](user-guide/multi-pce.md) — connect more than one PCE
-- [Troubleshooting](user-guide/troubleshooting.md) — when first run goes wrong
+- [Dashboard](_archive/user-guide/dashboard.md) — understand KPI cards, traffic queries, and alerts
+- [Multi-PCE](_archive/user-guide/multi-pce.md) — connect more than one PCE
+- [Troubleshooting](_archive/user-guide/troubleshooting.md) — when first run goes wrong
 
 ---
 ## Related Docs
 - [INDEX](INDEX.md) — full doc map
-- [Dashboard](user-guide/dashboard.md) — first place to look after install
-- [Multi-PCE](user-guide/multi-pce.md) — connecting more than one PCE
-- [Troubleshooting](user-guide/troubleshooting.md) — when first run goes wrong
+- [Dashboard](_archive/user-guide/dashboard.md) — first place to look after install
+- [Multi-PCE](_archive/user-guide/multi-pce.md) — connecting more than one PCE
+- [Troubleshooting](_archive/user-guide/troubleshooting.md) — when first run goes wrong

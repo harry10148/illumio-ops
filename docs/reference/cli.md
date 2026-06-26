@@ -245,7 +245,7 @@ illumio-ops monitor-gui --interval 15 --port 8443
 
 ### report
 
-Generate reports (traffic / audit / VEN status / policy-usage).
+Generate reports. Nine subcommands: `traffic`, `security`, `inventory`, `audit`, `ven-status`, `policy-usage`, `app-summary`, `resolve`, `policy-diff`.
 
 ```
 illumio-ops report <subcommand> [OPTIONS]
@@ -271,6 +271,23 @@ Generate a Traffic Flow Report.
 ```bash
 illumio-ops report traffic --format html --output-dir /tmp/reports
 illumio-ops report traffic --source csv --file flows.csv --format xlsx
+```
+
+#### report security
+
+Generate a Security Risk Report — B/L/R rule findings over PCE traffic flows, with an optional V-E vulnerability-exposure section (pass a scan CSV via `--vuln-csv`).
+
+```bash
+illumio-ops report security --format html --output-dir /tmp/reports
+illumio-ops report security --vuln-csv qualys-export.csv --format xlsx
+```
+
+#### report inventory
+
+Generate a Network & Traffic Inventory Report (Workloads, labels, and observed services).
+
+```bash
+illumio-ops report inventory --format xlsx
 ```
 
 #### report audit
@@ -322,6 +339,30 @@ Generate a Policy Usage Report.
 ```bash
 illumio-ops report policy-usage --start-date 2026-05-01 --format xlsx
 illumio-ops report policy-usage --source csv --file rules.csv
+```
+
+#### report app-summary
+
+Generate an App Summary Report for a single App Label (inbound / outbound view). `--app` is required; `--days` sets the traffic lookback window.
+
+```bash
+illumio-ops report app-summary --app payments --env prod --days 7
+```
+
+#### report resolve
+
+Resolve ACTIVE label-based Policy into IP-level firewall rules. Output `--format` is `json`, `csv`, or `all`.
+
+```bash
+illumio-ops report resolve --format json
+```
+
+#### report policy-diff
+
+Generate a Policy Diff Report (DRAFT vs ACTIVE, Ruleset / Rule scope). Output `--format` is `html`, `csv`, or `all`; `--attribution-days` sets the audit-event lookback for operator attribution.
+
+```bash
+illumio-ops report policy-diff --format html --attribution-days 30
 ```
 
 ---
@@ -632,5 +673,5 @@ The following environment variables are read by the CLI at runtime:
 
 - [REST API](rest-api.md) — programmatic equivalents (B2 deliverable)
 - [Glossary](glossary.md) — Illumio terminology
-- [Reports User Guide](../user-guide/reports.md) — operator-level report usage
-- [SIEM Integration](../user-guide/siem-integration.md) — operator-level SIEM config
+- [Reports User Guide](../_archive/user-guide/reports.md) — operator-level report usage
+- [SIEM Integration](../_archive/user-guide/siem-integration.md) — operator-level SIEM config

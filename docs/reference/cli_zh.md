@@ -244,7 +244,7 @@ illumio-ops monitor-gui --interval 15 --port 8443
 
 ### report
 
-產生報表（流量 / 稽核 / VEN 狀態 / 政策使用量）。
+產生報表。九個子命令：`traffic`、`security`、`inventory`、`audit`、`ven-status`、`policy-usage`、`app-summary`、`resolve`、`policy-diff`。
 
 ```
 illumio-ops report <子命令> [選項]
@@ -270,6 +270,23 @@ illumio-ops report <子命令> [選項]
 ```bash
 illumio-ops report traffic --format html --output-dir /tmp/reports
 illumio-ops report traffic --source csv --file flows.csv --format xlsx
+```
+
+#### report security
+
+產生安全風險報表（Security Risk Report）— 針對 PCE traffic flow 的 B/L/R 規則發現，並可選擇性加入 V-E 弱點暴露區段（以 `--vuln-csv` 提供掃描 CSV）。
+
+```bash
+illumio-ops report security --format html --output-dir /tmp/reports
+illumio-ops report security --vuln-csv qualys-export.csv --format xlsx
+```
+
+#### report inventory
+
+產生網路與流量盤點報表（Network & Traffic Inventory Report）— Workload、label 與觀測到的 service。
+
+```bash
+illumio-ops report inventory --format xlsx
 ```
 
 #### report audit
@@ -321,6 +338,30 @@ illumio-ops --json report ven-status
 ```bash
 illumio-ops report policy-usage --start-date 2026-05-01 --format xlsx
 illumio-ops report policy-usage --source csv --file rules.csv
+```
+
+#### report app-summary
+
+針對單一 App Label 產生 App 摘要報表（App Summary Report，含 inbound／outbound 視角）。`--app` 為必填；`--days` 設定 traffic 回溯天數。
+
+```bash
+illumio-ops report app-summary --app payments --env prod --days 7
+```
+
+#### report resolve
+
+將 ACTIVE 的 label-based Policy 解析為 IP 層級防火牆規則。`--format` 可為 `json`、`csv` 或 `all`。
+
+```bash
+illumio-ops report resolve --format json
+```
+
+#### report policy-diff
+
+產生政策差異報表（Policy Diff Report，DRAFT vs ACTIVE，Ruleset／Rule 範圍）。`--format` 可為 `html`、`csv` 或 `all`；`--attribution-days` 設定操作者歸因的 audit-event 回溯視窗。
+
+```bash
+illumio-ops report policy-diff --format html --attribution-days 30
 ```
 
 ---
@@ -625,5 +666,5 @@ esac
 
 - [REST API](rest-api.md) — 程式化等效操作（B2 交付物）
 - [詞彙表](glossary.md) — Illumio 術語說明
-- [報表使用指南](../user-guide/reports.md) — 操作員層級報表使用
-- [SIEM 整合](../user-guide/siem-integration.md) — 操作員層級 SIEM 配置
+- [報表使用指南](../_archive/user-guide/reports.md) — 操作員層級報表使用
+- [SIEM 整合](../_archive/user-guide/siem-integration.md) — 操作員層級 SIEM 配置

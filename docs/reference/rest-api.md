@@ -455,6 +455,6 @@ separate API served by the PCE appliance, not by illumio-ops.
 
 ## Related Docs
 - [CLI Reference](cli.md) — equivalent CLI commands
-- [SIEM Integration](../user-guide/siem-integration.md) — operator workflow for SIEM destinations
-- [Architecture Overview](../architecture/overview.md) — request flow & Flask routes (next task)
+- [SIEM Integration](../_archive/user-guide/siem-integration.md) — operator workflow for SIEM destinations
+- [Architecture Overview](../_archive/architecture/overview.md) — request flow & Flask routes (next task)
 - [Glossary](glossary.md) — Illumio terminology

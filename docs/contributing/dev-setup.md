@@ -243,5 +243,5 @@ the PR body:
 
 - [i18n Workflow](i18n-workflow.md) — adding translation keys (next task)
 - [Release Process](release-process.md) — building and shipping a release
-- [Architecture Overview](../architecture/overview.md) — understand what you're working on
+- [Architecture Overview](../_archive/architecture/overview.md) — understand what you're working on
 - [INDEX](../INDEX.md) — full doc map

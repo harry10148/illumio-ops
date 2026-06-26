@@ -26,7 +26,7 @@ related_docs:
 本指南說明如何為 illumio-ops 的 UI 和報告新增及維護國際化（i18n）鍵。
 系統支援英文（`en`）與繁體中文（`zh_TW`）。
 底層合約（鍵解析、儲存規則、語言切換）請參閱
-[`../architecture/i18n-contract.md`](../architecture/i18n-contract.md)。
+[`../architecture/i18n-contract.md`](../_archive/architecture/i18n-contract.md)。
 
 ---
 
@@ -57,7 +57,7 @@ related_docs:
 | `src/i18n/data/zh_explicit.json` | 授權 Illumio 術語詞彙表。涵蓋 Illumio 產品術語（workload、PCE、VEN、pairing profile 等）的已核可 zh_TW 值存放於此，並由 CI 交叉比對。 |
 | `src/i18n/data/dashboard_approved.json` | 儀表板 KPI 面板已鎖定 zh_TW 值的鍵子集。CI Category J 強制執行精確比對。 |
 
-交叉參考：[`../architecture/i18n-contract.md`](../architecture/i18n-contract.md)
+交叉參考：[`../architecture/i18n-contract.md`](../_archive/architecture/i18n-contract.md)
 說明 `t()` 在執行期如何解析鍵，以及 `zh_explicit.json` 如何覆蓋基礎翻譯檔。
 
 ---
@@ -267,7 +267,7 @@ type_label = t("rpt_email_traffic_subject", lang=lang)
 
 ## 相關文件
 
-- [i18n 合約（架構）](../architecture/i18n-contract.md) — 底層合約
+- [i18n 合約（架構）](../_archive/architecture/i18n-contract.md) — 底層合約
 - [詞彙表](../reference/glossary.md) — Illumio 術語
 - [開發環境設定](dev-setup.md) — 先準備好 venv
 - [發布流程](release-process.md) — 發布前執行哪些稽核閘門

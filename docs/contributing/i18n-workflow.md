@@ -27,7 +27,7 @@ This guide explains how to add and maintain internationalization (i18n) keys for
 the illumio-ops UI and reports.  The system supports English (`en`) and
 Traditional Chinese (`zh_TW`).  For the underlying contract (key resolution,
 storage rules, language switching) see
-[`../architecture/i18n-contract.md`](../architecture/i18n-contract.md).
+[`../architecture/i18n-contract.md`](../_archive/architecture/i18n-contract.md).
 
 ---
 
@@ -60,7 +60,7 @@ Do **not** add a key for:
 | `src/i18n/data/zh_explicit.json` | Authoritative Illumio-term glossary.  When a key covers an Illumio product term (workload, PCE, VEN, pairing profile, …), the approved zh_TW value lives here and is cross-checked by CI. |
 | `src/i18n/data/dashboard_approved.json` | Subset of keys whose zh_TW values are locked for the dashboard KPI panel.  CI Category J enforces exact-match. |
 
-Cross-reference: [`../architecture/i18n-contract.md`](../architecture/i18n-contract.md)
+Cross-reference: [`../architecture/i18n-contract.md`](../_archive/architecture/i18n-contract.md)
 explains how `t()` resolves keys at runtime and how `zh_explicit.json` overrides
 the base translation file.
 
@@ -278,7 +278,7 @@ reference or team sign-off) before adding it to `i18n_zh_TW.json`.
 
 ## Related Docs
 
-- [i18n Contract (architecture)](../architecture/i18n-contract.md) — the underlying contract
+- [i18n Contract (architecture)](../_archive/architecture/i18n-contract.md) — the underlying contract
 - [Glossary](../reference/glossary.md) — Illumio terminology
 - [Dev Setup](dev-setup.md) — getting your venv ready first
 - [Release Process](release-process.md) — what audit gates run before release

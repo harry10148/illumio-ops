@@ -450,6 +450,6 @@ GUI API 無 `page` / `offset` / `Link` 標頭機制。
 
 ## 相關文件
 - [CLI 參考](cli.md) — 對應的 CLI 指令
-- [SIEM 整合](../user-guide/siem-integration.md) — SIEM 目的地操作者工作流程
-- [架構概覽](../architecture/overview.md) — 請求流程與 Flask 路由（下一任務）
+- [SIEM 整合](../_archive/user-guide/siem-integration.md) — SIEM 目的地操作者工作流程
+- [架構概覽](../_archive/architecture/overview.md) — 請求流程與 Flask 路由（下一任務）
 - [術語表](glossary.md) — Illumio 術語
