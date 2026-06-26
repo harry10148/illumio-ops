@@ -166,7 +166,7 @@ class AuditHtmlExporter:
         mod00 = self._r.get("mod00", {})
         nav_html = (
             '<aside class="report-toc screen-only">'
-            '<h3>Contents</h3>'
+            f'<h3>{_s("rpt_nav_contents")}</h3>'
             '<ol>'
             f'<li><a href="#summary">{_s("rpt_au_nav_summary")}</a></li>'
             f'<li><a href="#health">{_s("rpt_au_nav_health")}</a></li>'
@@ -174,7 +174,7 @@ class AuditHtmlExporter:
             f'<li><a href="#policy">{_s("rpt_au_nav_policy")}</a></li>'
             f'<li><a href="#correlation">{_s("rpt_au_nav_correlation")}</a></li>'
             '</ol>'
-            '<button class="print-btn" onclick="window.print()">Print / PDF</button>'
+            f'<button class="print-btn" onclick="window.print()">{_s("rpt_nav_print_pdf")}</button>'
             '</aside>'
         )
         def _kpi_label(k: dict) -> str:

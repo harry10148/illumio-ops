@@ -64,7 +64,7 @@ def make_config_blueprint(
             if invalid_ips:
                 return jsonify({
                     "ok": False,
-                    "error": f"Invalid allowlist entries: {', '.join(invalid_ips)}"
+                    "error": t("gui_err_invalid_allowlist_entries", lang=lang, entries=', '.join(invalid_ips))
                 }), 400
             gui_cfg["allowed_ips"] = allowed_ips
 
@@ -147,6 +147,7 @@ def make_config_blueprint(
         # concurrent saves (cheroot multi-thread pool) cannot lose updates.
         with cm.write_lock:
             cm.load()
+            lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
             if 'api' in d:
                 api_in = d['api']
                 api_allowlist = _SETTINGS_ALLOWLISTS["api"]
@@ -155,7 +156,7 @@ def make_config_blueprint(
                     _url_val = str(api_in['url']).strip()
                     _scheme = urllib.parse.urlparse(_url_val).scheme.lower()
                     if _scheme not in ('http', 'https'):
-                        return jsonify({"ok": False, "error": "api.url must use http or https scheme"}), 400
+                        return jsonify({"ok": False, "error": t("gui_err_api_url_scheme", lang=lang)}), 400
                     if _scheme == 'http':
                         logger.warning("api.url uses plain HTTP — TLS verification cannot be performed")
                 for k in api_allowlist:
@@ -267,7 +268,7 @@ def make_config_blueprint(
             info = _get_cert_info(cert_path)
             return jsonify({
                 "ok": True,
-                "message": "Self-signed certificate renewed. Restart the server to apply.",
+                "message": t("gui_msg_cert_renewed_restart", lang=lang),
                 "cert_info": info,
             })
         except RuntimeError as e:
@@ -282,7 +283,7 @@ def make_config_blueprint(
         d = request.json or {}
         cn = str(d.get('cn', '')).strip()
         if not cn:
-            return jsonify({"ok": False, "error": "CN (Common Name) is required"}), 400
+            return jsonify({"ok": False, "error": t("gui_err_cn_required", lang=lang)}), 400
         cert_dir = os.path.join(_ROOT_DIR, "config", "tls")
         san_dns = [s.strip() for s in str(d.get('san_dns', '')).split(',') if s.strip()]
         san_ip = [s.strip() for s in str(d.get('san_ip', '')).split(',') if s.strip()]
@@ -310,7 +311,7 @@ def make_config_blueprint(
         d = request.json or {}
         cert_pem = str(d.get('cert_pem', '')).strip()
         if not cert_pem:
-            return jsonify({"ok": False, "error": "cert_pem is required"}), 400
+            return jsonify({"ok": False, "error": t("gui_err_cert_pem_required", lang=lang)}), 400
         cert_dir = os.path.join(_ROOT_DIR, "config", "tls")
         try:
             cert_info = _import_signed_cert(cert_dir, cert_pem)
@@ -346,6 +347,7 @@ def make_config_blueprint(
     def api_pce_profiles_action():
         d = request.json or {}
         action = d.get("action")
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         # Serialize load→mutate→save under the shared config lock (profile CRUD
         # helpers each call cm.save()) so concurrent writers don't lose updates.
         with cm.write_lock:
@@ -360,32 +362,32 @@ def make_config_blueprint(
                     "verify_ssl": bool(d.get("verify_ssl", True)),
                 }
                 if not profile["name"] or not profile["url"]:
-                    return _err("name and url required")
+                    return _err(t("gui_err_pce_name_url_required", lang=lang))
                 p = cm.add_pce_profile(profile)
                 return jsonify({"ok": True, "profile": p})
             elif action == "update":
                 pid = d.get("id")
                 if not pid:
-                    return _err("id required")
+                    return _err(t("gui_err_pce_id_required", lang=lang))
                 updates = {k: d[k] for k in ("name", "url", "org_id", "key", "secret", "verify_ssl") if k in d}
                 if not cm.update_pce_profile(int(pid), updates):
-                    return _err("profile not found")
+                    return _err(t("gui_err_pce_profile_not_found", lang=lang))
                 return jsonify({"ok": True})
             elif action == "activate":
                 pid = d.get("id")
                 if not pid:
-                    return _err("id required")
+                    return _err(t("gui_err_pce_id_required", lang=lang))
                 if not cm.activate_pce_profile(int(pid)):
-                    return _err("profile not found")
+                    return _err(t("gui_err_pce_profile_not_found", lang=lang))
                 return jsonify({"ok": True})
             elif action == "delete":
                 pid = d.get("id")
                 if not pid:
-                    return _err("id required")
+                    return _err(t("gui_err_pce_id_required", lang=lang))
                 if not cm.remove_pce_profile(int(pid)):
-                    return _err("profile not found")
+                    return _err(t("gui_err_pce_profile_not_found", lang=lang))
                 return jsonify({"ok": True})
             else:
-                return _err("unknown action")
+                return _err(t("gui_err_unknown_action", lang=lang))
 
     return bp

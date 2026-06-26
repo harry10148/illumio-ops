@@ -84,7 +84,7 @@ def make_rules_blueprint(
             return _err(str(exc), 400)
         filter_value = d.get('filter_value', '')
         if filter_value == 'pce_health':
-            return _err("pce_health must be created from the system health rule form", 400)
+            return _err(t("gui_err_pce_health_use_system_form", lang=lang), 400)
         cm.add_or_update_rule({
             "id": gen_rule_id(),
             "type": "event",
@@ -114,7 +114,7 @@ def make_rules_blueprint(
             return _err(str(exc), 400)
         filter_value = str(d.get('filter_value') or 'pce_health').strip() or 'pce_health'
         if filter_value != 'pce_health':
-            return _err("unsupported system rule type", 400)
+            return _err(t("gui_err_unsupported_system_rule_type", lang=lang), 400)
         cm.add_or_update_rule({
             "id": gen_rule_id(),
             "type": "system",

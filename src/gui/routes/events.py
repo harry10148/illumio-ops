@@ -218,13 +218,13 @@ def make_events_blueprint(
         try:
             idx = int(request.args.get('idx', '-1'))
         except (TypeError, ValueError):
-            return _err("invalid rule index", 400)
+            return _err(t("gui_err_invalid_rule_index", lang=lang), 400)
         if idx < 0 or idx >= len(cm.config.get('rules', [])):
-            return _err("rule not found", 404)
+            return _err(t("gui_err_rule_not_found", lang=lang), 404)
 
         rule = cm.config['rules'][idx]
         if rule.get('type') != 'event':
-            return _err("rule is not an event rule", 400)
+            return _err(t("gui_err_not_event_rule", lang=lang), 400)
 
         try:
             mins = max(5, min(int(request.args.get('mins', 60)), 10080))

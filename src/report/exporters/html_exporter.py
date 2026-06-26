@@ -509,11 +509,11 @@ class _TrafficReportBase:
         m_dims = mod12.get('maturity_dimensions', {})
         m_grade_color = _grade_to_color(m_grade)
         m_dim_labels = {
-            'enforcement_coverage': 'Enforcement Coverage',
-            'policy_coverage': 'Policy Coverage',
-            'lateral_movement_control': 'Lateral Movement Control',
-            'managed_asset_ratio': 'Managed Asset Ratio',
-            'risk_port_control': 'Risk Port Control',
+            'enforcement_coverage': _s('rpt_mat_enforcement_coverage'),
+            'policy_coverage': _s('rpt_mat_policy_coverage'),
+            'lateral_movement_control': _s('rpt_mat_lateral_movement_control'),
+            'managed_asset_ratio': _s('rpt_mat_managed_asset_ratio'),
+            'risk_port_control': _s('rpt_mat_risk_port_control'),
         }
         maturity_bars = ''
         for dim_key, dim_label in m_dim_labels.items():
@@ -607,9 +607,9 @@ class _TrafficReportBase:
         )
         nav_html = (
             '<aside class="report-toc screen-only">'
-            '<h3>Contents</h3>'
+            f'<h3>{_s("rpt_nav_contents")}</h3>'
             f'<ol>{_toc_items}</ol>'
-            '<button class="print-btn" onclick="window.print()">Print / PDF</button>'
+            f'<button class="print-btn" onclick="window.print()">{_s("rpt_nav_print_pdf")}</button>'
             '</aside>'
         )
 
@@ -761,7 +761,7 @@ class _TrafficReportBase:
     def _attack_summary_html(self, mod12: dict) -> str:
         def _rows(section_items):
             if not section_items:
-                return '<p class="note">No data</p>'
+                return f'<p class="note">{self._s("rpt_no_data")}</p>'
             return ''.join(
                 '<p style="margin-bottom:8px"><span class="badge badge-' +
                 str(item.get('severity', 'INFO')) + '">' + str(item.get('severity', 'INFO')) +
@@ -777,7 +777,7 @@ class _TrafficReportBase:
             html.escape(str(item.get('action', ''))) +
             '</p>'
             for item in action_matrix[:3]
-        ) or '<p class="note">No data</p>'
+        ) or f'<p class="note">{self._s("rpt_no_data")}</p>'
 
         _s = self._s
         return (
@@ -869,9 +869,14 @@ class _TrafficReportBase:
                 'blocked': 'BLOCKED',
                 'potentially_blocked': 'POTENTIAL',
             }.get(d, d.upper())
+            _heading_status = _s({
+                'allowed': 'rpt_pd_allowed',
+                'blocked': 'rpt_pd_blocked',
+                'potentially_blocked': 'rpt_pd_potential',
+            }.get(d, 'rpt_pd_allowed'))
             table_html += (
-                '<h3>' + d.replace('_', ' ').upper() + f' ({pct}% of total)'
-                f' &nbsp;·&nbsp; ↓ Inbound: {inb} &nbsp;·&nbsp; ↑ Outbound: {outb}</h3>'
+                '<h3>' + t('rpt_mod02_decision_heading', lang=_lang,
+                           status=_heading_status, pct=pct, inb=inb, outb=outb) + '</h3>'
             )
             table_html += self._three_col_tables(
                 f'<h4>{_s("rpt_tr_top_app_flows")}</h4>',

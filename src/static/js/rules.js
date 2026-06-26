@@ -80,23 +80,23 @@ async function loadRules() {
     }
 
     let f = [];
-    if (r.type === 'event') f.push('Event: ' + r.filter_value);
+    if (r.type === 'event') f.push(_t('gui_rules_pfx_event') + r.filter_value);
     if (r.type === 'system') {
       const healthLabel = _t('gui_system_health_type');
       const pceLabel = _t('gui_system_health_pce');
       f.push(healthLabel + ': ' + (r.filter_value === 'pce_health' ? pceLabel : (r.filter_value || '')));
     }
-    if (r.pd !== undefined && r.pd !== null) f.push('PD:' + (pdm[r.pd] || r.pd));
-    if (r.port) f.push('Port:' + r.port);
-    if (r.src_label) f.push('Src:' + r.src_label); if (r.dst_label) f.push('Dst:' + r.dst_label);
-    if (r.src_ip_in) f.push('SrcIP:' + r.src_ip_in); if (r.dst_ip_in) f.push('DstIP:' + r.dst_ip_in);
+    if (r.pd !== undefined && r.pd !== null) f.push(_t('gui_rules_pfx_pd') + (pdm[r.pd] || r.pd));
+    if (r.port) f.push(_t('gui_rules_pfx_port') + r.port);
+    if (r.src_label) f.push(_t('gui_rules_pfx_src') + r.src_label); if (r.dst_label) f.push(_t('gui_rules_pfx_dst') + r.dst_label);
+    if (r.src_ip_in) f.push(_t('gui_rules_pfx_srcip') + r.src_ip_in); if (r.dst_ip_in) f.push(_t('gui_rules_pfx_dstip') + r.dst_ip_in);
     // R5: throttle removed from UI; existing rule data retained server-side.
-    if (suppressedCount > 0) f.push('Suppressed:' + suppressedCount);
-    if (r.match_fields && Object.keys(r.match_fields).length) f.push('Match:' + Object.keys(r.match_fields).join(', '));
-    const editBtn = `<button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="Edit Rule" title="Edit Rule"><svg class="icon" aria-hidden="true"><use href="#icon-edit"></use></svg></button>`;
+    if (suppressedCount > 0) f.push(_t('gui_rules_pfx_suppressed') + suppressedCount);
+    if (r.match_fields && Object.keys(r.match_fields).length) f.push(_t('gui_rules_pfx_match') + Object.keys(r.match_fields).join(', '));
+    const editBtn = `<button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="${_t('gui_edit_rule')}" title="${_t('gui_edit_rule')}"><svg class="icon" aria-hidden="true"><use href="#icon-edit"></use></svg></button>`;
     const isEnabled = r.enabled !== false;
     const switchCls = isEnabled ? 'on' : 'off';
-    const switchWrap = `<span class="rule-switch-wrap"><input type="checkbox" class="r-chk" data-idx="${r.index}"${isEnabled ? ' checked' : ''}><span class="rule-switch ${switchCls}" title="${isEnabled ? 'Enabled' : 'Disabled'}" onclick="this.previousElementSibling.click()"></span></span>`;
+    const switchWrap = `<span class="rule-switch-wrap"><input type="checkbox" class="r-chk" data-idx="${r.index}"${isEnabled ? ' checked' : ''}><span class="rule-switch ${switchCls}" title="${isEnabled ? _t('gui_enabled') : _t('gui_disabled')}" onclick="this.previousElementSibling.click()"></span></span>`;
     html += `<tr><td>${switchWrap}</td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}"><code class="rule-cond-code">${escapeHtml(cond)}</code></td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | ')) || '—'}</td><td>${editBtn}</td></tr>`;
   });
   $('r-body').innerHTML = html || `<tr><td colspan="7"><div class="empty-state"><svg aria-hidden="true"><use href="#icon-shield"></use></svg><h3>${_t('gui_no_rules_title')}</h3><p>${_t('gui_no_rules_add_one')}</p></div></td></tr>`;

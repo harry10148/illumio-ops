@@ -479,14 +479,14 @@ def make_dashboard_blueprint(
         }
         builder = _builders.get(chart_id)
         if not builder:
-            return _err(f"Unknown chart_id: {chart_id}", 404)
+            return _err(t("gui_err_unknown_chart_id", lang=lang, chart_id=chart_id), 404)
         try:
             spec = builder(cm, lang=lang)
             fig = _spec_to_plotly_figure(spec)
             return jsonify(fig.to_plotly_json())
         except Exception as exc:
             logger.warning("Dashboard chart {} error: {}", chart_id, exc)
-            return _err("Chart unavailable", 500)
+            return _err(t("gui_err_chart_unavailable", lang=lang), 500)
 
     @bp.route('/api/dashboard/top10', methods=['POST'])
     @limiter.limit("30 per hour")

@@ -4,6 +4,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
+from src.i18n import t
+
 _UNLABELED = "unlabeled"
 
 SEVERITY_ORDER = {
@@ -38,56 +40,22 @@ FINDING_KIND_ORDER = {
     "enforcement_gap": 4,
 }
 
-RECOMMENDATION_TEMPLATES: dict[str, dict[str, str]] = {
-    "LOCK_BOUNDARY_PORTS": {
-        "en": "Restrict cross-boundary ports to explicit allowlists and remove broad access.",
-        "zh_TW": "將跨邊界通訊埠收斂為明確 allowlist，移除過寬存取範圍。",
-    },
-    "MOVE_TO_ENFORCEMENT": {
-        "en": "Move scoped workloads from visibility/testing into selective or full enforcement.",
-        "zh_TW": "將範圍內工作負載由 visibility/testing 推進到 selective 或 full enforcement。",
-    },
-    "DEFINE_RINGFENCE_SCOPE": {
-        "en": "Tighten ringfence scope so only required app-to-app paths are permitted.",
-        "zh_TW": "收斂 ringfence 範圍，只保留必要的 app-to-app 存取路徑。",
-    },
-    "REVIEW_REMOTE_ACCESS_ALLOWLIST": {
-        "en": "Review remote-access flows and keep only approved source-to-destination pairs.",
-        "zh_TW": "檢查遠端存取流量，只保留核准的來源到目的地組合。",
-    },
-    "TIGHTEN_LATERAL_POLICY": {
-        "en": "Reduce traversable lateral paths and segment high-reachability nodes.",
-        "zh_TW": "降低可橫向移動路徑，並優先分段高可達性的節點。",
-    },
-    "RESTRICT_TRANSIT_NODE_ACCESS": {
-        "en": "This workload acts as a network hub (high reachability or articulation point). Apply stricter east-west policy boundaries to limit lateral movement.",
-        "zh_TW": "此 workload 在流量圖中扮演網路樞紐角色（高可達性或 articulation point），請套用更嚴格的東西向政策邊界以限制橫向移動。",
-    },
-    "ONBOARD_UNMANAGED": {
-        "en": "Onboard unmanaged assets or explicitly isolate their access paths.",
-        "zh_TW": "將 unmanaged 資產納管，或明確隔離其存取路徑。",
-    },
-    "REVIEW_UNUSED_RULESETS": {
-        "en": "Review high-unused rulesets and narrow policy scope to active dependencies.",
-        "zh_TW": "檢視高比例未使用 ruleset，並將政策範圍收斂到實際依賴路徑。",
-    },
-    "RESOLVE_QUERY_FAILURES": {
-        "en": "Resolve pending/failed usage queries before making policy retirement decisions.",
-        "zh_TW": "先排除 pending/failed usage query，再進行政策下線判斷。",
-    },
-    "INVESTIGATE_HIGH_RISK_PORT_HITS": {
-        "en": "Investigate concentration of high-risk port hits and validate least-privilege policy intent.",
-        "zh_TW": "調查高風險通訊埠命中集中現象，並驗證最小權限政策是否符合預期。",
-    },
-    "REVIEW_HIGH_IMPACT_PROVISIONS": {
-        "en": "Review high-impact provisions and confirm boundary-sensitive changes were authorized.",
-        "zh_TW": "檢查高影響範圍 provision，確認邊界敏感變更皆經授權。",
-    },
-    "HARDEN_AUTH_CHANNELS": {
-        "en": "Harden authentication channels and investigate repeated failed authentication behavior.",
-        "zh_TW": "強化驗證通道並調查重複失敗的登入行為。",
-    },
-}
+# Action codes resolve to i18n keys (rpt_action_<lowercased code>); locale
+# dispatch happens inside t() so zh_TW reports never fall back to English.
+_ACTION_CODES: frozenset[str] = frozenset({
+    "LOCK_BOUNDARY_PORTS",
+    "MOVE_TO_ENFORCEMENT",
+    "DEFINE_RINGFENCE_SCOPE",
+    "REVIEW_REMOTE_ACCESS_ALLOWLIST",
+    "TIGHTEN_LATERAL_POLICY",
+    "RESTRICT_TRANSIT_NODE_ACCESS",
+    "ONBOARD_UNMANAGED",
+    "REVIEW_UNUSED_RULESETS",
+    "RESOLVE_QUERY_FAILURES",
+    "INVESTIGATE_HIGH_RISK_PORT_HITS",
+    "REVIEW_HIGH_IMPACT_PROVISIONS",
+    "HARDEN_AUTH_CHANNELS",
+})
 
 def _normalize_label(value: Any) -> str:
     text = str(value or "").strip().lower()
@@ -143,13 +111,11 @@ def rank_posture_items(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 def resolve_recommendation(code: str, lang: str = "en") -> str:
-    """Resolve recommendation text from deterministic templates."""
-    template = RECOMMENDATION_TEMPLATES.get(str(code or "").strip())
-    if not template:
-        return "Review attack posture evidence and apply least-privilege segmentation."
-    if lang in template:
-        return template[lang]
-    return template.get("en", "")
+    """Resolve recommendation text from i18n action-code keys."""
+    norm = str(code or "").strip()
+    if norm not in _ACTION_CODES:
+        return t("rpt_action_default", lang=lang)
+    return t(f"rpt_action_{norm.lower()}", lang=lang)
 
 def _enrich_app_display(app_display: str, app_env_key: str, node_ips: dict[str, list[str]]) -> str:
     """Append IPs to display label. Unlabeled: IPs only. Labeled: label · IPs."""
@@ -167,12 +133,12 @@ def summarize_attack_posture(items: list[dict[str, Any]], top_n: int = 5, lang: 
     """Build attack-first summary blocks for report/email/snapshot."""
     ranked = rank_posture_items(items)
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    finding_labels = {
-        "boundary_breach": ("Boundary control weakness detected", "偵測到邊界控制弱點"),
-        "suspicious_pivot": ("Suspicious pivot behavior detected", "偵測到可疑橫向樞紐行為"),
-        "blast_radius": ("High blast-radius posture detected", "偵測到高擴散半徑風險"),
-        "blind_spot": ("Visibility/enforcement blind spot detected", "偵測到可視性或強制執行盲點"),
-        "enforcement_gap": ("Enforcement gap detected", "偵測到強制執行落差"),
+    finding_label_keys = {
+        "boundary_breach": "rpt_finding_boundary_breach",
+        "suspicious_pivot": "rpt_finding_suspicious_pivot",
+        "blast_radius": "rpt_finding_blast_radius",
+        "blind_spot": "rpt_finding_blind_spot",
+        "enforcement_gap": "rpt_finding_enforcement_gap",
     }
 
     section_by_kind = {
@@ -187,8 +153,7 @@ def summarize_attack_posture(items: list[dict[str, Any]], top_n: int = 5, lang: 
         section = section_by_kind.get(str(item.get("finding_kind", "")).lower())
         if section:
             kind = str(item.get("finding_kind", "")).lower()
-            label_en, label_zh = finding_labels.get(kind, (kind.replace("_", " "), kind.replace("_", " ")))
-            label = label_zh if lang == "zh_TW" else label_en
+            label = t(finding_label_keys.get(kind, "rpt_finding_blind_spot"), lang=lang)
             app_display = item.get("app_display", "unlabeled (unlabeled)")
             if node_ips:
                 app_display = _enrich_app_display(app_display, item.get("app_env_key", ""), node_ips)

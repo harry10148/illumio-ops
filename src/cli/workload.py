@@ -13,6 +13,7 @@ from src.cli._output import (
     is_quiet,
 )
 from src.cli._exit_codes import EXIT_UNAVAILABLE
+from src.i18n import t
 
 
 @click.group("workload")
@@ -51,7 +52,7 @@ def list_workloads(ctx: click.Context, env: str | None, limit: int, enforcement:
                 transient=True,
                 console=console,
             ) as prog:
-                prog.add_task("Fetching workloads from PCE...", total=None)
+                prog.add_task(t("cli_wl_fetching"), total=None)
                 if managed_only:
                     workloads = api.fetch_managed_workloads(max_results=limit * 5)
                 else:
@@ -62,7 +63,7 @@ def list_workloads(ctx: click.Context, env: str | None, limit: int, enforcement:
             else:
                 workloads = api.search_workloads({"max_results": min(limit * 5, 1000)})
     except ConnectionError as exc:
-        echo_error(ctx, f"Cannot reach PCE: {exc}")
+        echo_error(ctx, t("cli_wl_cannot_reach_pce", exc=exc))
         ctx.exit(EXIT_UNAVAILABLE)
         return
 
@@ -102,13 +103,13 @@ def list_workloads(ctx: click.Context, env: str | None, limit: int, enforcement:
             click.echo(w.get("hostname") or "")
         return
 
-    table = Table(title=f"Workloads ({len(workloads)})", header_style="cyan", show_header=True)
-    table.add_column("#", justify="right", width=4, no_wrap=True)
-    table.add_column("Name")
-    table.add_column("Hostname")
-    table.add_column("Env")
-    table.add_column("Enforcement")
-    table.add_column("OS", no_wrap=True)
+    table = Table(title=t("cli_wl_table_title", n=len(workloads)), header_style="cyan", show_header=True)
+    table.add_column(t("cli_wl_col_num"), justify="right", width=4, no_wrap=True)
+    table.add_column(t("cli_wl_col_name"))
+    table.add_column(t("cli_wl_col_hostname"))
+    table.add_column(t("cli_wl_col_env"))
+    table.add_column(t("cli_wl_col_enforcement"))
+    table.add_column(t("cli_wl_col_os"), no_wrap=True)
 
     for i, w in enumerate(workloads, 1):
         env_val = next(

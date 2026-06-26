@@ -1,13 +1,12 @@
 # Dashboard i18n Audit
 
-**Scope keys:** 245
-**Findings:** 120
+**Scope keys:** 249
+**Findings:** 118
 
-## Rule: mixed_language (43)
+## Rule: mixed_language (42)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
-| `actmtx_staged_enforcement_reco` | Move workloads from test/visibility to selective or full enforcement. | 將 workload 從 test/visibility 模式移至 selective 或 full enforcement。 | non-glossary Latin tokens: ['workload', 'test', 'visibility', 'selective', 'full', 'enforcement'] |
 | `gui_attack_summary_title` | Attack Summary | 攻擊摘要（Boundary/Pivot/Blast Radius/Blind Spots/行動） | non-glossary Latin tokens: ['Boundary', 'Pivot', 'Blast', 'Radius', 'Blind', 'Spots'] |
 | `gui_card_suppressed_tooltip` | Cumulative alerts suppressed by cooldown or throttle rules. Counts the events th | 因 cooldown 或 throttle 規則被擋下、未派送的累積警示次數。代表事件確實命中規則但限流機制阻止它寄到 Email/LINE/Webhook，避 | non-glossary Latin tokens: ['cooldown', 'throttle', 'Email', 'LINE', 'Webhook'] |
 | `gui_card_unknown_types_tooltip` | PCE event types that arrived but matched no configured monitoring rule. Capped a | PCE 傳來但沒有任何 monitoring 規則涵蓋的 event_type 種類數，上限 100 種。數字大表示規則覆蓋率不足、可能漏抓新型事件；至「事件檢 | non-glossary Latin tokens: ['monitoring', 'event_type'] |
@@ -51,11 +50,10 @@
 | `pd_potentially_blocked_by_boundary` | Potentially Blocked by Boundary | Potentially Blocked by Boundary（潛在邊界 Block） | non-glossary Latin tokens: ['Potentially', 'by', 'Boundary'] |
 | `pd_potentially_blocked_by_override_deny` | Potentially Blocked by Override Deny | Potentially Blocked by Override Deny（潛在強制拒絕 Block） | non-glossary Latin tokens: ['Potentially', 'by', 'Override', 'Deny'] |
 
-## Rule: low_han_ratio (33)
+## Rule: low_han_ratio (32)
 
 | Key | EN | ZH | Detail |
 |---|---|---|---|
-| `actmtx_staged_enforcement_reco` | Move workloads from test/visibility to selective or full enforcement. | 將 workload 從 test/visibility 模式移至 selective 或 full enforcement。 | han_ratio=0.13 |
 | `gui_app_required` | App Label is required. | 必須指定 App Label。 | han_ratio=0.33 |
 | `gui_attack_summary_title` | Attack Summary | 攻擊摘要（Boundary/Pivot/Blast Radius/Blind Spots/行動） | han_ratio=0.15 |
 | `gui_card_health` | PCE Health | PCE 健康 | han_ratio=0.40 |

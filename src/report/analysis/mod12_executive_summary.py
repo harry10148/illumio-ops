@@ -113,19 +113,9 @@ def _compute_maturity_score(results: dict[str, Any]) -> dict[str, Any]:
 
 # Coverage / enforcement gap callouts (not part of the Action Matrix —
 # these surface only when coverage < 50%; kept inline for now).
-_KF = {
-    "staged_enforcement": {
-        "en": ("Only {cov:.0f}% of flows are enforced, but {staged:.0f}% are staged (rules ready, pending enforcement).",
-               "Move workloads from test/visibility to selective or full enforcement."),
-        "zh_TW": ("僅 {cov:.0f}% 的流量已強制執行，但 {staged:.0f}% 已暫存（政策已就緒，待啟用執行）。",
-                  "將 workload 從 test/visibility 模式移至 selective 或 full enforcement。"),
-    },
-    "policy_gap": {
-        "en": ("Only {cov:.0f}% of flows are covered by allow policies — true gap is {gap:.0f}%.",
-               "Create segmentation rules for the top uncovered flows."),
-        "zh_TW": ("僅 {cov:.0f}% 的流量有允許政策覆蓋 — 實際缺口為 {gap:.0f}%。",
-                  "為最大宗的未覆蓋流量建立分段規則。"),
-    },
+_KF_KEYS: dict[str, tuple[str, str]] = {
+    "staged_enforcement": ("rpt_kf_staged_enforcement_msg", "rpt_kf_staged_enforcement_reco"),
+    "policy_gap": ("rpt_kf_policy_gap_msg", "rpt_kf_policy_gap_reco"),
 }
 
 # Action Matrix recommendations — sourced from i18n table (rpt_actmtx_*).
@@ -139,8 +129,8 @@ _ACTMTX_KEYS: dict[str, tuple[str, str]] = {
 
 
 def _kf(key: str, lang: str, **kwargs) -> tuple[str, str]:
-    tmpl = _KF[key].get(lang) or _KF[key]["en"]
-    return tmpl[0].format(**kwargs), tmpl[1].format(**kwargs)
+    msg_key, reco_key = _KF_KEYS[key]
+    return t(msg_key, lang=lang, **kwargs), t(reco_key, lang=lang, **kwargs)
 
 
 def _actmtx(key: str, lang: str, **kwargs) -> tuple[str, str]:

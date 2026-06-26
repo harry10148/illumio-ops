@@ -96,7 +96,7 @@ class VenHtmlExporter:
 
         nav_html = (
             '<aside class="report-toc screen-only">'
-            '<h3>Contents</h3>'
+            f'<h3>{_s("rpt_nav_contents")}</h3>'
             '<ol>'
             f'<li><a href="#summary">{_s("rpt_ven_nav_summary")}</a></li>'
             f'<li><a href="#online">{_s("rpt_ven_nav_online")}</a></li>'
@@ -104,7 +104,7 @@ class VenHtmlExporter:
             f'<li><a href="#lost-today">{_s("rpt_ven_nav_lost_today")}</a></li>'
             f'<li><a href="#lost-yest">{_s("rpt_ven_nav_lost_yest")}</a></li>'
             '</ol>'
-            '<button class="print-btn" onclick="window.print()">Print / PDF</button>'
+            f'<button class="print-btn" onclick="window.print()">{_s("rpt_nav_print_pdf")}</button>'
             '</aside>'
         )
 

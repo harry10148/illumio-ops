@@ -2,6 +2,7 @@ import click
 
 from src.cli._output import echo_json, is_json, is_quiet
 from src.cli._exit_codes import EXIT_OK
+from src.i18n import t
 
 
 @click.command("status")
@@ -30,8 +31,10 @@ def status_cmd(ctx: click.Context) -> None:
             last_log = human_time_ago(mtime)
         except Exception:
             last_log = mtime.isoformat(timespec="seconds")
+        log_exists = True
     else:
-        last_log = "(no log file)"
+        last_log = t("cli_status_no_log_file")
+        log_exists = False
 
     if is_json(ctx):
         echo_json(ctx, {
@@ -43,17 +46,17 @@ def status_cmd(ctx: click.Context) -> None:
         return
 
     if is_quiet(ctx):
-        click.echo("ok" if last_log != "(no log file)" else "no log")
+        click.echo(t("cli_status_ok") if log_exists else t("cli_status_no_log"))
         return
 
     console = Console()
-    table = Table(title="illumio-ops status", show_header=True, header_style="cyan")
+    table = Table(title=t("cli_status_table_title"), show_header=True, header_style="cyan")
     table.add_column("Item")
     table.add_column("Value")
 
-    table.add_row("PCE URL", pce_url)
-    table.add_row("Language", language)
-    table.add_row("Rules", str(rules_count))
-    table.add_row("Last log activity", last_log)
+    table.add_row(t("cli_status_row_pce_url"), pce_url)
+    table.add_row(t("cli_status_row_language"), language)
+    table.add_row(t("cli_status_row_rules"), str(rules_count))
+    table.add_row(t("cli_status_row_last_log"), last_log)
 
     console.print(table)

@@ -171,7 +171,7 @@ class PolicyUsageHtmlExporter:
 
         nav_html = (
             '<aside class="report-toc screen-only">'
-            '<h3>Contents</h3>'
+            f'<h3>{_s("rpt_nav_contents")}</h3>'
             '<ol>'
             f'<li><a href="#summary">{_s("rpt_pu_nav_summary")}</a></li>'
             f'<li><a href="#overview">{_s("rpt_pu_nav_overview")}</a></li>'
@@ -180,7 +180,7 @@ class PolicyUsageHtmlExporter:
             f'<li><a href="#deny-rules">{_s("rpt_pu_nav_deny")}</a></li>'
             f'<li><a href="#draft-pd">{_s("rpt_pu_nav_draft_pd")}</a></li>'
             '</ol>'
-            '<button class="print-btn" onclick="window.print()">Print / PDF</button>'
+            f'<button class="print-btn" onclick="window.print()">{_s("rpt_nav_print_pdf")}</button>'
             '</aside>'
         )
 

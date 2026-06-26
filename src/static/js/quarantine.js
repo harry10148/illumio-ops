@@ -359,7 +359,7 @@ function updateTrafficKpis(data) {
     }
   };
 
-  setKpi('tw-kpi-flows', fmtInt(flows), 'flows');
+  setKpi('tw-kpi-flows', fmtInt(flows), _t('gui_flows'));
   setKpi('tw-kpi-conns', fmtCompact(conns), '');
   setKpi('tw-kpi-dst-ips', fmtInt(dstSet.size), '');
   setKpi('tw-kpi-peak-bw', fmtBw(peakBw), '');
@@ -444,7 +444,7 @@ function renderQtPage() {
     const pd_allowed = _t('gui_pd_allowed');
 
     const makePdBadge = (pd, isReported) => {
-      const prefix = isReported ? '' : '<span style="font-size:9px;opacity:0.8;">Draft </span>';
+      const prefix = isReported ? '' : '<span style="font-size:9px;opacity:0.8;">' + _t('gui_draft') + ' </span>';
       if (pd === 'blocked') return `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${prefix}${pd_blocked}</span>`;
       if (pd === 'potentially_blocked') return `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">${prefix}${pd_potential}</span>`;
       if (pd === 'allowed') return `<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${prefix}${pd_allowed}</span>`;

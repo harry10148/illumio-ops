@@ -390,7 +390,8 @@ def make_reports_blueprint(
     def api_report_job_status(job_id):
         jobs = _load_adhoc_jobs()
         if job_id not in jobs:
-            return jsonify({"ok": False, "error": "unknown job"}), 404
+            lang = request.args.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            return jsonify({"ok": False, "error": t("gui_err_unknown_job", lang=lang)}), 404
         return jsonify({"ok": True, **jobs[job_id]})
 
     @bp.route('/api/audit_report/generate', methods=['POST'])
@@ -526,7 +527,8 @@ def make_reports_blueprint(
     def api_list_labels():
         key = request.args.get('key', 'app')
         if key not in ('app', 'env', 'role', 'loc'):
-            return jsonify({"ok": False, "error": "invalid key"}), 400
+            lang = request.args.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            return jsonify({"ok": False, "error": t("gui_err_invalid_label_key", lang=lang)}), 400
         try:
             from src.api_client import ApiClient
             cm.load()

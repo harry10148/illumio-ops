@@ -440,7 +440,7 @@ class ReportScheduler:
             body += f"<div style='font-size:14px;font-weight:700;color:#1A2C32;margin-bottom:10px;border-bottom:2px solid #BE122F;padding-bottom:4px;'>{t('rpt_email_security_findings', lang=lang)}</div>"
             body += "<table style='width:100%;border-collapse:collapse;font-size:12px;'>"
             body += "<tr style='background:#24393F;color:#D6D7D7;'>"
-            body += "<th style='padding:8px;text-align:left;'>ID</th><th style='padding:8px;text-align:left;'>Finding</th><th style='padding:8px;text-align:left;'>Severity</th>"
+            body += f"<th style='padding:8px;text-align:left;'>{t('rpt_email_col_id', lang=lang)}</th><th style='padding:8px;text-align:left;'>{t('rpt_email_finding', lang=lang)}</th><th style='padding:8px;text-align:left;'>{t('rpt_email_col_severity', lang=lang)}</th>"
             body += "</tr>"
             sev_colors = {"CRITICAL": "#BE122F", "HIGH": "#F97607", "MEDIUM": "#F59E0B", "LOW": "#166644"}
             for i, f in enumerate(findings[:15]):

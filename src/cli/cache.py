@@ -72,14 +72,14 @@ def cache_backfill(ctx: click.Context, source: str, since: str, until: str | Non
     try:
         since_dt = datetime.strptime(since, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except ValueError:
-        echo_error(ctx, f"Invalid --since date: {since!r} (expected YYYY-MM-DD)")
+        echo_error(ctx, t("cli_cache_invalid_since_date", since=repr(since)))
         ctx.exit(EXIT_DATAERR)
         return
     if until:
         try:
             until_dt = datetime.strptime(until, "%Y-%m-%d").replace(tzinfo=timezone.utc)
         except ValueError:
-            echo_error(ctx, f"Invalid --until date: {until!r} (expected YYYY-MM-DD)")
+            echo_error(ctx, t("cli_cache_invalid_until_date", until=repr(until)))
             ctx.exit(EXIT_DATAERR)
             return
     else:
@@ -99,7 +99,7 @@ def cache_backfill(ctx: click.Context, source: str, since: str, until: str | Non
         from src.pce_cache.backfill import BackfillRunner
         runner = BackfillRunner(api, sf)
         if not is_quiet(ctx):
-            console.print(f"Backfilling [bold]{source}[/bold] from {since} to {until or 'now'}…")
+            console.print(t("cli_cache_backfilling", source=source, a=since, b=until or "now"))
         if source == "events":
             result = runner.run_events(since_dt, until_dt)
         else:
@@ -112,9 +112,9 @@ def cache_backfill(ctx: click.Context, source: str, since: str, until: str | Non
                 "elapsed": round(result.elapsed_seconds, 1),
             })
         elif not is_quiet(ctx):
-            console.print(f"[green]Done:[/green] {result.inserted} inserted, {result.duplicates} duplicates, {result.elapsed_seconds:.1f}s")
+            console.print(t("cli_cache_done", inserted=result.inserted, duplicates=result.duplicates, elapsed=f"{result.elapsed_seconds:.1f}"))
     except Exception as exc:
-        echo_error(ctx, f"Backfill failed: {exc}")
+        echo_error(ctx, t("cli_cache_backfill_failed", exc=exc))
         ctx.exit(EXIT_SOFTWARE)
         return
 
@@ -149,12 +149,12 @@ def cache_status(ctx: click.Context):
             for r in rows:
                 click.echo(r['source'])
             return
-        table = Table("Source", "Rows", "Last ingested")
+        table = Table(t("cli_cache_col_source"), t("cli_cache_col_rows"), t("cli_cache_col_last_ingested"))
         for r in rows:
             table.add_row(r['source'], str(r['rows']), r['last_ingested'] or "—")
         console.print(table)
     except Exception as exc:
-        echo_error(ctx, f"Status query failed: {exc}")
+        echo_error(ctx, t("cli_cache_status_failed", exc=exc))
 
 
 @cache_group.command("retention")
@@ -174,7 +174,7 @@ def cache_retention(ctx: click.Context, do_run: bool, json_output: bool):
         if json_output or is_json(ctx):
             echo_json(ctx, config_data)
         elif not is_quiet(ctx):
-            table = Table("Setting", "Days")
+            table = Table(t("cli_cache_col_setting"), t("cli_cache_col_days"))
             for key, val in config_data.items():
                 table.add_row(key, str(val))
             console.print(table)
@@ -196,12 +196,12 @@ def cache_retention(ctx: click.Context, do_run: bool, json_output: bool):
         if json_output or is_json(ctx):
             echo_json(ctx, result)
         elif not is_quiet(ctx):
-            result_table = Table("Table", "Rows deleted")
+            result_table = Table(t("cli_cache_col_table"), t("cli_cache_col_rows_deleted"))
             for key, count in result.items():
                 result_table.add_row(key, str(count))
             console.print(result_table)
             console.print(f"[green]{t('cli_cache_retention_done')}[/green]")
     except Exception as exc:
-        echo_error(ctx, f"Retention failed: {exc}")
+        echo_error(ctx, t("cli_cache_retention_failed", exc=exc))
         ctx.exit(EXIT_SOFTWARE)
         return

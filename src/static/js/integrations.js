@@ -89,7 +89,7 @@ window._integrations.setRender('cache', async function renderCache() {
     status = await stRes.json();
     s = await cfgRes.json();
   } catch (err) {
-    el.innerHTML = '<p style="color:red">Failed to load cache data: ' + escapeAttr(String(err)) + '</p>';
+    el.innerHTML = '<p style="color:red">' + _t('gui_it_load_failed_cache') + escapeAttr(String(err)) + '</p>';
     return;
   }
 
@@ -564,7 +564,7 @@ window._integrations.setRender('siem', async function renderSiem() {
     ]);
     fw = results[0]; destsBody = results[1]; status = results[2];
   } catch (err) {
-    el.innerHTML = '<p style="color:red">Failed to load SIEM data: ' + escapeAttr(String(err)) + '</p>';
+    el.innerHTML = '<p style="color:red">' + _t('gui_it_load_failed_siem') + escapeAttr(String(err)) + '</p>';
     return;
   }
   var dests = destsBody.destinations || destsBody || [];
@@ -1091,7 +1091,7 @@ async function _dlqLoadPage() {
     allEntries = body.entries || body || [];
   } catch (err) {
     var tbody = document.getElementById('dlq-tbody');
-    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="color:red">Failed to load: ' + escapeAttr(String(err)) + '</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="color:red">' + _t('gui_it_load_failed_dlq') + escapeAttr(String(err)) + '</td></tr>';
     return;
   }
 

@@ -254,12 +254,12 @@ async function loadRcardMeta() {
 
   // Derive schedule chip label from interval / frequency field
   function schedChip(s) {
-    if (!s || !s.enabled) return 'Manual';
+    if (!s || !s.enabled) return _t('gui_rcard_sched_manual');
     const iv = (s.interval || s.frequency || '').toLowerCase();
-    if (iv.includes('daily')  || iv === 'day')   return 'Daily';
-    if (iv.includes('weekly') || iv === 'week')  return 'Weekly';
-    if (iv.includes('month'))                    return 'Monthly';
-    return 'Scheduled';
+    if (iv.includes('daily')  || iv === 'day')   return _t('gui_rcard_sched_daily');
+    if (iv.includes('weekly') || iv === 'week')  return _t('gui_rcard_sched_weekly');
+    if (iv.includes('month'))                    return _t('gui_rcard_sched_monthly');
+    return _t('gui_rcard_sched_scheduled');
   }
 
   document.querySelectorAll('.rcard[data-rtype]').forEach(card => {
@@ -271,9 +271,9 @@ async function loadRcardMeta() {
     const mtime = latestByType[rtype];
     if (mtime) {
       const d = new Date(mtime * 1000);
-      lastEl.textContent = 'Last: ' + d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      lastEl.textContent = _t('gui_rcard_last').replace('{date}', d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
     } else {
-      lastEl.textContent = 'Last: —';
+      lastEl.textContent = _t('gui_rcard_last').replace('{date}', '—');
     }
 
     const sched = schedByType[rtype];
@@ -967,7 +967,7 @@ async function _pollTrafficJob(jobId) {
   await _pollReportJob(jobId, {
     failToast: _t('gui_toast_traffic_fail'),
     onDone: (s) => {
-      const msg = `${s.record_count} flows`;
+      const msg = _t('gui_toast_flows_count').replace('{n}', s.record_count);
       _hideGenProgress(true, msg);
       toast((_t('gui_toast_traffic_done')).replace('{msg}', msg));
     },
@@ -1069,7 +1069,7 @@ async function _doGenerateAudit() {
     const r = await post('/api/audit_report/generate', {start_date:startDate, end_date:endDate, format:fmt, lang: langElAudit ? langElAudit.value : 'en'});
     clearTimeout(_stepTimer);
     if (r.ok) {
-      const msg = `${r.record_count} events`;
+      const msg = _t('gui_toast_events_count').replace('{n}', r.record_count);
       _hideGenProgress(true, msg);
       toast((_t('gui_toast_audit_done')).replace('{msg}', msg));
       loadReports();
@@ -1648,7 +1648,7 @@ function renderOverview(d) {
         + (v.offline ? v.offline + ' ' + T('gui_ov_offline','offline') + ' &middot; ' : '')
         + T('gui_ov_oldest_hb','oldest heartbeat') + ' ' + _fmtAge(v.oldest_heartbeat_age_s)
       + '</div>'
-      + '<div class="ov-drill">&#8594; Workloads</div>';
+      + '<div class="ov-drill">&#8594; ' + T('gui_ov_drill_workloads','Workloads') + '</div>';
   // Blocked (tile removed from redesign layout — guard for safety)
   var b = d.blocked || {};
   var _blockedEl = document.getElementById('ov-blocked-body');
@@ -1659,10 +1659,10 @@ function renderOverview(d) {
         ? '<div style="color:var(--warn);font-size:12px;">' + T('gui_ov_cache_required','Enable PCE Cache') + '</div>'
       : (b.verdict === 'unknown')
         ? '<div style="color:var(--dim)">—</div>'
-      : _ovRows(['Blocked ' + (b.blocked || 0).toLocaleString(),
-                 'Potentially Blocked ' + (b.potential || 0).toLocaleString(),
+      : _ovRows([T('gui_pd_blocked','Blocked') + ' ' + (b.blocked || 0).toLocaleString(),
+                 T('gui_pd_potential','Potentially Blocked') + ' ' + (b.potential || 0).toLocaleString(),
                  (b.vs_prev_pct >= 0 ? '↑' : '↓') + Math.abs(b.vs_prev_pct || 0) + '% ' + T('gui_ov_vs_prev','vs prev')])
-        + '<div class="ov-drill">&#8594; Traffic</div>';
+        + '<div class="ov-drill">&#8594; ' + T('gui_ov_drill_traffic','Traffic') + '</div>';
   }
   // Pipeline
   var p = d.pipeline || {};
@@ -1675,8 +1675,8 @@ function renderOverview(d) {
       ? '<div style="color:var(--dim)">—</div>'
     : _ovRows([(T('gui_ov_cache_lag_label','cache lag') + ' ' + (lag || '—')),
                (T('gui_ov_siem_1h','SIEM 1h') + ' ' + (p.siem_success_1h != null ? p.siem_success_1h + '%' : '—')),
-               'DLQ ' + (p.dlq || 0)])
-      + '<div class="ov-drill">→ Integrations</div>';
+               T('gui_ov_dlq_label','DLQ') + ' ' + (p.dlq || 0)])
+      + '<div class="ov-drill">→ ' + T('gui_ov_drill_integrations','Integrations') + '</div>';
   // Alerts
   var a = d.alerts || {};
   _ovMark('ov-alerts-mark', a.verdict);

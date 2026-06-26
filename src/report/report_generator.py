@@ -550,7 +550,7 @@ class ReportGenerator:
                     "compute_draft": raw_export.get("compute_draft", False),
                 },
             )
-            print(f"Raw Explorer CSV saved: {raw_export['path']}")
+            print(t("rpt_raw_csv_saved", path=raw_export['path'], lang=lang))
 
         # Save snapshot for Web UI Dashboard directly
         try:
@@ -850,7 +850,7 @@ class ReportGenerator:
   <div style="border-radius:10px;overflow:hidden;border:1px solid #325158">
     <div style="background:#1A2C32;border-left:4px solid #FF5500;padding:18px 20px;color:#fff">
       <div style="font-size:20px;font-weight:700;margin-bottom:4px">{t("rpt_email_traffic_subject", lang=lang)}</div>
-      <div style="font-size:12px;color:#989A9B">Generated: {mod12.get('generated_at','')}</div>
+      <div style="font-size:12px;color:#989A9B">{t("rpt_email_generated_label", lang=lang)} {mod12.get('generated_at','')}</div>
     </div>
     <div style="background:#fff;padding:20px">
       <h3 style="color:#1A2C32;font-size:13px;font-weight:600;margin:0 0 8px;border-bottom:2px solid #FF5500;padding-bottom:5px">{t("rpt_email_key_metrics", lang=lang)}</h3>
@@ -874,7 +874,7 @@ class ReportGenerator:
 </body></html>"""
 
 
-def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", top_n: int = 100) -> str:
+def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", top_n: int = 100, lang: str = "en") -> str:
     """Generate a Traffic report XLSX with real per-sheet DataFrames."""
     import pandas as pd
     from openpyxl import Workbook
@@ -887,11 +887,11 @@ def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", 
     wb.remove(wb.active)
 
     # --- Executive Summary ---
-    ws = wb.create_sheet("Executive Summary")
+    ws = wb.create_sheet(t("rpt_xlsx_sheet_exec_summary", lang=lang))
     try:
         exec_data = exec_analyze(flows, profile=profile)
         kpis = exec_data.get("kpis", {})
-        ws.append(["KPI", "Value"])
+        ws.append([t("rpt_xlsx_col_kpi", lang=lang), t("rpt_xlsx_col_value", lang=lang)])
         if isinstance(kpis, dict):
             for k, v in kpis.items():
                 if isinstance(v, dict):
@@ -902,10 +902,10 @@ def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", 
             for item in kpis:
                 ws.append([str(item.get("label", "")), str(item.get("value", ""))])
     except Exception:
-        ws.append(["Note", "Executive summary unavailable"])
+        ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_xlsx_exec_unavailable", lang=lang)])
 
     # --- Policy Decisions ---
-    ws = wb.create_sheet("Policy Decisions")
+    ws = wb.create_sheet(t("rpt_xlsx_sheet_policy_decisions", lang=lang))
     try:
         pol = policy_decision_analysis(flows, top_n=top_n)
         summary_rows = []
@@ -924,7 +924,7 @@ def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", 
         ws.append(["Decision", "Count"])
 
     # --- Uncovered Flows ---
-    ws = wb.create_sheet("Uncovered Flows")
+    ws = wb.create_sheet(t("rpt_xlsx_sheet_uncovered_flows", lang=lang))
     try:
         unc = uncovered_flows(flows, top_n=top_n)
         top_flows = unc.get("top_flows")
@@ -951,7 +951,7 @@ def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", 
             ws.append(["src", "dst", "port", "policy_decision"])
 
     # --- Lateral Movement ---
-    ws = wb.create_sheet("Lateral Movement")
+    ws = wb.create_sheet(t("rpt_xlsx_sheet_lateral_movement", lang=lang))
     try:
         lat = lateral_movement_risk(flows, top_n=top_n)
         service_summary = lat.get("service_summary")
@@ -960,12 +960,12 @@ def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", 
             for _, row in service_summary.iterrows():
                 ws.append([str(v) for v in row])
         else:
-            ws.append(["Note", "No lateral movement flows detected"])
+            ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_xlsx_no_lateral", lang=lang)])
     except Exception:
-        ws.append(["Note", "Lateral movement data unavailable"])
+        ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_xlsx_lateral_unavailable", lang=lang)])
 
     # --- Top Talkers ---
-    ws = wb.create_sheet("Top Talkers")
+    ws = wb.create_sheet(t("rpt_xlsx_sheet_top_talkers", lang=lang))
     try:
         if hasattr(flows, "columns") and "src" in flows.columns and "dst" in flows.columns:
             talkers = (flows.groupby(["src", "dst"]).size()
