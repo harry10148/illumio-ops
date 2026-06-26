@@ -117,9 +117,16 @@ class ReportScheduler:
                 # subtraction works against the naive schedule-local `now`.
                 if last_run_dt.tzinfo is not None:
                     last_run_dt = last_run_dt.replace(tzinfo=None)
-                if (now - last_run_dt).total_seconds() < _MIN_RERUN_GAP:
+                # `now` is tz-AWARE for tz='local'/unset but NAIVE for
+                # 'UTC'/'UTC+N' (see _now_in_schedule_tz). Normalize to naive so
+                # the gap subtraction never mixes naive & aware datetimes — that
+                # TypeError previously escaped the ValueError-only guard and, via
+                # tick(), aborted ALL schedules on the first one with a stored
+                # last_run.
+                now_cmp = now.replace(tzinfo=None) if now.tzinfo else now
+                if (now_cmp - last_run_dt).total_seconds() < _MIN_RERUN_GAP:
                     return False
-            except ValueError:
+            except (ValueError, TypeError):
                 pass
 
         # cron_expr branch: use APScheduler CronTrigger to decide if due
@@ -601,7 +608,16 @@ class ReportScheduler:
         for sched in schedules:
             sched_tz = sched.get('timezone') or global_tz
             now = _now_in_schedule_tz(sched_tz)
-            if not self.should_run(sched, now):
+            try:
+                due = self.should_run(sched, now)
+            except Exception as e:
+                # One malformed schedule must never abort evaluation of the rest.
+                logger.error(
+                    "[Scheduler] should_run failed for schedule id={}: {}",
+                    sched.get("id"), e,
+                )
+                continue
+            if not due:
                 continue
 
             sid = str(sched.get("id", ""))

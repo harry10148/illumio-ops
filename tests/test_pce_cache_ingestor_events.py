@@ -155,3 +155,56 @@ def test_since_cursor_preserves_aware_watermark(session_factory):
     parsed = datetime.fromisoformat(api.since_seen)
     assert parsed.tzinfo is not None
     assert parsed.astimezone(timezone.utc) == aware_ts
+
+
+def test_async_threshold_stub_does_not_discard_sync_batch(session_factory):
+    """Regression: when the sync pull hits the async threshold, the async path is
+    an unimplemented stub returning []. The already-fetched sync events must be
+    inserted (not discarded) and the watermark must advance to their max
+    timestamp so the next poll pages forward instead of re-fetching forever."""
+    from src.pce_cache.ingestor_events import EventsIngestor
+    from src.pce_cache.models import IngestionWatermark
+    from src.pce_cache.watermark import WatermarkStore
+
+    base = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+    sync_batch = [_mk_event(i, base + timedelta(seconds=i)) for i in range(3)]
+    fake = FakeApiClient(events=sync_batch, async_events=[])  # stub returns []
+    ing = EventsIngestor(api=fake, session_factory=session_factory,
+                         watermark=WatermarkStore(session_factory),
+                         async_threshold=3)
+    inserted = ing.run_once()
+
+    assert fake.async_calls == 1            # cap path was taken
+    assert inserted == 3                    # fetched events inserted, NOT discarded
+    with session_factory() as s:
+        rows = s.execute(select(PceEvent)).scalars().all()
+        assert len(rows) == 3
+        wm_row = s.get(IngestionWatermark, "events")
+        advanced = wm_row.last_timestamp
+    assert advanced is not None, "watermark must advance so paging continues"
+    if advanced.tzinfo is None:             # SQLite reads back naive
+        advanced = advanced.replace(tzinfo=timezone.utc)
+    assert advanced == base + timedelta(seconds=2)
+
+
+def test_async_threshold_uses_async_result_when_non_empty(session_factory):
+    """When get_events_async is eventually implemented (returns a non-empty
+    batch), the cap path must use the async result (current behavior preserved
+    for the non-stub case)."""
+    from src.pce_cache.ingestor_events import EventsIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    ts = datetime(2026, 5, 1, 12, 0, 0, tzinfo=timezone.utc)
+    sync_batch = [_mk_event(i, ts) for i in range(3)]            # hits cap=3
+    async_batch = [_mk_event(100 + i, ts) for i in range(5)]    # real async data
+    fake = FakeApiClient(events=sync_batch, async_events=async_batch)
+    ing = EventsIngestor(api=fake, session_factory=session_factory,
+                         watermark=WatermarkStore(session_factory),
+                         async_threshold=3)
+    inserted = ing.run_once()
+
+    assert fake.async_calls == 1
+    assert inserted == 5                     # async batch used
+    with session_factory() as s:
+        ids = {r.pce_event_id for r in s.execute(select(PceEvent)).scalars().all()}
+    assert ids == {f"uuid-{100 + i}" for i in range(5)}

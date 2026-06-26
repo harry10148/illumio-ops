@@ -1,8 +1,9 @@
+import datetime
 from types import SimpleNamespace
 
 import pytest
 
-from src.report_scheduler import ReportScheduler
+from src.report_scheduler import ReportScheduler, _now_in_schedule_tz
 
 
 class _DummyReporter:
@@ -110,3 +111,80 @@ def test_scheduled_email_failure_is_reported():
             custom_recipients=["ops@example.com"],
             report_type="traffic",
         )
+
+
+# ─── Regression: tz='local' naive/aware datetime subtraction (HIGH) ───────────
+
+def test_should_run_local_tz_aware_now_with_stored_last_run_no_typeerror():
+    """tz='local' makes `now` tz-AWARE while the stored last_run parses NAIVE.
+    The min-rerun-gap subtraction must not raise TypeError; within the gap it
+    returns False (pre-fix this raised and killed the whole tick)."""
+    scheduler = ReportScheduler(_DummyConfigManager(), _DummyReporter())
+    now = _now_in_schedule_tz("local")
+    assert now.tzinfo is not None, "precondition: 'local' yields an aware now"
+    last_run = now.replace(tzinfo=None).isoformat()  # naive, just now → within gap
+    sched = {"id": 1, "enabled": True, "schedule_type": "daily", "hour": 8, "minute": 0}
+    assert scheduler.should_run(sched, now, last_run_str=last_run) is False
+
+
+def test_tick_local_tz_with_stored_last_run_evaluates_all_schedules(monkeypatch):
+    """A stored last_run on the FIRST schedule under tz='local' must not abort
+    tick(); every schedule is still evaluated (real should_run, no TypeError)."""
+    reporter = _DummyReporter()
+    cm = _DummyConfigManager()
+    cm.config = {
+        "settings": {"timezone": "local"},
+        "report_schedules": [
+            {"id": 1, "name": "First", "enabled": True,
+             "schedule_type": "daily", "hour": 8, "minute": 0},
+            {"id": 2, "name": "Second", "enabled": True,
+             "schedule_type": "daily", "hour": 8, "minute": 0},
+        ],
+    }
+    cm.load = lambda: None
+    scheduler = ReportScheduler(cm, reporter)
+
+    recent = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None).isoformat()
+    monkeypatch.setattr(scheduler, "_load_states",
+                        lambda: {"1": {"last_run": recent}, "2": {"last_run": recent}})
+
+    evaluated = []
+    real_should_run = ReportScheduler.should_run
+
+    def spy(self, sched, now, *a, **kw):
+        evaluated.append(sched["id"])
+        return real_should_run(self, sched, now, *a, **kw)
+
+    monkeypatch.setattr(ReportScheduler, "should_run", spy)
+
+    scheduler.tick()  # must not raise
+    assert evaluated == [1, 2]
+
+
+def test_tick_isolates_a_failing_should_run_per_schedule(monkeypatch):
+    """Defense-in-depth: even if should_run raises for one schedule, tick() must
+    keep evaluating the remaining schedules instead of aborting the cycle."""
+    reporter = _DummyReporter()
+    cm = _DummyConfigManager()
+    cm.config = {
+        "settings": {"timezone": "local"},
+        "report_schedules": [
+            {"id": 1, "name": "Bad", "enabled": True},
+            {"id": 2, "name": "Good", "enabled": True},
+        ],
+    }
+    cm.load = lambda: None
+    scheduler = ReportScheduler(cm, reporter)
+
+    evaluated = []
+
+    def flaky(sched, now):
+        evaluated.append(sched["id"])
+        if sched["id"] == 1:
+            raise TypeError("can't subtract offset-naive and offset-aware datetimes")
+        return False
+
+    monkeypatch.setattr(scheduler, "should_run", flaky)
+
+    scheduler.tick()  # must not raise
+    assert evaluated == [1, 2]

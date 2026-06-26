@@ -69,6 +69,11 @@ class TrafficIngestor:
         if wm and wm.last_timestamp:
             # Grace window: re-pull 5 minutes back to catch late-arriving flows
             grace = wm.last_timestamp - timedelta(minutes=5)
+            # SQLite + DateTime(timezone=True) reads back NAIVE, so an offset-less
+            # ISO string would make the PCE reject the query (HTTP 406
+            # invalid_timestamp). Re-attach UTC, mirroring EventsIngestor.
+            if grace.tzinfo is None:
+                grace = grace.replace(tzinfo=timezone.utc)
             return grace.isoformat()
         return None
 

@@ -53,14 +53,23 @@ class TrafficAggregator:
              "protocol", "action", "flow_count", "bytes_total"],
             sel,
         )
+        # MAX(existing, recomputed) instead of plain overwrite. Raw has 7-day
+        # retention but agg keeps 90 days, so agg outlives the raw rows it was
+        # built from. As retention deletes a bucket's raw rows, a re-aggregation
+        # recomputes that bucket from only the surviving sliver; a plain
+        # overwrite would shrink the previously-correct full sum downward and,
+        # once all the day's raw is gone, freeze the bucket at that corrupted
+        # value. MAX keeps the historical peak while still letting a same-day
+        # bucket grow as new raw arrives, and stays idempotent (MAX(x,x)=x).
+        agg_cols = PceTrafficFlowAgg.__table__.c
         stmt = stmt.on_conflict_do_update(
             index_elements=[
                 "bucket_day", "src_workload", "dst_workload",
                 "port", "protocol", "action",
             ],
             set_={
-                "flow_count": stmt.excluded.flow_count,
-                "bytes_total": stmt.excluded.bytes_total,
+                "flow_count": func.max(agg_cols.flow_count, stmt.excluded.flow_count),
+                "bytes_total": func.max(agg_cols.bytes_total, stmt.excluded.bytes_total),
             },
         )
         with self._sf.begin() as s:

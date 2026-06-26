@@ -130,3 +130,28 @@ def test_run_once_emits_poll_log_even_when_insert_batch_raises(session_factory, 
             ing.run_once()
     assert any("Traffic ingest poll" in rec.message for rec in caplog.records), \
         f"expected poll log on insert failure; got: {[r.message for r in caplog.records]}"
+
+
+def test_since_cursor_attaches_utc_offset_to_naive_watermark(session_factory):
+    """Regression: SQLite reads last_timestamp back NAIVE, so the emitted `since`
+    had no tz offset and the PCE rejected it (HTTP 406 invalid_timestamp). The
+    cursor must carry a UTC offset, mirroring EventsIngestor."""
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.models import IngestionWatermark
+    from src.pce_cache.watermark import WatermarkStore
+
+    naive_ts = datetime(2026, 5, 1, 12, 0, 0)  # mimics SQLite read-back (no tz)
+    with session_factory.begin() as s:
+        s.add(IngestionWatermark(source="traffic", last_timestamp=naive_ts,
+                                 last_sync_at=naive_ts, last_status="ok"))
+
+    ing = TrafficIngestor(api=FakeApiClient([]), session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory))
+    since = ing._since_cursor()
+
+    assert since is not None
+    parsed = datetime.fromisoformat(since)
+    assert parsed.tzinfo is not None, "PCE rejects naive timestamps (HTTP 406)"
+    assert parsed.utcoffset() == timedelta(0)
+    # 5-minute grace window still applied, now with a UTC offset
+    assert parsed == datetime(2026, 5, 1, 11, 55, 0, tzinfo=timezone.utc)

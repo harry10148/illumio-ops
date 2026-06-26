@@ -80,3 +80,35 @@ def test_aggregator_dedups_null_workload_rows(session_factory):
     assert len(null_group) == 1, f"expected 1 deduped row, got {len(null_group)}"
     assert null_group[0].src_workload == ""        # NULL coalesced to sentinel
     assert null_group[0].flow_count == 5           # summed
+
+
+def test_aggregator_does_not_shrink_bucket_when_raw_rows_expire(session_factory):
+    """Regression: raw has 7-day retention, agg keeps 90 days. When retention
+    deletes a bucket's raw rows, re-aggregation recomputes from the surviving
+    sliver — a plain overwrite would corrupt the stored historical sum downward.
+    MAX(existing, recomputed) must keep the full value."""
+    from sqlalchemy import delete
+    from src.pce_cache.aggregator import TrafficAggregator
+
+    _seed_raw(session_factory, count=50, action="blocked")
+    agg = TrafficAggregator(session_factory)
+    agg.run_once()
+    with session_factory() as s:
+        rows = s.execute(select(PceTrafficFlowAgg)).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].flow_count == 50
+    full_bytes = rows[0].bytes_total
+
+    # Simulate retention sweeping away most of the bucket's raw rows (keep 10/50).
+    survivors = [f"h-blocked-{i}" for i in range(10)]
+    with session_factory.begin() as s:
+        s.execute(delete(PceTrafficFlowRaw).where(
+            PceTrafficFlowRaw.flow_hash.notin_(survivors)))
+
+    # Re-aggregate from the surviving sliver: stored value must NOT shrink.
+    agg.run_once()
+    with session_factory() as s:
+        rows = s.execute(select(PceTrafficFlowAgg)).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].flow_count == 50, "aged bucket corrupted downward by re-aggregation"
+    assert rows[0].bytes_total == full_bytes

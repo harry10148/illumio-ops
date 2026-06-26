@@ -45,8 +45,16 @@ class EventsIngestor:
                         "Events sync pull hit cap ({}), switching to async",
                         self._async_threshold,
                     )
-                    self._wm.advance(self.SOURCE)
-                    events = self._api.get_events_async(since=since, rate_limit=True)
+                    events_async = self._api.get_events_async(since=since, rate_limit=True)
+                    # get_events_async is an unimplemented stub returning [] (Phase
+                    # 13). Never let its empty result clobber the already-fetched
+                    # sync batch: discarding it loses up to `cap` events, and with
+                    # no max timestamp the watermark can't advance, so the next
+                    # poll re-fetches and re-discards forever (permanent stall +
+                    # total loss above the threshold). Keep the sync batch; the
+                    # advance below pages forward to its max timestamp.
+                    if events_async:
+                        events = events_async
         except Exception as exc:
             logger.exception("Events ingest failed: {}", exc)
             self._wm.record_error(self.SOURCE, str(exc))
