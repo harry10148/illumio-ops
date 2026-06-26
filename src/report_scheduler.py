@@ -29,10 +29,23 @@ def _tz_offset_hours(tz_str: str) -> float:
     return float(m.group(1) + m.group(2))
 
 def _now_in_schedule_tz(tz_str: str) -> datetime.datetime:
-    """Return current naive datetime adjusted to the configured schedule timezone."""
+    """Return 'now' in the schedule's timezone for hour/minute matching.
+
+    Semantics by tz_str:
+      * 'UTC' / 'UTC+N' / 'UTC-N' → NAIVE wall-clock at that offset.
+      * 'local' or unset/empty    → UTC, returned as an AWARE datetime.
+
+    NOTE: despite the 'local' label, this intentionally resolves to UTC (NOT
+    server-local time). The aware-UTC fallback avoids naive/DST ambiguity and
+    mirrors rule_scheduler._now_in_tz; should_run() normalises the aware value
+    to naive before the rerun-gap subtraction. Consequence: a schedule set to
+    fire at HH:MM with tz='local'/unset fires at HH:MM UTC. Operators on a
+    non-UTC server who want local wall-clock must set an explicit 'UTC+N'.
+    """
     now_utc = datetime.datetime.now(datetime.timezone.utc)
     if not tz_str or tz_str == 'local':
-        # Fall back to UTC-aware (avoids naive datetime / DST ambiguity)
+        # 'local'/unset are treated as UTC (aware) — see docstring. Kept aware to
+        # dodge naive/DST ambiguity; should_run() strips tzinfo before comparing.
         return datetime.datetime.now(datetime.timezone.utc)
     if tz_str == 'UTC':
         return now_utc.replace(tzinfo=None)
@@ -519,9 +532,15 @@ class ReportScheduler:
 
     # ─── Report retention ────────────────────────────────────────────────────
 
-    # File prefix patterns for each report type (matches .html, .zip, and .json)
+    # File prefix patterns for each report type (matches .html, .zip, and .json).
+    # NOTE: 'traffic' uses the SecurityRisk-specific prefix because report_type
+    # 'traffic' renders the default security_risk profile (see ReportGenerator
+    # .export traffic_report_profile default + html_exporter filename). The bare
+    # 'Illumio_Traffic_Report_' prefix is a strict prefix of BOTH the SecurityRisk
+    # and NetworkInventory filenames, so using it here would let a 'traffic' prune
+    # delete a sibling NetworkInventory schedule's reports (cross-type loss).
     _REPORT_PREFIXES = {
-        "traffic":           "Illumio_Traffic_Report_",
+        "traffic":           "Illumio_Traffic_Report_SecurityRisk_",
         "security_risk":     "Illumio_Traffic_Report_SecurityRisk_",
         "network_inventory": "Illumio_Traffic_Report_NetworkInventory_",
         "audit":             "illumio_audit_report_",
@@ -532,11 +551,32 @@ class ReportScheduler:
         "app_summary":       "Illumio_App_Summary_",
     }
 
-    def _prune_by_count(self, output_dir: str, report_type: str, max_reports: int):
-        """Keep only the newest max_reports files for the given report type.
+    @staticmethod
+    def _report_unit_key(fname: str) -> str:
+        """Collapse a report file and its metadata sidecar to one report-unit key.
 
-        Files are identified by their name prefix, sorted by mtime descending.
-        Set max_reports to 0 to disable.
+        A single report run emits e.g. ``<stem>.html`` plus its
+        ``<stem>.html.metadata.json`` sidecar; both map to the same key so that
+        ``max_reports`` limits reports, not individual files.
+        """
+        name = fname
+        if name.endswith(".metadata.json"):
+            name = name[: -len(".metadata.json")]
+        for ext in (".html", ".zip", ".json"):
+            if name.endswith(ext):
+                name = name[: -len(ext)]
+                break
+        return name
+
+    def _prune_by_count(self, output_dir: str, report_type: str, max_reports: int):
+        """Keep only the newest max_reports REPORTS for the given report type.
+
+        A report is a UNIT: its ``.html`` (or ``.zip``/``.json``) file plus the
+        accompanying ``.html.metadata.json`` sidecar count as ONE report, so
+        ``max_reports`` limits reports rather than files. Matching files are
+        grouped into units, the units are sorted by their newest member's mtime
+        (filename as a deterministic tie-break), and every file in the surplus
+        units is deleted. Set max_reports to 0 to disable.
         """
         if max_reports <= 0 or not os.path.isdir(output_dir):
             return
@@ -544,24 +584,33 @@ class ReportScheduler:
         if not prefix:
             return
 
-        candidates = []
+        # Group matching files into report units (report + its metadata sidecar).
+        units: dict[str, dict] = {}
         for fname in os.listdir(output_dir):
-            if fname.startswith(prefix) and fname.endswith((".html", ".zip", ".json")):
-                fpath = os.path.join(output_dir, fname)
-                try:
-                    candidates.append((os.path.getmtime(fpath), fpath))
-                except OSError:
-                    pass
-
-        # Sort newest-first, delete everything beyond max_reports
-        candidates.sort(reverse=True)
-        to_delete = candidates[max_reports:]
-        for _, fpath in to_delete:
+            if not (fname.startswith(prefix) and fname.endswith((".html", ".zip", ".json"))):
+                continue
+            fpath = os.path.join(output_dir, fname)
             try:
-                os.remove(fpath)
-                logger.info(f"[Scheduler] Count-pruned: {os.path.basename(fpath)} (limit={max_reports})")
-            except Exception as e:
-                logger.warning(f"[Scheduler] Could not prune {fpath}: {e}")
+                mtime = os.path.getmtime(fpath)
+            except OSError:
+                continue
+            unit = units.setdefault(self._report_unit_key(fname),
+                                    {"mtime": mtime, "files": []})
+            unit["files"].append(fpath)
+            if mtime > unit["mtime"]:
+                unit["mtime"] = mtime
+
+        # Sort report units newest-first (mtime, then key for determinism on
+        # ties) and delete every file in the units beyond max_reports.
+        ordered = sorted(units.items(), key=lambda kv: (kv[1]["mtime"], kv[0]),
+                         reverse=True)
+        for _key, unit in ordered[max_reports:]:
+            for fpath in unit["files"]:
+                try:
+                    os.remove(fpath)
+                    logger.info(f"[Scheduler] Count-pruned: {os.path.basename(fpath)} (limit={max_reports})")
+                except Exception as e:
+                    logger.warning(f"[Scheduler] Could not prune {fpath}: {e}")
 
     def _prune_old_reports(self, output_dir: str):
         """Delete report files older than retention_days (default 30).
