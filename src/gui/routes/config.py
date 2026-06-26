@@ -143,59 +143,63 @@ def make_config_blueprint(
     @limiter.limit("30 per hour")
     def api_save_settings():
         d = _strip_redaction_placeholders(request.json or {})
-        if 'api' in d:
-            api_in = d['api']
-            api_allowlist = _SETTINGS_ALLOWLISTS["api"]
-            # Validate url scheme before accepting it
-            if 'url' in api_in:
-                _url_val = str(api_in['url']).strip()
-                _scheme = urllib.parse.urlparse(_url_val).scheme.lower()
-                if _scheme not in ('http', 'https'):
-                    return jsonify({"ok": False, "error": "api.url must use http or https scheme"}), 400
-                if _scheme == 'http':
-                    logger.warning("api.url uses plain HTTP — TLS verification cannot be performed")
-            for k in api_allowlist:
-                if k in api_in:
-                    cm.config['api'][k] = api_in[k]
-        if 'email' in d:
-            email_in = d['email']
-            if 'sender' in email_in:
-                cm.config['email']['sender'] = email_in['sender']
-            if 'recipients' in email_in:
-                cm.config['email']['recipients'] = email_in['recipients']
-        if 'smtp' in d:
-            allowlist = _SETTINGS_ALLOWLISTS["smtp"]
-            filtered = {k: v for k, v in d['smtp'].items() if k in allowlist}
-            cm.config.setdefault('smtp', {}).update(filtered)
-        if 'alerts' in d:
-            allowlist = _SETTINGS_ALLOWLISTS["alerts"]
-            filtered = {k: v for k, v in d['alerts'].items() if k in allowlist}
-            cm.config.setdefault('alerts', {}).update(filtered)
-        if 'settings' in d:
-            allowlist = _SETTINGS_ALLOWLISTS["settings"]
-            filtered = {k: v for k, v in d['settings'].items() if k in allowlist}
-            cm.config.setdefault('settings', {}).update(filtered)
-        if 'report' in d:
-            rpt_in = d['report']
-            rpt_cfg = cm.config.setdefault('report', {})
-            if 'output_dir' in rpt_in:
-                rpt_cfg['output_dir'] = rpt_in['output_dir']
-            if 'retention_days' in rpt_in:
-                try:
-                    rpt_cfg['retention_days'] = max(0, int(rpt_in['retention_days']))
-                except (TypeError, ValueError):
-                    pass  # intentional fallback: keep existing retention_days if new value is not numeric
-        known_roots = {'api', 'email', 'smtp', 'alerts', 'settings', 'report', 'pce_profiles', 'active_pce_id'}
-        for root in _plugin_config_roots():
-            if root in known_roots or root not in d:
-                continue
-            incoming = d.get(root)
-            if isinstance(incoming, dict):
-                cm.config.setdefault(root, {}).update(incoming)
-            else:
-                cm.config[root] = incoming
-        cm.sync_api_to_active_profile()
-        cm.save()
+        # Serialize the whole load→mutate→save under the shared config lock so
+        # concurrent saves (cheroot multi-thread pool) cannot lose updates.
+        with cm.write_lock:
+            cm.load()
+            if 'api' in d:
+                api_in = d['api']
+                api_allowlist = _SETTINGS_ALLOWLISTS["api"]
+                # Validate url scheme before accepting it
+                if 'url' in api_in:
+                    _url_val = str(api_in['url']).strip()
+                    _scheme = urllib.parse.urlparse(_url_val).scheme.lower()
+                    if _scheme not in ('http', 'https'):
+                        return jsonify({"ok": False, "error": "api.url must use http or https scheme"}), 400
+                    if _scheme == 'http':
+                        logger.warning("api.url uses plain HTTP — TLS verification cannot be performed")
+                for k in api_allowlist:
+                    if k in api_in:
+                        cm.config['api'][k] = api_in[k]
+            if 'email' in d:
+                email_in = d['email']
+                if 'sender' in email_in:
+                    cm.config['email']['sender'] = email_in['sender']
+                if 'recipients' in email_in:
+                    cm.config['email']['recipients'] = email_in['recipients']
+            if 'smtp' in d:
+                allowlist = _SETTINGS_ALLOWLISTS["smtp"]
+                filtered = {k: v for k, v in d['smtp'].items() if k in allowlist}
+                cm.config.setdefault('smtp', {}).update(filtered)
+            if 'alerts' in d:
+                allowlist = _SETTINGS_ALLOWLISTS["alerts"]
+                filtered = {k: v for k, v in d['alerts'].items() if k in allowlist}
+                cm.config.setdefault('alerts', {}).update(filtered)
+            if 'settings' in d:
+                allowlist = _SETTINGS_ALLOWLISTS["settings"]
+                filtered = {k: v for k, v in d['settings'].items() if k in allowlist}
+                cm.config.setdefault('settings', {}).update(filtered)
+            if 'report' in d:
+                rpt_in = d['report']
+                rpt_cfg = cm.config.setdefault('report', {})
+                if 'output_dir' in rpt_in:
+                    rpt_cfg['output_dir'] = rpt_in['output_dir']
+                if 'retention_days' in rpt_in:
+                    try:
+                        rpt_cfg['retention_days'] = max(0, int(rpt_in['retention_days']))
+                    except (TypeError, ValueError):
+                        pass  # intentional fallback: keep existing retention_days if new value is not numeric
+            known_roots = {'api', 'email', 'smtp', 'alerts', 'settings', 'report', 'pce_profiles', 'active_pce_id'}
+            for root in _plugin_config_roots():
+                if root in known_roots or root not in d:
+                    continue
+                incoming = d.get(root)
+                if isinstance(incoming, dict):
+                    cm.config.setdefault(root, {}).update(incoming)
+                else:
+                    cm.config[root] = incoming
+            cm.sync_api_to_active_profile()
+            cm.save()
         return jsonify({"ok": True})
 
     # ── TLS Certificate Management ─────────────────────────────────────────────
@@ -342,42 +346,46 @@ def make_config_blueprint(
     def api_pce_profiles_action():
         d = request.json or {}
         action = d.get("action")
-        if action == "add":
-            profile = {
-                "name":       d.get("name", "").strip(),
-                "url":        d.get("url", "").strip(),
-                "org_id":     d.get("org_id", "1"),
-                "key":        d.get("key", ""),
-                "secret":     d.get("secret", ""),
-                "verify_ssl": bool(d.get("verify_ssl", True)),
-            }
-            if not profile["name"] or not profile["url"]:
-                return _err("name and url required")
-            p = cm.add_pce_profile(profile)
-            return jsonify({"ok": True, "profile": p})
-        elif action == "update":
-            pid = d.get("id")
-            if not pid:
-                return _err("id required")
-            updates = {k: d[k] for k in ("name", "url", "org_id", "key", "secret", "verify_ssl") if k in d}
-            if not cm.update_pce_profile(int(pid), updates):
-                return _err("profile not found")
-            return jsonify({"ok": True})
-        elif action == "activate":
-            pid = d.get("id")
-            if not pid:
-                return _err("id required")
-            if not cm.activate_pce_profile(int(pid)):
-                return _err("profile not found")
-            return jsonify({"ok": True})
-        elif action == "delete":
-            pid = d.get("id")
-            if not pid:
-                return _err("id required")
-            if not cm.remove_pce_profile(int(pid)):
-                return _err("profile not found")
-            return jsonify({"ok": True})
-        else:
-            return _err("unknown action")
+        # Serialize load→mutate→save under the shared config lock (profile CRUD
+        # helpers each call cm.save()) so concurrent writers don't lose updates.
+        with cm.write_lock:
+            cm.load()
+            if action == "add":
+                profile = {
+                    "name":       d.get("name", "").strip(),
+                    "url":        d.get("url", "").strip(),
+                    "org_id":     d.get("org_id", "1"),
+                    "key":        d.get("key", ""),
+                    "secret":     d.get("secret", ""),
+                    "verify_ssl": bool(d.get("verify_ssl", True)),
+                }
+                if not profile["name"] or not profile["url"]:
+                    return _err("name and url required")
+                p = cm.add_pce_profile(profile)
+                return jsonify({"ok": True, "profile": p})
+            elif action == "update":
+                pid = d.get("id")
+                if not pid:
+                    return _err("id required")
+                updates = {k: d[k] for k in ("name", "url", "org_id", "key", "secret", "verify_ssl") if k in d}
+                if not cm.update_pce_profile(int(pid), updates):
+                    return _err("profile not found")
+                return jsonify({"ok": True})
+            elif action == "activate":
+                pid = d.get("id")
+                if not pid:
+                    return _err("id required")
+                if not cm.activate_pce_profile(int(pid)):
+                    return _err("profile not found")
+                return jsonify({"ok": True})
+            elif action == "delete":
+                pid = d.get("id")
+                if not pid:
+                    return _err("id required")
+                if not cm.remove_pce_profile(int(pid)):
+                    return _err("profile not found")
+                return jsonify({"ok": True})
+            else:
+                return _err("unknown action")
 
     return bp

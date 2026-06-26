@@ -398,6 +398,9 @@ def make_reports_blueprint(
     def api_generate_audit_report():
         d = request.json or {}
         _arlog = None
+        lang = d.get('lang', 'en')
+        if lang not in ('en', 'zh_TW'):
+            lang = 'en'
         try:
             from src.report.audit_generator import AuditGenerator
             from src.api_client import ApiClient
@@ -418,9 +421,6 @@ def make_reports_blueprint(
 
             start_date = d.get('start_date')
             end_date = d.get('end_date')
-            lang = d.get('lang', 'en')
-            if lang not in ('en', 'zh_TW'):
-                lang = 'en'
 
             result = gen.generate_from_api(start_date, end_date, lang=lang)
 
@@ -604,6 +604,9 @@ def make_reports_blueprint(
     def api_generate_ven_status_report():
         d = request.json or {}
         _vrlog = None
+        lang = d.get('lang', 'en')
+        if lang not in ('en', 'zh_TW'):
+            lang = 'en'
         try:
             from src.report.ven_status_generator import VenStatusGenerator
             from src.api_client import ApiClient
@@ -617,10 +620,6 @@ def make_reports_blueprint(
             cm.load()
             api = ApiClient(cm)
             gen = VenStatusGenerator(cm, api_client=api)
-
-            lang = d.get('lang', 'en')
-            if lang not in ('en', 'zh_TW'):
-                lang = 'en'
 
             result = gen.generate(lang=lang)
 
@@ -653,6 +652,9 @@ def make_reports_blueprint(
     def api_generate_policy_usage_report():
         d = request.get_json(silent=True) or request.form.to_dict() or {}
         _pulog = None
+        lang = d.get('lang', 'en')
+        if lang not in ('en', 'zh_TW'):
+            lang = 'en'
         try:
             from src.report.policy_usage_generator import PolicyUsageGenerator
             from src.api_client import ApiClient
@@ -671,9 +673,6 @@ def make_reports_blueprint(
 
             start_date = d.get('start_date')
             end_date   = d.get('end_date')
-            lang = d.get('lang', 'en')
-            if lang not in ('en', 'zh_TW'):
-                lang = 'en'
 
             source = d.get('source', 'api')
             if source == 'csv':

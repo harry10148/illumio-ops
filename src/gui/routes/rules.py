@@ -237,45 +237,54 @@ def make_rules_blueprint(
     def api_update_rule(idx):
         d = request.json or {}
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
-        if 0 <= idx < len(cm.config['rules']):
-            old = cm.config['rules'][idx]
-            if 'throttle' in d:
-                try:
-                    d['throttle'] = _normalize_rule_throttle(d.get('throttle', ''))
-                except ValueError as exc:
-                    return _err(str(exc), 400)
-            if 'match_fields' in d:
-                try:
-                    d['match_fields'] = _normalize_match_fields(d.get('match_fields'))
-                except ValueError as exc:
-                    return _err(str(exc), 400)
-            old.update(d)
-            # Re-parse label/ip fields for traffic and bw/vol
-            for prefix in ('src', 'dst', 'ex_src', 'ex_dst'):
-                raw = d.get(prefix, '')
-                if raw is not None:
-                    raw = str(raw).strip()
-                    if raw and '=' in raw:
-                        old[prefix + '_label'] = raw
-                        old[prefix + '_ip_in' if 'ex_' not in prefix else prefix + '_ip'] = None
-                    else:
-                        old[prefix + '_label'] = None
-                        if 'ex_' in prefix:
-                            old[prefix + '_ip'] = raw or None
+        # Re-load and save under the shared config lock so a concurrent writer
+        # (or the background scheduler's cm.load()) cannot interleave and either
+        # lose this update or expose a half-updated rules list.
+        with cm.write_lock:
+            cm.load()
+            if 0 <= idx < len(cm.config['rules']):
+                old = cm.config['rules'][idx]
+                if 'throttle' in d:
+                    try:
+                        d['throttle'] = _normalize_rule_throttle(d.get('throttle', ''))
+                    except ValueError as exc:
+                        return _err(str(exc), 400)
+                if 'match_fields' in d:
+                    try:
+                        d['match_fields'] = _normalize_match_fields(d.get('match_fields'))
+                    except ValueError as exc:
+                        return _err(str(exc), 400)
+                old.update(d)
+                # Re-parse label/ip fields for traffic and bw/vol
+                for prefix in ('src', 'dst', 'ex_src', 'ex_dst'):
+                    raw = d.get(prefix, '')
+                    if raw is not None:
+                        raw = str(raw).strip()
+                        if raw and '=' in raw:
+                            old[prefix + '_label'] = raw
+                            old[prefix + '_ip_in' if 'ex_' not in prefix else prefix + '_ip'] = None
                         else:
-                            old[prefix + '_ip_in'] = raw or None
-            # Cast numeric fields
-            for k in ('port', 'ex_port', 'proto', 'threshold_count', 'threshold_window', 'cooldown_minutes', 'pd'):
-                if k in old and old[k] is not None:
-                    try: old[k] = int(old[k]) if k != 'threshold_count' else float(old[k])
-                    except (ValueError, TypeError): pass  # intentional fallback: keep raw value if numeric cast fails
-            cm.save()
-            return jsonify({"ok": True})
-        return _err(t("gui_not_found", lang=lang), 404)
+                            old[prefix + '_label'] = None
+                            if 'ex_' in prefix:
+                                old[prefix + '_ip'] = raw or None
+                            else:
+                                old[prefix + '_ip_in'] = raw or None
+                # Cast numeric fields
+                for k in ('port', 'ex_port', 'proto', 'threshold_count', 'threshold_window', 'cooldown_minutes', 'pd'):
+                    if k in old and old[k] is not None:
+                        try: old[k] = int(old[k]) if k != 'threshold_count' else float(old[k])
+                        except (ValueError, TypeError): pass  # intentional fallback: keep raw value if numeric cast fails
+                cm.save()
+                return jsonify({"ok": True})
+            return _err(t("gui_not_found", lang=lang), 404)
 
     @bp.route('/api/rules/<int:idx>', methods=['DELETE'])
     def api_delete_rule(idx):
-        cm.remove_rules_by_index([idx])
+        # Re-load and delete under the shared config lock so a concurrent writer
+        # cannot lose this deletion (or a parallel update).
+        with cm.write_lock:
+            cm.load()
+            cm.remove_rules_by_index([idx])
         return jsonify({"ok": True})
 
     @bp.route('/api/rules/<int:idx>/highlight')

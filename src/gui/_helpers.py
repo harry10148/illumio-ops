@@ -388,6 +388,37 @@ def _err_with_log(category: str, exc: Exception, status: int = 500, *, lang: str
 
 
 # ---------------------------------------------------------------------------
+# Cached SQLAlchemy engines (one per SQLite db_path)
+# ---------------------------------------------------------------------------
+# Creating a fresh Engine per request leaks its connection pool — and the
+# underlying SQLite file descriptors — until garbage collection. The dashboard
+# polls the pce_cache DB on every refresh, so the process would accumulate
+# Engine objects holding open handles. Cache a single Engine per db_path and
+# reuse it across requests and across cheroot worker threads.
+#
+# NullPool: each session opens and closes its own DBAPI connection within the
+# calling thread, so a connection is never shared across threads (SQLite's
+# default check_same_thread stays satisfied) and no idle connection/FD is held
+# between requests. init_schema() runs once, when the engine is first created.
+_cache_engines: dict = {}
+_cache_engines_lock = threading.Lock()
+
+
+def _get_cache_engine(db_path: str):
+    """Return a process-wide cached SQLAlchemy Engine for *db_path* (SQLite)."""
+    with _cache_engines_lock:
+        eng = _cache_engines.get(db_path)
+        if eng is None:
+            from sqlalchemy import create_engine
+            from sqlalchemy.pool import NullPool
+            from src.pce_cache.schema import init_schema
+            eng = create_engine(f"sqlite:///{db_path}", poolclass=NullPool)
+            init_schema(eng)
+            _cache_engines[db_path] = eng
+        return eng
+
+
+# ---------------------------------------------------------------------------
 # PCE URL helpers
 # ---------------------------------------------------------------------------
 

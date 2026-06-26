@@ -78,8 +78,16 @@ def make_rule_scheduler_blueprint(
     def rs_rulesets():
         db, api, _ = _get_rs_components()
         q = request.args.get('q', '').strip()
-        page = int(request.args.get('page', 1))
-        size = int(request.args.get('size', 50))
+        # Guard against non-numeric query params (?page=abc) → 400-style default
+        # instead of an unhandled int() ValueError surfacing as a 500.
+        try:
+            page = int(request.args.get('page', 1))
+        except (TypeError, ValueError):
+            page = 1
+        try:
+            size = int(request.args.get('size', 50))
+        except (TypeError, ValueError):
+            size = 50
         try:
             api.update_label_cache(silent=True)
         except Exception as _e:
@@ -335,7 +343,7 @@ def make_rule_scheduler_blueprint(
     @bp.route('/api/rule_scheduler/schedules/delete', methods=['POST'])
     def rs_schedule_delete():
         db, api, _ = _get_rs_components()
-        data = request.get_json()
+        data = request.get_json(silent=True) or {}
         hrefs = data.get('hrefs', [])
         deleted = []
         for href in hrefs:

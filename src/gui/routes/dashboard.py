@@ -13,6 +13,7 @@ from src import __version__
 from src.gui import _helpers
 from src.gui._helpers import (
     _ok, _err, _err_with_log,
+    _get_cache_engine,
     _resolve_reports_dir, _resolve_state_file,
     _ui_translation_dict,
     _summarize_alert_channels,
@@ -57,12 +58,10 @@ def _retranslate_kpi_labels(data: dict, lang: str) -> None:
 
 
 def _cache_session(cm):
-    from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
-    from src.pce_cache.schema import init_schema
-    eng = create_engine(f"sqlite:///{cm.models.pce_cache.db_path}")
-    init_schema(eng)
-    return sessionmaker(eng)
+    # Reuse a single cached Engine per db_path instead of creating (and leaking)
+    # a new one per request. See _get_cache_engine() for the NullPool rationale.
+    return sessionmaker(_get_cache_engine(cm.models.pce_cache.db_path))
 
 
 _BLOCKED_KEYS = {"allowed": "allowed", "potentially_blocked": "potential", "blocked": "blocked"}
@@ -342,12 +341,6 @@ def make_dashboard_blueprint(
     @bp.route('/api/dashboard/queries', methods=['POST'])
     def api_save_dashboard_query():
         d = request.json or {}
-        cm.load()
-        if 'settings' not in cm.config:
-            cm.config['settings'] = {}
-        if 'dashboard_queries' not in cm.config['settings']:
-            cm.config['settings']['dashboard_queries'] = []
-
         name = d.get('name', 'My Query')
         rank_by = d.get('rank_by', 'count')
         pd_sel = int(d.get('pd', 3))
@@ -390,12 +383,21 @@ def make_dashboard_blueprint(
             "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip
         }
 
-        if idx is not None and 0 <= int(idx) < len(cm.config['settings']['dashboard_queries']):
-            cm.config['settings']['dashboard_queries'][int(idx)] = query_def
-        else:
-            cm.config['settings']['dashboard_queries'].append(query_def)
+        # Serialize load→mutate→save under the shared config lock so concurrent
+        # saves (cheroot multi-thread pool) cannot lose a query.
+        with cm.write_lock:
+            cm.load()
+            if 'settings' not in cm.config:
+                cm.config['settings'] = {}
+            if 'dashboard_queries' not in cm.config['settings']:
+                cm.config['settings']['dashboard_queries'] = []
 
-        cm.save()
+            if idx is not None and 0 <= int(idx) < len(cm.config['settings']['dashboard_queries']):
+                cm.config['settings']['dashboard_queries'][int(idx)] = query_def
+            else:
+                cm.config['settings']['dashboard_queries'].append(query_def)
+
+            cm.save()
         return jsonify({"ok": True})
 
     @bp.route('/api/dashboard/queries/<int:idx>', methods=['DELETE'])

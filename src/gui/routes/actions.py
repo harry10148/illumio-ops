@@ -433,18 +433,18 @@ def make_actions_blueprint(
         """
         try:
             import datetime
-            from sqlalchemy import create_engine, func, select as sa_select
+            from sqlalchemy import func, select as sa_select
             from sqlalchemy.orm import sessionmaker
             from src.pce_cache.models import PceTrafficFlowAgg, IngestionWatermark
-            from src.pce_cache.schema import init_schema
+            from src.gui._helpers import _get_cache_engine
 
             cfg = cm.models.pce_cache
             if not cfg.enabled:
                 return jsonify({"ok": True, "buckets": []})
 
-            engine = create_engine(f"sqlite:///{cfg.db_path}")
-            init_schema(engine)
-            sf = sessionmaker(engine)
+            # Reuse a single cached Engine per db_path (avoids per-request
+            # Engine/connection leak). See _get_cache_engine().
+            sf = sessionmaker(_get_cache_engine(cfg.db_path))
 
             now = datetime.datetime.now(datetime.timezone.utc)
             today = str(now.date())

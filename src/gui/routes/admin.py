@@ -34,7 +34,11 @@ def make_admin_blueprint(
         lang = cm.config.get('settings', {}).get('language', 'en')
         if module_name not in MODULES:
             return jsonify({"ok": False, "error": t("gui_err_unknown_module", lang=lang)}), 404
-        n = min(int(request.args.get("n", 200)), 500)
+        # Guard against a non-numeric ?n= param (int() would otherwise 500).
+        try:
+            n = min(int(request.args.get("n", 200)), 500)
+        except (TypeError, ValueError):
+            n = 200
         ml = ModuleLog.get(module_name)
         return jsonify({"ok": True, "module": module_name, "entries": ml.get_recent(n)})
 

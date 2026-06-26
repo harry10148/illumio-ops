@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from loguru import logger
 from src.utils import Colors
@@ -155,12 +156,28 @@ class ConfigManager:
         self.alerts_file = alerts_file
         self.config = json.loads(json.dumps(_DEFAULT_CONFIG))  # deep copy
         self._last_loaded_at: float | None = None
+        # Re-entrant lock guarding load-modify-save critical sections. cheroot
+        # serves the Web GUI from a multi-thread pool; without serialization two
+        # concurrent handlers doing load→mutate→save interleave and silently drop
+        # an update (last writer wins). Re-entrant because load() can itself call
+        # save() (web_gui secret/password backfill) inside a held section.
+        self._rw_lock = threading.RLock()
         self.load()
 
     @property
     def last_loaded_at(self) -> float | None:
         """Unix-timestamp seconds of last successful load(); None before first load."""
         return self._last_loaded_at
+
+    @property
+    def write_lock(self):
+        """Re-entrant lock for callers' load-modify-save critical sections.
+
+        GUI handlers wrap ``cm.load(); <mutate cm.config>; cm.save()`` in
+        ``with cm.write_lock:`` so concurrent worker threads cannot interleave
+        and lose updates.
+        """
+        return self._rw_lock
 
     def load(self):
         """Load and validate config.json via pydantic ConfigSchema."""

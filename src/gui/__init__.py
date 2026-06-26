@@ -123,7 +123,10 @@ def _rs_background_scheduler(cm: ConfigManager) -> None:
     last_check: float | None = None
     while not _shutdown_event.is_set():
         try:
-            cm.load()
+            # Take the shared config lock for the reload so it can't replace
+            # cm.config mid-mutation in a request handler's critical section.
+            with cm.write_lock:
+                cm.load()
             rs_cfg = cm.config.get("rule_scheduler", {})
             interval = rs_cfg.get("check_interval_seconds", 300)
             now = time.time()
