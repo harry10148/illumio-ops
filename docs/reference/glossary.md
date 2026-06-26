@@ -105,9 +105,9 @@ This page is a quick reference for newcomers. Each entry is self-contained: read
 
 **`t()` function** — The Python runtime translation helper in illumio-ops. Resolves an i18n key against the active locale's JSON file, falling back to `zh_explicit.json` if the key is not found in the base locale.
 
-**zh_explicit** — The file `src/i18n/data/zh_explicit.json`. The primary source of approved zh_TW translations for all Illumio-domain and illumio-ops UI strings. Overrides the generic `zh_TW.json` for product-specific terminology.
+**zh_explicit** — The file `src/i18n/data/zh_explicit.json`. The primary source of approved zh_TW translations for all Illumio-domain and illumio-ops UI strings. Overrides the base `src/i18n_zh_TW.json` catalog for product-specific terminology.
 
-**zh_explicit override** — The lookup priority rule: a key found in `zh_explicit.json` always wins over the same key in `zh_TW.json`. Ensures approved, product-accurate translations for alert messages, field labels, and recommendation strings.
+**zh_explicit override** — The lookup priority rule: a key found in `zh_explicit.json` always wins over the same key in the base `src/i18n_zh_TW.json`. Ensures approved, product-accurate translations for alert messages, field labels, and recommendation strings.
 
 ---
 

@@ -304,7 +304,7 @@ Generate an Audit Report.
 
 ```bash
 illumio-ops report audit --start-date 2026-05-01 --end-date 2026-05-15
-illumio-ops report audit --format pdf --output-dir /var/reports
+illumio-ops report audit --format xlsx --output-dir /var/reports
 ```
 
 #### report ven-status
@@ -552,7 +552,7 @@ illumio-ops version
 
 ```bash
 illumio-ops version
-# illumio-ops 3.25.0-tracks-abcd
+# illumio-ops 4.1.0
 ```
 
 ---

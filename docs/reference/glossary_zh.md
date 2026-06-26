@@ -105,9 +105,9 @@ related_docs:
 
 **`t()` function**（`t()` 函式）— illumio-ops 中的 Python 執行期翻譯輔助函式。對照現用語系的 JSON 檔案解析 i18n 鍵，若未找到則回退至 `zh_explicit.json`。
 
-**zh_explicit** — 檔案 `src/i18n/data/zh_explicit.json`。所有 Illumio 領域及 illumio-ops UI 字串的 zh_TW 核准翻譯主要來源。覆蓋通用 `zh_TW.json` 中的產品專用術語。
+**zh_explicit** — 檔案 `src/i18n/data/zh_explicit.json`。所有 Illumio 領域及 illumio-ops UI 字串的 zh_TW 核准翻譯主要來源。覆蓋基礎語系檔 `src/i18n_zh_TW.json` 中的產品專用術語。
 
-**zh_explicit override**（zh_explicit 覆寫）— 查找優先級規則：`zh_explicit.json` 中找到的鍵優先於 `zh_TW.json` 中的相同鍵。確保告警訊息、欄位標籤與建議字串採用經過核准、符合產品規範的翻譯。
+**zh_explicit override**（zh_explicit 覆寫）— 查找優先級規則：`zh_explicit.json` 中找到的鍵優先於基礎 `src/i18n_zh_TW.json` 中的相同鍵。確保告警訊息、欄位標籤與建議字串採用經過核准、符合產品規範的翻譯。
 
 ---
 
