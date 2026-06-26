@@ -1,6 +1,7 @@
 ﻿from __future__ import annotations
 
 import datetime
+import functools
 import json
 import html
 from typing import Any, Callable
@@ -39,11 +40,27 @@ class Reporter:
     def __init__(self, config_manager: Any) -> None:
         self.cm = config_manager
         self._lang: str = (config_manager.config.get("settings", {}).get("language", "en") or "en")
+        # Per-dispatch language override. send_alerts() sets this (try/finally)
+        # so the channel builders — which the alert plugins invoke without a
+        # lang argument — still render the recipient-visible content in the
+        # language requested for that dispatch instead of the process-global one.
+        self._dispatch_lang: str | None = None
         self.health_alerts: list[dict[str, Any]] = []
         self.event_alerts: list[dict[str, Any]] = []
         self.traffic_alerts: list[dict[str, Any]] = []
         self.metric_alerts: list[dict[str, Any]] = []
         self.last_dispatch_results: list[dict[str, Any]] = []
+
+    @staticmethod
+    def _lang_t(lang: str):
+        """Return ``t()`` pre-bound to ``lang``.
+
+        A content builder binds the module-level ``t`` to its dispatch language
+        via ``t = self._lang_t(_lang)``; every existing ``t(...)`` call in that
+        builder then localizes to ``lang`` (instead of the process-global
+        language) with no per-call-site changes.
+        """
+        return functools.partial(t, lang=lang)
 
     def _resolve_tz(self) -> tuple[datetime.tzinfo, str]:
         """Return (tzinfo, label) for the configured timezone (settings.timezone)."""
@@ -396,7 +413,7 @@ class Reporter:
         )
         return json.loads(rendered)
 
-    def _build_teams_card(self, subj: str) -> dict:
+    def _build_teams_card(self, subj: str, *, lang: str | None = None) -> dict:
         """Build a Power-Automate Adaptive Card (v1.4) POST body for Teams.
 
         Mirrors _build_webhook_payload's template-driven assembly but emits the
@@ -405,6 +422,8 @@ class Reporter:
         elements as plain text; everything is injected via *_json tokens so the
         rendered template is valid JSON.
         """
+        _lang = lang or self._dispatch_lang or self._lang
+        t = self._lang_t(_lang)
         total_issues = (
             len(self.health_alerts) + len(self.event_alerts)
             + len(self.traffic_alerts) + len(self.metric_alerts)
@@ -453,8 +472,10 @@ class Reporter:
         )
         return json.loads(rendered)
 
-    def generate_pretty_snapshot_html(self, data_list: list[dict[str, Any]]) -> str:
+    def generate_pretty_snapshot_html(self, data_list: list[dict[str, Any]], *, lang: str | None = None) -> str:
         import re
+        _lang = lang or self._dispatch_lang or self._lang
+        t = self._lang_t(_lang)
 
         def clean_ansi(text: Any) -> str:
             return re.sub(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])", "", str(text))
@@ -555,9 +576,9 @@ class Reporter:
             t_last = esc(ts_r.get("last_detected", "-").replace("T", " ").split(".")[0])
 
             direction = (
-                "Inbound"
+                t("alert_snap_dir_inbound")
                 if d.get("flow_direction") == "inbound"
-                else "Outbound"
+                else t("alert_snap_dir_outbound")
                 if d.get("flow_direction") == "outbound"
                 else d.get("flow_direction", "-")
             )
@@ -567,9 +588,9 @@ class Reporter:
             proto_str = "TCP" if proto == 6 else "UDP" if proto == 17 else str(proto)
             count = d.get("num_connections") or d.get("count") or 1
             pd_map = {
-                "blocked": "<span style='display:inline-block; color:#6f6f6f; background:#fafafa; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; border:1px solid #e5e5e5;'><span style='display:inline-block;width:6px;height:6px;background:#dc2626;border-radius:50%;margin-right:4px;vertical-align:middle;'></span>Blocked</span>",
-                "potentially_blocked": "<span style='display:inline-block; color:#6f6f6f; background:#fafafa; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; border:1px solid #e5e5e5;'><span style='display:inline-block;width:6px;height:6px;background:#d97706;border-radius:50%;margin-right:4px;vertical-align:middle;'></span>Potential</span>",
-                "allowed": "<span style='display:inline-block; color:#6f6f6f; background:#fafafa; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; border:1px solid #e5e5e5;'><span style='display:inline-block;width:6px;height:6px;background:#16a34a;border-radius:50%;margin-right:4px;vertical-align:middle;'></span>Allowed</span>",
+                "blocked": f"<span style='display:inline-block; color:#6f6f6f; background:#fafafa; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; border:1px solid #e5e5e5;'><span style='display:inline-block;width:6px;height:6px;background:#dc2626;border-radius:50%;margin-right:4px;vertical-align:middle;'></span>{t('alert_snap_decision_blocked')}</span>",
+                "potentially_blocked": f"<span style='display:inline-block; color:#6f6f6f; background:#fafafa; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; border:1px solid #e5e5e5;'><span style='display:inline-block;width:6px;height:6px;background:#d97706;border-radius:50%;margin-right:4px;vertical-align:middle;'></span>{t('alert_snap_decision_potential')}</span>",
+                "allowed": f"<span style='display:inline-block; color:#6f6f6f; background:#fafafa; padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; border:1px solid #e5e5e5;'><span style='display:inline-block;width:6px;height:6px;background:#16a34a;border-radius:50%;margin-right:4px;vertical-align:middle;'></span>{t('alert_snap_decision_allowed')}</span>",
             }
             decision = str(d.get("policy_decision")).lower()
             decision_html = pd_map.get(decision, esc(decision))
@@ -800,6 +821,10 @@ class Reporter:
 
     def send_alerts(self, force_test: bool = False, channels: list[str] | None = None, *, lang: str | None = None) -> list[dict[str, Any]]:
         _lang = lang or self._lang
+        # Bind the subject's t() to the dispatch language; _dispatch_lang (set
+        # around the plugin loop below) carries the same language into the
+        # body builders the plugins invoke without a lang argument.
+        t = self._lang_t(_lang)
         if (
             not any(
                 [
@@ -878,35 +903,42 @@ class Reporter:
             seen.add(key)
             ordered_channels.append(key)
 
-        for channel in ordered_channels:
-            if channel not in registry:
-                logger.warning("Configured alert channel has no registered plugin: {}", channel)
-                results.append({
-                    "channel": channel,
-                    "status": "failed",
-                    "target": "",
-                    "error": "plugin unavailable",
-                })
-                continue
-            plugin = self._get_output_plugin(channel)
-            if not plugin:
-                results.append({
-                    "channel": channel,
-                    "status": "failed",
-                    "target": "",
-                    "error": "plugin unavailable",
-                })
-                continue
-            try:
-                results.append(plugin.send(self, subj, lang=_lang))
-            except Exception as exc:
-                logger.exception("Alert plugin {} failed during send", channel)
-                results.append({
-                    "channel": channel,
-                    "status": "failed",
-                    "target": "",
-                    "error": str(exc),
-                })
+        # Publish the dispatch language so the plugins' calls into the content
+        # builders (which pass no lang) still render the body in _lang.
+        prev_dispatch_lang = self._dispatch_lang
+        self._dispatch_lang = _lang
+        try:
+            for channel in ordered_channels:
+                if channel not in registry:
+                    logger.warning("Configured alert channel has no registered plugin: {}", channel)
+                    results.append({
+                        "channel": channel,
+                        "status": "failed",
+                        "target": "",
+                        "error": "plugin unavailable",
+                    })
+                    continue
+                plugin = self._get_output_plugin(channel)
+                if not plugin:
+                    results.append({
+                        "channel": channel,
+                        "status": "failed",
+                        "target": "",
+                        "error": "plugin unavailable",
+                    })
+                    continue
+                try:
+                    results.append(plugin.send(self, subj, lang=_lang))
+                except Exception as exc:
+                    logger.exception("Alert plugin {} failed during send", channel)
+                    results.append({
+                        "channel": channel,
+                        "status": "failed",
+                        "target": "",
+                        "error": str(exc),
+                    })
+        finally:
+            self._dispatch_lang = prev_dispatch_lang
 
         self.last_dispatch_results = results
         counts = {
@@ -927,8 +959,10 @@ class Reporter:
             logger.warning("Failed to persist dispatch history: {}", exc)
         return results
 
-    def _build_line_message(self, subj: str) -> str:
+    def _build_line_message(self, subj: str, *, lang: str | None = None) -> str:
         """Build a LINE-friendly alert digest aligned to the vendor event content baseline."""
+        _lang = lang or self._dispatch_lang or self._lang
+        t = self._lang_t(_lang)
         records: str = t("alert_field_records")
 
         def section_header(title: str, count: int) -> str:
@@ -1043,7 +1077,7 @@ class Reporter:
             metric_section="\n".join(metric_section_lines),
         ).strip()
 
-    def _build_telegram_message(self, subj: str) -> str:
+    def _build_telegram_message(self, subj: str, *, lang: str | None = None) -> str:
         """Build an HTML-formatted alert digest for Telegram (parse_mode=HTML).
 
         Mirrors _build_line_message's section structure but produces Telegram-flavored
@@ -1052,6 +1086,9 @@ class Reporter:
         hard limit is 4096) with a translated footer announcing how many entries got
         truncated.
         """
+        _lang = lang or self._dispatch_lang or self._lang
+        t = self._lang_t(_lang)
+
         def esc(value: object) -> str:
             return html.escape(self._compact_text(value), quote=False)
 
@@ -1155,7 +1192,9 @@ class Reporter:
             return {"channel": "webhook", "status": "failed", "target": "", "error": "plugin unavailable"}
         return plugin.send(self, subj, lang=lang or self._lang)
 
-    def _render_vendor_event_detail_html(self, alert: dict, esc: Callable[[Any], str]) -> str:
+    def _render_vendor_event_detail_html(self, alert: dict, esc: Callable[[Any], str], *, lang: str | None = None) -> str:
+        _lang = lang or self._dispatch_lang or self._lang
+        t = self._lang_t(_lang)
         payload = self._build_event_alert_payload(alert)
         if not payload["events"]:
             return ""
@@ -1165,10 +1204,10 @@ class Reporter:
             action = event.get("action", {})
             meta_cells = []
             for label, value in (
-                ("Time", event.get("timestamp")),
-                ("Status", event.get("status_label")),
-                ("Severity", event.get("severity_label")),
-                ("Created By", event.get("created_by")),
+                (t("alert_field_time"), event.get("timestamp")),
+                (t("alert_field_status"), event.get("status_label")),
+                (t("alert_field_severity"), event.get("severity_label")),
+                (t("alert_field_created_by"), event.get("created_by")),
             ):
                 if value:
                     meta_cells.append(
@@ -1177,11 +1216,11 @@ class Reporter:
 
             action_rows = []
             for label, value in (
-                ("Endpoint", " ".join(part for part in [action.get("api_method"), action.get("api_endpoint")] if part).strip()),
-                ("Source IP", action.get("src_ip")),
-                ("HTTP Status", action.get("http_status_code")),
-                ("Target", event.get("target_name")),
-                ("Resource", event.get("resource_name")),
+                (t("alert_field_endpoint"), " ".join(part for part in [action.get("api_method"), action.get("api_endpoint")] if part).strip()),
+                (t("alert_field_src_ip"), action.get("src_ip")),
+                (t("alert_field_http_status"), action.get("http_status_code")),
+                (t("alert_field_target"), event.get("target_name")),
+                (t("alert_field_resource"), event.get("resource_name")),
             ):
                 if value:
                     action_rows.append(
@@ -1202,7 +1241,7 @@ class Reporter:
                     )
                 diff_table = (
                     "<table style='width:100%;border-collapse:collapse;font-size:11px;margin-top:6px;'>"
-                    "<tr><th style='text-align:left;padding:4px 6px;background:#fafafa;'>Field</th><th style='text-align:left;padding:4px 6px;background:#fafafa;'>Before</th><th style='text-align:left;padding:4px 6px;background:#fafafa;'>After</th></tr>"
+                    f"<tr><th style='text-align:left;padding:4px 6px;background:#fafafa;'>{t('alert_change_col_field')}</th><th style='text-align:left;padding:4px 6px;background:#fafafa;'>{t('alert_change_col_before')}</th><th style='text-align:left;padding:4px 6px;background:#fafafa;'>{t('alert_change_col_after')}</th></tr>"
                     + "".join(diff_rows)
                     + "</table>"
                 ) if diff_rows else ""
@@ -1224,36 +1263,36 @@ class Reporter:
 
             parser_notes = ""
             if event.get("parser_notes"):
-                parser_notes = f"<div style='margin-top:10px;font-size:11px;color:#7c3aed;'>Parser Notes: {esc(', '.join(event.get('parser_notes', [])))}</div>"
+                parser_notes = f"<div style='margin-top:10px;font-size:11px;color:#7c3aed;'>{t('alert_field_parser_notes')}: {esc(', '.join(event.get('parser_notes', [])))}</div>"
 
             pce_link = ""
             if event.get("pce_link"):
                 pce_link = (
                     f"<div style='margin-top:12px;'><a href='{esc(event['pce_link'])}' "
-                    f"style='display:inline-block;background:#ffffff;color:#0a0a0a;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;border:1px solid #e5e5e5;'>View on PCE</a></div>"
+                    f"style='display:inline-block;background:#ffffff;color:#0a0a0a;padding:8px 14px;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;border:1px solid #e5e5e5;'>{t('alert_field_view_on_pce')}</a></div>"
                 )
             resource_changes_html = ""
             if event.get("resource_changes_count"):
                 resource_changes_html = (
                     f"<div style='margin-top:12px;'><div style='font-size:12px;font-weight:600;color:#0a0a0a;'>"
-                    f"Resource Changes ({event.get('resource_changes_count', 0)})</div>{''.join(change_blocks)}</div>"
+                    f"{t('alert_field_resource_changes')} ({event.get('resource_changes_count', 0)})</div>{''.join(change_blocks)}</div>"
                 )
             notifications_html = ""
             if event.get("notifications_count"):
                 notifications_html = (
                     f"<div style='margin-top:12px;'><div style='font-size:12px;font-weight:600;color:#0a0a0a;'>"
-                    f"Notifications ({event.get('notifications_count', 0)})</div>{''.join(notification_blocks)}</div>"
+                    f"{t('alert_field_notifications')} ({event.get('notifications_count', 0)})</div>{''.join(notification_blocks)}</div>"
                 )
 
             action_rows_html = "".join(action_rows)
             if not action_rows_html:
-                action_rows_html = '<tr><td style="padding:8px 10px;color:#6f6f6f;">No action details</td></tr>'
+                action_rows_html = f'<tr><td style="padding:8px 10px;color:#6f6f6f;">{t("alert_field_no_action_details")}</td></tr>'
             sections.append(
                 f"<div style='margin-top:14px;padding:16px;border:1px solid #e5e5e5;border-radius:8px;background:#FFFFFF;'>"
                 f"<div style='padding:12px 14px;background:#fafafa;color:#0a0a0a;border-radius:6px 6px 0 0;font-size:14px;font-weight:600;border-left:3px solid #2563eb;'>{esc(event.get('event_type', 'event'))}</div>"
                 f"<table style='width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #e5e5e5;border-top:none;'><tr>{''.join(meta_cells)}</tr></table>"
                 f"<div style='margin-top:10px;'>"
-                f"<div style='font-size:12px;font-weight:600;color:#0a0a0a;margin-bottom:6px;'>API Action</div>"
+                f"<div style='font-size:12px;font-weight:600;color:#0a0a0a;margin-bottom:6px;'>{t('alert_field_api_action')}</div>"
                 f"<table style='width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #e5e5e5;border-radius:6px;overflow:hidden;'>{action_rows_html}</table>"
                 f"</div>"
                 f"{resource_changes_html}"
@@ -1511,15 +1550,18 @@ class Reporter:
 
     # ── Mail sender ──────────────────────────────────────────────────────────
 
-    def _build_mail_plain(self, subject: str) -> str:
+    def _build_mail_plain(self, subject: str, *, lang: str | None = None) -> str:
         """Render a plain-text version of the alert email.
 
         Reuses _build_line_message which already renders line_digest.txt.tmpl
         from the same alert lists, ensuring parity with LINE channel content.
         """
-        return self._build_line_message(subject)
+        return self._build_line_message(subject, lang=lang or self._dispatch_lang or self._lang)
 
-    def _build_mail_html(self, subj: str) -> str:
+    def _build_mail_html(self, subj: str, *, lang: str | None = None) -> str:
+        _lang = lang or self._dispatch_lang or self._lang
+        t = self._lang_t(_lang)
+
         def esc(text: Any) -> str:
             return html.escape(str(text), quote=True)
 
@@ -1621,7 +1663,7 @@ class Reporter:
             </tr>
 """
                 if alert.get("raw_data"):
-                    detail_html = self._render_vendor_event_detail_html(alert, esc)
+                    detail_html = self._render_vendor_event_detail_html(alert, esc, lang=_lang)
                     row_html += f"<tr><td colspan='4' style='padding:14px 14px 16px; background:#fafafa; border-bottom:1px solid #e5e5e5;'>{detail_html}</td></tr>"
                 rows.append(row_html)
             event_cta = (
@@ -1665,7 +1707,7 @@ class Reporter:
             <tr>
               <td colspan="3" style="{td_style} background:#fafafa; font-size:12px; padding:16px;">
                 <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #e5e5e5; border-radius:6px; background:#FFFFFF;"><strong style="color:#0a0a0a;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(alert.get('details',''))}</div>
-                {self.generate_pretty_snapshot_html(alert.get('raw_data', []))}
+                {self.generate_pretty_snapshot_html(alert.get('raw_data', []), lang=_lang)}
               </td>
             </tr>
 """
@@ -1710,7 +1752,7 @@ class Reporter:
             <tr>
               <td colspan="3" style="{td_style} background:#fafafa; font-size:12px; padding:16px;">
                 <div style="margin-bottom:10px; padding:12px 14px; border:1px solid #e5e5e5; border-radius:6px; background:#FFFFFF;"><strong style="color:#0a0a0a;">{esc(t('traffic_toptalkers'))}:</strong> {fmt_multiline(alert.get('details',''))}</div>
-                {self.generate_pretty_snapshot_html(alert.get('raw_data', []))}
+                {self.generate_pretty_snapshot_html(alert.get('raw_data', []), lang=_lang)}
               </td>
             </tr>
 """

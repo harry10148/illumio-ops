@@ -16,6 +16,7 @@ from io import BytesIO
 import orjson
 from loguru import logger
 
+from src.i18n import t
 from src.state_store import load_state_file, update_state_file
 
 _ASYNC_JOB_STATE_KEY = "async_query_jobs"
@@ -299,7 +300,7 @@ class AsyncJobManager:
             progress_ctx = nullcontext()
 
         with progress_ctx as prog:
-            task_id = prog.add_task(f"Polling async query...", total=None) if show_progress else None
+            task_id = prog.add_task(t("pu_progress_async_polling"), total=None) if show_progress else None
             for poll_num in range(max_polls):
                 time.sleep(2)
                 poll_status, poll_body = c._request(poll_url, timeout=15)
@@ -308,7 +309,7 @@ class AsyncJobManager:
                 poll_result = orjson.loads(poll_body)
                 state = poll_result.get("status")
                 if show_progress and prog is not None:
-                    prog.update(task_id, description=f"Async query: {state} (poll {poll_num + 1}/{max_polls})")
+                    prog.update(task_id, description=t("pu_progress_async_state", state=state, n=poll_num + 1, m=max_polls))
                 self._save_async_job_state(
                     job_href,
                     status=state,

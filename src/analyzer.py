@@ -99,6 +99,12 @@ class Analyzer:
                  subscriber_events: Any = None, subscriber_flows: Any = None,
                  cache_reader: Any = None) -> None:
         self.cm = config_manager
+        # Resolve the configured UI language once so alert criteria text (which
+        # is built here and dispatched verbatim through the reporter) localizes
+        # explicitly instead of relying on the process-global language under the
+        # concurrent monitor cycle.
+        _cfg = config_manager.config if isinstance(config_manager.config, dict) else {}
+        self._lang: str = (_cfg.get("settings", {}).get("language", "en") or "en")
         # Stored as Any: IApiClient/IReporter Protocols only declare a subset
         # of the methods Analyzer actually calls (e.g. execute_traffic_query_stream,
         # add_traffic_alert). TODO: expand the Protocols if we want stricter checking.
@@ -849,13 +855,14 @@ class Analyzer:
         self.state["alert_history"][rid] = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
         return True
 
-    def _build_criteria_str(self, rule: dict[str, Any]) -> str:
+    def _build_criteria_str(self, rule: dict[str, Any], *, lang: str | None = None) -> str:
         # Bandwidth fires on a strict '>' threshold; traffic/volume fire on '>='
         # (see _dispatch_alerts), so the advertised operator must match the type.
         op = ">" if rule.get("type") == "bandwidth" else ">="
-        crit = [f"Threshold: {op} {rule['threshold_count']}"]
+        _lang = lang or self._lang
+        crit = [t('alert_criteria_threshold', lang=_lang, op=op, n=rule['threshold_count'])]
         if rule.get('port'):
-            crit.append(f"Port:{rule['port']}")
+            crit.append(t('alert_criteria_port', lang=_lang, p=rule['port']))
         return ", ".join(crit)
 
     def _fetch_query_flows(
@@ -1284,11 +1291,11 @@ class Analyzer:
                 threshold = float(rule.get("threshold_count", 1))
                 status = f"{Colors.FAIL}{t('would_trigger')}{Colors.ENDC}" if is_trigger else f"{Colors.GREEN}{t('pass')}{Colors.ENDC}"
                 print(f"  -> {t('checking_health')}")
-                print(f"  -> Health Check: {health_type}")
-                print(f"  -> Status: {h_status if h_status is not None else 'N/A'}")
+                print(f"  -> {t('rule_health_check')}: {health_type}")
+                print(f"  -> {t('health_status')}: {h_status if h_status is not None else 'N/A'}")
                 print(t('eval_result', status=status, threshold=int(threshold)))
                 if h_msg:
-                    print(f"  -> Details: {h_msg[:200]}")
+                    print(f"  -> {t('health_details')}: {h_msg[:200]}")
 
             else:
                 # Traffic / BW / Vol Logic
@@ -1333,7 +1340,7 @@ class Analyzer:
                         matches.sort(key=lambda x: x.get('_metric_val', 0), reverse=True)
                     for i, m in enumerate(matches[:10]):
                         key = self.get_traffic_details_key(m)
-                        print(f"     [{i+1}] {key} Value: {m.get('_metric_fmt')} (PD:{m.get('policy_decision')})")
+                        print(f"     [{i+1}] {key} {t('alert_field_metric_value')}: {m.get('_metric_fmt')} (PD:{m.get('policy_decision')})")
 
         if interactive is None:
             interactive = not hasattr(sys.stdout, 'getvalue')

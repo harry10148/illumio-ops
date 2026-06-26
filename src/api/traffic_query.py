@@ -1039,7 +1039,7 @@ class TrafficQueryBuilder:
                 pending_rules.append((rule, payload, None))
 
         if cached_hits:
-            _progress(f"Reused {cached_hits}/{total} cached rule summaries...")
+            _progress(t("pu_progress_reused", done=cached_hits, total=total))
 
         job_map = {}
         submitted_count = 0
@@ -1057,7 +1057,7 @@ class TrafficQueryBuilder:
                 submitted_count += 1
                 if job_href:
                     job_map[job_href] = {"rule": rule, "payload": payload}
-                _progress(f"Submitting {submitted_count}/{len(pending_rules)}...")
+                _progress(t("pu_progress_submitting", done=submitted_count, total=len(pending_rules)))
 
         if not job_map:
             flows_by_port_totals = {}
@@ -1108,7 +1108,7 @@ class TrafficQueryBuilder:
             )
             return hit_hrefs, hit_counts
 
-        _progress(f"Polling {len(job_map)} jobs (0/{len(job_map)} done)...")
+        _progress(t("pu_progress_polling_start", total=len(job_map)))
 
         pending = set(job_map.keys())
         completed = set()
@@ -1150,8 +1150,7 @@ class TrafficQueryBuilder:
                 else:
                     still_pending.add(job_href)
             pending = still_pending
-            _progress(f"Polling... {len(completed)}/{len(job_map)} done, "
-                      f"{len(pending)} pending")
+            _progress(t("pu_progress_polling", done=len(completed), total=len(job_map), pending=len(pending)))
 
         downloaded = 0
         failed_rule_details = []
@@ -1174,7 +1173,7 @@ class TrafficQueryBuilder:
                     hit_hrefs.add(href)
                     hit_counts[href] = count
                     rule_port_summaries[href] = dict(summary.get("flows_by_port", {}) or {})
-                _progress(f"Downloading {downloaded}/{len(completed)}...")
+                _progress(t("pu_progress_downloading", done=downloaded, total=len(completed)))
 
         for job_href in sorted(failed):
             job_info = job_map.get(job_href, {})
