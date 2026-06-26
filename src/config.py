@@ -234,7 +234,11 @@ class ConfigManager:
                 loc = ".".join(str(p) for p in loc_parts)
                 redacted = _format_error_input(loc_parts, err.get('input'))
                 logger.error(f"  {loc}: {err['msg']} (input: {redacted})")
-            print(f"{Colors.FAIL}{t('error_loading_config', error=str(e)[:200])}{Colors.ENDC}")
+            # Do NOT surface raw str(e): pydantic embeds input_value=... which can
+            # echo secret field values (api.key/secret, smtp.password, tokens) to
+            # the console. The per-field detail is already logged above with
+            # _format_error_input redaction; the console gets a safe count only.
+            print(f"{Colors.FAIL}{t('error_loading_config', error=str(e.error_count()))}{Colors.ENDC}")
             # Fall back to the merged data (preserves valid sections, logs errors).
             # This keeps the app functional even with partially invalid config.
             self.models = ConfigSchema()  # typed access uses defaults
@@ -249,27 +253,6 @@ class ConfigManager:
         # Set only on the success path (after side effects complete); reading
         # config file errors above fall through to defaults but still finish here.
         self._last_loaded_at = time.time()
-
-    # Map rule filter_value → canonical name_key (for legacy alerts.json migration).
-    # Built from apply_best_practices.event_specs; kept in sync manually.
-    _LEGACY_FILTER_TO_NAME_KEY = {
-        "agent.tampering":                          "rule_agent_tampering",
-        "user.sign_in,user.login":                  "rule_login_failed",
-        "lost_agent.found":                         "rule_lost_agent",
-        "system_task.agent_missed_heartbeats_check":"rule_agent_heartbeat",
-        "system_task.agent_offline_check":          "rule_agent_offline",
-        "agent.suspend":                            "rule_agent_suspend",
-        "agent.clone_detected":                     "rule_agent_clone",
-        "request.authentication_failed":            "rule_api_auth_failed",
-        "agent.refresh_policy":                     "rule_policy_fail",
-        "rule_set.create,rule_set.update,rule_set.delete": "rule_ruleset_change",
-        "sec_policy.create":                        "rule_policy_provision",
-        "request.authorization_failed":             "rule_api_authz_failed",
-        "api_key.create,api_key.delete":            "rule_api_key_change",
-        "sec_rule.create,sec_rule.update,sec_rule.delete": "rule_sec_rule_change",
-        "workloads.unpair,agents.unpair":           "rule_bulk_unpair",
-        "authentication_settings.update":           "rule_auth_settings_change",
-    }
 
     # Map rule filter_value → canonical name_key (for legacy alerts.json migration).
     # Built from apply_best_practices.event_specs; kept in sync manually.

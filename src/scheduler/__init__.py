@@ -156,7 +156,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         logger.exception("Failed to register SIEM scheduler jobs: {}", exc)
 
     logger.info(
-        "Scheduler built: monitor=%dm report=60s rule=%ds persist=%s",
+        "Scheduler built: monitor={}m report=60s rule={}s persist={}",
         interval_minutes,
         rule_interval,
         bool(sched_cfg.get("persist")),
