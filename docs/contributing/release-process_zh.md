@@ -25,32 +25,25 @@ related_docs:
 
 ## 版本編號規則
 
-illumio-ops 採用 `<major>.<minor>.<patch>-<topic-slug>` 版本格式，
-與 git tag 命名慣例一致。
+illumio-ops 採用純 **語意化版本**（`<major>.<minor>.<patch>`，例如 `4.1.0`）。
+v4.0.0 之前的 `-<topic-slug>` codename 制已淘汰——`scripts/bump_version.sh`
+會**拒絕**任何非純 `X.Y.Z` 的版本。
 
-**`CHANGELOG.md` 中的實際範例：**
-
-| Tag | 說明 |
-|-----|------|
-| `v3.25.0-tracks-abcd` | 工作負載追蹤功能集 (tracks-abcd) |
-| `v3.26.0-i18n-architecture` | i18n 架構大改版 |
+版本的唯一真相來源為 `src/__init__.py` 的 `__version__`。
 
 **遞增規則：**
 
 - `patch` — 錯誤修復、文件更新、依賴版本釘定；不新增行為。
 - `minor` — 新功能或不破壞相容的 API 新增；向後相容。
 - `major` — 破壞 config schema、CLI flags 或 API 合約的變更。
-- `topic-slug` — 簡短、小寫、以連字號分隔，命名此次發佈主題。
-  選擇發佈後不需要重新命名的穩定名稱。
 
-**README 版本徽章格式**（來自 `README.md`）：
+**README 版本徽章**為純 `v<X.Y.Z>` shield：
 
 ```markdown
-![Version](https://img.shields.io/badge/Version-v3.25.0--tracks--abcd-blue?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v4.1.0-blue?style=flat-square)
 ```
 
-注意雙連字號編碼：shields.io 要求以 `--` 渲染單一 `-`，
-因此 `v3.25.0--tracks--abcd` 會顯示為 `v3.25.0-tracks-abcd`。
+`scripts/bump_version.sh` 會自動改寫 `README.md` 與 `README_zh.md` 兩者的徽章——無需手動編輯。
 
 ---
 
@@ -79,21 +72,22 @@ illumio-ops 採用 `<major>.<minor>.<patch>-<topic-slug>` 版本格式，
 
 ## 標籤與版本調升
 
+使用 canonical 的 bump 腳本——它會更新 `src/__init__.py`（`__version__`）、插入新的
+`CHANGELOG.md` 段落、改寫 `README.md` + `README_zh.md` 的版本徽章，然後 commit 並建立附注標籤：
+
 ```bash
-# 1. 確認分支乾淨且測試通過
-git status
-pytest -q
-
-# 2. 提交 CHANGELOG + README 徽章更新
-git add CHANGELOG.md README.md README_zh.md
-git commit -m "chore: bump version to v<X.Y.Z>-<slug>"
-
-# 3. 建立附注標籤
-git tag -a "v<X.Y.Z>-<slug>" -m "Release v<X.Y.Z>-<slug>"
-
-# 4. 推送分支與標籤
+# 從乾淨的工作樹、在發佈分支上執行
+pytest -q                          # 測試須先通過
+scripts/bump_version.sh 4.1.1      # 僅接受純 semver——codename 會被拒絕
 git push origin main
-git push origin "v<X.Y.Z>-<slug>"
+git push origin v4.1.1             # 推送腳本建立的標籤
+```
+
+若只想編輯檔案而不 commit／打標籤（例如想先手填 CHANGELOG），用 `--no-tag`：
+
+```bash
+scripts/bump_version.sh 4.1.1 --no-tag   # 只改 src/__init__.py + CHANGELOG
+# ...手動編輯 CHANGELOG.md，再自行 commit + 打標籤...
 ```
 
 > **注意：** 優先使用附注標籤（`-a`）而非輕量標籤，

@@ -25,32 +25,26 @@ related_docs:
 
 ## Versioning scheme
 
-illumio-ops uses a `<major>.<minor>.<patch>-<topic-slug>` versioning scheme,
-aligned with git tag conventions.
+illumio-ops uses plain **semantic versioning** (`<major>.<minor>.<patch>`, e.g. `4.1.0`).
+The `-<topic-slug>` codename scheme used before v4.0.0 has been retired —
+`scripts/bump_version.sh` **rejects** any version that is not a bare `X.Y.Z`.
 
-**Examples from `CHANGELOG.md`:**
-
-| Tag | What changed |
-|-----|-------------|
-| `v3.25.0-tracks-abcd` | Workload-tracking feature set (tracks-abcd) |
-| `v3.26.0-i18n-architecture` | i18n architecture overhaul |
+The version source of truth is `__version__` in `src/__init__.py`.
 
 **Bump rules:**
 
 - `patch` — bug fixes, documentation, dependency pins; no new behaviour.
 - `minor` — new features or non-breaking API additions; backward compatible.
 - `major` — breaking changes to config schema, CLI flags, or API contracts.
-- `topic-slug` — short, lowercase, hyphenated label naming the release theme.
-  Choose a slug that is stable (will not need renaming after release).
 
-**README version badge format** (from `README.md`):
+**README version badge** is a plain `v<X.Y.Z>` shield:
 
 ```markdown
-![Version](https://img.shields.io/badge/Version-v3.25.0--tracks--abcd-blue?style=flat-square)
+![Version](https://img.shields.io/badge/Version-v4.1.0-blue?style=flat-square)
 ```
 
-Note the double-hyphen encoding: shields.io requires `--` to render a single
-`-` inside a badge label, so `v3.25.0--tracks--abcd` renders as `v3.25.0-tracks-abcd`.
+`scripts/bump_version.sh` rewrites this badge in **both** `README.md` and `README_zh.md`
+automatically — you do not edit it by hand.
 
 ---
 
@@ -79,21 +73,24 @@ change "looks small" — each catches a distinct class of regression.
 
 ## Tagging & version bump
 
+Use the canonical bump script — it updates `src/__init__.py` (`__version__`), inserts a
+new `CHANGELOG.md` section, rewrites the Version badge in `README.md` + `README_zh.md`,
+then commits and creates the annotated tag:
+
 ```bash
-# 1. Ensure the branch is clean and tests pass
-git status
-pytest -q
-
-# 2. Commit the CHANGELOG + README badge update
-git add CHANGELOG.md README.md README_zh.md
-git commit -m "chore: bump version to v<X.Y.Z>-<slug>"
-
-# 3. Create an annotated tag
-git tag -a "v<X.Y.Z>-<slug>" -m "Release v<X.Y.Z>-<slug>"
-
-# 4. Push branch and tag
+# from a clean working tree, on the release branch
+pytest -q                          # tests must pass first
+scripts/bump_version.sh 4.1.1      # bare semver only — codenames are rejected
 git push origin main
-git push origin "v<X.Y.Z>-<slug>"
+git push origin v4.1.1             # push the tag the script created
+```
+
+To stage the file edits without committing/tagging (e.g. to fill in the CHANGELOG by
+hand first), use `--no-tag`:
+
+```bash
+scripts/bump_version.sh 4.1.1 --no-tag   # edits src/__init__.py + CHANGELOG only
+# ...edit CHANGELOG.md, then commit + tag by hand...
 ```
 
 > **Note:** Annotated tags (`-a`) are preferred over lightweight tags because
