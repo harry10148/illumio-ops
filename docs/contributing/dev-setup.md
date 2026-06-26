@@ -120,7 +120,7 @@ Test files live flat under `tests/`:
 | GUI / web | `test_gui_*.py` | Flask routes, settings subtab, auth |
 | i18n | `test_i18n_*.py`, `test_*_i18n.py` | Key parity, quality, audit |
 | Cache | `test_cache_*.py` | PCE cache read/write/wiring |
-| Reports | `test_report*.py`, `test_html_*.py` | HTML/XLSX/PDF report structure |
+| Reports | `test_report*.py`, `test_html_*.py` | HTML/XLSX report structure |
 | Scheduler | `test_cron_*.py` | APScheduler time / timezone |
 | Integration | `test_integrations_e2e.py`, `test_phase_*_e2e.py` | Multi-subsystem |
 

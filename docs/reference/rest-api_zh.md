@@ -1,7 +1,7 @@
 ---
 title: REST API
 audience: [api, developer, security]
-last_verified: 2026-05-15
+last_verified: 2026-06-26
 verified_against:
   - src/api/
   - src/gui/routes/
@@ -9,7 +9,7 @@ verified_against:
   - commit 4f78332
 related_docs:
   - cli.md
-  - ../user-guide/siem-integration.md
+  - ../_archive/user-guide/siem-integration.md
   - ../architecture/overview.md
   - glossary.md
 ---
@@ -19,6 +19,8 @@ related_docs:
 > 🔍 最後驗證 **2026-05-15** 對 commit `4f78332` — 詳見 frontmatter
 
 # REST API
+
+> ⚠️ **此中文版端點清單尚未同步最新路由——請以 [English 版](rest-api.md)（已於 2026-06-26 依原始碼重建）為準。**
 
 所有端點均由 illumio-ops 的 Flask GUI 提供
 （`src/gui/`、`src/siem/web.py`、`src/pce_cache/web.py`）。

@@ -117,7 +117,7 @@ pytest tests/test_i18n_audit.py tests/test_i18n_quality.py  # i18n 閘門
 | GUI / Web | `test_gui_*.py` | Flask 路由、設定分頁、認證 |
 | i18n | `test_i18n_*.py`、`test_*_i18n.py` | Key 對稱性、品質、審計 |
 | 快取 | `test_cache_*.py` | PCE 快取讀寫與接線 |
-| 報表 | `test_report*.py`、`test_html_*.py` | HTML/XLSX/PDF 報表結構 |
+| 報表 | `test_report*.py`、`test_html_*.py` | HTML/XLSX 報表結構 |
 | 排程器 | `test_cron_*.py` | APScheduler 時間 / 時區 |
 | 整合 | `test_integrations_e2e.py`、`test_phase_*_e2e.py` | 跨子系統 |
 
