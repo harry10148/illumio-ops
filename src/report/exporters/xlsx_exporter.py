@@ -21,6 +21,17 @@ _HEADER_FONT = Font(bold=True, color="FFFFFF")
 _HEADER_FILL = PatternFill("solid", fgColor="375379")
 _ALERT_FILL = PatternFill("solid", fgColor="FFC7CE")
 _ALERT_TOKENS = ("blocked", "deny", "violat", "critical", "red_flag")
+_FORMULA_PREFIXES = ("=", "+", "-", "@")
+
+
+def _neutralize(val: Any) -> Any:
+    """Defuse spreadsheet/CSV formula injection. A str that Excel would treat as a
+    formula (leading = + - @) is prefixed with a single quote so openpyxl stores it
+    as text rather than a live formula. Non-str values pass through unchanged."""
+    if isinstance(val, str) and val[:1] in _FORMULA_PREFIXES:
+        return "'" + val
+    return val
+
 
 def _write_module_sheet(wb: Workbook, name: str, module_data: dict[str, Any]) -> None:
     # openpyxl sheet names capped at 31 chars and cannot contain :\/?*[]
@@ -38,7 +49,7 @@ def _write_module_sheet(wb: Workbook, name: str, module_data: dict[str, Any]) ->
         # Write header
         headers = list(table[0].keys())
         for col_idx, header in enumerate(headers, 1):
-            cell = ws.cell(row=row, column=col_idx, value=str(header))
+            cell = ws.cell(row=row, column=col_idx, value=_neutralize(str(header)))
             cell.font = _HEADER_FONT
             cell.fill = _HEADER_FILL
             cell.alignment = Alignment(horizontal="center")
@@ -52,7 +63,7 @@ def _write_module_sheet(wb: Workbook, name: str, module_data: dict[str, Any]) ->
             row_text = " ".join(str(v).lower() for v in row_vals)
             is_alert = any(tok in row_text for tok in _ALERT_TOKENS)
             for col_idx, val in enumerate(row_vals, 1):
-                cell = ws.cell(row=row, column=col_idx, value=val)
+                cell = ws.cell(row=row, column=col_idx, value=_neutralize(val))
                 if is_alert:
                     cell.fill = _ALERT_FILL
             row += 1

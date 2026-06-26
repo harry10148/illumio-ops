@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import html
 from loguru import logger
 import os
 
@@ -108,7 +109,7 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False, l
             return _truncate_long_cell(row[col])
         if norm in ("event_type", "action"):
             return _wbr_at_dots(row[col])
-        return "" if row[col] is None else str(row[col])
+        return "" if row[col] is None else html.escape(str(row[col]))
 
     return render_df_table(
         df,
@@ -308,6 +309,7 @@ class AuditHtmlExporter:
         if not items:
             return ""
         _s = self._s
+        import html as _html
         html = (
             f"<div style='margin-bottom:14px; padding:12px 16px; background:#FEF2F2; border:1px solid #FCA5A5; border-radius:8px;'>"
             f"<div style='font-weight:700; font-size:13px; color:#991B1B; margin-bottom:6px;'>{_s('rpt_au_high_impact_title')}</div>"
@@ -315,12 +317,12 @@ class AuditHtmlExporter:
         )
         for item in items:
             wa = item.get("workloads_affected", 0)
-            ts = item.get("timestamp", "")
-            et = item.get("event_type", "")
-            actor = item.get("actor", "N/A")
-            src_ip = item.get("src_ip", "")
-            resource_name = item.get("resource_name", "")
-            status = item.get("status", "")
+            ts = _html.escape(str(item.get("timestamp", "")))
+            et = _html.escape(str(item.get("event_type", "")))
+            actor = _html.escape(str(item.get("actor", "N/A")))
+            src_ip = _html.escape(str(item.get("src_ip", "")))
+            resource_name = _html.escape(str(item.get("resource_name", "")))
+            status = _html.escape(str(item.get("status", "")))
             html += (
                 f"<div style='display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 10px; background:#FFF5F5; "
                 f"border-radius:6px; margin-bottom:6px; border-left:4px solid #EF4444;'>"

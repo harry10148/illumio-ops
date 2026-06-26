@@ -1,6 +1,8 @@
 """Shared 'needs attention' concern card — severity + actor/IP/target + recommendation."""
 from __future__ import annotations
 
+import html
+
 from src.report.analysis.audit.audit_risk import RISK_BG, RISK_COLOR
 from src.report.exporters.report_i18n import STRINGS
 
@@ -45,14 +47,14 @@ def render_concern_cards(items: list, lang: str = "en") -> str:
     for item in sorted(items, key=_sort_key):
         risk = item.get("risk", "INFO")
         badge = _risk_badge(risk)
-        event_type = item.get("event_type", "")
+        event_type = html.escape(str(item.get("event_type", "")))
         count = item.get("count", 0)
-        summary = item.get("summary", "")
-        rec = item.get("recommendation", "")
-        actors_str = ", ".join(str(a) for a in item.get("actors", [])[:3]) or "N/A"
-        targets_str = ", ".join(str(a) for a in item.get("targets", [])[:3])
-        resources_str = ", ".join(str(a) for a in item.get("resources", [])[:3])
-        src_ips_str = ", ".join(str(ip) for ip in item.get("src_ips", [])[:3])
+        summary = html.escape(str(item.get("summary", "")))
+        rec = html.escape(str(item.get("recommendation", "")))
+        actors_str = ", ".join(html.escape(str(a)) for a in item.get("actors", [])[:3]) or "N/A"
+        targets_str = ", ".join(html.escape(str(a)) for a in item.get("targets", [])[:3])
+        resources_str = ", ".join(html.escape(str(a)) for a in item.get("resources", [])[:3])
+        src_ips_str = ", ".join(html.escape(str(ip)) for ip in item.get("src_ips", [])[:3])
 
         row = (
             f'<div class="concern-card audit-attn-item risk-{risk}">'

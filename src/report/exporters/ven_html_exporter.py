@@ -161,7 +161,7 @@ class VenHtmlExporter:
                     full = html.escape(val_str, quote=True)
                     return (f'<span title="{full}">{first} '
                             f'<span class="ip-more">+{len(parts) - 1}</span></span>')
-                return val_str
+                return html.escape(val_str)
             return render_df_table(df, col_i18n=_COL_I18N, no_data_key=no_data_key,
                                    render_cell=_render_cell, lang=_sl)
 

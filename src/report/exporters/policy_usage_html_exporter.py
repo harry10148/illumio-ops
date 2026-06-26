@@ -110,7 +110,7 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", lang: str = "en") -> str:
             if val_str.lower() in ("true", "1", "yes"):
                 return f'<span class="badge-hit">{_s("rpt_yes")}</span>'
             return f'<span class="badge-unused">{_s("rpt_no")}</span>'
-        return val_str
+        return _e(val_str)
 
     return render_df_table(
         df,
@@ -365,7 +365,7 @@ class PolicyUsageHtmlExporter:
             return ""
         rows = "".join(
             '<div class="attention-row">'
-            f'<span>{item.get("ruleset", "")}</span>'
+            f'<span>{_e(item.get("ruleset", ""))}</span>'
             f'<span class="badge-unused">{item.get("unused_count", 0)}</span>'
             "</div>"
             for item in attention_items
@@ -396,7 +396,7 @@ class PolicyUsageHtmlExporter:
             "</div>"
             for label, value in rows
         )
-        notes_html = "".join(f"<li>{note}</li>" for note in notes)
+        notes_html = "".join(f"<li>{_e(note)}</li>" for note in notes)
         if notes_html:
             notes_html = f'<ul style="margin:10px 0 0 18px;">{notes_html}</ul>'
         return (

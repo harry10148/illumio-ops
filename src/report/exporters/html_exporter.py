@@ -186,8 +186,8 @@ def _format_evidence(evidence: dict, lang: str | None = None) -> str:
             v_display = v_str
         pills.append(
             f'<div class="ev-pill">'
-            f'<span class="ev-label">{label}</span>'
-            f'<b>{v_display}</b>'
+            f'<span class="ev-label">{html.escape(label)}</span>'
+            f'<b>{html.escape(v_display)}</b>'
             f'</div>'
         )
     return '<div class="finding-evidence">' + ''.join(pills) + '</div>'
@@ -375,14 +375,14 @@ def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
                 _orig = val
             _orig_up = str(_orig).upper()
             if _orig_up in _SEVERITY_TOKENS:
-                return f'<span class="badge badge-{_orig_up}">{val}</span>'
+                return f'<span class="badge badge-{_orig_up}">{html.escape(str(val))}</span>'
         if col in byte_cols:
             return _fmt_bytes(val)
         if col in bw_cols:
             return _fmt_bw(val)
         if col in int_cols:
             return _fmt_int_cell(val)
-        return '' if val is None else str(val)
+        return '' if val is None else html.escape(str(val))
 
     return render_df_table(
         df,
@@ -467,8 +467,8 @@ class _TrafficReportBase:
         key_findings_html = ''.join(
             '<p style="margin-bottom:8px"><span class="badge badge-' +
             kf.get('severity', 'INFO') + '">' + kf.get('severity', '') + '</span>&nbsp;' +
-            kf.get('finding', '') + ' <em style="color:#718096">&rarr; ' +
-            kf.get('action', '') + '</em></p>'
+            html.escape(kf.get('finding', '')) + ' <em style="color:#718096">&rarr; ' +
+            html.escape(kf.get('action', '')) + '</em></p>'
             for kf in mod12.get('key_findings', [])
         ) or f'<p class="note">{_s("rpt_no_findings")}</p>'
         attack_summary_html = self._attack_summary_html(mod12) if profile == 'security_risk' else ''
@@ -765,16 +765,16 @@ class _TrafficReportBase:
             return ''.join(
                 '<p style="margin-bottom:8px"><span class="badge badge-' +
                 str(item.get('severity', 'INFO')) + '">' + str(item.get('severity', 'INFO')) +
-                '</span>&nbsp;' + str(item.get('finding', '')) +
-                ' <em style="color:#718096">&rarr; ' + str(item.get('action', '')) + '</em>' +
+                '</span>&nbsp;' + html.escape(str(item.get('finding', ''))) +
+                ' <em style="color:#718096">&rarr; ' + html.escape(str(item.get('action', ''))) + '</em>' +
                 '</p>'
                 for item in section_items[:3]
             )
 
         action_matrix = mod12.get('action_matrix', []) or []
         action_html = ''.join(
-            '<p style="margin-bottom:8px"><b>' + str(item.get('action_code', '')) + '</b>: ' +
-            str(item.get('action', '')) +
+            '<p style="margin-bottom:8px"><b>' + html.escape(str(item.get('action_code', ''))) + '</b>: ' +
+            html.escape(str(item.get('action', ''))) +
             '</p>'
             for item in action_matrix[:3]
         ) or '<p class="note">No data</p>'
@@ -1235,8 +1235,8 @@ class _TrafficReportBase:
                     f'<div class="finding-card sev-{f.severity}">'
                     f'<div class="finding-header">'
                     f'<span class="badge badge-{f.severity}">{f.severity}</span>'
-                    f'<span class="finding-rule-id">{f.rule_id}</span>'
-                    f'<span class="finding-title">{rule_name}</span>'
+                    f'<span class="finding-rule-id">{html.escape(str(f.rule_id))}</span>'
+                    f'<span class="finding-title">{html.escape(str(rule_name))}</span>'
                     f'{tech_html}'
                     f'</div>'
                 )
@@ -1249,11 +1249,11 @@ class _TrafficReportBase:
                         f' <span>{how_text}</span></p>'
                     )
                 cards_html += (
-                    f'<p class="finding-desc">{f.description}</p>'
+                    f'<p class="finding-desc">{html.escape(str(f.description))}</p>'
                     + evidence_html
                     + f'<div class="finding-rec">'
                     f'<b>{_s("rpt_recommendation_label")}</b> '
-                    f'{f.recommendation}</div>'
+                    f'{html.escape(str(f.recommendation))}</div>'
                     f'</div>'
                 )
             cards_html += '</div>'
@@ -1509,6 +1509,7 @@ class _TrafficReportBase:
         return html
 
     def _mod_ringfence_html(self) -> str:
+        import html as _html
         _s = self._s
         m = self._r.get('mod_ringfence', {})
         if m.get('skipped'):
@@ -1520,7 +1521,7 @@ class _TrafficReportBase:
         for a in top_apps[:10]:
             app_name = a.get('app', a.get('index', ''))
             flows = a.get('flows', a.get(0, ''))
-            rows += f'<tr><td>{app_name}</td><td>{flows}</td></tr>'
+            rows += f'<tr><td>{_html.escape(str(app_name))}</td><td>{flows}</td></tr>'
         html = (
             f'<h4>{_s("rpt_mod_ringfence_top_apps_h4")}</h4>'
             '<div class="report-table-panel report-table-panel--compact">'
