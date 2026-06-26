@@ -338,7 +338,7 @@ def dlq_export():
             w.writerow([
                 row.id, row.destination, row.source_table, row.source_id,
                 row.retries, row.last_error, row.payload_preview,
-                row.quarantined_at.isoformat(),
+                row.quarantined_at.isoformat() if row.quarantined_at else "",
             ])
     return Response(buf.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=dlq.csv"})

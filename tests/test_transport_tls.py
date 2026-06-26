@@ -135,6 +135,23 @@ def test_tls_transport_verify_disabled_skips_cert_check(tmp_path):
     assert any("hello tls no-verify" in m for m in srv.received)
 
 
+def test_tls_connect_failure_does_not_leave_socket_set():
+    """Regression: when connect() fails, _connect must not leave self._sock
+    pointing at an unconnected (leaked) SSLSocket — it must close + stay None."""
+    from src.siem.transports.syslog_tls import SyslogTLSTransport
+
+    # Reserve then release a port so nothing is listening — connect() is refused.
+    probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    probe.bind(("127.0.0.1", 0))
+    dead_port = probe.getsockname()[1]
+    probe.close()
+
+    tr = SyslogTLSTransport("127.0.0.1", dead_port, tls_verify=False, timeout=2.0)
+    with pytest.raises(OSError):
+        tr._connect()
+    assert tr._sock is None
+
+
 def test_tls_transport_reconnects_after_connection_lost(tmp_path):
     """Transport reconnects transparently when the server drops the connection."""
     cert_path, key_path = _generate_self_signed(tmp_path)

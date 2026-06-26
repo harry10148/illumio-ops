@@ -96,10 +96,40 @@ def mask_event(event: dict[str, Any], *, mask_pii: bool = False) -> dict[str, An
     return masked
 
 
+def _mask_flow_user(flow: dict[str, Any]) -> None:
+    """Redact the OS user / process attribution the flow formatters emit.
+
+    The CEF and normalized-JSON flow formatters read ``service.user_name`` /
+    ``service.process_name`` (and the flat ``un`` / ``pn``) and emit them as
+    ``un`` / ``pn``. ``user_name`` is the OS user owning the connection —
+    genuine user attribution — so it must be redacted when masking is on.
+    """
+    svc = flow.get("service")
+    if isinstance(svc, dict):
+        for key in ("user_name", "process_name"):
+            if svc.get(key):
+                svc[key] = REDACTED
+    for key in ("un", "pn"):
+        if flow.get(key):
+            flow[key] = REDACTED
+
+
 def mask_flow(flow: dict[str, Any], *, mask_pii: bool = False) -> dict[str, Any]:
-    """Traffic flows are non-PII by nature (src/dst IPs + ports + labels are
-    operational data, not personal). This is a placeholder that currently
-    returns the flow unchanged but exists so callers don't need to special-case
-    event-vs-flow when invoking masking. Future-proof for if PCE adds
-    user-attribution fields to flows."""
-    return flow
+    """Return a possibly-masked copy of a traffic flow.
+
+    Flow 5-tuples, ports and labels are operational data, but PCE traffic
+    flows can carry ``service.user_name`` (the OS user owning the connection)
+    and ``service.process_name``, which the formatters forward as ``un`` /
+    ``pn``. When ``mask_pii`` is True these are redacted.
+
+    When ``mask_pii`` is False (default), the flow is returned unchanged (same
+    object). When True, a deep copy is returned with the user-attribution
+    fields redacted; the caller's flow object is never mutated.
+    """
+    if not mask_pii:
+        return flow
+    if not isinstance(flow, dict):
+        return flow
+    masked = deepcopy(flow)
+    _mask_flow_user(masked)
+    return masked

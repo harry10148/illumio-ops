@@ -34,8 +34,18 @@ class SyslogTLSTransport(Transport):
             ctx.verify_mode = ssl.CERT_NONE
         raw = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         raw.settimeout(self._timeout)
-        self._sock = ctx.wrap_socket(raw, server_hostname=self._host)
-        self._sock.connect((self._host, self._port))
+        sock = ctx.wrap_socket(raw, server_hostname=self._host)
+        try:
+            sock.connect((self._host, self._port))
+        except Exception:
+            # Don't leak the wrapped socket fd if the handshake/connect fails;
+            # only publish self._sock after a successful connect.
+            try:
+                sock.close()
+            except Exception:
+                pass
+            raise
+        self._sock = sock
 
     def send(self, payload: str) -> None:
         data = (payload + "\n").encode("utf-8")

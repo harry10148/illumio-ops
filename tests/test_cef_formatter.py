@@ -217,3 +217,24 @@ def test_cef_escapes_special_characters():
     assert _cef_escape("a=b") == r"a\=b"
     assert _cef_escape("a|b") == r"a\|b"
     assert _cef_escape("a\\b") == r"a\\b"
+
+
+def test_cef_header_escape_leaves_equals_literal():
+    """In CEF *headers* only '\\' and '|' are special; '=' is literal there."""
+    from src.siem.formatters.cef import _cef_header_escape
+    assert _cef_header_escape("a=b") == "a=b"        # '=' NOT escaped in header
+    assert _cef_header_escape("a|b") == r"a\|b"
+    assert _cef_header_escape("a\\b") == r"a\\b"
+
+
+def test_cef_event_header_does_not_backslash_equals():
+    """event_type sits in the DeviceEventClassID/Name header positions, so an
+    embedded '=' must stay literal, not get a spurious backslash."""
+    from src.siem.formatters.cef import CEFFormatter
+    ev = {
+        "uuid": "h-1", "timestamp": "2026-04-08T12:00:00Z",
+        "event_type": "weird=type", "severity": "info", "status": "success",
+    }
+    line = CEFFormatter().format_event(ev)
+    assert "|weird=type|weird=type|" in line
+    assert r"weird\=type" not in line

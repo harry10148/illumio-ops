@@ -130,9 +130,47 @@ def test_mask_handles_missing_optional_fields():
     assert out == event  # nothing to redact
 
 
-def test_mask_flow_default_passthrough():
+def test_mask_flow_disabled_passthrough():
+    """mask_pii=False (and the default) is a zero-copy passthrough."""
     flow = {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "dst_port": 443}
-    assert mask_flow(flow, mask_pii=True) is flow
+    assert mask_flow(flow, mask_pii=False) is flow
+    assert mask_flow(flow) is flow
+
+
+def test_mask_flow_redacts_service_user_and_process_name():
+    """mask_pii=True must redact the OS user (un) and process name (pn) the
+    formatters emit from service.user_name / service.process_name."""
+    flow = {
+        "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "dst_port": 443,
+        "service": {"port": 443, "proto": 6,
+                    "user_name": "LAB\\Administrator", "process_name": "onedrive.exe"},
+    }
+    snapshot = deepcopy(flow)
+    out = mask_flow(flow, mask_pii=True)
+    assert out is not flow                  # deep copy
+    assert flow == snapshot, "caller's flow was mutated"
+    assert out["service"]["user_name"] == REDACTED
+    assert out["service"]["process_name"] == REDACTED
+
+
+def test_mask_flow_redacts_flat_un_pn():
+    """Flat-form un/pn (already-extracted) are redacted too."""
+    flow = {"src_ip": "1.1.1.1", "un": "alice", "pn": "curl"}
+    out = mask_flow(flow, mask_pii=True)
+    assert out["un"] == REDACTED
+    assert out["pn"] == REDACTED
+
+
+def test_masked_flow_hides_username_in_cef_output():
+    """End-to-end: a masked flow must not leak the username into CEF output."""
+    from src.siem.formatters.cef import CEFFormatter
+    flow = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2",
+            "service": {"port": 22, "proto": 6,
+                        "user_name": "root", "process_name": "sshd"}}
+    line = CEFFormatter().format_flow(mask_flow(flow, mask_pii=True))
+    assert "un=root" not in line
+    assert "pn=sshd" not in line
+    assert "un=[REDACTED]" in line
 
 
 def test_dispatcher_builder_threads_mask_pii_through():

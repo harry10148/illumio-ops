@@ -136,6 +136,39 @@ def test_transport_for_hec_constructs_url():
     assert isinstance(t, SplunkHECTransport)
 
 
+def test_transport_for_tls_threads_ca_bundle_and_verify():
+    """Regression: _transport_for must pass tls_ca_bundle (and tls_verify) into
+    the TLS transport, mirroring the tester — otherwise custom-CA destinations
+    pass 'Test' but fail every real dispatch."""
+    from src.siem.dispatcher import _transport_for
+    from src.config_models import SiemDestinationSettings
+    cfg = SiemDestinationSettings(
+        name="t", transport="tls", host="siem.corp", port=6514,
+        tls_verify=True, tls_ca_bundle="/etc/pki/ca.pem",
+    )
+    t = _transport_for(cfg)
+    from src.siem.transports.syslog_tls import SyslogTLSTransport
+    assert isinstance(t, SyslogTLSTransport)
+    assert t._ca_bundle == "/etc/pki/ca.pem"
+    assert t._tls_verify is True
+
+
+def test_transport_for_hec_threads_verify_tls():
+    """Regression: _transport_for must forward tls_verify to the HEC transport
+    so an operator's tls_verify=False (dev/self-signed lab) is honored in
+    production dispatch, not just in the 'Test' button."""
+    from src.siem.dispatcher import _transport_for
+    from src.config_models import SiemDestinationSettings
+    cfg = SiemDestinationSettings(
+        name="h", transport="hec", host="splunk.corp", port=8088,
+        hec_token="tok", profile="dev", tls_verify=False,
+    )
+    t = _transport_for(cfg)
+    from src.siem.transports.splunk_hec import SplunkHECTransport
+    assert isinstance(t, SplunkHECTransport)
+    assert t._verify is False
+
+
 def test_enqueue_new_records_anti_join_only_undispatched(sf):
     """Regression: enqueue_new_records must use a SQL anti-join (NOT EXISTS),
     not load the dispatched-id set + `id NOT IN (...)` which blew SQLite's

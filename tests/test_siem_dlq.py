@@ -47,6 +47,45 @@ def test_dlq_replay_creates_dispatch_rows(sf):
     assert all(r.status == "pending" for r in rows)
 
 
+def test_dlq_replay_deletes_entries_and_is_not_double_forwarded(sf):
+    """Regression: replay() must remove the DeadLetter rows it requeues so the
+    queue reflects reality and a second replay can't re-enqueue the same records."""
+    from src.siem.dlq import DeadLetterQueue
+    _seed_dlq(sf, count=2)
+    dlq = DeadLetterQueue(sf)
+
+    assert dlq.replay("dest1", limit=10) == 2
+    with sf() as s:
+        assert s.execute(select(DeadLetter)).scalars().all() == []  # entries gone
+
+    # Second replay is a no-op — no duplicate dispatch rows.
+    assert dlq.replay("dest1", limit=10) == 0
+    with sf() as s:
+        dispatch_rows = s.execute(select(SiemDispatch)).scalars().all()
+    assert len(dispatch_rows) == 2
+
+
+def test_dlq_replay_ids_deletes_and_is_idempotent(sf):
+    """Regression: replay_ids() deletes the replayed entry, so a repeat call
+    reports 'not found' instead of enqueuing a duplicate dispatch row."""
+    from src.siem.dlq import DeadLetterQueue
+    _seed_dlq(sf, count=2)
+    with sf() as s:
+        ids = [e.id for e in s.execute(select(DeadLetter)).scalars().all()]
+
+    dlq = DeadLetterQueue(sf)
+    res1 = dlq.replay_ids(ids)
+    assert all(r["ok"] for r in res1)
+    with sf() as s:
+        assert s.execute(select(DeadLetter)).scalars().all() == []
+
+    res2 = dlq.replay_ids(ids)
+    assert all((not r["ok"] and r["error"] == "not found") for r in res2)
+    with sf() as s:
+        dispatch_rows = s.execute(select(SiemDispatch)).scalars().all()
+    assert len(dispatch_rows) == 2  # second replay added nothing
+
+
 def test_dlq_purge_removes_old_entries(sf):
     from src.siem.dlq import DeadLetterQueue
     _seed_dlq(sf, count=3, days_old=60)

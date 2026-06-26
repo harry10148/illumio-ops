@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
-from src.pce_cache.models import Base, PceEvent, PceTrafficFlowRaw, SiemDispatch
+from src.pce_cache.models import Base, DeadLetter, PceEvent, PceTrafficFlowRaw, SiemDispatch
 
 
 @pytest.fixture
@@ -124,7 +124,8 @@ def test_run_siem_dispatch_calls_tick_and_enqueue():
 
 
 def test_dispatcher_marks_failed_when_payload_none(sf):
-    """When _build_payload returns None, dispatch row must transition to 'failed'."""
+    """When _build_payload returns None, the dispatch row transitions to 'failed'
+    AND the event is quarantined to the DLQ (inspectable/replayable, not dropped)."""
     from src.siem.dispatcher import DestinationDispatcher, enqueue
     from src.siem.formatters.cef import CEFFormatter
     from unittest.mock import MagicMock
@@ -147,5 +148,7 @@ def test_dispatcher_marks_failed_when_payload_none(sf):
 
     with sf() as s:
         row = s.execute(sqlalchemy.select(SiemDispatch)).scalars().first()
+        dlq = s.execute(sqlalchemy.select(DeadLetter)).scalars().all()
     assert row.status == "failed"
-    assert row.last_error == "payload_build_failed"
+    assert len(dlq) == 1
+    assert dlq[0].last_error == "payload_build_failed"

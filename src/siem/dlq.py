@@ -39,6 +39,14 @@ class DeadLetterQueue:
                     queued_at=now,
                 ))
                 requeued += 1
+            # Remove the replayed DLQ entries in the same transaction so the
+            # queue reflects reality and a second replay can't re-enqueue them
+            # (avoids double-forwarding the same source record to the SIEM).
+            s.execute(
+                delete(DeadLetter).where(
+                    DeadLetter.id.in_([entry.id for entry in entries])
+                )
+            )
         return requeued
 
     def replay_ids(self, ids: list[int]) -> list[dict]:
@@ -59,6 +67,9 @@ class DeadLetterQueue:
                     retries=0,
                     queued_at=now,
                 ))
+                # Delete the replayed entry so a repeat replay is a no-op
+                # ('not found') instead of re-enqueuing a duplicate dispatch.
+                s.delete(dl)
                 out.append({"id": dl_id, "ok": True})
         return out
 

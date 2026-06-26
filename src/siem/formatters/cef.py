@@ -36,6 +36,16 @@ def _cef_escape(value: str) -> str:
     return value
 
 
+def _cef_header_escape(value: str) -> str:
+    """Escape CEF *header* fields. Per the CEF spec only '\\' and '|' are
+    special in the header; '=' is a literal there (unlike extension values)."""
+    value = value.replace("\\", "\\\\")
+    value = value.replace("|", "\\|")
+    value = value.replace("\n", "\\n")
+    value = value.replace("\r", "\\r")
+    return value
+
+
 def _ts_to_epoch_ms(ts_str: str) -> int:
     if ts_str.endswith("Z"):
         ts_str = ts_str[:-1] + "+00:00"
@@ -49,7 +59,7 @@ class CEFFormatter(Formatter):
     def format_event(self, event: dict) -> str:
         sev_str = str(event.get("severity", "info")).lower()
         sev_num = _SEVERITY_MAP.get(sev_str, 3)
-        event_type = _cef_escape(str(event.get("event_type", "unknown")))
+        event_type = _cef_header_escape(str(event.get("event_type", "unknown")))
 
         header = (
             f"CEF:0|Illumio|PCE|{_PCE_VERSION}"

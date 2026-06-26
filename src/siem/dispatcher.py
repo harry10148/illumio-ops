@@ -86,13 +86,10 @@ class DestinationDispatcher:
         for dispatch_row in rows:
             payload = self._build_payload(dispatch_row)
             if payload is None:
-                with self._sf.begin() as s:
-                    s.execute(
-                        update(SiemDispatch)
-                        .where(SiemDispatch.id == dispatch_row.id)
-                        .values(status="failed", last_error="payload_build_failed")
-                    )
-                failed += 1
+                # Route build failures through the DLQ (not a bare status='failed')
+                # so the dropped event stays inspectable and replayable.
+                self._quarantine(dispatch_row, None, "payload_build_failed")
+                quarantined += 1
                 continue
             try:
                 self._transport.send(payload)
@@ -148,7 +145,7 @@ class DestinationDispatcher:
             logger.exception("Failed to build payload for dispatch row {}: {}", row.id, exc)
         return None
 
-    def _quarantine(self, row: SiemDispatch, payload: str, error: str) -> None:
+    def _quarantine(self, row: SiemDispatch, payload: Optional[str], error: str) -> None:
         now = datetime.now(timezone.utc)
         with self._sf.begin() as s:
             s.add(DeadLetter(
@@ -157,7 +154,7 @@ class DestinationDispatcher:
                 destination=self._name,
                 retries=row.retries + 1,
                 last_error=error[:4000],
-                payload_preview=payload[:512],
+                payload_preview=payload[:512] if payload else "",
                 quarantined_at=now,
             ))
             s.execute(
@@ -195,11 +192,19 @@ def _transport_for(dest_cfg):
         return SyslogTCPTransport(host, port)
     elif transport_type == "tls":
         from src.siem.transports.syslog_tls import SyslogTLSTransport
-        return SyslogTLSTransport(host, port, tls_verify=dest_cfg.tls_verify)
+        return SyslogTLSTransport(
+            host, port,
+            tls_verify=dest_cfg.tls_verify,
+            ca_bundle=dest_cfg.tls_ca_bundle,
+        )
     elif transport_type == "hec":
         from src.siem.transports.splunk_hec import SplunkHECTransport
         url = f"https://{host}:{port}"
-        return SplunkHECTransport(url, token=dest_cfg.hec_token or "")
+        return SplunkHECTransport(
+            url,
+            token=dest_cfg.hec_token or "",
+            verify_tls=dest_cfg.tls_verify,
+        )
     raise ValueError(f"Unknown transport: {transport_type}")
 
 
