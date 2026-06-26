@@ -6,7 +6,7 @@ from collections import defaultdict, deque
 import pandas as pd
 
 from .attack_posture import build_app_display, make_posture_item, rank_posture_items, _enrich_app_display
-from src.i18n import t, get_language
+from src.i18n import t
 
 _LATERAL_PORTS = {
     445: "SMB",
@@ -440,7 +440,7 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4,
             "nodes": _chart_nodes,
             "edges": _chart_edges,
         },
-        "i18n": {"lang": get_language()},
+        "i18n": {"lang": lang},
     }
 
     return {

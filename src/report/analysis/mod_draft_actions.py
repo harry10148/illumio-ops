@@ -8,6 +8,23 @@ from __future__ import annotations
 import pandas as pd
 
 
+def _pair_cols(flows_df: pd.DataFrame) -> tuple[str, str]:
+    """Resolve the src/dst columns. The unified DataFrame uses src_ip/dst_ip;
+    older callers pass src/dst. Mirrors R05DraftReportedMismatch."""
+    src_col = "src" if "src" in flows_df.columns else "src_ip"
+    dst_col = "dst" if "dst" in flows_df.columns else "dst_ip"
+    return src_col, dst_col
+
+
+def _top_pairs(sub: pd.DataFrame, src_col: str, dst_col: str) -> list[dict]:
+    """Top (src, dst, port) flow groups, emitted with canonical src/dst keys."""
+    return (sub.groupby([src_col, dst_col, "port"]).size()
+            .sort_values(ascending=False).head(20)
+            .reset_index(name="flows")
+            .rename(columns={src_col: "src", dst_col: "dst"})
+            .to_dict("records"))
+
+
 def analyze(flows_df: pd.DataFrame) -> dict:
     if "draft_policy_decision" not in flows_df.columns:
         return {"skipped": True, "reason": "no draft_policy_decision column"}
@@ -20,11 +37,9 @@ def analyze(flows_df: pd.DataFrame) -> dict:
 
 
 def _override_deny_block(flows_df):
+    src_col, dst_col = _pair_cols(flows_df)
     mask = flows_df["draft_policy_decision"] == "blocked_by_override_deny"
-    sub = flows_df[mask]
-    top = (sub.groupby(["src", "dst", "port"]).size()
-           .sort_values(ascending=False).head(20)
-           .reset_index(name="flows").to_dict("records"))
+    top = _top_pairs(flows_df[mask], src_col, dst_col)
     return {
         "count": int(mask.sum()),
         "top_pairs": top,
@@ -33,20 +48,16 @@ def _override_deny_block(flows_df):
 
 
 def _potentially_override_deny_block(flows_df):
+    src_col, dst_col = _pair_cols(flows_df)
     mask = flows_df["draft_policy_decision"] == "potentially_blocked_by_override_deny"
-    sub = flows_df[mask]
-    top = (sub.groupby(["src", "dst", "port"]).size()
-           .sort_values(ascending=False).head(20)
-           .reset_index(name="flows").to_dict("records"))
+    top = _top_pairs(flows_df[mask], src_col, dst_col)
     return {"count": int(mask.sum()), "top_pairs": top}
 
 
 def _allowed_across_boundary_block(flows_df):
+    src_col, dst_col = _pair_cols(flows_df)
     mask = flows_df["draft_policy_decision"] == "allowed_across_boundary"
-    sub = flows_df[mask]
-    top = (sub.groupby(["src", "dst", "port"]).size()
-           .sort_values(ascending=False).head(20)
-           .reset_index(name="flows").to_dict("records"))
+    top = _top_pairs(flows_df[mask], src_col, dst_col)
     return {
         "count": int(mask.sum()),
         "top_pairs": top,

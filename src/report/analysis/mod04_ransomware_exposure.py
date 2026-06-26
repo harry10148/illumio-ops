@@ -1,10 +1,7 @@
 """Module 4: Ransomware Exposure Analysis."""
 from __future__ import annotations
 import pandas as pd
-from src.i18n import t, get_language
-
-_RISK_COLORS = {'critical': 'CRITICAL', 'high': 'HIGH',
-                'medium': 'MEDIUM', 'low': 'LOW'}
+from src.i18n import t
 
 def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20, *, lang: str = "en") -> dict:
     """
@@ -134,7 +131,7 @@ def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20, 
             ],
             'values': [level_counts[lvl] for lvl in risk_levels if lvl in level_counts],
         },
-        'i18n': {'lang': get_language()},
+        'i18n': {'lang': lang},
     }
 
     return {

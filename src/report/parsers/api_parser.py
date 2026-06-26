@@ -60,7 +60,7 @@ def flatten_flow_record(r: dict) -> dict:
 
     def _f(key): return float(r.get(key) or 0)
 
-    return {
+    row = {
         'src_ip':           src.get('ip', ''),
         'src_hostname':     src_wl.get('hostname', src.get('ip', '')),
         'src_managed':      bool(src_wl),
@@ -102,6 +102,18 @@ def flatten_flow_record(r: dict) -> dict:
         'raw_ddms':    _f('ddms'),
         'raw_tdms':    _f('tdms'),
     }
+
+    # Draft policy decision is a genuine PCE field that only appears on flow
+    # records when the async traffic query ran with compute_draft (the PCE
+    # update_rules pass). Carry it through verbatim so the unified df gains a
+    # 'draft_policy_decision' column ONLY for draft-PD runs; for ordinary runs
+    # the key is absent and the column is omitted, so the R01–R05 draft rules
+    # and mod_draft_* modules correctly no-op instead of fabricating data.
+    draft_pd = r.get('draft_policy_decision')
+    if draft_pd:
+        row['draft_policy_decision'] = draft_pd
+
+    return row
 
 
 def build_unified_df(rows: list[dict], data_source: str) -> pd.DataFrame:

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import pandas as pd
-from src.i18n import t, get_language
+from src.i18n import t
 
 from .attack_posture import (
     build_app_display,
@@ -301,7 +301,7 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
             "y_label": t("rpt_score", default="Score", lang=lang),
             "y_label_key": "rpt_chart_axis_score",
             "data": {"labels": factor_chart_labels, "values": factor_chart_values},
-            "i18n": {"lang": get_language()},
+            "i18n": {"lang": lang},
         },
     }
 

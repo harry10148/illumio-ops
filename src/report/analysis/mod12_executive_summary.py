@@ -5,7 +5,7 @@ import datetime
 from typing import Any
 
 from .attack_posture import summarize_attack_posture
-from src.i18n import t, get_language
+from src.i18n import t
 from src.humanize_ext import fmt_bytes_auto
 
 def _fmt(n) -> str:
@@ -284,7 +284,7 @@ def executive_summary(results: dict[str, Any], profile: str = "security_risk", l
             "y_label": t("rpt_score", default="Score", lang=lang),
             "y_label_key": "rpt_chart_axis_score",
             "data": {"labels": dim_labels, "values": dim_values},
-            "i18n": {"lang": get_language()},
+            "i18n": {"lang": lang},
         },
     }
 

@@ -89,9 +89,32 @@ class RulesEngine:
         """Run all rules and return sorted findings list."""
         findings: list[Finding] = []
         findings.extend(self._eval_builtin(df))
+        findings.extend(self._eval_draft_pd(df))
         findings.sort(key=lambda f: f.severity_rank)
         logger.info(f"[RulesEngine] {len(findings)} findings generated")
         return annotate_techniques(findings)
+
+    # ── draft-policy rules (R01–R05) ─────────────────────────────────────────
+
+    def _eval_draft_pd(self, df: pd.DataFrame) -> list[Finding]:
+        """Evaluate the standalone draft-PD rules (R01–R05).
+
+        These only fire when the unified df carries a 'draft_policy_decision'
+        column (populated by flatten_flow_record when the PCE async query ran
+        with compute_draft). When the column is absent — the common case for
+        reports whose fetch layer did not request draft computation — every
+        rule's _has_draft() guard returns empty and this is a no-op.
+        """
+        if "draft_policy_decision" not in df.columns:
+            return []
+        findings: list[Finding] = []
+        ctx: dict = {}
+        for rule_cls in DRAFT_PD_RULES:
+            try:
+                findings.extend(rule_cls().evaluate(df, ctx, self._lang) or [])
+            except Exception as e:
+                logger.warning(f"[RulesEngine] Draft rule {rule_cls.__name__} failed: {e}")
+        return findings
 
     # ── built-in rules ───────────────────────────────────────────────────────
 
@@ -188,6 +211,14 @@ class RulesEngine:
         n_allowed     = int((matched['policy_decision'] == 'allowed').sum())
         n_pb          = int((matched['policy_decision'] == 'potentially_blocked').sum())
 
+        # Cross-subnet-scoped counts. The cross-subnet branches below describe the
+        # cross-subnet flows specifically, so severity must be driven by the
+        # allowed/PB split WITHIN that subset — not by estate-wide n_allowed/n_pb
+        # (which also count same-subnet admin traffic and mislabel severity).
+        cross_subnet_rows = matched[~matched['_same_subnet']]
+        n_cross_subnet_allowed = int((cross_subnet_rows['policy_decision'] == 'allowed').sum())
+        n_cross_subnet_pb      = int((cross_subnet_rows['policy_decision'] == 'potentially_blocked').sum())
+
         _port_names = {135: 'RPC', 445: 'SMB', 3389: 'RDP', 5985: 'WinRM', 5986: 'WinRM-SSL'}
         port_counts = matched['port'].value_counts().head(5).to_dict()
         named_ports = {_port_names.get(p, str(p)): c for p, c in port_counts.items()}
@@ -208,17 +239,17 @@ class RulesEngine:
                 recommendation = t("rule_b001_rec_critical_cross_env", named_ports=list(named_ports.keys()), lang=self._lang)
             else:
                 recommendation = t("rule_b001_rec_pb_cross_env", named_ports=list(named_ports.keys()), lang=self._lang)
-        elif n_cross_subnet > 0 and n_allowed > 0:
+        elif n_cross_subnet > 0 and n_cross_subnet_allowed > 0:
             severity = 'HIGH'
             risk_summary = t(
                 "rpt_rule_B001_risk_cross_subnet_allowed", lang=self._lang,
                 n_cross_subnet=n_cross_subnet,
-                n_allowed=n_allowed,
+                n_allowed=n_cross_subnet_allowed,
                 n_same_subnet=n_same_subnet,
             )
             recommendation = t("rule_b001_rec_cross_subnet_allowed",
                                named_ports=list(named_ports.keys()), n_same_subnet=n_same_subnet, lang=self._lang)
-        elif n_cross_subnet > 0 and n_pb == n_cross_subnet:
+        elif n_cross_subnet > 0 and n_cross_subnet_pb == n_cross_subnet:
             severity = 'MEDIUM'
             risk_summary = t(
                 "rpt_rule_B001_risk_cross_subnet_pb", lang=self._lang,

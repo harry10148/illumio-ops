@@ -1,7 +1,7 @@
 """Module 3: Uncovered Flows — Policy Coverage Gaps."""
 from __future__ import annotations
 import pandas as pd
-from src.i18n import t, get_language
+from src.i18n import t
 
 
 def _rec_map(lang: str) -> dict[str, str]:
@@ -74,7 +74,7 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
                     ],
                     'values': [n_allowed, 0, 0],
                 },
-                'i18n': {'lang': get_language()},
+                'i18n': {'lang': lang},
             },
         }
 
@@ -103,7 +103,12 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
 
     # Classify each flow
     def _classify(row):
-        if not row['src_managed']:
+        src_managed = row['src_managed']
+        # NaN/unknown managed status must NOT be silently bucketed as managed
+        # (pandas NaN is truthy, so the old `not row['src_managed']` skipped it).
+        # An uncovered flow whose source cannot be confirmed managed is surfaced
+        # as unmanaged_source for investigation.
+        if pd.isna(src_managed) or not src_managed:
             return 'unmanaged_source'
         if row['src_app'] == row['dst_app'] and row['src_app'] != '':
             return 'intra_app'
@@ -163,7 +168,7 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
                 ],
                 'values': [n_allowed, n_pb, n_blocked + n_unknown],
             },
-            'i18n': {'lang': get_language()},
+            'i18n': {'lang': lang},
         },
     }
 

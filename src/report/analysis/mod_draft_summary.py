@@ -21,6 +21,11 @@ def analyze(flows_df: pd.DataFrame) -> dict:
     raw_counts = flows_df["draft_policy_decision"].value_counts().to_dict()
     counts = {s: int(raw_counts.get(s, 0)) for s in DRAFT_SUBTYPES}
 
+    # The unified DataFrame uses src_ip/dst_ip; older callers pass src/dst.
+    # Resolve like R05DraftReportedMismatch, then emit canonical src/dst keys.
+    src_col = "src" if "src" in flows_df.columns else "src_ip"
+    dst_col = "dst" if "dst" in flows_df.columns else "dst_ip"
+
     top_pairs: dict = {}
     for subtype in DRAFT_SUBTYPES:
         mask = flows_df["draft_policy_decision"] == subtype
@@ -28,11 +33,12 @@ def analyze(flows_df: pd.DataFrame) -> dict:
             continue
         top_pairs[subtype] = (
             flows_df[mask]
-            .groupby(["src", "dst"])
+            .groupby([src_col, dst_col])
             .size()
             .sort_values(ascending=False)
             .head(10)
             .reset_index(name="flows")
+            .rename(columns={src_col: "src", dst_col: "dst"})
             .to_dict("records")
         )
 
