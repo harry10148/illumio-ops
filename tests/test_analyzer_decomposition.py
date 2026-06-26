@@ -285,6 +285,36 @@ class TestRunRuleEngine(unittest.TestCase):
         vol_per_flow, _ = az.calculate_volume_mb(flow)
         self.assertAlmostEqual(res["max_val"], vol_per_flow * 2, places=4)
 
+    def test_non_numeric_count_does_not_abort_cycle(self):
+        """A single flow with a non-numeric num_connections must not raise — one
+        malformed PCE/cache row cannot kill the monitor cycle. The bad count
+        coerces to 0 so it simply contributes nothing."""
+        rule = _traffic_rule("r1", "traffic", threshold=1)
+        az = _make_analyzer([rule])
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        bad_flow = {**_flow(), "num_connections": "not-a-number"}
+
+        with patch.object(az, "check_flow_match", return_value=True):
+            result = az._run_rule_engine(iter([bad_flow]), [rule], now_utc)
+
+        self.assertEqual(len(result), 1)
+        _, res = result[0]
+        self.assertEqual(res["max_val"], 0.0)
+
+    def test_none_count_falls_back_without_crashing(self):
+        """A None num_connections falls back to the count default (1) and the
+        cycle continues normally."""
+        rule = _traffic_rule("r1", "traffic", threshold=1)
+        az = _make_analyzer([rule])
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        none_flow = {**_flow(), "num_connections": None}
+
+        with patch.object(az, "check_flow_match", return_value=True):
+            result = az._run_rule_engine(iter([none_flow]), [rule], now_utc)
+
+        _, res = result[0]
+        self.assertEqual(res["max_val"], 1.0)
+
 
 # ─── _dispatch_alerts ─────────────────────────────────────────────────────────
 

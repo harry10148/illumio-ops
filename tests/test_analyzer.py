@@ -93,5 +93,44 @@ class TestAnalyzer(unittest.TestCase):
         self.assertEqual(kwargs["filters"].native_filters["dst_ip_in"], "10.0.0.5")
         self.assertEqual(kwargs["filters"].native_filters["port"], 443)
 
+    def test_check_flow_match_non_numeric_pd_does_not_raise(self):
+        """A malformed (non-numeric) 'pd' field must not raise; the matcher
+        degrades gracefully instead of aborting the monitor cycle."""
+        rule = {"type": "traffic", "pd": -1, "name": "test rule"}
+        f = {"timestamp": "2023-01-01T12:00:00Z", "pd": "not-a-number"}
+        # pd filter is disabled (-1), so the flow still matches.
+        self.assertTrue(self.analyzer.check_flow_match(rule, f, None))
+
+    def test_check_flow_match_empty_pd_does_not_raise(self):
+        """An empty-string 'pd' must not raise; it is treated as unknown (-1)
+        and excluded from a pd-specific rule rather than crashing."""
+        rule = {"type": "traffic", "pd": 2, "name": "test rule"}
+        f = {"timestamp": "2023-01-01T12:00:00Z", "pd": ""}
+        self.assertFalse(self.analyzer.check_flow_match(rule, f, None))
+
+    def test_build_criteria_str_traffic_uses_ge(self):
+        """Traffic/volume rules fire at '>=' threshold, so the criteria text
+        must advertise '>=' (matches _dispatch_alerts)."""
+        rule = {"type": "traffic", "threshold_count": 5}
+        self.assertEqual(self.analyzer._build_criteria_str(rule), "Threshold: >= 5")
+
+    def test_build_criteria_str_bandwidth_uses_gt(self):
+        """Bandwidth rules fire at a strict '>' threshold."""
+        rule = {"type": "bandwidth", "threshold_count": 5}
+        self.assertEqual(self.analyzer._build_criteria_str(rule), "Threshold: > 5")
+
+    def test_event_count_in_window_counts_each_record_once(self):
+        """Each history record represents exactly one event (no 'c' compression)."""
+        rid = "rule1"
+        now = datetime.now(timezone.utc)
+        recent = now.strftime('%Y-%m-%dT%H:%M:%SZ')
+        self.analyzer.state["history"] = {rid: [
+            {"t": recent, "event_id": "e1"},
+            {"t": recent, "event_id": "e2"},
+            {"t": recent, "event_id": "e3"},
+        ]}
+        window_start = now - timedelta(minutes=10)
+        self.assertEqual(self.analyzer._event_count_in_window(rid, window_start), 3)
+
 if __name__ == '__main__':
     unittest.main()

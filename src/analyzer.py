@@ -33,6 +33,17 @@ STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
 
 # ─── Standalone Calculators (shared by Analyzer and Report modules) ──────────
 
+def _safe_int(value: Any, default: int = 0) -> int:
+    """Best-effort ``int()``: return *default* instead of raising on
+    None / empty / non-numeric input. PCE and cache flow records occasionally
+    carry malformed numeric fields; one bad row must not abort the monitor cycle.
+    """
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
 def calculate_mbps(flow: dict[str, Any]) -> tuple[float, str, float, float]:
     """
     Compute bandwidth in Mbps from a PCE traffic flow record.
@@ -253,7 +264,7 @@ class Analyzer:
         raw_dec = str(f.get("policy_decision", "")).lower()
         flow_pd = -1
         if p is not None:
-            flow_pd = int(p)
+            flow_pd = _safe_int(p, -1)
         elif "blocked" in raw_dec and "potentially" not in raw_dec:
             flow_pd = 2
         elif "potentially" in raw_dec:
@@ -386,7 +397,9 @@ class Analyzer:
                 continue
             if ts <= window_start:
                 continue
-            total += int(rec.get('c', 1))
+            # Each history record represents exactly one event (records only ever
+            # store {'t', 'event_id'}; there is no count-compression field).
+            total += 1
         return total
 
     def _fetch_event_batch(self) -> Any:
@@ -709,7 +722,7 @@ class Analyzer:
 
             bw_val, bw_note, _, _ = self.calculate_mbps(f)
             vol_val, vol_note = self.calculate_volume_mb(f)
-            conn_val = int(f.get("num_connections") or f.get("count", 1))
+            conn_val = _safe_int(f.get("num_connections") or f.get("count", 1))
 
             for rule in tr_rules:
                 rid = rule['id']
@@ -837,7 +850,10 @@ class Analyzer:
         return True
 
     def _build_criteria_str(self, rule: dict[str, Any]) -> str:
-        crit = [f"Threshold: > {rule['threshold_count']}"]
+        # Bandwidth fires on a strict '>' threshold; traffic/volume fire on '>='
+        # (see _dispatch_alerts), so the advertised operator must match the type.
+        op = ">" if rule.get("type") == "bandwidth" else ">="
+        crit = [f"Threshold: {op} {rule['threshold_count']}"]
         if rule.get('port'):
             crit.append(f"Port:{rule['port']}")
         return ", ".join(crit)
@@ -1118,7 +1134,7 @@ class Analyzer:
 
             bw_val, bw_note, _, _ = self.calculate_mbps(f)
             vol_val, vol_note = self.calculate_volume_mb(f)
-            conn_val = int(f.get("num_connections") or f.get("count", 1))
+            conn_val = _safe_int(f.get("num_connections") or f.get("count", 1))
 
             if rule["type"] == "bandwidth":
                 f_copy['_metric_val'] = bw_val
@@ -1288,7 +1304,7 @@ class Analyzer:
                             f_copy['_metric_val'] = v
                             f_copy['_metric_fmt'] = f"{format_unit(v, 'volume')} {note}"
                         else:
-                            c = int(f.get("num_connections") or f.get("count", 1))
+                            c = _safe_int(f.get("num_connections") or f.get("count", 1))
                             f_copy['_metric_val'] = c
                             f_copy['_metric_fmt'] = str(c)
                         matches.append(f_copy)
