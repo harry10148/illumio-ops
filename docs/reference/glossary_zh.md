@@ -151,5 +151,5 @@ related_docs:
 
 - [INDEX](../INDEX.md) — 完整文件地圖
 - [i18n Contract](i18n-contract.md) — 術語如何在執行期翻譯
-- [Dashboard](../_archive/user-guide/dashboard.md) — 許多術語的實際呈現介面
+- [操作手冊](../operations-manual_zh.md) — Web GUI 操作導覽（§3），許多術語的實際呈現介面（繁體中文）
 - [i18n Workflow](../contributing/i18n-workflow.md) — 新增可翻譯術語的流程

@@ -168,7 +168,7 @@ All documentation lives under [`docs/`](docs/). Start at the hub, then dive into
 - **Contributing:** [contributing/dev-setup.md](docs/contributing/dev-setup.md), [contributing/i18n-workflow.md](docs/contributing/i18n-workflow.md), [contributing/release-process.md](docs/contributing/release-process.md).
 - **Latest audit:** [reports/audit/2026-06-26-static-findings.md](reports/audit/2026-06-26-static-findings.md).
 
-Historical and superseded docs (the old `user-guide/` and `architecture/` sets, UX reviews, the 2026-05-22 security audit, and session handoffs) are archived under `docs/_archive/`.
+Historical and superseded docs (the old `user-guide/` and `architecture/` sets, UX reviews, the 2026-05-22 security audit, and session handoffs) have been removed from the tree; they remain recoverable from git history.
 
 ---
 

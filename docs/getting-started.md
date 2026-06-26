@@ -167,7 +167,7 @@ and fill in the `api` block:
 ```
 
 If you have multiple PCEs, add entries to `pce_profiles` and set `active_pce_id`.
-See [Multi-PCE](_archive/user-guide/multi-pce.md) for the full multi-PCE workflow.
+See the [Operations Manual](operations-manual_zh.md) for the full multi-PCE workflow (繁體中文).
 
 **Verify connectivity** by running the status command:
 
@@ -274,13 +274,9 @@ journalctl -u illumio-ops -f
 
 ## Where to go next
 
-- [Dashboard](_archive/user-guide/dashboard.md) — understand KPI cards, traffic queries, and alerts
-- [Multi-PCE](_archive/user-guide/multi-pce.md) — connect more than one PCE
-- [Troubleshooting](_archive/user-guide/troubleshooting.md) — when first run goes wrong
+- [Operations Manual](operations-manual_zh.md) — dashboard, multi-PCE, and troubleshooting, plus day-2 operations (繁體中文)
 
 ---
 ## Related Docs
 - [INDEX](INDEX.md) — full doc map
-- [Dashboard](_archive/user-guide/dashboard.md) — first place to look after install
-- [Multi-PCE](_archive/user-guide/multi-pce.md) — connecting more than one PCE
-- [Troubleshooting](_archive/user-guide/troubleshooting.md) — when first run goes wrong
+- [Operations Manual](operations-manual_zh.md) — dashboard, multi-PCE, and troubleshooting after install (繁體中文)

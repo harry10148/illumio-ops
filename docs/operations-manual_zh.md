@@ -791,9 +791,5 @@ grep -n "ERROR\|Exception\|Traceback" /opt/illumio-ops/logs/illumio_ops.log | ta
 ## 相關文件
 
 - [Getting Started（安裝快速上手）](getting-started_zh.md)
-- [Dashboard 使用手冊](_archive/user-guide/dashboard_zh.md)
 - [CLI 參考](reference/cli_zh.md)
-- [SIEM Integration](_archive/user-guide/siem-integration_zh.md)
-- [TLS & Certificates](_archive/user-guide/tls-and-certificates_zh.md)
-- [Troubleshooting](_archive/user-guide/troubleshooting_zh.md)
 - [Glossary（詞彙表）](reference/glossary_zh.md)

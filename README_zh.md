@@ -168,7 +168,7 @@ illumio-ops/
 - **貢獻指引（Contributing）：** [contributing/dev-setup_zh.md](docs/contributing/dev-setup_zh.md)、[contributing/i18n-workflow_zh.md](docs/contributing/i18n-workflow_zh.md)、[contributing/release-process_zh.md](docs/contributing/release-process_zh.md)。
 - **最新稽核：** [reports/audit/2026-06-26-static-findings.md](reports/audit/2026-06-26-static-findings.md)。
 
-歷史與已被取代的文件（舊版 `user-guide/` 與 `architecture/`、UX 審查、2026-05-22 安全稽核，以及 session handoff）已歸檔於 `docs/_archive/`。
+歷史與已被取代的文件（舊版 `user-guide/` 與 `architecture/`、UX 審查、2026-05-22 安全稽核，以及 session handoff）已自文件樹移除；仍可從 git 歷史還原。
 
 ---
 

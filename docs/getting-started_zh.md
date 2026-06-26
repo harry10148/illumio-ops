@@ -166,7 +166,7 @@ Restart=always
 ```
 
 如需連線多台 PCE，請在 `pce_profiles` 陣列中新增條目，並設定 `active_pce_id`。
-完整多 PCE 設定流程請參閱 [Multi-PCE](_archive/user-guide/multi-pce.md)。
+完整多 PCE 設定流程請參閱[操作手冊](operations-manual_zh.md)（繁體中文）。
 
 **驗證連線**，執行 status 指令：
 
@@ -270,13 +270,9 @@ journalctl -u illumio-ops -f
 
 ## 下一步
 
-- [Dashboard](_archive/user-guide/dashboard.md) — 了解 KPI 卡片、流量查詢與告警
-- [Multi-PCE](_archive/user-guide/multi-pce.md) — 連接多台 PCE
-- [Troubleshooting](_archive/user-guide/troubleshooting.md) — 首次執行發生問題時的排查指南
+- [操作手冊](operations-manual_zh.md) — 儀表板、多台 PCE 與疑難排解，以及 day-2 維運（繁體中文）
 
 ---
 ## 相關文件
 - [INDEX](INDEX.md) — 完整文件地圖
-- [Dashboard](_archive/user-guide/dashboard.md) — 安裝後第一個查看的地方
-- [Multi-PCE](_archive/user-guide/multi-pce.md) — 連接多台 PCE
-- [Troubleshooting](_archive/user-guide/troubleshooting.md) — 首次執行發生問題時的排查指南
+- [操作手冊](operations-manual_zh.md) — 安裝後的儀表板、多台 PCE 與疑難排解（繁體中文）

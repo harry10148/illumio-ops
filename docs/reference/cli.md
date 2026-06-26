@@ -673,5 +673,4 @@ The following environment variables are read by the CLI at runtime:
 
 - [REST API](rest-api.md) — programmatic equivalents (B2 deliverable)
 - [Glossary](glossary.md) — Illumio terminology
-- [Reports User Guide](../_archive/user-guide/reports.md) — operator-level report usage
-- [SIEM Integration](../_archive/user-guide/siem-integration.md) — operator-level SIEM config
+- [Operations Manual](../operations-manual_zh.md) — operator-level reports (§5) and SIEM config (§7) (繁體中文)

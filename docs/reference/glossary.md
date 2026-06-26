@@ -151,5 +151,5 @@ This page is a quick reference for newcomers. Each entry is self-contained: read
 
 - [INDEX](../INDEX.md) — full doc map
 - [i18n Contract](i18n-contract.md) — how terms get translated at runtime
-- [Dashboard](../_archive/user-guide/dashboard.md) — where many of these terms surface
+- [Operations Manual](../operations-manual_zh.md) — Web GUI walkthrough (§3) where many of these terms surface (繁體中文)
 - [i18n Workflow](../contributing/i18n-workflow.md) — adding new translatable terms

@@ -47,7 +47,7 @@ reference and contributing material follows.
 ## Audit & history
 
 - **Latest audit:** `reports/audit/2026-06-26-static-findings.md` — the 2026-06-26 static review. All 11 HIGH-severity findings were resolved on this branch.
-- **Historical / superseded docs** — the previous `user-guide/` and `architecture/` sets, the UX reviews, the 2026-05-22 security audit, and the session handoffs — are archived under **`docs/_archive/`**.
+- **Historical / superseded docs** — the previous `user-guide/` and `architecture/` sets, the UX reviews, the 2026-05-22 security audit, and the session handoffs — have been removed from the tree; they remain recoverable from git history.
 
 ## How docs are kept fresh
 

@@ -255,4 +255,4 @@ sudo systemctl start illumio-ops.service
 - [開發環境設定](dev-setup.md) — 打標籤前的本地環境
 - [入門指南（操作人員升級）](../getting-started.md) — 使用者端操作
 - [i18n 工作流程](i18n-workflow.md) — 發佈前 i18n 審計
-- [TLS 與憑證](../_archive/user-guide/tls-and-certificates.md) — 發佈時的憑證輪換
+- [操作手冊](../operations-manual_zh.md) — TLS 憑證輪替（§8.6）與 day-2 維運（繁體中文）

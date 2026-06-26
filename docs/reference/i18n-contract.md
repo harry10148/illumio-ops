@@ -15,7 +15,6 @@ related_docs:
   - ../../README.md
   - ../contributing/i18n-workflow.md
   - glossary.md
-  - ../_archive/user-guide/dashboard.md
 ---
 
 > **[English](i18n-contract.md)** | [繁體中文](i18n-contract_zh.md)
@@ -359,4 +358,4 @@ silent drift in the translations most visible to operators on the dashboard.
 - [Architecture Overview](../../README.md) — bigger picture
 - [i18n Workflow](../contributing/i18n-workflow.md) — add a new translation key (B3 deliverable)
 - [Glossary](glossary.md) — Illumio terminology
-- [Dashboard](../_archive/user-guide/dashboard.md) — operator-level i18n behavior
+- [Operations Manual](../operations-manual_zh.md) — operator-level i18n behavior in the Web GUI (§3) (繁體中文)

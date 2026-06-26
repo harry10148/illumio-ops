@@ -666,5 +666,4 @@ esac
 
 - [REST API](rest-api.md) — 程式化等效操作（B2 交付物）
 - [詞彙表](glossary.md) — Illumio 術語說明
-- [報表使用指南](../_archive/user-guide/reports.md) — 操作員層級報表使用
-- [SIEM 整合](../_archive/user-guide/siem-integration.md) — 操作員層級 SIEM 配置
+- [操作手冊](../operations-manual_zh.md) — 操作員層級報表（§5）與 SIEM 配置（§7）（繁體中文）

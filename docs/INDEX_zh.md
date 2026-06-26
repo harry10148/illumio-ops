@@ -46,7 +46,7 @@ verified_against:
 ## 稽核與歷史
 
 - **最新稽核：** `reports/audit/2026-06-26-static-findings.md` — 2026-06-26 靜態審查。本分支已解決全部 11 項 HIGH 嚴重度發現。
-- **歷史／已被取代的文件** — 先前的 `user-guide/` 與 `architecture/`、UX 審查、2026-05-22 安全稽核，以及 session handoff——皆已歸檔於 **`docs/_archive/`**。
+- **歷史／已被取代的文件** — 先前的 `user-guide/` 與 `architecture/`、UX 審查、2026-05-22 安全稽核，以及 session handoff——已自文件樹移除；仍可從 git 歷史還原。
 
 ## 文件保鮮機制
 
