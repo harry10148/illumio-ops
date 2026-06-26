@@ -86,6 +86,40 @@ def test_event_poller_dedups_overlap_and_does_not_regress_watermark():
     assert parse_event_timestamp(batch.next_watermark) >= parse_event_timestamp(watermark)
 
 
+def test_fetch_batch_survives_event_with_unparseable_timestamp():
+    """A polled event with a missing/garbled timestamp must not abort the batch.
+    Previously max() over a mix of datetimes and None raised TypeError."""
+    class FakeApi:
+        def fetch_events_strict(self, start_time_str, end_time_str=None, max_results=5000):
+            return [
+                {"href": "/orgs/1/events/1", "event_type": "user.login",
+                 "timestamp": "2026-04-08T00:00:00Z"},
+                {"href": "/orgs/1/events/2", "event_type": "user.login",
+                 "timestamp": "not-a-timestamp"},
+                {"href": "/orgs/1/events/3", "event_type": "user.login"},  # missing
+            ]
+
+    poller = EventPoller(FakeApi(), overlap_seconds=60)
+    batch = poller.fetch_batch(watermark="2026-04-08T00:05:00Z")  # must not raise
+
+    assert len(batch.events) == 3  # one bad timestamp does not drop the batch
+    assert parse_event_timestamp(batch.next_watermark) is not None
+
+
+def test_normalize_event_handles_list_valued_resource():
+    """event['resource'] as a non-dict (e.g. a list) must not raise AttributeError
+    in the user./agent./container_cluster. target-resolution branches."""
+    event = {
+        "event_type": "user.update",
+        "resource": [{"user": {"username": "bob"}}],
+    }
+
+    normalized = normalize_event(event)  # must not raise
+
+    assert normalized["event_type"] == "user.update"
+    assert normalized["target_type"] == "user"
+
+
 def test_normalize_event_prefers_vendor_action_fields_and_resource_changes():
     event = {
         "href": "/orgs/1/events/sample-1",

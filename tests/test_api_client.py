@@ -237,6 +237,14 @@ class TestApiClientNativeTrafficBuilder(unittest.TestCase):
         self.assertEqual(job_state["query_name"], "policy-usage-test")
         self.assertEqual(job_state["status"], "queued")
 
+    def test_submit_async_query_handles_empty_202_body(self):
+        """A 202 Accepted with an empty/non-JSON body must not crash (which would
+        abort the whole parallel rule-usage batch); it returns None per contract."""
+        self.client._request = lambda url, **kwargs: (202, b"")
+
+        payload = {"query_name": "empty-202", "sources": {"include": [], "exclude": []}}
+        self.assertIsNone(self.client.submit_async_query(payload))
+
     def test_batch_get_rule_traffic_counts_reuses_cached_summary(self):
         rule = {
             "href": "/orgs/1/sec_policy/draft/rule_sets/1/sec_rules/9",

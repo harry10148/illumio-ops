@@ -256,7 +256,9 @@ def _build_parser_notes(event: dict[str, Any], normalized: dict[str, Any]) -> li
 
 def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
     event_type = _string(event.get("event_type"))
-    resource_type, resource_obj = _extract_resource_entry(event.get("resource"))
+    raw_resource = event.get("resource")
+    resource_dict = raw_resource if isinstance(raw_resource, dict) else {}
+    resource_type, resource_obj = _extract_resource_entry(raw_resource)
     if not resource_type:
         resource_type, resource_obj = _resource_from_changes(event.get("resource_changes"))
 
@@ -268,7 +270,7 @@ def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
     if event_type.startswith(("user.", "request.")):
         target_type = "user"
         target_name = _pick_first(
-            _resource_name((event.get("resource") or {}).get("user")),
+            _resource_name(resource_dict.get("user")),
             _extract_notification_user(event),
             resource_name,
             actor_user,
@@ -276,15 +278,15 @@ def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
     elif event_type.startswith(("agent.", "agents.")):
         target_type = "agent" if resource_type == "agent" else "workload"
         target_name = _pick_first(
-            _resource_name((event.get("resource") or {}).get("agent")),
-            _resource_name((event.get("resource") or {}).get("workload")),
+            _resource_name(resource_dict.get("agent")),
+            _resource_name(resource_dict.get("workload")),
             resource_name,
             actor_agent,
         )
     elif event_type.startswith("container_cluster."):
         target_type = "container_cluster"
         target_name = _pick_first(
-            _resource_name((event.get("resource") or {}).get("container_cluster")),
+            _resource_name(resource_dict.get("container_cluster")),
             resource_name,
             actor if actor_type == "container_cluster" else "",
         )

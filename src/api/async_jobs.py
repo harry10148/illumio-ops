@@ -256,7 +256,14 @@ class AsyncJobManager:
             text = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
             logger.debug(f"submit_async_query failed: {status} {text[:200]}")
             return None
-        result = orjson.loads(body)
+        try:
+            result = orjson.loads(body)
+        except (orjson.JSONDecodeError, ValueError, TypeError):
+            # A 202 Accepted frequently carries an empty (or non-JSON) body. Do
+            # not let one such response abort the whole parallel submit batch;
+            # honour the documented "or None on failure" contract instead.
+            logger.debug(f"submit_async_query: {status} response had no parseable JSON body")
+            return None
         job_href = result.get("href")
         self._save_async_job_state(
             job_href,

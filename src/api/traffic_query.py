@@ -755,14 +755,19 @@ class TrafficQueryBuilder:
         stream = self.execute_traffic_query_stream(
             start_time_str, end_time_str, policy_decisions, filters=query_spec
         )
-        if stream is None:
-            return []
-
         records = list(stream)
 
-        if query_spec.fallback_filters:
+        # execute_traffic_query_stream demotes any native filter that fails href
+        # resolution into the *effective* fallback set, which it publishes on the
+        # client diagnostics. Re-apply that set client-side: query_spec.fallback_filters
+        # was built before resolution and never contains an unresolved native key,
+        # so using it would silently widen the report with unfiltered flows.
+        diagnostics = self._client.last_traffic_query_diagnostics or {}
+        fallback_filters = diagnostics.get("fallback_filters", query_spec.fallback_filters)
+
+        if fallback_filters:
             before = len(records)
-            records = [r for r in records if self._flow_matches_filters(r, query_spec.fallback_filters)]
+            records = [r for r in records if self._flow_matches_filters(r, fallback_filters)]
             after = len(records)
             if before != after:
                 logger.info(f"[ReportFilter] {before} → {after} flows after applying filters")

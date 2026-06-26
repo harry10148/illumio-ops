@@ -99,7 +99,11 @@ class EventPoller:
             deduped.append(event)
 
         latest_event_ts = max(
-            (parse_event_timestamp(item.get("timestamp")) for item in raw_events),
+            (
+                ts
+                for item in raw_events
+                if (ts := parse_event_timestamp(item.get("timestamp"))) is not None
+            ),
             default=None,
         )
         watermark_candidates = [poll_started_at, watermark_dt]

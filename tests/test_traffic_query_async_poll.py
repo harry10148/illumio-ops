@@ -62,3 +62,44 @@ def test_query_gives_up_at_deadline_not_fixed_count():
     ):
         out = list(builder._submit_and_stream_async_query({"sources": {}}))
     assert out == []
+
+
+class _DiagClient:
+    """Client stub exposing the diagnostics attribute fetch_traffic_for_report reads."""
+
+    def __init__(self):
+        self.last_traffic_query_diagnostics = {}
+        self.last_rule_usage_batch_stats = {}
+
+
+def test_fetch_traffic_for_report_applies_unresolved_native_filters():
+    """A native filter (dst_labels) that fails href resolution is demoted into the
+    *effective* fallback set published on the client diagnostics. fetch_traffic_for_report
+    must apply that set client-side, otherwise the report is silently widened with
+    flows that do NOT match the requested filter (audit: over-broad report data)."""
+    client = _DiagClient()
+    builder = TrafficQueryBuilder(client)
+
+    match = {"src": {}, "service": {},
+             "dst": {"workload": {"labels": [{"key": "App", "value": "DB"}]}}}
+    nomatch = {"src": {}, "service": {},
+               "dst": {"workload": {"labels": [{"key": "App", "value": "WEB"}]}}}
+
+    def fake_stream(start, end, pds, filters=None, compute_draft=False):
+        # Simulate native dst_labels resolution failure -> demoted to fallback.
+        client.last_traffic_query_diagnostics = {
+            "fallback_filters": {"dst_labels": ["App=DB"]},
+            "unresolved_native_filters": {"dst_labels": ["App=DB"]},
+        }
+        yield match
+        yield nomatch
+
+    builder.execute_traffic_query_stream = fake_stream
+    out = builder.fetch_traffic_for_report(
+        "2026-04-01T00:00:00Z", "2026-04-02T00:00:00Z",
+        filters={"dst_labels": ["App=DB"]},
+    )
+
+    # dst_labels is a *native* filter, so query_spec.fallback_filters is empty;
+    # only the diagnostics-published effective fallback re-applies the filter.
+    assert out == [match]
