@@ -201,7 +201,7 @@ function _highlightRow(tr, q) {
     const orig = td.textContent;
     if (!orig.toLowerCase().includes(q)) return;
     const re = new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`, 'gi');
-    td.innerHTML = orig.replace(re, '<mark>$1</mark>');
+    td.innerHTML = escapeHtml(orig).replace(re, '<mark>$1</mark>');
   });
 }
 function _clearHighlight(tr) {

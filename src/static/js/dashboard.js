@@ -1955,7 +1955,7 @@ function _renderTop10Body(idx, data, total, ts, source) {
     let svc_str = escapeHtml(m.svc);
     if (m.svc.length > 25) {
       let arr = m.svc.split(',').map(s => s.trim());
-      let encJson = encodeURIComponent(JSON.stringify(arr));
+      let encJson = encodeURIComponent(JSON.stringify(arr)).replace(/'/g, '%27');
       svc_str = `<span onclick="showCellPopover(event, 'SVC', JSON.parse(decodeURIComponent('${encJson}')))" style="cursor:pointer; border-bottom:1px dotted var(--dim); color:var(--accent);">${escapeHtml(m.svc.substring(0, 23))}...</span>`;
     }
     // Fallback: if flow_direction unknown, surface process/user in service cell

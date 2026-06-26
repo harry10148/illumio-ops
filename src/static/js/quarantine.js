@@ -423,7 +423,7 @@ function renderQtPage() {
 
     if (svc_str.length > 25) {
       let arr = svc_str.split(',').map(s => s.trim());
-      let encJson = encodeURIComponent(JSON.stringify(arr));
+      let encJson = encodeURIComponent(JSON.stringify(arr)).replace(/'/g, '%27');
       svc_str = `<span onclick="showCellPopover(event, 'SVC', JSON.parse(decodeURIComponent('${encJson}')))" style="cursor:pointer; border-bottom:1px dotted var(--dim); color:var(--accent);">${escapeHtml(svc_str.substring(0, 23))}...</span>`;
     } else {
       svc_str = escapeHtml(svc_str);

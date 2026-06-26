@@ -381,7 +381,7 @@ function _renderPceSection(a, profiles, activePceId) {
   ${activePceId ? `<p style="margin-top:8px;color:var(--dim);font-size:0.85em"><span data-i18n="gui_pce_active">Active PCE</span>: <strong>${escapeHtml((profiles.find(p=>p.id===activePceId)||{}).name||'')}</strong> — <span data-i18n="gui_pce_save_profile" style="font-style:italic">Saving settings will update this profile.</span></p>` : ''}
 </fieldset>
 <fieldset><legend data-i18n="gui_api_conn">API Connection</legend>
-  <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${a.url || ''}"><small class="form-text text-muted" data-i18n="gui_url_help"></small></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${a.org_id || ''}"><small class="form-text text-muted" data-i18n="gui_org_id_help"></small></div></div>
+  <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${escapeHtml(a.url || '')}"><small class="form-text text-muted" data-i18n="gui_url_help"></small></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${escapeHtml(a.org_id || '')}"><small class="form-text text-muted" data-i18n="gui_org_id_help"></small></div></div>
   <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${a.key || ''}"><small class="form-text text-muted" data-i18n="gui_api_key_help"></small></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${a.secret || ''}"><small class="form-text text-muted" data-i18n="gui_api_secret_help"></small></div></div>
   <div class="chk"><label><input type="checkbox" id="s-ssl" ${a.verify_ssl ? 'checked' : ''}> <span data-i18n="gui_verify_ssl">Verify SSL</span></label></div>
 </fieldset>`;
@@ -454,7 +454,7 @@ function _renderDisplaySection(st, rpt) {
   <div class="form-row">
     <div class="form-group" style="flex:2">
       <label data-i18n="gui_report_output_dir">Output Directory</label>
-      <input id="s-rpt-dir" value="${rpt.output_dir || 'reports/'}">
+      <input id="s-rpt-dir" value="${escapeHtml(rpt.output_dir || 'reports/')}">
       <small style="color:var(--dim)" data-i18n="gui_report_output_dir_hint">Path where generated reports are saved (relative to project root or absolute).</small>
     </div>
     <div class="form-group" style="flex:1">
@@ -531,7 +531,7 @@ function _renderSecuritySection(sec, _tlsStatus) {
 </fieldset>
 <fieldset><legend data-i18n="gui_web_security">Web GUI Security</legend>
   <div class="form-row">
-    <div class="form-group"><label data-i18n="gui_username">Username</label><input id="s-sec-user" value="${sec.username || 'admin'}"></div>
+    <div class="form-group"><label data-i18n="gui_username">Username</label><input id="s-sec-user" value="${escapeHtml(sec.username || 'admin')}"></div>
     <div class="form-group"><label data-i18n="gui_allowed_ips">Allowed IPs (comma separated IP or CIDR)</label><input id="s-sec-ips" value="${(sec.allowed_ips || []).join(', ')}" placeholder="e.g. 192.168.1.100, 10.0.0.0/8"></div>
   </div>
   <p style="color:var(--dim); font-size:0.85em; margin-bottom:12px;" data-i18n="gui_leave_blank_pass">Leave password blank to keep current password.</p>
