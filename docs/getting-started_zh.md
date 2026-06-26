@@ -178,11 +178,10 @@ python3 illumio-ops.py status
 
 ## 首次登入（安全）
 
-首次啟動時，應用程式會將一次性自動生成的密碼輸出至 `stderr`：
+首次啟動時，使用內建預設帳密登入：
 
 ```text
-[illumio-ops] Initial credentials — username: illumio  password: <generated>
-Sign in once with these credentials, then change the password at the Settings page.
+username: illumio   password: illumio
 ```
 
 預設使用者名稱為 `illumio`（可透過 `config.json` 的 `web_gui.username` 調整）。

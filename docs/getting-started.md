@@ -179,12 +179,10 @@ A successful connection shows PCE reachability and daemon status.
 
 ## First Login (security)
 
-On first start, the application prints an auto-generated one-time password to
-`stderr`:
+On first start, sign in with the built-in default credentials:
 
 ```text
-[illumio-ops] Initial credentials — username: illumio  password: <generated>
-Sign in once with these credentials, then change the password at the Settings page.
+username: illumio   password: illumio
 ```
 
 The default username is `illumio` (configurable via `web_gui.username` in
