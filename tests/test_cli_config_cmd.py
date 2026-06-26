@@ -236,3 +236,38 @@ def test_config_login_missing_required_opts_exits_usage(runner):
             "--no-interactive",
         ])
     assert result.exit_code == EXIT_USAGE
+
+
+def test_config_login_interactive_blank_secret_keeps_existing(runner):
+    """Pressing Enter at the interactive secret prompt must NOT wipe the stored secret."""
+    from unittest.mock import patch
+    cm = _make_cm()
+    cm.config["api"]["secret"] = "existing-secret"
+    with patch("src.config.ConfigManager", return_value=cm):
+        # url/key/org-id supplied as options → only the secret prompt fires;
+        # blank input (just Enter) must preserve the current secret.
+        result = runner.invoke(config_group, [
+            "login",
+            "--url", "https://pce.prod:8443",
+            "--key", "mykey",
+            "--org-id", "3",
+        ], input="\n")
+    assert result.exit_code == 0, result.output
+    assert cm.config["api"]["secret"] == "existing-secret"
+    cm.save.assert_called_once()
+
+
+def test_config_login_interactive_new_secret_overrides(runner):
+    """A typed interactive secret still replaces the stored one (fix must not over-preserve)."""
+    from unittest.mock import patch
+    cm = _make_cm()
+    cm.config["api"]["secret"] = "old-secret"
+    with patch("src.config.ConfigManager", return_value=cm):
+        result = runner.invoke(config_group, [
+            "login",
+            "--url", "https://pce.prod:8443",
+            "--key", "mykey",
+            "--org-id", "1",
+        ], input="brand-new-secret\n")
+    assert result.exit_code == 0, result.output
+    assert cm.config["api"]["secret"] == "brand-new-secret"

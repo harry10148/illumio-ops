@@ -237,7 +237,10 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> N
         if key is None:
             key = click.prompt("API key", default=current.get("key", ""), show_default=False)
         if secret is None:
-            secret = click.prompt("API secret", default="", hide_input=True, show_default=False)
+            # Blank input keeps the stored secret (mirrors url/key/org_id above);
+            # default="" used to silently wipe it when an operator pressed Enter.
+            secret = click.prompt("API secret", default=current.get("secret", ""),
+                                  hide_input=True, show_default=False)
         if org_id is None:
             org_id = click.prompt("Org ID", default=current.get("org_id", "1"))
 

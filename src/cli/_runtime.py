@@ -107,7 +107,7 @@ def run_gui_only(cm, port: int = 5001, host: str = "0.0.0.0") -> None:
     except Exception as e:
         logger.debug("cache-enabled check skipped in gui-only mode: {}", e)
 
-    launch_gui(cm, port=port)
+    launch_gui(cm, host=host, port=port)
 
 
 def run_daemon_with_gui(cm, interval: int = 10, port: int = 5001, host: str = "0.0.0.0") -> None:
@@ -162,7 +162,7 @@ def run_daemon_with_gui(cm, interval: int = 10, port: int = 5001, host: str = "0
 
     threading.Thread(target=_gui_stopper, daemon=True).start()
 
-    launch_gui(cm, port=port, persistent_mode=True)
+    launch_gui(cm, host=host, port=port, persistent_mode=True)
 
     # After launch_gui returns (server stopped), join the daemon thread so the
     # background scheduler exits cooperatively before the process terminates.

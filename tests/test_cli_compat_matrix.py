@@ -188,7 +188,7 @@ def test_legacy_gui_dispatches_launch_gui_with_port(monkeypatch):
     calls = {}
     _install_main_test_env(monkeypatch, main_module)
     fake_gui = types.SimpleNamespace(
-        launch_gui=lambda cm, port: calls.update(port=port, has_config=bool(cm)),
+        launch_gui=lambda cm, host, port: calls.update(port=port, host=host, has_config=bool(cm)),
         HAS_FLASK=True,
         FLASK_IMPORT_ERROR=None,
     )
@@ -197,7 +197,8 @@ def test_legacy_gui_dispatches_launch_gui_with_port(monkeypatch):
 
     main_module.main()
 
-    assert calls == {"port": 8123, "has_config": True}
+    # host is forwarded through run_gui_only → launch_gui (legacy path keeps the 0.0.0.0 default)
+    assert calls == {"port": 8123, "host": "0.0.0.0", "has_config": True}
 
 
 @pytest.mark.parametrize(

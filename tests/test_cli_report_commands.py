@@ -149,3 +149,41 @@ def test_report_audit_click_exception_exits_dataerr():
 
     assert result.exit_code == EXIT_DATAERR
     assert "No data for report" in result.output
+
+
+def test_report_audit_file_not_found_exits_noinput():
+    """FileNotFoundError must hit the clean FileNotFoundError handler (EXIT_NOINPUT 66).
+
+    Regression: FileNotFoundError is an OSError subclass; when the
+    `except (ConnectionError, OSError)` clause is ordered first it re-raises the
+    error (its message lacks 'connection'), so the sibling FileNotFoundError
+    handler is dead and the operator hits the generic excepthook instead.
+    """
+    from src.cli.root import cli
+    from src.cli._exit_codes import EXIT_NOINPUT
+
+    runner = CliRunner()
+    with patch(
+        "src.cli.report.generate_audit_report",
+        side_effect=FileNotFoundError("missing-input.csv"),
+    ):
+        result = runner.invoke(cli, ["report", "audit"])
+
+    assert result.exit_code == EXIT_NOINPUT, result.output
+    assert "Input file not found" in result.output
+
+
+def test_report_audit_connection_error_exits_unavailable():
+    """Connection failures still map to EXIT_UNAVAILABLE (69) after the clause reorder."""
+    from src.cli.root import cli
+    from src.cli._exit_codes import EXIT_UNAVAILABLE
+
+    runner = CliRunner()
+    with patch(
+        "src.cli.report.generate_audit_report",
+        side_effect=ConnectionError("connection refused"),
+    ):
+        result = runner.invoke(cli, ["report", "audit"])
+
+    assert result.exit_code == EXIT_UNAVAILABLE, result.output
+    assert "Connection failed" in result.output

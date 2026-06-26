@@ -286,15 +286,15 @@ def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_
         echo_error(ctx, exc.format_message())
         ctx.exit(EXIT_DATAERR)
         return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
         echo_error(ctx, f"Connection failed: {exc}")
         ctx.exit(EXIT_UNAVAILABLE)
-        return
-    except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
-        ctx.exit(EXIT_NOINPUT)
         return
     except Exception as exc:
         log.exception("traffic report failed")
@@ -339,15 +339,15 @@ def report_security(ctx: click.Context, source: str, file_path, fmt: str, output
         echo_error(ctx, exc.format_message())
         ctx.exit(EXIT_DATAERR)
         return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
         echo_error(ctx, f"Connection failed: {exc}")
         ctx.exit(EXIT_UNAVAILABLE)
-        return
-    except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
-        ctx.exit(EXIT_NOINPUT)
         return
     except Exception as exc:
         log.exception("security report failed")
@@ -382,15 +382,15 @@ def report_inventory(ctx: click.Context, source: str, file_path, fmt: str, outpu
         echo_error(ctx, exc.format_message())
         ctx.exit(EXIT_DATAERR)
         return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
         echo_error(ctx, f"Connection failed: {exc}")
         ctx.exit(EXIT_UNAVAILABLE)
-        return
-    except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
-        ctx.exit(EXIT_NOINPUT)
         return
     except Exception as exc:
         log.exception("inventory report failed")
@@ -419,15 +419,15 @@ def report_audit(ctx: click.Context, start_date: str | None, end_date: str | Non
         echo_error(ctx, exc.format_message())
         ctx.exit(EXIT_DATAERR)
         return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
         echo_error(ctx, f"Connection failed: {exc}")
         ctx.exit(EXIT_UNAVAILABLE)
-        return
-    except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
-        ctx.exit(EXIT_NOINPUT)
         return
     except Exception as exc:
         log.exception("audit report failed")
@@ -449,15 +449,15 @@ def report_ven_status(ctx: click.Context, fmt: str, output_dir) -> None:
         echo_error(ctx, exc.format_message())
         ctx.exit(EXIT_DATAERR)
         return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
         echo_error(ctx, f"Connection failed: {exc}")
         ctx.exit(EXIT_UNAVAILABLE)
-        return
-    except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
-        ctx.exit(EXIT_NOINPUT)
         return
     except Exception as exc:
         log.exception("ven-status report failed")
@@ -498,15 +498,15 @@ def report_policy_usage(
         echo_error(ctx, exc.format_message())
         ctx.exit(EXIT_DATAERR)
         return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
         echo_error(ctx, f"Connection failed: {exc}")
         ctx.exit(EXIT_UNAVAILABLE)
-        return
-    except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
-        ctx.exit(EXIT_NOINPUT)
         return
     except Exception as exc:
         log.exception("policy-usage report failed")
@@ -628,15 +628,15 @@ def report_app_summary(ctx: click.Context, app: str, env: str | None, days: int,
         echo_error(ctx, exc.format_message())
         ctx.exit(EXIT_DATAERR)
         return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
         echo_error(ctx, f"Connection failed: {exc}")
         ctx.exit(EXIT_UNAVAILABLE)
-        return
-    except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
-        ctx.exit(EXIT_NOINPUT)
         return
     except Exception as exc:
         log.exception("app-summary report failed")
@@ -680,15 +680,15 @@ def report_resolve(ctx: click.Context, fmt: str, output_dir) -> None:
         echo_error(ctx, exc.format_message())
         ctx.exit(EXIT_DATAERR)
         return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
         echo_error(ctx, f"Connection failed: {exc}")
         ctx.exit(EXIT_UNAVAILABLE)
-        return
-    except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
-        ctx.exit(EXIT_NOINPUT)
         return
     except Exception as exc:
         log.exception("policy resolver report failed")
@@ -723,15 +723,15 @@ def report_policy_diff(ctx: click.Context, fmt: str, output_dir, email: bool,
         echo_error(ctx, exc.format_message())
         ctx.exit(EXIT_DATAERR)
         return
+    except FileNotFoundError as exc:
+        echo_error(ctx, f"Input file not found: {exc}")
+        ctx.exit(EXIT_NOINPUT)
+        return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
         echo_error(ctx, f"Connection failed: {exc}")
         ctx.exit(EXIT_UNAVAILABLE)
-        return
-    except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
-        ctx.exit(EXIT_NOINPUT)
         return
     except Exception as exc:
         log.exception("policy-diff report failed")
