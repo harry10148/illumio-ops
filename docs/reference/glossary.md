@@ -8,7 +8,7 @@ verified_against:
   - commit 838ee40
 related_docs:
   - ../INDEX.md
-  - ../architecture/i18n-contract.md
+  - i18n-contract.md
   - ../user-guide/dashboard.md
   - ../contributing/i18n-workflow.md
 ---
@@ -150,6 +150,6 @@ This page is a quick reference for newcomers. Each entry is self-contained: read
 ## Related Docs
 
 - [INDEX](../INDEX.md) — full doc map
-- [i18n Contract](../_archive/architecture/i18n-contract.md) — how terms get translated at runtime
+- [i18n Contract](i18n-contract.md) — how terms get translated at runtime
 - [Dashboard](../_archive/user-guide/dashboard.md) — where many of these terms surface
 - [i18n Workflow](../contributing/i18n-workflow.md) — adding new translatable terms

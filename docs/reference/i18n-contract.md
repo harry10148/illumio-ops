@@ -1,7 +1,7 @@
 ---
 title: i18n Contract
 audience: [developer]
-last_verified: 2026-05-15
+last_verified: 2026-06-26
 verified_against:
   - src/i18n/engine.py
   - src/i18n/__init__.py
@@ -14,12 +14,12 @@ verified_against:
 related_docs:
   - overview.md
   - ../contributing/i18n-workflow.md
-  - ../reference/glossary.md
-  - ../user-guide/dashboard.md
+  - glossary.md
+  - ../_archive/user-guide/dashboard.md
 ---
 
 > **[English](i18n-contract.md)** | [繁體中文](i18n-contract_zh.md)
-> 📍 [INDEX](../INDEX.md) › Architecture › i18n Contract
+> 📍 [INDEX](../INDEX.md) › Reference › i18n Contract
 > 🔍 Last verified **2026-05-15** against commit `503f029` — see frontmatter for sources
 
 # i18n Contract
@@ -358,5 +358,5 @@ silent drift in the translations most visible to operators on the dashboard.
 
 - [Architecture Overview](overview.md) — bigger picture
 - [i18n Workflow](../contributing/i18n-workflow.md) — add a new translation key (B3 deliverable)
-- [Glossary](../reference/glossary.md) — Illumio terminology
-- [Dashboard](../user-guide/dashboard.md) — operator-level i18n behavior
+- [Glossary](glossary.md) — Illumio terminology
+- [Dashboard](../_archive/user-guide/dashboard.md) — operator-level i18n behavior

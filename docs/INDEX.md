@@ -34,6 +34,7 @@ reference and contributing material follows.
 | CLI | [reference/cli.md](reference/cli.md) | [reference/cli_zh.md](reference/cli_zh.md) |
 | Glossary | [reference/glossary.md](reference/glossary.md) | [reference/glossary_zh.md](reference/glossary_zh.md) |
 | REST API | [reference/rest-api.md](reference/rest-api.md) | [reference/rest-api_zh.md](reference/rest-api_zh.md) |
+| i18n Contract | [reference/i18n-contract.md](reference/i18n-contract.md) | [reference/i18n-contract_zh.md](reference/i18n-contract_zh.md) |
 
 ## Contributing
 

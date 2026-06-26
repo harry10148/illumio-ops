@@ -8,7 +8,7 @@ verified_against:
   - commit 838ee40
 related_docs:
   - ../INDEX.md
-  - ../architecture/i18n-contract.md
+  - i18n-contract.md
   - ../user-guide/dashboard.md
   - ../contributing/i18n-workflow.md
 ---
@@ -150,6 +150,6 @@ related_docs:
 ## 相關文件
 
 - [INDEX](../INDEX.md) — 完整文件地圖
-- [i18n Contract](../_archive/architecture/i18n-contract.md) — 術語如何在執行期翻譯
+- [i18n Contract](i18n-contract.md) — 術語如何在執行期翻譯
 - [Dashboard](../_archive/user-guide/dashboard.md) — 許多術語的實際呈現介面
 - [i18n Workflow](../contributing/i18n-workflow.md) — 新增可翻譯術語的流程
