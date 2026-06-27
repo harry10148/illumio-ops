@@ -764,7 +764,6 @@ class Analyzer:
                     res['top_matches'].append(f_copy)
 
         logger.info(t('found_traffic', count=count_processed))
-        logger.info(f"Processed {count_processed} traffic flows.")
 
         # Return a flat list of (rule, result) pairs for all rules
         return [(rule, rule_results[rule['id']]) for rule in tr_rules]
