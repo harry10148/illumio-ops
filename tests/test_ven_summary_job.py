@@ -42,6 +42,34 @@ def test_run_ven_summary_writes_counts(tmp_path, monkeypatch):
     assert s["updated_at"]
 
 
+def test_ven_summary_attention_reasons_localized_to_configured_language(tmp_path, monkeypatch):
+    """Attention reasons render in the app's configured language, not hardcoded English."""
+    from src.scheduler.jobs import run_ven_summary
+
+    dashboard_path = str(tmp_path / "dashboard_summary.json")
+    state_file = str(tmp_path / "state.json")
+    monkeypatch.setattr(dashboard_store, "_dashboard_file", lambda: dashboard_path)
+
+    cm = MagicMock()
+    cm.config = {"settings": {"language": "zh_TW"}}
+    api = MagicMock()
+    stale = _wl("stale-host", 99.0)                       # offline by stale heartbeat
+    no_status = {"hostname": "no-status-host",            # offline by unknown status
+                 "agent": {"status": {"status": "", "hours_since_last_heartbeat": None}}}
+    api.fetch_managed_workloads.return_value = [stale, no_status]
+    api.__enter__.return_value = api
+    api.__exit__.return_value = False
+
+    with patch("src.scheduler.jobs.ApiClient", return_value=api), \
+         patch("src.scheduler.jobs._resolve_state_file", return_value=state_file):
+        run_ven_summary(cm)
+
+    s = json.load(open(dashboard_path))["ven_summary"]
+    reasons = {a["host"]: a["reason"] for a in s["attention"]}
+    assert reasons["stale-host"] == "99 小時無心跳"
+    assert reasons["no-status-host"] == "狀態：未知"
+
+
 def test_run_ven_summary_preserves_last_good_on_error(tmp_path, monkeypatch):
     from src.scheduler.jobs import run_ven_summary
     from src.dashboard_store import write_dashboard_summary

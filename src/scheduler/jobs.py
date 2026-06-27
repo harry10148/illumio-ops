@@ -182,9 +182,11 @@ def run_ven_summary(cm) -> None:
     """
     import datetime
     from src.dashboard_store import write_dashboard_summary
+    from src.i18n import t
 
     _ONLINE = {"active", "online"}
     _THRESH_H = 1.0
+    lang = cm.config.get("settings", {}).get("language", "en")
     now = datetime.datetime.now(datetime.timezone.utc)
     try:
         with ApiClient(cm) as api:
@@ -216,8 +218,11 @@ def run_ven_summary(cm) -> None:
                 online += 1
             else:
                 host = w.get("hostname") or w.get("name") or "?"
-                reason = (f"{int(hslh)}h no heartbeat" if hslh is not None
-                          else f"status={status or 'unknown'}")
+                if hslh is not None:
+                    reason = t("ven_attention_no_heartbeat", lang=lang, hours=int(hslh))
+                else:
+                    status_label = status or t("ven_attention_status_unknown", lang=lang)
+                    reason = t("ven_attention_status", lang=lang, status=status_label)
                 attention.append({"host": host, "reason": reason})
             if hslh is not None:
                 oldest_age = max(oldest_age, hslh * 3600.0)
