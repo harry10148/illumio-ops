@@ -530,7 +530,7 @@ def main():
     )
     parser.add_argument(
         "--report-type",
-        choices=["traffic", "audit", "ven_status", "policy_usage"],
+        choices=["traffic", "audit", "ven_status", "policy_usage", "draft_policy"],
         default="traffic",
         help="Report type: traffic (default), audit, ven_status, or policy_usage",
     )
@@ -654,6 +654,17 @@ def main():
                 paths = generate_ven_status_report(
                     fmt=args.format,
                     output_dir=args.output_dir,
+                )
+            elif args.report_type == "draft_policy":
+                if args.source != "api":
+                    raise click.ClickException("--source csv is not supported for draft_policy reports")
+                paths = generate_traffic_report(
+                    source=args.source,
+                    fmt=args.format,
+                    output_dir=args.output_dir,
+                    email=args.email,
+                    traffic_report_profile=args.profile,
+                    draft_policy=True,
                 )
             else:
                 if args.email:

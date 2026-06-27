@@ -746,14 +746,20 @@ class TrafficQueryBuilder:
         return True
 
     def fetch_traffic_for_report(self, start_time_str, end_time_str,
-                                 policy_decisions=None, filters=None):
-        """Convenience wrapper for report generation."""
+                                 policy_decisions=None, filters=None, compute_draft=False):
+        """Convenience wrapper for report generation.
+
+        When compute_draft is True the PCE async query also recomputes draft
+        policy decisions (the ~12s update_rules pass), so the returned records
+        carry draft_policy_decision for the R01-R05 rules. Off by default.
+        """
         if policy_decisions is None:
             policy_decisions = ["blocked", "potentially_blocked", "allowed"]
 
         query_spec = self.build_traffic_query_spec(filters)
         stream = self.execute_traffic_query_stream(
-            start_time_str, end_time_str, policy_decisions, filters=query_spec
+            start_time_str, end_time_str, policy_decisions, filters=query_spec,
+            compute_draft=compute_draft
         )
         records = list(stream)
 

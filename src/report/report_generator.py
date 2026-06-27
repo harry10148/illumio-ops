@@ -212,7 +212,8 @@ class ReportGenerator:
 
     def _fetch_traffic_df(self, start: datetime.datetime, end: datetime.datetime,
                           filters: Optional[dict] = None, use_cache: bool = True,
-                          cache_workload_hrefs: Optional[list] = None):
+                          cache_workload_hrefs: Optional[list] = None,
+                          compute_draft: bool = False):
         """Return (DataFrame, source). Same cover-state logic as _fetch_traffic
         but the cache portion is built via the vectorized read_flows_df (no
         per-row re-flatten); API portions go through _parse_api. The cache and
@@ -243,6 +244,7 @@ class ReportGenerator:
                         start_time_str=_fmt_iso(start),
                         end_time_str=_fmt_iso(cache_start),
                         filters=filters,
+                        compute_draft=compute_draft,
                     ) or []
                     df_gap = self._parse_api(gap)
                     df_cache = self._cache.read_flows_df(cache_start, end,
@@ -256,6 +258,7 @@ class ReportGenerator:
             start_time_str=_fmt_iso(start),
             end_time_str=_fmt_iso(end),
             filters=filters,
+            compute_draft=compute_draft,
         )
         return self._parse_api(flows or []), "api"
 
@@ -300,6 +303,7 @@ class ReportGenerator:
                           lang: str = "en",
                           clip_to_cache: bool = False,
                           use_cache: bool = True,
+                          draft_policy: bool = False,
                           vuln_csv_path: str | None = None) -> ReportResult:
         """Fetch traffic from PCE API and run the full analysis pipeline.
 
@@ -349,10 +353,12 @@ class ReportGenerator:
                 end_dt = now_utc
                 end_date = end_dt.isoformat().replace("+00:00", "Z")
 
-        if ruleset_needs_draft_pd(DRAFT_PD_RULES):
+        if draft_policy:
+            use_cache = False  # cache has no draft_policy_decision column — force a live fetch
             filters = dict(filters or {})
             filters["requires_draft_pd"] = True
-        df, _source = self._fetch_traffic_df(start_dt, end_dt, filters, use_cache=use_cache)
+        df, _source = self._fetch_traffic_df(start_dt, end_dt, filters, use_cache=use_cache,
+                                             compute_draft=draft_policy)
 
         if df.empty:
             logger.warning("[ReportGenerator] No records returned from API")

@@ -88,6 +88,7 @@ def generate_traffic_report(
     vuln_csv_path: str | None = None,
     use_cache: bool = True,
     data_source: str | None = None,
+    draft_policy: bool = False,
 ) -> list[str]:
     from src.api_client import ApiClient
     from src.config import ConfigManager
@@ -120,7 +121,7 @@ def generate_traffic_report(
     else:
         result = gen.generate_from_api(traffic_report_profile=traffic_report_profile, lang=lang,
                                        vuln_csv_path=vuln_csv_path, use_cache=use_cache,
-                                       clip_to_cache=clip_to_cache)
+                                       clip_to_cache=clip_to_cache, draft_policy=draft_policy)
 
     if result.record_count == 0:
         raise click.ClickException("No data for report")
@@ -298,6 +299,44 @@ def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_
         return
     except Exception as exc:
         log.exception("traffic report failed")
+        echo_error(ctx, f"Unexpected error: {exc}")
+        ctx.exit(EXIT_SOFTWARE)
+        return
+    _emit_paths(ctx, paths, fmt)
+
+
+@report_group.command("draft-policy")
+@click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
+@click.option("--output-dir", type=click.Path(), default=None)
+@click.option("--email", is_flag=True)
+@click.pass_context
+def report_draft_policy(ctx: click.Context, fmt: str, output_dir, email: bool) -> None:
+    """Generate a Draft-Policy report (R01-R05).
+
+    Always fetches live from the PCE with compute_draft (the ~12s update_rules
+    pass) so the flows carry draft_policy_decision; the cache cannot serve this
+    report because it has no draft column.
+    """
+    try:
+        paths = generate_traffic_report(
+            source="api",
+            fmt=fmt,
+            output_dir=output_dir,
+            email=email,
+            draft_policy=True,
+        )
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, f"Connection failed: {exc}")
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except Exception as exc:
+        log.exception("draft-policy report failed")
         echo_error(ctx, f"Unexpected error: {exc}")
         ctx.exit(EXIT_SOFTWARE)
         return
