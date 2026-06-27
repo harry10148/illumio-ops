@@ -7,7 +7,7 @@ import re
 
 # Module-level imports required for test patching (patch targets must be attributes of this module)
 from src.api_client import ApiClient
-from src.gui._helpers import _resolve_state_file
+from src.gui._helpers import _resolve_state_file, _get_cache_engine
 from src.report.snapshot_store import read_latest
 
 
@@ -90,16 +90,12 @@ def _enabled_siem_destinations(cm, source_type: str) -> list[str]:
 
 def run_events_ingest(cm) -> None:
     try:
-        from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        from src.pce_cache.schema import init_schema
         from src.pce_cache.watermark import WatermarkStore
         from src.pce_cache.ingestor_events import EventsIngestor
         from src.api_client import ApiClient
         cfg = cm.models.pce_cache
-        engine = create_engine(f"sqlite:///{cfg.db_path}")
-        init_schema(engine)
-        sf = sessionmaker(engine)
+        sf = sessionmaker(_get_cache_engine(cfg.db_path))
         with ApiClient(cm) as api:
             ing = EventsIngestor(api=api, session_factory=sf,
                                   watermark=WatermarkStore(sf),
@@ -113,16 +109,12 @@ def run_events_ingest(cm) -> None:
 
 def run_traffic_ingest(cm) -> None:
     try:
-        from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        from src.pce_cache.schema import init_schema
         from src.pce_cache.watermark import WatermarkStore
         from src.pce_cache.ingestor_traffic import TrafficIngestor
         from src.api_client import ApiClient
         cfg = cm.models.pce_cache
-        engine = create_engine(f"sqlite:///{cfg.db_path}")
-        init_schema(engine)
-        sf = sessionmaker(engine)
+        sf = sessionmaker(_get_cache_engine(cfg.db_path))
         with ApiClient(cm) as api:
             ing = TrafficIngestor(api=api, session_factory=sf,
                                    watermark=WatermarkStore(sf),
@@ -136,14 +128,10 @@ def run_traffic_ingest(cm) -> None:
 
 def run_traffic_aggregate(cm) -> None:
     try:
-        from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        from src.pce_cache.schema import init_schema
         from src.pce_cache.aggregator import TrafficAggregator
         cfg = cm.models.pce_cache
-        engine = create_engine(f"sqlite:///{cfg.db_path}")
-        init_schema(engine)
-        sf = sessionmaker(engine)
+        sf = sessionmaker(_get_cache_engine(cfg.db_path))
         agg = TrafficAggregator(sf)
         count = agg.run_once()
         logger.info("Traffic aggregate: {} buckets updated", count)
@@ -153,14 +141,10 @@ def run_traffic_aggregate(cm) -> None:
 
 def run_cache_retention(cm) -> None:
     try:
-        from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        from src.pce_cache.schema import init_schema
         from src.pce_cache.retention import RetentionWorker
         cfg = cm.models.pce_cache
-        engine = create_engine(f"sqlite:///{cfg.db_path}")
-        init_schema(engine)
-        sf = sessionmaker(engine)
+        sf = sessionmaker(_get_cache_engine(cfg.db_path))
         worker = RetentionWorker(sf)
         result = worker.run_once(
             events_days=cfg.events_retention_days,
@@ -287,9 +271,7 @@ def run_posture_summary(cm) -> None:
 
 
 def run_siem_dispatch(cm) -> None:
-    from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
-    from src.pce_cache.schema import init_schema
     from src.siem.dispatcher import enqueue_new_records, build_dispatcher
     try:
         siem_cfg = cm.models.siem
@@ -300,9 +282,7 @@ def run_siem_dispatch(cm) -> None:
             logger.debug("run_siem_dispatch: no enabled destinations configured")
             return
         cache_cfg = cm.models.pce_cache
-        engine = create_engine(f"sqlite:///{cache_cfg.db_path}")
-        init_schema(engine)
-        sf = sessionmaker(engine)
+        sf = sessionmaker(_get_cache_engine(cache_cfg.db_path))
         dest_names = [d.name for d in enabled_dests]
         new_count = enqueue_new_records(sf, dest_names)
         if new_count:
