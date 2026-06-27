@@ -15,9 +15,13 @@ class R05DraftReportedMismatch(_DraftPdRuleMixin):
     def evaluate(self, flows_df: pd.DataFrame, ctx: dict, lang: str = "en") -> list[Finding]:
         if not self._has_draft(flows_df):
             return []
+        # Match the standard PCE draft decisions (blocked / potentially_blocked)
+        # as well as the boundary/override-deny subtypes (blocked_*).
+        _draft = flows_df["draft_policy_decision"]
         matched = flows_df[
             (flows_df["policy_decision"] == "allowed") &
-            flows_df["draft_policy_decision"].str.startswith("blocked_", na=False)
+            (_draft.isin({"blocked", "potentially_blocked"}) |
+             _draft.str.startswith("blocked_", na=False))
         ]
         if matched.empty:
             return []

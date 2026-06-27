@@ -15,7 +15,12 @@ class R01DraftDenyDetected(_DraftPdRuleMixin):
     def evaluate(self, flows_df: pd.DataFrame, ctx: dict, lang: str = "en") -> list[Finding]:
         if not self._has_draft(flows_df):
             return []
-        _deny_values = {"blocked_by_boundary", "blocked_by_override_deny"}
+        # The PCE's compute_draft returns the standard decisions (blocked /
+        # potentially_blocked); the *_by_boundary / *_override_deny subtypes only
+        # appear when the draft policy uses Enforcement Boundaries / override-deny.
+        # Match both so the rule fires regardless of how the deny is expressed.
+        _deny_values = {"blocked", "potentially_blocked",
+                        "blocked_by_boundary", "blocked_by_override_deny"}
         matched = flows_df[
             (flows_df["policy_decision"] == "allowed") &
             flows_df["draft_policy_decision"].isin(_deny_values)
