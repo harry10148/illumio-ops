@@ -97,7 +97,7 @@ function _detectBrowserTimezone() {
   if (offsetHours === 0) return 'UTC';
   const sign = offsetHours > 0 ? '+' : '-';
   const abs = Math.abs(offsetHours);
-  return `UTC${sign}${abs % 1 === 0 ? abs : abs}`;
+  return `UTC${sign}${abs}`;
 }
 function _utcToLocal(utcHour) {
   const off = _tzOffsetHours();

@@ -1475,12 +1475,7 @@ function _renderPostureHero(posture, T) {
       var valStr = (c.value != null ? c.value : '—') + (c.unit || '');
       // Severity colouring: risk_health >= 70 ok, >= 40 md, else hi
       // coverage/readiness: >= 70 ok, >= 40 md, else hi
-      var cls = '';
-      if (c.key === 'risk_health') {
-        cls = c.value >= 70 ? 'v-ok' : (c.value >= 40 ? 'v-md' : 'v-hi');
-      } else {
-        cls = c.value >= 70 ? 'v-ok' : (c.value >= 40 ? 'v-md' : 'v-hi');
-      }
+      var cls = c.value >= 70 ? 'v-ok' : (c.value >= 40 ? 'v-md' : 'v-hi');
       var label = T(c.label_key, c.key);
       html += '<div class="posture-metric">'
             + '<div class="posture-metric-v ' + cls + '">' + valStr + '</div>'
