@@ -410,9 +410,10 @@ class ApiClient:
     def _flow_matches_filters(flow: dict, filters: dict) -> bool:
         return TrafficQueryBuilder._flow_matches_filters(flow, filters)
 
-    def fetch_traffic_for_report(self, start_time_str: str, end_time_str: str, policy_decisions: list[str] | None = None, filters: Any = None) -> list[dict[str, Any]]:
+    def fetch_traffic_for_report(self, start_time_str: str, end_time_str: str, policy_decisions: list[str] | None = None, filters: Any = None, compute_draft: bool = False) -> list[dict[str, Any]]:
         return self._traffic.fetch_traffic_for_report(
-            start_time_str, end_time_str, policy_decisions=policy_decisions, filters=filters
+            start_time_str, end_time_str, policy_decisions=policy_decisions, filters=filters,
+            compute_draft=compute_draft
         )
 
     def get_last_traffic_query_diagnostics(self) -> dict[str, Any]:

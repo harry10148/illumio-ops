@@ -16,6 +16,30 @@ from src.api.traffic_query import TrafficQueryBuilder
 from src.report.report_generator import ReportGenerator
 
 
+# ── Layer 0: ApiClient delegates compute_draft to the builder ─────────────────
+# Regression guard: the report path calls ApiClient.fetch_traffic_for_report
+# (a thin wrapper over TrafficQueryBuilder), not the builder directly. Mocked-api
+# unit tests can't catch a missing kwarg on the real wrapper.
+
+def test_api_client_fetch_traffic_for_report_forwards_compute_draft():
+    from src.api_client import ApiClient
+    api = ApiClient.__new__(ApiClient)  # bypass __init__ (no PCE config needed)
+    api._traffic = MagicMock()
+    api._traffic.fetch_traffic_for_report.return_value = []
+    api.fetch_traffic_for_report("2026-06-01T00:00:00Z", "2026-06-02T00:00:00Z",
+                                 compute_draft=True)
+    assert api._traffic.fetch_traffic_for_report.call_args.kwargs.get("compute_draft") is True
+
+
+def test_api_client_fetch_traffic_for_report_defaults_compute_draft_false():
+    from src.api_client import ApiClient
+    api = ApiClient.__new__(ApiClient)
+    api._traffic = MagicMock()
+    api._traffic.fetch_traffic_for_report.return_value = []
+    api.fetch_traffic_for_report("2026-06-01T00:00:00Z", "2026-06-02T00:00:00Z")
+    assert api._traffic.fetch_traffic_for_report.call_args.kwargs.get("compute_draft") is False
+
+
 # ── Layer 1: TrafficQueryBuilder.fetch_traffic_for_report threads compute_draft ─
 
 def test_fetch_traffic_for_report_threads_compute_draft():
