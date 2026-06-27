@@ -144,6 +144,31 @@ def test_mass_assignment_rejected(authed_client, app):
     assert smtp_cfg.get("host") == "test.host", "Allowed key 'host' should be saved"
 
 
+# ── Test 2b: telegram/teams keys survive the alerts allowlist ─────────────────
+# Backend supports these channels (AlertsSettings + dispatch plugins); the GUI
+# settings-save must not silently drop them when an operator configures them.
+
+def test_alerts_save_preserves_telegram_and_teams_keys(authed_client, app):
+    client, csrf = authed_client
+    res = client.post(
+        "/api/settings",
+        json={"alerts": {
+            "telegram_bot_token": "tg-bot-123",
+            "telegram_chat_id": "chat-456",
+            "teams_webhook_url": "https://outlook.office.com/webhook/abc",
+        }},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert res.status_code == 200
+
+    cm = app.config["CM"]
+    cm.load()
+    alerts_cfg = cm.config.get("alerts", {})
+    assert alerts_cfg.get("telegram_bot_token") == "tg-bot-123"
+    assert alerts_cfg.get("telegram_chat_id") == "chat-456"
+    assert alerts_cfg.get("teams_webhook_url") == "https://outlook.office.com/webhook/abc"
+
+
 # ── Test 3: api.url with ftp:// scheme is rejected with 400 ───────────────────
 
 def test_pce_url_scheme_validator(authed_client):

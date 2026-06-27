@@ -170,7 +170,8 @@ def _strip_redaction_placeholders(obj):
 
 _SETTINGS_ALLOWLISTS = {
     "smtp": {"host", "port", "user", "password", "enable_auth", "enable_tls"},
-    "alerts": {"active", "line_channel_access_token", "line_target_id", "webhook_url"},
+    "alerts": {"active", "line_channel_access_token", "line_target_id", "webhook_url",
+               "telegram_bot_token", "telegram_chat_id", "teams_webhook_url"},
     "settings": {
         "language", "theme", "timezone", "enable_health_check", "dashboard_queries",
     },
