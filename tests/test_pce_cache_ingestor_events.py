@@ -59,6 +59,32 @@ def test_ingestor_writes_events_to_cache(session_factory):
     assert {r.pce_event_id for r in rows} == {"uuid-1", "uuid-2"}
 
 
+def test_ingestor_coerces_null_status_to_default(session_factory):
+    """A PCE event with explicit "status": null must not crash the chunked insert
+    (pce_events.status is NOT NULL); it is stored with the default "success",
+    matching the absent-status convention, and the rest of the batch survives."""
+    from src.pce_cache.ingestor_events import EventsIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    ts = datetime.now(timezone.utc)
+    null_status = _mk_event(1, ts)
+    null_status["status"] = None        # PCE returns explicit null, not an absent key
+    good = _mk_event(2, ts + timedelta(seconds=1))
+    fake = FakeApiClient(events=[null_status, good])
+    ing = EventsIngestor(api=fake, session_factory=session_factory,
+                         watermark=WatermarkStore(session_factory),
+                         async_threshold=10000)
+
+    count = ing.run_once()
+
+    assert count == 2                   # whole batch inserted, no rollback
+    with session_factory() as s:
+        by_id = {r.pce_event_id: r.status
+                 for r in s.execute(select(PceEvent)).scalars().all()}
+    assert by_id["uuid-1"] == "success"  # null coerced to default
+    assert by_id["uuid-2"] == "success"
+
+
 def test_ingestor_skips_duplicates(session_factory):
     from src.pce_cache.ingestor_events import EventsIngestor
     from src.pce_cache.watermark import WatermarkStore

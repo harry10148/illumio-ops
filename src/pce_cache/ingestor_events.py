@@ -100,7 +100,7 @@ class EventsIngestor:
                 "timestamp": _parse_iso(ev["timestamp"]),
                 "event_type": ev.get("event_type", "unknown"),
                 "severity": ev.get("severity", "info"),
-                "status": ev.get("status", "success"),
+                "status": ev.get("status") or "success",  # coerce explicit null/"" → NOT NULL col
                 "pce_fqdn": ev.get("pce_fqdn", ""),
                 "raw_json": orjson.dumps(ev).decode("utf-8"),
                 "ingested_at": now,
