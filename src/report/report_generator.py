@@ -292,11 +292,25 @@ class ReportGenerator:
                                        cache_workload_hrefs=cache_workload_hrefs)
         return df
 
+    @staticmethod
+    def _cap_records(df, max_results, draft_policy: bool = False):
+        """Cap df to max_results rows so analysis/render stays tractable on busy
+        PCEs. For draft-policy reports, move the draft-divergent (subtype) flows —
+        the R01-R05 subjects — ahead of the cap so they survive the truncation."""
+        if not max_results or df.empty or len(df) <= max_results:
+            return df
+        import pandas as pd
+        if draft_policy and "draft_policy_decision" in df.columns:
+            sub = df["draft_policy_decision"].astype(str).str.contains(
+                "_by_boundary|_override_deny|_across_boundary", regex=True, na=False)
+            df = pd.concat([df[sub], df[~sub]], ignore_index=True)
+        return df.head(max_results)
+
     # ── public ───────────────────────────────────────────────────────────────
 
     def generate_from_api(self, start_date: Optional[str] = None,
                           end_date: Optional[str] = None,
-                          max_results: int = 200_000,
+                          max_results: int | None = None,
                           filters: Optional[dict] = None,
                           traffic_report_profile: str = "security_risk",
                           detail_level: str = _REPORT_DETAIL_LEVEL,
@@ -359,6 +373,9 @@ class ReportGenerator:
             filters["requires_draft_pd"] = True
         df, _source = self._fetch_traffic_df(start_dt, end_dt, filters, use_cache=use_cache,
                                              compute_draft=draft_policy)
+        if max_results and not df.empty and len(df) > max_results:
+            logger.info("[ReportGenerator] capping {} rows to max_results={}", len(df), max_results)
+            df = self._cap_records(df, max_results, draft_policy)
 
         if df.empty:
             logger.warning("[ReportGenerator] No records returned from API")

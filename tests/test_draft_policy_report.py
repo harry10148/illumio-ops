@@ -104,6 +104,47 @@ def test_generate_from_api_default_pays_no_draft_cost():
     assert kw.get("use_cache") is True, "normal report keeps using the cache"
 
 
+# ── Layer 2b: --max-records caps the analysed df (render perf on busy PCEs) ─────
+
+def test_cap_records_noop_when_under_limit():
+    df = pd.DataFrame([{"draft_policy_decision": "allowed"}] * 5)
+    assert len(ReportGenerator._cap_records(df, 10, draft_policy=True)) == 5
+
+
+def test_cap_records_plain_head_when_not_draft():
+    df = pd.DataFrame([{"x": i} for i in range(10)])
+    out = ReportGenerator._cap_records(df, 3, draft_policy=False)
+    assert list(out["x"]) == [0, 1, 2]
+
+
+def test_cap_records_keeps_draft_subtypes_within_cap():
+    # 10 generic rows first, the 2 interesting subtype rows last — a plain head(3)
+    # would drop them; the draft-aware cap must retain them.
+    rows = [{"draft_policy_decision": "allowed", "i": i} for i in range(10)]
+    rows += [{"draft_policy_decision": "blocked_by_override_deny", "i": 10},
+             {"draft_policy_decision": "potentially_blocked_by_boundary", "i": 11}]
+    out = ReportGenerator._cap_records(pd.DataFrame(rows), 3, draft_policy=True)
+    assert len(out) == 3
+    assert set(out["draft_policy_decision"]) >= {
+        "blocked_by_override_deny", "potentially_blocked_by_boundary"}
+
+
+def test_cli_report_draft_policy_passes_max_records():
+    captured = {}
+
+    def fake_generate_from_api(self, *a, **k):
+        captured["max_results"] = k.get("max_results")
+        raise SystemExit(0)
+
+    from src.cli.root import cli
+    with patch("src.report.report_generator.ReportGenerator.generate_from_api",
+               fake_generate_from_api), \
+         patch("src.report.cache_support.cache_available", return_value=True):
+        CliRunner().invoke(cli, ["report", "draft-policy", "--max-records", "5000"],
+                           catch_exceptions=True)
+    assert captured.get("max_results") == 5000
+
+
 # ── Layer 3: CLI surfaces (click subcommand + legacy --report-type) ────────────
 
 import sys

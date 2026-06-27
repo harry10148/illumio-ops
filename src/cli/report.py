@@ -91,6 +91,7 @@ def generate_traffic_report(
     draft_policy: bool = False,
     start_date: str | None = None,
     end_date: str | None = None,
+    max_results: int | None = None,
 ) -> list[str]:
     from src.api_client import ApiClient
     from src.config import ConfigManager
@@ -122,6 +123,7 @@ def generate_traffic_report(
                                        vuln_csv_path=vuln_csv_path)
     else:
         result = gen.generate_from_api(start_date=start_date, end_date=end_date,
+                                       max_results=max_results,
                                        traffic_report_profile=traffic_report_profile, lang=lang,
                                        vuln_csv_path=vuln_csv_path, use_cache=use_cache,
                                        clip_to_cache=clip_to_cache, draft_policy=draft_policy)
@@ -311,12 +313,15 @@ def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_
 @report_group.command("draft-policy")
 @click.option("--start-date", type=str, default=None, help="Start date in YYYY-MM-DD")
 @click.option("--end-date", type=str, default=None, help="End date in YYYY-MM-DD")
+@click.option("--max-records", type=int, default=None,
+              help="Cap analysed flows (draft-divergent flows are kept first) — keeps render "
+                   "tractable on high-volume PCEs")
 @click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
 @click.option("--email", is_flag=True)
 @click.pass_context
 def report_draft_policy(ctx: click.Context, start_date: str | None, end_date: str | None,
-                        fmt: str, output_dir, email: bool) -> None:
+                        max_records: int | None, fmt: str, output_dir, email: bool) -> None:
     """Generate a Draft-Policy report (R01-R05).
 
     Always fetches live from the PCE with compute_draft (the ~12s update_rules
@@ -329,6 +334,7 @@ def report_draft_policy(ctx: click.Context, start_date: str | None, end_date: st
             source="api",
             start_date=start_date,
             end_date=end_date,
+            max_results=max_records,
             fmt=fmt,
             output_dir=output_dir,
             email=email,
