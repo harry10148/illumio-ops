@@ -39,11 +39,12 @@ def test_docs_do_not_advertise_python38_source_runtime():
 
 
 def test_docs_list_alerts_json_as_preserved_operator_config():
+    # The 2026-06 rebuild removed the docs/user-guide/ subtree; the alerts /
+    # quarantine content now lives in the operations manual.
     docs = {
         "docs/getting-started.md": _read("docs/getting-started.md"),
         "docs/getting-started_zh.md": _read("docs/getting-started_zh.md"),
-        "docs/user-guide/alerts-and-quarantine.md": _read("docs/user-guide/alerts-and-quarantine.md"),
-        "docs/user-guide/alerts-and-quarantine_zh.md": _read("docs/user-guide/alerts-and-quarantine_zh.md"),
+        "docs/operations-manual_zh.md": _read("docs/operations-manual_zh.md"),
     }
 
     for path, text in docs.items():
@@ -72,11 +73,12 @@ def test_version_badges_match_runtime_version():
 
 
 def test_gui_port_and_bind_host_docs_match_runtime_defaults():
-    # No new user-facing doc may advertise the stale GUI port 5000.
+    # No new user-facing doc may advertise the stale GUI port 5000. (The 2026-06
+    # rebuild folded the troubleshooting / settings user-guide pages into the
+    # operations manual.)
     doc_paths = [
         "docs/getting-started.md", "docs/getting-started_zh.md",
-        "docs/user-guide/troubleshooting.md", "docs/user-guide/troubleshooting_zh.md",
-        "docs/user-guide/settings-and-pce-cache.md", "docs/user-guide/settings-and-pce-cache_zh.md",
+        "docs/operations-manual_zh.md",
         "docs/reference/cli.md", "docs/reference/cli_zh.md",
     ]
     for path in doc_paths:
@@ -95,13 +97,13 @@ def test_gui_port_and_bind_host_docs_match_runtime_defaults():
 
 
 def test_report_format_and_click_examples_match_cli_contracts():
+    # The 2026-06 rebuild folded the reports user-guide page into the operations manual.
     docs = {
         "README.md": _read("README.md"),
         "README_zh.md": _read("README_zh.md"),
         "docs/reference/cli.md": _read("docs/reference/cli.md"),
         "docs/reference/cli_zh.md": _read("docs/reference/cli_zh.md"),
-        "docs/user-guide/reports.md": _read("docs/user-guide/reports.md"),
-        "docs/user-guide/reports_zh.md": _read("docs/user-guide/reports_zh.md"),
+        "docs/operations-manual_zh.md": _read("docs/operations-manual_zh.md"),
     }
 
     stale_fragments = (

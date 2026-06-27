@@ -26,11 +26,11 @@ def test_rsyslog_targets_remote_host():
 
 
 def test_siem_doc_exists_with_four_options():
-    # Doc was moved during 2026-05 refactor (PR #29). New path:
-    #   docs/user-guide/siem-integration.md
-    # The legacy doc labelled destinations "Option A..D"; the new doc uses
-    # the actual transport keys (udp / tcp / tls / hec), which are what the
-    # user wires into config/config.json under siem.destinations.transport.
-    doc = Path("docs/user-guide/siem-integration.md").read_text(encoding="utf-8")
+    # The SIEM integration guide was consolidated into the operations manual
+    # during the 2026-06 docs rebuild (the docs/user-guide/ subtree was removed;
+    # SIEM transports are also documented in docs/reference/cli.md). Transports
+    # are documented by their real config keys (udp / tcp / tls / hec), which are
+    # what the user wires into config/config.json under siem.destinations.transport.
+    doc = Path("docs/operations-manual_zh.md").read_text(encoding="utf-8")
     for transport in ("udp", "tcp", "tls", "hec"):
         assert f"`{transport}`" in doc, f"SIEM doc missing transport: {transport}"
