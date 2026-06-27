@@ -89,6 +89,8 @@ def generate_traffic_report(
     use_cache: bool = True,
     data_source: str | None = None,
     draft_policy: bool = False,
+    start_date: str | None = None,
+    end_date: str | None = None,
 ) -> list[str]:
     from src.api_client import ApiClient
     from src.config import ConfigManager
@@ -119,7 +121,8 @@ def generate_traffic_report(
         result = gen.generate_from_csv(file_path, traffic_report_profile=traffic_report_profile, lang=lang,
                                        vuln_csv_path=vuln_csv_path)
     else:
-        result = gen.generate_from_api(traffic_report_profile=traffic_report_profile, lang=lang,
+        result = gen.generate_from_api(start_date=start_date, end_date=end_date,
+                                       traffic_report_profile=traffic_report_profile, lang=lang,
                                        vuln_csv_path=vuln_csv_path, use_cache=use_cache,
                                        clip_to_cache=clip_to_cache, draft_policy=draft_policy)
 
@@ -306,20 +309,26 @@ def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_
 
 
 @report_group.command("draft-policy")
+@click.option("--start-date", type=str, default=None, help="Start date in YYYY-MM-DD")
+@click.option("--end-date", type=str, default=None, help="End date in YYYY-MM-DD")
 @click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
 @click.option("--email", is_flag=True)
 @click.pass_context
-def report_draft_policy(ctx: click.Context, fmt: str, output_dir, email: bool) -> None:
+def report_draft_policy(ctx: click.Context, start_date: str | None, end_date: str | None,
+                        fmt: str, output_dir, email: bool) -> None:
     """Generate a Draft-Policy report (R01-R05).
 
     Always fetches live from the PCE with compute_draft (the ~12s update_rules
     pass) so the flows carry draft_policy_decision; the cache cannot serve this
-    report because it has no draft column.
+    report because it has no draft column. compute_draft is expensive over a wide
+    window, so scope the query with --start-date/--end-date (defaults to 7 days).
     """
     try:
         paths = generate_traffic_report(
             source="api",
+            start_date=start_date,
+            end_date=end_date,
             fmt=fmt,
             output_dir=output_dir,
             email=email,

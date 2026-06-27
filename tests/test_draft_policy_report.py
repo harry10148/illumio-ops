@@ -136,6 +136,28 @@ def test_cli_report_traffic_does_not_request_draft():
     assert _capture_draft_policy(["report", "traffic"]).get("draft_policy") in (False, None)
 
 
+def test_cli_report_draft_policy_passes_date_window():
+    captured = {}
+
+    def fake_generate_from_api(self, *a, **k):
+        captured.update(start_date=k.get("start_date"), end_date=k.get("end_date"),
+                        draft_policy=k.get("draft_policy"))
+        raise SystemExit(0)
+
+    from src.cli.root import cli
+    with patch("src.report.report_generator.ReportGenerator.generate_from_api",
+               fake_generate_from_api), \
+         patch("src.report.cache_support.cache_available", return_value=True):
+        CliRunner().invoke(
+            cli,
+            ["report", "draft-policy", "--start-date", "2026-06-26", "--end-date", "2026-06-27"],
+            catch_exceptions=True,
+        )
+    assert captured.get("start_date") == "2026-06-26"
+    assert captured.get("end_date") == "2026-06-27"
+    assert captured.get("draft_policy") is True
+
+
 def test_legacy_report_type_draft_policy_dispatches(monkeypatch):
     import src.main as main_module
 
