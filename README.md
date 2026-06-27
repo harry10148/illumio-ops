@@ -213,6 +213,18 @@ The GUI can run over HTTP (dev/internal) or HTTPS. cheroot terminates TLS native
 
 `config/config.json` holds PCE API credentials and alert-channel secrets in plaintext, so it — along with `config/alerts.json`, `config/rule_schedules.json`, and `config/tls/` — is **gitignored**. Apply restrictive filesystem permissions (e.g. `chmod 600`). illumio-ops performs **no outbound telemetry**: the only outbound connections are to the configured PCE and to SIEM / alert destinations.
 
+### Telegram alert plugin — token leakage via proxy access logs
+
+The Telegram Bot API embeds the bot token in the **URL path** (`https://api.telegram.org/bot<TOKEN>/sendMessage`). In high-sensitivity environments, prevent any forward proxy or WAF from writing full URL paths to access logs, use a direct (NoProxy) connection to bypass corporate proxies, or switch to webhook mode (the webhook URL does not contain the token). The Loguru token scrubber redacts local logs but cannot protect intermediate network devices.
+
+### Server header fingerprinting
+
+cheroot emits `Server: Cheroot/<version>` by default, exposing version information to fingerprinting. If your audit policy requires header suppression, strip it at the reverse proxy with `proxy_hide_header Server;` (nginx) or an equivalent directive.
+
+### Production git workflow — autoStash and reproducibility
+
+`scripts/setup-prod-git.sh` enables `git config merge.autoStash=true`, so a production host may silently stash uncommitted local edits during `git pull`. The host may then not be bit-for-bit **reproducible** against the deployed git tag. After each deployment, run `git stash list` and confirm it is empty; for hosts where reproducibility must be guaranteed, use `scripts/setup.sh` instead.
+
 ---
 
 ## Status & Notes

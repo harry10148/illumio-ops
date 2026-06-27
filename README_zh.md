@@ -213,6 +213,18 @@ GUI 可以 HTTP（開發／內網）或 HTTPS 執行。cheroot 以強化 cipher 
 
 `config/config.json` 以明文保存 PCE API 憑證與告警通道 secret，因此它——連同 `config/alerts.json`、`config/rule_schedules.json` 與 `config/tls/`——皆已 **gitignore**。請套用嚴格的檔案權限（例如 `chmod 600`）。illumio-ops **不進行任何對外遙測（telemetry）**：唯一的對外連線是連到設定的 PCE，以及 SIEM／告警目的地。
 
+### Telegram alert plugin — token 經 proxy access log 洩漏
+
+Telegram Bot API 將 bot token 嵌在 **URL path**（`https://api.telegram.org/bot<TOKEN>/sendMessage`）。在高敏感環境部署時，請禁止任何 forward proxy 或 WAF 將完整 URL path 寫入 access log、改用 NoProxy direct 連線繞過企業代理，或改用 webhook 模式（webhook URL 不含 token）。Loguru 的 token 屏蔽只能遮蔽本機 log，無法保護中介網路設備。
+
+### Server header 指紋識別
+
+cheroot 預設輸出 `Server: Cheroot/<version>` 響應 header，會將版本資訊暴露給指紋識別。若稽核政策要求隱藏，請在 reverse proxy 端以 `proxy_hide_header Server;`（nginx）或相應指令移除。
+
+### 正式環境 Git 流程 — autoStash 與可重現性
+
+`scripts/setup-prod-git.sh` 啟用 `git config merge.autoStash=true`，prod box 在 `git pull` 時可能靜默 stash 未提交的本地編輯，導致與所部署的 git tag **不是 bit-for-bit reproducible**。每次部署後請執行 `git stash list` 確認為空；若需保證可重現性，請改用 `scripts/setup.sh`。
+
 ---
 
 ## 狀態與備註（Status & Notes）
