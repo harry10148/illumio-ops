@@ -1,7 +1,7 @@
 ---
 title: Release Process
 audience: [developer]
-last_verified: 2026-05-15
+last_verified: 2026-06-26
 verified_against:
   - CHANGELOG.md
   - deploy/

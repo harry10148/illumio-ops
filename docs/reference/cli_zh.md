@@ -1,7 +1,7 @@
 ---
 title: CLI Reference
 audience: [operator, api, developer]
-last_verified: 2026-05-15
+last_verified: 2026-06-26
 verified_against:
   - src/cli/
   - src/cli/menus/

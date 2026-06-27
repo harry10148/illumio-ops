@@ -1,7 +1,7 @@
 ---
 title: Getting Started
 audience: [operator]
-last_verified: 2026-05-15
+last_verified: 2026-06-26
 verified_against:
   - docs/Installation.md (legacy, audited)
   - docs/UPGRADE.md (legacy, audited)

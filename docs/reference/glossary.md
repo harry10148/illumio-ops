@@ -1,7 +1,7 @@
 ---
 title: Glossary
 audience: [operator, developer, api, security]
-last_verified: 2026-05-15
+last_verified: 2026-06-26
 verified_against:
   - src/i18n/data/zh_explicit.json
   - docs/Glossary.md (legacy, audited)
