@@ -43,16 +43,20 @@ from src import __version__
 
 def _request_lang() -> str:
     """Resolve lang for the current request: session > config default."""
-    from flask import session, has_request_context
+    from flask import session, has_request_context, current_app
     if has_request_context():
         s_lang = session.get("lang")
         if s_lang:
             return s_lang
-    try:
-        from src.config import cm
-        return cm.config.get("settings", {}).get("language", "en")
-    except Exception:
-        return "en"
+        # Config default: read the shared ConfigManager the app factory stored
+        # at app.config['CM'] (there is no module-level src.config.cm).
+        try:
+            cm = current_app.config.get("CM")
+            if cm is not None:
+                return cm.config.get("settings", {}).get("language", "en")
+        except Exception:
+            pass
+    return "en"
 from src.alerts import PLUGIN_METADATA, plugin_config_value
 from src.report.dashboard_summaries import (
     build_audit_dashboard_summary,
