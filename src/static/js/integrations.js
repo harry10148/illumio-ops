@@ -317,7 +317,7 @@ async function doDaemonRestart(btn, msgSpan) {
       return;
     }
     if (body.ok) {
-      btn.textContent = 'OK';
+      btn.textContent = _t('gui_status_ok');
       msgSpan.textContent = _t('gui_restart_success');
       msgSpan.removeAttribute('data-i18n');
       setTimeout(function() {
@@ -621,7 +621,7 @@ window._integrations.setRender('siem', async function renderSiem() {
   var perDestMap = {};
   siemRows.forEach(function(d) { if (d.destination) perDestMap[d.destination] = d; });
   var rows = dests.map(function(d) { return buildSiemRow(d, perDestMap[d.name] || {}); }).join('');
-  tbody.innerHTML = rows || '<tr><td colspan="6" style="color:var(--dim);">(none)</td></tr>';
+  tbody.innerHTML = rows || '<tr><td colspan="6" style="color:var(--dim);" data-i18n="gui_it_none">(none)</td></tr>';
   if (typeof window.i18nApply === 'function') window.i18nApply();
 });
 
@@ -937,8 +937,8 @@ async function siemTestDest(nameEnc) {
     return;
   }
   var msg = body.ok
-    ? 'OK: ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)'
-    : 'FAIL: ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
+    ? _t('gui_status_ok') + ': ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)'
+    : _t('gui_status_fail') + ': ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
   alert(msg);
 }
 
@@ -965,10 +965,10 @@ async function siemTestDestInline() {
     banner.textContent = _t('gui_it_dest_not_saved');
   } else if (body.ok) {
     banner.style.color = 'var(--ok, green)';
-    banner.textContent = 'OK: ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)';
+    banner.textContent = _t('gui_status_ok') + ': ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)';
   } else {
     banner.style.color = 'var(--color-danger)';
-    banner.textContent = 'FAIL: ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
+    banner.textContent = _t('gui_status_fail') + ': ' + _t('gui_siem_test_fail') + ': ' + String(body.error || '');
   }
 }
 window.siemTestDest = siemTestDest;
@@ -1269,16 +1269,17 @@ async function dlqView(id) {
   modal.appendChild(title);
 
   [
-    ['Destination', entry.destination || entry.source_table],
-    ['Event ID', entry.source_id],
-    ['Failed at', entry.quarantined_at],
-    ['Retries', entry.retries],
+    ['gui_dlq_dt_destination', 'Destination', entry.destination || entry.source_table],
+    ['gui_dlq_dt_event_id', 'Event ID', entry.source_id],
+    ['gui_dlq_dt_failed_at', 'Failed at', entry.quarantined_at],
+    ['gui_dlq_dt_retries', 'Retries', entry.retries],
   ].forEach(function(pair) {
     var d = document.createElement('div');
     var b = document.createElement('b');
-    b.textContent = pair[0];
+    b.setAttribute('data-i18n', pair[0]);
+    b.textContent = pair[1];
     d.appendChild(b);
-    d.appendChild(document.createTextNode(': ' + (pair[1] == null ? '' : pair[1])));
+    d.appendChild(document.createTextNode(': ' + (pair[2] == null ? '' : pair[2])));
     modal.appendChild(d);
   });
 
@@ -1287,6 +1288,7 @@ async function dlqView(id) {
     var errLabel = document.createElement('div');
     errLabel.style.marginTop = '10px';
     var errB = document.createElement('b');
+    errB.setAttribute('data-i18n', 'gui_dlq_dt_reason');
     errB.textContent = 'Reason';
     errLabel.appendChild(errB);
     modal.appendChild(errLabel);
@@ -1301,6 +1303,7 @@ async function dlqView(id) {
     var payLabel = document.createElement('div');
     payLabel.style.marginTop = '10px';
     var payB = document.createElement('b');
+    payB.setAttribute('data-i18n', 'gui_dlq_dt_payload');
     payB.textContent = 'Payload';
     payLabel.appendChild(payB);
     modal.appendChild(payLabel);
@@ -1504,8 +1507,8 @@ function _buildAlertChannelCards(settings) {
   var mailPort = smtp.port || email.smtp_port || '';
   var mailSender = (alerts.mail && alerts.mail.sender) || email.sender || '';
   var mailStatus = mailConfigured ? 'ok' : 'muted';
-  var mailStatusLabel = mailConfigured ? 'Verified' : 'Not configured';
-  var mailSub = mailHost ? (mailHost + (mailPort ? ':' + mailPort : '')) : 'SMTP not configured';
+  var mailStatusLabel = mailConfigured ? _t('gui_ov_ch_verified') : _t('gui_ov_ch_not_configured');
+  var mailSub = mailHost ? (mailHost + (mailPort ? ':' + mailPort : '')) : _t('gui_ov_ch_smtp_not_configured');
 
   // Alert channel config is stored FLAT under `alerts` (e.g. alerts.line_channel_access_token),
   // not as nested sub-objects. Secret fields are redacted to asterisks by /api/settings, which
@@ -1514,19 +1517,19 @@ function _buildAlertChannelCards(settings) {
   // LINE card
   var lineConfigured = !!alerts.line_channel_access_token__set;
   var lineStatus = lineConfigured ? 'ok' : 'muted';
-  var lineStatusLabel = lineConfigured ? 'Verified' : 'Not configured';
+  var lineStatusLabel = lineConfigured ? _t('gui_ov_ch_verified') : _t('gui_ov_ch_not_configured');
   var lineTarget = alerts.line_target_id || '';
 
   // Telegram card
   var tgConfigured = !!alerts.telegram_bot_token__set;
   var tgChatId = alerts.telegram_chat_id || '';
   var tgStatus = tgConfigured ? 'ok' : 'muted';
-  var tgStatusLabel = tgConfigured ? 'Configured' : 'Not configured';
+  var tgStatusLabel = tgConfigured ? _t('gui_ov_ch_configured') : _t('gui_ov_ch_not_configured');
 
   // Webhook card (url is redacted, so the real value can't be displayed)
   var whConfigured = !!alerts.webhook_url__set;
   var whStatus = whConfigured ? 'ok' : 'muted';
-  var whStatusLabel = whConfigured ? 'Verified' : 'Not configured';
+  var whStatusLabel = whConfigured ? _t('gui_ov_ch_verified') : _t('gui_ov_ch_not_configured');
 
   function chip(cls, label) {
     return '<span class="it-status-chip it-status-' + cls + '">' + label + '</span>';
@@ -1534,7 +1537,7 @@ function _buildAlertChannelCards(settings) {
 
   var cards = '<div class="it-channel-section">'
     + '<div class="it-channel-header">'
-    + '<div><strong>Alert channels</strong><span class="it-channel-sub">Mail · LINE · Telegram · Webhook</span></div>'
+    + '<div><strong data-i18n="gui_ov_alert_channels">Alert channels</strong><span class="it-channel-sub">Mail · LINE · Telegram · Webhook</span></div>'
     + '</div>'
     + '<div class="integ-grid">';
 
@@ -1542,13 +1545,13 @@ function _buildAlertChannelCards(settings) {
   cards += '<div class="integ-card">'
     + '<div class="integ-card-h">'
     + '<div class="integ-card-logo">@</div>'
-    + '<div><div class="integ-card-name">Mail (SMTP)</div>'
+    + '<div><div class="integ-card-name" data-i18n="gui_ov_ch_mail_smtp">Mail (SMTP)</div>'
     + '<div class="integ-card-sub">' + escapeAttr(mailSub) + '</div></div>'
     + chip(mailStatus, mailStatusLabel)
     + '</div>';
   if (mailConfigured) {
     cards += '<div class="integ-card-meta">'
-      + (mailSender ? '<span>Sender <strong>' + escapeAttr(mailSender) + '</strong></span>' : '')
+      + (mailSender ? '<span><span data-i18n="gui_ov_ch_sender">Sender</span> <strong>' + escapeAttr(mailSender) + '</strong></span>' : '')
       + '</div>';
   }
   cards += '</div>';
@@ -1557,13 +1560,13 @@ function _buildAlertChannelCards(settings) {
   cards += '<div class="integ-card">'
     + '<div class="integ-card-h">'
     + '<div class="integ-card-logo">L</div>'
-    + '<div><div class="integ-card-name">LINE Push</div>'
+    + '<div><div class="integ-card-name" data-i18n="gui_ov_ch_line_push">LINE Push</div>'
     + '<div class="integ-card-sub">Channel access token</div></div>'
     + chip(lineStatus, lineStatusLabel)
     + '</div>';
   if (lineConfigured && lineTarget) {
     var lineShort = lineTarget.length > 14 ? lineTarget.slice(0, 7) + '…' + lineTarget.slice(-6) : lineTarget;
-    cards += '<div class="integ-card-meta"><span>Target ID <strong>' + escapeAttr(lineShort) + '</strong></span></div>';
+    cards += '<div class="integ-card-meta"><span><span data-i18n="gui_ov_ch_target_id">Target ID</span> <strong>' + escapeAttr(lineShort) + '</strong></span></div>';
   }
   cards += '</div>';
 
@@ -1576,7 +1579,7 @@ function _buildAlertChannelCards(settings) {
     + chip(tgStatus, tgStatusLabel)
     + '</div>';
   if (tgChatId) {
-    cards += '<div class="integ-card-meta"><span>Chat ID <strong>' + escapeAttr(String(tgChatId)) + '</strong></span></div>';
+    cards += '<div class="integ-card-meta"><span><span data-i18n="gui_ov_ch_chat_id">Chat ID</span> <strong>' + escapeAttr(String(tgChatId)) + '</strong></span></div>';
   }
   cards += '</div>';
 
