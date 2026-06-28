@@ -576,9 +576,9 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
         import src.gui as _self
         if not _self._GUI_OWNS_DAEMON:
             return jsonify({"ok": False,
-                            "error": "Daemon is managed externally; restart via systemctl or your service manager."}), 409
+                            "error": t("gui_daemon_external", lang=_request_lang())}), 409
         if _self._DAEMON_RESTART_FN is None:
-            return jsonify({"ok": False, "error": "restart hook not installed"}), 500
+            return jsonify({"ok": False, "error": t("gui_daemon_no_hook", lang=_request_lang())}), 500
         try:
             _self._DAEMON_SCHEDULER = _self._DAEMON_RESTART_FN()
             return jsonify({"ok": True}), 200

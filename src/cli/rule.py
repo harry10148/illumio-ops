@@ -117,13 +117,13 @@ def edit_rule(ctx: click.Context, rule_id: int, no_preview: bool) -> None:
 
     if not no_preview and not is_quiet(ctx):
         console = Console()
-        console.print("[bold]Before:[/bold]")
+        console.print(f"[bold]{t('cli_rule_before')}[/bold]")
         console.print(Syntax(before, "json", theme="monokai", line_numbers=False))
-        console.print("[bold]After:[/bold]")
+        console.print(f"[bold]{t('cli_rule_after')}[/bold]")
         console.print(Syntax(after, "json", theme="monokai", line_numbers=False))
-        if not questionary.confirm("Save changes?", default=True).unsafe_ask():
+        if not questionary.confirm(t('cli_rule_confirm_save'), default=True).unsafe_ask():
             click.echo(t("cli_rule_aborted"))
             return
 
     cm.save()
-    click.echo(f"Rule {rule_id} saved.")
+    click.echo(t('cli_rule_saved', id=rule_id))
