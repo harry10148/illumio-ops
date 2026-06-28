@@ -260,11 +260,28 @@ class Reporter:
             if base.endswith(suffix):
                 base = base[: -len(suffix)]
                 break
+        base = self._console_base(base)
         if "/orgs/" in href:
             _, _, tail = href.partition("/orgs/")
             _, _, href = tail.partition("/")
             href = "/" + href if href else ""
         return f"{base}/#{href}" if href else base
+
+    @staticmethod
+    def _console_base(api_base: str) -> str:
+        """Web-console base for the event deep-link.
+
+        On-prem the API host also serves the web console, so the API base is
+        correct. Illumio SaaS serves the API from a regional SCP cluster
+        (e.g. *.ap-scp1.illumio.com) but the web console is the region-agnostic
+        console.illum.io — a different host — so the API base would 404. Map any
+        SaaS SCP API host to console.illum.io.
+        """
+        from urllib.parse import urlparse
+        host = (urlparse(api_base).hostname or "").lower()
+        if host.endswith("illumio.com") and "scp" in host:
+            return "https://console.illum.io"
+        return api_base
 
     @staticmethod
     def _summarize_notification_info(info: Any) -> str:
