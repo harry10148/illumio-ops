@@ -269,7 +269,7 @@ async function cacheSave() {
     showRestartBanner(banner);
   } else {
     banner.style.display = 'block';
-    banner.textContent = 'Validation error:';
+    banner.textContent = _t('gui_it_validation_error');
     var ul = document.createElement('ul');
     Object.entries(body.errors || {}).forEach(function(entry) {
       var li = document.createElement('li');
@@ -286,12 +286,10 @@ function showRestartBanner(target) {
   var wrap = document.createElement('div');
   wrap.className = 'banner';
   var span = document.createElement('span');
-  span.setAttribute('data-i18n', 'gui_restart_required_banner');
-  span.textContent = 'Settings saved. Restart monitor to apply scheduling changes.';
+  span.textContent = _t('gui_it_restart_saved');
   var restartBtn = document.createElement('button');
   restartBtn.className = 'btn btn-primary';
-  restartBtn.setAttribute('data-i18n', 'gui_restart_monitor_btn');
-  restartBtn.textContent = 'Restart Monitor';
+  restartBtn.textContent = _t('gui_it_restart_monitor');
   restartBtn.addEventListener('click', function() { doDaemonRestart(restartBtn, span); });
   var dismissBtn = document.createElement('button');
   dismissBtn.className = 'btn';
@@ -382,13 +380,13 @@ async function submitCacheBackfill() {
     if (!r.ok) {
       if (result) {
         result.style.color = 'var(--color-danger)';
-        result.textContent = 'Backfill failed: ' + (body.error || r.status);
+        result.textContent = _t('gui_it_backfill_failed') + (body.error || r.status);
       }
       return;
     }
     if (result) {
       result.style.color = 'var(--accent2,var(--fg))';
-      result.textContent = 'Done — source: ' + source
+      result.textContent = _t('gui_it_backfill_done_source') + source
         + ' · inserted: ' + (body.inserted || 0)
         + ' · duplicates: ' + (body.duplicates || 0)
         + ' · total: ' + (body.total_rows || 0)
@@ -400,17 +398,17 @@ async function submitCacheBackfill() {
 }
 
 async function cacheRetentionNow() {
-  if (!confirm('Run retention purge now? This will delete cache rows older than the configured retention days.')) return;
+  if (!confirm(_t('gui_it_retention_confirm'))) return;
   var r = await fetch('/api/cache/retention/run', {
     method: 'POST',
     headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
   });
   var body = await r.json().catch(function() { return {}; });
   if (!r.ok) {
-    alert('Retention failed: ' + (body.error || r.status));
+    alert(_t('gui_it_retention_failed') + (body.error || r.status));
     return;
   }
-  alert('Retention done — events: ' + (body.events || 0)
+  alert(_t('gui_it_retention_done_events') + (body.events || 0)
     + ', traffic_raw: ' + (body.traffic_raw || 0)
     + ', traffic_agg: ' + (body.traffic_agg || 0)
     + ', dead_letter: ' + (body.dead_letter || 0));
@@ -729,7 +727,7 @@ async function siemSaveForwarder() {
   if (body.ok) {
     showRestartBanner(banner);
   } else {
-    banner.textContent = 'Validation error: ' + JSON.stringify(body.errors || body.error || '');
+    banner.textContent = _t('gui_it_validation_error') + ' ' + JSON.stringify(body.errors || body.error || '');
   }
 }
 
@@ -738,7 +736,7 @@ async function siemDeleteDest(nameEnc) {
   var confirmMsg = (typeof _t === 'function') ? _t('gui_confirm_delete') : 'Delete this destination?';
   if (!confirm(confirmMsg)) return;
   var r = await fetch('/api/siem/destinations/' + encodeURIComponent(name), {method: 'DELETE', headers: {'X-CSRF-Token': _csrfToken()}});
-  if (!r.ok) { alert('Delete failed: HTTP ' + r.status); return; }
+  if (!r.ok) { alert(_t('gui_it_delete_failed_http') + r.status); return; }
   window._integrations.renderSiem();
 }
 
@@ -915,7 +913,7 @@ async function siemSaveDest(editNameEnc) {
     }
     body = await resp.json();
   } catch (err) {
-    document.getElementById('md-banner').textContent = 'Save failed: ' + String(err);
+    document.getElementById('md-banner').textContent = _t('gui_it_save_failed') + String(err);
     return;
   }
   if (resp.ok && body.ok !== false) {
@@ -924,7 +922,7 @@ async function siemSaveDest(editNameEnc) {
     showRestartBanner(document.getElementById('siem-banner'));
   } else {
     var banner = document.getElementById('md-banner');
-    if (banner) banner.textContent = 'Save failed: ' + (body.error || JSON.stringify(body.errors || body));
+    if (banner) banner.textContent = _t('gui_it_save_failed') + (body.error || JSON.stringify(body.errors || body));
   }
 }
 
@@ -935,7 +933,7 @@ async function siemTestDest(nameEnc) {
     resp = await fetch('/api/siem/destinations/' + encodeURIComponent(name) + '/test', {method: 'POST', headers: {'X-CSRF-Token': _csrfToken()}});
     body = await resp.json();
   } catch (err) {
-    alert('Test error: ' + String(err));
+    alert(_t('gui_it_test_error') + String(err));
     return;
   }
   var msg = body.ok
@@ -948,11 +946,11 @@ async function siemTestDestInline() {
   var banner = document.getElementById('md-banner');
   if (!banner) return;
   banner.style.color = '';
-  banner.textContent = 'Testing…';
+  banner.textContent = _t('gui_it_testing');
   var name = (document.getElementById('md-name') || {}).value || '';
   name = name.trim();
   if (!name) {
-    banner.textContent = 'Enter name, then Save, then Test.';
+    banner.textContent = _t('gui_it_enter_name_save_test');
     return;
   }
   var resp, body;
@@ -960,11 +958,11 @@ async function siemTestDestInline() {
     resp = await fetch('/api/siem/destinations/' + encodeURIComponent(name) + '/test', {method: 'POST', headers: {'X-CSRF-Token': _csrfToken()}});
     body = await resp.json();
   } catch (err) {
-    banner.textContent = 'Test error: ' + String(err);
+    banner.textContent = _t('gui_it_test_error') + String(err);
     return;
   }
   if (resp.status === 404) {
-    banner.textContent = 'Destination not yet saved. Save first, then Test.';
+    banner.textContent = _t('gui_it_dest_not_saved');
   } else if (body.ok) {
     banner.style.color = 'var(--ok, green)';
     banner.textContent = 'OK: ' + _t('gui_siem_test_ok') + ' (' + _t('gui_siem_test_latency') + ': ' + Number(body.latency_ms) + ' ms)';
@@ -1042,8 +1040,8 @@ function buildDlqSkeleton() {
     + '</div>'
     + '<div id="dlq-empty-state" class="it-dlq-empty" style="display:none;">'
     + '<div class="it-dlq-empty-icon">∅</div>'
-    + '<h3>DLQ is empty</h3>'
-    + '<p>All destinations are currently delivering normally. To test backfill, temporarily point the host to a blackhole IP (e.g. 192.0.2.1) and send an event.</p>'
+    + '<h3>' + _t('gui_it_dlq_empty_title') + '</h3>'
+    + '<p>' + _t('gui_it_dlq_empty_body') + '</p>'
     + '</div>'
     + '<div id="dlq-pager" style="margin-top:8px;"></div>'
     + '<div id="dlq-modal-host"></div>';
@@ -1165,7 +1163,7 @@ async function dlqReplaySelected() {
       method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
       body: JSON.stringify({ids: ids}),
     });
-    if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
+    if (!r.ok) { alert(_t('gui_it_request_failed_http') + r.status); return; }
     var body = await r.json();
     // Show per-item requeued results if available
     if (body && body.requeued) {
@@ -1174,7 +1172,7 @@ async function dlqReplaySelected() {
       }).join('\n');
       console.info('[DLQ replay]', summary);
     }
-  } catch (err) { alert('Replay error: ' + String(err)); return; }
+  } catch (err) { alert(_t('gui_it_replay_error') + String(err)); return; }
   dlqSearch();
 }
 
@@ -1185,7 +1183,7 @@ async function dlqReplay(ids) {
       method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
       body: JSON.stringify({ids: ids}),
     });
-    if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
+    if (!r.ok) { alert(_t('gui_it_request_failed_http') + r.status); return; }
     var body = await r.json();
     if (body && body.requeued) {
       var summary = body.requeued.map(function(item) {
@@ -1193,7 +1191,7 @@ async function dlqReplay(ids) {
       }).join('\n');
       console.info('[DLQ replay]', summary);
     }
-  } catch (err) { alert('Replay error: ' + String(err)); return; }
+  } catch (err) { alert(_t('gui_it_replay_error') + String(err)); return; }
   dlqSearch();
 }
 
@@ -1201,21 +1199,21 @@ async function dlqPurgeSelected() {
   var ids = _dlqSelectedIds();
   if (!ids.length) return;
   var dest = (document.getElementById('dlq-dest') || {}).value || '';
-  if (!dest) { alert('Select a destination filter first.'); return; }
-  if (!confirm('Purge ' + ids.length + ' entries from ' + dest + '?')) return;
+  if (!dest) { alert(_t('gui_it_select_dest_filter')); return; }
+  if (!confirm(_t('gui_it_purge_n_prefix') + ids.length + _t('gui_it_purge_n_from') + dest + '?')) return;
   try {
     var r = await fetch('/api/siem/dlq/purge', {
       method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
       body: JSON.stringify({dest: dest, older_than_days: 0}),
     });
-    if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
-  } catch (err) { alert('Purge error: ' + String(err)); return; }
+    if (!r.ok) { alert(_t('gui_it_request_failed_http') + r.status); return; }
+  } catch (err) { alert(_t('gui_it_purge_error') + String(err)); return; }
   dlqSearch();
 }
 
 async function dlqPurgeAll() {
   var dest = (document.getElementById('dlq-dest') || {}).value || '';
-  if (!dest) { alert('Pick a destination first.'); return; }
+  if (!dest) { alert(_t('gui_it_pick_dest_first')); return; }
   var confirmMsg = (typeof _t === 'function') ? _t('gui_dlq_confirm_purge_all') : 'Type the destination name to confirm Purge ALL';
   var typed = prompt(confirmMsg, '');
   if (typed !== dest) return;
@@ -1224,8 +1222,8 @@ async function dlqPurgeAll() {
       method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
       body: JSON.stringify({dest: dest, older_than_days: 0}),
     });
-    if (!r.ok) { alert('Request failed: HTTP ' + r.status); return; }
-  } catch (err) { alert('Purge error: ' + String(err)); return; }
+    if (!r.ok) { alert(_t('gui_it_request_failed_http') + r.status); return; }
+  } catch (err) { alert(_t('gui_it_purge_error') + String(err)); return; }
   dlqSearch();
 }
 
@@ -1250,10 +1248,10 @@ async function dlqView(id) {
   var entry = null;
   try {
     var r = await fetch('/api/siem/dlq/' + id);
-    if (!r.ok) { alert('Failed to load entry: HTTP ' + r.status); return; }
+    if (!r.ok) { alert(_t('gui_it_load_entry_failed_http') + r.status); return; }
     entry = await r.json();
   } catch (err) {
-    alert('Inspect error: ' + String(err));
+    alert(_t('gui_it_inspect_error') + String(err));
     return;
   }
 
