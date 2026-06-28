@@ -13,6 +13,7 @@ from src.cli._exit_codes import (
     EXIT_UNAVAILABLE,
 )
 from src.cli._output import echo_error, echo_json, is_json
+from src.i18n import t
 
 _REPORT_FORMATS = ["html", "csv", "pdf", "xlsx", "all"]
 
@@ -41,7 +42,7 @@ def _iso_date(value: str | None, *, end_of_day: bool) -> str | None:
         parsed = dt.datetime.strptime(value.strip(), "%Y-%m-%d")
     except ValueError as exc:
         raise click.ClickException(
-            f"Invalid date {value!r}. Expected YYYY-MM-DD."
+            t("cli_report_invalid_date", value=value, lang=_ctx_lang())
         ) from exc
     suffix = "23:59:59Z" if end_of_day else "00:00:00Z"
     return parsed.strftime(f"%Y-%m-%dT{suffix}")
@@ -51,6 +52,13 @@ def _resolve_lang(cm) -> str:
     """Read settings.language from config; fall back to 'en'. Only en/zh_TW supported."""
     raw = (cm.config.get("settings", {}) or {}).get("language", "en")
     return raw if raw in {"en", "zh_TW"} else "en"
+
+
+def _ctx_lang() -> str:
+    """Resolve the active UI language when no ConfigManager is in scope
+    (mirrors the inline pattern used by report_resolve)."""
+    from src.config import ConfigManager
+    return _resolve_lang(ConfigManager())
 
 
 _TRAFFIC_PROFILES = ["security_risk", "network_inventory"]
@@ -72,7 +80,7 @@ def _resolve_cli_data_source(data_source, legacy_cache):
     """Map the CLI's --data-source / legacy --cache flags to (data_source, use_cache)
     for generate_traffic_report. Emits a deprecation note when the legacy flag is used."""
     if data_source is None and legacy_cache is not None:
-        click.echo("note: --cache/--no-cache is deprecated; use --data-source", err=True)
+        click.echo(t("cli_report_cache_deprecated", lang=_ctx_lang()), err=True)
     use_cache = legacy_cache if legacy_cache is not None else True
     return data_source, use_cache
 
@@ -108,7 +116,7 @@ def generate_traffic_report(
     eff_ds = data_source if data_source is not None else ("cache" if use_cache else "no-cache")
     use_cache, clip_to_cache, _ds_warn = resolve_data_source(eff_ds, cache_available(cm))
     if _ds_warn:
-        click.echo(f"warning: {_ds_warn}", err=True)
+        click.echo(t("cli_report_data_source_warning", msg=_ds_warn, lang=_ctx_lang()), err=True)
     _root_dir, config_dir = _resolve_paths(output_dir)
     out = _resolve_output_dir(cm, output_dir)
 
@@ -118,7 +126,7 @@ def generate_traffic_report(
                           cache_reader=_make_cache_reader(cm))
     if source == "csv":
         if not file_path:
-            raise click.ClickException("--file is required when --source csv is used")
+            raise click.ClickException(t("cli_report_file_required_csv", lang=lang))
         result = gen.generate_from_csv(file_path, traffic_report_profile=traffic_report_profile, lang=lang,
                                        vuln_csv_path=vuln_csv_path)
     else:
@@ -129,7 +137,7 @@ def generate_traffic_report(
                                        clip_to_cache=clip_to_cache, draft_policy=draft_policy)
 
     if result.record_count == 0:
-        raise click.ClickException("No data for report")
+        raise click.ClickException(t("cli_report_no_data", lang=lang))
 
     return gen.export(
         result,
@@ -178,7 +186,7 @@ def generate_audit_report(
         lang=lang,
     )
     if result.record_count == 0:
-        raise click.ClickException("No data for report")
+        raise click.ClickException(t("cli_report_no_data", lang=lang))
     return gen.export(result, fmt=fmt, output_dir=out, lang=lang)
 
 
@@ -199,7 +207,7 @@ def generate_ven_status_report(
     gen = VenStatusGenerator(cm, api_client=api)
     result = gen.generate(lang=lang)
     if result.record_count == 0:
-        raise click.ClickException("No data for report")
+        raise click.ClickException(t("cli_report_no_data", lang=lang))
     return gen.export(result, fmt=fmt, output_dir=out, lang=lang)
 
 
@@ -225,7 +233,7 @@ def generate_policy_usage_report(
     lang = _resolve_lang(cm)
     if source == "csv":
         if not file_path:
-            raise click.ClickException("--file is required when --source csv is used")
+            raise click.ClickException(t("cli_report_file_required_csv", lang=lang))
         result = gen.generate_from_csv(file_path, lang=lang)
     else:
         result = gen.generate_from_api(
@@ -235,7 +243,7 @@ def generate_policy_usage_report(
         )
 
     if result.record_count == 0:
-        raise click.ClickException("No data for report")
+        raise click.ClickException(t("cli_report_no_data", lang=lang))
     return gen.export(result, fmt=fmt, output_dir=out, lang=lang)
 
 
@@ -275,7 +283,7 @@ def report_group() -> None:
 def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool, traffic_report_profile: str, data_source, legacy_cache) -> None:
     """Generate Traffic Flow Report."""
     if ctx.get_parameter_source("traffic_report_profile") == click.core.ParameterSource.COMMANDLINE:
-        click.echo("note: 'report traffic --profile' is deprecated; use 'report security' / 'report inventory'", err=True)
+        click.echo(t("cli_report_profile_deprecated", lang=_ctx_lang()), err=True)
     data_source, use_cache = _resolve_cli_data_source(data_source, legacy_cache)
     try:
         paths = generate_traffic_report(
@@ -293,18 +301,18 @@ def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_
         ctx.exit(EXIT_DATAERR)
         return
     except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
+        echo_error(ctx, t("cli_report_input_not_found", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_NOINPUT)
         return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     except Exception as exc:
         log.exception("traffic report failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_SOFTWARE)
         return
     _emit_paths(ctx, paths, fmt)
@@ -347,12 +355,12 @@ def report_draft_policy(ctx: click.Context, start_date: str | None, end_date: st
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     except Exception as exc:
         log.exception("draft-policy report failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_SOFTWARE)
         return
     _emit_paths(ctx, paths, fmt)
@@ -394,18 +402,18 @@ def report_security(ctx: click.Context, source: str, file_path, fmt: str, output
         ctx.exit(EXIT_DATAERR)
         return
     except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
+        echo_error(ctx, t("cli_report_input_not_found", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_NOINPUT)
         return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     except Exception as exc:
         log.exception("security report failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_SOFTWARE)
         return
     _emit_paths(ctx, paths, fmt)
@@ -437,18 +445,18 @@ def report_inventory(ctx: click.Context, source: str, file_path, fmt: str, outpu
         ctx.exit(EXIT_DATAERR)
         return
     except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
+        echo_error(ctx, t("cli_report_input_not_found", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_NOINPUT)
         return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     except Exception as exc:
         log.exception("inventory report failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_SOFTWARE)
         return
     _emit_paths(ctx, paths, fmt)
@@ -474,18 +482,18 @@ def report_audit(ctx: click.Context, start_date: str | None, end_date: str | Non
         ctx.exit(EXIT_DATAERR)
         return
     except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
+        echo_error(ctx, t("cli_report_input_not_found", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_NOINPUT)
         return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     except Exception as exc:
         log.exception("audit report failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_SOFTWARE)
         return
     _emit_paths(ctx, paths, fmt)
@@ -504,18 +512,18 @@ def report_ven_status(ctx: click.Context, fmt: str, output_dir) -> None:
         ctx.exit(EXIT_DATAERR)
         return
     except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
+        echo_error(ctx, t("cli_report_input_not_found", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_NOINPUT)
         return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     except Exception as exc:
         log.exception("ven-status report failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_SOFTWARE)
         return
     _emit_paths(ctx, paths, fmt)
@@ -553,18 +561,18 @@ def report_policy_usage(
         ctx.exit(EXIT_DATAERR)
         return
     except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
+        echo_error(ctx, t("cli_report_input_not_found", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_NOINPUT)
         return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     except Exception as exc:
         log.exception("policy-usage report failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_SOFTWARE)
         return
     _emit_paths(ctx, paths, fmt)
@@ -639,14 +647,14 @@ def generate_app_summary_report(
     eff_ds = data_source if data_source is not None else ("cache" if use_cache else "no-cache")
     use_cache, _clip, _ds_warn = resolve_data_source(eff_ds, cache_available(cm))
     if _ds_warn:
-        click.echo(f"warning: {_ds_warn}", err=True)
+        click.echo(t("cli_report_data_source_warning", msg=_ds_warn, lang=_ctx_lang()), err=True)
 
     try:
         known = {l.get("value") for l in api.get_labels("app") if l.get("value")}
         if app not in known:
             close = ", ".join(sorted(k for k in known if app.lower() in k.lower())[:5]) \
                 or ", ".join(sorted(known)[:8])
-            click.echo(f"Warning: App Label '{app}' not found on the PCE. Known: {close}")
+            click.echo(t("cli_report_app_label_not_found", app=app, known=close, lang=lang))
     except Exception:
         pass  # best-effort; never block generation
 
@@ -683,18 +691,18 @@ def report_app_summary(ctx: click.Context, app: str, env: str | None, days: int,
         ctx.exit(EXIT_DATAERR)
         return
     except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
+        echo_error(ctx, t("cli_report_input_not_found", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_NOINPUT)
         return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     except Exception as exc:
         log.exception("app-summary report failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_SOFTWARE)
         return
     _emit_paths(ctx, paths, "html")
@@ -735,18 +743,18 @@ def report_resolve(ctx: click.Context, fmt: str, output_dir) -> None:
         ctx.exit(EXIT_DATAERR)
         return
     except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
+        echo_error(ctx, t("cli_report_input_not_found", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_NOINPUT)
         return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     except Exception as exc:
         log.exception("policy resolver report failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_SOFTWARE)
         return
     if not paths and not is_json(ctx):
@@ -778,18 +786,18 @@ def report_policy_diff(ctx: click.Context, fmt: str, output_dir, email: bool,
         ctx.exit(EXIT_DATAERR)
         return
     except FileNotFoundError as exc:
-        echo_error(ctx, f"Input file not found: {exc}")
+        echo_error(ctx, t("cli_report_input_not_found", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_NOINPUT)
         return
     except (ConnectionError, OSError) as exc:
         if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
             raise
-        echo_error(ctx, f"Connection failed: {exc}")
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     except Exception as exc:
         log.exception("policy-diff report failed")
-        echo_error(ctx, f"Unexpected error: {exc}")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_SOFTWARE)
         return
     _emit_paths(ctx, paths, fmt)

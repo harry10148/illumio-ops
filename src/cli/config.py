@@ -9,6 +9,7 @@ from rich.console import Console
 
 from src.cli._output import is_json, is_quiet, echo_error, echo_json
 from src.cli._exit_codes import EXIT_NOINPUT, EXIT_DATAERR, EXIT_CONFIG, EXIT_USAGE
+from src.i18n import t
 
 @click.group("config")
 def config_group() -> None:
@@ -29,7 +30,7 @@ def validate(ctx: click.Context, config_file: str | None) -> None:
         config_file = os.path.join(root_dir, "config", "config.json")
 
     if not os.path.exists(config_file):
-        echo_error(ctx, f"Config file not found: {config_file}")
+        echo_error(ctx, t("cli_config_file_not_found", path=config_file))
         if is_json(ctx):
             echo_json(ctx, {"valid": False, "errors": ["Config file not found"]})
         ctx.exit(EXIT_NOINPUT)
@@ -39,7 +40,7 @@ def validate(ctx: click.Context, config_file: str | None) -> None:
         try:
             raw = json.load(f)
         except json.JSONDecodeError as e:
-            echo_error(ctx, f"Malformed JSON: {e}")
+            echo_error(ctx, t("cli_config_malformed_json", error=e))
             if is_json(ctx):
                 echo_json(ctx, {"valid": False, "errors": [str(e)]})
             ctx.exit(EXIT_DATAERR)
@@ -62,19 +63,19 @@ def validate(ctx: click.Context, config_file: str | None) -> None:
         if is_json(ctx):
             echo_json(ctx, {"valid": False, "errors": error_list})
         else:
-            echo_error(ctx, f"Found {e.error_count()} validation error(s):")
+            echo_error(ctx, t("cli_config_found_errors", count=e.error_count()))
             console = Console(stderr=True)
             for err in e.errors():
                 loc = ".".join(str(p) for p in err["loc"])
-                console.print(f"  [yellow]{loc}[/yellow]: {err['msg']} "
-                             f"(input: [magenta]{err.get('input')!r}[/magenta])")
+                console.print(t("cli_config_validate_error_row", loc=loc,
+                                msg=err["msg"], input=repr(err.get("input"))))
         ctx.exit(EXIT_CONFIG)
         return
 
     if is_json(ctx):
         echo_json(ctx, {"valid": True})
     elif not is_quiet(ctx):
-        click.echo("config.json is valid")
+        click.echo(t("cli_config_valid"))
 
 @config_group.command("show")
 @click.option("--section", type=str, default=None,
@@ -87,8 +88,8 @@ def show(ctx: click.Context, section: str | None) -> None:
     if section is None:
         data = cm.config
     elif section not in cm.config:
-        echo_error(ctx, f"Unknown section: {section!r}. "
-                   f"Valid sections: {', '.join(sorted(cm.config.keys()))}")
+        echo_error(ctx, t("cli_config_unknown_section_show", section=repr(section),
+                          valid=', '.join(sorted(cm.config.keys()))))
         ctx.exit(EXIT_USAGE)
         return
     else:
@@ -145,16 +146,15 @@ def set_cmd(ctx: click.Context, key: str, value: str) -> None:
     # Parse KEY into section.field
     parts = key.split(".", 1)
     if len(parts) != 2:
-        echo_error(ctx, f"Key must be in section.field format (got: {key!r}). "
-                        f"Example: api.url")
+        echo_error(ctx, t("cli_config_key_format", name=repr(key)))
         ctx.exit(EXIT_USAGE)
         return
 
     section, field = parts
 
     if section not in _SETTABLE_SECTIONS:
-        echo_error(ctx, f"Unknown section {section!r}. "
-                        f"Settable sections: {', '.join(sorted(_SETTABLE_SECTIONS))}")
+        echo_error(ctx, t("cli_config_unknown_section_set", section=repr(section),
+                          settable=', '.join(sorted(_SETTABLE_SECTIONS))))
         ctx.exit(EXIT_USAGE)
         return
 
@@ -162,8 +162,9 @@ def set_cmd(ctx: click.Context, key: str, value: str) -> None:
     section_dict = cm.config.get(section, {})
 
     if field not in section_dict:
-        echo_error(ctx, f"Unknown field {field!r} in section {section!r}. "
-                        f"Available: {', '.join(sorted(section_dict.keys()))}")
+        echo_error(ctx, t("cli_config_unknown_field", field=repr(field),
+                          section=repr(section),
+                          available=', '.join(sorted(section_dict.keys()))))
         ctx.exit(EXIT_USAGE)
         return
 
@@ -171,7 +172,7 @@ def set_cmd(ctx: click.Context, key: str, value: str) -> None:
     try:
         typed_value = _coerce_value(value, section_dict[field])
     except (ValueError, TypeError) as e:
-        echo_error(ctx, f"Invalid value for {key}: {e}")
+        echo_error(ctx, t("cli_config_invalid_value", name=key, error=e))
         ctx.exit(EXIT_DATAERR)
         return
 
@@ -185,7 +186,7 @@ def set_cmd(ctx: click.Context, key: str, value: str) -> None:
     except ValidationError as e:
         errors = [f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"
                   for err in e.errors()]
-        echo_error(ctx, f"Validation failed: {'; '.join(errors)}")
+        echo_error(ctx, t("cli_config_validation_failed", errors='; '.join(errors)))
         ctx.exit(EXIT_CONFIG)
         return
 
@@ -197,7 +198,7 @@ def set_cmd(ctx: click.Context, key: str, value: str) -> None:
     if is_json(ctx):
         echo_json(ctx, {"key": key, "value": display_value, "saved": True})
     elif not is_quiet(ctx):
-        click.echo(f"Set {key} = {display_value}")
+        click.echo(t("cli_config_set", name=key, value=display_value))
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +227,7 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> N
         missing = [f for f, v in [("--url", url), ("--key", key), ("--secret", secret)]
                    if v is None]
         if missing:
-            echo_error(ctx, f"--no-interactive requires: {', '.join(missing)}")
+            echo_error(ctx, t("cli_config_no_interactive_requires", missing=', '.join(missing)))
             ctx.exit(EXIT_USAGE)
             return
     else:
@@ -259,7 +260,7 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> N
     except ValidationError as e:
         errors = [f"{'.'.join(str(p) for p in err['loc'])}: {err['msg']}"
                   for err in e.errors()]
-        echo_error(ctx, f"Validation failed: {'; '.join(errors)}")
+        echo_error(ctx, t("cli_config_validation_failed", errors='; '.join(errors)))
         ctx.exit(EXIT_CONFIG)
         return
 
@@ -268,4 +269,4 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> N
     if is_json(ctx):
         echo_json(ctx, {"url": url, "org_id": str(org_id), "saved": True})
     elif not is_quiet(ctx):
-        click.echo(f"PCE login saved: {url} (org {org_id})")
+        click.echo(t("cli_config_login_saved", url=url, org_id=org_id))

@@ -170,7 +170,7 @@ def test_report_audit_file_not_found_exits_noinput():
         result = runner.invoke(cli, ["report", "audit"])
 
     assert result.exit_code == EXIT_NOINPUT, result.output
-    assert "Input file not found" in result.output
+    assert "missing-input.csv" in result.output  # filename surfaces (message is now i18n'd)
 
 
 def test_report_audit_connection_error_exits_unavailable():
@@ -186,4 +186,4 @@ def test_report_audit_connection_error_exits_unavailable():
         result = runner.invoke(cli, ["report", "audit"])
 
     assert result.exit_code == EXIT_UNAVAILABLE, result.output
-    assert "Connection failed" in result.output
+    assert "connection refused" in result.output  # error detail surfaces (message is now i18n'd)
