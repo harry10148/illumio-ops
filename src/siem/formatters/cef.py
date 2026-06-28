@@ -79,7 +79,9 @@ class CEFFormatter(Formatter):
                     or event.get("uuid")
                     or event.get("href") or "")
         ext.append(f"externalId={_cef_escape(str(event_id))}")
-        ext.append(f"outcome={_cef_escape(str(event.get('status', '')))}")
+        status = event.get("status")
+        if status:
+            ext.append(f"outcome={_cef_escape(str(status))}")
 
         # who acted — created_by can be user / service_account / system
         actor = _extract_actor(event.get("created_by") or {})

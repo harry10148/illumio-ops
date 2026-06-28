@@ -21,17 +21,20 @@ class SyslogWrappedFormatter(Formatter):
     syslog server requires proper RFC5424 framing.
     """
 
-    def __init__(self, inner: Formatter):
+    def __init__(self, inner: Formatter, host: str = "illumio-ops"):
         self._inner = inner
+        # RFC5424 hostname fallback when the record carries no pce_fqdn (flows
+        # never do); identifies the forwarder rather than emitting NILVALUE "-".
+        self._host = host
 
     def format_event(self, event: dict) -> str:
         payload = self._inner.format_event(event)
         sev_str = str(event.get("severity", "info")).lower()
         sev_num = _SYSLOG_SEV_MAP.get(sev_str, 6)
-        hostname = str(event.get("pce_fqdn") or "-")
+        hostname = str(event.get("pce_fqdn") or self._host)
         return wrap_rfc5424(payload, severity=sev_num, hostname=hostname)
 
     def format_flow(self, flow: dict) -> str:
         payload = self._inner.format_flow(flow)
-        hostname = str(flow.get("pce_fqdn") or "-")
+        hostname = str(flow.get("pce_fqdn") or self._host)
         return wrap_rfc5424(payload, severity=6, hostname=hostname)
