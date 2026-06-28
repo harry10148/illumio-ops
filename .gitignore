@@ -90,3 +90,4 @@ docs/ux-review-*/screenshots/
 
 # Limiter runtime snapshot state (auto-created by GUI rate limiter)
 config/limiter/
+docs/ux-review-2026-05-14/
