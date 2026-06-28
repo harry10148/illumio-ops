@@ -8,7 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from src.pce_cache.models import SiemDispatch
 from src.siem.dispatcher import DestinationDispatcher
 from src.siem.formatters.cef import CEFFormatter
-from src.siem.formatters.json_line import JSONLineFormatter
+from src.siem.formatters.normalized_json import NormalizedJSONFormatter
 from src.siem.transports.base import Transport
 
 
@@ -78,7 +78,7 @@ def test_e2e_traffic_flow_reaches_transport_as_json(sf):
     ts = datetime.now(timezone.utc)
     api = FakeTrafficApi([{
         "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2",
-        "port": 443, "protocol": "tcp", "action": "blocked",
+        "port": 443, "protocol": "tcp", "policy_decision": "blocked",
         "flow_count": 5, "bytes_in": 100, "bytes_out": 200,
         "first_detected": ts.isoformat(),
         "last_detected": (ts + timedelta(seconds=1)).isoformat(),
@@ -90,7 +90,7 @@ def test_e2e_traffic_flow_reaches_transport_as_json(sf):
     ).run_once()
 
     transport = CapturingTransport()
-    dispatcher = DestinationDispatcher("elastic", sf, JSONLineFormatter(), transport)
+    dispatcher = DestinationDispatcher("elastic", sf, NormalizedJSONFormatter(), transport)
     result = dispatcher.tick()
 
     assert result["sent"] == 1
@@ -120,7 +120,7 @@ def test_e2e_multi_destination_fanout(sf):
     splunk_tr = CapturingTransport()
     elastic_tr = CapturingTransport()
     DestinationDispatcher("splunk", sf, CEFFormatter(), splunk_tr).tick()
-    DestinationDispatcher("elastic", sf, JSONLineFormatter(), elastic_tr).tick()
+    DestinationDispatcher("elastic", sf, NormalizedJSONFormatter(), elastic_tr).tick()
 
     assert len(splunk_tr.payloads) == 1
     assert len(elastic_tr.payloads) == 1
