@@ -108,7 +108,26 @@ class Reporter:
         self.health_alerts.append(alert)
 
     def add_event_alert(self, alert: dict[str, Any]) -> None:
+        # Map the PCE event_type to its vendored runbook so the email/webhook
+        # render points (which read alert['runbook_url']) surface a "Runbook ↗"
+        # link. An explicit runbook_url on the alert always wins.
+        if not alert.get("runbook_url"):
+            url = self._runbook_url_for_alert(alert)
+            if url:
+                alert["runbook_url"] = url
         self.event_alerts.append(alert)
+
+    @staticmethod
+    def _runbook_url_for_alert(alert: dict) -> str:
+        """Resolve the runbook URL for an event alert from its event_type ('' if none)."""
+        events = alert.get("raw_data") or []
+        event_type = ""
+        if events and isinstance(events[0], dict):
+            event_type = str(events[0].get("event_type") or "")
+        if not event_type:
+            return ""
+        from src.events.runbooks import runbook_for
+        return str((runbook_for(event_type) or {}).get("runbook_url") or "")
 
     def add_traffic_alert(self, alert: dict[str, Any]) -> None:
         self.traffic_alerts.append(alert)

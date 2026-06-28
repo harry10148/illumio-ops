@@ -62,3 +62,39 @@ def test_alert_body_omits_runbook_link_when_absent():
     html = r._build_mail_html("subject")
     assert "/runbooks/" not in html
     assert "runbook_url" not in html
+
+
+# ── runbook auto-mapping from event_type (add_event_alert wiring) ──────────────
+
+def _reporter():
+    cm = MagicMock()
+    cm.config = {"email": {"sender": "x@x", "recipients": ["a@x"]},
+                 "alerts": {"active": ["mail"]}}
+    return Reporter(cm)
+
+
+def test_add_event_alert_maps_runbook_url_from_event_type():
+    from src.events.runbooks import runbook_for
+    r = _reporter()
+    r.add_event_alert({
+        "rule": "Auth failures", "desc": "5 auth failures",
+        "raw_data": [{"event_type": "request.authentication_failed",
+                      "href": "/orgs/1/events/abc"}],
+    })
+    expected = runbook_for("request.authentication_failed")["runbook_url"]
+    assert r.event_alerts[0]["runbook_url"] == expected
+
+
+def test_add_event_alert_no_runbook_for_unknown_event_type():
+    r = _reporter()
+    r.add_event_alert({"rule": "x", "raw_data": [{"event_type": "totally.unknown"}]})
+    assert not r.event_alerts[0].get("runbook_url")
+
+
+def test_add_event_alert_preserves_explicit_runbook_url():
+    r = _reporter()
+    r.add_event_alert({
+        "rule": "x", "runbook_url": "https://custom/rb",
+        "raw_data": [{"event_type": "request.authentication_failed"}],
+    })
+    assert r.event_alerts[0]["runbook_url"] == "https://custom/rb"
