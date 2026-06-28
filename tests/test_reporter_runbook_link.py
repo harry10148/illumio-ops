@@ -86,3 +86,35 @@ def test_add_event_alert_preserves_explicit_runbook_url():
         "raw_data": [{"event_type": "request.authentication_failed"}],
     })
     assert r.event_alerts[0]["runbook_url"] == "https://custom/rb"
+
+
+# ── runbook RESPONSE (remediation text) mapping + rendering ────────────────────
+
+def test_add_event_alert_maps_runbook_response_from_event_type():
+    from src.events.runbooks import runbook_for
+    r = _reporter()
+    r.add_event_alert({"rule": "Auth failures",
+                       "raw_data": [{"event_type": "request.authentication_failed"}]})
+    assert r.event_alerts[0]["runbook_response"] == \
+        runbook_for("request.authentication_failed")["response"]
+
+
+def test_add_event_alert_no_response_for_unknown_event_type():
+    r = _reporter()
+    r.add_event_alert({"rule": "x", "raw_data": [{"event_type": "totally.unknown"}]})
+    assert not r.event_alerts[0].get("runbook_response")
+
+
+def test_add_event_alert_preserves_explicit_runbook_response():
+    r = _reporter()
+    r.add_event_alert({"rule": "x", "runbook_response": "do nothing",
+                       "raw_data": [{"event_type": "request.authentication_failed"}]})
+    assert r.event_alerts[0]["runbook_response"] == "do nothing"
+
+
+def test_event_alert_body_renders_runbook_response():
+    r = _reporter()
+    r.add_event_alert({"rule": "Auth failures", "desc": "5 fails",
+                       "raw_data": [{"event_type": "request.authentication_failed"}]})
+    html = r._build_mail_html("subject")
+    assert "Immediate action required" in html  # response remediation text appears

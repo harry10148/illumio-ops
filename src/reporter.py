@@ -108,13 +108,28 @@ class Reporter:
         self.health_alerts.append(alert)
 
     def add_event_alert(self, alert: dict[str, Any]) -> None:
-        # NOTE (2026-06-28): event_type -> runbook_url auto-mapping was reverted.
-        # The vendored runbook_urls (docs.illumio.com/core/24.2/...) are stale —
-        # they 301-redirect to generic guide indexes, not the topic page. Runbook
-        # value will instead be surfaced as the remediation *response* text
-        # (sourced via NotebookLM); runbooks.py / runbook_for are retained for it.
-        # An explicit runbook_url set by the caller still renders.
+        # Map the PCE event_type to its runbook *response* (remediation steps) so
+        # the event-alert render surfaces it. The runbook_url links were dropped
+        # (the vendored docs.illumio.com deep-links are stale); the response text
+        # is the durable, version-independent value. An explicit runbook_response
+        # set by the caller always wins.
+        if not alert.get("runbook_response"):
+            resp = self._runbook_response_for_alert(alert)
+            if resp:
+                alert["runbook_response"] = resp
         self.event_alerts.append(alert)
+
+    @staticmethod
+    def _runbook_response_for_alert(alert: dict) -> str:
+        """Resolve the runbook remediation response from the alert's event_type ('' if none)."""
+        events = alert.get("raw_data") or []
+        event_type = ""
+        if events and isinstance(events[0], dict):
+            event_type = str(events[0].get("event_type") or "")
+        if not event_type:
+            return ""
+        from src.events.runbooks import runbook_for
+        return str((runbook_for(event_type) or {}).get("response") or "")
 
     def add_traffic_alert(self, alert: dict[str, Any]) -> None:
         self.traffic_alerts.append(alert)
@@ -772,6 +787,23 @@ class Reporter:
         )
 
     @staticmethod
+    def _render_runbook_response(response: str | None) -> str:
+        """Render the runbook remediation steps as an inline note, or '' if none.
+
+        Multi-line text is HTML-escaped and newlines become <br>; styled as a
+        left-bordered info note to sit under the event-alert summary.
+        """
+        if not response:
+            return ''
+        import html as _html
+        body = _html.escape(str(response).strip()).replace("\n", "<br>")
+        return (
+            '<div style="margin-top:6px;padding:6px 10px;border-left:3px solid #2563eb;'
+            'background:#f0f6ff;font-size:12px;line-height:1.5;color:#1e3a5f;'
+            f'font-family:Arial,sans-serif;"><strong>Runbook</strong><br>{body}</div>'
+        )
+
+    @staticmethod
     def _build_preheader_text(issues_list: list[dict[str, Any]], max_chars: int = 90) -> str:
         """Build a 50-90 char standalone preview shown in inbox.
 
@@ -1387,10 +1419,11 @@ class Reporter:
             for alert in self.event_alerts:
                 sev_badge = self._render_severity_badge(alert.get('severity', 'info'))
                 runbook = self._render_runbook_link(alert.get('runbook_url'))
+                runbook_resp = self._render_runbook_response(alert.get('runbook_response'))
                 row_html = f"""
             <tr>
               <td style="{td_style} font-size:11px; color:#6f6f6f;">{esc(alert.get('time',''))}</td>
-              <td style="{td_style}"><strong>{esc(alert.get('rule',''))}</strong>{runbook}<br><small style="color:#6f6f6f;">{esc(alert.get('desc',''))}</small></td>
+              <td style="{td_style}"><strong>{esc(alert.get('rule',''))}</strong>{runbook}<br><small style="color:#6f6f6f;">{esc(alert.get('desc',''))}</small>{runbook_resp}</td>
               <td style="{td_style} text-align:center;">{sev_badge}<small>({esc(alert.get('count',0))})</small></td>
               <td style="{td_style}">{esc(alert.get('source',''))}</td>
             </tr>
