@@ -18,7 +18,7 @@ def test_runbook_lookup_returns_severity_and_response():
     rb = runbook_for("request.authentication_failed")
     assert rb is not None
     assert rb["severity_hint"] == "critical"
-    assert "brute force" in rb["response"].lower()
+    assert "authentication" in rb["response"].lower()
     assert runbook_for("totally.unknown") is None
 
 
