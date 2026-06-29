@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 # Event-type -> operator remediation mapping. Responses are grounded in the
-# Illumio "Events Described" documentation (sourced via NotebookLM 2026-06-29);
-# consumed by the alert reporter (src/reporter.py add_event_alert). The legacy
-# runbook_url values are retained as metadata but are NOT rendered (stale links).
+# user's curated Illumio NotebookLM notebook (full Admin/REST/Architecture/Events
+# references; regenerated 2026-06-29) and consumed by the alert reporter
+# (src/reporter.py add_event_alert). The legacy runbook_url values are retained
+# as metadata but are NOT rendered (stale links).
 
 RUNBOOK_CATEGORIES: dict[str, dict] = {
     "security-auth-failure": {
@@ -13,7 +14,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm",
         "severity_hint": "critical",
-        "response": "When these events trigger, an API request has failed due to authentication or authorization issues. Operators should navigate to the PCE web console under Troubleshooting > Events to review the organization events. Check the event record details for the exception type, exception message, and severity to determine if the failure was a misconfigured API tool or an unauthorized access attempt.",
+        "response": "Review the PCE web console Troubleshooting > Events to identify the source IP address and username attempting access. Check the event details for exceptions, failed authentication, or authorization errors to determine if it is a misconfiguration or a brute force attack. If unexpected API request failures persist, verify the credentials, API key permissions, or SAML integration settings.",
     },
     "security-auth-activity": {
         "patterns": [
@@ -28,7 +29,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm",
         "severity_hint": "info",
-        "response": "These events indicate routine user session activities such as authenticating, logging in, and logging out. Operators can view these user actions in the PCE web console by navigating to Troubleshooting > Events. No immediate remediation is required unless the events indicate suspicious patterns, in which case the operator should investigate the associated user and source IP.",
+        "response": "Navigate to the PCE web console Troubleshooting > Events or Access Management > User Activity to review user session data. Confirm that the login, logout, and session creation events correspond to authorized personnel accessing the system. Investigate any unusual login times, unexpected source IP addresses, or concurrent sessions that might indicate compromised credentials.",
     },
     "security-user-management": {
         "patterns": [
@@ -48,7 +49,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/user-management.htm",
         "severity_hint": "warning",
-        "response": "Alerts in this category signify changes to user accounts or RBAC permissions, such as creations, updates, deletions, or invitations. Operators should search for these organization events in the PCE web console under Troubleshooting > Events. Review the event record for the pre-change and post-change values to verify that the access modifications were authorized.",
+        "response": "View these organizational events in the PCE web console under Troubleshooting > Events to audit role based access control modifications. Verify that any user creation, deletion, or permission updates were authorized by a Global Organization Owner. Ensure that users are granted the least privilege required and that scoped roles restrict access to the correct application, environment, and location labels.",
     },
     "security-api-keys": {
         "patterns": [
@@ -61,7 +62,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/rest-api/authentication-and-api-keys.htm",
         "severity_hint": "warning",
-        "response": "These events trigger when an API key or credential is created, updated, or deleted. Operators should verify the identity of the user who generated the event by checking the organization events via the PCE web console under Troubleshooting > Events. Check the event records to confirm that the API key lifecycle changes align with expected API administrative operations.",
+        "response": "Check the Organization events export or Troubleshooting > Events in the PCE web console to monitor the lifecycle of API keys. Because API keys provide persistent REST API access for automation and scripts, verify that any new key creation or modification was requested by an authorized user or service account. Ensure that deleted or updated keys belong to inactive scripts or departing administrators.",
     },
     "agent-tampering": {
         "patterns": [
@@ -70,7 +71,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/ven-tampering-protection.htm",
         "severity_hint": "critical",
-        "response": "These events alert on potential workload compromise, indicating that an agent's firewall was tampered with or a cloned VEN was detected. Operators should monitor these events closely for high-value workloads and verify if administrative intervention is required, especially if the severity level is marked as an error. Investigate the specific workload details in the PCE web console under Troubleshooting > Events to identify the root cause of the tampering or cloning.",
+        "response": "Immediately investigate the affected workload, as firewall tampering is an early indicator of compromise. View the event details in the PCE web console Troubleshooting > Events to identify if an attacker or administrator added, modified, or flushed the Illumio firewall rules. For clone detected events, determine if a legitimate virtual machine clone occurred and verify if automatic cloned VEN remediation resolved the issue.",
     },
     "agent-lifecycle": {
         "patterns": [
@@ -87,7 +88,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm",
         "severity_hint": "info",
-        "response": "This category tracks when VEN agents are paired, unpaired, suspended, or upgraded. If an agent.suspend event fires unexpectedly, it indicates the workload is no longer protected and may be under attack. Operators should navigate to Troubleshooting > Events in the PCE web console to verify if the lifecycle change was intentional and monitor these events for high-value workloads.",
+        "response": "Monitor these events in the PCE web console Troubleshooting > Events for changes to the VEN protection state. If an agent suspend event appears without scheduled maintenance, investigate immediately because the VEN firewall rules are completely removed and the workload is exposed. For unpair or upgrade events, confirm they align with approved administrative actions or maintenance windows.",
     },
     "policy-changes": {
         "patterns": [
@@ -107,7 +108,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/overview-of-security-policy.htm",
         "severity_hint": "warning",
-        "response": "These events occur when draft rulesets are created, updated, deleted, or when security policies are provisioned. Operators should review the ruleset scope labels in the event details to ensure they are not unintentionally broad, such as applying to All Applications or All Environments. For policy creation events, verify the workloads_affected field, and if the number exceeds an acceptable threshold, investigate the associated policy changes immediately.",
+        "response": "Review the PCE web console Troubleshooting > Events to pinpoint overly broad ruleset scopes, such as those missing application or environment restrictions. When monitoring security policy create events, check the workloads affected field to see how many workloads received the updated policy. If the number of affected workloads exceeds an acceptable threshold, investigate the associated policy changes for misconfigurations.",
     },
     "enforcement-boundary": {
         "patterns": [
@@ -117,7 +118,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/enforcement-boundaries.htm",
         "severity_hint": "warning",
-        "response": "Alerts in this category are generated when an enforcement boundary is created, updated, or deleted. Operators should review these system modifications in the PCE web console under Troubleshooting > Events. Check the pre-change and post-change values of the affected boundary resources to ensure the modifications were authorized.",
+        "response": "Check the PCE web console Troubleshooting > Events to audit changes to selective enforcement boundaries. Verify that the updated or deleted deny rules correctly reflect the intended restrictions for your high risk ports or applications. Ensure that these enforcement boundaries are not inadvertently blocking legitimate critical traffic or exposing protected workloads.",
     },
     "workload-changes": {
         "patterns": [
@@ -137,7 +138,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/workload-operations.htm",
         "severity_hint": "info",
-        "response": "These events occur when workload settings are updated, created, or deleted within the system. Operators should inspect the event records in the PCE web console Troubleshooting > Events view to understand what triggered the workload modification. If related lost_agent.found events occur after a workload deletion, operators must send alerts and prepare to pair the VENs with the PCE again.",
+        "response": "Review the Organization events export or Troubleshooting > Events to track when workloads are created, updated, deleted, or marked unmanaged. Monitor these events to ensure that the workload network interfaces and IP addresses accurately match your environment topology. Investigate unexpected changes to high value workloads, as these modifications can directly alter the security posture and policy enforcement.",
     },
     "label-changes": {
         "patterns": [
@@ -151,7 +152,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/workload-management/labels-and-label-groups.htm",
         "severity_hint": "info",
-        "response": "This category tracks when labels or label groups are created, updated, or deleted. Operators should monitor these events closely because the removed or added labels could represent high-value applications or environments. Review the organization events export to verify that the label modifications correctly reflect intended policy categorizations.",
+        "response": "Navigate to the PCE web console Troubleshooting > Events to audit creations, updates, or deletions of labels and label groups. Monitor these events closely for high value labels, as removing or adding them can represent a significant shift in application environments or security boundaries. Verify that these label changes do not inadvertently grant lower security workloads access to higher security resources.",
     },
     "network-infrastructure": {
         "patterns": [
@@ -168,7 +169,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/network-enforcement/overview.htm",
         "severity_hint": "warning",
-        "response": "These alerts indicate that a network object or SecureConnect gateway has been created, modified, or deleted. Operators should evaluate the pre-change and post-change values of the network resources to confirm the infrastructure changes are expected. View these organization events by selecting Troubleshooting > Events in the PCE web console.",
+        "response": "Check the PCE web console Troubleshooting > Events to review modifications to network objects and secure connect gateways. Validate that the network creations or updates correctly represent your current corporate and external data center zones. Ensure these infrastructure changes were performed by an authorized Global Administrator or Organization Owner to prevent disruptions to workload connectivity.",
     },
     "container-events": {
         "patterns": [
@@ -183,7 +184,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/kubernetes-and-openshift/overview.htm",
         "severity_hint": "info",
-        "response": "Alerts in this category fire when container clusters or container workload profiles are created, modified, or deleted. Operators can review these actions by navigating to the Troubleshooting > Events page in the PCE web console. Assess the event record details to ensure that any updates to container services align with expected container orchestration changes.",
+        "response": "View these organizational events in the PCE web console under Troubleshooting > Events to track changes within your Kubernetes or OpenShift environments. Verify that container cluster creations, deletions, and workload profile updates align with expected deployments. Ensure that the enforcement modes and labels applied to these container clusters maintain the required security segmentation.",
     },
     "ip-list-changes": {
         "patterns": [
@@ -194,7 +195,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/security-policy/ip-lists.htm",
         "severity_hint": "warning",
-        "response": "These events are triggered when an IP list is created, updated, or deleted. Operators should verify the pre-change and post-change values of the IP list resources to ensure the modified addresses are accurate and authorized. The events can be viewed and verified by exporting the filtered list of organization events from the PCE web console.",
+        "response": "Monitor the PCE web console Troubleshooting > Events to track when IP lists are created, updated, or deleted. Since IP lists are global policy objects used in security rules to allow or block traffic, verify that the IP addresses and CIDR blocks accurately reflect trusted networks or known threats. Confirm that these changes were authorized to prevent accidentally permitting unauthorized external access.",
     },
     "auth-config": {
         "patterns": [
@@ -211,7 +212,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/user-administration/authentication-configuration.htm",
         "severity_hint": "critical",
-        "response": "These events capture changes to the PCE authentication infrastructure, including LDAP and SAML configurations. Operators must check the PCE web console under Troubleshooting > Events to identify which user or system generated the event. Validate the before and after configuration values to ensure the authentication settings update was authorized, as improper changes could impact user access.",
+        "response": "Review the PCE web console Troubleshooting > Events to audit any modifications to the PCE authentication settings, including LDAP and SAML configurations. Verify that changes to password policies or single sign on parameters were performed by a Global Organization Owner. Investigate any unauthorized modifications, as they could compromise user authentication and enable unauthorized access to the PCE.",
     },
     "system-tasks": {
         "patterns": [
@@ -223,7 +224,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/pce-administration/system-tasks.htm",
         "severity_hint": "info",
-        "response": "These alerts indicate routine system tasks or issues where VENs have missed heartbeats and are marked offline. Operators should prioritize missed heartbeat and offline check events for high-value workloads, as the PCE will remove these workloads from policy and alter their security posture. Investigate the affected VENs to determine if they need maintenance or if there is a network connectivity issue causing the missed heartbeats.",
+        "response": "Investigate workloads generating these events by viewing the PCE web console Troubleshooting > Events or Organization events export. A missed heartbeats check event indicates a VEN failed to communicate, and the PCE may take the workload offline after a sustained period, removing its IP address from policy. Verify the network connectivity of the affected workloads and ensure the VEN processes are running correctly.",
     },
     "server-errors": {
         "patterns": [
@@ -233,7 +234,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/pce-administration/troubleshooting.htm",
         "severity_hint": "critical",
-        "response": "Alerts in this category mean an API request failed due to an internal server error, unavailable service, or unknown server error. Operators should export the filtered organization events from the PCE web console to review the specific failure details. Examine the event record for the exception type, exception message, and severity to aid in troubleshooting the service interruption.",
+        "response": "Review the PCE web console Troubleshooting > Events to identify the specific API endpoint and HTTP status code causing the failure. Examine the application logs on the core nodes and monitor the system resource utilization across the PCE cluster for high CPU, memory, or disk latency. If the server errors are persistent and disrupt PCE operations, gather a PCE Support Report and contact Illumio Support.",
     },
 }
 

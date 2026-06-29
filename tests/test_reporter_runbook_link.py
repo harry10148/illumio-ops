@@ -117,4 +117,4 @@ def test_event_alert_body_renders_runbook_response():
     r.add_event_alert({"rule": "Auth failures", "desc": "5 fails",
                        "raw_data": [{"event_type": "request.authentication_failed"}]})
     html = r._build_mail_html("subject")
-    assert "authentication or authorization" in html  # doc-grounded response text appears
+    assert "brute force" in html  # doc-grounded response text appears
