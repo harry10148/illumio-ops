@@ -483,7 +483,7 @@ illumio-ops generates several report types from live PCE data or the local cache
 | Security & Risk | `report security` | Fixed security_risk orientation; can include vulnerability scans (Qualys/Tenable) via `--vuln-csv` |
 | Network & Traffic Inventory | `report inventory` | Inventory-style report with a fixed network_inventory orientation |
 | Audit | `report audit` | Audit events and policy changes (supports `--start-date`/`--end-date`) |
-| VEN Status | `report ven-status` | Inventory of VEN online / offline / unmanaged |
+| VEN Status | `report ven-status` | Inventory of VEN status (online / offline) plus unmanaged workloads (in Illumio, "Unmanaged" is a Workload state — an endpoint labeled by IP with no VEN installed — not a VEN status) |
 | Policy Usage | `report policy-usage` | Per-rule hit analysis to find unused rules |
 | App Summary | `report app-summary --app <APP> [--env --days]` | Inbound/outbound view of a single App label |
 | Policy Resolve | `report resolve` | Resolves ACTIVE label-based policy into IP-level firewall rules |
@@ -549,6 +549,8 @@ Which channels are enabled is determined by the `alerts.active` list (e.g. `["ma
 - **Bandwidth rules**: fire on a bandwidth (Mbps) or volume (MB) threshold.
 
 Each rule can set `threshold_type` (immediate/count), `threshold_window`, `cooldown_minutes`, and `throttle` (`N/Tm`) to suppress alert storms.
+
+> **Operational practice (Illumio recommendation)**: do **not** monitor Illumio Core events in isolation. Treat them as one input to your overall security tooling and correlate them with other sources for context. (Source: Illumio — Events Described.)
 
 ---
 
@@ -748,6 +750,7 @@ Procedure for obtaining a CA-signed certificate in production (Settings → Secu
 ### 9.4 Reports
 
 - **Empty report / no data**: no data within the cache window. First run `illumio-ops cache backfill --source events|traffic --since <earlier date>`, then regenerate with a wider date range.
+  > Note: workloads in the **Idle** policy state have their traffic flow summaries excluded — the PCE does not export them to syslog — so Idle workloads are absent from traffic reports by design. (Source: Illumio Traffic Flow Summaries — Visibility Settings.)
 - **Policy Usage hits are 0**: only provisioned (active) rules are queried; draft rules are excluded. Provision them on the PCE first.
 - **Chinese shows as boxes in the PDF**: install a CJK font (`fonts-noto-cjk` / `google-noto-cjk-fonts`) and regenerate, or use `--format html`.
 

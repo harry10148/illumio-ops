@@ -483,7 +483,7 @@ illumio-ops 從即時 PCE 資料或本地 cache 產生多種報表，輸出於 `
 | Security & Risk | `report security` | 固定 security_risk 取向；可帶 `--vuln-csv` 納入漏洞掃描（Qualys/Tenable） |
 | Network & Traffic Inventory | `report inventory` | 固定 network_inventory 取向的清單型報表 |
 | Audit | `report audit` | 稽核事件與 policy 變更（支援 `--start-date`/`--end-date`） |
-| VEN Status | `report ven-status` | VEN 線上／離線／unmanaged 盤點 |
+| VEN Status | `report ven-status` | VEN 狀態（online／offline）盤點，外加 unmanaged workloads（在 Illumio 中，「Unmanaged」是 Workload 狀態——以 IP 標記、未安裝 VEN 的端點——而非 VEN 狀態） |
 | Policy Usage | `report policy-usage` | 每條 rule 的命中分析，找出未使用規則 |
 | App Summary | `report app-summary --app <APP> [--env --days]` | 單一 App label 的進出向視圖 |
 | Policy Resolve | `report resolve` | 把 ACTIVE label-based policy 解析成 IP 層防火牆規則 |
@@ -549,6 +549,8 @@ illumio-ops report policy-diff --email          # 產生並寄出【會寄信】
 - **Bandwidth 規則**：以頻寬（Mbps）或量（MB）門檻觸發。
 
 每條規則可設 `threshold_type`（immediate／count）、`threshold_window`、`cooldown_minutes` 與 `throttle`（`N/Tm`）以抑制告警風暴。
+
+> **營運實務（Illumio 建議）**：請勿孤立地監控 Illumio Core events。應將其視為整體安全工具的其中一項輸入，並與其他來源交叉關聯以取得情境。（來源：Illumio — Events Described。）
 
 ---
 
@@ -748,6 +750,7 @@ Web GUI 預設以 **HTTPS** 服務（`web_gui.tls.enabled: true`、`self_signed:
 ### 9.4 報表
 
 - **空報表／無資料**：cache 視窗內無資料。先 `illumio-ops cache backfill --source events|traffic --since <較早日期>`，再以較寬日期重產。
+  > 注意：處於 **Idle** policy state 的 workloads 其 traffic flow summaries 會被排除——PCE 不會將其匯出至 syslog——因此 Idle workloads 依設計不會出現在 traffic 報表中。（來源：Illumio Traffic Flow Summaries — Visibility Settings。）
 - **Policy Usage 命中為 0**：只查已佈署（active）規則；draft 規則被排除。請先在 PCE 佈署。
 - **PDF 中文變方塊**：安裝 CJK 字型（`fonts-noto-cjk` / `google-noto-cjk-fonts`）後重產，或改用 `--format html`。
 

@@ -29,7 +29,7 @@ related_docs:
 
 **Enforcement Boundary**（強制邊界）— 獨立於一般規則的範圍式拒絕聲明。在工作負載群組之間建立「防爆牆」；在 Selective 強制模式下，VEN 僅封鎖違反邊界的流量。
 
-**Enforcement Mode**（強制模式）— VEN 的運作狀態：*Idle*（關閉，無記錄）、*Visibility Only*（僅被動監控）、*Selective*（僅封鎖邊界違規）、*Full*（預設拒絕 / 零信任，僅允許清單）。Full 是生產環境微分段的目標狀態。
+**Enforcement Mode**（強制模式）— VEN 的運作狀態：*Idle*（不強制，但 VEN 仍會每約 10 分鐘回報網路流量、每約 4 小時回報 OS 相容性）、*Visibility Only*（僅被動監控）、*Selective*（僅對強制邊界涵蓋的服務/埠進行強制，且僅針對入站流量）、*Full*（預設拒絕 / 零信任，僅允許清單）。Full 是生產環境微分段的目標狀態。Unmanaged 工作負載以及透過 NEN（Network Enforcement Node）管理的工作負載無法使用 Selective 強制模式。
 
 **Environment**（環境）— `env` 標籤維度，記錄工作負載的 SDLC 階段（例如 `production`、`staging`、`dev`）。用於規則集以限定規則適用的生命週期階段。
 
@@ -60,6 +60,8 @@ related_docs:
 **Service Account**（服務帳號）— PCE 中的非人類身分，供自動化工具（腳本、CI/CD 流程）透過 API 金鑰驗證 PCE API，不與使用者帳號綁定。
 
 **VEN (Virtual Enforcement Node)**（虛擬強制節點）— 安裝於每個受管工作負載的輕量代理程式。設定主機原生防火牆（`iptables`/`nftables`、WFP），收集流量遙測，並透過 TLS TCP 8443/8444 套用從 PCE 接收的政策。
+
+**Visibility Level**（可見性層級）— 在 Full 強制模式下，控制 VEN 記錄多少流量：*Off*、*Blocked*、*Blocked + Allowed*、*Enhanced Data Collection*。
 
 **Workload**（工作負載）— PCE 追蹤的受管運算資源。三種子類型：*Managed*（已配對 VEN，即時遙測）、*Unmanaged*（僅標籤 IP，無 VEN）、*Container*（透過 Kubelink 的 Kubernetes/OpenShift Pod）。
 

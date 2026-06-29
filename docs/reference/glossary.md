@@ -29,7 +29,7 @@ This page is a quick reference for newcomers. Each entry is self-contained: read
 
 **Enforcement Boundary** — A scoped deny statement separate from regular rules. Defines a "blast wall" between groups of workloads; in Selective enforcement mode the VEN blocks only flows that violate a boundary.
 
-**Enforcement Mode** — The operating state of a VEN: *Idle* (off, no logging), *Visibility Only* (passive monitoring only), *Selective* (block boundary violations only), or *Full* (default-deny / zero-trust, allow-list only). Full is the production target for microsegmentation.
+**Enforcement Mode** — The operating state of a VEN: *Idle* (no enforcement, but the VEN still reports network traffic ~every 10 min and OS compatibility ~every 4 h), *Visibility Only* (passive monitoring only), *Selective* (enforcement applies only to the services/ports covered by enforcement boundaries, on inbound traffic only), or *Full* (default-deny / zero-trust, allow-list only). Full is the production target for microsegmentation. Unmanaged workloads and workloads managed via NENs (Network Enforcement Nodes) cannot use Selective enforcement.
 
 **Environment** — The `env` label dimension, recording the SDLC stage of a workload (e.g. `production`, `staging`, `dev`). Used in rulesets to scope rules to a lifecycle stage.
 
@@ -60,6 +60,8 @@ This page is a quick reference for newcomers. Each entry is self-contained: read
 **Service Account** — A non-human PCE identity used by automated tools (scripts, CI/CD pipelines) to authenticate to the PCE API via an API key, without tying access to a user account.
 
 **VEN (Virtual Enforcement Node)** — A lightweight agent installed on each managed workload. Programs the host's native firewall (`iptables`/`nftables`, WFP), collects flow telemetry, and applies policy received from the PCE over TLS on TCP 8443/8444.
+
+**Visibility Level** — Under Full enforcement, controls how much traffic the VEN logs: *Off*, *Blocked*, *Blocked + Allowed*, or *Enhanced Data Collection*.
 
 **Workload** — A managed compute resource tracked by the PCE. Three subtypes: *Managed* (VEN paired, live telemetry), *Unmanaged* (labelled IP-only, no VEN), *Container* (Kubernetes/OpenShift pod via Kubelink).
 
