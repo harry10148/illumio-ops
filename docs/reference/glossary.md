@@ -27,7 +27,7 @@ This page is a quick reference for newcomers. Each entry is self-contained: read
 
 **Application Group** — A logical grouping of workloads that share the same `app` label value, representing one business service (e.g. `HRM`, `Payments`). Rulesets are often scoped to an Application Group.
 
-**Enforcement Boundary** — A scoped deny statement separate from regular rules. Defines a "blast wall" between groups of workloads; in Selective enforcement mode the VEN blocks only flows that violate a boundary.
+**Enforcement Boundary** — A scoped deny statement separate from regular rules (renamed **Deny Rules** in newer PCE releases). Defines a "blast wall" between groups of workloads; in Selective enforcement mode the VEN blocks only inbound flows that violate a boundary, while violating *outbound* flows are still logged as Potentially Blocked.
 
 **Enforcement Mode** — The operating state of a VEN: *Idle* (no enforcement, but the VEN still reports network traffic ~every 10 min and OS compatibility ~every 4 h), *Visibility Only* (passive monitoring only), *Selective* (enforcement applies only to the services/ports covered by enforcement boundaries, on inbound traffic only), or *Full* (default-deny / zero-trust, allow-list only). Full is the production target for microsegmentation. Unmanaged workloads and workloads managed via NENs (Network Enforcement Nodes) cannot use Selective enforcement.
 
@@ -61,7 +61,7 @@ This page is a quick reference for newcomers. Each entry is self-contained: read
 
 **VEN (Virtual Enforcement Node)** — A lightweight agent installed on each managed workload. Programs the host's native firewall (`iptables`/`nftables`, WFP), collects flow telemetry, and applies policy received from the PCE over TLS on TCP 8443/8444.
 
-**Visibility Level** — Under Full enforcement, controls how much traffic the VEN logs: *Off*, *Blocked*, *Blocked + Allowed*, or *Enhanced Data Collection*.
+**Visibility Level** — Controls how much traffic the VEN logs: *Off*, *Blocked*, *Blocked + Allowed*, or *Enhanced Data Collection*. (Historically a Full-enforcement setting; as of PCE 25.2.10, *Enhanced Data Collection* can be enabled in all enforcement modes.)
 
 **Workload** — A managed compute resource tracked by the PCE. Three subtypes: *Managed* (VEN paired, live telemetry), *Unmanaged* (labelled IP-only, no VEN), *Container* (Kubernetes/OpenShift pod via Kubelink).
 

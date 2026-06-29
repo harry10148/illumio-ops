@@ -73,7 +73,7 @@ All rules are stored in the `rules` array of `config/alerts.json`; each has a `t
 
 > The operator difference is made explicit by `_build_criteria_str` and `_dispatch_alerts`: **bandwidth uses `>`, traffic/volume use `>=`**. `calculate_mbps` prefers delta bytes/`ddms` (Interval), falling back to total bytes/`tdms` (Avg); `calculate_volume_mb` works the same way (Interval → Total).
 
-> Beyond the polled `system` health-status check above, the PCE itself also emits `system_health` events (Severity **Warning**, **Error**, or **Fatal**) roughly every minute; monitoring these is an Illumio-recommended best practice. (Source: Illumio "Events Described — Recommended Events to Monitor".)
+> Beyond the polled `system` health-status check above, the PCE itself also emits `system_health` events roughly every minute — logged at **INFO** severity while the cluster is healthy, escalating to **Warning / Error / Fatal** only when system metrics (CPU, memory, disk) cross their thresholds. The Illumio best practice is to monitor these events filtered to **severity Warning or higher**. (Source: Illumio "Events Described — Recommended Events to Monitor".)
 
 ### 2.2 Flow matching: `check_flow_match`
 
