@@ -40,3 +40,12 @@ def test_archive_retention_days_bounds_and_custom():
     assert PceCacheSettings(archive_retention_days=365).archive_retention_days == 365
     with pytest.raises(ValidationError):
         PceCacheSettings(archive_retention_days=-1)
+
+
+def test_archive_review_max_days_default_and_bounds():
+    import pytest
+    from pydantic import ValidationError
+    assert PceCacheSettings().archive_review_max_days == 31
+    assert PceCacheSettings(archive_review_max_days=7).archive_review_max_days == 7
+    with pytest.raises(ValidationError):
+        PceCacheSettings(archive_review_max_days=0)

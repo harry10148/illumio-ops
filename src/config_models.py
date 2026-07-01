@@ -251,6 +251,7 @@ class PceCacheSettings(_Base):
     archive_interval_hours: int = Field(default=24, ge=1)
     archive_gzip_after_days: int = Field(default=7, ge=1)
     archive_retention_days: int = Field(default=0, ge=0)  # 0 = 永久保留（不刪 archive 檔）
+    archive_review_max_days: int = Field(default=31, ge=1)  # archive 查閱單次載入的日期範圍上限
 
 
 class SiemDestinationSettings(_Base):
