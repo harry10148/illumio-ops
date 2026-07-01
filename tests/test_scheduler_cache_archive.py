@@ -14,7 +14,7 @@ def _cm(tmp_path, archive_enabled=True):
 def test_run_cache_archive_invokes_exporter(tmp_path):
     from src.scheduler.jobs import run_cache_archive
     cm = _cm(tmp_path)
-    with patch("src.gui._helpers._get_cache_engine"), \
+    with patch("src.scheduler.jobs._get_cache_engine"), \
          patch("sqlalchemy.orm.sessionmaker"), \
          patch("src.pce_cache.archive.ArchiveExporter") as mock_exp:
         mock_exp.return_value.run_once.return_value = {}
@@ -29,7 +29,7 @@ def test_run_cache_archive_invokes_exporter(tmp_path):
 def test_run_cache_archive_swallows_exceptions(tmp_path):
     from src.scheduler.jobs import run_cache_archive
     cm = _cm(tmp_path)
-    with patch("src.gui._helpers._get_cache_engine", side_effect=RuntimeError("boom")):
+    with patch("src.scheduler.jobs._get_cache_engine", side_effect=RuntimeError("boom")):
         run_cache_archive(cm)  # 不得拋出
 
 
@@ -40,7 +40,7 @@ def test_run_cache_retention_passes_archive_enabled(tmp_path):
     cfg.events_retention_days = 90
     cfg.traffic_raw_retention_days = 7
     cfg.traffic_agg_retention_days = 90
-    with patch("src.gui._helpers._get_cache_engine"), \
+    with patch("src.scheduler.jobs._get_cache_engine"), \
          patch("sqlalchemy.orm.sessionmaker"), \
          patch("src.pce_cache.retention.RetentionWorker") as mock_w:
         mock_w.return_value.run_once.return_value = {}
