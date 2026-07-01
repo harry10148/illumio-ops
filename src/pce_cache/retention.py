@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
 
+from loguru import logger
 from sqlalchemy import delete
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import (
-    DeadLetter, PceEvent, PceTrafficFlowAgg, PceTrafficFlowRaw, SiemDispatch,
+    DeadLetter, IngestionCursor, PceEvent, PceTrafficFlowAgg,
+    PceTrafficFlowRaw, SiemDispatch,
 )
 
 
@@ -21,19 +23,28 @@ class RetentionWorker:
         traffic_agg_days: int = 90,
         dlq_days: int = 30,
         dispatch_days: int = 14,
+        archive_enabled: bool = False,
     ) -> dict[str, int]:
         now = datetime.now(timezone.utc)
         results: dict[str, int] = {}
 
         with self._sf.begin() as s:
-            cutoff = now - timedelta(days=events_days)
-            r = s.execute(delete(PceEvent).where(PceEvent.ingested_at < cutoff))
-            results["events"] = r.rowcount
+            policy_cutoff = now - timedelta(days=events_days)
+            eff = self._effective_cutoff(s, "pce_events", policy_cutoff, archive_enabled)
+            if eff is None:
+                results["events"] = 0
+            else:
+                r = s.execute(delete(PceEvent).where(PceEvent.ingested_at < eff))
+                results["events"] = r.rowcount
 
         with self._sf.begin() as s:
-            cutoff = now - timedelta(days=traffic_raw_days)
-            r = s.execute(delete(PceTrafficFlowRaw).where(PceTrafficFlowRaw.ingested_at < cutoff))
-            results["traffic_raw"] = r.rowcount
+            policy_cutoff = now - timedelta(days=traffic_raw_days)
+            eff = self._effective_cutoff(s, "pce_traffic_flows_raw", policy_cutoff, archive_enabled)
+            if eff is None:
+                results["traffic_raw"] = 0
+            else:
+                r = s.execute(delete(PceTrafficFlowRaw).where(PceTrafficFlowRaw.ingested_at < eff))
+                results["traffic_raw"] = r.rowcount
 
         with self._sf.begin() as s:
             cutoff = now - timedelta(days=traffic_agg_days)
@@ -61,3 +72,29 @@ class RetentionWorker:
             results["siem_dispatch"] = r.rowcount
 
         return results
+
+    def _effective_cutoff(self, s, source_table, policy_cutoff, archive_enabled):
+        """回傳實際刪除界線。archive_enabled=True 時，只刪「到期且已 archive」
+        的列：界線取 min(policy_cutoff, archiver cursor 的 last_ingested_at)；
+        cursor 為 None（尚未 archive 任何列）→ 回傳 None（該來源不刪）。"""
+        if not archive_enabled:
+            return policy_cutoff
+        cur = s.get(IngestionCursor, ("archiver", source_table))
+        archived_ts = cur.last_ingested_at if cur else None
+        # SQLite 讀回的 DateTime(timezone=True) 是 naive（tzinfo 被剝除），
+        # 其值為 UTC wall-clock，補回 UTC tzinfo 才能與 aware 的 policy_cutoff 比較。
+        if archived_ts is not None and archived_ts.tzinfo is None:
+            archived_ts = archived_ts.replace(tzinfo=timezone.utc)
+        if archived_ts is None:
+            logger.warning(
+                "retention guard: nothing archived for {} yet; withholding deletion",
+                source_table,
+            )
+            return None
+        if archived_ts < policy_cutoff:
+            logger.warning(
+                "retention guard: archive behind for {} (archived up to {} < policy {}); "
+                "withholding un-archived rows",
+                source_table, archived_ts, policy_cutoff,
+            )
+        return min(policy_cutoff, archived_ts)

@@ -159,3 +159,56 @@ def test_retention_keeps_pending_and_failed_siem_dispatch(session_factory):
     assert deleted["siem_dispatch"] == 0
     with session_factory() as s:
         assert len(s.execute(select(SiemDispatch)).scalars().all()) == 6
+
+
+def _set_archiver_cursor(sf, source_table, last_ingested_at):
+    from src.pce_cache.models import IngestionCursor
+    with sf.begin() as s:
+        s.add(IngestionCursor(
+            consumer="archiver", source_table=source_table,
+            last_ingested_at=last_ingested_at, last_row_id=10**9,
+            updated_at=_now(),
+        ))
+
+
+def test_guard_withholds_when_nothing_archived(session_factory):
+    """archive_enabled 但沒有 archiver cursor（什麼都還沒 archive）→ 不刪任何 raw flow。"""
+    from src.pce_cache.retention import RetentionWorker
+    _seed_raw_flows(session_factory, old_count=5, new_count=0)
+    worker = RetentionWorker(session_factory)
+    deleted = worker.run_once(traffic_raw_days=7, archive_enabled=True)
+    assert deleted["traffic_raw"] == 0
+    with session_factory() as s:
+        from sqlalchemy import select
+        assert len(s.execute(select(PceTrafficFlowRaw)).scalars().all()) == 5
+
+
+def test_guard_deletes_when_archive_caught_up(session_factory):
+    """archiver cursor 已覆蓋到現在 → 到期列照常刪除。"""
+    from src.pce_cache.retention import RetentionWorker
+    _seed_raw_flows(session_factory, old_count=5, new_count=2)
+    _set_archiver_cursor(session_factory, "pce_traffic_flows_raw", _now())
+    worker = RetentionWorker(session_factory)
+    deleted = worker.run_once(traffic_raw_days=7, archive_enabled=True)
+    assert deleted["traffic_raw"] == 5  # 5 舊列到期且已 archive → 刪；2 新列未到期
+
+
+def test_guard_withholds_rows_newer_than_cursor(session_factory):
+    """archive 落後：cursor 停在很久以前 → 到期但未 archive 的列不刪。"""
+    from src.pce_cache.retention import RetentionWorker
+    _seed_raw_flows(session_factory, old_count=5, new_count=0)  # 皆為 100 天前、到期
+    _set_archiver_cursor(session_factory, "pce_traffic_flows_raw",
+                         _now() - __import__("datetime").timedelta(days=200))
+    worker = RetentionWorker(session_factory)
+    deleted = worker.run_once(traffic_raw_days=7, archive_enabled=True)
+    # cursor(200天前) 比舊列(100天前)還早 → 舊列都在 cursor 之後 → 不刪
+    assert deleted["traffic_raw"] == 0
+
+
+def test_guard_off_matches_current_behaviour(session_factory):
+    """archive_enabled=False（預設）→ 到期即刪，與現況一致（回歸保護）。"""
+    from src.pce_cache.retention import RetentionWorker
+    _seed_raw_flows(session_factory, old_count=5, new_count=2)
+    worker = RetentionWorker(session_factory)
+    deleted = worker.run_once(traffic_raw_days=7)  # 不帶 archive_enabled
+    assert deleted["traffic_raw"] == 5
