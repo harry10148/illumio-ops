@@ -209,6 +209,26 @@ function buildCacheForm(s) {
     + '</div>'
     + '</fieldset>'
     + '<fieldset>'
+    + '<legend data-i18n="gui_cache_sec_archive">Archive</legend>'
+    + '<div class="chk" style="margin-bottom:14px;">'
+    + '<label><input type="checkbox" name="archive_enabled"' + (s.archive_enabled ? ' checked' : '') + '>'
+    + ' <span data-i18n="gui_cache_archive_enabled">Enable archive</span></label>'
+    + '</div>'
+    + '<div class="form-group">'
+    + '<label data-i18n="gui_cache_archive_dir">Archive dir</label>'
+    + '<input name="archive_dir" value="' + escapeAttr(s.archive_dir || 'data/archive') + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_archive_dir_help"></small>'
+    + '</div>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label data-i18n="gui_cache_archive_interval_hours">Interval (hours)</label>'
+    + '<input type="number" name="archive_interval_hours" min="1" value="' + Number(s.archive_interval_hours || 24) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_archive_interval_hours_help"></small></div>'
+    + '<div class="form-group"><label data-i18n="gui_cache_archive_gzip_after_days">Gzip after (days)</label>'
+    + '<input type="number" name="archive_gzip_after_days" min="1" value="' + Number(s.archive_gzip_after_days || 7) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_archive_gzip_after_days_help"></small></div>'
+    + '</div>'
+    + '</fieldset>'
+    + '<fieldset>'
     + '<legend data-i18n="gui_cache_sec_polling">Polling (seconds)</legend>'
     + '<div class="form-row">'
     + '<div class="form-group"><label>events_poll_interval_seconds</label>'
@@ -253,6 +273,10 @@ async function cacheSave() {
     traffic_poll_interval_seconds: Number(data.traffic_poll_interval_seconds),
     rate_limit_per_minute: Number(data.rate_limit_per_minute),
     async_threshold_events: Number(data.async_threshold_events),
+    archive_enabled: form.elements['archive_enabled'].checked,
+    archive_dir: data.archive_dir,
+    archive_interval_hours: Number(data.archive_interval_hours),
+    archive_gzip_after_days: Number(data.archive_gzip_after_days),
     traffic_filter: (typeof window.collectTrafficFilter === 'function')
       ? window.collectTrafficFilter() : existing.traffic_filter,
     traffic_sampling: (typeof window.collectTrafficSampling === 'function')

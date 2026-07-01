@@ -59,6 +59,10 @@ def test_put_cache_settings_happy(client, tmp_path):
         "traffic_poll_interval_seconds": 3600,
         "rate_limit_per_minute": 400,
         "async_threshold_events": 10000,
+        "archive_enabled": True,
+        "archive_dir": str(tmp_path / "archive"),
+        "archive_interval_hours": 6,
+        "archive_gzip_after_days": 3,
         "traffic_filter": {
             "actions": ["blocked"],
             "workload_label_env": ["prod"],
@@ -74,6 +78,33 @@ def test_put_cache_settings_happy(client, tmp_path):
     assert resp.status_code == 200
     b = resp.get_json()
     assert b["ok"] is True and b["requires_restart"] is True
+
+
+def test_put_cache_archive_roundtrip(client):
+    """archive 四欄能透過既有 /api/cache/settings round-trip（UI 表單依賴此契約）。"""
+    resp = client.put("/api/cache/settings", json={
+        "archive_enabled": True,
+        "archive_dir": "/mnt/wormstore/illumio",
+        "archive_interval_hours": 6,
+        "archive_gzip_after_days": 3,
+    }, environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    assert resp.get_json()["ok"] is True
+    got = client.get("/api/cache/settings",
+                     environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
+    assert got["archive_enabled"] is True
+    assert got["archive_dir"] == "/mnt/wormstore/illumio"
+    assert got["archive_interval_hours"] == 6
+    assert got["archive_gzip_after_days"] == 3
+
+
+def test_put_cache_archive_invalid(client):
+    """archive_interval_hours 有 ge=1 下限，0 應驗證失敗回 422。"""
+    resp = client.put("/api/cache/settings",
+                      json={"archive_interval_hours": 0},
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 422
+    assert resp.get_json()["ok"] is False
 
 
 def test_put_cache_invalid_ip(client):
