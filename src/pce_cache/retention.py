@@ -4,7 +4,7 @@ from datetime import datetime, timezone, timedelta
 
 from loguru import logger
 from sqlalchemy import delete
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from src.pce_cache.models import (
     DeadLetter, IngestionCursor, PceEvent, PceTrafficFlowAgg,
@@ -73,7 +73,13 @@ class RetentionWorker:
 
         return results
 
-    def _effective_cutoff(self, s, source_table, policy_cutoff, archive_enabled):
+    def _effective_cutoff(
+        self,
+        s: Session,
+        source_table: str,
+        policy_cutoff: datetime,
+        archive_enabled: bool,
+    ) -> datetime | None:
         """回傳實際刪除界線。archive_enabled=True 時，只刪「到期且已 archive」
         的列：界線取 min(policy_cutoff, archiver cursor 的 last_ingested_at)；
         cursor 為 None（尚未 archive 任何列）→ 回傳 None（該來源不刪）。"""

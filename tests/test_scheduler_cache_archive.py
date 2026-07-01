@@ -29,8 +29,11 @@ def test_run_cache_archive_invokes_exporter(tmp_path):
 def test_run_cache_archive_swallows_exceptions(tmp_path):
     from src.scheduler.jobs import run_cache_archive
     cm = _cm(tmp_path)
-    with patch("src.scheduler.jobs._get_cache_engine", side_effect=RuntimeError("boom")):
+    with patch("src.scheduler.jobs._get_cache_engine", side_effect=RuntimeError("boom")), \
+         patch("src.scheduler.jobs.logger") as mock_logger:
         run_cache_archive(cm)  # 不得拋出
+    # 例外必須被收斂到 logger.exception（讓維運看得到），而非靜默吞掉
+    assert mock_logger.exception.called
 
 
 def test_run_cache_retention_passes_archive_enabled(tmp_path):

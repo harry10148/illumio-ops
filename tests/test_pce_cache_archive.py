@@ -56,6 +56,7 @@ def test_archive_exports_new_traffic_rows_as_jsonl(sf, archive_dir):
     assert res["traffic"].rows == 2
     path = os.path.join(archive_dir, "traffic-2026-06-30.jsonl")
     assert os.path.exists(path)
+    assert res["traffic"].files_written == [path]
     lines = _read_lines(path)
     assert len(lines) == 2
     assert {ln["flow_hash"] for ln in lines} == {"h1", "h2"}
@@ -167,6 +168,26 @@ def test_archive_exports_audit_events(sf, archive_dir):
     assert lines[0]["pce_event_id"] == "e1"
     assert lines[0]["event_type"] == "user.sign_in"
     assert lines[0]["raw"] == {"href": "/orgs/1/events/e1", "d": 1}
+    # 契約：audit 時間戳同樣帶明確 UTC offset（與 traffic 對稱）
+    assert lines[0]["event_time"].endswith("+00:00")
+    assert lines[0]["ingested_at"].endswith("+00:00")
+
+
+def test_archive_emits_null_raw_when_raw_json_empty(sf, archive_dir):
+    from src.pce_cache.archive import ArchiveExporter
+    # 契約：raw_json 為空 → JSONL 的 raw 欄位為 null
+    with sf.begin() as s:
+        s.add(PceTrafficFlowRaw(
+            flow_hash="empty", first_detected=_dt(2026, 6, 30), last_detected=_dt(2026, 6, 30),
+            src_ip="10.0.0.1", src_workload="web", dst_ip="10.0.0.2", dst_workload="db",
+            port=443, protocol="tcp", action="allowed", flow_count=1,
+            bytes_in=0, bytes_out=0, raw_json="",
+            ingested_at=_dt(2026, 6, 30),
+        ))
+    ArchiveExporter(sf, archive_dir).run_once()
+    lines = _read_lines(os.path.join(archive_dir, "traffic-2026-06-30.jsonl"))
+    assert lines[0]["flow_hash"] == "empty"
+    assert lines[0]["raw"] is None
 
 
 def test_gzip_rotates_only_old_files(sf, archive_dir):

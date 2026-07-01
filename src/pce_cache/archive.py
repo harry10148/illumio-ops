@@ -63,6 +63,18 @@ _SOURCES = [
 
 
 class ArchiveExporter:
+    """把 pce_cache 的 traffic/audit 列增量匯出成分日 JSONL，供長期保存。
+
+    交付語意：每批先寫檔並 fsync 成功後才推進 archiver cursor，故為
+    at-least-once —— 正常運作不重複，但若在 fsync 後、cursor 推進前崩潰，
+    下次會重寫同批，JSONL 可能含重複列（無資料遺失；下游可用 flow_hash /
+    pce_event_id 去重）。
+
+    儲存語意：以 append + gzip 輪替 + remove 操作一般 POSIX 可讀寫目錄，
+    非硬體 WORM 檔案系統（後者會拒絕 append/remove）。目錄不可寫時各操作
+    以 logger.warning 安全降級，不會腐化既有檔案。
+    """
+
     def __init__(self, session_factory: sessionmaker, archive_dir: str,
                  gzip_after_days: int = 7):
         self._sf = session_factory
@@ -150,7 +162,7 @@ class ArchiveExporter:
             names = os.listdir(self._dir)
         except OSError as exc:
             # best-effort 清理：目錄不存在/無權限/非目錄等任何列目錄失敗都安全跳過，不中斷 archive job
-            logger.warning("archive gzip skipped: listdir {} failed: {}", self._dir, exc)
+            logger.warning("archive gzip skipped {} (listdir failed): {}", self._dir, exc)
             return
         for name in names:
             if not name.endswith(".jsonl"):
