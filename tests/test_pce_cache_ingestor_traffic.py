@@ -245,6 +245,6 @@ def test_traffic_run_once_records_error_status_on_insert_failure(session_factory
 
     with session_factory() as s:
         row = s.get(IngestionWatermark, "traffic")
-    assert row is not None                        # 目前為 None（未 record_error）→ 紅
+    assert row is not None                        # record_error 必須在 re-raise 前寫入 watermark
     assert row.last_status == "error"
     assert "database is locked" in (row.last_error or "")

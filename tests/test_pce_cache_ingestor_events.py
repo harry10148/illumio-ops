@@ -258,3 +258,4 @@ def test_events_run_once_records_error_status_on_insert_failure(session_factory)
     with session_factory() as s:
         row = s.get(IngestionWatermark, "events")
     assert row is not None and row.last_status == "error"
+    assert "database is locked" in (row.last_error or "")
