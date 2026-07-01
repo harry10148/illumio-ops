@@ -205,6 +205,18 @@ def test_guard_withholds_rows_newer_than_cursor(session_factory):
     assert deleted["traffic_raw"] == 0
 
 
+def test_guard_withholds_events_when_nothing_archived(session_factory):
+    """archive_enabled 但沒有 pce_events 的 archiver cursor（什麼都還沒 archive）
+    → 不刪任何到期 event。既有守門測試只覆蓋 traffic_raw，補一條 pce_events 的最小驗證。"""
+    from src.pce_cache.retention import RetentionWorker
+    _seed_events(session_factory, old_count=5, new_count=0)
+    worker = RetentionWorker(session_factory)
+    deleted = worker.run_once(events_days=30, archive_enabled=True)
+    assert deleted["events"] == 0
+    with session_factory() as s:
+        assert len(s.execute(select(PceEvent)).scalars().all()) == 5
+
+
 def test_guard_off_matches_current_behaviour(session_factory):
     """archive_enabled=False（預設）→ 到期即刪，與現況一致（回歸保護）。"""
     from src.pce_cache.retention import RetentionWorker

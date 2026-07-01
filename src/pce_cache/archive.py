@@ -73,9 +73,7 @@ class ArchiveExporter:
         os.makedirs(self._dir, exist_ok=True)
         results: dict[str, ArchiveResult] = {}
         for prefix, model, source_table, ev_attr, builder in _SOURCES:
-            results[
-                "traffic" if prefix == "traffic" else "audit"
-            ] = self._export_source(prefix, model, source_table, ev_attr, builder)
+            results[prefix] = self._export_source(prefix, model, source_table, ev_attr, builder)
         self._gzip_old_files()
         return results
 
@@ -162,7 +160,10 @@ class ArchiveExporter:
                 if os.path.getmtime(path) >= cutoff:
                     continue
                 gz_path = path + ".gz"
-                with open(path, "rb") as src, gzip.open(gz_path, "wb") as dst:
+                # 既有 .gz 用 append 成新 gzip member，保留舊資料；多-member gzip
+                # 標準工具可透明解壓。"wb" 會截斷覆寫既有內容，故僅在無既有 .gz 時使用。
+                mode = "ab" if os.path.exists(gz_path) else "wb"
+                with open(path, "rb") as src, gzip.open(gz_path, mode) as dst:
                     while True:
                         chunk = src.read(1 << 20)
                         if not chunk:

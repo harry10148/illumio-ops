@@ -1,7 +1,7 @@
 import gzip
 import os
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 
 import orjson
 import pytest
@@ -216,6 +216,34 @@ def test_gzip_is_idempotent_and_skips_already_gzipped(sf, archive_dir):
     with open(gz, "rb") as fh:
         after = fh.read()
     assert after == before
+
+
+def test_gzip_rotation_appends_to_existing_gz_without_overwriting(sf, archive_dir):
+    """既有 .gz（batch A，例如上一輪 rotation 留下的）+ 同名新 .jsonl（batch B，到期）
+    → _gzip_old_files() 後 .gz 必須同時保留 batch A 與 batch B（多-member gzip），
+    不能用 'wb' 截斷覆寫掉既有 batch A。"""
+    from src.pce_cache.archive import ArchiveExporter
+    exporter = ArchiveExporter(sf, archive_dir, gzip_after_days=7)
+
+    path = os.path.join(archive_dir, "traffic-2026-05-01.jsonl")
+    gz_path = path + ".gz"
+
+    # 既有 .gz：batch A
+    with gzip.open(gz_path, "wb") as fh:
+        fh.write(orjson.dumps({"flow_hash": "batchA"}) + b"\n")
+
+    # 同名新 .jsonl：batch B，mtime 調成到期
+    with open(path, "wb") as fh:
+        fh.write(orjson.dumps({"flow_hash": "batchB"}) + b"\n")
+    old_mtime = time.time() - 30 * 86400
+    os.utime(path, (old_mtime, old_mtime))
+
+    exporter._gzip_old_files()
+
+    assert not os.path.exists(path)  # 原 .jsonl 已移除
+    with gzip.open(gz_path, "rb") as fh:
+        restored = [orjson.loads(ln) for ln in fh.read().splitlines() if ln.strip()]
+    assert {r["flow_hash"] for r in restored} == {"batchA", "batchB"}
 
 
 def test_gzip_old_files_swallows_non_missing_oserror_from_listdir(sf, archive_dir, monkeypatch):
