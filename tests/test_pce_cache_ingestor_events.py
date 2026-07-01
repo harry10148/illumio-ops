@@ -234,3 +234,27 @@ def test_async_threshold_uses_async_result_when_non_empty(session_factory):
     with session_factory() as s:
         ids = {r.pce_event_id for r in s.execute(select(PceEvent)).scalars().all()}
     assert ids == {f"uuid-{100 + i}" for i in range(5)}
+
+
+def test_events_run_once_records_error_status_on_insert_failure(session_factory):
+    import pytest
+    from sqlalchemy.exc import OperationalError
+    from src.pce_cache.ingestor_events import EventsIngestor
+    from src.pce_cache.watermark import WatermarkStore
+    from src.pce_cache.models import IngestionWatermark
+
+    ts = datetime.now(timezone.utc)
+    fake = FakeApiClient(events=[_mk_event(1, ts)])
+    ing = EventsIngestor(api=fake, session_factory=session_factory,
+                         watermark=WatermarkStore(session_factory), async_threshold=10000)
+
+    def _boom(_events):
+        raise OperationalError("INSERT", {}, Exception("database is locked"))
+    ing._insert_batch = _boom
+
+    with pytest.raises(OperationalError):
+        ing.run_once()
+
+    with session_factory() as s:
+        row = s.get(IngestionWatermark, "events")
+    assert row is not None and row.last_status == "error"

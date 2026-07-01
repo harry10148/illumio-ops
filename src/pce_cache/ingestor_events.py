@@ -60,12 +60,17 @@ class EventsIngestor:
             self._wm.record_error(self.SOURCE, str(exc))
             return 0
 
-        inserted = self._insert_batch(events)
-        if events:
-            last = max(e["timestamp"] for e in events)
-            last_href = events[-1].get("href", "")
-            self._wm.advance(self.SOURCE, last_timestamp=_parse_iso(last), last_href=last_href)
-        return inserted
+        try:
+            inserted = self._insert_batch(events)
+            if events:
+                last = max(e["timestamp"] for e in events)
+                last_href = events[-1].get("href", "")
+                self._wm.advance(self.SOURCE, last_timestamp=_parse_iso(last), last_href=last_href)
+            return inserted
+        except Exception as exc:
+            # insert/advance 失敗：記 error 再 re-raise（run_events_ingest 會 logger.exception）。
+            self._wm.record_error(self.SOURCE, str(exc))
+            raise
 
     def _since_cursor(self) -> str:
         # PCE rejects timestamps without a tz marker (HTTP 406 invalid_timestamp).

@@ -59,6 +59,11 @@ class TrafficIngestor:
                     self._wm.advance(self.SOURCE, last_timestamp=_parse_iso(last))
                     watermark_advanced = True
             return inserted
+        except Exception as exc:
+            # insert/advance 失敗（如 database is locked）：記 error 讓 last_status
+            # 反映真實，再 re-raise（run_traffic_ingest 仍以 logger.exception 記錄）。
+            self._wm.record_error(self.SOURCE, str(exc))
+            raise
         finally:
             logger.info(
                 "Traffic ingest poll: fetched={} inserted={} watermark_advanced={} since={}",

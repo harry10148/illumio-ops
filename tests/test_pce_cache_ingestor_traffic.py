@@ -223,3 +223,28 @@ def test_since_cursor_attaches_utc_offset_to_naive_watermark(session_factory):
     assert parsed.utcoffset() == timedelta(0)
     # 5-minute grace window still applied, now with a UTC offset
     assert parsed == datetime(2026, 5, 1, 11, 55, 0, tzinfo=timezone.utc)
+
+
+def test_traffic_run_once_records_error_status_on_insert_failure(session_factory):
+    import pytest
+    from sqlalchemy.exc import OperationalError
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+    from src.pce_cache.models import IngestionWatermark
+
+    fake = FakeApiClient([_mk_flow(1)])
+    ing = TrafficIngestor(api=fake, session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory))
+
+    def _boom(_flows):
+        raise OperationalError("INSERT", {}, Exception("database is locked"))
+    ing._insert_batch = _boom
+
+    with pytest.raises(OperationalError):        # re-raise 契約保留
+        ing.run_once()
+
+    with session_factory() as s:
+        row = s.get(IngestionWatermark, "traffic")
+    assert row is not None                        # 目前為 None（未 record_error）→ 紅
+    assert row.last_status == "error"
+    assert "database is locked" in (row.last_error or "")
