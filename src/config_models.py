@@ -246,6 +246,10 @@ class PceCacheSettings(_Base):
     async_threshold_events: int = Field(default=10000, ge=1, le=10000)
     traffic_filter: TrafficFilterSettings = Field(default_factory=TrafficFilterSettings)
     traffic_sampling: TrafficSamplingSettings = Field(default_factory=TrafficSamplingSettings)
+    archive_enabled: bool = False
+    archive_dir: str = "data/archive"
+    archive_interval_hours: int = Field(default=24, ge=1)
+    archive_gzip_after_days: int = Field(default=7, ge=1)
 
 
 class SiemDestinationSettings(_Base):
