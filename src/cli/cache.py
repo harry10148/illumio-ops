@@ -168,6 +168,7 @@ def cache_retention(ctx: click.Context, do_run: bool, json_output: bool):
         "events_retention_days": int(cfg.get("events_retention_days", 90)),
         "traffic_raw_retention_days": int(cfg.get("traffic_raw_retention_days", 7)),
         "traffic_agg_retention_days": int(cfg.get("traffic_agg_retention_days", 365)),
+        "archive_enabled": bool(cfg.get("archive_enabled", False)),
     }
 
     if not do_run:
@@ -192,6 +193,7 @@ def cache_retention(ctx: click.Context, do_run: bool, json_output: bool):
             events_days=config_data["events_retention_days"],
             traffic_raw_days=config_data["traffic_raw_retention_days"],
             traffic_agg_days=config_data["traffic_agg_retention_days"],
+            archive_enabled=config_data["archive_enabled"],
         )
         if json_output or is_json(ctx):
             echo_json(ctx, result)

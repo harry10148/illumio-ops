@@ -214,6 +214,7 @@ def _run_retention(cm):
             events_days=cfg.events_retention_days,
             traffic_raw_days=cfg.traffic_raw_retention_days,
             traffic_agg_days=cfg.traffic_agg_retention_days,
+            archive_enabled=cfg.archive_enabled,
         )
         print(f"  retention complete: {results}")
     except Exception as exc:

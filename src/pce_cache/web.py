@@ -101,6 +101,7 @@ def api_cache_retention_run():
             events_days=int(cfg.events_retention_days),
             traffic_raw_days=int(cfg.traffic_raw_retention_days),
             traffic_agg_days=int(cfg.traffic_agg_retention_days),
+            archive_enabled=cfg.archive_enabled,
         )
         return jsonify(result)
     except Exception as e:

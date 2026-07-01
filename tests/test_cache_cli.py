@@ -27,6 +27,26 @@ def test_cache_retention_shows_config():
     assert "90" in result.output or "retention" in result.output.lower()
 
 
+def test_cache_retention_run_passes_archive_enabled():
+    """--run 必須把設定的 archive_enabled 傳給 RetentionWorker.run_once，
+    否則客戶啟用 archive 後，這個手動 CLI 入口會靜默刪除未 archive 的列。"""
+    from src.cli.cache import cache_group
+    runner = CliRunner()
+    with patch("src.cli.cache._get_cache_config", return_value={
+        "events_retention_days": 90,
+        "traffic_raw_retention_days": 7,
+        "traffic_agg_retention_days": 365,
+        "archive_enabled": True,
+    }):
+        with patch("src.cli.cache._get_db_session_factory", return_value=MagicMock()):
+            with patch("src.pce_cache.retention.RetentionWorker") as MockWorker:
+                MockWorker.return_value.run_once.return_value = {}
+                result = runner.invoke(cache_group, ["retention", "--run"])
+    assert result.exit_code == 0
+    _, kwargs = MockWorker.return_value.run_once.call_args
+    assert kwargs.get("archive_enabled") is True
+
+
 def test_cache_backfill_requires_source():
     from src.cli.cache import cache_group
     runner = CliRunner()

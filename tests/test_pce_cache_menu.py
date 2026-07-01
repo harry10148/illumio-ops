@@ -42,6 +42,26 @@ def test_menu_edit_settings_persists(cm):
     assert cm2.config.get("pce_cache", {}).get("events_retention_days") == 60
 
 
+def test_menu_retention_passes_archive_enabled(tmp_path):
+    """選項 6（Run retention now）必須把設定的 archive_enabled 傳給
+    RetentionWorker.run_once，否則客戶啟用 archive 後這個入口會靜默刪除未 archive 的列。"""
+    from src.pce_cache_cli import manage_pce_cache_menu
+    p = tmp_path / "config.json"
+    p.write_text(json.dumps({
+        "pce_cache": {
+            "db_path": str(tmp_path / "cache.sqlite"),
+            "archive_enabled": True,
+        },
+    }))
+    cm = ConfigManager(config_file=str(p))
+    with patch.object(builtins, "input", _seq(["6", "0"])), \
+         patch("src.pce_cache.retention.RetentionWorker") as MockWorker:
+        MockWorker.return_value.run_once.return_value = {}
+        manage_pce_cache_menu(cm)
+    _, kwargs = MockWorker.return_value.run_once.call_args
+    assert kwargs.get("archive_enabled") is True
+
+
 def test_menu_invalid_choice(cm, capsys):
     from src.pce_cache_cli import manage_pce_cache_menu
     with patch.object(builtins, "input", _seq(["99", "0"])):

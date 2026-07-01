@@ -131,6 +131,46 @@ def test_retention_run_requires_login(tmp_path):
         os.unlink(path)
 
 
+def test_retention_run_passes_archive_enabled(tmp_path):
+    """手動入口（Web GUI）必須把設定的 archive_enabled 傳給 RetentionWorker.run_once，
+    否則客戶啟用 archive 後，這個入口會用預設的 False 靜默刪除未 archive 的列。"""
+    from unittest.mock import patch
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    try:
+        with open(path, "w") as f:
+            json.dump({
+                "web_gui": {
+                    "username": "admin",
+                    "password": "pw",
+                    "secret_key": "s",
+                    "allowed_ips": ["127.0.0.1"],
+                },
+                "pce_cache": {
+                    "enabled": False,
+                    "db_path": str(tmp_path / "cache.sqlite"),
+                    "archive_enabled": True,
+                },
+            }, f)
+        cm = ConfigManager(config_file=path)
+        from src.gui import _create_app
+        app = _create_app(cm, persistent_mode=True)
+        app.config["TESTING"] = True
+        app.config["WTF_CSRF_ENABLED"] = False
+        with app.test_client() as c:
+            c.post("/api/login", json={"username": "admin", "password": "pw"},
+                   environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+            with patch("src.pce_cache.retention.RetentionWorker") as MockWorker:
+                MockWorker.return_value.run_once.return_value = {}
+                resp = c.post("/api/cache/retention/run",
+                              environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+            assert resp.status_code == 200
+            _, kwargs = MockWorker.return_value.run_once.call_args
+            assert kwargs.get("archive_enabled") is True
+    finally:
+        os.unlink(path)
+
+
 def test_cache_lag_empty(client):
     resp = client.get("/api/cache/lag",
                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
