@@ -315,7 +315,7 @@ class SiemForwarderSettings(_Base):
     enabled: bool = False
     destinations: list[SiemDestinationSettings] = Field(default_factory=list)
     dlq_max_per_dest: int = Field(default=10000, ge=100)
-    dispatch_tick_seconds: int = Field(default=5, ge=1)
+    dispatch_tick_seconds: int = Field(default=30, ge=1)
 
 
 class ConfigSchema(_Base):

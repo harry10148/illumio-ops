@@ -108,7 +108,7 @@ def test_siem_forwarder_settings_defaults():
     cfg = SiemForwarderSettings()
     assert cfg.enabled is False
     assert cfg.destinations == []
-    assert cfg.dispatch_tick_seconds == 5
+    assert cfg.dispatch_tick_seconds == 30
 
 
 def test_report_snapshot_retention_default():
