@@ -29,7 +29,14 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     rule_interval = cm.config.get("rule_scheduler", {}).get("check_interval_seconds", 300)
     sched_cfg = cm.config.get("scheduler", {}) or {}
 
-    executors = {"default": ThreadPoolExecutor(max_workers=5)}
+    executors = {
+        "default": ThreadPoolExecutor(max_workers=5),
+        # 單一 writer：SQLite 本就序列化寫者，強制這些 cache 批次 job 共用一個
+        # worker → 消除 traffic/events ingest vs aggregate/retention/archive 的
+        # 破壞性寫鎖競爭。慢 I/O 的 monitor_cycle/siem_dispatch 留在 default，
+        # 避免反向阻塞 ingest。
+        "cache_writer": ThreadPoolExecutor(max_workers=1),
+    }
     job_defaults = {
         "coalesce": True,          # if we miss ticks during suspension, run just once
         "max_instances": 1,        # prevent concurrent re-entry
@@ -131,14 +138,16 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             _kick = _dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(seconds=10)
             sched.add_job(run_events_ingest, _IT(seconds=cache_cfg.events_poll_interval_seconds),
                           args=[cm], id="pce_cache_ingest_events", replace_existing=True,
-                          next_run_time=_kick)
+                          next_run_time=_kick, executor="cache_writer")
             sched.add_job(run_traffic_ingest, _IT(seconds=cache_cfg.traffic_poll_interval_seconds),
                           args=[cm], id="pce_cache_ingest_traffic", replace_existing=True,
-                          next_run_time=_kick)
+                          next_run_time=_kick, executor="cache_writer")
             sched.add_job(run_traffic_aggregate, _IT(hours=1),
-                          args=[cm], id="pce_cache_aggregate", replace_existing=True)
+                          args=[cm], id="pce_cache_aggregate", replace_existing=True,
+                          executor="cache_writer")
             sched.add_job(run_cache_retention, _IT(hours=24),
-                          args=[cm], id="pce_cache_retention", replace_existing=True)
+                          args=[cm], id="pce_cache_retention", replace_existing=True,
+                          executor="cache_writer")
             sched.add_job(run_cache_lag_monitor, _IT(seconds=60),
                           args=[cm], id="cache_lag_monitor", replace_existing=True)
     except Exception as exc:
