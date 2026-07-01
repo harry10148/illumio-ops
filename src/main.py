@@ -42,21 +42,25 @@ def _make_subscribers(cm):
         return None, None
 
 
-def _make_cache_reader(cm):
-    """Return a CacheReader when pce_cache is enabled and reachable, else None.
+def _make_cache_reader(cm, db_path: str | None = None):
+    """Return a CacheReader for the pce_cache DB (or an explicit db_path).
 
-    Used by ReportGenerator and AuditGenerator to short-circuit PCE API calls
-    when the requested time window is already covered by the local cache.
+    db_path=None: use cm.models.pce_cache.db_path and honor the `enabled` gate
+    (existing behavior). An explicit db_path (e.g. the archive review DB) builds
+    a reader unconditionally — archive review does not depend on live cache being
+    enabled.
     """
     try:
-        if not cm.models.pce_cache.enabled:
-            return None
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
         from src.pce_cache.reader import CacheReader
         from src.pce_cache.schema import init_schema
         cfg = cm.models.pce_cache
-        engine = create_engine(f"sqlite:///{cfg.db_path}")
+        if db_path is None:
+            if not cfg.enabled:
+                return None
+            db_path = cfg.db_path
+        engine = create_engine(f"sqlite:///{db_path}")
         init_schema(engine)
         sf = sessionmaker(engine)
         return CacheReader(
