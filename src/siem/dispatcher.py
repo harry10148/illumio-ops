@@ -69,6 +69,7 @@ class DestinationDispatcher:
     def _process_batch(self) -> dict[str, int]:
         now = datetime.now(timezone.utc)
         sent = failed = quarantined = 0
+        sent_ids: list[int] = []
 
         with self._sf() as s:
             rows = s.execute(
@@ -93,12 +94,7 @@ class DestinationDispatcher:
                 continue
             try:
                 self._transport.send(payload)
-                with self._sf.begin() as s:
-                    s.execute(
-                        update(SiemDispatch)
-                        .where(SiemDispatch.id == dispatch_row.id)
-                        .values(status="sent", sent_at=datetime.now(timezone.utc))
-                    )
+                sent_ids.append(dispatch_row.id)
                 sent += 1
             except Exception as exc:
                 logger.warning("SIEM dispatch failed for row {}: {}", dispatch_row.id, exc)
@@ -117,6 +113,20 @@ class DestinationDispatcher:
                             .values(retries=new_retries, next_attempt_at=next_at)
                         )
                     failed += 1
+
+        # 成功送出的列以單一 transaction 一次標記 sent（原本逐列 commit 是
+        # 與 ingest 對撞的主要寫鎖 churn）。若 process 在網路送出後、此
+        # commit 前崩潰，那些列下輪會重送 —— 重複交付窗口因此變寬。
+        # 這是刻意的 at-least-once 取捨：SIEM 本即 at-least-once，
+        # 使用者已同意 eventual。
+        if sent_ids:
+            sent_at = datetime.now(timezone.utc)
+            with self._sf.begin() as s:
+                s.execute(
+                    update(SiemDispatch)
+                    .where(SiemDispatch.id.in_(sent_ids))
+                    .values(status="sent", sent_at=sent_at)
+                )
 
         return {"sent": sent, "failed": failed, "quarantined": quarantined}
 

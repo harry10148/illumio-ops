@@ -195,3 +195,37 @@ def test_enqueue_new_records_anti_join_only_undispatched(sf):
             select(SiemDispatch).where(SiemDispatch.source_id == 3)
         ).scalars().all()
     assert len(rows) == 1
+
+
+class _CountingSF:
+    """包住 sessionmaker，計數 .begin() 呼叫次數（= 寫交易數）。"""
+    def __init__(self, sf):
+        self._sf = sf
+        self.begin_calls = 0
+    def __call__(self, *a, **k):
+        return self._sf(*a, **k)
+    def begin(self, *a, **k):
+        self.begin_calls += 1
+        return self._sf.begin(*a, **k)
+
+
+class _FakeFormatter:
+    def format_event(self, data): return "PAYLOAD"
+    def format_flow(self, data): return "PAYLOAD"
+
+
+def test_process_batch_marks_all_sent_in_one_transaction(sf):
+    from src.siem.dispatcher import DestinationDispatcher
+    for i in range(1, 4):
+        _seed_event(sf, i)               # 3 筆 pending，destination="test-dest"
+    counting = _CountingSF(sf)
+    d = DestinationDispatcher("test-dest", counting, _FakeFormatter(), SuccessTransport())
+
+    result = d.tick()
+
+    assert result["sent"] == 3
+    with sf() as s:
+        rows = s.execute(select(SiemDispatch)).scalars().all()
+    assert all(r.status == "sent" for r in rows)
+    assert all(r.sent_at is not None for r in rows)
+    assert counting.begin_calls == 1     # 3 筆成功 → 僅一個寫交易
