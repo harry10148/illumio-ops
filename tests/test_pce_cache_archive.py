@@ -167,3 +167,46 @@ def test_archive_exports_audit_events(sf, archive_dir):
     assert lines[0]["pce_event_id"] == "e1"
     assert lines[0]["event_type"] == "user.sign_in"
     assert lines[0]["raw"] == {"href": "/orgs/1/events/e1", "d": 1}
+
+
+def test_gzip_rotates_only_old_files(sf, archive_dir):
+    from src.pce_cache.archive import ArchiveExporter
+    exporter = ArchiveExporter(sf, archive_dir, gzip_after_days=7)
+
+    old_path = os.path.join(archive_dir, "traffic-2026-06-01.jsonl")
+    new_path = os.path.join(archive_dir, "traffic-2026-06-30.jsonl")
+    with open(old_path, "wb") as fh:
+        fh.write(orjson.dumps({"flow_hash": "old", "raw": {"n": 1}}) + b"\n")
+    with open(new_path, "wb") as fh:
+        fh.write(orjson.dumps({"flow_hash": "new", "raw": {"n": 2}}) + b"\n")
+
+    # 把舊檔 mtime 調成 30 天前；新檔維持現在
+    old_mtime = time.time() - 30 * 86400
+    os.utime(old_path, (old_mtime, old_mtime))
+
+    exporter._gzip_old_files()
+
+    # 舊檔被壓縮、原檔移除；內容可解回原文
+    assert not os.path.exists(old_path)
+    gz = old_path + ".gz"
+    assert os.path.exists(gz)
+    with gzip.open(gz, "rb") as fh:
+        restored = [orjson.loads(ln) for ln in fh.read().splitlines() if ln.strip()]
+    assert restored[0]["flow_hash"] == "old"
+
+    # 新檔不動
+    assert os.path.exists(new_path)
+    assert not os.path.exists(new_path + ".gz")
+
+
+def test_gzip_is_idempotent_and_skips_already_gzipped(sf, archive_dir):
+    from src.pce_cache.archive import ArchiveExporter
+    exporter = ArchiveExporter(sf, archive_dir, gzip_after_days=7)
+    gz = os.path.join(archive_dir, "traffic-2026-06-01.jsonl.gz")
+    with gzip.open(gz, "wb") as fh:
+        fh.write(b'{"flow_hash": "x"}\n')
+    old_mtime = time.time() - 30 * 86400
+    os.utime(gz, (old_mtime, old_mtime))
+    # 不應拋錯、也不應動既有 .gz
+    exporter._gzip_old_files()
+    assert os.path.exists(gz)

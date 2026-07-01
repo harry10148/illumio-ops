@@ -147,5 +147,27 @@ class ArchiveExporter:
             cur.updated_at = now
 
     def _gzip_old_files(self) -> None:
-        # Task 3 實作；本任務先 no-op，鎖定簽章。
-        return None
+        cutoff = time.time() - self._gzip_after_days * 86400
+        try:
+            names = os.listdir(self._dir)
+        except FileNotFoundError:
+            return
+        for name in names:
+            if not name.endswith(".jsonl"):
+                continue
+            path = os.path.join(self._dir, name)
+            try:
+                if os.path.getmtime(path) >= cutoff:
+                    continue
+                gz_path = path + ".gz"
+                with open(path, "rb") as src, gzip.open(gz_path, "wb") as dst:
+                    while True:
+                        chunk = src.read(1 << 20)
+                        if not chunk:
+                            break
+                        dst.write(chunk)
+                    dst.flush()
+                    os.fsync(dst.fileno())
+                os.remove(path)  # 只有 .gz 成功寫入後才刪原檔
+            except OSError as exc:
+                logger.warning("archive gzip skipped {}: {}", path, exc)
