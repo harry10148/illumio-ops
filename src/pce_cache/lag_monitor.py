@@ -49,14 +49,11 @@ def check_cache_lag(session_factory: sessionmaker, max_lag_seconds: int = 300) -
 
 def run_cache_lag_monitor(cm) -> None:
     """APScheduler job: check ingestor lag, log if stalled."""
-    from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker as _SM
-    from src.pce_cache.schema import init_schema
+    from src.gui._helpers import _get_cache_engine
 
     cfg = cm.models.pce_cache
-    engine = create_engine(f"sqlite:///{cfg.db_path}")
-    init_schema(engine)
-    sf = _SM(engine)
+    sf = _SM(_get_cache_engine(cfg.db_path))
 
     max_lag = 300
     try:
