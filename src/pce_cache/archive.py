@@ -24,10 +24,16 @@ class ArchiveResult:
     files_written: list[str] = field(default_factory=list)
 
 
+def _as_utc(dt: datetime) -> datetime:
+    """SQLite 讀回的 DateTime(timezone=True) 是 naive（tzinfo 被剝除），
+    其值為 UTC wall-clock。補上 UTC tzinfo 使下游時間戳無歧義。"""
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
 def _traffic_record(row: PceTrafficFlowRaw) -> dict:
     return {
-        "event_time": row.last_detected.isoformat(),
-        "ingested_at": row.ingested_at.isoformat(),
+        "event_time": _as_utc(row.last_detected).isoformat(),
+        "ingested_at": _as_utc(row.ingested_at).isoformat(),
         "flow_hash": row.flow_hash,
         "src_ip": row.src_ip, "src_workload": row.src_workload,
         "dst_ip": row.dst_ip, "dst_workload": row.dst_workload,
@@ -40,8 +46,8 @@ def _traffic_record(row: PceTrafficFlowRaw) -> dict:
 
 def _audit_record(row: PceEvent) -> dict:
     return {
-        "event_time": row.timestamp.isoformat(),
-        "ingested_at": row.ingested_at.isoformat(),
+        "event_time": _as_utc(row.timestamp).isoformat(),
+        "ingested_at": _as_utc(row.ingested_at).isoformat(),
         "pce_href": row.pce_href, "pce_event_id": row.pce_event_id,
         "event_type": row.event_type, "severity": row.severity,
         "status": row.status, "pce_fqdn": row.pce_fqdn,
@@ -106,11 +112,8 @@ class ArchiveExporter:
         # 依事件時間 UTC 日分組，一批可落在多個日期檔
         by_day: dict[str, list[bytes]] = {}
         for record, ev_time, _ing, _rid in batch:
-            # SQLite 讀回的 DateTime(timezone=True) 是 naive（tzinfo 被剝除），
-            # 但值本身即 UTC wall-clock；補上 UTC tzinfo 再轉換，避免被誤判為本機時區
-            if ev_time.tzinfo is None:
-                ev_time = ev_time.replace(tzinfo=timezone.utc)
-            day = ev_time.astimezone(timezone.utc).strftime("%Y-%m-%d")
+            # 分日與序列化共用同一 UTC 正規化 helper，避免同根因的 naive-datetime bug 分兩處修
+            day = _as_utc(ev_time).astimezone(timezone.utc).strftime("%Y-%m-%d")
             by_day.setdefault(day, []).append(orjson.dumps(record))
         written: set[str] = set()
         for day, lines in by_day.items():
