@@ -106,6 +106,10 @@ class ArchiveExporter:
         # 依事件時間 UTC 日分組，一批可落在多個日期檔
         by_day: dict[str, list[bytes]] = {}
         for record, ev_time, _ing, _rid in batch:
+            # SQLite 讀回的 DateTime(timezone=True) 是 naive（tzinfo 被剝除），
+            # 但值本身即 UTC wall-clock；補上 UTC tzinfo 再轉換，避免被誤判為本機時區
+            if ev_time.tzinfo is None:
+                ev_time = ev_time.replace(tzinfo=timezone.utc)
             day = ev_time.astimezone(timezone.utc).strftime("%Y-%m-%d")
             by_day.setdefault(day, []).append(orjson.dumps(record))
         written: set[str] = set()
