@@ -229,3 +229,26 @@ def test_process_batch_marks_all_sent_in_one_transaction(sf):
     assert all(r.status == "sent" for r in rows)
     assert all(r.sent_at is not None for r in rows)
     assert counting.begin_calls == 1     # 3 筆成功 → 僅一個寫交易
+
+
+def test_process_batch_mixed_success_and_failure(sf):
+    from src.siem.dispatcher import DestinationDispatcher
+    for i in range(1, 4):
+        _seed_event(sf, i)                      # 3 筆 pending
+    counting = _CountingSF(sf)
+    tr = FailTransport(fail_times=1)            # 第一筆 send 失敗，其餘成功
+    d = DestinationDispatcher("test-dest", counting, _FakeFormatter(), tr, max_retries=5)
+
+    result = d.tick()
+
+    assert result["sent"] == 2
+    assert result["failed"] == 1
+    with sf() as s:
+        rows = s.execute(select(SiemDispatch)).scalars().all()
+    sent = [r for r in rows if r.status == "sent"]
+    pending = [r for r in rows if r.status == "pending"]
+    assert len(sent) == 2
+    assert len(pending) == 1
+    assert pending[0].retries == 1 and pending[0].next_attempt_at is not None
+    # 1 個逐列 retry 交易 + 1 個批次 sent 交易 = 2
+    assert counting.begin_calls == 2

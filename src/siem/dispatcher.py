@@ -20,6 +20,12 @@ def _backoff_seconds(retries: int) -> int:
     return min(2 ** retries * 5, 3600)
 
 
+# SQLite 的 SQLITE_LIMIT_VARIABLE_NUMBER 預設為 999；批次標記 sent 時把
+# id 清單切成 ≤ 此值一組，避免 batch_size 調高（config 允許到 10000）時
+# 觸發 "too many SQL variables"。仍在同一 transaction 內完成（每 tick 一次 commit）。
+_SENT_UPDATE_CHUNK = 900
+
+
 class DestinationDispatcher:
     """Dispatcher for a single SIEM destination."""
 
@@ -122,11 +128,13 @@ class DestinationDispatcher:
         if sent_ids:
             sent_at = datetime.now(timezone.utc)
             with self._sf.begin() as s:
-                s.execute(
-                    update(SiemDispatch)
-                    .where(SiemDispatch.id.in_(sent_ids))
-                    .values(status="sent", sent_at=sent_at)
-                )
+                for i in range(0, len(sent_ids), _SENT_UPDATE_CHUNK):
+                    chunk = sent_ids[i:i + _SENT_UPDATE_CHUNK]
+                    s.execute(
+                        update(SiemDispatch)
+                        .where(SiemDispatch.id.in_(chunk))
+                        .values(status="sent", sent_at=sent_at)
+                    )
 
         return {"sent": sent, "failed": failed, "quarantined": quarantined}
 
