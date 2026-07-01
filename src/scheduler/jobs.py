@@ -164,7 +164,8 @@ def run_cache_archive(cm) -> None:
         cfg = cm.models.pce_cache
         sf = sessionmaker(_get_cache_engine(cfg.db_path))
         exporter = ArchiveExporter(sf, archive_dir=cfg.archive_dir,
-                                   gzip_after_days=cfg.archive_gzip_after_days)
+                                   gzip_after_days=cfg.archive_gzip_after_days,
+                                   retention_days=cfg.archive_retention_days)
         result = exporter.run_once()
         logger.info("Cache archive exported: {}", result)
     except Exception as exc:

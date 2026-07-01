@@ -1293,6 +1293,8 @@
   "gui_cache_archive_gzip_after_days_help": "超過此天數的封存檔會以 gzip 壓縮。",
   "gui_cache_archive_interval_hours": "間隔（小時）",
   "gui_cache_archive_interval_hours_help": "封存匯出工作的執行頻率。",
+  "gui_cache_archive_retention_days": "保存上限（天）",
+  "gui_cache_archive_retention_days_help": "刪除事件日超過此天數的封存檔。0＝永久保留。",
   "gui_cache_async_threshold_events_help": "單次輪詢回傳事件數達到此值時，自動切換為非同步批次匯出模式。高流量 PCE 可提高此值。",
   "gui_cache_card_traffic_agg": "彙總流量",
   "gui_cache_card_traffic_raw": "原始流量",

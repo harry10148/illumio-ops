@@ -7,6 +7,7 @@ def test_archive_defaults_are_off_and_safe():
     assert s.archive_dir == "data/archive"
     assert s.archive_interval_hours == 24
     assert s.archive_gzip_after_days == 7
+    assert s.archive_retention_days == 0  # 0 = 永久保留（不刪 archive 檔）
 
 
 def test_archive_fields_parse_custom_values():
@@ -29,3 +30,13 @@ def test_archive_interval_and_gzip_have_lower_bounds():
         PceCacheSettings(archive_interval_hours=0)
     with pytest.raises(ValidationError):
         PceCacheSettings(archive_gzip_after_days=0)
+
+
+def test_archive_retention_days_bounds_and_custom():
+    import pytest
+    from pydantic import ValidationError
+    # 0 合法（永久保留）；正值合法；負值不合法
+    assert PceCacheSettings(archive_retention_days=0).archive_retention_days == 0
+    assert PceCacheSettings(archive_retention_days=365).archive_retention_days == 365
+    with pytest.raises(ValidationError):
+        PceCacheSettings(archive_retention_days=-1)

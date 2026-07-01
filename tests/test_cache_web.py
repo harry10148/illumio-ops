@@ -63,6 +63,7 @@ def test_put_cache_settings_happy(client, tmp_path):
         "archive_dir": str(tmp_path / "archive"),
         "archive_interval_hours": 6,
         "archive_gzip_after_days": 3,
+        "archive_retention_days": 90,
         "traffic_filter": {
             "actions": ["blocked"],
             "workload_label_env": ["prod"],
@@ -87,6 +88,7 @@ def test_put_cache_archive_roundtrip(client):
         "archive_dir": "/mnt/wormstore/illumio",
         "archive_interval_hours": 6,
         "archive_gzip_after_days": 3,
+        "archive_retention_days": 365,
     }, environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert resp.status_code == 200
     assert resp.get_json()["ok"] is True
@@ -96,6 +98,7 @@ def test_put_cache_archive_roundtrip(client):
     assert got["archive_dir"] == "/mnt/wormstore/illumio"
     assert got["archive_interval_hours"] == 6
     assert got["archive_gzip_after_days"] == 3
+    assert got["archive_retention_days"] == 365
 
 
 def test_put_cache_archive_invalid(client):

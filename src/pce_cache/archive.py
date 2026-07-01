@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import gzip
 import os
+import re
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import orjson
 from loguru import logger
@@ -15,6 +16,9 @@ from src.pce_cache.models import IngestionCursor, PceEvent, PceTrafficFlowRaw
 
 _BATCH = 5000
 _CONSUMER = "archiver"
+# 只匹配 archive 自己產生的檔名（traffic/audit-YYYY-MM-DD.jsonl[.gz]），
+# 讓保存上限的刪除只碰 archive 檔、不誤刪目錄裡其他東西。
+_ARCHIVE_NAME = re.compile(r"^(?:traffic|audit)-(\d{4}-\d{2}-\d{2})\.jsonl(?:\.gz)?$")
 
 
 @dataclass
@@ -76,10 +80,11 @@ class ArchiveExporter:
     """
 
     def __init__(self, session_factory: sessionmaker, archive_dir: str,
-                 gzip_after_days: int = 7):
+                 gzip_after_days: int = 7, retention_days: int = 0):
         self._sf = session_factory
         self._dir = archive_dir
         self._gzip_after_days = gzip_after_days
+        self._retention_days = retention_days
 
     def run_once(self) -> dict[str, ArchiveResult]:
         os.makedirs(self._dir, exist_ok=True)
@@ -87,6 +92,7 @@ class ArchiveExporter:
         for prefix, model, source_table, ev_attr, builder in _SOURCES:
             results[prefix] = self._export_source(prefix, model, source_table, ev_attr, builder)
         self._gzip_old_files()
+        self._purge_old_files()
         return results
 
     def _export_source(self, prefix, model, source_table, ev_attr, builder) -> ArchiveResult:
@@ -186,3 +192,29 @@ class ArchiveExporter:
                 os.remove(path)  # 只有 .gz 成功寫入後才刪原檔
             except OSError as exc:
                 logger.warning("archive gzip skipped {}: {}", path, exc)
+
+    def _purge_old_files(self) -> None:
+        # retention_days=0（或負）→ 永久保留，不刪任何 archive 檔。
+        if self._retention_days <= 0:
+            return
+        cutoff = datetime.now(timezone.utc).date() - timedelta(days=self._retention_days)
+        try:
+            names = os.listdir(self._dir)
+        except OSError as exc:
+            logger.warning("archive purge skipped {} (listdir failed): {}", self._dir, exc)
+            return
+        for name in names:
+            m = _ARCHIVE_NAME.match(name)
+            if not m:
+                continue
+            try:
+                file_date = date.fromisoformat(m.group(1))
+            except ValueError:
+                continue
+            # 依「檔名事件日」判斷（非 mtime）：只刪事件日早於保存期界線的 archive 檔。
+            if file_date < cutoff:
+                path = os.path.join(self._dir, name)
+                try:
+                    os.remove(path)
+                except OSError as exc:
+                    logger.warning("archive purge skipped {}: {}", path, exc)

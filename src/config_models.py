@@ -250,6 +250,7 @@ class PceCacheSettings(_Base):
     archive_dir: str = "data/archive"
     archive_interval_hours: int = Field(default=24, ge=1)
     archive_gzip_after_days: int = Field(default=7, ge=1)
+    archive_retention_days: int = Field(default=0, ge=0)  # 0 = 永久保留（不刪 archive 檔）
 
 
 class SiemDestinationSettings(_Base):

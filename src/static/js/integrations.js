@@ -227,6 +227,9 @@ function buildCacheForm(s) {
     + '<input type="number" name="archive_gzip_after_days" min="1" value="' + Number(s.archive_gzip_after_days || 7) + '">'
     + '<small class="form-text text-muted" data-i18n="gui_cache_archive_gzip_after_days_help"></small></div>'
     + '</div>'
+    + '<div class="form-group"><label data-i18n="gui_cache_archive_retention_days">Retention limit (days)</label>'
+    + '<input type="number" name="archive_retention_days" min="0" value="' + Number(s.archive_retention_days || 0) + '">'
+    + '<small class="form-text text-muted" data-i18n="gui_cache_archive_retention_days_help"></small></div>'
     + '</fieldset>'
     + '<fieldset>'
     + '<legend data-i18n="gui_cache_sec_polling">Polling (seconds)</legend>'
@@ -277,6 +280,7 @@ async function cacheSave() {
     archive_dir: data.archive_dir,
     archive_interval_hours: Number(data.archive_interval_hours),
     archive_gzip_after_days: Number(data.archive_gzip_after_days),
+    archive_retention_days: Number(data.archive_retention_days),
     traffic_filter: (typeof window.collectTrafficFilter === 'function')
       ? window.collectTrafficFilter() : existing.traffic_filter,
     traffic_sampling: (typeof window.collectTrafficSampling === 'function')

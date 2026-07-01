@@ -8,6 +8,7 @@ def _cm(tmp_path, archive_enabled=True):
     cfg.archive_enabled = archive_enabled
     cfg.archive_dir = str(tmp_path / "archive")
     cfg.archive_gzip_after_days = 7
+    cfg.archive_retention_days = 90
     return cm
 
 
@@ -23,6 +24,7 @@ def test_run_cache_archive_invokes_exporter(tmp_path):
     _args, kwargs = mock_exp.call_args
     assert kwargs.get("archive_dir") == cm.models.pce_cache.archive_dir
     assert kwargs.get("gzip_after_days") == 7
+    assert kwargs.get("retention_days") == 90
     mock_exp.return_value.run_once.assert_called_once()
 
 

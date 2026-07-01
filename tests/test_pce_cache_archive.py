@@ -279,3 +279,46 @@ def test_gzip_old_files_swallows_non_missing_oserror_from_listdir(sf, archive_di
     monkeypatch.setattr(archive_mod.os, "listdir", _raise_permission_error)
 
     ArchiveExporter(sf, archive_dir)._gzip_old_files()  # 不應拋錯
+
+
+def test_purge_disabled_by_default_keeps_files(sf, archive_dir):
+    from src.pce_cache.archive import ArchiveExporter
+    # 預設 retention_days=0 → 永久保留，不刪任何 archive 檔
+    old = os.path.join(archive_dir, "traffic-2020-01-01.jsonl")
+    with open(old, "wb") as fh:
+        fh.write(b'{"flow_hash": "x"}\n')
+    ArchiveExporter(sf, archive_dir)._purge_old_files()
+    assert os.path.exists(old)
+
+
+def test_purge_deletes_files_older_than_retention_by_event_date(sf, archive_dir):
+    from datetime import datetime, timezone, timedelta
+    from src.pce_cache.archive import ArchiveExporter
+    today = datetime.now(timezone.utc).date()
+    old_date = (today - timedelta(days=40)).isoformat()
+    recent_date = (today - timedelta(days=3)).isoformat()
+
+    old_jsonl = os.path.join(archive_dir, f"traffic-{old_date}.jsonl")
+    old_gz = os.path.join(archive_dir, f"audit-{old_date}.jsonl.gz")
+    recent_jsonl = os.path.join(archive_dir, f"traffic-{recent_date}.jsonl")
+    for p in (old_jsonl, recent_jsonl):
+        with open(p, "wb") as fh:
+            fh.write(b'{"flow_hash": "x"}\n')
+    with gzip.open(old_gz, "wb") as fh:
+        fh.write(b'{"pce_event_id": "e"}\n')
+
+    ArchiveExporter(sf, archive_dir, retention_days=30)._purge_old_files()
+
+    assert not os.path.exists(old_jsonl)   # 事件日 40 天前 > 30 → 刪
+    assert not os.path.exists(old_gz)      # .gz 同樣依檔名事件日刪
+    assert os.path.exists(recent_jsonl)    # 3 天前 < 30 → 保留
+
+
+def test_purge_ignores_non_archive_files(sf, archive_dir):
+    from src.pce_cache.archive import ArchiveExporter
+    other = os.path.join(archive_dir, "not-an-archive.txt")
+    with open(other, "wb") as fh:
+        fh.write(b"keep me\n")
+    # 即使很短的保存期，也只刪符合 archive 命名規則（traffic/audit-YYYY-MM-DD）的檔
+    ArchiveExporter(sf, archive_dir, retention_days=1)._purge_old_files()
+    assert os.path.exists(other)
