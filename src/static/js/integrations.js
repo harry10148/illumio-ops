@@ -1400,7 +1400,7 @@ function _buildOvPipelineHealth(health) {
     + '</div>';
 }
 
-function _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq, throughput) {
+function _buildOvCards(cache, destCount, totalPending, totalSent, totalFailed, totalDlq, throughput) {
   var siemClass = totalFailed > 0 ? 'card-err' : 'card-ok';
   var dlqClass  = totalDlq  > 0 ? 'card-warn' : 'card-ok';
   var cacheEvents  = Number(cache.events      || 0);
@@ -1428,8 +1428,8 @@ function _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, 
     + '</div>'
     + '<div class="card card-neutral">'
     + '<div class="label" data-i18n="gui_ov_siem_destinations">SIEM Destinations</div>'
-    + '<div class="value">' + siemStatus.length + '</div>'
-    + '<div style="font-size:.75rem;color:var(--dim);">' + _t('gui_ov_destinations_fmt').replace('{n}', siemStatus.length) + '</div>'
+    + '<div class="value">' + destCount + '</div>'
+    + '<div style="font-size:.75rem;color:var(--dim);">' + _t('gui_ov_destinations_fmt').replace('{n}', destCount) + '</div>'
     + '</div>'
     + '<div class="card ' + siemClass + '">'
     + '<div class="label" data-i18n="gui_ov_siem_queue">SIEM Queue</div>'
@@ -1481,7 +1481,7 @@ window._integrations.setRender('overview', async function renderOverview() {
   if (!el) return;
   el.innerHTML = '<p class="subtitle" data-i18n="gui_it_loading">Loading...</p>';
 
-  var cache, siem, settings, health, throughput;
+  var cache, siem, settings, health, throughput, dests;
   try {
     var results = await Promise.all([
       fetch('/api/cache/status').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
@@ -1489,12 +1489,14 @@ window._integrations.setRender('overview', async function renderOverview() {
       fetch('/api/settings').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
       fetch('/api/cache/health').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
       fetch('/api/cache/throughput').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
+      fetch('/api/siem/destinations').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
     ]);
     cache      = results[0] || {};
     siem       = results[1] || {status: []};
     settings   = results[2] || {};
     health     = results[3] || {};
     throughput = results[4] || {};
+    dests      = results[5] || null;
   } catch (err) {
     el.textContent = '';
     var p = document.createElement('p');
@@ -1505,6 +1507,10 @@ window._integrations.setRender('overview', async function renderOverview() {
   }
 
   var siemStatus = siem.status || [];
+  // KPI「SIEM 目的地」數應反映目前 config 的目的地，而非 dispatch 歷史裡出現過的
+  // distinct 名稱（改名/刪除的舊目的地會殘留在歷史裡，讓計數偏高）。
+  var configuredDests = dests ? (dests.destinations || dests) : [];
+  var destCount = Array.isArray(configuredDests) ? configuredDests.length : 0;
   var totalPending = 0, totalSent = 0, totalFailed = 0, totalDlq = 0;
   siemStatus.forEach(function(d) {
     totalPending += Number(d.pending || 0);
@@ -1514,7 +1520,7 @@ window._integrations.setRender('overview', async function renderOverview() {
   });
 
   el.innerHTML = _buildOvPipelineHealth(health)
-               + _buildOvCards(cache, siemStatus, totalPending, totalSent, totalFailed, totalDlq, throughput)
+               + _buildOvCards(cache, destCount, totalPending, totalSent, totalFailed, totalDlq, throughput)
                + _buildOvRecentTable(siemStatus)
                + _buildAlertChannelCards(settings);
   if (typeof window.i18nApply === 'function') window.i18nApply();
