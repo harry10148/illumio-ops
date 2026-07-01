@@ -150,10 +150,25 @@ def run_cache_retention(cm) -> None:
             events_days=cfg.events_retention_days,
             traffic_raw_days=cfg.traffic_raw_retention_days,
             traffic_agg_days=cfg.traffic_agg_retention_days,
+            archive_enabled=cfg.archive_enabled,
         )
         logger.info("Cache retention purged: {}", result)
     except Exception as exc:
         logger.exception("run_cache_retention failed: {}", exc)
+
+
+def run_cache_archive(cm) -> None:
+    try:
+        from sqlalchemy.orm import sessionmaker
+        from src.pce_cache.archive import ArchiveExporter
+        cfg = cm.models.pce_cache
+        sf = sessionmaker(_get_cache_engine(cfg.db_path))
+        exporter = ArchiveExporter(sf, archive_dir=cfg.archive_dir,
+                                   gzip_after_days=cfg.archive_gzip_after_days)
+        result = exporter.run_once()
+        logger.info("Cache archive exported: {}", result)
+    except Exception as exc:
+        logger.exception("run_cache_archive failed: {}", exc)
 
 
 def run_ven_summary(cm) -> None:

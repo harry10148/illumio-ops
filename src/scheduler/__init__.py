@@ -129,6 +129,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             from src.scheduler.jobs import (
                 run_events_ingest, run_traffic_ingest,
                 run_traffic_aggregate, run_cache_retention,
+                run_cache_archive,
             )
             from src.pce_cache.lag_monitor import run_cache_lag_monitor
             # Fire ingest jobs ~10s after scheduler start so daemon restarts
@@ -150,6 +151,10 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
                           executor="cache_writer")
             sched.add_job(run_cache_lag_monitor, _IT(seconds=60),
                           args=[cm], id="cache_lag_monitor", replace_existing=True)
+            if cache_cfg.archive_enabled:
+                sched.add_job(run_cache_archive, _IT(hours=cache_cfg.archive_interval_hours),
+                              args=[cm], id="pce_cache_archive", replace_existing=True,
+                              executor="cache_writer")
     except Exception as exc:
         logger.exception("Failed to register pce_cache scheduler jobs: {}", exc)
 
