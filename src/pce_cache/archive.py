@@ -150,7 +150,9 @@ class ArchiveExporter:
         cutoff = time.time() - self._gzip_after_days * 86400
         try:
             names = os.listdir(self._dir)
-        except FileNotFoundError:
+        except OSError as exc:
+            # best-effort 清理：目錄不存在/無權限/非目錄等任何列目錄失敗都安全跳過，不中斷 archive job
+            logger.warning("archive gzip skipped: listdir {} failed: {}", self._dir, exc)
             return
         for name in names:
             if not name.endswith(".jsonl"):

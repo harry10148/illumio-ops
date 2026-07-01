@@ -207,6 +207,26 @@ def test_gzip_is_idempotent_and_skips_already_gzipped(sf, archive_dir):
         fh.write(b'{"flow_hash": "x"}\n')
     old_mtime = time.time() - 30 * 86400
     os.utime(gz, (old_mtime, old_mtime))
+    with open(gz, "rb") as fh:
+        before = fh.read()
     # 不應拋錯、也不應動既有 .gz
     exporter._gzip_old_files()
     assert os.path.exists(gz)
+    # 路徑不變不代表內容沒被重寫：確認 bytes 前後一致，偵測「跳過邏輯失效但重複寫入同路徑」的迴歸
+    with open(gz, "rb") as fh:
+        after = fh.read()
+    assert after == before
+
+
+def test_gzip_old_files_swallows_non_missing_oserror_from_listdir(sf, archive_dir, monkeypatch):
+    from src.pce_cache import archive as archive_mod
+    from src.pce_cache.archive import ArchiveExporter
+
+    def _raise_permission_error(_path):
+        raise PermissionError("denied")
+
+    # os.listdir 可能丟出 FileNotFoundError 以外的 OSError（例如權限不足、非目錄），
+    # 這是 best-effort 清理常式，任何列目錄失敗都應安全跳過而非中斷 archive job
+    monkeypatch.setattr(archive_mod.os, "listdir", _raise_permission_error)
+
+    ArchiveExporter(sf, archive_dir)._gzip_old_files()  # 不應拋錯
