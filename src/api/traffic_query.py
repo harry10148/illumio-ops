@@ -450,11 +450,16 @@ class TrafficQueryBuilder:
 
     # ── Submit+stream flow ───────────────────────────────────────────────
 
-    def _submit_and_stream_async_query(self, payload, compute_draft=False):
-        """Submit an async query and stream its downloaded results."""
+    def _submit_and_stream_async_query(self, payload, compute_draft=False, rate_limit=False):
+        """Submit an async query and stream its downloaded results.
+
+        rate_limit 貫穿到這條鏈上每一次實際打 PCE 的 _request 呼叫（submit、
+        poll、update_rules、download）——rate limiter 的語意是「PCE 出站 API
+        呼叫次數」，不是「查詢次數」，每個 HTTP request 都該計數。
+        """
         c = self._client
         url = f"{c.base_url}/traffic_flows/async_queries"
-        status, body = c._request(url, method="POST", data=payload, timeout=10)
+        status, body = c._request(url, method="POST", data=payload, timeout=10, rate_limit=rate_limit)
         if status not in (200, 201, 202):
             text = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
             logger.error(f"API Error {status}: {text}")
@@ -479,7 +484,7 @@ class TrafficQueryBuilder:
         expected_matches = 0
         while time.monotonic() < deadline:
             time.sleep(interval)
-            poll_status, poll_body = c._request(poll_url, timeout=15)
+            poll_status, poll_body = c._request(poll_url, timeout=15, rate_limit=rate_limit)
             if poll_status != 200:
                 continue
 
@@ -515,7 +520,7 @@ class TrafficQueryBuilder:
         if compute_draft:
             update_rules_url = f"{c.api_cfg['url']}/api/v2{job_url}/update_rules"
             logger.info(f"Calling update_rules: PUT {update_rules_url}")
-            ur_status, ur_body = c._request(update_rules_url, method="PUT", data={}, timeout=30)
+            ur_status, ur_body = c._request(update_rules_url, method="PUT", data={}, timeout=30, rate_limit=rate_limit)
             logger.info(f"update_rules response: HTTP {ur_status}")
             if ur_status in (202, 204):
                 ur_text = ur_body.decode('utf-8', errors='replace') if isinstance(ur_body, bytes) else str(ur_body)
@@ -523,7 +528,7 @@ class TrafficQueryBuilder:
                 print(t('waiting_traffic', default='Waiting for traffic calculation...'), end="", flush=True)
                 time.sleep(10)
                 for attempt in range(30):
-                    poll_status, poll_body = c._request(poll_url, timeout=15)
+                    poll_status, poll_body = c._request(poll_url, timeout=15, rate_limit=rate_limit)
                     if poll_status != 200:
                         time.sleep(2)
                         continue
@@ -549,7 +554,7 @@ class TrafficQueryBuilder:
         def _download_rows():
             """Download + parse the gzipped result file into a list of flow dicts.
             Returns None only when the HTTP download itself fails."""
-            dl_status, dl_body = c._request(dl_url, timeout=60)
+            dl_status, dl_body = c._request(dl_url, timeout=60, rate_limit=rate_limit)
             if dl_status != 200:
                 logger.error(f"Download failed: {dl_status}")
                 return None
@@ -602,7 +607,7 @@ class TrafficQueryBuilder:
         for item in rows:
             yield item
 
-    def execute_traffic_query_stream(self, start_time_str, end_time_str, policy_decisions, filters=None, compute_draft=False):
+    def execute_traffic_query_stream(self, start_time_str, end_time_str, policy_decisions, filters=None, compute_draft=False, rate_limit=False):
         """Executes an async traffic query and yields results row by row."""
         c = self._client
         query_spec = self.build_traffic_query_spec(filters)
@@ -642,7 +647,7 @@ class TrafficQueryBuilder:
                 payload.get("sources_destinations_query_op"),
                 payload.get("policy_decisions"),
             )
-            yield from self._submit_and_stream_async_query(payload, compute_draft=compute_draft)
+            yield from self._submit_and_stream_async_query(payload, compute_draft=compute_draft, rate_limit=rate_limit)
         except Exception as e:
             logger.error(f"Query Exception: {e}")
             print(t("api_query_exception", error=str(e)))
@@ -746,7 +751,8 @@ class TrafficQueryBuilder:
         return True
 
     def fetch_traffic_for_report(self, start_time_str, end_time_str,
-                                 policy_decisions=None, filters=None, compute_draft=False):
+                                 policy_decisions=None, filters=None, compute_draft=False,
+                                 rate_limit=False):
         """Convenience wrapper for report generation.
 
         When compute_draft is True the PCE async query also recomputes draft
@@ -759,7 +765,7 @@ class TrafficQueryBuilder:
         query_spec = self.build_traffic_query_spec(filters)
         stream = self.execute_traffic_query_stream(
             start_time_str, end_time_str, policy_decisions, filters=query_spec,
-            compute_draft=compute_draft
+            compute_draft=compute_draft, rate_limit=rate_limit
         )
         records = list(stream)
 

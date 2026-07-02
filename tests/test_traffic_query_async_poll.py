@@ -25,7 +25,7 @@ class _FakeClient:
             f.write(orjson.dumps(records))
         return buf.getvalue()
 
-    def _request(self, url, method="GET", data=None, timeout=None):
+    def _request(self, url, method="GET", data=None, timeout=None, rate_limit=False):
         if method == "POST" and url.endswith("/async_queries"):
             return 202, orjson.dumps(
                 {"href": "/orgs/1/traffic_flows/async_queries/1", "status": "queued"}
@@ -85,7 +85,7 @@ def test_fetch_traffic_for_report_applies_unresolved_native_filters():
     nomatch = {"src": {}, "service": {},
                "dst": {"workload": {"labels": [{"key": "App", "value": "WEB"}]}}}
 
-    def fake_stream(start, end, pds, filters=None, compute_draft=False):
+    def fake_stream(start, end, pds, filters=None, compute_draft=False, rate_limit=False):
         # Simulate native dst_labels resolution failure -> demoted to fallback.
         client.last_traffic_query_diagnostics = {
             "fallback_filters": {"dst_labels": ["App=DB"]},

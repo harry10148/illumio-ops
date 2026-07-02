@@ -163,3 +163,40 @@ def test_get_traffic_flows_async_enforces_max_results(api_client):
     result = api_client.get_traffic_flows_async(max_results=3, since="2026-01-01T00:00:00Z")
 
     assert result == fake_flows[:3]
+
+
+# ── Task F4: get_traffic_flows_async rate_limit wiring ─────────────────────
+
+
+def test_get_traffic_flows_async_threads_rate_limit_to_fetch_traffic_for_report(api_client):
+    """get_traffic_flows_async(rate_limit=True) must actually reach
+    fetch_traffic_for_report, not silently drop the flag — this is the
+    cache-ingest high-frequency caller's expected behaviour."""
+    captured = {}
+
+    def fake_fetch(start_time_str, end_time_str, rate_limit=False, **kw):
+        captured["rate_limit"] = rate_limit
+        return []
+
+    api_client.fetch_traffic_for_report = fake_fetch
+
+    api_client.get_traffic_flows_async(rate_limit=True, since="2026-01-01T00:00:00Z")
+
+    assert captured.get("rate_limit") is True
+
+
+def test_api_client_fetch_traffic_for_report_threads_rate_limit(api_client, monkeypatch):
+    """The facade's fetch_traffic_for_report wrapper must forward rate_limit
+    to the TrafficQueryBuilder implementation."""
+    captured = {}
+
+    def fake_traffic_fetch(start_time_str, end_time_str, policy_decisions=None,
+                           filters=None, compute_draft=False, rate_limit=False):
+        captured["rate_limit"] = rate_limit
+        return []
+
+    monkeypatch.setattr(api_client._traffic, "fetch_traffic_for_report", fake_traffic_fetch)
+
+    api_client.fetch_traffic_for_report("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z", rate_limit=True)
+
+    assert captured.get("rate_limit") is True

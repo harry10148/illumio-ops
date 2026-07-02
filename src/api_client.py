@@ -311,7 +311,9 @@ class ApiClient:
         if since is None:
             since = (datetime.now(timezone.utc) - timedelta(hours=24)).replace(microsecond=0).isoformat()
         with contextlib.redirect_stdout(io.StringIO()):
-            flows = self.fetch_traffic_for_report(start_time_str=since, end_time_str=end_time) or []
+            flows = self.fetch_traffic_for_report(
+                start_time_str=since, end_time_str=end_time, rate_limit=rate_limit
+            ) or []
         # fetch_traffic_for_report has no max_results parameter (native payload
         # always requests MAX_TRAFFIC_RESULTS); enforce the caller's cap here so
         # cache ingestion gets the bound it asked for instead of silently ignoring it.
@@ -410,22 +412,23 @@ class ApiClient:
             start_time_str, end_time_str, policy_decisions, filters=filters
         )
 
-    def _submit_and_stream_async_query(self, payload: dict[str, Any], compute_draft: bool = False) -> Iterator[dict[str, Any]]:
-        yield from self._traffic._submit_and_stream_async_query(payload, compute_draft=compute_draft)
+    def _submit_and_stream_async_query(self, payload: dict[str, Any], compute_draft: bool = False, rate_limit: bool = False) -> Iterator[dict[str, Any]]:
+        yield from self._traffic._submit_and_stream_async_query(payload, compute_draft=compute_draft, rate_limit=rate_limit)
 
-    def execute_traffic_query_stream(self, start_time_str: str, end_time_str: str, policy_decisions: list[str], filters: Any = None, compute_draft: bool = False) -> Iterator[dict[str, Any]]:
+    def execute_traffic_query_stream(self, start_time_str: str, end_time_str: str, policy_decisions: list[str], filters: Any = None, compute_draft: bool = False, rate_limit: bool = False) -> Iterator[dict[str, Any]]:
         yield from self._traffic.execute_traffic_query_stream(
-            start_time_str, end_time_str, policy_decisions, filters=filters, compute_draft=compute_draft
+            start_time_str, end_time_str, policy_decisions, filters=filters, compute_draft=compute_draft,
+            rate_limit=rate_limit
         )
 
     @staticmethod
     def _flow_matches_filters(flow: dict, filters: dict) -> bool:
         return TrafficQueryBuilder._flow_matches_filters(flow, filters)
 
-    def fetch_traffic_for_report(self, start_time_str: str, end_time_str: str, policy_decisions: list[str] | None = None, filters: Any = None, compute_draft: bool = False) -> list[dict[str, Any]]:
+    def fetch_traffic_for_report(self, start_time_str: str, end_time_str: str, policy_decisions: list[str] | None = None, filters: Any = None, compute_draft: bool = False, rate_limit: bool = False) -> list[dict[str, Any]]:
         return self._traffic.fetch_traffic_for_report(
             start_time_str, end_time_str, policy_decisions=policy_decisions, filters=filters,
-            compute_draft=compute_draft
+            compute_draft=compute_draft, rate_limit=rate_limit
         )
 
     def get_last_traffic_query_diagnostics(self) -> dict[str, Any]:
