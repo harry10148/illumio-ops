@@ -71,6 +71,26 @@ def test_import_restores_rows_with_fidelity(sf, archive_dir):
     assert r.last_detected.replace(tzinfo=timezone.utc).hour == 12
 
 
+def test_import_floors_timestamps_to_whole_seconds(sf, archive_dir):
+    # archive 查閱靠「查詢窗=MIN(last_detected) 整秒」使 cover_state=full、不打即時 API。
+    # 匯入時把時間戳 floor 到整秒，讓此不變量與來源精度無關。
+    from src.pce_cache.archive_import import ArchiveImporter
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 1, "action": "allowed",
+           "first_detected": "2026-06-10T11:00:00.777+00:00"}
+    line = orjson.dumps({
+        "event_time": "2026-06-10T12:00:00.5+00:00",
+        "ingested_at": "2026-06-10T12:00:00.5+00:00",
+        "flow_hash": "sub", "src_ip": "1.1.1.1", "dst_ip": "2.2.2.2",
+        "port": 1, "protocol": "tcp", "action": "allowed", "flow_count": 1,
+        "bytes_in": 0, "bytes_out": 0, "raw": raw,
+    })
+    _write(archive_dir, "traffic-2026-06-10.jsonl", [line])
+    ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
+    r = _rows(sf)[0]
+    assert r.last_detected.microsecond == 0
+    assert r.first_detected.microsecond == 0
+
+
 def test_import_reads_gzip_and_filters_by_range(sf, archive_dir):
     from src.pce_cache.archive_import import ArchiveImporter
     raw = {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 80, "action": "allowed"}

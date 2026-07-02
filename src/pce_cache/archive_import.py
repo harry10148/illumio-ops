@@ -21,7 +21,12 @@ def _parse_dt(s: str) -> datetime:
     if s.endswith("Z"):
         s = s[:-1] + "+00:00"
     dt = datetime.fromisoformat(s)
-    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+    dt = dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+    # Floor 到整秒：archive 查閱把查詢窗設為 MIN(last_detected) 的整秒字串
+    # （actions.py 用 strftime("...%SZ")）。若時間戳帶次秒精度，start < earliest
+    # 會讓 CacheReader.cover_state 判 partial → fallback 打即時 PCE API，破壞
+    # 「archive 查閱只讀 review DB」的不變量。整秒化使該不變量與來源精度無關。
+    return dt.replace(microsecond=0)
 
 
 def _iter_lines(path: str):
