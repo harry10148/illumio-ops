@@ -515,6 +515,8 @@ illumio-ops report policy-diff --email          # generate and send [sends mail]
 
 **Scheduled reports**: can be created in the Web GUI (Reports → Schedules) or the CLI interactive menu. Schedulable types cover traffic/audit/VEN-status/policy-usage; schedules fire while the daemon is running, against the currently active PCE profile.
 
+> **Catch-up on upgrade**: after an upgrade, the first scheduler tick will run once for a schedule whose target time today has already passed and hasn't run yet today (catch-up semantics, limited to one run).
+
 ---
 
 ## 6. Alerts

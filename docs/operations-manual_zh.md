@@ -515,6 +515,8 @@ illumio-ops report policy-diff --email          # 產生並寄出【會寄信】
 
 **排程報表**：可在 Web GUI（Reports → Schedules）或 CLI 互動選單建立。可排程的類型涵蓋 traffic／audit／VEN-status／policy-usage；排程於 daemon 執行時觸發，針對當下作用中的 PCE profile。
 
+> **升級後補跑**：升級後首個排程 tick，若某排程今天的目標時刻已過且今天尚未執行過，會補跑一次（catch-up 語意，以一次為限）。
+
 ---
 
 ## 6. 告警

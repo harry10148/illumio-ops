@@ -250,7 +250,7 @@ class VenStatusGenerator:
                      'paired_at', 'ven_version']
         )
 
-    def _parse_tz(self) -> datetime.timezone:
+    def _parse_tz(self) -> datetime.tzinfo:
         tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
         return parse_tz(tz_str)
 

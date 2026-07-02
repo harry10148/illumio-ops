@@ -4,13 +4,19 @@ Shared timezone helpers for the report engine.
 
 Consolidates timezone parsing and formatting that was previously duplicated
 across report_generator.py and ven_status_generator.py.
+
+IANA 時區名稱（例如 'Asia/Taipei'）委派給 src.tz_utils.resolve_tz 解析，
+避免與其餘呼叫端（reporter、schedulers）分歧；local/UTC/UTC±N 行為保持不變。
 """
 import datetime
 
-def parse_tz(tz_str: str) -> datetime.timezone:
+from src.tz_utils import resolve_tz as _resolve_tz
+
+def parse_tz(tz_str: str) -> datetime.tzinfo:
     """
-    Parse a config timezone string into a datetime.timezone object.
-    Supported formats: 'local', 'UTC', 'UTC+8', 'UTC-5', 'UTC+5.5', etc.
+    Parse a config timezone string into a tzinfo object.
+    Supported formats: 'local', 'UTC', 'UTC+8', 'UTC-5', 'UTC+5.5', IANA
+    names (e.g. 'Asia/Taipei'), etc.
     'local' returns the system's local timezone via UTC offset.
     """
     if not tz_str or tz_str == 'local':
@@ -23,9 +29,9 @@ def parse_tz(tz_str: str) -> datetime.timezone:
         hours_part = float(tz_str[4:])
         total_minutes = int(sign * hours_part * 60)
         return datetime.timezone(datetime.timedelta(minutes=total_minutes))
-    return datetime.timezone.utc
+    return _resolve_tz(tz_str)
 
-def fmt_tz_now(tz: datetime.timezone) -> str:
+def fmt_tz_now(tz: datetime.tzinfo) -> str:
     """Return current time formatted as '2026-03-26 16:30:00 (UTC+08:00)'."""
     now = datetime.datetime.now(tz)
     return fmt_tz_str(now)
