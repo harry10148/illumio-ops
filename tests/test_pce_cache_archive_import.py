@@ -150,35 +150,52 @@ def test_import_skips_rows_missing_required_keys_or_bad_timestamp(sf, archive_di
 
 
 def test_import_truncated_gzip_skips_remainder_and_continues(sf, archive_dir):
-    # 截斷/損壞的 .gz（gzip 輪替中途崩潰的典型場景）：該檔剩餘部分放棄，
-    # 記 warning，不中斷整次匯入，繼續匯入下一檔。
+    # 截斷/損壞的 .gz（gzip 輪替中途崩潰的典型場景）：截斷前已讀出的行照常
+    # 入庫，剩餘部分放棄、記 warning，不中斷整次匯入，繼續匯入下一檔。
+    #
+    # 截斷點的確定性建構：gzip 允許多 member 串接（append 模式輪替即此形態），
+    # 檔案 = 完整 member（3 行）+ 截半的 member（2 行）。第一個 member 自帶
+    # end-of-stream marker，其 3 行保證完整 yield；第二個 member 截半必定在
+    # 迭代中途丟 EOFError。相比「單一 stream 截 N% bytes」，不依賴壓縮率與
+    # 解壓 buffer 行為，避免 flaky。
+    import io
     from src.pce_cache.archive_import import ArchiveImporter
     raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 22, "action": "allowed"}
+
+    def _member(lines):
+        buf = io.BytesIO()
+        with gzip.open(buf, "wb") as fh:
+            for ln in lines:
+                fh.write(ln + b"\n")
+        return buf.getvalue()
+
+    good_part = _member([_traffic_line(h, "2026-06-01", raw) for h in ("t1", "t2", "t3")])
+    bad_part = _member([_traffic_line(h, "2026-06-01", raw) for h in ("lost1", "lost2")])
     path = os.path.join(archive_dir, "traffic-2026-06-01.jsonl.gz")
-    with gzip.open(path, "wb") as fh:
-        fh.write(_traffic_line("truncated", "2026-06-01", raw) + b"\n")
-    # 截斷尾部，破壞 gzip 的 end-of-stream marker，模擬半寫入檔案。
-    with open(path, "rb") as fh:
-        good_bytes = fh.read()
     with open(path, "wb") as fh:
-        fh.write(good_bytes[: len(good_bytes) // 2])
+        fh.write(good_part + bad_part[: len(bad_part) // 2])
 
     _write(archive_dir, "traffic-2026-06-02.jsonl", [_traffic_line("good", "2026-06-02", raw)])
 
     res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
-    assert res["files"] == 2                          # 兩檔都嘗試讀
-    assert {r.flow_hash for r in _rows(sf)} == {"good"}  # 下一檔繼續匯入
+    assert res["files"] == 2                          # 兩檔都嘗試讀（損壞檔仍計入）
+    assert res["rows"] == 4                           # 截斷前 3 行 + 下一檔 1 行
+    # 截斷前已讀出的行確實落進 DB；截斷後的行放棄；下一檔繼續匯入
+    assert {r.flow_hash for r in _rows(sf)} == {"t1", "t2", "t3", "good"}
 
 
 def test_import_flush_db_error_propagates(sf, archive_dir):
     # DB 寫入例外（_flush）不可被 per-line 容錯吞掉，仍須往外傳播。
+    # 刻意丟 ValueError（per-line except 捕的型別之一）：若 _flush 被誤包進
+    # per-line 的 except (KeyError, ValueError)，此測試會失敗——這是範圍
+    # 精確性的判別測試；RuntimeError 測不出這個風險。
     from src.pce_cache.archive_import import ArchiveImporter
     raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 22, "action": "allowed"}
     _write(archive_dir, "traffic-2026-06-10.jsonl", [_traffic_line("boom", "2026-06-10", raw)])
 
     importer = ArchiveImporter(archive_dir, sf)
-    importer._flush = lambda chunk: (_ for _ in ()).throw(RuntimeError("db boom"))
-    with pytest.raises(RuntimeError, match="db boom"):
+    importer._flush = lambda chunk: (_ for _ in ()).throw(ValueError("db boom"))
+    with pytest.raises(ValueError, match="db boom"):
         importer.import_range(date(2026, 6, 1), date(2026, 6, 30))
 
 
