@@ -243,18 +243,40 @@ def _dlq_list(cm):
 
 
 def _dlq_bulk(cm, action):
-    ids = input(f"  DLQ ids to {action} (comma): ").strip()
-    if not ids:
+    from src.siem.dlq import DeadLetterQueue
+
+    raw = input(f"  DLQ ids to {action} (comma): ").strip()
+    if not raw:
         return
-    print(f"  {action} not implemented in CLI (use GUI DLQ tab)")
+    try:
+        ids = [int(x.strip()) for x in raw.split(",") if x.strip()]
+    except ValueError:
+        print("  invalid id list")
+        return
+    sf = _dlq_engine(cm)
+    if action == "replay":
+        for r in DeadLetterQueue(sf).replay_ids(ids):
+            print(f"  [{r['id']}] " + ("replayed" if r["ok"] else r["error"]))
+    else:  # purge: 逐筆刪除選定的 DLQ id（dlq.py 的 purge() 只支援依 destination+
+        # 天數批次刪除，選取特定 id 屬於獨立語意，直接刪除即可，不需擴充 dlq.py）。
+        from sqlalchemy import delete
+        from src.pce_cache.models import DeadLetter
+        with sf.begin() as s:
+            result = s.execute(delete(DeadLetter).where(DeadLetter.id.in_(ids)))
+        print(f"  purged {result.rowcount} entries")
 
 
 def _dlq_purge_all(cm):
+    from src.siem.dlq import DeadLetterQueue
+
     name = input("  destination: ").strip()
     if input(f"  type '{name}' to confirm: ").strip() != name:
         print("  cancelled")
         return
-    print("  purge all not implemented in CLI (use GUI DLQ tab)")
+    # older_than_days=0：cutoff 等於現在，既有的 quarantined_at 一定早於現在，
+    # 等同清空該 destination 的全部 DLQ 項目。
+    removed = DeadLetterQueue(_dlq_engine(cm)).purge(name, older_than_days=0)
+    print(f"  purged {removed} entries for {name}")
 
 
 def _dlq_export(cm):
