@@ -377,22 +377,34 @@ def make_config_blueprint(
                 pid = d.get("id")
                 if not pid:
                     return _err(t("gui_err_pce_id_required", lang=lang))
+                try:
+                    pid = int(pid)
+                except (TypeError, ValueError):
+                    return _err(t("gui_err_invalid_number", lang=lang))
                 updates = {k: d[k] for k in ("name", "url", "org_id", "key", "secret", "verify_ssl") if k in d}
-                if not cm.update_pce_profile(int(pid), updates):
+                if not cm.update_pce_profile(pid, updates):
                     return _err(t("gui_err_pce_profile_not_found", lang=lang))
                 return jsonify({"ok": True})
             elif action == "activate":
                 pid = d.get("id")
                 if not pid:
                     return _err(t("gui_err_pce_id_required", lang=lang))
-                if not cm.activate_pce_profile(int(pid)):
+                try:
+                    pid = int(pid)
+                except (TypeError, ValueError):
+                    return _err(t("gui_err_invalid_number", lang=lang))
+                if not cm.activate_pce_profile(pid):
                     return _err(t("gui_err_pce_profile_not_found", lang=lang))
                 return jsonify({"ok": True})
             elif action == "delete":
                 pid = d.get("id")
                 if not pid:
                     return _err(t("gui_err_pce_id_required", lang=lang))
-                if not cm.remove_pce_profile(int(pid)):
+                try:
+                    pid = int(pid)
+                except (TypeError, ValueError):
+                    return _err(t("gui_err_invalid_number", lang=lang))
+                if not cm.remove_pce_profile(pid):
                     return _err(t("gui_err_pce_profile_not_found", lang=lang))
                 return jsonify({"ok": True})
             else:

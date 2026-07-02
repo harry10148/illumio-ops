@@ -1468,6 +1468,7 @@
   "gui_err_invalid_expire_fmt": "失效時間格式不合法",
   "gui_err_invalid_file_type": "檔案類型無效",
   "gui_err_invalid_ip": "無效 IP 位址",
+  "gui_err_invalid_number": "數值格式不正確。",
   "gui_err_invalid_password_form": "密碼須為 12–512 個字元且與確認密碼相符",
   "gui_err_invalid_path": "路徑無效",
   "gui_err_invalid_time_hhmm": "時間格式不合法（請使用 HH:MM）",

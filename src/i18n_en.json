@@ -1468,6 +1468,7 @@
   "gui_err_invalid_expire_fmt": "Invalid expiration format",
   "gui_err_invalid_file_type": "Invalid file type",
   "gui_err_invalid_ip": "Invalid IP address",
+  "gui_err_invalid_number": "Invalid numeric value.",
   "gui_err_invalid_password_form": "Password must be 12–512 characters and match the confirmation",
   "gui_err_invalid_path": "Invalid path",
   "gui_err_invalid_time_hhmm": "Invalid time format (use HH:MM)",

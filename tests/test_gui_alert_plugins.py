@@ -120,6 +120,70 @@ def test_debug_endpoint_returns_captured_output(client, monkeypatch):
     assert "debug-output-line" in response.json["output"]
 
 
+def test_debug_endpoint_rejects_non_numeric_mins(client):
+    """D2 sub-item 3: bare int(d.get('mins')) must not 500 on bad input."""
+    login = client.post('/api/login', json={
+        "username": "admin",
+        "password": "testpass"
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert login.status_code == 200
+    csrf_token = _csrf(login)
+
+    response = client.post(
+        '/api/actions/debug',
+        json={"mins": "not-a-number", "pd_sel": 3},
+        environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+        headers={'X-CSRF-Token': csrf_token},
+    )
+    assert response.status_code == 400
+    assert response.json["ok"] is False
+
+
+def test_debug_endpoint_rejects_non_numeric_pd_sel(client):
+    login = client.post('/api/login', json={
+        "username": "admin",
+        "password": "testpass"
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert login.status_code == 200
+    csrf_token = _csrf(login)
+
+    response = client.post(
+        '/api/actions/debug',
+        json={"mins": 30, "pd_sel": "all"},
+        environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+        headers={'X-CSRF-Token': csrf_token},
+    )
+    assert response.status_code == 400
+    assert response.json["ok"] is False
+
+
+def test_debug_endpoint_clamps_huge_mins(client, monkeypatch):
+    """D2 sub-item 3: an oversized `mins` must be clamped, not used verbatim,
+    so a client can't force an unbounded PCE traffic-window query."""
+    login = client.post('/api/login', json={
+        "username": "admin",
+        "password": "testpass"
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert login.status_code == 200
+    csrf_token = _csrf(login)
+
+    captured = {}
+
+    def fake_run_debug_mode(self, mins=None, pd_sel=None, interactive=None):
+        captured["mins"] = mins
+
+    monkeypatch.setattr("src.analyzer.Analyzer.run_debug_mode", fake_run_debug_mode)
+
+    response = client.post(
+        '/api/actions/debug',
+        json={"mins": 999999999, "pd_sel": 3},
+        environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+        headers={'X-CSRF-Token': csrf_token},
+    )
+    assert response.status_code == 200
+    assert captured["mins"] == 10080
+
+
 def test_status_includes_alert_channel_health(app_persistent):
     client = app_persistent.test_client()
     login = client.post('/api/login', json={

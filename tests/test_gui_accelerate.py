@@ -59,6 +59,19 @@ def test_accelerate_filters_invalid_hrefs(client, monkeypatch):
     assert captured["hrefs"] == ["/orgs/1/workloads/aaa", "/orgs/1/workloads/bbb"]
 
 
+def test_accelerate_rejects_non_numeric_duration(client):
+    """D2 sub-item 3: bare int(d.get('duration_minutes')) must not 500."""
+    csrf = _login(client)
+    r = client.post(
+        '/api/workloads/accelerate',
+        json={"hrefs": ["/orgs/1/workloads/aaa"], "duration_minutes": "soon"},
+        environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+        headers={'X-CSRF-Token': csrf},
+    )
+    assert r.status_code == 400
+    assert r.json["ok"] is False
+
+
 def test_accelerate_bubbles_partial_failure(client, monkeypatch):
     csrf = _login(client)
     monkeypatch.setattr(

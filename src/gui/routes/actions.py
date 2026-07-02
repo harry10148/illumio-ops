@@ -286,7 +286,10 @@ def make_actions_blueprint(
         d = request.json or {}
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         raw_hrefs = d.get('hrefs', []) or []
-        duration = int(d.get('duration_minutes', 0) or 0)  # logged only
+        try:
+            duration = int(d.get('duration_minutes', 0) or 0)  # logged only
+        except (TypeError, ValueError):
+            return _err(t("gui_err_invalid_number", lang=lang), 400)
         hrefs = [h for h in raw_hrefs if _is_workload_href(h)]
         skipped_invalid = len(raw_hrefs) - len(hrefs)
 
@@ -339,8 +342,15 @@ def make_actions_blueprint(
     def api_debug():
         d = request.json or {}
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
-        mins = int(d.get('mins', 30))
-        pd_sel = int(d.get('pd_sel', 3))
+        try:
+            mins = int(d.get('mins', 30))
+            pd_sel = int(d.get('pd_sel', 3))
+        except (TypeError, ValueError):
+            return _err(t("gui_err_invalid_number", lang=lang), 400)
+        # Clamp to the same window used by the manual traffic/event lookups
+        # (gui/routes/events.py) so a bogus/huge `mins` cannot trigger an
+        # oversized PCE query.
+        mins = max(5, min(mins, 10080))
         from src.api_client import ApiClient
         from src.reporter import Reporter
         from src.analyzer import Analyzer

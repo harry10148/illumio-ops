@@ -85,6 +85,12 @@ def make_rules_blueprint(
         filter_value = d.get('filter_value', '')
         if filter_value == 'pce_health':
             return _err(t("gui_err_pce_health_use_system_form", lang=lang), 400)
+        try:
+            threshold_count = int(d.get('threshold_count', 1))
+            threshold_window = int(d.get('threshold_window', 10))
+            cooldown_minutes = int(d.get('cooldown_minutes', 10))
+        except (TypeError, ValueError):
+            return _err(t("gui_err_invalid_number", lang=lang), 400)
         cm.add_or_update_rule({
             "id": gen_rule_id(),
             "type": "event",
@@ -96,9 +102,9 @@ def make_rules_blueprint(
             "desc": d.get('name', ''),
             "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
             "threshold_type": d.get('threshold_type', 'immediate'),
-            "threshold_count": int(d.get('threshold_count', 1)),
-            "threshold_window": int(d.get('threshold_window', 10)),
-            "cooldown_minutes": int(d.get('cooldown_minutes', 10)),
+            "threshold_count": threshold_count,
+            "threshold_window": threshold_window,
+            "cooldown_minutes": cooldown_minutes,
             "throttle": throttle,
             "match_fields": match_fields,
         })

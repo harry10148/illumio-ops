@@ -210,6 +210,33 @@ def test_event_rule_create_persists_throttle_and_rejects_invalid(client):
     assert bad.json["ok"] is False
 
 
+def test_event_rule_create_rejects_non_numeric_threshold(client):
+    """D2 sub-item 3: bare int(d.get('threshold_count'/'threshold_window'/
+    'cooldown_minutes')) must not 500 on non-numeric input."""
+    login = client.post('/api/login', json={
+        "username": "admin",
+        "password": "testpass"
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert login.status_code == 200
+    csrf_token = _csrf(login)
+
+    for bad_field in ("threshold_count", "threshold_window", "cooldown_minutes"):
+        payload = {
+            "name": "Bad numeric rule",
+            "filter_value": "request.authentication_failed",
+            "threshold_type": "count",
+            "threshold_count": 2,
+            "threshold_window": 10,
+            "cooldown_minutes": 5,
+        }
+        payload[bad_field] = "oops"
+        res = client.post('/api/rules/event', json=payload,
+                          environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                          headers={'X-CSRF-Token': csrf_token})
+        assert res.status_code == 400, f"{bad_field} should be rejected with 400"
+        assert res.json["ok"] is False
+
+
 def test_rules_api_returns_throttle_state(client, monkeypatch, tmp_path):
     login = client.post('/api/login', json={
         "username": "admin",
