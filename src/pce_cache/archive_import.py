@@ -8,6 +8,7 @@ from datetime import date, datetime, timezone
 
 import orjson
 from loguru import logger
+from sqlalchemy import case, func
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import sessionmaker
 
@@ -85,6 +86,14 @@ class ArchiveImporter:
         self._sf = session_factory
 
     def import_range(self, start: date, end: date) -> dict:
+        """匯入 [start, end]（含端點）範圍內的 traffic archive 到 review DB。
+
+        回傳形狀不變：{"rows", "files", "skipped", "start", "end"}。F6 起
+        `rows` 的語意從「新插入列數」改成「本次匯入被 upsert 的列數」（新插入
+        +合併更新皆計入，見 `_flush` docstring）——同一 flow_hash 在較晚的
+        export 檔案裡帶著成長後的值再次出現時，不再被當成單純的重複捨棄，
+        而是合併進既有列；仍計入 `skipped` 的只剩真正無法解析的列（缺
+        必要欄位／時間戳格式非法／raw 為 null）。"""
         from src.report.parsers.api_parser import flatten_flow_record
         files = skipped = rows = 0
         pending: list[dict] = []
@@ -155,19 +164,48 @@ class ArchiveImporter:
                 "start": start.isoformat(), "end": end.isoformat()}
 
     def _flush(self, chunk: list[dict]) -> tuple[int, int]:
-        """500 列/transaction 的 chunked upsert：以 flow_hash 為 unique key
-        做 on_conflict_do_nothing，不再靠 IntegrityError 逐列去重。同批（或
-        跨批但已落地）內的重複 flow_hash 只留第一筆；rowcount 即實際插入數，
-        批內筆數與 rowcount 的差額即該批的重複數。"""
+        """500 列/transaction 的 chunked upsert：以 flow_hash 為 unique key。
+
+        F6 前是 on_conflict_do_nothing——同 flow_hash 重複匯出時，後到的列
+        （通常帶著 re-pull 後成長的值）被整批丟棄，是 archive 計數低於 live
+        cache 的根因之一。現在改成 on_conflict_do_update，volatile 欄位取
+        MAX、first_detected 取 MIN（比照 aggregator.py／ingestor_traffic.py
+        既有的 GREATEST 語意，對亂序重匯不會縮小、重複匯入同一份 idempotent）：
+          - last_detected / bytes_in / bytes_out / flow_count / ingested_at
+            取 MAX。
+          - first_detected 取 MIN（同 flow_hash 理論上 first_detected 恆等，
+            因為 flow_hash 的計算本身就包含 first_detected；取 MIN 只是
+            防禦性對齊，不影響正常情況）。
+          - raw_json / report_json 取「較新 last_detected 那一側」：CASE WHEN
+            excluded.last_detected >= 既有值 THEN 用 excluded 側、否則維持
+            既有值——避免舊 export 事後重匯，把新 export 的內容蓋回舊快照。
+
+        SQLite 對同一條 INSERT 陳述式裡的多列會依序套用 upsert（後面的列可以
+        conflict 到同陳述式裡前面剛插入的列），所以批內重複 flow_hash 也會
+        正確依序合併，不需要額外的 Python 端去重。
+
+        統計語意：回傳值第一項從「新插入列數」改成「本批被 upsert 的列數」
+        （新插入+合併更新皆計入，rowcount 已完整涵蓋兩者）；upsert 不會丟列，
+        第二項（skipped 差額）理論上恆為 0，保留計算方式只是防禦未來若換成
+        會丟列的 upsert 變體。"""
         with self._sf.begin() as s:
-            stmt = (
-                sqlite_insert(PceTrafficFlowRaw)
-                .values(chunk)
-                .on_conflict_do_nothing(index_elements=["flow_hash"])
-            )
+            cols = PceTrafficFlowRaw.__table__.c
+            base = sqlite_insert(PceTrafficFlowRaw).values(chunk)
+            newer = base.excluded.last_detected >= cols.last_detected
+            set_ = {
+                "last_detected": func.max(cols.last_detected, base.excluded.last_detected),
+                "first_detected": func.min(cols.first_detected, base.excluded.first_detected),
+                "bytes_in": func.max(cols.bytes_in, base.excluded.bytes_in),
+                "bytes_out": func.max(cols.bytes_out, base.excluded.bytes_out),
+                "flow_count": func.max(cols.flow_count, base.excluded.flow_count),
+                "ingested_at": func.max(cols.ingested_at, base.excluded.ingested_at),
+                "raw_json": case((newer, base.excluded.raw_json), else_=cols.raw_json),
+                "report_json": case((newer, base.excluded.report_json), else_=cols.report_json),
+            }
+            stmt = base.on_conflict_do_update(index_elements=["flow_hash"], set_=set_)
             result = s.execute(stmt)
-            inserted = result.rowcount
-        return inserted, len(chunk) - inserted
+            upserted = result.rowcount
+        return upserted, len(chunk) - upserted
 
 
 def review_db_path(cfg) -> str:

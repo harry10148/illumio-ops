@@ -103,6 +103,64 @@ def test_export_import_round_trip_preserves_first_detected_absent_from_raw(sf, t
     assert r.last_detected.replace(tzinfo=timezone.utc) == last_detected
 
 
+def test_reimport_same_flow_hash_merges_volatile_columns_via_max(sf, archive_dir):
+    # F6：同 flow_hash 在兩個不同 export 快照（例如 re-pull 後 ingested_at 被
+    # bump、再次被 archiver 撿到匯出）以「取較大值」合併，而非讓後到的列
+    # 覆蓋或丟棄前一筆——即使順序顛倒（較小值的列後到）也不能讓已合併出的
+    # 較大值被縮小。
+    from src.pce_cache.archive_import import ArchiveImporter
+    raw_small = {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 443, "action": "blocked"}
+    raw_big = {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 443, "action": "blocked",
+               "note": "grown"}
+    small = orjson.dumps({
+        "event_time": "2026-06-10T12:01:00+00:00", "ingested_at": "2026-06-10T12:01:00+00:00",
+        "first_detected": "2026-06-10T12:00:00+00:00",
+        "flow_hash": "grow", "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2",
+        "port": 443, "protocol": "tcp", "action": "blocked",
+        "flow_count": 1, "bytes_in": 100, "bytes_out": 200, "raw": raw_small,
+    })
+    big = orjson.dumps({
+        "event_time": "2026-06-10T12:30:00+00:00", "ingested_at": "2026-06-10T12:30:00+00:00",
+        "first_detected": "2026-06-10T12:00:00+00:00",
+        "flow_hash": "grow", "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2",
+        "port": 443, "protocol": "tcp", "action": "blocked",
+        "flow_count": 5, "bytes_in": 900, "bytes_out": 1200, "raw": raw_big,
+    })
+    # 較大值先出現、較小值後到（out-of-order re-export）：MAX 合併不可被縮小。
+    _write(archive_dir, "traffic-2026-06-10.jsonl", [big, small])
+
+    res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
+    assert res["rows"] == 2 and res["skipped"] == 0
+    r = _rows(sf)[0]
+    assert r.bytes_in == 900 and r.bytes_out == 1200 and r.flow_count == 5
+    assert r.last_detected.replace(tzinfo=timezone.utc).minute == 30
+    # raw_json/report_json 取「較新 last_detected」那一側 → 應是 raw_big，不是後到的 raw_small
+    assert orjson.loads(r.raw_json) == raw_big
+
+
+def test_reimport_same_archive_file_twice_is_idempotent(sf, archive_dir):
+    # 自我檢查：同一份 archive 檔案重複匯入兩次，最終狀態必須跟只匯入一次
+    # 完全相同（MAX/MIN merge 對相同輸入是冪等的）。
+    from src.pce_cache.archive_import import ArchiveImporter
+    raw = {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 443, "action": "blocked"}
+    _write(archive_dir, "traffic-2026-06-10.jsonl", [_traffic_line("idem", "2026-06-10", raw)])
+
+    importer = ArchiveImporter(archive_dir, sf)
+    importer.import_range(date(2026, 6, 1), date(2026, 6, 30))
+    with sf() as s:
+        first_state = [(r.flow_hash, r.bytes_in, r.bytes_out, r.flow_count,
+                        r.last_detected, r.first_detected, r.raw_json)
+                       for r in s.execute(select(PceTrafficFlowRaw)).scalars().all()]
+
+    importer.import_range(date(2026, 6, 1), date(2026, 6, 30))  # 再匯一次同一份檔案
+    with sf() as s:
+        second_state = [(r.flow_hash, r.bytes_in, r.bytes_out, r.flow_count,
+                         r.last_detected, r.first_detected, r.raw_json)
+                        for r in s.execute(select(PceTrafficFlowRaw)).scalars().all()]
+
+    assert first_state == second_state
+
+
 def test_import_falls_back_to_raw_first_detected_for_old_archives_without_top_level_field(sf, archive_dir):
     """向後相容：舊格式 archive（沒有頂層 first_detected 欄位）仍必須能透過
     raw 回推 fallback 正常載入，不因新增頂層欄位而退化。"""
@@ -159,12 +217,14 @@ def test_import_reads_gzip_and_filters_by_range(sf, archive_dir):
     assert {r.flow_hash for r in _rows(sf)} == {"g1"}
 
 
-def test_import_skips_null_raw_and_dedups(sf, archive_dir):
+def test_import_skips_null_raw_and_merges_same_flow_hash(sf, archive_dir):
+    # F6：同 flow_hash 不再是「去重丟棄」而是 upsert 合併，計入 rows；
+    # 只有真正無法解析的列（raw=None）才計入 skipped。
     from src.pce_cache.archive_import import ArchiveImporter
     raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 22, "action": "allowed"}
     lines = [
         _traffic_line("dup", "2026-06-10", raw),
-        _traffic_line("dup", "2026-06-10", raw),          # 同 flow_hash → 去重
+        _traffic_line("dup", "2026-06-10", raw),          # 同 flow_hash → 合併（非丟棄）
         orjson.dumps({"event_time": "2026-06-10T12:00:00+00:00",
                       "ingested_at": "2026-06-10T12:00:00+00:00",
                       "flow_hash": "nullraw", "raw": None}),  # raw=None → skip
@@ -172,7 +232,7 @@ def test_import_skips_null_raw_and_dedups(sf, archive_dir):
     _write(archive_dir, "traffic-2026-06-10.jsonl", lines)
 
     res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
-    assert res["rows"] == 1 and res["skipped"] == 2
+    assert res["rows"] == 2 and res["skipped"] == 1
     assert {r.flow_hash for r in _rows(sf)} == {"dup"}
 
 
@@ -273,29 +333,30 @@ def test_import_flush_db_error_propagates_from_in_loop_chunk_flush(sf, archive_d
         importer.import_range(date(2026, 6, 1), date(2026, 6, 30))
 
 
-def test_import_dedups_multiple_rows_within_same_batch(sf, archive_dir):
-    # 同一批（500 列/transaction）內有 3 筆重複 flow_hash：只留第一筆，
-    # skipped 由 rowcount 差額推得（3 筆嘗試 - 1 筆實際插入 = 2）。
+def test_import_merges_multiple_rows_within_same_batch(sf, archive_dir):
+    # F6：同一批（500 列/transaction）內有 3 筆重複 flow_hash：一律 upsert，
+    # SQLite 對同陳述式內的多列依序套用 conflict，全部 3 筆都計入 rows
+    # （1 次插入 + 2 次合併更新），最終只留一筆實際 DB 列（flow_hash unique）。
     from src.pce_cache.archive_import import ArchiveImporter
     raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 22, "action": "allowed"}
     lines = [_traffic_line("triple", "2026-06-10", raw) for _ in range(3)]
     _write(archive_dir, "traffic-2026-06-10.jsonl", lines)
 
     res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
-    assert res["rows"] == 1 and res["skipped"] == 2
+    assert res["rows"] == 3 and res["skipped"] == 0
     assert {r.flow_hash for r in _rows(sf)} == {"triple"}
 
 
-def test_import_dedups_across_files(sf, archive_dir):
-    # 同 flow_hash 出現在不同 archive 檔案（跨檔案）：仍靠 flow_hash unique
-    # 約束只留一筆，統計（rows/skipped/files）需正確反映跨檔案的重複。
+def test_import_merges_across_files(sf, archive_dir):
+    # F6：同 flow_hash 出現在不同 archive 檔案（跨檔案）：upsert 合併，兩筆都
+    # 計入 rows；最終只留一筆實際 DB 列（flow_hash unique）。
     from src.pce_cache.archive_import import ArchiveImporter
     raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 22, "action": "allowed"}
     _write(archive_dir, "traffic-2026-06-10.jsonl", [_traffic_line("cross", "2026-06-10", raw)])
     _write(archive_dir, "traffic-2026-06-11.jsonl", [_traffic_line("cross", "2026-06-11", raw)])
 
     res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
-    assert res["rows"] == 1 and res["skipped"] == 1 and res["files"] == 2
+    assert res["rows"] == 2 and res["skipped"] == 0 and res["files"] == 2
     assert {r.flow_hash for r in _rows(sf)} == {"cross"}
 
 

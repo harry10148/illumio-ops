@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -251,6 +251,46 @@ def test_enqueue_new_records_does_not_backfill_traffic_to_audit_only_destination
     assert len(rows) == 1
     assert rows[0].source_table == "pce_events"
     assert rows[0].destination == "audit-dest"
+
+
+def test_enqueue_new_records_not_reenqueued_after_ingested_at_bump(sf):
+    """F6 副作用鎖定：re-pull 一筆已 dispatch 過的 traffic flow 會把
+    ingested_at bump（見 ingestor_traffic.py），但 id 不變。安全網補登的
+    anti-join 以 (source_table, source_id, destination) 判斷，不看
+    ingested_at，所以 bump 後該 (row, destination) pair 已有 dispatch row，
+    不會被 enqueue_new_records 誤判成「缺 dispatch」而重複派送。"""
+    from src.siem.dispatcher import enqueue_new_records
+    from src.pce_cache.models import PceTrafficFlowRaw, SiemDispatch
+
+    now = datetime.now(timezone.utc)
+    with sf.begin() as s:
+        flow = PceTrafficFlowRaw(
+            flow_hash="hash-bump", src_ip="1.2.3.4", dst_ip="5.6.7.8", port=443,
+            protocol="tcp", action="allowed", flow_count=1, bytes_in=0, bytes_out=0,
+            first_detected=now, last_detected=now, raw_json="{}", ingested_at=now,
+        )
+        s.add(flow)
+        s.flush()
+        flow_id = flow.id
+        s.add(SiemDispatch(
+            source_table="pce_traffic_flows_raw", source_id=flow_id,
+            destination="test-dest", status="sent", retries=0, queued_at=now,
+        ))
+
+    # 模擬 re-pull：ingest 端 upsert 把 ingested_at bump 到更晚的時間，id 不變。
+    with sf.begin() as s:
+        row = s.get(PceTrafficFlowRaw, flow_id)
+        row.ingested_at = now + timedelta(minutes=5)
+        row.bytes_in = 900
+
+    created = enqueue_new_records(sf, {"pce_traffic_flows_raw": ["test-dest"]})
+
+    assert created == 0   # 已有 dispatch row，bump 不觸發重複派送
+    with sf() as s:
+        dispatches = s.execute(
+            select(SiemDispatch).where(SiemDispatch.source_id == flow_id)
+        ).scalars().all()
+    assert len(dispatches) == 1
 
 
 def test_enqueue_new_records_scan_count_independent_of_destination_count(sf):

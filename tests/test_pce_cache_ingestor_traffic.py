@@ -200,6 +200,27 @@ def test_repulled_flow_does_not_reenqueue_siem(session_factory):
     assert len(dispatches) == 1
 
 
+def test_repulled_flow_bumps_ingested_at(session_factory):
+    """F6：re-pull 一筆既有 flow（同 flow_hash）必須把 ingested_at bump 到本次
+    ingest 時間，而非凍結在首次插入時的值——archiver 的匯出游標依
+    (ingested_at, id) 前進，不 bump 就永遠不會重新撿到這筆持續成長的列，
+    造成長壽 flow 的 archive 計數系統性低於 live cache（根因）。"""
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    ing = TrafficIngestor(api=BumpingApiClient(), session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory))
+    ing.run_once()
+    with session_factory() as s:
+        first_ingested_at = s.execute(select(PceTrafficFlowRaw)).scalar_one().ingested_at
+
+    ing.run_once()  # re-pull：同 flow_hash，只更新
+    with session_factory() as s:
+        second_ingested_at = s.execute(select(PceTrafficFlowRaw)).scalar_one().ingested_at
+
+    assert second_ingested_at > first_ingested_at
+
+
 def test_since_cursor_attaches_utc_offset_to_naive_watermark(session_factory):
     """Regression: SQLite reads last_timestamp back NAIVE, so the emitted `since`
     had no tz offset and the PCE rejected it (HTTP 406 invalid_timestamp). The

@@ -25,6 +25,13 @@ class RetentionWorker:
         dispatch_days: int = 14,
         archive_enabled: bool = False,
     ) -> dict[str, int]:
+        """刪除依 ingested_at 早於保留期限的列（見下方 delete）。
+
+        F6：ingest 端 re-pull 既有 flow 時會把 ingested_at bump 到本次 ingest
+        時間（ingestor_traffic.py）。這會連帶延長該列在這裡的存活期限——
+        語意上是合理的：一筆持續被 re-pull（代表仍活躍）的 flow，本就不該
+        被當成陳舊資料清掉；只有真正不再出現在 PCE 回應裡的 flow，其
+        ingested_at 才會停止推進、如常在保留期限到期後被刪除。"""
         now = datetime.now(timezone.utc)
         results: dict[str, int] = {}
 

@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import PceEvent
@@ -92,6 +92,42 @@ def test_processor_success_advances_cursor(session_factory):
     out = sub.poll_new_rows(processor=seen.extend)
     assert len(out) == 1 and len(seen) == 1
     assert sub.poll_new_rows() == []
+
+
+def test_subscriber_rereads_row_after_ingested_at_bump(session_factory):
+    """F6 副作用鎖定：ingest 端 re-pull 一筆既有 flow 會把 ingested_at bump
+    到本次 ingest 時間（見 ingestor_traffic.py）。CacheSubscriber 的游標同樣
+    依 (ingested_at, id) 前進，所以已經讀過這筆列的 subscriber 會在下一次
+    poll 重新讀到它——這是 at-least-once 語意本就允許、預期中的行為（並非
+    需要修的 bug），這裡明文鎖定，避免日後被誤當成迴歸修掉。"""
+    from src.pce_cache.subscriber import CacheSubscriber
+    from src.pce_cache.models import PceTrafficFlowRaw
+
+    def _seed_flow(ingested_at):
+        with session_factory.begin() as s:
+            s.add(PceTrafficFlowRaw(
+                flow_hash="bump1", src_ip="10.0.0.1", src_workload="web",
+                dst_ip="10.0.0.2", dst_workload="db", port=443, protocol="tcp",
+                action="blocked", flow_count=1, bytes_in=100, bytes_out=200,
+                first_detected=datetime(2026, 4, 19, 9, 0, tzinfo=timezone.utc),
+                last_detected=datetime(2026, 4, 19, 10, 0, tzinfo=timezone.utc),
+                raw_json="{}", ingested_at=ingested_at,
+            ))
+
+    _seed_flow(datetime(2026, 4, 19, 10, 0, tzinfo=timezone.utc))
+    sub = CacheSubscriber(session_factory, "analyzer", "pce_traffic_flows_raw")
+    assert len(sub.poll_new_rows()) == 1
+    assert sub.poll_new_rows() == []   # 沒有新變化時，如常不重讀
+
+    # 模擬 re-pull：同一列（flow_hash 唯一，upsert 更新既有列）的 ingested_at
+    # 被 bump 到更晚的時間。
+    with session_factory.begin() as s:
+        row = s.execute(select(PceTrafficFlowRaw)).scalar_one()
+        row.ingested_at = datetime(2026, 4, 19, 10, 5, tzinfo=timezone.utc)
+
+    rows = sub.poll_new_rows()
+    assert len(rows) == 1   # bump 後預期會重讀，非資料遺失或迴歸
+    assert rows[0]["flow_hash"] == "bump1"
 
 
 def test_ties_on_ingested_at_broken_by_row_id(session_factory):

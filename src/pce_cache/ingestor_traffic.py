@@ -104,6 +104,20 @@ class TrafficIngestor:
         idempotent). The SIEM enqueue must still fire ONLY for genuinely new
         rows, so a pre-upsert snapshot of existing flow_hashes splits new inserts
         from refreshed re-pulls (an upsert's RETURNING covers both).
+
+        conflict 時也把 ingested_at bump 到本次 ingest 時間（excluded.ingested_at）
+        ——archiver（archive.py 的 ArchiveExporter）的匯出游標依 (ingested_at, id)
+        增量前進，若不 bump，一筆 flow 一旦被匯出過，之後即使在這裡持續刷新
+        volatile 欄位，archiver 也不會再撿到它，造成長壽 flow 的 archive 計數
+        系統性低於 live cache（根因修復見 archive.py docstring 與 F6 report）。
+        bump 的副作用（皆已評估為可接受，見 F6 report）：
+          - subscriber（CacheSubscriber，同樣依 (ingested_at, id) 游標）會重讀
+            這筆列——at-least-once 語意本就允許重讀。
+          - SIEM enqueue 不會重複派送：安全網補登（siem/dispatcher.py 的
+            enqueue_new_records）以 (source_table, source_id, destination) 判斷
+            anti-join，bump 不改 id，該 pair 已有 dispatch row 就不會再補登。
+          - retention（依 ingested_at 刪除）：bump 會延長這筆列的存活——語意上
+            合理，活躍 flow 不該被當成陳舊資料清掉。
         """
         from src.report.parsers.api_parser import flatten_flow_record
         now = datetime.now(timezone.utc)
@@ -170,6 +184,8 @@ class TrafficIngestor:
                 set_ = {c: func.max(raw_cols[c], base.excluded[c]) for c in self._VOLATILE}
                 # report_json reflects the (refreshed) counters; take the latest.
                 set_["report_json"] = base.excluded.report_json
+                # re-pull 一律 bump 到本次 ingest 時間，讓 archiver 游標重新看到本列。
+                set_["ingested_at"] = base.excluded.ingested_at
                 stmt = (
                     base
                     .on_conflict_do_update(index_elements=["flow_hash"], set_=set_)

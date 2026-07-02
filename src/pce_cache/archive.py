@@ -81,18 +81,27 @@ class ArchiveExporter:
     非硬體 WORM 檔案系統（後者會拒絕 append/remove）。目錄不可寫時各操作
     以 logger.warning 安全降級，不會腐化既有檔案。
 
-    已知限制（設計決策：只文件化，不改行為）——長壽 flow 的 archive 計數可能
-    低於 live cache：
+    長壽 flow 的成長會被重新匯出（F6 修復，取代舊版「只文件化不改行為」的
+    已知限制）：
       - 匯出游標依 (ingested_at, id) 前進；ingestor 的 upsert（見
-        ingestor_traffic.py 的 on_conflict_do_update）只刷新 volatile 欄位
-        （last_detected/bytes_in/bytes_out/flow_count），不會 bump ingested_at。
-      - 因此一筆 flow 一旦被匯出過（游標已越過它的 ingested_at），之後即使
-        live cache 端持續累積 bytes/flow_count，也不會再被這個增量匯出邏輯
-        撿到——它已經「早於游標」。
-      - 影響：從 archive JSONL 重建的 review DB，對長壽 flow（同一 flow_hash
-        持續被 upsert 更新很久）算出的流量/連線數會反映「首次匯出當下的快照
-        值」，而非 live cache 目前的最新累積值，兩邊對同一 flow 的計數可能不等
-        （review DB 偏低）。短命 flow（一次性、匯出後不再被 upsert）不受影響。
+        ingestor_traffic.py 的 on_conflict_do_update）現在會把 conflict 時的
+        ingested_at bump 到本次 ingest 時間（不再只刷新 last_detected/
+        bytes_in/bytes_out/flow_count 這些 volatile 欄位）。
+      - 因此一筆 flow 即使先前已被匯出過（游標已越過它舊的 ingested_at），
+        只要之後在 live cache 端又被 re-pull 而成長，bump 過的 ingested_at
+        會讓它重新落在游標之後，下一輪 export 會再次撿到它、寫出成長後的值。
+      - import 端（archive_import.py 的 ArchiveImporter._flush）同步改成
+        upsert（取代舊版 on_conflict_do_nothing）：同 flow_hash 的後續匯出以
+        MAX 合併 last_detected/bytes_in/bytes_out/flow_count（first_detected
+        取 MIN；raw_json/report_json 取較新 last_detected 那一側），而不是把
+        後到的成長值整批丟棄。兩端缺一則修復無效：只 bump 不改 import 端，
+        後到的列在匯入時仍會被丟棄；只改 import 端不 bump，archiver 游標根本
+        不會重新撿到該列讓它有機會被再次匯出。
+      - 歷史遺留：F6 修復前產生的 archive 檔案，其中長壽 flow 可能仍停在
+        「首次匯出當下的快照值」；只要該 flow 之後（在修復後的 ingestor 下）
+        再被 re-pull 一次並匯出，import 端的 MAX 合併會自然把 review DB 的值
+        追上最新累積值，不需要手動 backfill。短命 flow（一次性、匯出後不再
+        被 upsert）本就不受影響。
     """
 
     def __init__(self, session_factory: sessionmaker, archive_dir: str,

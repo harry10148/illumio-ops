@@ -641,7 +641,7 @@ illumio-ops cache retention --run             # 立即執行保留清除
 
 > 採增量、watermark 為基的輪詢，無「全量刷新」模式。每日 APScheduler 工作會依 TTL 清除過期列；另有 lag 監控每 60 秒檢查擷取落後並於逾時時記 WARNING/ERROR。
 
-**長期 archive 匯出與 Archive Review 計數偏低：** archiver（`ArchiveExporter`）會把 `pce_events`／`pce_traffic_flows_raw` 依 `ingested_at` 游標增量匯出成逐日 JSONL 檔。由於 ingestor 的 upsert 只刷新 volatile 欄位（`last_detected`／`bytes_in`／`bytes_out`／`flow_count`），不會 bump `ingested_at`，一筆長壽 flow 若在首次匯出「之後」於 live cache 端持續成長，這些後續成長不會再被匯出——該列已經早於游標。因此從 archive 重建的計數（例如 Archive Review DB）對長壽 flow 的流量／連線數可能**低於** live PCE cache；一次性、短命的 flow 不受影響。這是已知且接受的限制（非 bug），細節見 `src/pce_cache/archive.py` 的 `ArchiveExporter` docstring。
+**長期 archive 匯出與長壽 flow 的成長：** archiver（`ArchiveExporter`）會把 `pce_events`／`pce_traffic_flows_raw` 依 `ingested_at` 游標增量匯出成逐日 JSONL 檔。ingestor 的 upsert 現在會在 conflict 時把 `ingested_at` bump 到本次 ingest 時間（只要 re-pull 的 flow 有 volatile 欄位——`last_detected`／`bytes_in`／`bytes_out`／`flow_count`——發生變化），所以一筆持續成長的長壽 flow 會被下一輪 archive 匯出重新撿到，不再永遠停在游標之後。import 端 `ArchiveImporter` 改以 `flow_hash` 為 key upsert，`last_detected`／`bytes_in`／`bytes_out`／`flow_count` 取 MAX 合併（`first_detected` 取 MIN，`raw_json`／`report_json` 取較新 `last_detected` 那一側），因此重複匯入同一 flow 較晚的 export，只會讓 Archive Review DB 重建出的計數往上補齊，不會被凍結或縮小。修復前產生的 archive 檔案，若其中的長壽 flow 在當時仍持續成長，可能仍停在首次匯出的快照值；只要該 flow 之後（在修復後的 ingestor 下）再被 re-pull 一次並匯出，匯入那份較晚的檔案時，MAX 合併會自然把計數追上，不需要手動 backfill。細節見 `src/pce_cache/archive.py`／`archive_import.py` 的 docstring。
 
 ### 8.2 更新
 
