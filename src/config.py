@@ -412,10 +412,21 @@ class ConfigManager:
             # 階段短暫變成 world/group 可讀。
             config_dir = os.path.dirname(self.config_file) or "."
             fd, tmp_file = tempfile.mkstemp(dir=config_dir, suffix=".tmp")
-            with os.fdopen(fd, 'w', encoding='utf-8') as f:
-                json.dump(config_for_disk, f, indent=4, ensure_ascii=False)
-            # On Windows, os.replace handles atomic rename
-            os.replace(tmp_file, self.config_file)
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    json.dump(config_for_disk, f, indent=4, ensure_ascii=False)
+                    # 寫完先 fsync 再 replace，避免斷電留下空/半寫的 config.json
+                    # （比照 state_store.py 既有做法）。
+                    f.flush()
+                    os.fsync(f.fileno())
+                # On Windows, os.replace handles atomic rename
+                os.replace(tmp_file, self.config_file)
+            except Exception:
+                try:
+                    os.unlink(tmp_file)
+                except OSError:
+                    pass  # intentional fallback: tmp file cleanup is best-effort; original exception is re-raised
+                raise
             try:
                 os.chmod(self.config_file, 0o600)
             except OSError:
@@ -472,9 +483,20 @@ class ConfigManager:
         os.makedirs(alerts_dir, exist_ok=True)
         # 同 save() 理由：mkstemp 建檔即 0600，避免暫存檔階段機密外洩。
         fd, tmp_file = tempfile.mkstemp(dir=alerts_dir or ".", suffix=".tmp")
-        with os.fdopen(fd, 'w', encoding='utf-8') as f:
-            json.dump(payload, f, indent=4, ensure_ascii=False)
-        os.replace(tmp_file, self.alerts_file)
+        try:
+            with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                json.dump(payload, f, indent=4, ensure_ascii=False)
+                # 寫完先 fsync 再 replace，避免斷電留下空/半寫的 alerts.json
+                # （比照 state_store.py 既有做法）。
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp_file, self.alerts_file)
+        except Exception:
+            try:
+                os.unlink(tmp_file)
+            except OSError:
+                pass  # intentional fallback: tmp file cleanup is best-effort; original exception is re-raised
+            raise
         try:
             os.chmod(self.alerts_file, 0o600)
         except OSError:
