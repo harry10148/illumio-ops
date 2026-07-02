@@ -287,54 +287,95 @@ def enqueue(
             ))
 
 
+# 補登 insert 的 chunk 大小，比照 repo 既有慣例（ingestor_events/traffic、
+# archive_import 皆用 500）。
+_ENQUEUE_CHUNK = 500
+
+
 def enqueue_new_records(
     session_factory: sessionmaker,
-    destinations: list[str],
+    destinations_by_source_table: dict[str, list[str]],
 ) -> int:
-    """Safety-net backfill: enqueue any cache rows that ingestors didn't enqueue inline.
+    """Safety-net backfill: enqueue any (cache row, destination) pairs that
+    ingestors didn't enqueue inline.
 
     Ingestors enqueue rows in the same transaction as the cache write, so this
-    function should normally find nothing. It exists to cover (a) destinations
-    being newly added/enabled (historical rows weren't enqueued at write time),
-    (b) crash recovery, and (c) operator-driven backfill.
+    function should normally find nothing. It exists to cover (a) a
+    destination being newly added/enabled for a source_type — historical rows
+    of that source_type were never enqueued to it, even if the same cache row
+    already has dispatch rows for other destinations — (b) crash recovery,
+    and (c) operator-driven backfill.
+
+    The anti-join is scoped per (source_table, source_id, destination), not
+    just per (source_table, source_id): a row already dispatched to
+    destination A is still eligible for backfill to newly-enabled destination
+    B if it lacks a B row. at-least-once semantics for a given
+    (row, destination) pair are unchanged — the anti-join still guards
+    against re-enqueuing a pair that already has a dispatch row.
+
+    destinations_by_source_table maps source_table (e.g. "pce_events") to the
+    destination names already filtered to that source_table's source_type
+    (see scheduler.jobs._enabled_siem_destinations). This mirrors the
+    ingest-side filter so, e.g., an audit-only destination is never backfilled
+    a traffic row and vice versa.
+
+    All new rows are inserted within a single transaction (chunked to respect
+    SQLite's bound-parameter cap), not one transaction per row — backfilling a
+    large cache on first SIEM enable would otherwise be a per-row fsync storm.
 
     Returns count of new dispatch rows created.
     """
-    if not destinations:
-        return 0
-
-    total = 0
     pairs: list[tuple[str, type]] = [
         ("pce_events", PceEvent),
         ("pce_traffic_flows_raw", PceTrafficFlowRaw),
     ]
-    for source_table, model in pairs:
-        with session_factory() as s:
-            # SQL anti-join: cache rows that have no SiemDispatch row yet.
-            # Previously this loaded the entire dispatched-id set into Python and
-            # built `id NOT IN (... one bind per id ...)`, which on a large cache
-            # blew past SQLite's variable cap (`too many SQL variables`) — the
-            # job then failed every tick, hammering the DB. A correlated
-            # NOT EXISTS lets SQLite do the anti-join with the
-            # (source_table, source_id) index and no per-id binds.
-            dispatched = (
-                select(SiemDispatch.id)
-                .where(
-                    SiemDispatch.source_table == source_table,
-                    SiemDispatch.source_id == model.id,
+    to_enqueue: list[tuple[str, int, str]] = []  # (source_table, source_id, destination)
+    with session_factory() as s:
+        for source_table, model in pairs:
+            for dest in destinations_by_source_table.get(source_table) or []:
+                # SQL anti-join scoped to THIS destination: cache rows with no
+                # SiemDispatch row for `dest` yet. Previously this loaded the
+                # entire dispatched-id set into Python and built
+                # `id NOT IN (... one bind per id ...)` without a destination
+                # filter, which (a) blew past SQLite's variable cap on a large
+                # cache and (b) meant a row dispatched to any destination could
+                # never be backfilled for a newly-enabled one. A correlated
+                # NOT EXISTS filtered on destination fixes both.
+                dispatched = (
+                    select(SiemDispatch.id)
+                    .where(
+                        SiemDispatch.source_table == source_table,
+                        SiemDispatch.source_id == model.id,
+                        SiemDispatch.destination == dest,
+                    )
+                    .exists()
                 )
-                .exists()
-            )
-            new_ids = s.execute(
-                select(model.id).where(~dispatched)
-            ).scalars().all()
-        for source_id in new_ids:
-            enqueue(session_factory, source_table, source_id, destinations)
-            total += 1
+                new_ids = s.execute(
+                    select(model.id).where(~dispatched)
+                ).scalars().all()
+                to_enqueue.extend((source_table, sid, dest) for sid in new_ids)
+
+    total = len(to_enqueue)
     if total:
+        now = datetime.now(timezone.utc)
+        with session_factory.begin() as s:
+            for i in range(0, total, _ENQUEUE_CHUNK):
+                chunk = to_enqueue[i:i + _ENQUEUE_CHUNK]
+                s.add_all([
+                    SiemDispatch(
+                        source_table=source_table, source_id=source_id,
+                        destination=dest, status="pending", retries=0,
+                        queued_at=now,
+                    )
+                    for source_table, source_id, dest in chunk
+                ])
+                # 逐 chunk flush，使每個 INSERT 陳述式受 chunk 上限約束，
+                # 但仍在同一 transaction 內（commit 只有一次）。
+                s.flush()
         logger.info(
-            "siem safety-net backfill enqueued {} rows (ingestors should normally cover this; "
-            "expected after destination add/enable or crash recovery)",
+            "siem safety-net backfill enqueued {} (row, destination) pairs "
+            "(ingestors should normally cover this; expected after "
+            "destination add/enable or crash recovery)",
             total,
         )
     return total

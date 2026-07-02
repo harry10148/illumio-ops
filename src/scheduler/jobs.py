@@ -299,8 +299,14 @@ def run_siem_dispatch(cm) -> None:
             return
         cache_cfg = cm.models.pce_cache
         sf = sessionmaker(_get_cache_engine(cache_cfg.db_path))
-        dest_names = [d.name for d in enabled_dests]
-        new_count = enqueue_new_records(sf, dest_names)
+        # 按 source_type 過濾補登目的地，比照 ingest 端 _enabled_siem_destinations
+        # （見上方 run_events_ingest/run_traffic_ingest），避免 audit-only
+        # destination 被補登 traffic rows（反之亦然）。
+        dests_by_source_table = {
+            "pce_events": _enabled_siem_destinations(cm, "audit"),
+            "pce_traffic_flows_raw": _enabled_siem_destinations(cm, "traffic"),
+        }
+        new_count = enqueue_new_records(sf, dests_by_source_table)
         if new_count:
             logger.info("run_siem_dispatch: enqueued {} new records", new_count)
         for dest_cfg in enabled_dests:

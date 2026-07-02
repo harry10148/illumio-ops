@@ -187,14 +187,98 @@ def test_enqueue_new_records_anti_join_only_undispatched(sf):
             pce_fqdn="pce.test", raw_json="{}", ingested_at=now,
         ))
 
-    assert enqueue_new_records(sf, ["test-dest"]) == 1   # only event 3
-    assert enqueue_new_records(sf, ["test-dest"]) == 0   # idempotent
+    assert enqueue_new_records(sf, {"pce_events": ["test-dest"]}) == 1   # only event 3
+    assert enqueue_new_records(sf, {"pce_events": ["test-dest"]}) == 0   # idempotent
 
     with sf() as s:
         rows = s.execute(
             select(SiemDispatch).where(SiemDispatch.source_id == 3)
         ).scalars().all()
     assert len(rows) == 1
+
+
+def test_enqueue_new_records_backfills_newly_enabled_destination(sf):
+    """RED: a row already dispatched to destination A must still be backfilled
+    for newly-enabled destination B — the anti-join must be scoped per
+    destination, not just per (source_table, source_id). Previously the
+    anti-join only checked 'does this row have ANY dispatch row', so a row
+    that had ever been enqueued for any destination could never be backfilled
+    for a later-enabled one."""
+    from src.siem.dispatcher import enqueue_new_records
+
+    _seed_event(sf, 1)  # already dispatched to "test-dest" (see _seed_event)
+
+    created = enqueue_new_records(sf, {"pce_events": ["test-dest", "new-dest"]})
+
+    assert created == 1  # only the new-dest row is missing
+    with sf() as s:
+        rows = s.execute(
+            select(SiemDispatch).where(SiemDispatch.source_id == 1)
+        ).scalars().all()
+    destinations = {r.destination for r in rows}
+    assert destinations == {"test-dest", "new-dest"}
+
+
+def test_enqueue_new_records_does_not_backfill_traffic_to_audit_only_destination(sf):
+    """RED: destinations_by_source_table must filter per source_table (i.e. per
+    source_type), mirroring the ingest-side _enabled_siem_destinations filter.
+    An audit-only destination passed only for "pce_events" must never receive
+    a backfilled traffic row."""
+    from src.siem.dispatcher import enqueue_new_records
+    from src.pce_cache.models import PceEvent, PceTrafficFlowRaw, SiemDispatch
+
+    now = datetime.now(timezone.utc)
+    with sf.begin() as s:
+        s.add(PceEvent(
+            pce_href="/orgs/1/events/1", pce_event_id="uuid-1", timestamp=now,
+            event_type="policy.update", severity="info", status="success",
+            pce_fqdn="pce.test", raw_json="{}", ingested_at=now,
+        ))
+        s.add(PceTrafficFlowRaw(
+            flow_hash="hash-1", src_ip="1.2.3.4", dst_ip="5.6.7.8", port=443,
+            protocol="tcp", action="allowed", flow_count=1, bytes_in=0, bytes_out=0,
+            first_detected=now, last_detected=now, raw_json="{}", ingested_at=now,
+        ))
+
+    created = enqueue_new_records(sf, {
+        "pce_events": ["audit-dest"],
+        "pce_traffic_flows_raw": [],  # audit-dest is not subscribed to traffic
+    })
+
+    assert created == 1
+    with sf() as s:
+        rows = s.execute(select(SiemDispatch)).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].source_table == "pce_events"
+    assert rows[0].destination == "audit-dest"
+
+
+def _seed_many_events_without_dispatch(sf, n: int) -> None:
+    now = datetime.now(timezone.utc)
+    with sf.begin() as s:
+        s.add_all([
+            PceEvent(
+                pce_href=f"/orgs/1/events/bulk-{i}", pce_event_id=f"uuid-bulk-{i}",
+                timestamp=now, event_type="policy.update", severity="info",
+                status="success", pce_fqdn="pce.test", raw_json="{}", ingested_at=now,
+            )
+            for i in range(n)
+        ])
+
+
+def test_enqueue_new_records_uses_one_transaction_for_many_rows(sf):
+    """RED: backfilling a large cache on first SIEM enable must not open one
+    transaction per row (fsync storm). Insert is chunked but committed in a
+    single transaction."""
+    from src.siem.dispatcher import enqueue_new_records
+
+    _seed_many_events_without_dispatch(sf, 1200)  # > one 500-row chunk
+    counting = _CountingSF(sf)
+
+    created = enqueue_new_records(counting, {"pce_events": ["bulk-dest"]})
+
+    assert created == 1200
+    assert counting.begin_calls == 1
 
 
 class _CountingSF:

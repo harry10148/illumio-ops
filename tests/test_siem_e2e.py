@@ -147,7 +147,7 @@ def test_e2e_safety_net_backfills_only_when_needed(sf):
         siem_destinations=["splunk"],
     ).run_once()
 
-    backfilled = enqueue_new_records(sf, ["splunk"])
+    backfilled = enqueue_new_records(sf, {"pce_events": ["splunk"]})
     assert backfilled == 0
 
 
@@ -169,7 +169,7 @@ def test_e2e_safety_net_picks_up_rows_with_no_inline_destinations(sf):
     ).run_once()
 
     # Operator enables a destination → safety net catches up
-    backfilled = enqueue_new_records(sf, ["splunk"])
+    backfilled = enqueue_new_records(sf, {"pce_events": ["splunk"]})
     assert backfilled == 1
     with sf() as s:
         row = s.execute(select(SiemDispatch)).scalar_one()

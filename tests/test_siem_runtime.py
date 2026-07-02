@@ -63,7 +63,10 @@ def test_enqueue_new_records_creates_dispatch_rows(sf):
     from src.siem.dispatcher import enqueue_new_records
     _add_event(sf)
     _add_flow(sf)
-    enqueue_new_records(sf, destinations=["syslog://host:514"])
+    enqueue_new_records(sf, {
+        "pce_events": ["syslog://host:514"],
+        "pce_traffic_flows_raw": ["syslog://host:514"],
+    })
     with sf() as s:
         rows = s.execute(select(SiemDispatch)).scalars().all()
     assert len(rows) == 2  # 1 event + 1 flow
@@ -77,7 +80,7 @@ def test_enqueue_new_records_skips_already_dispatched(sf):
     from src.siem.dispatcher import enqueue_new_records, enqueue
     eid = _add_event(sf)
     enqueue(sf, "pce_events", eid, ["syslog://host:514"])  # pre-enqueue
-    enqueue_new_records(sf, destinations=["syslog://host:514"])
+    enqueue_new_records(sf, {"pce_events": ["syslog://host:514"]})
     with sf() as s:
         rows = s.execute(select(SiemDispatch)).scalars().all()
     assert len(rows) == 1  # no duplicate
@@ -86,7 +89,10 @@ def test_enqueue_new_records_skips_already_dispatched(sf):
 def test_enqueue_new_records_noop_when_no_records(sf):
     """enqueue_new_records does nothing when cache is empty."""
     from src.siem.dispatcher import enqueue_new_records
-    enqueue_new_records(sf, destinations=["syslog://host:514"])
+    enqueue_new_records(sf, {
+        "pce_events": ["syslog://host:514"],
+        "pce_traffic_flows_raw": ["syslog://host:514"],
+    })
     with sf() as s:
         count = s.execute(select(SiemDispatch)).scalars().all()
     assert len(count) == 0
