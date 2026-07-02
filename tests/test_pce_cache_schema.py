@@ -123,76 +123,118 @@ def test_schema_creates_report_json_null_partial_index():
         assert "report_json IS NULL" in sql, f"index is not partial: {sql}"
 
 
-def test_schema_normalizes_agg_bucket_day_old_format():
+def _reset_bucket_day_migration_marker(engine):
+    """把 user_version 清回 0，模擬「遷移尚未跑過、但表裡已有舊格式資料」的
+    既有 DB。測試裡的舊格式列是在 init_schema 之後才塞入的，若不清標記，
+    守衛會讓後續 init_schema 直接跳過正規化。"""
+    from sqlalchemy import text
+    with engine.begin() as conn:
+        conn.execute(text("PRAGMA user_version = 0"))
+
+
+def test_schema_normalizes_agg_bucket_day_old_format(tmp_path):
     """一次性遷移：既有 agg 列若 bucket_day 是舊格式（aggregator 過去用 SQL
     'start of day' 產出，無微秒），init_schema 要把它正規化成跟 reader 端
     SQLAlchemy 綁的 datetime 一致的新格式（含 .000000），資料不遺失。"""
     from sqlalchemy import text
     from src.pce_cache.schema import init_schema
 
-    with tempfile.TemporaryDirectory() as tmp:
-        path = os.path.join(tmp, "cache.sqlite")
-        engine = create_engine(f"sqlite:///{path}")
-        init_schema(engine)
-        with engine.begin() as conn:
-            conn.execute(text(
-                "INSERT INTO pce_traffic_flows_agg "
-                "(bucket_day, src_workload, dst_workload, port, protocol, action, "
-                "flow_count, bytes_total) VALUES "
-                "('2026-06-30 00:00:00', 'web', 'db', 443, 'tcp', 'blocked', 10, 3000)"
-            ))
-        init_schema(engine)  # 觸發遷移
-        with engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT bucket_day, flow_count, bytes_total FROM pce_traffic_flows_agg"
-            )).fetchall()
-        assert len(rows) == 1
-        assert rows[0].bucket_day == "2026-06-30 00:00:00.000000"
-        assert rows[0].flow_count == 10
-        assert rows[0].bytes_total == 3000
+    engine = create_engine(f"sqlite:///{tmp_path / 'cache.sqlite'}")
+    init_schema(engine)
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO pce_traffic_flows_agg "
+            "(bucket_day, src_workload, dst_workload, port, protocol, action, "
+            "flow_count, bytes_total) VALUES "
+            "('2026-06-30 00:00:00', 'web', 'db', 443, 'tcp', 'blocked', 10, 3000)"
+        ))
+    _reset_bucket_day_migration_marker(engine)
+    init_schema(engine)  # 觸發遷移
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT bucket_day, flow_count, bytes_total FROM pce_traffic_flows_agg"
+        )).fetchall()
+    assert len(rows) == 1
+    assert rows[0].bucket_day == "2026-06-30 00:00:00.000000"
+    assert rows[0].flow_count == 10
+    assert rows[0].bytes_total == 3000
 
-        init_schema(engine)  # 再跑一次必須冪等，不重複也不出錯
-        with engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT bucket_day FROM pce_traffic_flows_agg"
-            )).fetchall()
-        assert len(rows) == 1
-        assert rows[0].bucket_day == "2026-06-30 00:00:00.000000"
+    _reset_bucket_day_migration_marker(engine)
+    init_schema(engine)  # 再跑一次必須冪等，不重複也不出錯
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT bucket_day FROM pce_traffic_flows_agg"
+        )).fetchall()
+    assert len(rows) == 1
+    assert rows[0].bucket_day == "2026-06-30 00:00:00.000000"
 
 
-def test_schema_normalizes_agg_bucket_day_merges_on_collision():
+def test_schema_normalizes_agg_bucket_day_merges_on_collision(tmp_path):
     """遷移碰撞情境：同一分組鍵舊格式與新格式列並存時，正規化不能直接
     UPDATE（會撞 ix_agg_unique），必須 MAX 合併（與 aggregator 的
     conflict-MAX 冪等語意一致）後刪除舊格式列，資料不遺失也不重複。"""
     from sqlalchemy import text
     from src.pce_cache.schema import init_schema
 
-    with tempfile.TemporaryDirectory() as tmp:
-        path = os.path.join(tmp, "cache.sqlite")
-        engine = create_engine(f"sqlite:///{path}")
-        init_schema(engine)
-        with engine.begin() as conn:
-            conn.execute(text(
-                "INSERT INTO pce_traffic_flows_agg "
-                "(bucket_day, src_workload, dst_workload, port, protocol, action, "
-                "flow_count, bytes_total) VALUES "
-                "('2026-06-30 00:00:00', 'web', 'db', 443, 'tcp', 'blocked', 10, 3000)"
-            ))
-            conn.execute(text(
-                "INSERT INTO pce_traffic_flows_agg "
-                "(bucket_day, src_workload, dst_workload, port, protocol, action, "
-                "flow_count, bytes_total) VALUES "
-                "('2026-06-30 00:00:00.000000', 'web', 'db', 443, 'tcp', 'blocked', 7, 5000)"
-            ))
-        init_schema(engine)  # 觸發遷移，碰撞須合併
-        with engine.connect() as conn:
-            rows = conn.execute(text(
-                "SELECT bucket_day, flow_count, bytes_total FROM pce_traffic_flows_agg"
-            )).fetchall()
-        assert len(rows) == 1, f"expected merge to 1 row, got {len(rows)}"
-        assert rows[0].bucket_day == "2026-06-30 00:00:00.000000"
-        assert rows[0].flow_count == 10     # MAX(10, 7)
-        assert rows[0].bytes_total == 5000  # MAX(3000, 5000)
+    engine = create_engine(f"sqlite:///{tmp_path / 'cache.sqlite'}")
+    init_schema(engine)
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO pce_traffic_flows_agg "
+            "(bucket_day, src_workload, dst_workload, port, protocol, action, "
+            "flow_count, bytes_total) VALUES "
+            "('2026-06-30 00:00:00', 'web', 'db', 443, 'tcp', 'blocked', 10, 3000)"
+        ))
+        conn.execute(text(
+            "INSERT INTO pce_traffic_flows_agg "
+            "(bucket_day, src_workload, dst_workload, port, protocol, action, "
+            "flow_count, bytes_total) VALUES "
+            "('2026-06-30 00:00:00.000000', 'web', 'db', 443, 'tcp', 'blocked', 7, 5000)"
+        ))
+    _reset_bucket_day_migration_marker(engine)
+    init_schema(engine)  # 觸發遷移，碰撞須合併
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT bucket_day, flow_count, bytes_total FROM pce_traffic_flows_agg"
+        )).fetchall()
+    assert len(rows) == 1, f"expected merge to 1 row, got {len(rows)}"
+    assert rows[0].bucket_day == "2026-06-30 00:00:00.000000"
+    assert rows[0].flow_count == 10     # MAX(10, 7)
+    assert rows[0].bytes_total == 5000  # MAX(3000, 5000)
+
+
+def test_schema_agg_bucket_day_migration_guard_skips_completed_migration(tmp_path):
+    """守衛：bucket_day 正規化的 NOT LIKE '%.%' 掃描無法用索引（leading
+    wildcard），而 init_schema 被 per-request/per-query 呼叫
+    （_make_cache_reader、review_session_factory），所以遷移完成後必須以
+    PRAGMA user_version 標記、後續呼叫 O(1) 直接跳過。驗證：全新 DB 跑過
+    init_schema 後 user_version 已設；此時塞一筆舊格式列再跑 init_schema，
+    該列保持原樣（證明掃描被守衛跳過，而非又執行了一次）。"""
+    from sqlalchemy import text
+    from src.pce_cache.schema import _MIGRATION_AGG_BUCKET_DAY, init_schema
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'cache.sqlite'}")
+    init_schema(engine)  # 全新 DB 也要走過遷移並設下完成標記
+    with engine.connect() as conn:
+        version = conn.execute(text("PRAGMA user_version")).scalar()
+    assert version == _MIGRATION_AGG_BUCKET_DAY
+
+    # 標記已設：插入舊格式列後重跑 init_schema，正規化應被守衛跳過
+    # （正常運行下 aggregator 已不會再寫出舊格式，這只是探測守衛用）。
+    with engine.begin() as conn:
+        conn.execute(text(
+            "INSERT INTO pce_traffic_flows_agg "
+            "(bucket_day, src_workload, dst_workload, port, protocol, action, "
+            "flow_count, bytes_total) VALUES "
+            "('2026-06-30 00:00:00', 'web', 'db', 443, 'tcp', 'blocked', 1, 1)"
+        ))
+    init_schema(engine)
+    with engine.connect() as conn:
+        bucket_day = conn.execute(text(
+            "SELECT bucket_day FROM pce_traffic_flows_agg"
+        )).scalar()
+    assert bucket_day == "2026-06-30 00:00:00", \
+        "guard did not skip the scan: old-format probe row was normalized"
 
 
 def test_schema_sets_read_perf_pragmas():

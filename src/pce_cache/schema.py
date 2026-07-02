@@ -98,6 +98,16 @@ def _drop_deprecated_indexes(engine: Engine) -> None:
             conn.execute(text(f"DROP INDEX IF EXISTS {name}"))
 
 
+# 一次性資料遷移的完成標記。init_schema 被 per-request/per-query 呼叫
+# （src/main.py 的 _make_cache_reader、archive_import 的 review_session_factory），
+# 升級鏈裡其他步驟都是便宜的 metadata 檢查，但 bucket_day 正規化的
+# NOT LIKE '%.%' 是 leading-wildcard、無法用索引，會全表掃描 agg 表——
+# 用 PRAGMA user_version 守衛，遷移完成後穩態成本降回 O(1)。
+# （repo 內 user_version 無其他用途；日後要加新的一次性遷移時把此值 +1，
+# 並在對應遷移函式比對新值。）
+_MIGRATION_AGG_BUCKET_DAY = 1
+
+
 # bucket_day 舊格式（aggregator 以前用 SQL 'start of day' 產出，無微秒，例如
 # "2026-06-30 00:00:00"）跟 reader 端 SQLAlchemy 綁的 datetime（含微秒，例如
 # "2026-06-30 00:00:00.000000"）字串比較不一致，導致午夜 start 漏讀當日 bucket
@@ -110,8 +120,15 @@ def _normalize_agg_bucket_day(engine: Engine) -> None:
     正規化後的 key 若已存在新格式列，直接 UPDATE 會撞 unique constraint，
     因此改用 MAX 合併（與 aggregator 的 conflict-MAX 冪等語意一致）後刪除
     舊格式列；沒有碰撞則單純 UPDATE 成新格式。
+
+    守衛：user_version 已達標就直接返回，省掉每次 init_schema 的全表掃描
+    （穩態 O(1)）。兩執行緒併發時可能都通過守衛、各跑一次正規化——
+    正規化本身冪等，守衛只是省成本，競態下多跑一次無害。
     """
     with engine.begin() as conn:
+        version = conn.execute(text("PRAGMA user_version")).scalar()
+        if version >= _MIGRATION_AGG_BUCKET_DAY:
+            return
         old_rows = conn.execute(text(
             "SELECT id, bucket_day, src_workload, dst_workload, port, protocol, "
             "action, flow_count, bytes_total FROM pce_traffic_flows_agg "
@@ -150,6 +167,8 @@ def _normalize_agg_bucket_day(engine: Engine) -> None:
                     "UPDATE pce_traffic_flows_agg SET bucket_day = :bucket_day "
                     "WHERE id = :id"
                 ), {"bucket_day": new_bucket_day, "id": row.id})
+        # PRAGMA 不吃 bind 參數；值來自模組常數（int），無注入疑慮。
+        conn.execute(text(f"PRAGMA user_version = {_MIGRATION_AGG_BUCKET_DAY}"))
 
 
 def _enable_wal_pragma(engine: Engine) -> None:
