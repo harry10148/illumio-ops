@@ -7,7 +7,10 @@ from src.cli.root import cli
 
 def _invoke(args):
     runner = CliRunner()
-    with patch("src.cli.report.generate_traffic_report", return_value=["/tmp/x.html"]) as gen:
+    # Pin the CLI language: _ctx_lang() reads config/config.json, so without
+    # this the deprecation-message assertion depends on the local config.
+    with patch("src.cli.report.generate_traffic_report", return_value=["/tmp/x.html"]) as gen, \
+            patch("src.cli.report._ctx_lang", return_value="en"):
         result = runner.invoke(cli, args)
     return result, gen
 
