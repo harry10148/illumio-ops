@@ -393,6 +393,7 @@
   "gui_err_pce_id_required": "PCE profile ID is required.",
   "gui_err_pce_name_url_required": "PCE profile name and URL are required.",
   "gui_err_pce_profile_not_found": "PCE profile not found.",
+  "gui_err_report_output_dir_forbidden": "Report output directory cannot be a system path or the filesystem root.",
   "gui_err_rule_not_found": "Rule not found.",
   "gui_err_unknown_action": "Unknown action.",
   "gui_err_unknown_job": "Unknown job.",

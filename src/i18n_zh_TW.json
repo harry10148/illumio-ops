@@ -393,6 +393,7 @@
   "gui_err_pce_id_required": "必須提供 PCE 設定檔 ID。",
   "gui_err_pce_name_url_required": "必須提供 PCE 設定檔名稱與網址。",
   "gui_err_pce_profile_not_found": "找不到 PCE 設定檔。",
+  "gui_err_report_output_dir_forbidden": "報表輸出目錄不可設為系統路徑或檔案系統根目錄。",
   "gui_err_rule_not_found": "找不到規則。",
   "gui_err_unknown_action": "未知的操作。",
   "gui_err_unknown_job": "未知的工作。",

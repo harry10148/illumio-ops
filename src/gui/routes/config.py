@@ -1,6 +1,7 @@
 """Config Blueprint: security, settings, alert-plugins, TLS, and PCE-profile routes."""
 from __future__ import annotations
 
+import json
 import os
 import urllib.parse
 
@@ -16,6 +17,7 @@ from src.gui._helpers import (
     _redact_secrets,
     _strip_redaction_placeholders,
     _validate_allowed_ips,
+    _is_forbidden_report_output_dir,
     _SETTINGS_ALLOWLISTS,
     _plugin_config_roots,
     _ROOT_DIR,
@@ -58,10 +60,14 @@ def make_config_blueprint(
         with cm.write_lock:
             cm.load()
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
-            gui_cfg = cm.config.setdefault("web_gui", {})
+            # scratch：web_gui 底下每個欄位都是純量或整包替換的 list（沒有
+            # 巢狀 dict 會被就地修改），淺拷貝即可把驗證失敗前的暫存變更
+            # 隔離在 scratch，通過才整批寫回 cm.config——避免被拒絕的欄位
+            # （例如 username）留在共用的 cm.config 物件裡被併發 GET 看到。
+            gui_scratch = dict(cm.config.get("web_gui", {}))
 
             if "username" in d:
-                gui_cfg["username"] = d["username"]
+                gui_scratch["username"] = d["username"]
 
             if "allowed_ips" in d:
                 allowed_ips, invalid_ips = _validate_allowed_ips(d["allowed_ips"])
@@ -70,24 +76,25 @@ def make_config_blueprint(
                         "ok": False,
                         "error": t("gui_err_invalid_allowlist_entries", lang=lang, entries=', '.join(invalid_ips))
                     }), 400
-                gui_cfg["allowed_ips"] = allowed_ips
+                gui_scratch["allowed_ips"] = allowed_ips
 
             if d.get("new_password"):
-                must_change = bool(gui_cfg.get("must_change_password", False))
+                must_change = bool(gui_scratch.get("must_change_password", False))
                 if not must_change:
                     old_pw = d.get("old_password") or ""
                     if not old_pw:
                         return jsonify({"ok": False, "error": t("gui_err_old_password_required", lang=lang)}), 400
-                    if not verify_password(old_pw, gui_cfg.get("password", "")):
+                    if not verify_password(old_pw, gui_scratch.get("password", "")):
                         return jsonify({"ok": False, "error": t("gui_err_old_password_incorrect", lang=lang)}), 400
                 new_pw = d["new_password"]
                 confirm_pw = d.get("confirm_password", new_pw)
                 if not (12 <= len(new_pw) <= 512) or new_pw != confirm_pw:
                     return jsonify({"ok": False, "error": t("gui_err_invalid_password_form", lang=lang)}), 400
-                gui_cfg["password"] = hash_password(new_pw)
-                gui_cfg.pop("_initial_password", None)
-                gui_cfg.pop("must_change_password", None)
+                gui_scratch["password"] = hash_password(new_pw)
+                gui_scratch.pop("_initial_password", None)
+                gui_scratch.pop("must_change_password", None)
 
+            cm.config["web_gui"] = gui_scratch
             cm.save()
         return jsonify({"ok": True})
 
@@ -152,6 +159,16 @@ def make_config_blueprint(
         with cm.write_lock:
             cm.load()
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            # scratch：對整份 cm.config 做深拷貝（json round-trip，沿用
+            # ConfigManager 既有慣例，見 apply_best_practices / __init__ 的
+            # 深拷貝寫法）。這個 handler 一次可能同時處理 api / email / smtp /
+            # alerts / settings / report / 外掛設定等多個區塊，其中不只一個
+            # 區塊會做「先寫入再驗證、失敗才 400」——用淺拷貝只隔離得了單一
+            # 頂層鍵，遇到巢狀結構（例如 api 區塊本身）還是可能把中間狀態寫進
+            # 共用的 cm.config。所有欄位變更只落在 scratch，全部驗證通過才
+            # 整批寫回 cm.config + save；任何一個 400 都讓 cm.config 維持
+            # load() 剛讀回的原狀，不會有欄位被併發 GET 看到或誤存。
+            scratch = json.loads(json.dumps(cm.config))
             if 'api' in d:
                 api_in = d['api']
                 api_allowlist = _SETTINGS_ALLOWLISTS["api"]
@@ -165,7 +182,7 @@ def make_config_blueprint(
                         logger.warning("api.url uses plain HTTP — TLS verification cannot be performed")
                 for k in api_allowlist:
                     if k in api_in:
-                        cm.config['api'][k] = api_in[k]
+                        scratch['api'][k] = api_in[k]
                 # 批次 5 C3 的配套：合併後的 api 區塊寫入磁碟前先驗證。
                 # 少了這一步，裸 POST（例如 verify_ssl=false 而 profile
                 # 仍是 'production'）會成功存檔，下一次 cm.load() 就會被
@@ -173,7 +190,7 @@ def make_config_blueprint(
                 from pydantic import ValidationError as _ValidationError
                 from src.config_models import ApiSettings
                 try:
-                    ApiSettings.model_validate(cm.config['api'])
+                    ApiSettings.model_validate(scratch['api'])
                 except _ValidationError as ve:
                     reason = ve.errors()[0]['msg'] if ve.errors() else str(ve)
                     return jsonify({
@@ -183,26 +200,35 @@ def make_config_blueprint(
             if 'email' in d:
                 email_in = d['email']
                 if 'sender' in email_in:
-                    cm.config['email']['sender'] = email_in['sender']
+                    scratch['email']['sender'] = email_in['sender']
                 if 'recipients' in email_in:
-                    cm.config['email']['recipients'] = email_in['recipients']
+                    scratch['email']['recipients'] = email_in['recipients']
             if 'smtp' in d:
                 allowlist = _SETTINGS_ALLOWLISTS["smtp"]
                 filtered = {k: v for k, v in d['smtp'].items() if k in allowlist}
-                cm.config.setdefault('smtp', {}).update(filtered)
+                scratch.setdefault('smtp', {}).update(filtered)
             if 'alerts' in d:
                 allowlist = _SETTINGS_ALLOWLISTS["alerts"]
                 filtered = {k: v for k, v in d['alerts'].items() if k in allowlist}
-                cm.config.setdefault('alerts', {}).update(filtered)
+                scratch.setdefault('alerts', {}).update(filtered)
             if 'settings' in d:
                 allowlist = _SETTINGS_ALLOWLISTS["settings"]
                 filtered = {k: v for k, v in d['settings'].items() if k in allowlist}
-                cm.config.setdefault('settings', {}).update(filtered)
+                scratch.setdefault('settings', {}).update(filtered)
             if 'report' in d:
                 rpt_in = d['report']
-                rpt_cfg = cm.config.setdefault('report', {})
+                rpt_cfg = scratch.setdefault('report', {})
                 if 'output_dir' in rpt_in:
-                    rpt_cfg['output_dir'] = rpt_in['output_dir']
+                    candidate_dir = rpt_in['output_dir']
+                    # 只擋「新設定」：不強制驗證既有已存在 cm.config 的
+                    # output_dir（load() 不呼叫這個檢查），避免升級後既有
+                    # 自訂路徑（例如剛好落在某個前綴下）讓 GUI 直接自鎖。
+                    if _is_forbidden_report_output_dir(candidate_dir):
+                        return jsonify({
+                            "ok": False,
+                            "error": t("gui_err_report_output_dir_forbidden", lang=lang),
+                        }), 400
+                    rpt_cfg['output_dir'] = candidate_dir
                 if 'retention_days' in rpt_in:
                     try:
                         rpt_cfg['retention_days'] = max(0, int(rpt_in['retention_days']))
@@ -214,9 +240,10 @@ def make_config_blueprint(
                     continue
                 incoming = d.get(root)
                 if isinstance(incoming, dict):
-                    cm.config.setdefault(root, {}).update(incoming)
+                    scratch.setdefault(root, {}).update(incoming)
                 else:
-                    cm.config[root] = incoming
+                    scratch[root] = incoming
+            cm.config = scratch
             cm.sync_api_to_active_profile()
             cm.save()
         return jsonify({"ok": True})

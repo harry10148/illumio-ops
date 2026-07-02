@@ -280,6 +280,36 @@ def _resolve_reports_dir(cm_ref: ConfigManager) -> str:
     d = cm_ref.config.get('report', {}).get('output_dir', 'reports')
     return d if os.path.isabs(d) else os.path.join(_ROOT_DIR, d)
 
+
+# 系統敏感前綴——report.output_dir 之後的下載／批次刪除都以這個目錄為根，
+# 若允許指到 /etc 等系統目錄，即使下載端點本身的 realpath+startswith 防護
+# 正確，根目錄本身仍可能暴露或誤刪系統檔案。只在「新設定」擋，既有已存
+# 的 output_dir 不在 load() 時強制驗證（見 config.py POST handler 的呼叫點）。
+_REPORT_OUTPUT_DIR_DENYLIST = (
+    "/etc", "/usr", "/bin", "/sbin", "/boot",
+    "/root", "/proc", "/sys", "/dev", "/lib",
+)
+
+
+def _is_forbidden_report_output_dir(raw: str) -> bool:
+    """回傳 True 表示 *raw* resolve 後落在系統敏感前綴或是檔案系統根 `/`。
+
+    相對路徑比照 `_resolve_reports_dir` 以專案根目錄為基準解析，
+    再用 realpath 消解 `..`／symlink，避免用字串前綴繞過（例如 `/etcetera`
+    這種同前綴但非同目錄的名稱，用路徑元件比對而非 startswith 字串）。
+    """
+    candidate = str(raw or "").strip()
+    resolved = candidate if os.path.isabs(candidate) else os.path.join(_ROOT_DIR, candidate)
+    resolved = os.path.realpath(resolved)
+    if resolved == os.sep:
+        return True
+    parts = resolved.split(os.sep)
+    if len(parts) > 1:
+        top_level = os.sep + parts[1]
+        if top_level in _REPORT_OUTPUT_DIR_DENYLIST:
+            return True
+    return False
+
 def _resolve_config_dir() -> str:
     return os.path.join(_ROOT_DIR, 'config')
 
