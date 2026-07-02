@@ -30,10 +30,10 @@ def _make_report(directory, kind, ts, mtime):
     return html, meta
 
 
-def test_prune_traffic_groups_metadata_and_spares_other_kinds(tmp_path):
-    """KEY: prune('traffic') must (1) never delete NetworkInventory reports and
-    (2) count a report + its .html.metadata.json sidecar as ONE report."""
-    # report_type='traffic' emits the SecurityRisk profile (html_exporter:433).
+def test_prune_security_risk_groups_metadata_and_spares_other_kinds(tmp_path):
+    """KEY: prune('security_risk') must (1) never delete NetworkInventory
+    reports and (2) count a report + its .html.metadata.json sidecar as ONE
+    report."""
     sr = [_make_report(tmp_path, "SecurityRisk", f"2026-06-0{i + 1}_0000", 1_000_000 + i)
           for i in range(3)]
     # Two NetworkInventory reports from a sibling schedule in the same dir.
@@ -41,7 +41,7 @@ def test_prune_traffic_groups_metadata_and_spares_other_kinds(tmp_path):
           for i in range(2)]
 
     sched = ReportScheduler.__new__(ReportScheduler)
-    sched._prune_by_count(str(tmp_path), "traffic", max_reports=2)
+    sched._prune_by_count(str(tmp_path), "security_risk", max_reports=2)
 
     names = {p.name for p in tmp_path.iterdir()}
 
@@ -93,15 +93,44 @@ def test_prune_traffic_does_not_touch_network_inventory_when_only_kind_present(t
         assert html.name in names and meta.name in names
 
 
-def test_traffic_prefix_is_security_risk_specific():
-    """The 'traffic' retention prefix must match exactly what 'traffic' emits
-    (SecurityRisk) and NOT be a prefix of the NetworkInventory kind."""
-    sr = ReportScheduler._REPORT_PREFIXES["security_risk"]
-    ni = ReportScheduler._REPORT_PREFIXES["network_inventory"]
-    traffic = ReportScheduler._REPORT_PREFIXES["traffic"]
-    assert traffic == sr
-    assert not ni.startswith(traffic)
-    assert not traffic.startswith("Illumio_Traffic_Report_NetworkInventory_")
+def test_prune_traffic_matches_only_unsuffixed_timestamp_filename(tmp_path):
+    """'traffic' now emits UNSUFFIXED filenames (TrafficFlowsHtmlExporter
+    ._filename: 'Illumio_Traffic_Report_<ts>.html', no kind suffix). Retention
+    for 'traffic' must match ONLY that unsuffixed pattern, and 'security_risk'
+    must keep matching ONLY its own SecurityRisk-suffixed filename -- neither
+    may cross-match the other's (or NetworkInventory's) files sharing the dir.
+    """
+    ts_old, ts_new = "2026-07-01_0100", "2026-07-03_0202"
+    # Two 'traffic' reports (over the max_reports=1 cap) plus one SecurityRisk
+    # and one NetworkInventory report from sibling schedules in the same dir.
+    traffic_old = tmp_path / f"Illumio_Traffic_Report_{ts_old}.html"
+    traffic_new = tmp_path / f"Illumio_Traffic_Report_{ts_new}.html"
+    sr = tmp_path / f"Illumio_Traffic_Report_SecurityRisk_{ts_new}.html"
+    ni = tmp_path / f"Illumio_Traffic_Report_NetworkInventory_{ts_new}.html"
+    for f, mtime in ((traffic_old, 1_000_000), (traffic_new, 2_000_000),
+                     (sr, 3_000_000), (ni, 4_000_000)):
+        f.write_text("x")
+        os.utime(f, (mtime, mtime))
+
+    sched = ReportScheduler.__new__(ReportScheduler)
+
+    # A 'traffic' prune with room for only one report must: (a) actually match
+    # and prune the oldest traffic report -- proving the matcher isn't blind to
+    # the new unsuffixed filename -- and (b) never touch the
+    # SecurityRisk/NetworkInventory files, which share the literal prefix.
+    sched._prune_by_count(str(tmp_path), "traffic", max_reports=1)
+    names = {p.name for p in tmp_path.iterdir()}
+    assert traffic_old.name not in names, "oldest traffic report should have been pruned"
+    assert traffic_new.name in names, "newest traffic report wrongly pruned"
+    assert sr.name in names, "SecurityRisk report wrongly matched by 'traffic' prune"
+    assert ni.name in names, "NetworkInventory report wrongly matched by 'traffic' prune"
+
+    # A 'security_risk' prune must likewise only ever touch its own file.
+    sched._prune_by_count(str(tmp_path), "security_risk", max_reports=1)
+    names = {p.name for p in tmp_path.iterdir()}
+    assert traffic_new.name in names
+    assert sr.name in names, "own SecurityRisk report wrongly pruned"
+    assert ni.name in names
 
 
 # ─── Finding #6: schedule timezone 'local'/unset semantics ────────────────────

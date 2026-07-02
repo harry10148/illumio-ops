@@ -12,6 +12,7 @@ import datetime
 import json
 from loguru import logger
 import os
+import re
 
 from src.i18n import t
 from src.report.report_metadata import extract_attack_summary
@@ -578,14 +579,17 @@ class ReportScheduler:
     # ─── Report retention ────────────────────────────────────────────────────
 
     # File prefix patterns for each report type (matches .html, .zip, and .json).
-    # NOTE: 'traffic' uses the SecurityRisk-specific prefix because report_type
-    # 'traffic' renders the default security_risk profile (see ReportGenerator
-    # .export traffic_report_profile default + html_exporter filename). The bare
-    # 'Illumio_Traffic_Report_' prefix is a strict prefix of BOTH the SecurityRisk
-    # and NetworkInventory filenames, so using it here would let a 'traffic' prune
-    # delete a sibling NetworkInventory schedule's reports (cross-type loss).
+    # Most entries are a literal prefix (startswith). 'traffic' needs a regex:
+    # TrafficFlowsHtmlExporter._filename emits an UNSUFFIXED filename
+    # ('Illumio_Traffic_Report_<ts>.html'), and the bare string
+    # 'Illumio_Traffic_Report_' is a strict prefix of BOTH the SecurityRisk and
+    # NetworkInventory filenames used by 'security_risk'/'network_inventory', so
+    # a literal-prefix match would let a 'traffic' prune delete a sibling
+    # schedule's SecurityRisk/NetworkInventory reports (cross-type loss). The
+    # regex anchors on the timestamp's leading digit right after the prefix so
+    # it matches only the unsuffixed traffic filename.
     _REPORT_PREFIXES = {
-        "traffic":           "Illumio_Traffic_Report_SecurityRisk_",
+        "traffic":           re.compile(r"^Illumio_Traffic_Report_\d{4}-"),
         "security_risk":     "Illumio_Traffic_Report_SecurityRisk_",
         "network_inventory": "Illumio_Traffic_Report_NetworkInventory_",
         "audit":             "illumio_audit_report_",
@@ -628,11 +632,15 @@ class ReportScheduler:
         prefix = self._REPORT_PREFIXES.get(report_type)
         if not prefix:
             return
+        # 'prefix' is either a literal string (startswith) or a compiled regex
+        # (match) -- see _REPORT_PREFIXES.
+        matches = prefix.match if isinstance(prefix, re.Pattern) else \
+            (lambda fname: fname.startswith(prefix))
 
         # Group matching files into report units (report + its metadata sidecar).
         units: dict[str, dict] = {}
         for fname in os.listdir(output_dir):
-            if not (fname.startswith(prefix) and fname.endswith((".html", ".zip", ".json"))):
+            if not (matches(fname) and fname.endswith((".html", ".zip", ".json"))):
                 continue
             fpath = os.path.join(output_dir, fname)
             try:
