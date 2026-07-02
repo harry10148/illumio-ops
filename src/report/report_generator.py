@@ -352,7 +352,8 @@ class ReportGenerator:
                  src_ip, dst_ip, port, proto, ex_src_labels, ex_dst_labels,
                  ex_src_ip, ex_dst_ip, ex_port, policy_decisions).
         """
-        if traffic_report_profile not in ("security_risk", "network_inventory"):
+        from src.report.analysis import PROFILES
+        if traffic_report_profile not in PROFILES:
             raise ValueError(f"invalid traffic_report_profile: {traffic_report_profile!r}")
         if self.api is None:
             raise RuntimeError("api_client is required for generate_from_api()")
@@ -442,7 +443,8 @@ class ReportGenerator:
                           lang: str = "en",
                           vuln_csv_path: str | None = None) -> ReportResult:
         """Parse a CSV file from the PCE UI export and run the analysis pipeline."""
-        if traffic_report_profile not in ("security_risk", "network_inventory"):
+        from src.report.analysis import PROFILES
+        if traffic_report_profile not in PROFILES:
             raise ValueError(f"invalid traffic_report_profile: {traffic_report_profile!r}")
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
@@ -692,9 +694,12 @@ class ReportGenerator:
         print(t("rpt_running_analysis", count=f"{record_count:,}", lang=lang))
 
         # Rules engine
-        engine = RulesEngine(self._report_cfg, config_dir=self._config_dir, lang=lang)
-        findings = engine.evaluate(df)
-        print(t("rpt_rules_findings", count=len(findings), lang=lang))
+        if traffic_report_profile == "traffic":
+            findings = []
+        else:
+            engine = RulesEngine(self._report_cfg, config_dir=self._config_dir, lang=lang)
+            findings = engine.evaluate(df)
+            print(t("rpt_rules_findings", count=len(findings), lang=lang))
 
         # 15 modules
         results = self._run_modules(df, findings, traffic_report_profile=traffic_report_profile,
@@ -702,19 +707,23 @@ class ReportGenerator:
 
         # Label hygiene (Inventory profile section): workloads fetch is best-effort.
         # CSV-sourced reports have no inventory — flow-derived metrics only.
-        try:
-            from src.report.analysis.mod_labels import label_hygiene
-            _workloads = None
-            if source != 'csv' and self.api is not None:
-                _workloads = self.api.fetch_managed_workloads()
-            results["mod_labels"] = label_hygiene(df, _workloads, lang=lang)
-        except Exception as exc:  # noqa: BLE001 — hygiene must not break the report
-            logger.warning(f"[Report] label hygiene skipped: {exc}")
+        if traffic_report_profile != "traffic":
+            try:
+                from src.report.analysis.mod_labels import label_hygiene
+                _workloads = None
+                if source != 'csv' and self.api is not None:
+                    _workloads = self.api.fetch_managed_workloads()
+                results["mod_labels"] = label_hygiene(df, _workloads, lang=lang)
+            except Exception as exc:  # noqa: BLE001 — hygiene must not break the report
+                logger.warning(f"[Report] label hygiene skipped: {exc}")
+                results["mod_labels"] = {"workload_data_available": False,
+                                         "managed_unlabeled_flow_count": 0}
+        else:
             results["mod_labels"] = {"workload_data_available": False,
                                      "managed_unlabeled_flow_count": 0}
 
         # V-E lite: only when the operator supplies a vulnerability-scan CSV.
-        if getattr(self, "_vuln_csv_path", None):
+        if getattr(self, "_vuln_csv_path", None) and traffic_report_profile != "traffic":
             try:
                 from src.report.parsers.vuln_csv import load_vulns
                 from src.report.analysis.mod_vuln import vuln_exposure
@@ -783,7 +792,7 @@ class ReportGenerator:
         results: dict = {'findings': findings}
         module_errors: list = []
 
-        for mod_id, fn, adapter in get_traffic_modules():
+        for mod_id, fn, adapter in get_traffic_modules(traffic_report_profile):
             try:
                 results[mod_id] = adapter(fn, df, self._report_cfg, top_n, lang)
                 print(f"[Report]   {mod_id} ✓", end='  \r', flush=True)
