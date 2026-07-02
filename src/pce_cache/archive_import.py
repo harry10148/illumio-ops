@@ -106,3 +106,59 @@ class ArchiveImporter:
                     skipped += 1
         return {"rows": rows, "files": files, "skipped": skipped,
                 "start": start.isoformat(), "end": end.isoformat()}
+
+
+def review_db_path(cfg) -> str:
+    """review DB 放在 cache db_path 同目錄下，固定檔名。"""
+    base = os.path.dirname(os.path.abspath(cfg.db_path))
+    return os.path.join(base, "archive_review.sqlite")
+
+
+def _meta_path(cfg) -> str:
+    return review_db_path(cfg) + ".meta.json"
+
+
+def review_session_factory(cfg):
+    """對 review DB 建一個 sessionmaker（短命 engine，不用 process 快取，
+    避免 review DB 被重建後抓到舊連線）。"""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    engine = create_engine(f"sqlite:///{review_db_path(cfg)}")
+    init_schema(engine)
+    return sessionmaker(engine)
+
+
+def load_archive_review(cfg, start: date, end: date) -> dict:
+    """重建 review DB → 匯入範圍內 traffic archive → 跑聚合 → 寫 sidecar meta。"""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.aggregator import TrafficAggregator
+    db = review_db_path(cfg)
+    for suffix in ("", "-wal", "-shm"):
+        try:
+            os.remove(db + suffix)
+        except FileNotFoundError:
+            pass
+    engine = create_engine(f"sqlite:///{db}")
+    try:
+        init_schema(engine)
+        sf = sessionmaker(engine)
+        result = ArchiveImporter(cfg.archive_dir, sf).import_range(start, end)
+        TrafficAggregator(sf).run_once()
+    finally:
+        engine.dispose()  # 釋放檔案 handle，讓下次重建能安全刪檔
+    meta = {"loaded": True, "rows": result["rows"], "files": result["files"],
+            "skipped": result["skipped"], "start": result["start"], "end": result["end"]}
+    with open(_meta_path(cfg), "wb") as fh:
+        fh.write(orjson.dumps(meta))
+    return meta
+
+
+def review_status(cfg) -> dict:
+    try:
+        with open(_meta_path(cfg), "rb") as fh:
+            return orjson.loads(fh.read())
+    except FileNotFoundError:
+        return {"loaded": False}

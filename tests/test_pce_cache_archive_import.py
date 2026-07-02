@@ -109,3 +109,52 @@ def test_import_ignores_non_traffic_files(sf, archive_dir):
     res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
     assert res["rows"] == 1 and res["files"] == 1
     assert {r.flow_hash for r in _rows(sf)} == {"t1"}
+
+
+from types import SimpleNamespace
+
+
+def _cfg(tmp_path, archive_dir):
+    # review DB 會放在 db_path 同目錄；archive_review_max_days 由 route 用，這裡不需要
+    return SimpleNamespace(db_path=str(tmp_path / "cache.sqlite"), archive_dir=archive_dir)
+
+
+def test_load_review_rebuilds_imports_and_aggregates(tmp_path, archive_dir):
+    from src.pce_cache.archive_import import (
+        load_archive_review, review_status, review_db_path, review_session_factory)
+    from src.pce_cache.models import PceTrafficFlowAgg
+    from sqlalchemy import select
+    raw = {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 443, "action": "blocked"}
+    _write(archive_dir, "traffic-2026-06-20.jsonl", [_traffic_line("a1", "2026-06-20", raw)])
+    cfg = _cfg(tmp_path, archive_dir)
+
+    meta = load_archive_review(cfg, date(2026, 6, 1), date(2026, 6, 30))
+    assert meta["loaded"] is True and meta["rows"] == 1
+    assert os.path.exists(review_db_path(cfg))
+    # status 反映 meta
+    st = review_status(cfg)
+    assert st["loaded"] is True and st["rows"] == 1 and st["start"] == "2026-06-01"
+    # 聚合表有列（趨勢圖/KPI 用）
+    with review_session_factory(cfg)() as s:
+        assert len(s.execute(select(PceTrafficFlowAgg)).scalars().all()) >= 1
+
+
+def test_load_review_rebuilds_on_second_load(tmp_path, archive_dir):
+    from src.pce_cache.archive_import import load_archive_review, review_session_factory
+    from src.pce_cache.models import PceTrafficFlowRaw
+    from sqlalchemy import select
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 1, "action": "allowed"}
+    _write(archive_dir, "traffic-2026-06-05.jsonl", [_traffic_line("first", "2026-06-05", raw)])
+    _write(archive_dir, "traffic-2026-07-05.jsonl", [_traffic_line("second", "2026-07-05", raw)])
+    cfg = _cfg(tmp_path, archive_dir)
+
+    load_archive_review(cfg, date(2026, 6, 1), date(2026, 6, 30))   # 只含 first
+    load_archive_review(cfg, date(2026, 7, 1), date(2026, 7, 31))   # 重建後只含 second
+    with review_session_factory(cfg)() as s:
+        hashes = {r.flow_hash for r in s.execute(select(PceTrafficFlowRaw)).scalars().all()}
+    assert hashes == {"second"}   # 前一次載入已被重建清掉
+
+
+def test_review_status_empty_when_never_loaded(tmp_path, archive_dir):
+    from src.pce_cache.archive_import import review_status
+    assert review_status(_cfg(tmp_path, archive_dir)) == {"loaded": False}
