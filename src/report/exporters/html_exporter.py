@@ -1631,3 +1631,7 @@ class HtmlExporter(_TrafficReportBase):
             return NetworkInventoryHtmlExporter._ordered_section_keys(self)
         return SecurityRiskHtmlExporter._ordered_section_keys(self)
 
+
+class TrafficFlowsHtmlExporter(SecurityRiskHtmlExporter):
+    """Placeholder until the dedicated traffic-flows exporter lands (Task 5)."""
+

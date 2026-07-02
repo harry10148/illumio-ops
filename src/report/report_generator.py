@@ -498,29 +498,34 @@ class ReportGenerator:
         # Loads read the PREVIOUS run's files; saves archive this run's data.
         try:
             from src.report.trend_store import save_snapshot, load_previous, compute_deltas, build_kpi_dict_from_metadata, canonicalize_legacy_keys
+            _trend_key = f"traffic_{traffic_report_profile}"
             meta = self._build_report_metadata(result, file_format="snapshot")
             kpi_dict = build_kpi_dict_from_metadata(meta.get("kpis", []))
             ts = meta.get("generated_at", "")
-            prev = load_previous(output_dir, "traffic")
+            prev = load_previous(output_dir, _trend_key)
             prev = canonicalize_legacy_keys(prev, candidate_keys=list(kpi_dict.keys()))
-            save_snapshot(output_dir, "traffic", kpi_dict, generated_at=ts)
+            save_snapshot(output_dir, _trend_key, kpi_dict, generated_at=ts)
             if prev:
                 result.module_results["_trend_deltas"] = compute_deltas(kpi_dict, prev)
-            # Baseline drift: compare this run's flow signatures vs last run, then archive.
-            from src.report.flow_history import build_signatures, load_previous_signatures, save_signatures
-            from src.report.analysis.mod_drift import baseline_drift
-            if result.dataframe is not None and not result.dataframe.empty:
-                _prev_sigs, _prev_ts = load_previous_signatures(output_dir, "traffic")
-                result.module_results["mod_drift"] = baseline_drift(
-                    result.dataframe, prev_signatures=_prev_sigs, prev_generated_at=_prev_ts)
-                save_signatures(output_dir, "traffic", build_signatures(result.dataframe), generated_at=ts)
+            # Baseline drift is a security_risk-only section; other profiles
+            # neither render nor archive flow signatures.
+            if traffic_report_profile == "security_risk":
+                from src.report.flow_history import build_signatures, load_previous_signatures, save_signatures
+                from src.report.analysis.mod_drift import baseline_drift
+                if result.dataframe is not None and not result.dataframe.empty:
+                    _prev_sigs, _prev_ts = load_previous_signatures(output_dir, _trend_key)
+                    result.module_results["mod_drift"] = baseline_drift(
+                        result.dataframe, prev_signatures=_prev_sigs, prev_generated_at=_prev_ts)
+                    save_signatures(output_dir, _trend_key, build_signatures(result.dataframe), generated_at=ts)
         except Exception as e:
             logger.warning(f"[ReportGenerator] Trend snapshot failed: {e}")
 
         if fmt in ('html', 'all', 'all_raw'):
-            _exporter_cls = (NetworkInventoryHtmlExporter
-                             if traffic_report_profile == "network_inventory"
-                             else SecurityRiskHtmlExporter)
+            from src.report.exporters.html_exporter import TrafficFlowsHtmlExporter
+            _exporter_cls = {
+                "network_inventory": NetworkInventoryHtmlExporter,
+                "traffic": TrafficFlowsHtmlExporter,
+            }.get(traffic_report_profile, SecurityRiskHtmlExporter)
             path = _exporter_cls(
                 result.module_results,
                 data_source=result.data_source,
