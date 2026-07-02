@@ -422,6 +422,13 @@ class _TrafficReportBase:
         """Whether the summary hero shows the micro-segmentation maturity block."""
         raise NotImplementedError
 
+    def _filename(self, ts: str) -> str:
+        return f'Illumio_Traffic_Report_{self.REPORT_KIND or "SecurityRisk"}_{ts}.html'
+
+    def _hero_includes_findings(self) -> bool:
+        """Whether the hero card renders key-findings + attack summary."""
+        return True
+
     def build(self) -> str:
         """Public alias for _build(); returns the full HTML string."""
         return self._build()
@@ -430,7 +437,7 @@ class _TrafficReportBase:
         """Write HTML file and return full path."""
         os.makedirs(output_dir, exist_ok=True)
         ts = datetime.datetime.now().strftime('%Y-%m-%d_%H%M')
-        filename = f'Illumio_Traffic_Report_{self.REPORT_KIND or "SecurityRisk"}_{ts}.html'
+        filename = self._filename(ts)
         filepath = os.path.join(output_dir, filename)
 
         with open(filepath, 'w', encoding='utf-8') as f:
@@ -617,18 +624,28 @@ class _TrafficReportBase:
 
         # The summary hero: maturity block included only when the subclass opts in.
         _maturity_block = (f'<h2>{_s("rpt_tr_maturity_heading")}</h2>' + maturity_html) if self._include_maturity() else ''
+        _badge_html = {
+            "SecurityRisk": f'<div class="report-profile-badge report-profile-badge--security">{_s("rpt_kicker_security_risk")}</div>',
+            "NetworkInventory": f'<div class="report-profile-badge report-profile-badge--inventory">{_s("rpt_kicker_network_inventory")}</div>',
+            "Traffic": f'<div class="report-profile-badge report-profile-badge--traffic">{_s("rpt_kicker_traffic_flows")}</div>',
+        }[self.REPORT_KIND or "SecurityRisk"]
+        _title_key = {
+            "SecurityRisk": "rpt_security_report_title",
+            "NetworkInventory": "rpt_inventory_report_title",
+            "Traffic": "rpt_traffic_flows_report_title",
+        }[self.REPORT_KIND or "SecurityRisk"]
+        _findings_block = ((f'<h2>{_s("rpt_key_findings")}</h2>' + key_findings_html
+                            + attack_summary_html)
+                           if self._hero_includes_findings() else '')
         _hero = (
             '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
             f'<div class="report-kicker">{_s("rpt_kicker_traffic")}</div>'
-            + (f'<div class="report-profile-badge report-profile-badge--security">{_s("rpt_kicker_security_risk")}</div>'
-               if self.REPORT_KIND == "SecurityRisk" else
-               f'<div class="report-profile-badge report-profile-badge--inventory">{_s("rpt_kicker_network_inventory")}</div>')
-            + f'<h1>{_s("rpt_security_report_title" if self.REPORT_KIND == "SecurityRisk" else "rpt_inventory_report_title")}</h1>'
+            + _badge_html
+            + f'<h1>{_s(_title_key)}</h1>'
             f'<p class="report-subtitle">{_s("rpt_generated")} ' + generated_at + '</p></div>'
             + summary_pills + _maturity_block + trend_html
-            + f'<h2>{_s("rpt_key_findings")}</h2>' + key_findings_html
-            + attack_summary_html + '</section>\n'
+            + _findings_block + '</section>\n'
         )
 
         _sec = {
@@ -688,6 +705,16 @@ class _TrafficReportBase:
         body += f'<footer>{_s("rpt_tr_footer")} &middot; {today_str}</footer>'
         if self._profile == "network_inventory":
             _report_title = t("rpt_cover_type_inventory", lang=self._lang)
+            cover_html = _build_cover_page(
+                title=_report_title,
+                report_type=_report_title,
+                date_range=self._date_range,
+                pce_url=self._pce_url,
+                org_name=self._org_name,
+                lang=self._lang,
+            )
+        elif self._profile == "traffic":
+            _report_title = t("rpt_cover_type_traffic", lang=self._lang)
             cover_html = _build_cover_page(
                 title=_report_title,
                 report_type=_report_title,
@@ -1632,6 +1659,69 @@ class HtmlExporter(_TrafficReportBase):
         return SecurityRiskHtmlExporter._ordered_section_keys(self)
 
 
-class TrafficFlowsHtmlExporter(SecurityRiskHtmlExporter):
-    """Placeholder until the dedicated traffic-flows exporter lands (Task 5)."""
+class TrafficFlowsHtmlExporter(_TrafficReportBase):
+    """Plain traffic-facts report: no scoring, no security analysis (spec A)."""
+
+    REPORT_KIND = "Traffic"
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("profile", "traffic")
+        super().__init__(*args, **kwargs)
+
+    def _include_maturity(self) -> bool:
+        return False
+
+    def _hero_includes_findings(self) -> bool:
+        return False
+
+    def _filename(self, ts: str) -> str:
+        return f'Illumio_Traffic_Report_{ts}.html'
+
+    def _ordered_section_keys(self) -> list[str]:
+        return ['summary', 'overview', 'policy', 'distribution', 'bandwidth', 'unmanaged']
+
+    def _mod02_html(self):
+        # Summary table + decision chart only — no per-decision app-flow detail.
+        _lang = self._lang
+        m = self._r.get('mod02', {}) or {}
+        chart_html = _render_chart_for_html(m.get('chart_spec'), lang=_lang)
+        table_html = self._subnote('rpt_tr_mod02_intro') + _df_to_html(m.get('summary'), lang=_lang)
+        return ('<div class="section-top">' + chart_html + '</div>'
+                + '<div class="section-bottom">' + table_html + '</div>')
+
+    def _mod09_html(self):
+        # App / Env distribution only (role/loc are inventory concerns).
+        _s = self._s
+        _lang = self._lang
+        m = self._r.get('mod09', {}) or {}
+        dist = m.get('label_distribution', {}) or {}
+        out = ''
+        for key in ('app', 'env'):
+            for side in ('src', 'dst'):
+                d = dist.get(f'{side}_{key}')
+                if d is not None and hasattr(d, 'empty') and not d.empty:
+                    out += _df_to_html(d, lang=_lang)
+        pd_ = m.get('port_distribution')
+        if pd_ is not None and hasattr(pd_, 'empty') and not pd_.empty:
+            out += f'<h3>{_s("rpt_tr_port_distribution")}</h3>' + _df_to_html(pd_, lang=_lang)
+        proto = m.get('proto_distribution')
+        if proto is not None and hasattr(proto, 'empty') and not proto.empty:
+            out += f'<h3>{_s("rpt_tr_proto_distribution")}</h3>' + _df_to_html(proto, lang=_lang)
+        return out
+
+    def _mod08_html(self):
+        # Unmanaged overview: KPI strip + top sources table only.
+        _s = self._s
+        _lang = self._lang
+        m = self._r.get('mod08', {}) or {}
+        return (
+            '<div class="coverage-grid">'
+            + _cov_stat(_s('rpt_tr_unmanaged_flow_stat'), str(m.get('unmanaged_flow_count', 0)) + ' (' + str(m.get('unmanaged_pct', 0)) + '%)')
+            + _cov_stat(_s('rpt_tr_unique_unmanaged_src'), str(m.get('unique_unmanaged_src', 0)))
+            + _cov_stat(_s('rpt_tr_unique_unmanaged_dst'), str(m.get('unique_unmanaged_dst', 0)))
+            + '</div>'
+            + self._subnote('rpt_tr_unmanaged_subnote')
+            + f'<h3>{_s("rpt_tr_top_unmanaged")}</h3>'
+            + _df_to_html(m.get('top_unmanaged_src'), lang=_lang)
+        )
 

@@ -89,6 +89,7 @@ BASE_CSS = """\
   .report-profile-badge { display: inline-block; padding: 4px 12px; margin-bottom: 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
   .report-profile-badge--security { background: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
   .report-profile-badge--inventory { background: #DBEAFE; color: #1E40AF; border: 1px solid #93C5FD; }
+  .report-profile-badge--traffic { background: #DCFCE7; color: #166534; border: 1px solid #86EFAC; }
   .section-intro { margin: 0 0 14px; color: var(--slate-50); font-size: 12px; line-height: 1.6; }
 
   .kpi-grid { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; }
