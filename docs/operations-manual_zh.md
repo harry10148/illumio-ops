@@ -252,7 +252,7 @@ cp config/config.json.example config/config.json
 | `settings` | `language`（`en` / `zh_TW`）、`theme`、`timezone`、`enable_health_check`、`dashboard_queries`。 |
 | `report` / `report_schedules` | 報表預設與排程清單。 |
 | `rule_scheduler` | `enabled`、`check_interval_seconds`（預設 300）。 |
-| `scheduler` | APScheduler 持久化：`persist`、`db_path`。 |
+| `scheduler` | `persist`、`db_path` — 已棄用，不再生效（僅使用記憶體 job store；`persist=true` 只會記一筆 warning）。 |
 | `web_gui` | `username`、`password`（Argon2id 雜湊）、`secret_key`、`allowed_ips`、`tls{...}`、`must_change_password`。 |
 | `logging` | `level`、`json_sink`、`rotation`（如 `10 MB`）、`retention`。 |
 | `pce_cache` | 本地 SQLite 快取設定（見 [8.1](#81-pce-cache保留策略)）。 |

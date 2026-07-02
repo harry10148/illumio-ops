@@ -21,13 +21,19 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     """Factory for a BackgroundScheduler wired with illumio_ops jobs.
 
     Does NOT call sched.start() — caller owns lifecycle.
-    When config.scheduler.persist=true, uses SQLAlchemyJobStore so jobs
-    survive daemon restarts (requires SQLAlchemy installed).
+    config.scheduler.persist is deprecated and no longer honored (see
+    SchedulerSettings docstring): jobs always use the default in-memory
+    job store; persist=true only logs a warning.
     """
-    import os
-
     rule_interval = cm.config.get("rule_scheduler", {}).get("check_interval_seconds", 300)
     sched_cfg = cm.config.get("scheduler", {}) or {}
+
+    if sched_cfg.get("persist"):
+        logger.warning(
+            "scheduler.persist=true is deprecated and no longer honored "
+            "(SQLAlchemy job store removed — see SchedulerSettings docstring); "
+            "ignoring, using in-memory job store"
+        )
 
     executors = {
         "default": ThreadPoolExecutor(max_workers=5),
@@ -44,21 +50,6 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     }
 
     kwargs: dict = {"executors": executors, "job_defaults": job_defaults}
-
-    if sched_cfg.get("persist"):
-        try:
-            from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
-            db_path = sched_cfg.get("db_path", "config/scheduler.db")
-            if not os.path.isabs(db_path):
-                pkg_dir = os.path.dirname(os.path.abspath(__file__))
-                root_dir = os.path.dirname(os.path.dirname(pkg_dir))
-                db_path = os.path.join(root_dir, db_path)
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-            url = f"sqlite:///{db_path}"
-            kwargs["jobstores"] = {"default": SQLAlchemyJobStore(url=url)}
-            logger.info("Scheduler using persistent SQLite jobstore: {}", db_path)
-        except ImportError:
-            logger.warning("scheduler.persist=true but SQLAlchemy not installed; using MemoryJobStore")
 
     sched = BackgroundScheduler(**kwargs)
 
@@ -170,9 +161,8 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         logger.exception("Failed to register SIEM scheduler jobs: {}", exc)
 
     logger.info(
-        "Scheduler built: monitor={}m report=60s rule={}s persist={}",
+        "Scheduler built: monitor={}m report=60s rule={}s",
         interval_minutes,
         rule_interval,
-        bool(sched_cfg.get("persist")),
     )
     return sched

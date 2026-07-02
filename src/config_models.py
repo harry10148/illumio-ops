@@ -146,8 +146,16 @@ class RuleSchedulerSettings(_Base):
     check_interval_seconds: int = Field(default=300, ge=60)   # min 1 minute
 
 class SchedulerSettings(_Base):
-    persist: bool = False          # enable SQLAlchemy job store for daemon restart durability
-    db_path: str = "config/scheduler.db"
+    """APScheduler 執行期設定。
+
+    persist/db_path 已棄用：SQLAlchemy 持久化 job store 已移除——build_scheduler
+    以 args=[cm] 註冊 job，ConfigManager 持有 RLock 無法 pickle；且所有 job 皆為
+    interval 型、每次 build 時 replace_existing=True 全部重建，persist 對這類
+    job 本就無收益。欄位保留只為向下相容舊 config：persist=true 時忽略並記一筆
+    warning，不拒絕啟動。
+    """
+    persist: bool = False          # deprecated — 不再生效，見上方說明
+    db_path: str = "config/scheduler.db"  # deprecated — persist 移除後不使用
 
 class WebGuiTls(_Base):
     enabled: bool = True

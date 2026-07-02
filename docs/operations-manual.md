@@ -252,7 +252,7 @@ cp config/config.json.example config/config.json
 | `settings` | `language` (`en` / `zh_TW`), `theme`, `timezone`, `enable_health_check`, `dashboard_queries`. |
 | `report` / `report_schedules` | Report defaults and the schedule list. |
 | `rule_scheduler` | `enabled`, `check_interval_seconds` (default 300). |
-| `scheduler` | APScheduler persistence: `persist`, `db_path`. |
+| `scheduler` | `persist`, `db_path` — deprecated, no longer used (in-memory job store only; `persist=true` just logs a warning). |
 | `web_gui` | `username`, `password` (Argon2id hash), `secret_key`, `allowed_ips`, `tls{...}`, `must_change_password`. |
 | `logging` | `level`, `json_sink`, `rotation` (e.g. `10 MB`), `retention`. |
 | `pce_cache` | Local SQLite cache settings (see [8.1](#81-pce-cache-and-retention-policy)). |
