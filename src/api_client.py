@@ -98,6 +98,15 @@ class ApiClient:
         self.api_cfg = self.cm.config["api"]
         self.base_url = f"{self.api_cfg['url']}/api/v2/orgs/{self.api_cfg['org_id']}"
         self._auth_header = self._build_auth_header()
+        # 熱路徑修正：rpm 在建構時讀一次快取，_request 不再每次呼叫都重建 ConfigManager。
+        # getattr 容錯：某些呼叫端（例如 report_scheduler 測試）用不含 .models 的輕量
+        # namespace 充當 config_manager；缺 .models 時退回 400，與舊行為的 fallback 一致。
+        self._rate_limit_per_minute = getattr(
+            getattr(self.cm, "models", None), "pce_cache", None
+        )
+        self._rate_limit_per_minute = getattr(
+            self._rate_limit_per_minute, "rate_limit_per_minute", 400
+        )
 
         # ── Caches (TTL) + lock — owned by facade so tests can mutate directly ──
         # Use time.time (wall clock) so freezegun can control expiry in tests.
@@ -192,14 +201,7 @@ class ApiClient:
             raise RuntimeError("ApiClient is closed; create a new instance")
         if rate_limit:
             from src.pce_cache.rate_limiter import get_rate_limiter
-            rpm = 400
-            try:
-                from src.config import ConfigManager
-                cm = ConfigManager()
-                rpm = cm.models.pce_cache.rate_limit_per_minute
-            except Exception:
-                pass
-            if not get_rate_limiter(rate_per_minute=rpm).acquire(timeout=30.0):
+            if not get_rate_limiter(rate_per_minute=self._rate_limit_per_minute).acquire(timeout=30.0):
                 from src.exceptions import APIError
                 raise APIError("Global rate limiter timeout — PCE 500/min budget exhausted")
         req_headers = {}
@@ -255,10 +257,11 @@ class ApiClient:
         return url
 
     def fetch_events_strict(self, start_time_str: str, end_time_str: str | None = None,
-                            max_results: int = 5000, event_type: str | None = None) -> list[dict[str, Any]]:
+                            max_results: int = 5000, event_type: str | None = None,
+                            rate_limit: bool = False) -> list[dict[str, Any]]:
         url = self._build_events_url(start_time_str, end_time_str=end_time_str,
                                      max_results=max_results, event_type=event_type)
-        status, body = self._request(url, timeout=30)
+        status, body = self._request(url, timeout=30, rate_limit=rate_limit)
         if status != 200:
             err_msg = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
             raise EventFetchError(status, err_msg[:1000])
@@ -273,12 +276,14 @@ class ApiClient:
 
         return data
 
-    def fetch_events(self, start_time_str: str, end_time_str: str | None = None, max_results: int = 5000) -> list[dict[str, Any]]:
+    def fetch_events(self, start_time_str: str, end_time_str: str | None = None, max_results: int = 5000,
+                     rate_limit: bool = False) -> list[dict[str, Any]]:
         try:
             return self.fetch_events_strict(
                 start_time_str,
                 end_time_str=end_time_str,
                 max_results=max_results,
+                rate_limit=rate_limit,
             )
         except EventFetchError as e:
             logger.error(f"Get Events Failed: {e.status} - {e.message}")
@@ -294,6 +299,7 @@ class ApiClient:
         return self.fetch_events(
             start_time_str=since or "",
             max_results=max_results,
+            rate_limit=rate_limit,
         )
 
     def get_events_async(self, since: str | None = None, rate_limit: bool = False, **kwargs: Any) -> list[dict[str, Any]]:
@@ -308,7 +314,16 @@ class ApiClient:
         if since is None:
             since = (datetime.now(timezone.utc) - timedelta(hours=24)).replace(microsecond=0).isoformat()
         with contextlib.redirect_stdout(io.StringIO()):
-            return self.fetch_traffic_for_report(start_time_str=since, end_time_str=end_time) or []
+            flows = self.fetch_traffic_for_report(start_time_str=since, end_time_str=end_time) or []
+        # fetch_traffic_for_report has no max_results parameter (native payload
+        # always requests MAX_TRAFFIC_RESULTS); enforce the caller's cap here so
+        # cache ingestion gets the bound it asked for instead of silently ignoring it.
+        if max_results is not None and len(flows) > max_results:
+            logger.warning(
+                f"get_traffic_flows_async: truncating {len(flows)} flows to max_results={max_results}"
+            )
+            flows = flows[:max_results]
+        return flows
 
     # ═══════════════════════════════════════════════════════════════════════
     # LabelResolver delegation wrappers

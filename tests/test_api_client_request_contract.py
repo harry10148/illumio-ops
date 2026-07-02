@@ -109,3 +109,57 @@ def test_verify_ssl_true_uses_system_ca():
                          "verify_ssl": True}}
     api = ApiClient(cm)
     assert api._session.verify is True
+
+
+# ── Task C1: rate-limit hot path + dead-parameter wiring ──────────────────
+
+
+@responses.activate
+def test_request_rate_limit_does_not_construct_config_manager(api_client, monkeypatch):
+    """_request(rate_limit=True) must use the cached rpm from __init__, never
+    rebuild a ConfigManager per request (full config.json read + pydantic
+    validation on every rate-limited call)."""
+    from src.pce_cache.rate_limiter import reset_for_tests
+    reset_for_tests()
+    api_client._rate_limit_per_minute = 6000  # large bucket so acquire() never blocks
+
+    spy = MagicMock(side_effect=lambda *a, **kw: MagicMock(
+        models=MagicMock(pce_cache=MagicMock(rate_limit_per_minute=400))
+    ))
+    monkeypatch.setattr("src.config.ConfigManager", spy)
+
+    url = "https://pce.example.com:8443/api/v2/test"
+    responses.add(responses.GET, url, status=200, body=b'{"ok": true}')
+
+    status, _ = api_client._request(url, rate_limit=True)
+
+    assert status == 200
+    spy.assert_not_called()
+
+
+def test_get_events_rate_limit_true_reaches_request(api_client):
+    """get_events(rate_limit=True) must actually flow into _request's
+    rate-limit gate, not silently drop the flag."""
+    calls = []
+
+    def fake_request(url, **kwargs):
+        calls.append(kwargs.get("rate_limit"))
+        return 200, b"[]"
+
+    api_client._request = fake_request
+
+    api_client.get_events(max_results=10, since="2026-01-01T00:00:00Z", rate_limit=True)
+
+    assert calls == [True]
+
+
+def test_get_traffic_flows_async_enforces_max_results(api_client):
+    """get_traffic_flows_async(max_results=N) must actually cap the returned
+    flows, since fetch_traffic_for_report has no max_results parameter of
+    its own to forward the cap to."""
+    fake_flows = [{"i": i} for i in range(10)]
+    api_client.fetch_traffic_for_report = MagicMock(return_value=fake_flows)
+
+    result = api_client.get_traffic_flows_async(max_results=3, since="2026-01-01T00:00:00Z")
+
+    assert result == fake_flows[:3]
