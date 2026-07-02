@@ -127,6 +127,20 @@ draft 分析、vuln、labels。不抓 workloads、不需 vuln CSV。
 2. Drift「消失配對」過濾 ICMP、port 0、ephemeral 高 port；
    `(unlabeled)→(unlabeled)` 配對收合成一行統計。
 
+## N. PDF 匯出與表格版面（全報表一致性）
+
+1. 所有 HTML 報表都要有「列印 / PDF」按鈕：policy_diff、app_summary 兩個
+   exporter 目前缺少（其餘報表已有 `print-btn` + `window.print()`）。
+   之後新增的報表一律必須帶此按鈕（納入共用版型/檢查）。
+2. 表格欄寬必須配合 PDF 版面：使用者不得需要水平拖拉才能看到內容。
+   - 螢幕呈現：`.report-table-wrap` 不得依賴 `overflow: auto` 水平捲動
+     呈現主要內容；欄位內容改為自動換行（`white-space: normal` +
+     `word-break`），寬表以欄寬收斂與內容截斷（tooltip 顯示全文）處理。
+   - 列印呈現：`@media print` 下表格必須完整落在 A4 版面內
+     （`table-layout: fixed` + 換行），不得裁切欄位。
+   - 各報表 HTML 表格欄數以列印可讀為上限原則（過寬的明細表改下放
+     CSV/XLSX，與「HTML 給結論、明細給 XLSX」原則一致）。
+
 ## 不做的事（另案）
 
 - 宣告式報表定義重構。
@@ -149,7 +163,7 @@ draft 分析、vuln、labels。不抓 workloads、不需 vuln CSV。
 1. Phase 1：Profile 感知模組執行 + 新 Traffic 報表 + CLI（A、D、E）。
 2. Phase 2：Security 呈現簡化 + 死碼清理（B）。
 3. Phase 3：Inventory 精簡（C）。
-4. Phase 4：顯示層修正批次（F）。
+4. Phase 4：顯示層修正批次（F）+ PDF 匯出與表格版面一致性（N）。
 5. Phase 5：Audit / Policy Usage / VEN 精簡（I、J、K）。
 6. Phase 6：趨勢與 Drift 可信度（L）。
 
