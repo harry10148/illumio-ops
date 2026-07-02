@@ -316,6 +316,84 @@ class TestRunRuleEngine(unittest.TestCase):
         self.assertEqual(res["max_val"], 1.0)
 
 
+# ─── _run_rule_engine: bounded top_matches accumulation (Task C6) ────────────
+
+class TestRunRuleEngineBoundedTopN(unittest.TestCase):
+    """Behavior lock: _run_rule_engine must not accumulate unbounded top_matches
+    (O(flows) memory). The accumulated structure must stay bounded to the same
+    N that _dispatch_alerts trims to (currently 10), and the resulting top-10
+    set/order (after dispatch's own final sort) must be identical to the
+    original 'accumulate everything, then stable-sort descending, slice[:10]'
+    algorithm — including tie-break behavior at the rank-10/11 boundary.
+    """
+
+    def _volume_flow(self, mb: float, idx: int):
+        return {**_flow(), "dst_dbo": int(mb * 1024 * 1024), "dst_dbi": 0, "id": idx}
+
+    def test_accumulated_structure_stays_bounded_to_dispatch_limit(self):
+        """White-box bound: len(top_matches) after the engine run must never
+        exceed the dispatch-side top-N (10), even with far more matching flows."""
+        rule = _traffic_rule("r1", "volume", threshold=0)
+        az = _make_analyzer([rule])
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        flows = [self._volume_flow(mb=float(i), idx=i) for i in range(37)]
+
+        with patch.object(az, "check_flow_match", return_value=True):
+            result = az._run_rule_engine(iter(flows), [rule], now_utc)
+
+        _, res = result[0]
+        self.assertLessEqual(len(res["top_matches"]), 10)
+
+    def test_bounded_top_matches_equals_golden_full_sort_with_boundary_ties(self):
+        """Golden-oracle equivalence: with >10 matches including a 3-way tie
+        straddling the rank-10/11 cutoff, the bounded accumulation must select
+        the exact same top-10 set/order as full-accumulate + stable sort.
+
+        Flow layout (15 flows):
+          idx 0..8  -> unique volumes 15,14,...,7 MB   (9 flows, all in top 10)
+          idx 9..11 -> tied volume 6 MB                (3-way tie for the 10th slot)
+          idx 12..14 -> volumes 3,2,1 MB                (below cutoff, excluded)
+        Original algorithm (stable sort desc by metric, ties keep append order)
+        picks idx 9 (earliest of the tie) for the 10th slot, dropping idx 10/11.
+        """
+        rule = _traffic_rule("r1", "volume", threshold=0)
+        az = _make_analyzer([rule])
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+
+        flows = []
+        for i in range(9):
+            flows.append(self._volume_flow(mb=float(15 - i), idx=i))  # 15..7
+        for i in range(9, 12):
+            flows.append(self._volume_flow(mb=6.0, idx=i))            # tie at 6
+        for i, mb in zip(range(12, 15), (3.0, 2.0, 1.0)):
+            flows.append(self._volume_flow(mb=mb, idx=i))             # below cutoff
+
+        with patch.object(az, "check_flow_match", return_value=True):
+            result = az._run_rule_engine(iter(flows), [rule], now_utc)
+
+        _, res = result[0]
+        self.assertLessEqual(len(res["top_matches"]), 10)
+
+        # Golden oracle: replicate the ORIGINAL unbounded algorithm inline.
+        all_matches = []
+        for f in flows:
+            vol_val, _ = az.calculate_volume_mb(f)
+            fc = dict(f)
+            fc["_metric_val"] = vol_val
+            all_matches.append(fc)
+        all_matches.sort(key=lambda x: x.get("_metric_val", 0), reverse=True)
+        golden_top10_ids = [m["id"] for m in all_matches[:10]]
+
+        # Dispatch performs its own final stable sort on whatever top_matches
+        # it receives; simulate that step here to compare final dispatch order.
+        dispatch_sorted = sorted(
+            res["top_matches"], key=lambda x: x.get("_metric_val", 0), reverse=True
+        )
+        self.assertEqual([m["id"] for m in dispatch_sorted], golden_top10_ids)
+        self.assertEqual(golden_top10_ids[:9], list(range(9)))
+        self.assertEqual(golden_top10_ids[9], 9)  # earliest of the 3-way tie wins
+
+
 # ─── _dispatch_alerts ─────────────────────────────────────────────────────────
 
 class TestDispatchAlerts(unittest.TestCase):

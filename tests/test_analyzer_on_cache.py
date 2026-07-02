@@ -232,6 +232,36 @@ class TestAnalyzerOnCache(unittest.TestCase):
         # once for the gap (raises), once for the full-range fallthrough.
         self.assertEqual(az.api.execute_traffic_query_stream.call_count, 2)
 
+    def test_query_flows_hybrid_gap_end_excludes_cache_start(self):
+        """Behavior lock (Task C6): the API gap query and the cache read must
+        not both include the flow sitting exactly on cache_start. read_flows_raw
+        is inclusive on both ends ('last_detected >= start'), so the gap query's
+        end boundary sent to the API must be strictly before cache_start (a
+        half-open [start, cache_start) gap) — not cache_start itself, which
+        would double-count any flow whose last_detected == cache_start.
+        """
+        az = _make_analyzer()
+        cr = _make_cache_reader_for_flows(cover_state="partial", cache_start=_CACHE_START)
+        az._cache_reader = cr
+        az.api.execute_traffic_query_stream.return_value = iter([])
+        az.api.build_traffic_query_spec = MagicMock(return_value=MagicMock(
+            report_only_filters={}, requires_draft_pd=False,
+        ))
+
+        az._fetch_query_flows(
+            _START, _END, ["allowed"], az.api.build_traffic_query_spec({}), False,
+        )
+
+        gap_end_arg = az.api.execute_traffic_query_stream.call_args[0][1]
+        gap_end_dt = datetime.datetime.strptime(gap_end_arg, '%Y-%m-%dT%H:%M:%SZ').replace(
+            tzinfo=datetime.timezone.utc)
+        self.assertLess(gap_end_dt, _CACHE_START)
+
+        # Cache read must still start exactly at cache_start (unchanged contract).
+        cr.read_flows_raw.assert_called_once()
+        cache_read_start = cr.read_flows_raw.call_args[0][0]
+        self.assertEqual(cache_read_start, _CACHE_START)
+
 
 if __name__ == "__main__":
     unittest.main()

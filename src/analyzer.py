@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import heapq
 import json
 import gc
 import os
@@ -30,6 +31,11 @@ from src.interfaces import IApiClient, IReporter
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
 STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
+
+# Number of top matches _dispatch_alerts keeps per triggered rule (see its
+# `top_10 = res['top_matches'][:10]`). _run_rule_engine bounds its per-rule
+# accumulation to this same N so it never grows past what dispatch uses.
+TOP_MATCHES_LIMIT = 10
 
 # ─── Standalone Calculators (shared by Analyzer and Report modules) ──────────
 
@@ -708,6 +714,24 @@ class Analyzer:
         traffic_stream, now_utc = self._legacy_fetch_traffic()
         return traffic_stream, tr_rules, now_utc
 
+    @staticmethod
+    def _push_bounded_top_match(heap: list, metric_val: float, idx: int, item: dict, limit: int) -> None:
+        """Maintain `heap` as the bounded top-`limit` matches by metric_val.
+
+        Tie-break matches the original 'accumulate everything, then stable
+        sort descending' behavior: on equal metric_val, the earlier-appended
+        flow (smaller idx) wins the remaining slot. Entries are
+        (metric_val, -idx, item) so heapq's min-heap root is always the
+        current worst entry (lowest metric_val; on ties, the most recently
+        appended one), which is exactly what a better/tied-but-later new
+        entry should evict.
+        """
+        entry = (metric_val, -idx, item)
+        if len(heap) < limit:
+            heapq.heappush(heap, entry)
+        elif entry > heap[0]:
+            heapq.heapreplace(heap, entry)
+
     def _run_rule_engine(self, traffic_stream: Any, tr_rules: list, now_utc: datetime.datetime) -> list:
         """Iterate over traffic flows and accumulate per-rule match results.
 
@@ -719,8 +743,16 @@ class Analyzer:
         Returns:
             List of (rule, result_dict) pairs for ALL rules, each paired with
             its accumulated result containing max_val and top_matches.
+
+        top_matches accumulation is bounded to TOP_MATCHES_LIMIT per rule
+        (via a min-heap) instead of collecting every matching flow — dispatch
+        only ever keeps the top 10 anyway, so unbounded accumulation was
+        O(flows) memory for no observable benefit. The bounded structure
+        preserves the same top-N set and order dispatch would have derived
+        from the full accumulation (see _push_bounded_top_match tie-break).
         """
         rule_results: dict[Any, dict[str, Any]] = {r['id']: {'max_val': 0.0, 'top_matches': []} for r in tr_rules}
+        top_heaps: dict[Any, list] = {r['id']: [] for r in tr_rules}
 
         count_processed = 0
         for f in traffic_stream:
@@ -739,6 +771,7 @@ class Analyzer:
                     continue
 
                 res = rule_results[rid]
+                heap = top_heaps[rid]
 
                 if rule["type"] == "bandwidth":
                     if bw_val > res['max_val']:
@@ -747,23 +780,31 @@ class Analyzer:
                         f_copy = f.copy()
                         f_copy['_metric_val'] = bw_val
                         f_copy['_metric_fmt'] = f"{format_unit(bw_val, 'bandwidth')} {bw_note}"
-                        res['top_matches'].append(f_copy)
+                        self._push_bounded_top_match(heap, bw_val, count_processed, f_copy, TOP_MATCHES_LIMIT)
 
                 elif rule["type"] == "volume":
                     res['max_val'] += vol_val
                     f_copy = f.copy()
                     f_copy['_metric_val'] = vol_val
                     f_copy['_metric_fmt'] = f"{format_unit(vol_val, 'volume')} {vol_note}"
-                    res['top_matches'].append(f_copy)
+                    self._push_bounded_top_match(heap, vol_val, count_processed, f_copy, TOP_MATCHES_LIMIT)
 
                 else:  # Traffic Count
                     res['max_val'] += conn_val
                     f_copy = f.copy()
                     f_copy['_metric_val'] = conn_val
                     f_copy['_metric_fmt'] = str(conn_val)
-                    res['top_matches'].append(f_copy)
+                    self._push_bounded_top_match(heap, conn_val, count_processed, f_copy, TOP_MATCHES_LIMIT)
 
         logger.info(t('found_traffic', count=count_processed))
+
+        # Restore append order (ascending idx) within each rule's bounded set
+        # so downstream consumers (_dispatch_alerts' own stable sort) see the
+        # same tie-break behavior as the original unbounded accumulation.
+        for rid, heap in top_heaps.items():
+            rule_results[rid]['top_matches'] = [
+                item for (_, _, item) in sorted(heap, key=lambda e: -e[1])
+            ]
 
         # Return a flat list of (rule, result) pairs for all rules
         return [(rule, rule_results[rule['id']]) for rule in tr_rules]
@@ -790,7 +831,7 @@ class Analyzer:
 
             if is_trigger and self._check_cooldown(rule):
                 res['top_matches'].sort(key=lambda x: x.get('_metric_val', 0), reverse=True)
-                top_10 = res['top_matches'][:10]
+                top_10 = res['top_matches'][:TOP_MATCHES_LIMIT]
                 self.stats.record_rule_trigger(rule, match_count=len(top_10), metric_value=val)
 
                 ctr = Counter([self.get_traffic_details_key(m) for m in top_10])
@@ -920,17 +961,30 @@ class Analyzer:
         if state == "partial":
             cache_start = self._cache_reader.earliest_data_timestamp("traffic")
             if cache_start is not None and cache_start > start_dt:
-                gap_end = cache_start.strftime('%Y-%m-%dT%H:%M:%SZ')
+                # Half-open gap window: cache.read_flows_raw is inclusive on
+                # both ends ('last_detected >= cache_start'), so an API gap
+                # query ending exactly at cache_start would double-count any
+                # flow whose last_detected == cache_start. Shift the API gap
+                # end back by 1s (the API's timestamp resolution) so the gap
+                # covers [start_dt, cache_start) and the cache covers
+                # [cache_start, end_dt] — each flow counted exactly once.
+                gap_end_dt = cache_start - datetime.timedelta(seconds=1)
                 logger.info(
-                    "query_flows: hybrid fetch — API gap [{} → {}), cache [{} → {}]",
-                    start_dt, cache_start, cache_start, end_dt,
+                    "query_flows: hybrid fetch — API gap [{} → {}], cache [{} → {}]",
+                    start_dt, gap_end_dt, cache_start, end_dt,
                 )
                 try:
-                    gap_stream = self.api.execute_traffic_query_stream(
-                        start_time, gap_end, query_pds,
-                        filters=query_spec, compute_draft=needs_draft,
-                    )
-                    gap_list = list(gap_stream) if gap_stream is not None else []
+                    if gap_end_dt >= start_dt:
+                        gap_end = gap_end_dt.strftime('%Y-%m-%dT%H:%M:%SZ')
+                        gap_stream = self.api.execute_traffic_query_stream(
+                            start_time, gap_end, query_pds,
+                            filters=query_spec, compute_draft=needs_draft,
+                        )
+                        gap_list = list(gap_stream) if gap_stream is not None else []
+                    else:
+                        # Sub-second gap: nothing meaningful left for the API
+                        # to fetch after the -1s shift.
+                        gap_list = []
                 except Exception as exc:
                     logger.warning(
                         "query_flows hybrid: API gap fetch failed ({}); falling back to full API path", exc,
