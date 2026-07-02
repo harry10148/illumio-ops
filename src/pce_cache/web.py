@@ -5,9 +5,9 @@ import threading
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required
-from loguru import logger
 
 from src.i18n import t
+from src.gui._helpers import _err_with_log
 
 bp = Blueprint("pce_cache", __name__, url_prefix="/api/cache")
 
@@ -81,8 +81,7 @@ def api_cache_backfill():
             "elapsed_seconds": result.elapsed_seconds,
         })
     except Exception as e:
-        logger.exception("cache backfill error: {}", e)
-        return jsonify({"error": str(e)}), 500
+        return _err_with_log("cache_backfill", e, lang=lang)
 
 
 @bp.route("/retention/run", methods=["POST"])
@@ -105,8 +104,7 @@ def api_cache_retention_run():
         )
         return jsonify(result)
     except Exception as e:
-        logger.exception("cache retention error: {}", e)
-        return jsonify({"error": str(e)}), 500
+        return _err_with_log("cache_retention_run", e, lang=lang)
 
 
 @bp.route("/status", methods=["GET"])
@@ -131,8 +129,7 @@ def api_cache_status():
                 result[key] = s.execute(select(func.count()).select_from(model)).scalar() or 0
         return jsonify(result)
     except Exception as e:
-        logger.exception("cache status error: {}", e)
-        return jsonify({"error": str(e)}), 500
+        return _err_with_log("cache_status", e, lang=lang)
 
 
 @bp.route("/lag", methods=["GET"])
@@ -167,8 +164,7 @@ def api_cache_lag():
         ]
         return jsonify({"sources": sources})
     except Exception as e:
-        logger.exception("cache lag error: {}", e)
-        return jsonify({"error": str(e)}), 500
+        return _err_with_log("cache_lag", e, lang=lang)
 
 
 @bp.route("/health", methods=["GET"])
@@ -217,8 +213,7 @@ def api_cache_health():
             "dlq": totals["dlq"],
         })
     except Exception as e:
-        logger.exception("cache health error: {}", e)
-        return jsonify({"error": str(e)}), 500
+        return _err_with_log("cache_health", e, lang=lang)
 
 
 @bp.route("/throughput", methods=["GET"])
@@ -297,8 +292,7 @@ def load_archive():
         return jsonify({"ok": False,
                         "error": t("gui_traffic_archive_load_busy", lang=lang)}), 409
     except Exception as exc:  # noqa: BLE001
-        logger.exception("archive load failed: {}", exc)
-        return jsonify({"ok": False, "error": str(exc)}), 500
+        return _err_with_log("cache_archive_load", exc, lang=lang)
     return jsonify({"ok": True, **meta})
 
 
@@ -307,8 +301,8 @@ def load_archive():
 def archive_status():
     from src.pce_cache.archive_import import review_status
     cm = current_app.config['CM']
+    lang = cm.config.get('settings', {}).get('language', 'en')
     try:
         return jsonify(review_status(cm.models.pce_cache))
     except Exception as exc:  # noqa: BLE001
-        logger.exception("archive status error: {}", exc)
-        return jsonify({"error": str(exc)}), 500
+        return _err_with_log("cache_archive_status", exc, lang=lang)

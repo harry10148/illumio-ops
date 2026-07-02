@@ -181,3 +181,43 @@ def test_pce_url_scheme_validator(authed_client):
     assert res.status_code == 400
     body = res.get_json()
     assert body.get("ok") is False
+
+
+# ── Test 4: batch-5 C3 follow-up — api block validated before it can brick
+# the next cm.load() (verify_ssl=False + profile stays 'production' trips
+# ApiSettings' fail-hard TLS guard on load) ────────────────────────────────
+
+def test_settings_post_rejects_api_block_that_would_brick_next_load(authed_client, app):
+    client, csrf = authed_client
+    res = client.post(
+        "/api/settings",
+        json={"api": {"verify_ssl": False}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert res.status_code == 400
+    body = res.get_json()
+    assert body.get("ok") is False
+
+    # Must not have persisted: a fresh load() must not raise ConfigError.
+    cm = app.config["CM"]
+    cm.load()
+    assert cm.config["api"]["verify_ssl"] is True
+
+
+def test_settings_post_accepts_verify_ssl_false_with_explicit_dev_profile(authed_client, app):
+    """Sanity: the guard is the same ApiSettings rule used elsewhere (dev
+    profile explicitly opts out of TLS verification), not a blanket ban."""
+    client, csrf = authed_client
+    cm = app.config["CM"]
+    cm.load()
+    cm.config["api"]["profile"] = "dev"
+    cm.save()
+
+    res = client.post(
+        "/api/settings",
+        json={"api": {"verify_ssl": False}},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert res.status_code == 200
+    cm.load()
+    assert cm.config["api"]["verify_ssl"] is False

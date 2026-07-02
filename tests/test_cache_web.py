@@ -205,6 +205,38 @@ def test_retention_run_passes_archive_enabled(tmp_path):
         os.unlink(path)
 
 
+# ── D2 sub-item 4: generic 500 body via _err_with_log, no raw exception leak ─
+
+class _BoomSessionFactory:
+    """Session factory whose __call__ raises, to exercise a route's inner
+    try/except (the one wrapping the actual query, not `_get_sf()` itself)."""
+
+    def __call__(self):
+        raise RuntimeError("secret-db-path-leak")
+
+
+def test_cache_status_500_does_not_leak_exception_detail(client, monkeypatch):
+    monkeypatch.setattr("src.pce_cache.web._get_sf", lambda: _BoomSessionFactory())
+    resp = client.get("/api/cache/status",
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["ok"] is False
+    assert "request_id" in body
+    assert "secret-db-path-leak" not in body["error"]
+
+
+def test_cache_health_500_does_not_leak_exception_detail(client, monkeypatch):
+    monkeypatch.setattr("src.pce_cache.web._get_sf", lambda: _BoomSessionFactory())
+    resp = client.get("/api/cache/health",
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["ok"] is False
+    assert "request_id" in body
+    assert "secret-db-path-leak" not in body["error"]
+
+
 def test_cache_lag_empty(client):
     resp = client.get("/api/cache/lag",
                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})

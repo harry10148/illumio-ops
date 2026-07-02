@@ -67,3 +67,39 @@ def test_siem_dlq_list_no_crash(client):
     resp = client.get("/api/siem/dlq?dest=dest1",
                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert resp.status_code in (200, 302, 401, 500)
+
+
+# ── D2 sub-item 4: generic 500 body via _err_with_log, no raw exception leak ─
+
+def test_siem_list_destinations_500_does_not_leak_exception_detail(client, monkeypatch):
+    monkeypatch.setattr(
+        "src.siem.web._get_siem_cfg",
+        lambda: (_ for _ in ()).throw(RuntimeError("secret-db-path-leak")),
+    )
+    login = client.post("/api/login", json={"username": "admin", "password": "testpass"},
+                        environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert login.status_code == 200
+    resp = client.get("/api/siem/destinations",
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["ok"] is False
+    assert "request_id" in body
+    assert "secret-db-path-leak" not in body["error"]
+
+
+def test_siem_dispatch_status_500_does_not_leak_exception_detail(client, monkeypatch):
+    monkeypatch.setattr(
+        "src.siem.web._get_sf",
+        lambda: (_ for _ in ()).throw(RuntimeError("secret-db-path-leak")),
+    )
+    login = client.post("/api/login", json={"username": "admin", "password": "testpass"},
+                        environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert login.status_code == 200
+    resp = client.get("/api/siem/status",
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 500
+    body = resp.get_json()
+    assert body["ok"] is False
+    assert "request_id" in body
+    assert "secret-db-path-leak" not in body["error"]

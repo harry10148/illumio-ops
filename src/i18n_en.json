@@ -381,6 +381,7 @@
   "gui_it_none": "(none)",
   "gui_edit_rule": "Edit rule",
   "gui_enabled": "Enabled",
+  "gui_err_api_invalid_config": "Invalid API configuration: {reason}",
   "gui_err_api_url_scheme": "API URL must use http:// or https://",
   "gui_err_cert_pem_required": "Certificate PEM is required.",
   "gui_err_chart_unavailable": "Chart data is unavailable.",

@@ -166,6 +166,20 @@ def make_config_blueprint(
                 for k in api_allowlist:
                     if k in api_in:
                         cm.config['api'][k] = api_in[k]
+                # Batch-5 C3 follow-up: validate the merged api block before it
+                # can reach disk. Without this, a bare POST (e.g. verify_ssl=false
+                # while profile stays 'production') saves successfully, then
+                # bricks the next cm.load() via ApiSettings' fail-hard TLS guard.
+                from pydantic import ValidationError as _ValidationError
+                from src.config_models import ApiSettings
+                try:
+                    ApiSettings.model_validate(cm.config['api'])
+                except _ValidationError as ve:
+                    reason = ve.errors()[0]['msg'] if ve.errors() else str(ve)
+                    return jsonify({
+                        "ok": False,
+                        "error": t("gui_err_api_invalid_config", lang=lang, reason=reason),
+                    }), 400
             if 'email' in d:
                 email_in = d['email']
                 if 'sender' in email_in:

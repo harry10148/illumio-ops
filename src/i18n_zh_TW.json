@@ -381,6 +381,7 @@
   "gui_it_none": "(無)",
   "gui_edit_rule": "編輯規則",
   "gui_enabled": "已啟用",
+  "gui_err_api_invalid_config": "無效的 API 設定：{reason}",
   "gui_err_api_url_scheme": "API 網址必須使用 http:// 或 https://",
   "gui_err_cert_pem_required": "必須提供憑證 PEM。",
   "gui_err_chart_unavailable": "圖表資料無法使用。",

@@ -5,10 +5,10 @@ from datetime import datetime, timezone, timedelta
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required
-from loguru import logger
 
 from src.i18n import t
 from src.siem.tester import send_test_event
+from src.gui._helpers import _err_with_log
 
 bp = Blueprint("siem", __name__, url_prefix="/api/siem")
 
@@ -46,13 +46,13 @@ def _get_sf():
 @bp.route("/destinations", methods=["GET"])
 @login_required
 def list_destinations():
+    lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
     try:
         cfg = _get_siem_cfg()
         dests = [d.model_dump() for d in cfg.destinations]
         return jsonify({"destinations": dests})
     except Exception as exc:
-        logger.exception("siem list_destinations error: {}", exc)
-        return jsonify({"error": str(exc)}), 500
+        return _err_with_log("siem_list_destinations", exc, lang=lang)
 
 
 @bp.route("/destinations", methods=["POST"])
@@ -154,6 +154,7 @@ def _siem_window_totals(s):
 @bp.route("/status", methods=["GET"])
 @login_required
 def dispatch_status():
+    lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
     try:
         from sqlalchemy import func, select
         from src.pce_cache.models import DeadLetter, SiemDispatch
@@ -205,13 +206,13 @@ def dispatch_status():
                 entry["avg_latency_ms"] = int(lat * 86400 * 1000) if lat else None
         return jsonify({"status": result})
     except Exception as exc:
-        logger.exception("siem dispatch_status error: {}", exc)
-        return jsonify({"error": str(exc)}), 500
+        return _err_with_log("siem_dispatch_status", exc, lang=lang)
 
 
 @bp.route("/dlq", methods=["GET"])
 @login_required
 def list_dlq():
+    lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
     try:
         from src.siem.dlq import DeadLetterQueue
         dest = request.args.get("dest", "")
@@ -236,7 +237,7 @@ def list_dlq():
             ]
         })
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+        return _err_with_log("siem_list_dlq", exc, lang=lang)
 
 
 @bp.route("/dlq/<int:dl_id>", methods=["GET"])
@@ -273,6 +274,7 @@ def get_dlq_item(dl_id):
 @bp.route("/dlq/replay", methods=["POST"])
 @login_required
 def replay_dlq():
+    lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
     try:
         from src.siem.dlq import DeadLetterQueue
         data = request.get_json(force=True) or {}
@@ -286,12 +288,13 @@ def replay_dlq():
         count = dlq.replay(dest, limit=limit)
         return jsonify({"status": "ok", "requeued": count})
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+        return _err_with_log("siem_replay_dlq", exc, lang=lang)
 
 
 @bp.route("/dlq/purge", methods=["POST"])
 @login_required
 def purge_dlq():
+    lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
     try:
         from src.siem.dlq import DeadLetterQueue
         data = request.get_json(force=True) or {}
@@ -302,7 +305,7 @@ def purge_dlq():
         removed = dlq.purge(dest, older_than_days=older_than_days)
         return jsonify({"status": "ok", "removed": removed})
     except Exception as exc:
-        return jsonify({"error": str(exc)}), 500
+        return _err_with_log("siem_purge_dlq", exc, lang=lang)
 
 
 @bp.route("/dlq/export", methods=["GET"])
