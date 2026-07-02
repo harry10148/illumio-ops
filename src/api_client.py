@@ -99,14 +99,11 @@ class ApiClient:
         self.base_url = f"{self.api_cfg['url']}/api/v2/orgs/{self.api_cfg['org_id']}"
         self._auth_header = self._build_auth_header()
         # 熱路徑修正：rpm 在建構時讀一次快取，_request 不再每次呼叫都重建 ConfigManager。
-        # getattr 容錯：某些呼叫端（例如 report_scheduler 測試）用不含 .models 的輕量
-        # namespace 充當 config_manager；缺 .models 時退回 400，與舊行為的 fallback 一致。
-        self._rate_limit_per_minute = getattr(
-            getattr(self.cm, "models", None), "pce_cache", None
-        )
-        self._rate_limit_per_minute = getattr(
-            self._rate_limit_per_minute, "rate_limit_per_minute", 400
-        )
+        # ConfigManager.load() 成功與 ValidationError fallback 兩條路徑都必定設 self.models
+        # （config.py:227,244），且 ConfigSchema.pce_cache 有 default_factory——真實
+        # ConfigManager 不存在缺 .models 的路徑，直讀即可；測試替身缺 .models 屬於替身
+        # 的型別違約，應修測試而非在生產碼留 fallback。
+        self._rate_limit_per_minute = int(self.cm.models.pce_cache.rate_limit_per_minute)
 
         # ── Caches (TTL) + lock — owned by facade so tests can mutate directly ──
         # Use time.time (wall clock) so freezegun can control expiry in tests.

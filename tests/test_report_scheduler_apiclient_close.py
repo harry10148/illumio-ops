@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from src.config_models import ConfigSchema
 from src.report_scheduler import ReportScheduler
 
 
@@ -13,7 +14,9 @@ class _DummyReporter:
 
 
 def _make_cm(tmp_path):
-    cm = SimpleNamespace()
+    # models: ApiClient.__init__ 直讀 cm.models.pce_cache.rate_limit_per_minute；
+    # 真實 ConfigManager 一定有 .models，替身也必須遵守這個型別合約。
+    cm = SimpleNamespace(models=ConfigSchema())
     cm.config = {
         "api": {"url": "https://pce.test", "org_id": "1", "key": "k", "secret": "s"},
         "report": {"output_dir": str(tmp_path)},
