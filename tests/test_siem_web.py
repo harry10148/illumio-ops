@@ -69,7 +69,7 @@ def test_siem_dlq_list_no_crash(client):
     assert resp.status_code in (200, 302, 401, 500)
 
 
-# ── D2 sub-item 4: generic 500 body via _err_with_log, no raw exception leak ─
+# ── D2 子項 4：500 body 經 _err_with_log 回通用訊息，不外洩原始例外 ──────────
 
 def test_siem_list_destinations_500_does_not_leak_exception_detail(client, monkeypatch):
     monkeypatch.setattr(

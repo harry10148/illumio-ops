@@ -52,9 +52,9 @@ def make_config_blueprint(
     @limiter.limit("10 per hour")
     def api_security_post():
         d = request.json or {}
-        # Serialize load→mutate→save under the shared config lock so concurrent
-        # saves (cheroot multi-thread pool) cannot interleave and lose updates
-        # (matches api_save_settings / api_pce_profiles_action below).
+        # 以共用 config 鎖序列化整段 load→mutate→save，避免併發存檔
+        # （cheroot 多執行緒 pool）互相交錯而丟失更新
+        # （比照下方 api_save_settings / api_pce_profiles_action 的既有做法）。
         with cm.write_lock:
             cm.load()
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
@@ -166,10 +166,10 @@ def make_config_blueprint(
                 for k in api_allowlist:
                     if k in api_in:
                         cm.config['api'][k] = api_in[k]
-                # Batch-5 C3 follow-up: validate the merged api block before it
-                # can reach disk. Without this, a bare POST (e.g. verify_ssl=false
-                # while profile stays 'production') saves successfully, then
-                # bricks the next cm.load() via ApiSettings' fail-hard TLS guard.
+                # 批次 5 C3 的配套：合併後的 api 區塊寫入磁碟前先驗證。
+                # 少了這一步，裸 POST（例如 verify_ssl=false 而 profile
+                # 仍是 'production'）會成功存檔，下一次 cm.load() 就會被
+                # ApiSettings 的 fail-hard TLS guard 擋下，GUI 直接自鎖。
                 from pydantic import ValidationError as _ValidationError
                 from src.config_models import ApiSettings
                 try:
@@ -253,9 +253,9 @@ def make_config_blueprint(
     @limiter.limit("10 per hour")
     def api_tls_config():
         d = request.json or {}
-        # Serialize load→mutate→save under the shared config lock so concurrent
-        # saves (cheroot multi-thread pool) cannot interleave and lose updates
-        # (matches api_save_settings / api_pce_profiles_action above).
+        # 以共用 config 鎖序列化整段 load→mutate→save，避免併發存檔
+        # （cheroot 多執行緒 pool）互相交錯而丟失更新
+        # （比照上方 api_save_settings / api_pce_profiles_action 的既有做法）。
         with cm.write_lock:
             cm.load()
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')

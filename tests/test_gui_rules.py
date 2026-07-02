@@ -211,8 +211,8 @@ def test_event_rule_create_persists_throttle_and_rejects_invalid(client):
 
 
 def test_event_rule_create_rejects_non_numeric_threshold(client):
-    """D2 sub-item 3: bare int(d.get('threshold_count'/'threshold_window'/
-    'cooldown_minutes')) must not 500 on non-numeric input."""
+    """D2 子項 3：裸 int(d.get('threshold_count'/'threshold_window'/
+    'cooldown_minutes')) 收到非數字輸入不可 500。"""
     login = client.post('/api/login', json={
         "username": "admin",
         "password": "testpass"

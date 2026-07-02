@@ -1,4 +1,4 @@
-"""D2 sub-item 3: /api/pce-profiles must return 400 (not 500) on a non-numeric id."""
+"""D2 子項 3：/api/pce-profiles 收到非數字 id 必須回 400（而非 500）。"""
 from tests._helpers import _csrf
 
 
@@ -43,7 +43,7 @@ def test_pce_profiles_delete_rejects_non_numeric_id(client):
 
 
 def test_pce_profiles_update_accepts_numeric_string_id(client):
-    """Sanity: a numeric id (as a string, e.g. from a JS form) still works."""
+    """Sanity：數字 id 以字串傳入（例如 JS 表單）仍然可用。"""
     csrf = _login(client)
     added = client.post('/api/pce-profiles', json={
         "action": "add",

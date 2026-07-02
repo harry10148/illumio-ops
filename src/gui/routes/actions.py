@@ -347,9 +347,8 @@ def make_actions_blueprint(
             pd_sel = int(d.get('pd_sel', 3))
         except (TypeError, ValueError):
             return _err(t("gui_err_invalid_number", lang=lang), 400)
-        # Clamp to the same window used by the manual traffic/event lookups
-        # (gui/routes/events.py) so a bogus/huge `mins` cannot trigger an
-        # oversized PCE query.
+        # clamp 到與手動流量/事件查詢（gui/routes/events.py）相同的時間窗，
+        # 避免惡意或誤填的超大 `mins` 觸發過大的 PCE 查詢。
         mins = max(5, min(mins, 10080))
         from src.api_client import ApiClient
         from src.reporter import Reporter

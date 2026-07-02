@@ -205,11 +205,11 @@ def test_retention_run_passes_archive_enabled(tmp_path):
         os.unlink(path)
 
 
-# ── D2 sub-item 4: generic 500 body via _err_with_log, no raw exception leak ─
+# ── D2 子項 4：500 body 經 _err_with_log 回通用訊息，不外洩原始例外 ──────────
 
 class _BoomSessionFactory:
-    """Session factory whose __call__ raises, to exercise a route's inner
-    try/except (the one wrapping the actual query, not `_get_sf()` itself)."""
+    """__call__ 會拋例外的 session factory，用來觸發 route 內層的
+    try/except（包住實際查詢的那層，而非 `_get_sf()` 本身）。"""
 
     def __call__(self):
         raise RuntimeError("secret-db-path-leak")

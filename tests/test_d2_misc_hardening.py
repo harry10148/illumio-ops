@@ -1,5 +1,5 @@
-"""D2 misc hardening: session cookie Secure flag, login.html password
-minlength, and write-lock coverage for /api/security and /api/tls/config.
+"""D2 雜項強化：session cookie Secure flag、login.html 密碼 minlength、
+以及 /api/security 與 /api/tls/config 的 write-lock 覆蓋。
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ def _write_config(tmp_path, **web_gui_overrides):
     return str(cfg)
 
 
-# ── Sub-item 1: session cookie Secure flag must track use_https ────────────
+# ── 子項 1：session cookie Secure flag 必須跟隨 use_https ──────────────────
 
 def test_session_cookie_secure_when_https_enabled(tmp_path):
     from src.config import ConfigManager
@@ -35,9 +35,8 @@ def test_session_cookie_secure_when_https_enabled(tmp_path):
 
 
 def test_session_cookie_not_secure_when_https_disabled(tmp_path):
-    """Without this fix, SESSION_COOKIE_SECURE was hardcoded True even when
-    TLS is off, so a browser talking to the GUI over plain HTTP would never
-    send the session cookie back — login would appear to silently fail."""
+    """修正前 SESSION_COOKIE_SECURE 被寫死 True：TLS 關閉時，瀏覽器經純 HTTP
+    連 GUI 永遠不會回傳 session cookie——登入看起來像靜默失敗。"""
     from src.config import ConfigManager
     from src.gui import build_app
 
@@ -46,7 +45,7 @@ def test_session_cookie_not_secure_when_https_disabled(tmp_path):
     assert app.config["SESSION_COOKIE_SECURE"] is False
 
 
-# ── Sub-item 2: login.html password fields must match backend's 12-char min ─
+# ── 子項 2：login.html 密碼欄位必須符合後端的 12 字元下限 ──────────────────
 
 def test_login_page_password_minlength_matches_backend(tmp_path):
     from src.config import ConfigManager
@@ -57,18 +56,18 @@ def test_login_page_password_minlength_matches_backend(tmp_path):
     app.config["TESTING"] = True
     body = app.test_client().get("/login").get_data(as_text=True)
     assert 'id="new-password"' in body
-    assert body.count('minlength="12"') >= 2, "both password fields must require 12 chars (matches config.py's 12-512 rule)"
+    assert body.count('minlength="12"') >= 2, "兩個密碼欄位都必須要求 12 字元（對齊 config.py 的 12-512 規則）"
     assert 'minlength="8"' not in body
 
 
-# ── Sub-item 5: /api/security and /api/tls/config must serialize saves ─────
+# ── 子項 5：/api/security 與 /api/tls/config 必須序列化存檔 ────────────────
 
 def test_api_security_post_holds_write_lock_across_load_mutate_save():
     from src.gui.routes import config as config_routes
     src = inspect.getsource(config_routes.make_config_blueprint)
-    # crude structural check: the api_security_post body (bounded by the next
-    # @bp.route) must contain the write_lock context manager, matching the
-    # existing api_save_settings / api_pce_profiles_action convention.
+    # 粗略的結構檢查：api_security_post 本體（以下一個 @bp.route 為界）
+    # 必須包含 write_lock context manager，比照既有的
+    # api_save_settings / api_pce_profiles_action 慣例。
     start = src.index("def api_security_post")
     end = src.index("# ── API: Settings")
     body = src[start:end]

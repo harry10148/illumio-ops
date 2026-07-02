@@ -121,7 +121,7 @@ def test_debug_endpoint_returns_captured_output(client, monkeypatch):
 
 
 def test_debug_endpoint_rejects_non_numeric_mins(client):
-    """D2 sub-item 3: bare int(d.get('mins')) must not 500 on bad input."""
+    """D2 子項 3：裸 int(d.get('mins')) 收到壞輸入不可 500。"""
     login = client.post('/api/login', json={
         "username": "admin",
         "password": "testpass"
@@ -158,8 +158,8 @@ def test_debug_endpoint_rejects_non_numeric_pd_sel(client):
 
 
 def test_debug_endpoint_clamps_huge_mins(client, monkeypatch):
-    """D2 sub-item 3: an oversized `mins` must be clamped, not used verbatim,
-    so a client can't force an unbounded PCE traffic-window query."""
+    """D2 子項 3：超大的 `mins` 必須被 clamp，不可原樣使用，
+    避免用戶端強迫 PCE 執行無上限的流量時間窗查詢。"""
     login = client.post('/api/login', json={
         "username": "admin",
         "password": "testpass"

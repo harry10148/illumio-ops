@@ -60,7 +60,7 @@ def test_accelerate_filters_invalid_hrefs(client, monkeypatch):
 
 
 def test_accelerate_rejects_non_numeric_duration(client):
-    """D2 sub-item 3: bare int(d.get('duration_minutes')) must not 500."""
+    """D2 子項 3：裸 int(d.get('duration_minutes')) 不可 500。"""
     csrf = _login(client)
     r = client.post(
         '/api/workloads/accelerate',

@@ -183,9 +183,9 @@ def test_pce_url_scheme_validator(authed_client):
     assert body.get("ok") is False
 
 
-# ── Test 4: batch-5 C3 follow-up — api block validated before it can brick
-# the next cm.load() (verify_ssl=False + profile stays 'production' trips
-# ApiSettings' fail-hard TLS guard on load) ────────────────────────────────
+# ── Test 4：批次 5 C3 配套——api 區塊在弄壞下一次 cm.load() 之前先驗證
+# （verify_ssl=False 而 profile 仍是 'production' 會在 load 時觸發
+# ApiSettings 的 fail-hard TLS guard）──────────────────────────────────────
 
 def test_settings_post_rejects_api_block_that_would_brick_next_load(authed_client, app):
     client, csrf = authed_client
@@ -198,15 +198,15 @@ def test_settings_post_rejects_api_block_that_would_brick_next_load(authed_clien
     body = res.get_json()
     assert body.get("ok") is False
 
-    # Must not have persisted: a fresh load() must not raise ConfigError.
+    # 不可已寫入磁碟：重新 load() 不得拋出 ConfigError。
     cm = app.config["CM"]
     cm.load()
     assert cm.config["api"]["verify_ssl"] is True
 
 
 def test_settings_post_accepts_verify_ssl_false_with_explicit_dev_profile(authed_client, app):
-    """Sanity: the guard is the same ApiSettings rule used elsewhere (dev
-    profile explicitly opts out of TLS verification), not a blanket ban."""
+    """Sanity：這個 guard 就是其他地方共用的同一條 ApiSettings 規則
+    （dev profile 明確選擇停用 TLS 驗證），不是一律禁止。"""
     client, csrf = authed_client
     cm = app.config["CM"]
     cm.load()
