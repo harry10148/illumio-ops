@@ -40,7 +40,7 @@ def test_internal_server_error_hides_details():
     try:
         with open(path, 'w') as f:
             json.dump({
-                "api": {"url": "test", "key": "test", "secret": "test", "org_id": "1"},
+                "api": {"url": "https://pce.test", "key": "test", "secret": "test", "org_id": "1"},
                 "rules": [],
             }, f)
 

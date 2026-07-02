@@ -34,7 +34,7 @@ def _make_analyzer():
     """Build an Analyzer with stub doubles and a minimal config."""
     import json, os, tempfile
     cfg = {
-        "api": {"url": "https://pce.example.com:8443", "org_id": 1, "key": "k", "secret": "s"},
+        "api": {"url": "https://pce.example.com:8443", "org_id": "1", "key": "k", "secret": "s"},
         "analysis": {"traffic_hours": 24, "exclude_broadcast": True, "alert_threshold": 1},
         "rules": [],
         "events": {"enabled": False, "fetch_minutes": 5, "rules": []},

@@ -87,7 +87,7 @@ def temp_config_file():
 
     # Init empty config
     with open(path, 'w') as f:
-        json.dump({"api": {"url": "test", "key": "test", "secret": "test", "org_id": "1"}, "rules": []}, f)
+        json.dump({"api": {"url": "https://pce.test", "key": "test", "secret": "test", "org_id": "1"}, "rules": []}, f)
 
     yield path
     # Cleanup config + sibling alerts.json (created on first save)

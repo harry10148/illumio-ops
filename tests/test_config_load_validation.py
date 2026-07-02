@@ -39,15 +39,67 @@ def test_load_rejects_http_port_out_of_range(tmp_path, caplog):
 
 
 def test_load_rejects_non_http_url(tmp_path, caplog):
+    """api.url is an api-block field, so an invalid scheme now fails hard
+    (see test_load_fails_hard_on_invalid_api_block) rather than falling back."""
     from src.config import ConfigManager
+    from src.exceptions import ConfigError
     cfg_file = _write(tmp_path, {
         "api": {"url": "ftp://wrong", "org_id": "1", "key": "k", "secret": "s"},
     })
     caplog.set_level(logging.ERROR)
-    ConfigManager(cfg_file)
+    with pytest.raises(ConfigError):
+        ConfigManager(cfg_file)
     # Must surface url error
     msgs = " ".join(r.message for r in caplog.records).lower()
     assert "url" in msgs or "http" in msgs
+
+
+def test_load_fails_hard_on_invalid_api_block(tmp_path, caplog):
+    """api-block validation failures must raise ConfigError, not fall back.
+
+    verify_ssl=False + profile='production' trips ApiSettings' TLS guard.
+    Falling back here would keep the unvalidated dict (verify_ssl=False) in
+    cm.config while cm.models silently reset to safe defaults — the guard
+    would become a no-op. Must refuse to start instead.
+    """
+    from src.config import ConfigManager
+    from src.exceptions import ConfigError
+    cfg_file = _write(tmp_path, {
+        "api": {"url": "https://pce.test", "org_id": "1", "key": "k", "secret": "s",
+                "verify_ssl": False, "profile": "production"},
+    })
+    caplog.set_level(logging.ERROR)
+    with pytest.raises(ConfigError) as exc_info:
+        ConfigManager(cfg_file)
+    msg = str(exc_info.value)
+    # Actionable: names the violating field and how to fix it
+    assert "api" in msg
+    assert "verify_ssl" in msg
+    assert "profile" in msg.lower()
+
+
+def test_load_other_block_failure_still_falls_back(tmp_path, caplog):
+    """Non-api block validation failures keep the existing fallback behavior
+    (this task narrows fail-hard to the api block only)."""
+    from src.config import ConfigManager
+    cfg_file = _write(tmp_path, {
+        "api": {"url": "https://pce.test", "org_id": "1", "key": "k", "secret": "s"},
+        "smtp": {"host": "x", "port": 99999},
+    })
+    caplog.set_level(logging.ERROR)
+    cm = ConfigManager(cfg_file)  # must NOT raise
+    # Fallback semantics unchanged: models reset to defaults, dict keeps merged data
+    assert cm.config["smtp"]["port"] == 99999
+    assert cm.models.smtp.port == 25
+
+
+def test_load_empty_config_file_does_not_raise(tmp_path):
+    """No config.json on disk at all → pure defaults, no ValidationError path."""
+    from src.config import ConfigManager
+    cfg_file = str(tmp_path / "config.json")  # does not exist
+    cm = ConfigManager(cfg_file)
+    assert cm.config["api"]["verify_ssl"] is True
+    assert cm.models.api.verify_ssl is True
 
 
 def test_load_surfaces_typo_in_top_level_key(tmp_path, caplog):
@@ -92,8 +144,14 @@ def test_config_with_rule_backups_reloads_cleanly(tmp_path):
 
 
 def test_load_redacts_secret_input_in_logs(tmp_path, caplog):
-    """ValidationError logs must NEVER include raw secret values."""
+    """ValidationError logs must NEVER include raw secret values.
+
+    api.secret is an api-block field, so this now fails hard (see
+    test_load_fails_hard_on_invalid_api_block); the redaction requirement
+    applies to both the logs and the raised ConfigError message.
+    """
     from src.config import ConfigManager
+    from src.exceptions import ConfigError
     cfg = tmp_path / "config.json"
     # Inject a secret with an invalid type that trips validation
     cfg.write_text(json.dumps({
@@ -101,10 +159,12 @@ def test_load_redacts_secret_input_in_logs(tmp_path, caplog):
                 "key": "valid_key", "secret": 99999}  # int instead of str
     }), encoding="utf-8")
     caplog.set_level(logging.ERROR)
-    ConfigManager(str(cfg))
+    with pytest.raises(ConfigError) as exc_info:
+        ConfigManager(str(cfg))
     combined = " ".join(r.message for r in caplog.records)
     assert "99999" not in combined, "secret value leaked to logs"
     assert "[REDACTED]" in combined or "secret" in combined.lower()
+    assert "99999" not in str(exc_info.value), "secret value leaked to raised error"
 
 
 # ─── Split-file tests ───────────────────────────────────────────────────────

@@ -271,7 +271,7 @@ def test_cli_event_catalog_excludes_pce_health_system_rule():
 def test_system_rules_overwrite_by_filter_value(tmp_path):
     config_file = tmp_path / "config.json"
     config_file.write_text(
-        '{"api":{"url":"test","org_id":"1","key":"","secret":""},"rules":[]}',
+        '{"api":{"url":"https://pce.test","org_id":"1","key":"","secret":""},"rules":[]}',
         encoding="utf-8",
     )
 
@@ -312,7 +312,7 @@ def test_add_or_update_rule_matches_existing_rule_by_id(tmp_path):
 
     config_file = tmp_path / "config.json"
     config_file.write_text(
-        '{"api":{"url":"test","org_id":"1","key":"","secret":""},"rules":[]}',
+        '{"api":{"url":"https://pce.test","org_id":"1","key":"","secret":""},"rules":[]}',
         encoding="utf-8",
     )
 

@@ -184,6 +184,7 @@ class ConfigManager:
         """Load and validate config.json via pydantic ConfigSchema."""
         from pydantic import ValidationError
         from src.config_models import ConfigSchema
+        from src.exceptions import ConfigError
 
         raw_data = {}
         if os.path.exists(self.config_file):
@@ -230,18 +231,36 @@ class ConfigManager:
         except ValidationError as e:
             # Format pydantic errors into readable log lines
             logger.error(f"Config validation failed: {e.error_count()} error(s):")
+            api_errors: list[str] = []
             for err in e.errors():
                 loc_parts = err["loc"]
                 loc = ".".join(str(p) for p in loc_parts)
                 redacted = _format_error_input(loc_parts, err.get('input'))
                 logger.error(f"  {loc}: {err['msg']} (input: {redacted})")
+                if loc_parts and loc_parts[0] == "api":
+                    api_errors.append(f"{loc}: {err['msg']}")
             # Do NOT surface raw str(e): pydantic embeds input_value=... which can
             # echo secret field values (api.key/secret, smtp.password, tokens) to
             # the console. The per-field detail is already logged above with
             # _format_error_input redaction; the console gets a safe count only.
             print(f"{Colors.FAIL}{t('error_loading_config', error=str(e.error_count()))}{Colors.ENDC}")
+            if api_errors:
+                # The 'api' block controls PCE connectivity and the TLS
+                # verify_ssl/profile guard. Falling back to defaults here would
+                # silently keep the unvalidated (and possibly TLS-unsafe) dict
+                # in self.config while self.models quietly reset to safe
+                # defaults — the two representations would diverge and the
+                # guard would become a no-op. Refuse to start instead.
+                message = (
+                    "Refusing to start: config.json 'api' block failed validation "
+                    f"({'; '.join(api_errors)}). Fix the offending field(s) in "
+                    "config.json (see per-field errors above) and restart."
+                )
+                logger.error(message)
+                raise ConfigError(message) from e
             # Fall back to the merged data (preserves valid sections, logs errors).
             # This keeps the app functional even with partially invalid config.
+            # Only reached when the 'api' block itself validated cleanly.
             self.models = ConfigSchema()  # typed access uses defaults
             self.config = merged          # dict access uses the raw merged data
 

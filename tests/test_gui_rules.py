@@ -111,7 +111,7 @@ def test_event_rule_test_returns_current_vs_legacy_diff(monkeypatch):
     try:
         with open(path, 'w', encoding='utf-8') as f:
             json.dump({
-                "api": {"url": "test", "key": "test", "secret": "test", "org_id": "1"},
+                "api": {"url": "https://pce.test", "key": "test", "secret": "test", "org_id": "1"},
                 "rules": [
                     {
                         "id": 1,

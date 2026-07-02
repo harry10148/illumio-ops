@@ -15,7 +15,7 @@ def client(tmp_path):
     try:
         with open(path, "w") as f:
             json.dump({
-                "api": {"url": "test", "key": "test", "secret": "test", "org_id": "1"},
+                "api": {"url": "https://pce.test", "key": "test", "secret": "test", "org_id": "1"},
                 "rules": [],
                 "web_gui": {
                     "username": "admin",
