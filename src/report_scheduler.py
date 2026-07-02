@@ -12,27 +12,18 @@ import datetime
 import json
 from loguru import logger
 import os
-import re
 
 from src.i18n import t
 from src.report.report_metadata import extract_attack_summary
 from src.state_store import load_state_file, update_state_file
-
-def _tz_offset_hours(tz_str: str) -> float:
-    """Return UTC offset in hours for a timezone string like 'UTC+8' or 'UTC-5'.
-    Returns 0 for 'UTC' or 'local' (server local time is handled separately)."""
-    if not tz_str or tz_str in ('local', 'UTC'):
-        return 0.0
-    m = re.match(r'^UTC([+-])(\d+(?:\.\d+)?)$', tz_str)
-    if not m:
-        return 0.0
-    return float(m.group(1) + m.group(2))
+from src.tz_utils import resolve_tz
 
 def _now_in_schedule_tz(tz_str: str) -> datetime.datetime:
     """Return 'now' in the schedule's timezone for hour/minute matching.
 
     Semantics by tz_str:
-      * 'UTC' / 'UTC+N' / 'UTC-N' → NAIVE wall-clock at that offset.
+      * 'UTC' / 'UTC+N' / 'UTC-N' / IANA 名稱（如 'Asia/Taipei'）→ NAIVE
+        wall-clock in that timezone.
       * 'local' or unset/empty    → UTC, returned as an AWARE datetime.
 
     NOTE: despite the 'local' label, this intentionally resolves to UTC (NOT
@@ -40,17 +31,20 @@ def _now_in_schedule_tz(tz_str: str) -> datetime.datetime:
     mirrors rule_scheduler._now_in_tz; should_run() normalises the aware value
     to naive before the rerun-gap subtraction. Consequence: a schedule set to
     fire at HH:MM with tz='local'/unset fires at HH:MM UTC. Operators on a
-    non-UTC server who want local wall-clock must set an explicit 'UTC+N'.
+    non-UTC server who want local wall-clock must set an explicit 'UTC+N' or
+    IANA name.
+
+    時區字串一律經 tz_utils.resolve_tz 解析成 tzinfo，再用
+    ``datetime.now(tzinfo)`` 取得該時區「真正」的當下牆鐘 —— 這樣 IANA 名稱
+    才不會被誤判成偏移 0（過去只認 'UTC±N'，IANA 名稱會靜默退回 UTC，讓
+    cron 分支把 UTC 牆鐘誤標成該時區時間，觸發時刻整整偏移一個 UTC offset）。
     """
-    now_utc = datetime.datetime.now(datetime.timezone.utc)
     if not tz_str or tz_str == 'local':
         # 'local'/unset are treated as UTC (aware) — see docstring. Kept aware to
         # dodge naive/DST ambiguity; should_run() strips tzinfo before comparing.
         return datetime.datetime.now(datetime.timezone.utc)
-    if tz_str == 'UTC':
-        return now_utc.replace(tzinfo=None)
-    offset = _tz_offset_hours(tz_str)
-    return (now_utc + datetime.timedelta(hours=offset)).replace(tzinfo=None)
+    tz_obj = resolve_tz(tz_str)
+    return datetime.datetime.now(tz_obj).replace(tzinfo=None)
 
 # State key written to state.json
 _STATE_KEY = "report_schedule_states"

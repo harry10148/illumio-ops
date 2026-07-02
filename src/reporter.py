@@ -64,18 +64,9 @@ class Reporter:
 
     def _resolve_tz(self) -> tuple[datetime.tzinfo, str]:
         """Return (tzinfo, label) for the configured timezone (settings.timezone)."""
+        from src.tz_utils import resolve_tz
         tz_str = self.cm.config.get('settings', {}).get('timezone', 'local')
-        if not tz_str or tz_str == 'local':
-            offset = datetime.datetime.now(datetime.timezone.utc).astimezone().utcoffset()
-            tz: datetime.tzinfo = datetime.timezone(offset)  # type: ignore[arg-type]
-        elif tz_str == 'UTC':
-            tz = datetime.timezone.utc
-        elif tz_str.startswith('UTC+') or tz_str.startswith('UTC-'):
-            sign = 1 if tz_str[3] == '+' else -1
-            total_minutes = int(sign * float(tz_str[4:]) * 60)
-            tz = datetime.timezone(datetime.timedelta(minutes=total_minutes))
-        else:
-            tz = datetime.timezone.utc
+        tz = resolve_tz(tz_str)
         offset_s = datetime.datetime.now(tz).strftime('%z')
         sign_ch = offset_s[0]; hh = offset_s[1:3]; mm = offset_s[3:5]
         label = f"UTC{sign_ch}{hh}:{mm}" if mm != '00' else f"UTC{sign_ch}{hh}"

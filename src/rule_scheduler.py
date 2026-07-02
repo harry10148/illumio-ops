@@ -10,20 +10,20 @@ from loguru import logger
 from src.utils import Colors
 from src.i18n import t
 from src.href_utils import extract_id  # canonical — also re-exported for rule_scheduler_cli.py
+from src.tz_utils import resolve_tz
 
 def _now_in_tz(tz_str: str) -> datetime.datetime:
-    """Return current naive datetime in the configured schedule timezone."""
-    import datetime as _dt
-    now_utc = _dt.datetime.now(_dt.timezone.utc)
+    """Return current naive datetime in the configured schedule timezone.
+
+    'local'/unset 保留原本的 aware-UTC fallback（避免 naive/DST 比較問題，
+    A1 已鎖定 one_time 比較不得回歸）。'UTC'/'UTC±N'/IANA 名稱一律經
+    tz_utils.resolve_tz 解析成 tzinfo，取該時區「真正」的當下牆鐘再去
+    tzinfo——修正過去 IANA 名稱被靜默當成偏移 0 (UTC) 的問題。
+    """
     if not tz_str or tz_str == 'local':
-        return _dt.datetime.now(_dt.timezone.utc)  # UTC-aware fallback (avoids DST ambiguity)
-    if tz_str == 'UTC':
-        return now_utc.replace(tzinfo=None)
-    m = re.match(r'^UTC([+-])(\d+(?:\.\d+)?)$', tz_str)
-    if m:
-        offset = _dt.timedelta(hours=float(m.group(1) + m.group(2)))
-        return (now_utc + offset).replace(tzinfo=None)
-    return _dt.datetime.now(_dt.timezone.utc)  # UTC-aware fallback
+        return datetime.datetime.now(datetime.timezone.utc)  # UTC-aware fallback (avoids DST ambiguity)
+    tz_obj = resolve_tz(tz_str)
+    return datetime.datetime.now(tz_obj).replace(tzinfo=None)
 
 _WEEKDAY_INDEX = {
     "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
