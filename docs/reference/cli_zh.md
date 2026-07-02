@@ -255,7 +255,7 @@ illumio-ops report <子命令> [選項]
 
 #### report traffic
 
-產生流量分析報表。
+產生流量報表——僅純流量事實（overview、policy decision 摘要、app/env 分佈、頻寬、unmanaged 概覽），不含安全評分。如需先前的綜合分析輸出，請改用 `report security`／`report inventory`。
 
 | 選項 | 說明 |
 |------|------|
@@ -264,7 +264,7 @@ illumio-ops report <子命令> [選項]
 | `--format [html\|csv\|pdf\|xlsx\|all]` | 輸出格式。 |
 | `--output-dir PATH` | 報表輸出目錄。 |
 | `--email` | 產生後以 e-mail 寄送報表。 |
-| `--profile [security_risk\|network_inventory]` | 流量報表分析設定檔。 |
+| `--profile [security_risk\|network_inventory]` | **已棄用。** 重現分拆前的 `report security`／`report inventory` 輸出。 |
 | `-h, --help` | 顯示說明並退出。 |
 
 ```bash

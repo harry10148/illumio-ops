@@ -15,7 +15,7 @@
 
 - **四種執行模式** — 背景 daemon（`--monitor`）、獨立 Web GUI（`--gui`）、monitor + GUI 合併模式（`--monitor-gui`），以及互動式 CLI 選單。
 - **24 條自動化安全規則** — B 系列（ransomware／涵蓋率）、L 系列（lateral movement／資料外洩），以及 R 系列 R01–R05（Draft policy 對齊），對 PCE traffic flow 進行評估。
-- **完整報表引擎** — 15 個 traffic 分析模組，加上 audit、policy-usage 與 VEN status 報表，輸出為 **HTML / CSV / XLSX**。
+- **完整報表引擎** — 三種流量報表 profile（`report traffic` 純流量事實、`report security` 15 模組安全風險分析、`report inventory` 網路盤點），加上 audit、policy-usage 與 VEN status 報表，輸出為 **HTML / CSV / XLSX**。
 - **多通道告警** — Email、LINE、Webhook、Telegram 與 Teams。
 - **SIEM 轉送器** — CEF、JSON、RFC5424 syslog，以及 Splunk HEC，透過 UDP / TCP / TLS / HTTPS 傳送，並具備每目的地的 dead-letter queue（DLQ）。
 - **本地 SQLite 快取** — 選用的 WAL 模式 PCE event 與 traffic 鏡像，搭配 retention TTL，讓報表與儀表板不必反覆查詢 PCE。

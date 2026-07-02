@@ -479,8 +479,8 @@ illumio-ops generates several report types from live PCE data or the local cache
 
 | Report | Subcommand | Purpose |
 |---|---|---|
-| Traffic Flow | `report traffic` | Comprehensive traffic security analysis (15 modules: policy decisions, ransomware exposure, lateral movement, enforcement readiness, etc.) |
-| Security & Risk | `report security` | Fixed security_risk orientation; can include vulnerability scans (Qualys/Tenable) via `--vuln-csv` |
+| Traffic Flow | `report traffic` | Plain traffic-facts report (overview, policy decision summary, app/env distribution, bandwidth, unmanaged overview); no security scoring |
+| Security & Risk | `report security` | Comprehensive traffic security analysis (15 modules: policy decisions, ransomware exposure, lateral movement, enforcement readiness, etc.); fixed security_risk orientation; can include vulnerability scans (Qualys/Tenable) via `--vuln-csv` |
 | Network & Traffic Inventory | `report inventory` | Inventory-style report with a fixed network_inventory orientation |
 | Audit | `report audit` | Audit events and policy changes (supports `--start-date`/`--end-date`) |
 | VEN Status | `report ven-status` | Inventory of VEN status (online / offline) plus unmanaged workloads (in Illumio, "Unmanaged" is a Workload state — an endpoint labeled by IP with no VEN installed — not a VEN status) |

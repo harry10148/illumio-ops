@@ -256,7 +256,7 @@ Canonical subcommand names match the WebUI button labels. The `generate-*` forms
 
 #### report traffic
 
-Generate a Traffic Flow Report.
+Generate a Traffic Flow Report — plain traffic facts only (overview, policy decision summary, app/env distribution, bandwidth, unmanaged overview), no security scoring. Use `report security` / `report inventory` for the previous comprehensive outputs.
 
 | Option | Description |
 |--------|-------------|
@@ -265,7 +265,7 @@ Generate a Traffic Flow Report.
 | `--format [html\|csv\|pdf\|xlsx\|all]` | Output format. |
 | `--output-dir PATH` | Directory to write the report. |
 | `--email` | E-mail the report after generation. |
-| `--profile [security_risk\|network_inventory]` | Traffic report profile. |
+| `--profile [security_risk\|network_inventory]` | **Deprecated.** Reproduces the pre-split `report security` / `report inventory` output. |
 | `-h, --help` | Show help and exit. |
 
 ```bash

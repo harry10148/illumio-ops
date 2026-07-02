@@ -15,7 +15,7 @@
 
 - **Four execution modes** — background daemon (`--monitor`), standalone Web GUI (`--gui`), combined monitor + GUI (`--monitor-gui`), or an interactive CLI menu.
 - **24 automated security rules** — B-series (ransomware / coverage), L-series (lateral movement / exfiltration), and R-series R01–R05 (Draft policy alignment) evaluated against PCE traffic flows.
-- **Rich report engine** — 15 traffic-analysis modules plus audit, policy-usage, and VEN-status reports, rendered to **HTML / CSV / XLSX**.
+- **Rich report engine** — three traffic report profiles (`report traffic` for plain traffic facts, `report security` for the 15-module security & risk analysis, `report inventory` for network inventory) plus audit, policy-usage, and VEN-status reports, rendered to **HTML / CSV / XLSX**.
 - **Multi-channel alerts** — Email, LINE, Webhook, Telegram, and Teams.
 - **SIEM forwarder** — CEF, JSON, and RFC5424 syslog, plus Splunk HEC, over UDP / TCP / TLS / HTTPS with a per-destination dead-letter queue (DLQ).
 - **Local SQLite cache** — optional WAL-mode mirror of PCE events and traffic with retention TTLs, so reports and the dashboard run without hammering the PCE.

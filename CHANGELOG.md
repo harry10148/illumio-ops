@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/) —
 a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 `-topic-slug` codename suffix; the codename was retired in 4.1.0.)
 
+## [Unreleased]
+
+### Changed
+
+- `report traffic` now generates the new plain Traffic Flow Report (traffic facts only,
+  no security scoring). Use `report security` / `report inventory` for the previous
+  outputs; `--profile` on `report traffic` is deprecated.
+- Trend and baseline-drift snapshots are now keyed per report profile
+  (`traffic_security_risk`, `traffic_network_inventory`, `traffic_traffic`).
+  The first run after upgrading has no previous baseline to compare against.
+
+### Added
+
+- Plain Traffic Flow Report profile (`traffic`): overview, policy decision summary,
+  app/env distribution, bandwidth, unmanaged overview. Runs only lightweight modules.
+
 ## [4.1.0] — 2026-06-21
 
 ### Changed
