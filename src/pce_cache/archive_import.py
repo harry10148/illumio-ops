@@ -7,7 +7,7 @@ from datetime import date, datetime, timezone
 
 import orjson
 from loguru import logger
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import PceTrafficFlowRaw
@@ -63,13 +63,16 @@ def _matching_traffic_files(archive_dir: str, start: date, end: date) -> list[st
 class ArchiveImporter:
     """把 archive 的 traffic JSONL 逐行還原成 PceTrafficFlowRaw 灌進指定的 review DB。"""
 
+    _CHUNK = 500
+
     def __init__(self, archive_dir: str, session_factory: sessionmaker):
         self._dir = archive_dir
         self._sf = session_factory
 
     def import_range(self, start: date, end: date) -> dict:
         from src.report.parsers.api_parser import flatten_flow_record
-        rows = files = skipped = 0
+        files = skipped = rows = 0
+        pending: list[dict] = []
         for name in _matching_traffic_files(self._dir, start, end):
             files += 1
             path = os.path.join(self._dir, name)
@@ -94,31 +97,50 @@ class ArchiveImporter:
                     report_json = orjson.dumps(flatten_flow_record(raw)).decode("utf-8")
                 except Exception:  # noqa: BLE001
                     report_json = None
-                try:
-                    with self._sf.begin() as s:
-                        s.add(PceTrafficFlowRaw(
-                            flow_hash=rec["flow_hash"],
-                            src_ip=rec.get("src_ip", ""),
-                            src_workload=rec.get("src_workload"),
-                            dst_ip=rec.get("dst_ip", ""),
-                            dst_workload=rec.get("dst_workload"),
-                            port=rec.get("port") or 0,
-                            protocol=rec.get("protocol", "tcp"),
-                            action=rec.get("action", "unknown"),
-                            flow_count=rec.get("flow_count") or 1,
-                            bytes_in=rec.get("bytes_in") or 0,
-                            bytes_out=rec.get("bytes_out") or 0,
-                            first_detected=first_detected,
-                            last_detected=last_detected,
-                            raw_json=orjson.dumps(raw).decode("utf-8"),
-                            report_json=report_json,
-                            ingested_at=ingested_at,
-                        ))
-                    rows += 1
-                except IntegrityError:
-                    skipped += 1
+                pending.append({
+                    "flow_hash": rec["flow_hash"],
+                    "src_ip": rec.get("src_ip", ""),
+                    "src_workload": rec.get("src_workload"),
+                    "dst_ip": rec.get("dst_ip", ""),
+                    "dst_workload": rec.get("dst_workload"),
+                    "port": rec.get("port") or 0,
+                    "protocol": rec.get("protocol", "tcp"),
+                    "action": rec.get("action", "unknown"),
+                    "flow_count": rec.get("flow_count") or 1,
+                    "bytes_in": rec.get("bytes_in") or 0,
+                    "bytes_out": rec.get("bytes_out") or 0,
+                    "first_detected": first_detected,
+                    "last_detected": last_detected,
+                    "raw_json": orjson.dumps(raw).decode("utf-8"),
+                    "report_json": report_json,
+                    "ingested_at": ingested_at,
+                })
+                if len(pending) >= self._CHUNK:
+                    inserted, dup = self._flush(pending)
+                    rows += inserted
+                    skipped += dup
+                    pending = []
+        if pending:
+            inserted, dup = self._flush(pending)
+            rows += inserted
+            skipped += dup
         return {"rows": rows, "files": files, "skipped": skipped,
                 "start": start.isoformat(), "end": end.isoformat()}
+
+    def _flush(self, chunk: list[dict]) -> tuple[int, int]:
+        """500 列/transaction 的 chunked upsert：以 flow_hash 為 unique key
+        做 on_conflict_do_nothing，不再靠 IntegrityError 逐列去重。同批（或
+        跨批但已落地）內的重複 flow_hash 只留第一筆；rowcount 即實際插入數，
+        批內筆數與 rowcount 的差額即該批的重複數。"""
+        with self._sf.begin() as s:
+            stmt = (
+                sqlite_insert(PceTrafficFlowRaw)
+                .values(chunk)
+                .on_conflict_do_nothing(index_elements=["flow_hash"])
+            )
+            result = s.execute(stmt)
+            inserted = result.rowcount
+        return inserted, len(chunk) - inserted
 
 
 def review_db_path(cfg) -> str:

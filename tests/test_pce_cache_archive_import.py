@@ -119,6 +119,32 @@ def test_import_skips_null_raw_and_dedups(sf, archive_dir):
     assert {r.flow_hash for r in _rows(sf)} == {"dup"}
 
 
+def test_import_dedups_multiple_rows_within_same_batch(sf, archive_dir):
+    # 同一批（500 列/transaction）內有 3 筆重複 flow_hash：只留第一筆，
+    # skipped 由 rowcount 差額推得（3 筆嘗試 - 1 筆實際插入 = 2）。
+    from src.pce_cache.archive_import import ArchiveImporter
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 22, "action": "allowed"}
+    lines = [_traffic_line("triple", "2026-06-10", raw) for _ in range(3)]
+    _write(archive_dir, "traffic-2026-06-10.jsonl", lines)
+
+    res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
+    assert res["rows"] == 1 and res["skipped"] == 2
+    assert {r.flow_hash for r in _rows(sf)} == {"triple"}
+
+
+def test_import_dedups_across_files(sf, archive_dir):
+    # 同 flow_hash 出現在不同 archive 檔案（跨檔案）：仍靠 flow_hash unique
+    # 約束只留一筆，統計（rows/skipped/files）需正確反映跨檔案的重複。
+    from src.pce_cache.archive_import import ArchiveImporter
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 22, "action": "allowed"}
+    _write(archive_dir, "traffic-2026-06-10.jsonl", [_traffic_line("cross", "2026-06-10", raw)])
+    _write(archive_dir, "traffic-2026-06-11.jsonl", [_traffic_line("cross", "2026-06-11", raw)])
+
+    res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
+    assert res["rows"] == 1 and res["skipped"] == 1 and res["files"] == 2
+    assert {r.flow_hash for r in _rows(sf)} == {"cross"}
+
+
 def test_import_ignores_non_traffic_files(sf, archive_dir):
     from src.pce_cache.archive_import import ArchiveImporter
     raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 1, "action": "allowed"}
