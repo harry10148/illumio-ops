@@ -280,7 +280,8 @@ def load_archive():
     try:
         start = date.fromisoformat(body.get("start_date", ""))
         end = date.fromisoformat(body.get("end_date", ""))
-    except ValueError:
+    except (ValueError, TypeError):
+        # ValueError=格式錯；TypeError=傳入 null/非字串（fromisoformat(None)）。兩者都回 400。
         return jsonify({"ok": False, "error": "invalid date (YYYY-MM-DD)"}), 400
     if end < start:
         return jsonify({"ok": False, "error": "end before start"}), 400

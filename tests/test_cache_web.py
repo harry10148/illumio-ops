@@ -269,7 +269,6 @@ def test_cache_lag_surfaces_error(client, tmp_path):
 
 
 def _seed_archive(tmp_path):
-    import gzip  # noqa: F401
     import orjson
     d = tmp_path / "arch"
     d.mkdir()
@@ -314,6 +313,64 @@ def test_archive_load_rejects_bad_dates(client):
                        json={"start_date": "nope", "end_date": "2026-06-30"},
                        environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert resp.status_code == 400
+
+
+def test_archive_load_rejects_null_date(client):
+    # 傳 JSON null（→ Python None）：date.fromisoformat(None) 會拋 TypeError，
+    # route 須一併攔成 400，而非讓框架回 500。
+    resp = client.post("/api/cache/archive/load",
+                       json={"start_date": None, "end_date": "2026-06-30"},
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 400
+
+
+def test_archive_load_requires_login(tmp_path):
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    try:
+        with open(path, "w") as f:
+            json.dump({
+                "web_gui": {"username": "admin", "password": "pw",
+                            "secret_key": "s", "allowed_ips": ["127.0.0.1"]},
+                "pce_cache": {"enabled": False,
+                              "db_path": str(tmp_path / "cache.sqlite")},
+            }, f)
+        cm = ConfigManager(config_file=path)
+        from src.gui import _create_app
+        app = _create_app(cm, persistent_mode=True)
+        app.config["TESTING"] = True
+        app.config["WTF_CSRF_ENABLED"] = False
+        with app.test_client() as c:
+            resp = c.post("/api/cache/archive/load",
+                          json={"start_date": "2026-06-01", "end_date": "2026-06-30"},
+                          environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+            assert resp.status_code in (302, 401)
+    finally:
+        os.unlink(path)
+
+
+def test_archive_status_requires_login(tmp_path):
+    fd, path = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    try:
+        with open(path, "w") as f:
+            json.dump({
+                "web_gui": {"username": "admin", "password": "pw",
+                            "secret_key": "s", "allowed_ips": ["127.0.0.1"]},
+                "pce_cache": {"enabled": False,
+                              "db_path": str(tmp_path / "cache.sqlite")},
+            }, f)
+        cm = ConfigManager(config_file=path)
+        from src.gui import _create_app
+        app = _create_app(cm, persistent_mode=True)
+        app.config["TESTING"] = True
+        app.config["WTF_CSRF_ENABLED"] = False
+        with app.test_client() as c:
+            resp = c.get("/api/cache/archive/status",
+                         environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+            assert resp.status_code in (302, 401)
+    finally:
+        os.unlink(path)
 
 
 def test_cache_lag_requires_login(tmp_path):
