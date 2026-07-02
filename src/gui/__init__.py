@@ -173,9 +173,13 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
 
     # Initialize session secret
     app.secret_key = gui_cfg.get("secret_key") or secrets.token_hex(32)
-    # Always set Secure cookie flag (TLS is the default)
+    # Secure cookie flag must track the actual transport: a hardcoded True
+    # here would make the browser silently drop the session cookie whenever
+    # TLS is disabled (web_gui.tls.enabled=false is a supported deployment
+    # mode — see launch_gui), locking operators out over plain HTTP. Match
+    # Talisman's session_cookie_secure=use_https set up below.
     tls_cfg = gui_cfg.get("tls", {})
-    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_SECURE'] = use_https
     app.jinja_env.globals.update(t=t)
 
     # ── pygments CSS — generated once at startup ───────────────────────────────

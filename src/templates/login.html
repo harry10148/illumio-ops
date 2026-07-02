@@ -248,12 +248,12 @@
       <p class="change-pw-banner" id="change-pw-banner">{{ t('login_must_change_banner') }}</p>
       <div>
         <label for="new-password">{{ t('login_new_password') }}</label>
-        <input class="input" type="password" id="new-password" name="new-password" required autocomplete="new-password" minlength="8">
+        <input class="input" type="password" id="new-password" name="new-password" required autocomplete="new-password" minlength="12">
         <div class="err" id="err-new-password"></div>
       </div>
       <div>
         <label for="confirm-password">{{ t('login_confirm_password') }}</label>
-        <input class="input" type="password" id="confirm-password" name="confirm-password" required autocomplete="new-password" minlength="8">
+        <input class="input" type="password" id="confirm-password" name="confirm-password" required autocomplete="new-password" minlength="12">
         <div class="err" id="err-confirm-password"></div>
       </div>
       <button type="submit" class="submit" id="change-pw-btn">{{ t('login_change_pw_btn') }}</button>

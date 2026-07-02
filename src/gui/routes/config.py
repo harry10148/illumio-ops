@@ -52,39 +52,43 @@ def make_config_blueprint(
     @limiter.limit("10 per hour")
     def api_security_post():
         d = request.json or {}
-        cm.load()
-        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
-        gui_cfg = cm.config.setdefault("web_gui", {})
+        # Serialize load→mutate→save under the shared config lock so concurrent
+        # saves (cheroot multi-thread pool) cannot interleave and lose updates
+        # (matches api_save_settings / api_pce_profiles_action below).
+        with cm.write_lock:
+            cm.load()
+            lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            gui_cfg = cm.config.setdefault("web_gui", {})
 
-        if "username" in d:
-            gui_cfg["username"] = d["username"]
+            if "username" in d:
+                gui_cfg["username"] = d["username"]
 
-        if "allowed_ips" in d:
-            allowed_ips, invalid_ips = _validate_allowed_ips(d["allowed_ips"])
-            if invalid_ips:
-                return jsonify({
-                    "ok": False,
-                    "error": t("gui_err_invalid_allowlist_entries", lang=lang, entries=', '.join(invalid_ips))
-                }), 400
-            gui_cfg["allowed_ips"] = allowed_ips
+            if "allowed_ips" in d:
+                allowed_ips, invalid_ips = _validate_allowed_ips(d["allowed_ips"])
+                if invalid_ips:
+                    return jsonify({
+                        "ok": False,
+                        "error": t("gui_err_invalid_allowlist_entries", lang=lang, entries=', '.join(invalid_ips))
+                    }), 400
+                gui_cfg["allowed_ips"] = allowed_ips
 
-        if d.get("new_password"):
-            must_change = bool(gui_cfg.get("must_change_password", False))
-            if not must_change:
-                old_pw = d.get("old_password") or ""
-                if not old_pw:
-                    return jsonify({"ok": False, "error": t("gui_err_old_password_required", lang=lang)}), 400
-                if not verify_password(old_pw, gui_cfg.get("password", "")):
-                    return jsonify({"ok": False, "error": t("gui_err_old_password_incorrect", lang=lang)}), 400
-            new_pw = d["new_password"]
-            confirm_pw = d.get("confirm_password", new_pw)
-            if not (12 <= len(new_pw) <= 512) or new_pw != confirm_pw:
-                return jsonify({"ok": False, "error": t("gui_err_invalid_password_form", lang=lang)}), 400
-            gui_cfg["password"] = hash_password(new_pw)
-            gui_cfg.pop("_initial_password", None)
-            gui_cfg.pop("must_change_password", None)
+            if d.get("new_password"):
+                must_change = bool(gui_cfg.get("must_change_password", False))
+                if not must_change:
+                    old_pw = d.get("old_password") or ""
+                    if not old_pw:
+                        return jsonify({"ok": False, "error": t("gui_err_old_password_required", lang=lang)}), 400
+                    if not verify_password(old_pw, gui_cfg.get("password", "")):
+                        return jsonify({"ok": False, "error": t("gui_err_old_password_incorrect", lang=lang)}), 400
+                new_pw = d["new_password"]
+                confirm_pw = d.get("confirm_password", new_pw)
+                if not (12 <= len(new_pw) <= 512) or new_pw != confirm_pw:
+                    return jsonify({"ok": False, "error": t("gui_err_invalid_password_form", lang=lang)}), 400
+                gui_cfg["password"] = hash_password(new_pw)
+                gui_cfg.pop("_initial_password", None)
+                gui_cfg.pop("must_change_password", None)
 
-        cm.save()
+            cm.save()
         return jsonify({"ok": True})
 
     # ── API: Settings ──────────────────────────────────────────────────────────
@@ -235,23 +239,27 @@ def make_config_blueprint(
     @limiter.limit("10 per hour")
     def api_tls_config():
         d = request.json or {}
-        cm.load()
-        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
-        gui_cfg = cm.config.setdefault("web_gui", {})
-        tls = gui_cfg.setdefault("tls", {})
-        tls["enabled"] = bool(d.get("enabled", False))
-        tls["self_signed"] = bool(d.get("self_signed", False))
-        tls["cert_file"] = str(d.get("cert_file", "")).strip()
-        tls["key_file"] = str(d.get("key_file", "")).strip()
-        tls["auto_renew"] = bool(d.get("auto_renew", True))
-        # Clamp the threshold into a sensible range so the UI can't push a
-        # zero (auto-renew every restart) or a negative value.
-        try:
-            days = int(d.get("auto_renew_days", 30))
-        except (TypeError, ValueError):
-            days = 30
-        tls["auto_renew_days"] = max(1, min(days, 365))
-        cm.save()
+        # Serialize load→mutate→save under the shared config lock so concurrent
+        # saves (cheroot multi-thread pool) cannot interleave and lose updates
+        # (matches api_save_settings / api_pce_profiles_action above).
+        with cm.write_lock:
+            cm.load()
+            lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            gui_cfg = cm.config.setdefault("web_gui", {})
+            tls = gui_cfg.setdefault("tls", {})
+            tls["enabled"] = bool(d.get("enabled", False))
+            tls["self_signed"] = bool(d.get("self_signed", False))
+            tls["cert_file"] = str(d.get("cert_file", "")).strip()
+            tls["key_file"] = str(d.get("key_file", "")).strip()
+            tls["auto_renew"] = bool(d.get("auto_renew", True))
+            # Clamp the threshold into a sensible range so the UI can't push a
+            # zero (auto-renew every restart) or a negative value.
+            try:
+                days = int(d.get("auto_renew_days", 30))
+            except (TypeError, ValueError):
+                days = 30
+            tls["auto_renew_days"] = max(1, min(days, 365))
+            cm.save()
         return jsonify({"ok": True, "message": t("gui_tls_saved_restart_hint", lang=lang)})
 
     @bp.route('/api/tls/renew', methods=['POST'])
