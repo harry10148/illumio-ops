@@ -119,6 +119,69 @@ def test_import_skips_null_raw_and_dedups(sf, archive_dir):
     assert {r.flow_hash for r in _rows(sf)} == {"dup"}
 
 
+def test_import_skips_rows_missing_required_keys_or_bad_timestamp(sf, archive_dir):
+    # 缺 flow_hash / event_time，或時間戳格式非法：per-line 容錯，計入
+    # skipped、不中斷整次匯入；好行仍正常入庫。
+    from src.pce_cache.archive_import import ArchiveImporter
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 22, "action": "allowed"}
+    lines = [
+        _traffic_line("ok1", "2026-06-10", raw),
+        orjson.dumps({  # 缺 flow_hash
+            "event_time": "2026-06-10T12:00:00+00:00",
+            "ingested_at": "2026-06-10T12:00:00+00:00",
+            "raw": raw,
+        }),
+        orjson.dumps({  # 缺 event_time
+            "ingested_at": "2026-06-10T12:00:00+00:00",
+            "flow_hash": "no-event-time", "raw": raw,
+        }),
+        orjson.dumps({  # 時間戳格式非法
+            "event_time": "not-a-timestamp",
+            "ingested_at": "2026-06-10T12:00:00+00:00",
+            "flow_hash": "bad-ts", "raw": raw,
+        }),
+        _traffic_line("ok2", "2026-06-10", raw),
+    ]
+    _write(archive_dir, "traffic-2026-06-10.jsonl", lines)
+
+    res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
+    assert res["rows"] == 2 and res["skipped"] == 3
+    assert {r.flow_hash for r in _rows(sf)} == {"ok1", "ok2"}
+
+
+def test_import_truncated_gzip_skips_remainder_and_continues(sf, archive_dir):
+    # 截斷/損壞的 .gz（gzip 輪替中途崩潰的典型場景）：該檔剩餘部分放棄，
+    # 記 warning，不中斷整次匯入，繼續匯入下一檔。
+    from src.pce_cache.archive_import import ArchiveImporter
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 22, "action": "allowed"}
+    path = os.path.join(archive_dir, "traffic-2026-06-01.jsonl.gz")
+    with gzip.open(path, "wb") as fh:
+        fh.write(_traffic_line("truncated", "2026-06-01", raw) + b"\n")
+    # 截斷尾部，破壞 gzip 的 end-of-stream marker，模擬半寫入檔案。
+    with open(path, "rb") as fh:
+        good_bytes = fh.read()
+    with open(path, "wb") as fh:
+        fh.write(good_bytes[: len(good_bytes) // 2])
+
+    _write(archive_dir, "traffic-2026-06-02.jsonl", [_traffic_line("good", "2026-06-02", raw)])
+
+    res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
+    assert res["files"] == 2                          # 兩檔都嘗試讀
+    assert {r.flow_hash for r in _rows(sf)} == {"good"}  # 下一檔繼續匯入
+
+
+def test_import_flush_db_error_propagates(sf, archive_dir):
+    # DB 寫入例外（_flush）不可被 per-line 容錯吞掉，仍須往外傳播。
+    from src.pce_cache.archive_import import ArchiveImporter
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 22, "action": "allowed"}
+    _write(archive_dir, "traffic-2026-06-10.jsonl", [_traffic_line("boom", "2026-06-10", raw)])
+
+    importer = ArchiveImporter(archive_dir, sf)
+    importer._flush = lambda chunk: (_ for _ in ()).throw(RuntimeError("db boom"))
+    with pytest.raises(RuntimeError, match="db boom"):
+        importer.import_range(date(2026, 6, 1), date(2026, 6, 30))
+
+
 def test_import_dedups_multiple_rows_within_same_batch(sf, archive_dir):
     # 同一批（500 列/transaction）內有 3 筆重複 flow_hash：只留第一筆，
     # skipped 由 rowcount 差額推得（3 筆嘗試 - 1 筆實際插入 = 2）。

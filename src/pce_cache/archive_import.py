@@ -41,11 +41,16 @@ def _parse_dt(s: str) -> datetime:
 
 def _iter_lines(path: str):
     opener = gzip.open if path.endswith(".gz") else open
-    with opener(path, "rb") as fh:
-        for line in fh:
-            line = line.strip()
-            if line:
-                yield line
+    try:
+        with opener(path, "rb") as fh:
+            for line in fh:
+                line = line.strip()
+                if line:
+                    yield line
+    except (OSError, EOFError, gzip.BadGzipFile) as exc:
+        # 截斷/損壞的封存檔（例如 gzip 輪替中途崩潰產生的半檔）：已讀出的
+        # 行照常處理，這裡只記 warning、放棄該檔剩餘部分，讓呼叫端繼續下一檔。
+        logger.warning("archive: corrupt/truncated file {}: {}", path, exc)
 
 
 def _matching_traffic_files(archive_dir: str, start: date, end: date) -> list[str]:
@@ -96,11 +101,19 @@ class ArchiveImporter:
                 if raw is None:
                     skipped += 1
                     continue
-                last_detected = _parse_dt(rec["event_time"])
-                ingested_at = _parse_dt(rec["ingested_at"])
-                ts_range = raw.get("timestamp_range") or {}
-                fd_raw = raw.get("first_detected") or ts_range.get("first_detected", "")
-                first_detected = _parse_dt(fd_raw) if fd_raw else last_detected
+                # 缺 flow_hash / event_time / ingested_at，或時間戳格式非法：
+                # 手動編輯、版本差異、部分寫入都可能造成——per-line 容錯，
+                # 計入 skipped、continue，不中斷整次匯入。
+                try:
+                    last_detected = _parse_dt(rec["event_time"])
+                    ingested_at = _parse_dt(rec["ingested_at"])
+                    ts_range = raw.get("timestamp_range") or {}
+                    fd_raw = raw.get("first_detected") or ts_range.get("first_detected", "")
+                    first_detected = _parse_dt(fd_raw) if fd_raw else last_detected
+                    flow_hash = rec["flow_hash"]
+                except (KeyError, ValueError):
+                    skipped += 1
+                    continue
                 # 與即時 ingest / backfill 一致：預先算好 report_json，維持
                 # ix_raw_report_json_null 的「幾乎無 NULL」不變量；flatten 失敗不阻斷。
                 try:
@@ -108,7 +121,7 @@ class ArchiveImporter:
                 except Exception:  # noqa: BLE001
                     report_json = None
                 pending.append({
-                    "flow_hash": rec["flow_hash"],
+                    "flow_hash": flow_hash,
                     "src_ip": rec.get("src_ip", ""),
                     "src_workload": rec.get("src_workload"),
                     "dst_ip": rec.get("dst_ip", ""),
