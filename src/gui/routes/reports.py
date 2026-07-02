@@ -821,21 +821,26 @@ def make_reports_blueprint(
             if not sched:
                 return jsonify({"ok": False, "error": t("gui_schedule_not_found", lang=lang)}), 404
 
-            from src.report_scheduler import ReportScheduler
+            from src.report_scheduler import ReportScheduler, _now_in_schedule_tz
             from src.reporter import Reporter
             reporter = Reporter(cm)
             scheduler = ReportScheduler(cm, reporter)
             scheduler._state_file = _resolve_state_file()
-            now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+            # last_run 寫入基準與 tick() 統一：schedule.timezone → global
+            # settings.timezone → 'local'（同 _now_in_schedule_tz 語意，等同
+            # UTC-aware）。讀取端（should_run）仍相容 aware/naive 兩種既有格式。
+            global_tz = cm.config.get('settings', {}).get('timezone', 'local')
+            sched_tz = sched.get('timezone') or global_tz
+            now_str = _now_in_schedule_tz(sched_tz).isoformat()
             scheduler._save_state(schedule_id, now_str, "running")
 
             def _run():
                 try:
                     scheduler.run_schedule(sched)
-                    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    now_str = _now_in_schedule_tz(sched_tz).isoformat()
                     scheduler._save_state(schedule_id, now_str, "success")
                 except Exception as e:
-                    now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    now_str = _now_in_schedule_tz(sched_tz).isoformat()
                     scheduler._save_state(schedule_id, now_str, "failed", str(e))
                     logger.exception(f"GUI-triggered schedule {schedule_id} failed: {e}")
 
