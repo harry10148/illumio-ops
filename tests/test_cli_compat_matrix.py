@@ -213,7 +213,7 @@ def test_legacy_gui_dispatches_launch_gui_with_port(monkeypatch):
                 "fmt": "all",
                 "output_dir": "out",
                 "email": True,
-                "traffic_report_profile": "security_risk",
+                "traffic_report_profile": "traffic",
                 "use_cache": True,
                 "data_source": None,
             },

@@ -275,14 +275,16 @@ def report_group() -> None:
     "--profile",
     "traffic_report_profile",
     type=click.Choice(_TRAFFIC_PROFILES),
-    default="security_risk",
-    help="Traffic report profile (security_risk or network_inventory)",
+    default=None,
+    help="(deprecated) use `report security` / `report inventory` instead.",
 )
 @_data_source_options
 @click.pass_context
 def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_dir, email: bool, traffic_report_profile: str, data_source, legacy_cache) -> None:
     """Generate Traffic Flow Report."""
-    if ctx.get_parameter_source("traffic_report_profile") == click.core.ParameterSource.COMMANDLINE:
+    if traffic_report_profile is None:
+        traffic_report_profile = "traffic"
+    else:
         click.echo(t("cli_report_profile_deprecated", lang=_ctx_lang()), err=True)
     data_source, use_cache = _resolve_cli_data_source(data_source, legacy_cache)
     try:

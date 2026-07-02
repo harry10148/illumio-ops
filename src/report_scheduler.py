@@ -314,12 +314,14 @@ class ReportScheduler:
             from src.report.report_generator import ReportGenerator
             gen = ReportGenerator(self.cm, api_client=api, config_dir=self._config_dir,
                                   cache_reader=_make_cache_reader(self.cm))
-            result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=filters, lang=lang)
+            result = gen.generate_from_api(start_date=start_date, end_date=end_date, filters=filters, lang=lang,
+                                           traffic_report_profile="traffic")
             if result.record_count == 0:
                 logger.warning(f"[Scheduler] '{name}': no traffic data — skipping export")
                 return None, []
             paths = gen.export(result, fmt=fmt, output_dir=output_dir,
-                               send_email=False, reporter=None)
+                               send_email=False, reporter=None,
+                               traffic_report_profile="traffic")
             return result, paths
 
         elif report_type in ("security_risk", "network_inventory"):

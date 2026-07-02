@@ -299,7 +299,7 @@ def make_reports_blueprint(
         cm.load()
 
         source = d.get('source', 'api')
-        _VALID_PROFILES = ("security_risk", "network_inventory")
+        _VALID_PROFILES = ("traffic", "security_risk", "network_inventory")
         traffic_report_profile = d.get('traffic_report_profile', 'security_risk')
         if traffic_report_profile not in _VALID_PROFILES:
             traffic_report_profile = 'security_risk'
