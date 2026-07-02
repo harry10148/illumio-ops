@@ -93,15 +93,20 @@ async function loadRules() {
     // R5: throttle removed from UI; existing rule data retained server-side.
     if (suppressedCount > 0) f.push(_t('gui_rules_pfx_suppressed') + suppressedCount);
     if (r.match_fields && Object.keys(r.match_fields).length) f.push(_t('gui_rules_pfx_match') + Object.keys(r.match_fields).join(', '));
-    const editBtn = `<button class="btn btn-primary btn-sm" onclick="editRule(${r.index},'${r.type}')" aria-label="${_t('gui_edit_rule')}" title="${_t('gui_edit_rule')}"><svg class="icon" aria-hidden="true"><use href="#icon-edit"></use></svg></button>`;
+    const editBtn = `<button class="btn btn-primary btn-sm" data-action="editRule" data-args='${escapeHtml(JSON.stringify([r.index, r.type]))}' aria-label="${_t('gui_edit_rule')}" title="${_t('gui_edit_rule')}"><svg class="icon" aria-hidden="true"><use href="#icon-edit"></use></svg></button>`;
     const isEnabled = r.enabled !== false;
     const switchCls = isEnabled ? 'on' : 'off';
-    const switchWrap = `<span class="rule-switch-wrap"><input type="checkbox" class="r-chk" data-idx="${r.index}"${isEnabled ? ' checked' : ''}><span class="rule-switch ${switchCls}" title="${isEnabled ? _t('gui_enabled') : _t('gui_disabled')}" onclick="this.previousElementSibling.click()"></span></span>`;
+    const switchWrap = `<span class="rule-switch-wrap"><input type="checkbox" class="r-chk" data-idx="${r.index}"${isEnabled ? ' checked' : ''}><span class="rule-switch ${switchCls}" title="${isEnabled ? _t('gui_enabled') : _t('gui_disabled')}" data-action="_rulesToggleSwitchClick" data-arg-source="self"></span></span>`;
     html += `<tr><td>${switchWrap}</td><td title="${typ}">${typ}</td><td title="${escapeHtml(r.name)}">${escapeHtml(r.name)}</td><td>${statusHtml}</td><td title="${cond}"><code class="rule-cond-code">${escapeHtml(cond)}</code></td><td title="${escapeHtml(f.join(' | '))}">${escapeHtml(f.join(' | ')) || '—'}</td><td>${editBtn}</td></tr>`;
   });
   $('r-body').innerHTML = html || `<tr><td colspan="7"><div class="empty-state"><svg aria-hidden="true"><use href="#icon-shield"></use></svg><h3>${_t('gui_no_rules_title')}</h3><p>${_t('gui_no_rules_add_one')}</p></div></td></tr>`;
   initTableResizers();
   if (typeof loadAlertTestActions === 'function') loadAlertTestActions();
+}
+// switch 外觀是 span，實際狀態由前一個 checkbox 控制；點 span 轉發 click 給 checkbox。
+function _rulesToggleSwitchClick(el) {
+  const cb = el.previousElementSibling;
+  if (cb) cb.click();
 }
 function toggleAll(el) {
   document.querySelectorAll('.r-chk').forEach(c => {

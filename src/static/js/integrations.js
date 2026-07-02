@@ -256,7 +256,7 @@ function buildCacheForm(s) {
     + '<div id="cache-form-extra"></div>'
     + '<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px;">'
     + '<div id="cache-banner" style="flex:1;display:none;"></div>'
-    + '<button type="button" class="btn btn-primary" onclick="cacheSave()" data-i18n="gui_save">Save</button>'
+    + '<button type="button" class="btn btn-primary" data-action="cacheSave" data-i18n="gui_save">Save</button>'
     + '</div>'
     + '</form>';
 }
@@ -686,7 +686,7 @@ function buildSiemForwarderForm(fw) {
     + ' <span data-i18n="gui_siem_enabled">Enabled</span></label>'
     + '</div>'
     + '<div style="display:flex;justify-content:flex-end;">'
-    + '<button class="btn btn-primary btn-sm" onclick="siemSaveForwarder()" data-i18n="gui_save">Save</button>'
+    + '<button class="btn btn-primary btn-sm" data-action="siemSaveForwarder" data-i18n="gui_save">Save</button>'
     + '</div>'
     + '</section>';
 }
@@ -695,7 +695,7 @@ function buildSiemDestinationsSection() {
   return '<section class="rs-glass">'
     + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">'
     + '<h3 style="color:var(--accent2);margin:0;" data-i18n="gui_siem_destinations">Destinations</h3>'
-    + '<button class="btn btn-sm" onclick="siemOpenDestModal()" data-i18n="gui_siem_add">+ Add</button>'
+    + '<button class="btn btn-sm" data-action="siemOpenDestModal" data-i18n="gui_siem_add">+ Add</button>'
     + '</div>'
     + '<div class="table-container">'
     + '<table class="rule-table">'
@@ -732,9 +732,9 @@ function buildSiemRow(d, st) {
     + '<td>' + Number(d.port || 514) + '</td>'
     + '<td>' + _siemStatusBadge(d, st) + '</td>'
     + '<td style="white-space:nowrap;">'
-    + '<button class="btn btn-sm" onclick="siemTestDest(\'' + nameEnc + '\')" data-i18n="gui_siem_test">Test</button> '
-    + '<button class="btn btn-sm" onclick="siemOpenDestModal(\'' + nameEnc + '\')" data-i18n="gui_siem_edit">Edit</button> '
-    + '<button class="btn btn-sm btn-danger" onclick="siemDeleteDest(\'' + nameEnc + '\')" data-i18n="gui_siem_delete">Delete</button>'
+    + '<button class="btn btn-sm" data-action="siemTestDest" data-args=\'["' + nameEnc + '"]\' data-i18n="gui_siem_test">Test</button> '
+    + '<button class="btn btn-sm" data-action="siemOpenDestModal" data-args=\'["' + nameEnc + '"]\' data-i18n="gui_siem_edit">Edit</button> '
+    + '<button class="btn btn-sm btn-danger" data-action="siemDeleteDest" data-args=\'["' + nameEnc + '"]\' data-i18n="gui_siem_delete">Delete</button>'
     + '</td>'
     + '</tr>';
 }
@@ -790,7 +790,13 @@ async function siemOpenDestModal(nameEnc) {
       console.warn('Could not load destination data:', err);
     }
   }
-  document.getElementById('siem-modal-host').innerHTML = buildDestModal(dest, name);
+  var host = document.getElementById('siem-modal-host');
+  host.innerHTML = buildDestModal(dest, name);
+  // 點背景關閉 modal；點 modal 本體要擋掉冒泡，避免觸發背景的關閉（同 dlqView 的作法）。
+  var backdropEl = host.querySelector('.modal-backdrop');
+  if (backdropEl) backdropEl.addEventListener('click', siemCloseModal);
+  var modalEl = host.querySelector('.modal');
+  if (modalEl) modalEl.addEventListener('click', function (e) { e.stopPropagation(); });
   siemToggleCondFields();
   if (typeof window.i18nApply === 'function') window.i18nApply();
 }
@@ -815,8 +821,8 @@ function buildDestModal(dest, editName) {
     }).join('');
   }
 
-  return '<div class="modal-backdrop" onclick="siemCloseModal(event)">'
-    + '<div class="modal" onclick="event.stopPropagation()">'
+  return '<div class="modal-backdrop">'
+    + '<div class="modal">'
     + '<h2 data-i18n="' + titleKey + '">' + titleText + ' destination</h2>'
 
     + '<h3 data-i18n="gui_siem_sec_basic">Basic</h3>'
@@ -836,7 +842,7 @@ function buildDestModal(dest, editName) {
     + '<h3 data-i18n="gui_siem_sec_transport">Transport</h3>'
     + '<div class="form-row">'
     + '<div class="form-group"><label data-i18n="gui_siem_transport">Transport</label>'
-    + '<select id="md-transport" onchange="siemToggleCondFields()">' + mkOpts(['udp', 'tcp', 'tls', 'hec'], dest.transport) + '</select>'
+    + '<select id="md-transport" data-on-change="siemToggleCondFields">' + mkOpts(['udp', 'tcp', 'tls', 'hec'], dest.transport) + '</select>'
     + '<small class="form-text text-muted" data-i18n="gui_siem_transport_help"></small></div>'
     + '<div class="form-group"><label data-i18n="gui_siem_format">Format</label>'
     + '<select id="md-format">' + mkOpts(['cef', 'json', 'syslog_cef', 'syslog_json'], dest.format) + '</select>'
@@ -876,9 +882,9 @@ function buildDestModal(dest, editName) {
 
     + '<div id="md-banner" style="margin-top:10px;color:var(--color-danger);"></div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">'
-    + '<button class="btn" onclick="siemCloseModal(event)" data-i18n="gui_cancel">Cancel</button>'
-    + '<button class="btn" onclick="siemTestDestInline()" data-i18n="gui_siem_test_inline">Test Connection</button>'
-    + '<button class="btn btn-primary" onclick="siemSaveDest(\'' + editAttr + '\')" data-i18n="gui_save">Save</button>'
+    + '<button class="btn" data-action="siemCloseModal" data-i18n="gui_cancel">Cancel</button>'
+    + '<button class="btn" data-action="siemTestDestInline" data-i18n="gui_siem_test_inline">Test Connection</button>'
+    + '<button class="btn btn-primary" data-action="siemSaveDest" data-args=\'["' + editAttr + '"]\' data-i18n="gui_save">Save</button>'
     + '</div>'
     + '</div>'
     + '</div>';
@@ -1043,13 +1049,13 @@ function buildDlqSkeleton() {
     + '<label data-i18n="gui_dlq_filter_reason">Reason contains</label>'
     + '<input id="dlq-reason" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;color:var(--fg);font-size:.83rem;">'
     + '</div>'
-    + '<button class="btn btn-sm" onclick="dlqSearch()" style="align-self:flex-end;" data-i18n="gui_dlq_search">Search</button>'
+    + '<button class="btn btn-sm" data-action="dlqSearch" style="align-self:flex-end;" data-i18n="gui_dlq_search">Search</button>'
     + '<span class="spacer"></span>'
-    + '<button class="btn btn-sm" onclick="dlqSelectAll()" style="align-self:flex-end;" data-i18n="gui_dlq_select_all">Select All</button>'
-    + '<button class="btn btn-sm" onclick="dlqReplaySelected()" style="align-self:flex-end;" data-i18n="gui_dlq_replay_selected">Replay</button>'
-    + '<button class="btn btn-sm btn-warn" onclick="dlqPurgeSelected()" style="align-self:flex-end;" data-i18n="gui_dlq_purge_selected">Purge</button>'
-    + '<button class="btn btn-sm btn-danger" onclick="dlqPurgeAll()" style="align-self:flex-end;" data-i18n="gui_dlq_purge_all">Purge ALL</button>'
-    + '<button class="btn btn-sm" onclick="dlqExport()" style="align-self:flex-end;" data-i18n="gui_dlq_export">Export CSV</button>'
+    + '<button class="btn btn-sm" data-action="dlqSelectAll" style="align-self:flex-end;" data-i18n="gui_dlq_select_all">Select All</button>'
+    + '<button class="btn btn-sm" data-action="dlqReplaySelected" style="align-self:flex-end;" data-i18n="gui_dlq_replay_selected">Replay</button>'
+    + '<button class="btn btn-sm btn-warn" data-action="dlqPurgeSelected" style="align-self:flex-end;" data-i18n="gui_dlq_purge_selected">Purge</button>'
+    + '<button class="btn btn-sm btn-danger" data-action="dlqPurgeAll" style="align-self:flex-end;" data-i18n="gui_dlq_purge_all">Purge ALL</button>'
+    + '<button class="btn btn-sm" data-action="dlqExport" style="align-self:flex-end;" data-i18n="gui_dlq_export">Export CSV</button>'
     + '</div>'
     + '<div class="table-container">'
     + '<table class="rule-table">'
@@ -1147,8 +1153,8 @@ async function _dlqLoadPage() {
     var hasMore = allEntries.length >= DLQ_PAGE_SIZE * _dlqPage;
     var atMax = _dlqPage >= DLQ_MAX_PAGE;
     pager.innerHTML = _t('gui_dlq_page') + ' ' + _dlqPage + ' · '
-      + '<button class="btn" onclick="dlqPrevPage()"' + (_dlqPage <= 1 ? ' disabled' : '') + '>‹</button>'
-      + ' <button class="btn" onclick="dlqNextPage()"' + (!hasMore || atMax ? ' disabled' : '') + '>›</button>';
+      + '<button class="btn" data-action="dlqPrevPage"' + (_dlqPage <= 1 ? ' disabled' : '') + '>‹</button>'
+      + ' <button class="btn" data-action="dlqNextPage"' + (!hasMore || atMax ? ' disabled' : '') + '>›</button>';
   }
   if (typeof window.i18nApply === 'function') window.i18nApply();
 }
@@ -1164,8 +1170,8 @@ function buildDlqRow(e) {
     + '<td style="font-size:.78rem;color:var(--dim);">' + escapeAttr(_fmtShortDt(e.quarantined_at)) + '</td>'
     + '<td style="text-align:center;">' + Number(e.retries || 0) + '</td>'
     + '<td style="white-space:nowrap;">'
-    + '<button class="btn btn-sm" onclick="dlqView(' + id + ')" data-i18n="gui_dlq_view">View</button> '
-    + '<button class="btn btn-sm" onclick="dlqReplay([' + id + '])" data-i18n="gui_dlq_replay">Replay</button>'
+    + '<button class="btn btn-sm" data-action="dlqView" data-args=\'[' + id + ']\' data-i18n="gui_dlq_view">View</button> '
+    + '<button class="btn btn-sm" data-action="dlqReplay" data-args=\'[[' + id + ']]\' data-i18n="gui_dlq_replay">Replay</button>'
     + '</td>'
     + '</tr>';
 }

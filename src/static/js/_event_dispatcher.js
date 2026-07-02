@@ -11,6 +11,11 @@
 //
 // data-arg-source overrides data-args. Values: "value" | "checked" | "self".
 // Functions are looked up on window.* so existing globals keep working.
+//
+// data-pass-event="1"（opt-in，極少數情境用，例如需要 stopImmediatePropagation
+// 或以觸發元素定位 popover）：在 data-args/data-arg-source 算出的參數尾端，
+// 額外附加原生 event 與觸發元素兩個參數。不開這個屬性時行為完全不變，
+// 避免既有 handler 的可選參數（如 body = {}）被意外覆蓋。
 (function () {
     'use strict';
 
@@ -51,6 +56,8 @@
         if (src === 'value') args = [target.value];
         else if (src === 'checked') args = [target.checked];
         else if (src === 'self') args = [target];
+
+        if (target.dataset.passEvent) args = args.concat([e, target]);
 
         fn.apply(target, args);
     }

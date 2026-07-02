@@ -117,16 +117,16 @@ async function loadReports() {
     const downloadLabel = _t('gui_btn_download');
     const deleteLabel = _t('gui_btn_delete');
     let actionBtn = '';
-    const fnAttr = `data-fn="${escapeHtml(rp.filename)}"`;
+    const fnArgs = `data-args='${escapeHtml(JSON.stringify([rp.filename]))}'`;
     if(rp.filename.endsWith('.html')) {
       actionBtn = `<a href="/reports/${escapeHtml(rp.filename)}" target="_blank" class="btn btn-sm btn-secondary">${viewLabel}</a>` +
-                  `<button class="btn btn-sm btn-primary" ${fnAttr} onclick="blobDownloadReport(this.dataset.fn)">${downloadLabel}</button>`;
+                  `<button class="btn btn-sm btn-primary" data-action="blobDownloadReport" ${fnArgs}>${downloadLabel}</button>`;
     } else {
-      actionBtn = `<button class="btn btn-sm btn-primary" ${fnAttr} onclick="blobDownloadReport(this.dataset.fn)">${downloadLabel}</button>`;
+      actionBtn = `<button class="btn btn-sm btn-primary" data-action="blobDownloadReport" ${fnArgs}>${downloadLabel}</button>`;
     }
-    const delBtn = `<button class="btn btn-sm btn-danger" data-fn="${escapeHtml(rp.filename)}" onclick="deleteReport(this.dataset.fn)" title="${deleteLabel}" aria-label="${deleteLabel}" style="padding:4px 8px;line-height:1;">&times;</button>`;
+    const delBtn = `<button class="btn btn-sm btn-danger" data-action="deleteReport" ${fnArgs} title="${deleteLabel}" aria-label="${deleteLabel}" style="padding:4px 8px;line-height:1;">&times;</button>`;
     tbody.innerHTML += `<tr>
-      <td><input type="checkbox" class="rt-chk" value="${escapeHtml(rp.filename)}" onchange="onReportCheckChange()"></td>
+      <td><input type="checkbox" class="rt-chk" value="${escapeHtml(rp.filename)}" data-on-change="onReportCheckChange"></td>
       <td><div>${escapeHtml(rp.filename)}</div>${metaLine}</td>
       <td>${d}</td>
       <td>${sz}</td>
@@ -352,10 +352,10 @@ function renderSchedules() {
       <td>${enabledBadge}</td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
-          <button class="btn btn-sm btn-primary" onclick="runScheduleNow(${s.id})" style="padding:3px 7px;font-size:0.8rem;" title="${_t('gui_sched_run')}">${_t('gui_sched_run')}</button>
-          <button class="btn btn-sm btn-secondary" onclick="editSchedule(${s.id})" style="padding:3px 7px;font-size:0.8rem;">${_t('gui_sched_edit')}</button>
-          <button class="btn btn-sm" onclick="toggleSchedule(${s.id})" style="padding:3px 7px;font-size:0.8rem;background:var(--accent2);color:var(--bg);">${escapeHtml(toggleLabel)}</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteSchedule(${s.id},'${escapeHtml(s.name||'')}')" style="padding:3px 7px;font-size:0.8rem;">&times;</button>
+          <button class="btn btn-sm btn-primary" data-action="runScheduleNow" data-args='${escapeHtml(JSON.stringify([s.id]))}' style="padding:3px 7px;font-size:0.8rem;" title="${_t('gui_sched_run')}">${_t('gui_sched_run')}</button>
+          <button class="btn btn-sm btn-secondary" data-action="editSchedule" data-args='${escapeHtml(JSON.stringify([s.id]))}' style="padding:3px 7px;font-size:0.8rem;">${_t('gui_sched_edit')}</button>
+          <button class="btn btn-sm" data-action="toggleSchedule" data-args='${escapeHtml(JSON.stringify([s.id]))}' style="padding:3px 7px;font-size:0.8rem;background:var(--accent2);color:var(--bg);">${escapeHtml(toggleLabel)}</button>
+          <button class="btn btn-sm btn-danger" data-action="deleteSchedule" data-args='${escapeHtml(JSON.stringify([s.id, s.name||'']))}' style="padding:3px 7px;font-size:0.8rem;">&times;</button>
         </div>
       </td>
     </tr>`;
@@ -1391,8 +1391,8 @@ function renderDashboardQueries() {
             <span style="font-size:10px;background:var(--dim);color:#fff;padding:2px 6px;border-radius:4px;margin-right:8px;">${rankLabel}</span>
             <span style="flex:1"></span>
             <span id="d-qstate-${i}" style="color:var(--dim);font-size:0.8rem;margin-right:12px;"></span>
-            <button class="btn btn-sm" style="background:var(--bg);border:1px solid var(--border);margin-right:6px;" onclick="openQueryModal(${i})" aria-label="${_t('gui_edit_query_widget')}" title="${_t('gui_edit_query_widget')}"><svg class="icon" aria-hidden="true"><use href="#icon-edit"></use></svg></button>
-            <button class="btn btn-primary btn-sm" onclick="runTop10Query(${i})">${_t('gui_run_btn')}</button>
+            <button class="btn btn-sm" style="background:var(--bg);border:1px solid var(--border);margin-right:6px;" data-action="openQueryModal" data-args='[${i}]' aria-label="${_t('gui_edit_query_widget')}" title="${_t('gui_edit_query_widget')}"><svg class="icon" aria-hidden="true"><use href="#icon-edit"></use></svg></button>
+            <button class="btn btn-primary btn-sm" data-action="runTop10Query" data-args='[${i}]'>${_t('gui_run_btn')}</button>
          </div>
          
           <table class="rule-table" style="margin-top:10px;border-top:1px solid var(--border);font-size:0.8rem;">
@@ -1931,9 +1931,9 @@ function _renderTop10Body(idx, data, total, ts, source) {
 
     let isoBtn = '';
     if (m.s_href && m.d_href) {
-      isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${escapeHtml(m.s_href)}', false, '${escapeHtml(m.d_href)}')"><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
+      isoBtn = `<button class="btn btn-danger btn-sm" data-action="openQuarantineModal" data-args='${escapeHtml(JSON.stringify([m.s_href, false, m.d_href]))}'><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
     } else if (m.s_href || m.d_href) {
-      isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${escapeHtml(m.s_href || m.d_href)}')"><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
+      isoBtn = `<button class="btn btn-danger btn-sm" data-action="openQuarantineModal" data-args='${escapeHtml(JSON.stringify([m.s_href || m.d_href]))}'><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
     }
 
     const formatActor = (name, ip, href, labelsHtml, process, user) => {
@@ -1950,8 +1950,7 @@ function _renderTop10Body(idx, data, total, ts, source) {
     let svc_str = escapeHtml(m.svc);
     if (m.svc.length > 25) {
       let arr = m.svc.split(',').map(s => s.trim());
-      let encJson = encodeURIComponent(JSON.stringify(arr)).replace(/'/g, '%27');
-      svc_str = `<span onclick="showCellPopover(event, 'SVC', JSON.parse(decodeURIComponent('${encJson}')))" style="cursor:pointer; border-bottom:1px dotted var(--dim); color:var(--accent);">${escapeHtml(m.svc.substring(0, 23))}...</span>`;
+      svc_str = `<span data-action="_svcPopoverClick" data-args='${escapeHtml(JSON.stringify(['SVC', arr]))}' data-pass-event="1" style="cursor:pointer; border-bottom:1px dotted var(--dim); color:var(--accent);">${escapeHtml(m.svc.substring(0, 23))}...</span>`;
     }
     // Fallback: if flow_direction unknown, surface process/user in service cell
     if (m.svc_process || m.svc_user) {

@@ -40,12 +40,12 @@ async function loadAlertTestActions() {
   try {
     const status = await api('/api/status');
     const channels = status.alert_channels || [];
-    container.innerHTML = `<button class="btn btn-primary" onclick="runAction('test-alert')">${_t('gui_action_send_all')}</button>` +
+    container.innerHTML = `<button class="btn btn-primary" data-action="runAction" data-args='["test-alert"]'>${_t('gui_action_send_all')}</button>` +
       channels.map(channel => `
         <button
           class="btn btn-secondary"
           style="${(!channel.enabled || !channel.configured) ? 'opacity:0.72;' : ''}"
-          onclick="runPluginTestAlert('${escapeHtml(channel.name)}')"
+          data-action="runPluginTestAlert" data-args='${escapeHtml(JSON.stringify([channel.name]))}'
           title="${escapeHtml(channel.description || '')}"
         >${_t('gui_action_test_prefix')} ${escapeHtml(channel.display_name || channel.name)}</button>
       `).join('');

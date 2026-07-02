@@ -351,8 +351,8 @@ function _renderPceSection(a, profiles, activePceId) {
       <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(p.url)}">${escapeHtml(p.url)}</td>
       <td>${p.org_id || ''}</td>
       <td style="white-space:nowrap;overflow:visible;text-overflow:clip">
-        ${p.id !== activePceId ? `<button class="btn btn-primary btn-sm" onclick="activatePceProfile(${p.id})" data-i18n="gui_pce_activate">Activate</button>` : `<span style="color:var(--success);font-weight:600"><svg class="icon" aria-hidden="true" style="width:14px;height:14px;vertical-align:middle;"><use href="#icon-check"></use></svg></span>`}
-        <button class="btn btn-sm" style="margin-left:4px" onclick="deletePceProfile(${p.id})" data-i18n="gui_pce_delete_profile">Delete</button>
+        ${p.id !== activePceId ? `<button class="btn btn-primary btn-sm" data-action="activatePceProfile" data-args='${escapeHtml(JSON.stringify([p.id]))}' data-i18n="gui_pce_activate">Activate</button>` : `<span style="color:var(--success);font-weight:600"><svg class="icon" aria-hidden="true" style="width:14px;height:14px;vertical-align:middle;"><use href="#icon-check"></use></svg></span>`}
+        <button class="btn btn-sm" style="margin-left:4px" data-action="deletePceProfile" data-args='${escapeHtml(JSON.stringify([p.id]))}' data-i18n="gui_pce_delete_profile">Delete</button>
       </td>
     </tr>`).join('');
   return `
@@ -376,7 +376,7 @@ function _renderPceSection(a, profiles, activePceId) {
       <div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-pce-secret" type="password"></div>
     </div>
     <div class="chk" style="margin-bottom:8px"><label><input type="checkbox" id="s-pce-ssl" checked> <span data-i18n="gui_verify_ssl">Verify SSL</span></label></div>
-    <button class="btn btn-primary btn-sm" onclick="addPceProfile()" data-i18n="gui_pce_add">Add PCE Profile</button>
+    <button class="btn btn-primary btn-sm" data-action="addPceProfile" data-i18n="gui_pce_add">Add PCE Profile</button>
   </div></details>
   ${activePceId ? `<p style="margin-top:8px;color:var(--dim);font-size:0.85em"><span data-i18n="gui_pce_active">Active PCE</span>: <strong>${escapeHtml((profiles.find(p=>p.id===activePceId)||{}).name||'')}</strong> — <span data-i18n="gui_pce_save_profile" style="font-style:italic">Saving settings will update this profile.</span></p>` : ''}
 </fieldset>
@@ -471,7 +471,7 @@ function _renderSecuritySection(sec, _tlsStatus) {
 <fieldset><legend data-i18n="gui_tls_title">TLS / HTTPS</legend>
   <div class="chk" style="margin-bottom:10px"><label><input type="checkbox" id="s-tls-enabled" ${_tlsStatus.enabled ? 'checked' : ''}> <span data-i18n="gui_tls_enable">Enable HTTPS</span></label></div>
   <div id="s-tls-options" style="display:${_tlsStatus.enabled ? 'block' : 'none'}">
-    <div class="chk" style="margin-bottom:10px"><label><input type="checkbox" id="s-tls-selfsigned" ${_tlsStatus.self_signed ? 'checked' : ''} onchange="toggleTlsMode()"> <span data-i18n="gui_tls_self_signed">Use self-signed certificate</span></label></div>
+    <div class="chk" style="margin-bottom:10px"><label><input type="checkbox" id="s-tls-selfsigned" ${_tlsStatus.self_signed ? 'checked' : ''} data-on-change="toggleTlsMode"> <span data-i18n="gui_tls_self_signed">Use self-signed certificate</span></label></div>
     <div id="s-tls-custom" style="display:${_tlsStatus.self_signed ? 'none' : 'block'}">
       <div class="form-row">
         <div class="form-group"><label data-i18n="gui_tls_cert_file">Certificate File Path</label><input id="s-tls-cert" value="${escapeHtml(_tlsStatus.cert_file || '')}" placeholder="/path/to/cert.pem"><small class="form-text text-muted" data-i18n="gui_tls_cert_file_help"></small></div>
@@ -495,14 +495,14 @@ function _renderSecuritySection(sec, _tlsStatus) {
               <label data-i18n="gui_tls_csr_key_alg">Key Algorithm</label>
               <select id="s-csr-alg"><option value="rsa-2048">RSA-2048</option><option value="ecdsa-p256">ECDSA P-256</option></select>
             </div>
-            <button class="btn btn-primary" style="margin-bottom:4px" onclick="generateCsr()" data-i18n="gui_tls_csr_generate">Generate CSR</button>
+            <button class="btn btn-primary" style="margin-bottom:4px" data-action="generateCsr" data-i18n="gui_tls_csr_generate">Generate CSR</button>
           </div>
           <div id="s-csr-result" style="display:none;margin-top:10px">
             <label style="font-weight:600;font-size:0.88em" data-i18n="gui_tls_csr_pem_label">CSR (send to your CA)</label>
             <textarea id="s-csr-pem" readonly rows="8" style="font-family:monospace;font-size:0.78em;width:100%;margin-top:4px;resize:vertical"></textarea>
             <div style="display:flex;gap:8px;margin-top:6px">
-              <button class="btn btn-sm" onclick="copyCsr()" data-i18n="gui_tls_csr_copy">Copy</button>
-              <button class="btn btn-sm" onclick="downloadCsr()" data-i18n="gui_tls_csr_download">Download .csr</button>
+              <button class="btn btn-sm" data-action="copyCsr" data-i18n="gui_tls_csr_copy">Copy</button>
+              <button class="btn btn-sm" data-action="downloadCsr" data-i18n="gui_tls_csr_download">Download .csr</button>
             </div>
           </div>
         </div>
@@ -512,7 +512,7 @@ function _renderSecuritySection(sec, _tlsStatus) {
         <div style="padding:12px 14px 14px">
           <p style="font-size:0.85em;color:var(--dim);margin:0 0 10px" data-i18n="gui_tls_import_hint">Paste the PEM certificate signed by your CA. The configuration will be updated automatically.</p>
           <textarea id="s-import-cert-pem" rows="8" style="font-family:monospace;font-size:0.78em;width:100%;resize:vertical" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"></textarea>
-          <button class="btn btn-primary" style="margin-top:8px" onclick="importSignedCert()" data-i18n="gui_tls_import_btn">Import Certificate</button>
+          <button class="btn btn-primary" style="margin-top:8px" data-action="importSignedCert" data-i18n="gui_tls_import_btn">Import Certificate</button>
         </div>
       </details>
     </div>
@@ -572,7 +572,7 @@ function _renderTlsCertInfo() {
     ? `<div><strong data-i18n="gui_tls_days_remaining">Days Remaining</strong>: ${humanizeDays(days)}</div>`
     : '';
   const renewBtn = _tlsStatus.self_signed
-    ? `<button class="btn btn-primary btn-sm" style="margin-top:10px" onclick="renewTlsCert()" data-i18n="gui_tls_renew">Renew Now</button>`
+    ? `<button class="btn btn-primary btn-sm" style="margin-top:10px" data-action="renewTlsCert" data-i18n="gui_tls_renew">Renew Now</button>`
     : '';
   el.innerHTML = `
     <div class="card" style="margin-top:10px;padding:14px 18px;">

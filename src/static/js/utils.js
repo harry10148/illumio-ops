@@ -270,8 +270,18 @@ function renderLabelsHtml(labels) {
 
 let _activePopover = null;
 
-function showCellPopover(event, title, items) {
-  event.stopPropagation();
+// service 欄位截斷文字的 popover：由 dispatcher 呼叫，event/target 靠
+// data-pass-event="1" 附加在參數尾端（見 _event_dispatcher.js）。
+function _svcPopoverClick(title, items, event, target) {
+  showCellPopover(event, target, title, items);
+}
+
+// target：觸發的儲存格元素本身，用於定位（dispatcher 委派下 event.currentTarget 會是 document，不可用）。
+function showCellPopover(event, target, title, items) {
+  // dispatcher 的 click 監聽也掛在 document 上，stopPropagation 對「同一節點上
+  // 其他 listener」無效，需用 stopImmediatePropagation 才能擋掉稍後註冊、
+  // 會關閉本 popover 的「點外部關閉」listener。
+  event.stopImmediatePropagation();
   if (_activePopover) {
     _activePopover.remove();
     _activePopover = null;
@@ -287,7 +297,7 @@ function showCellPopover(event, title, items) {
   pop.innerHTML = html;
   document.body.appendChild(pop);
 
-  const rect = event.currentTarget.getBoundingClientRect();
+  const rect = target.getBoundingClientRect();
   const popRect = pop.getBoundingClientRect();
 
   let top = rect.bottom + window.scrollY + 5;
@@ -429,6 +439,10 @@ function initTableResizers() {
   });
 }
 
+// toast 的關閉鈕：把自己的父層 class 重設回未顯示狀態。
+function _toastCloseClick(el) {
+  el.parentElement.className = 'toast';
+}
 let _toastTimer = null;
 function toast(msg, type) {
   // type: 'err'|'warn'|'info' or falsy for success
@@ -436,7 +450,7 @@ function toast(msg, type) {
   const _svgIcon = (id) => `<svg class="icon" aria-hidden="true" style="width:14px;height:14px;vertical-align:middle;"><use href="#${id}"></use></svg>`;
   const icons = { err: _svgIcon('icon-cross'), warn: _svgIcon('icon-alert'), info: 'ℹ' };
   const cls = type === 'err' ? ' err' : type === 'warn' ? ' warn' : type === 'info' ? ' info' : '';
-  t.innerHTML = `<span class="toast-icon">${icons[type] || _svgIcon('icon-check')}</span><span>${escapeHtml(msg)}</span><button class="toast-close" onclick="this.parentElement.className='toast'" aria-label="Close">${_svgIcon('icon-cross')}</button>`;
+  t.innerHTML = `<span class="toast-icon">${icons[type] || _svgIcon('icon-check')}</span><span>${escapeHtml(msg)}</span><button class="toast-close" data-action="_toastCloseClick" data-arg-source="self" aria-label="Close">${_svgIcon('icon-cross')}</button>`;
   t.className = 'toast' + cls + ' show';
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => t.className = 'toast', 4000);

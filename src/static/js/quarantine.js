@@ -424,8 +424,7 @@ function renderQtPage() {
 
     if (svc_str.length > 25) {
       let arr = svc_str.split(',').map(s => s.trim());
-      let encJson = encodeURIComponent(JSON.stringify(arr)).replace(/'/g, '%27');
-      svc_str = `<span onclick="showCellPopover(event, 'SVC', JSON.parse(decodeURIComponent('${encJson}')))" style="cursor:pointer; border-bottom:1px dotted var(--dim); color:var(--accent);">${escapeHtml(svc_str.substring(0, 23))}...</span>`;
+      svc_str = `<span data-action="_svcPopoverClick" data-args='${escapeHtml(JSON.stringify(['SVC', arr]))}' data-pass-event="1" style="cursor:pointer; border-bottom:1px dotted var(--dim); color:var(--accent);">${escapeHtml(svc_str.substring(0, 23))}...</span>`;
     } else {
       svc_str = escapeHtml(svc_str);
     }
@@ -453,15 +452,15 @@ function renderQtPage() {
       if (pd === 'blocked_by_override_deny') return `<span style="background:var(--danger);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${prefix}${_t('pd_blocked_by_override_deny')}</span>`;
       if (pd === 'potentially_blocked_by_boundary') return `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">${prefix}${_t('pd_potentially_blocked_by_boundary')}</span>`;
       if (pd === 'potentially_blocked_by_override_deny') return `<span style="background:var(--warn);color:#000;padding:2px 6px;border-radius:4px;font-size:10px;">${prefix}${_t('pd_potentially_blocked_by_override_deny')}</span>`;
-      return `<span style="background:var(--dim);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${prefix}${pd}</span>`;
+      return `<span style="background:var(--dim);color:#fff;padding:2px 6px;border-radius:4px;font-size:10px;">${prefix}${escapeHtml(pd)}</span>`;
     };
 
     let pdBadge = makePdBadge(rawPd, true);
     let draftBadge = rawDraftPd ? `<div style="margin-top:3px;">${makePdBadge(rawDraftPd, false)}</div>` : '';
 
     let isoBtn = '';
-    if (shref && dhref) isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${shref}', false, '${dhref}')"><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
-    else if (shref || dhref) isoBtn = `<button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${shref || dhref}')"><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
+    if (shref && dhref) isoBtn = `<button class="btn btn-danger btn-sm" data-action="openQuarantineModal" data-args='${escapeHtml(JSON.stringify([shref, false, dhref]))}'><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
+    else if (shref || dhref) isoBtn = `<button class="btn btn-danger btn-sm" data-action="openQuarantineModal" data-args='${escapeHtml(JSON.stringify([shref || dhref]))}'><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>`;
 
     let f_seen = item.timestamp_range ? item.timestamp_range.first_detected || "" : "";
     let l_seen = item.timestamp_range ? item.timestamp_range.last_detected || "" : "";
@@ -586,9 +585,9 @@ function renderQwPage() {
     const mgmtText = w.managed ? (_t('gui_management_managed')) : (_t('gui_management_unmanaged'));
 
     const isManaged = w.managed === true;
-    const accelLabel = escapeHtml((w.hostname || w.name || href).replace(/'/g, "\\'"));
+    const accelLabel = w.hostname || w.name || href;
     const accelBtn = isManaged
-      ? `<button class="btn btn-secondary btn-sm" style="margin-left:6px;" title="${_t('gui_btn_accelerate_tip')}" onclick="accelerateOne('${href}','${accelLabel}')">${_t('gui_btn_accelerate')}</button>`
+      ? `<button class="btn btn-secondary btn-sm" style="margin-left:6px;" title="${_t('gui_btn_accelerate_tip')}" data-action="accelerateOne" data-args='${escapeHtml(JSON.stringify([href, accelLabel]))}'>${_t('gui_btn_accelerate')}</button>`
       : `<button class="btn btn-secondary btn-sm" style="margin-left:6px;" disabled title="${_t('gui_accel_unmanaged_tip')}">${_t('gui_btn_accelerate')}</button>`;
 
     html += `<tr>
@@ -603,7 +602,7 @@ function renderQwPage() {
           <td>${ipStr}</td>
           <td style="font-size:11px;">${labelsHtml || `<span style="color:var(--dim);font-size:10px;">${_t('gui_no_labels')}</span>`}</td>
           <td>
-            <button class="btn btn-danger btn-sm" onclick="openQuarantineModal('${href}')"><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>
+            <button class="btn btn-danger btn-sm" data-action="openQuarantineModal" data-args='${escapeHtml(JSON.stringify([href]))}'><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>
             ${accelBtn}
             ${hasQuarantine ? `<span style="font-size:10px;color:var(--danger);font-weight:bold;margin-left:8px;">${_t('gui_isolated')}</span>` : ''}
           </td>
