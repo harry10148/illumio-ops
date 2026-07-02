@@ -262,7 +262,7 @@
   "cli_report_data_source_warning": "warning: {msg}",
   "cli_report_file_required_csv": "--file is required when --source csv is used",
   "cli_report_no_data": "No data for report",
-  "cli_report_profile_deprecated": "note: 'report traffic --profile' is deprecated; use 'report security' / 'report inventory'",
+  "cli_report_profile_deprecated": "--profile is deprecated: use `report security` or `report inventory`. This run keeps the requested profile.",
   "cli_report_input_not_found": "Input file not found: {error}",
   "cli_report_connection_failed": "Connection failed: {error}",
   "cli_report_unexpected_error": "Unexpected error: {error}",
