@@ -132,3 +132,58 @@ def test_fetch_events_partial_with_api_error_falls_back_to_api(tmp_path):
     # Must fall through to api.get_events, not silently return cache data.
     api.get_events.assert_called_once()
     assert source == "api"
+
+
+def test_fetch_events_hybrid_boundary_event_counted_exactly_once(tmp_path):
+    """資料層行為鎖（Task F3，C6 同型 follow-up）：timestamp 恰好等於
+    cache_start 的 event，在合併結果中必須恰好出現一次。
+
+    兩個 mock 資料來源皆忠實模擬「兩端皆含端點」的查詢語意：
+    - PCE events API 以 timestamp[gte]/timestamp[lte] 建構查詢（見
+      src/api_client.py._build_events_url），兩個運算子皆為 inclusive，
+      比 analyzer 的 traffic API 假設更明確（gte/lte 直接寫在參數名中）。
+    - cache.read_events 依 timestamp >= start AND <= end 過濾（見
+      src/pce_cache/reader.py read_events）。
+    修正前 API gap 以 cache_start 結束、cache 亦含 cache_start 端點，
+    合併後邊界 event 出現兩次；修正後 gap 結束於 cache_start 前 1 秒，
+    只有 cache 側回傳它 → 一次。
+    """
+    from src.report.audit_generator import AuditGenerator
+
+    # 秒解析度截斷：_fetch_events 直接用 start.isoformat() 組 URL 參數，
+    # 若帶微秒會與測試模擬的 '%Y-%m-%dT%H:%M:%SZ' 格式對不上。
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    cache_start = now - timedelta(days=1)
+    start = now - timedelta(days=2)
+
+    def _parse(ts):
+        return datetime.strptime(ts, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+
+    boundary_event = {"event_type": "boundary",
+                      "timestamp": cache_start.strftime('%Y-%m-%dT%H:%M:%SZ')}
+    gap_event = {"event_type": "gap-only",
+                "timestamp": (cache_start - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')}
+    all_events = [gap_event, boundary_event]
+
+    api = _make_mock_api()
+
+    def _api_fetch(start_str, end_str):
+        # 模擬 PCE events API：timestamp[gte]=start_str, timestamp[lte]=end_str
+        s, e = _parse(start_str), _parse(end_str)
+        return [ev for ev in all_events if s <= _parse(ev["timestamp"]) <= e]
+    api.fetch_events.side_effect = _api_fetch
+
+    cache = _make_cache_reader(cover_state="partial", earliest=cache_start)
+
+    def _cache_read(start_dt, end_dt):
+        # 模擬 read_events：timestamp >= start AND <= end（皆含端點）
+        return [ev for ev in all_events if start_dt <= _parse(ev["timestamp"]) <= end_dt]
+    cache.read_events.side_effect = _cache_read
+
+    gen = AuditGenerator(api=api, cache_reader=cache)
+    events, source = gen._fetch_events(start, now)
+
+    types = [ev["event_type"] for ev in events]
+    assert types.count("boundary") == 1  # 端點 event 恰好一次
+    assert types.count("gap-only") == 1  # gap 段 event 不受影響
+    assert source == "mixed"

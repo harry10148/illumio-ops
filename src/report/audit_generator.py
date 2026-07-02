@@ -459,14 +459,33 @@ class AuditGenerator:
             elif state == "partial":
                 cache_start = self._cache.earliest_data_timestamp("events")
                 if cache_start is not None and cache_start > start:
+                    # 半開的 gap 視窗：cache.read_events 兩端皆含端點
+                    # （'timestamp >= start AND <= end'，見
+                    # src/pce_cache/reader.py）；PCE events API 以
+                    # timestamp[gte]/timestamp[lte] 建構查詢（見
+                    # src/api_client.py._build_events_url），兩者皆為
+                    # inclusive，比 traffic API 更明確（gte/lte 直接寫在
+                    # 參數名中）。若 API gap 直接以 cache_start 結束，
+                    # 落在 cache_start 精確時間戳上的 event 會被兩側各
+                    # 算一次。將 API gap 的結束時間回退 1 秒，使 gap
+                    # 覆蓋 [start, cache_start)、cache 覆蓋
+                    # [cache_start, end] —— 每筆 event 恰好計一次。殘餘
+                    # 風險與 analyzer._fetch_query_flows 相同：event
+                    # timestamp 若帶次秒精度，cache_start-1s 那一整秒的
+                    # event 可能被漏掉，屬已知取捨，嚴格優於先前的雙算。
+                    gap_end_dt = cache_start - datetime.timedelta(seconds=1)
                     logger.info(
-                        "Audit report: hybrid fetch — API gap [{} → {}), cache [{} → {}]",
-                        start, cache_start, cache_start, end,
+                        "Audit report: hybrid fetch — API gap [{} → {}], cache [{} → {}]",
+                        start, gap_end_dt, cache_start, end,
                     )
                     start_str = start.isoformat().replace("+00:00", "Z")
-                    cache_start_str = cache_start.isoformat().replace("+00:00", "Z")
+                    gap_end_str = gap_end_dt.isoformat().replace("+00:00", "Z")
                     try:
-                        gap = self.api.fetch_events(start_str, cache_start_str) or []
+                        if gap_end_dt >= start:
+                            gap = self.api.fetch_events(start_str, gap_end_str) or []
+                        else:
+                            # 次秒級 gap：回退 1 秒後已無有意義的窗口可查詢。
+                            gap = []
                     except Exception as exc:
                         logger.warning(
                             "Audit hybrid: API gap fetch failed ({}); falling back to full API path", exc,

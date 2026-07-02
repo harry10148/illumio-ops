@@ -237,3 +237,112 @@ def test_generate_from_api_clip_to_cache_default_off_does_not_clip(tmp_path):
     gen.generate_from_api(start_date=start, end_date=end)
     # Default behavior: API call is made for the leading gap
     api.fetch_traffic_for_report.assert_called_once()
+
+
+def test_fetch_traffic_hybrid_boundary_flow_counted_exactly_once(tmp_path):
+    """資料層行為鎖（Task F3，C6 同型 follow-up）：last_detected 恰好等於
+    cache_start 的 flow，在合併結果中必須恰好出現一次。
+
+    兩個 mock 資料來源皆忠實模擬「兩端皆含端點」的查詢語意：
+    - PCE traffic API 的 start_date/end_date 在秒解析度下為 inclusive
+      （report_generator._fetch_traffic 與 analyzer._fetch_query_flows
+      走同一個 execute_traffic_query_stream → start_date/end_date payload，
+      見 src/api/traffic_query.py _build_native_traffic_payload）。
+    - cache.read_flows_raw 依 last_detected >= start AND <= end 過濾
+      （見 src/pce_cache/reader.py）。
+    修正前 API gap 以 cache_start 結束、cache 亦含 cache_start 端點，
+    合併後邊界 flow 出現兩次；修正後 gap 結束於 cache_start 前 1 秒，
+    只有 cache 側回傳它 → 一次。
+    """
+    from datetime import datetime, timedelta, timezone
+    from src.report.report_generator import ReportGenerator
+
+    # 秒解析度截斷：_fmt_iso 直接輸出 datetime.isoformat()，若帶微秒會與
+    # PCE API 的 '%Y-%m-%dT%H:%M:%SZ' 字串格式對不上（見 C6 對 analyzer 的
+    # 同一假設）。
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    cache_start = now - timedelta(hours=2)
+    request_start = now - timedelta(days=3)
+
+    def _parse(ts):
+        return datetime.strptime(ts, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+
+    boundary_flow = {**_make_flow(), "id": "boundary",
+                     "last_detected": cache_start.strftime('%Y-%m-%dT%H:%M:%SZ')}
+    gap_only_flow = {**_make_flow(), "id": "gap-only",
+                     "last_detected": (cache_start - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M:%SZ')}
+    all_flows = [gap_only_flow, boundary_flow]
+
+    api = _make_mock_api()
+
+    def _api_fetch(start_time_str, end_time_str, filters=None):
+        # 模擬 PCE traffic API：回傳 [start, end] 兩端皆含端點的 flow
+        s, e = _parse(start_time_str), _parse(end_time_str)
+        return [f for f in all_flows if s <= _parse(f["last_detected"]) <= e]
+    api.fetch_traffic_for_report.side_effect = _api_fetch
+
+    cache = _make_cache_reader(cover_state="partial", earliest=cache_start)
+
+    def _cache_read(start, end, workload_hrefs=None):
+        # 模擬 read_flows_raw：last_detected >= start AND <= end（皆含端點）
+        return [f for f in all_flows if start <= _parse(f["last_detected"]) <= end]
+    cache.read_flows_raw.side_effect = _cache_read
+
+    gen = ReportGenerator(api=api, cache_reader=cache)
+    result = gen._fetch_traffic(request_start, now)
+
+    ids = [f["id"] for f in result["raw"]]
+    assert ids.count("boundary") == 1  # 端點 flow 恰好一次
+    assert ids.count("gap-only") == 1  # gap 段 flow 不受影響
+    assert result["source"] == "mixed"
+
+
+def test_fetch_traffic_df_hybrid_boundary_flow_counted_exactly_once(tmp_path):
+    """資料層行為鎖（Task F3）：_fetch_traffic_df 走與 _fetch_traffic 相同的
+    切分點，同樣需要邊界 flow 恰好計一次。見上一測試的語意說明。
+
+    僅在合併層驗證（gap 側與 cache 側各自回傳的 DataFrame 直接拼接），
+    不經過完整的 APIParser/build_unified_df 流程 —— 與 C6 對 analyzer
+    的資料層測試手法一致：鎖的是切分點的算術，不是解析管線。
+    """
+    from datetime import datetime, timedelta, timezone
+    from unittest.mock import MagicMock
+    import pandas as pd
+    from src.report.report_generator import ReportGenerator
+
+    # 秒解析度截斷：理由同上一測試（_fmt_iso 直接輸出帶微秒的 isoformat()）。
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    cache_start = now - timedelta(hours=2)
+    request_start = now - timedelta(days=3)
+
+    boundary_row = {"id": "boundary", "last_detected": cache_start}
+    gap_row = {"id": "gap-only", "last_detected": cache_start - timedelta(hours=1)}
+    all_rows = [gap_row, boundary_row]
+
+    api = _make_mock_api()
+
+    def _api_fetch(start_time_str, end_time_str, filters=None, compute_draft=False):
+        s = datetime.strptime(start_time_str, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+        e = datetime.strptime(end_time_str, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+        return [r for r in all_rows if s <= r["last_detected"] <= e]
+    api.fetch_traffic_for_report.side_effect = _api_fetch
+
+    cache = _make_cache_reader(cover_state="partial", earliest=cache_start)
+
+    def _cache_read_df(start, end, workload_hrefs=None, policy_decisions=None):
+        rows = [r for r in all_rows if start <= r["last_detected"] <= end]
+        return pd.DataFrame(rows) if rows else pd.DataFrame(columns=["id", "last_detected"])
+    cache.read_flows_df.side_effect = _cache_read_df
+
+    gen = ReportGenerator(api=api, cache_reader=cache)
+    # 資料層鎖：以簡單直通取代完整 APIParser 解析，只驗證切分點算術。
+    gen._parse_api = lambda records: (
+        pd.DataFrame(records) if records else pd.DataFrame(columns=["id", "last_detected"])
+    )
+
+    df, source = gen._fetch_traffic_df(request_start, now, None)
+
+    ids = df["id"].tolist()
+    assert ids.count("boundary") == 1  # 端點 flow 恰好一次
+    assert ids.count("gap-only") == 1  # gap 段 flow 不受影響
+    assert source == "mixed"

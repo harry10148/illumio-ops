@@ -190,15 +190,33 @@ class ReportGenerator:
             if state == "partial":
                 cache_start = self._cache.earliest_data_timestamp("traffic")
                 if cache_start is not None and cache_start > start:
+                    # 半開的 gap 視窗：cache.read_flows_raw 兩端皆含端點
+                    # （'last_detected >= start AND <= end'，見
+                    # src/pce_cache/reader.py），且此處呼叫的 PCE traffic
+                    # API 與 analyzer._fetch_query_flows 走同一個
+                    # start_date/end_date payload（inclusive，秒解析度，
+                    # 見 src/analyzer.py C6 修法與其假設風險註解）。若 API
+                    # gap 直接以 cache_start 結束，落在 cache_start 精確
+                    # 時間戳上的 flow 會被兩側各算一次。將 API gap 的結束
+                    # 時間回退 1 秒，使 gap 覆蓋 [start, cache_start)、
+                    # cache 覆蓋 [cache_start, end] —— 每筆 flow 恰好計
+                    # 一次。與 analyzer 相同的殘餘風險：若 API end 實為
+                    # exclusive，則 cache_start-1s 那一整秒的 flow 會被
+                    # 漏掉，屬已知取捨，嚴格優於先前的雙算。
+                    gap_end_dt = cache_start - datetime.timedelta(seconds=1)
                     logger.info(
-                        "Traffic report: hybrid fetch — API gap [{} → {}), cache [{} → {}]",
-                        start, cache_start, cache_start, end,
+                        "Traffic report: hybrid fetch — API gap [{} → {}], cache [{} → {}]",
+                        start, gap_end_dt, cache_start, end,
                     )
-                    gap = self.api.fetch_traffic_for_report(
-                        start_time_str=_fmt_iso(start),
-                        end_time_str=_fmt_iso(cache_start),
-                        filters=filters,
-                    ) or []
+                    if gap_end_dt >= start:
+                        gap = self.api.fetch_traffic_for_report(
+                            start_time_str=_fmt_iso(start),
+                            end_time_str=_fmt_iso(gap_end_dt),
+                            filters=filters,
+                        ) or []
+                    else:
+                        # 次秒級 gap：回退 1 秒後已無有意義的窗口可查詢。
+                        gap = []
                     cached = self._cache.read_flows_raw(cache_start, end, workload_hrefs=cache_workload_hrefs)
                     # agg data not available for hybrid results
                     source = "mixed" if gap else "cache"
@@ -236,16 +254,25 @@ class ReportGenerator:
             if state == "partial":
                 cache_start = self._cache.earliest_data_timestamp("traffic")
                 if cache_start is not None and cache_start > start:
+                    # 半開的 gap 視窗：語意與假設同 _fetch_traffic 的
+                    # 同型註解（cache 兩端皆含端點、PCE API 亦為
+                    # inclusive）。將 gap 結束時間回退 1 秒，避免
+                    # cache_start 精確時間戳上的 flow 被兩側各算一次。
+                    gap_end_dt = cache_start - datetime.timedelta(seconds=1)
                     logger.info(
-                        "Traffic report: hybrid fetch — API gap [{} → {}), cache [{} → {}]",
-                        start, cache_start, cache_start, end,
+                        "Traffic report: hybrid fetch — API gap [{} → {}], cache [{} → {}]",
+                        start, gap_end_dt, cache_start, end,
                     )
-                    gap = self.api.fetch_traffic_for_report(
-                        start_time_str=_fmt_iso(start),
-                        end_time_str=_fmt_iso(cache_start),
-                        filters=filters,
-                        compute_draft=compute_draft,
-                    ) or []
+                    if gap_end_dt >= start:
+                        gap = self.api.fetch_traffic_for_report(
+                            start_time_str=_fmt_iso(start),
+                            end_time_str=_fmt_iso(gap_end_dt),
+                            filters=filters,
+                            compute_draft=compute_draft,
+                        ) or []
+                    else:
+                        # 次秒級 gap：回退 1 秒後已無有意義的窗口可查詢。
+                        gap = []
                     df_gap = self._parse_api(gap)
                     df_cache = self._cache.read_flows_df(cache_start, end,
                                                          workload_hrefs=cache_workload_hrefs,
