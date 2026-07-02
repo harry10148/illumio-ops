@@ -141,12 +141,21 @@ draft 分析、vuln、labels。不抓 workloads、不需 vuln CSV。
    - 各報表 HTML 表格欄數以列印可讀為上限原則（過寬的明細表改下放
      CSV/XLSX，與「HTML 給結論、明細給 XLSX」原則一致）。
 
-## 不做的事（另案）
+## 不做的事（另案，已各自立計畫）
 
-- 宣告式報表定義重構。
-- XLSX 平行路徑（`generate_*_xlsx` ×3）架構重構——K1 只修 VEN 判定不一致。
-- Policy Diff 擴充（IP list / service / label group 層 diff）。
-- Enforcement 就緒度獨立成報表（產品方向，待使用回饋）。
+- **XLSX 匯出統一**：盤點發現 `generate_*_xlsx` ×3 在 production **零呼叫者**
+  （僅測試使用），正式 `--format xlsx` 走 `export_xlsx()` 且塞空殼 sheet
+  （`{'summary': '', 'table': []}`）——使用者拿到的 XLSX 幾乎沒有內容。
+  修復計畫：`docs/superpowers/plans/2026-07-02-backlog-xlsx-export-unification.md`
+  （排 Phase 5 之後）。K1 仍先修 VEN 判定不一致。
+- **Policy Diff 擴充**（IP list / service / label group 層 diff）：
+  `docs/superpowers/plans/2026-07-02-backlog-policy-diff-object-layers.md`
+  （建議排 Phase 4 之後）。
+- **Enforcement 就緒度獨立報表**：
+  `docs/superpowers/plans/2026-07-02-backlog-readiness-standalone-report.md`
+  （前置條件：Phase 2 上線後收使用回饋確認需求；若 Security 精簡版已夠用則取消）。
+- **宣告式報表定義重構**：架構討論已決議不採（Profile 感知模組執行已滿足需求），
+  不立計畫；若日後報表種類繼續膨脹再重評。
 
 ## 測試策略
 
