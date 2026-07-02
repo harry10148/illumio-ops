@@ -2365,6 +2365,7 @@
   "gui_traffic_archive_no_files": "選取範圍內找不到封存檔（目前載入未變更）",
   "gui_traffic_archive_none": "尚未載入封存",
   "gui_traffic_archive_load_error": "封存載入失敗：{err}",
+  "gui_traffic_archive_load_busy": "已有另一個封存載入正在進行中，請稍後再試",
   "gui_traffic_rule_desc": "這個規則用來監控連線次數是否異常升高。",
   "gui_traffic_rule_saved": "流量規則已儲存",
   "gui_traffic_run_query_empty": "執行查詢以檢視即時流量異常。",

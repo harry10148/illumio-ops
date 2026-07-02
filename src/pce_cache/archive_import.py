@@ -3,6 +3,7 @@ from __future__ import annotations
 import gzip
 import os
 import re
+import threading
 from datetime import date, datetime, timezone
 
 import orjson
@@ -13,6 +14,15 @@ from sqlalchemy.orm import sessionmaker
 from src.pce_cache.models import PceTrafficFlowRaw
 
 _TRAFFIC_FILE = re.compile(r"^traffic-(\d{4}-\d{2}-\d{2})\.jsonl(?:\.gz)?$")
+
+# 同時只允許一個 load 在跑：重建/匯入/聚合期間若第二個 load 進來，會跟第一個
+# 搶同一個暫存檔與目標 DB。用 module-level lock + non-blocking acquire，
+# 第二個請求立即被擋下（不排隊），呼叫端（web.py）接住 ArchiveLoadBusy 回 409。
+_LOAD_LOCK = threading.Lock()
+
+
+class ArchiveLoadBusy(Exception):
+    """另一個 load_archive_review 正在進行中（lock 非阻塞取得失敗）。"""
 
 
 def _parse_dt(s: str) -> datetime:
@@ -169,45 +179,95 @@ def review_session_factory(cfg):
     return sessionmaker(engine)
 
 
+def _remove_sqlite_sidecars(path: str) -> None:
+    """只刪 -wal/-shm sidecar，留下主檔（存在才刪，不存在不當錯誤）。"""
+    for suffix in ("-wal", "-shm"):
+        try:
+            os.remove(path + suffix)
+        except FileNotFoundError:
+            pass
+
+
+def _remove_sqlite_files(path: str) -> None:
+    """刪除 SQLite 主檔與其 -wal/-shm sidecar（存在才刪，不存在不當錯誤）。"""
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+    _remove_sqlite_sidecars(path)
+
+
+def _write_meta(cfg, meta: dict) -> None:
+    """meta 寫入 temp + os.replace，避免崩潰留下半寫入的 meta 檔。"""
+    path = _meta_path(cfg)
+    tmp = path + ".tmp"
+    with open(tmp, "wb") as fh:
+        fh.write(orjson.dumps(meta))
+    os.replace(tmp, path)
+
+
 def load_archive_review(cfg, start: date, end: date) -> dict:
     """重建 review DB → 匯入範圍內 traffic archive → 跑聚合 → 寫 sidecar meta。
 
     防呆：範圍內沒有任何封存檔時，不重建 review DB（保留目前已載入的資料）、
     也不改 meta，回報 no_files=True，讓呼叫端明確提示，而非顯示看似成功的
-    「0 筆」並把上一次載入的資料洗掉。"""
+    「0 筆」並把上一次載入的資料洗掉。
+
+    併發：整個函式被 module-level lock 包住，non-blocking acquire——第二個
+    進來的 load 立即拋 ArchiveLoadBusy，不排隊、不會跟第一個搶同一份暫存檔。
+
+    核心不變量：load 失敗後，review_status 與 review DB 必須仍一致地描述
+    上一次成功載入。做法是 build-to-temp：整個重建/匯入/聚合都灌到獨立的
+    暫存檔（`archive_review.sqlite.tmp`），只有全部成功才 os.replace 原子
+    切換成正式檔、再寫 meta；任何一步失敗，正式 DB 與 meta 完全沒被碰過，
+    只需清掉暫存檔。"""
     from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
     from src.pce_cache.schema import init_schema
     from src.pce_cache.aggregator import TrafficAggregator
-    if not _matching_traffic_files(cfg.archive_dir, start, end):
-        prev = review_status(cfg)
-        return {"loaded": bool(prev.get("loaded")), "no_files": True,
-                "files": 0, "rows": 0, "skipped": 0,
-                "start": start.isoformat(), "end": end.isoformat()}
-    db = review_db_path(cfg)
-    for suffix in ("", "-wal", "-shm"):
-        try:
-            os.remove(db + suffix)
-        except FileNotFoundError:
-            pass
-    engine = create_engine(f"sqlite:///{db}")
+    if not _LOAD_LOCK.acquire(blocking=False):
+        raise ArchiveLoadBusy()
     try:
-        init_schema(engine)
-        sf = sessionmaker(engine)
-        result = ArchiveImporter(cfg.archive_dir, sf).import_range(start, end)
-        TrafficAggregator(sf).run_once()
+        if not _matching_traffic_files(cfg.archive_dir, start, end):
+            prev = review_status(cfg)
+            return {"loaded": bool(prev.get("loaded")), "no_files": True,
+                    "files": 0, "rows": 0, "skipped": 0,
+                    "start": start.isoformat(), "end": end.isoformat()}
+        db = review_db_path(cfg)
+        tmp = db + ".tmp"
+        # 清掉前次可能留下的暫存檔（例如上次崩潰在切換前中斷）。
+        _remove_sqlite_files(tmp)
+        engine = create_engine(f"sqlite:///{tmp}")
+        try:
+            init_schema(engine)
+            sf = sessionmaker(engine)
+            result = ArchiveImporter(cfg.archive_dir, sf).import_range(start, end)
+            TrafficAggregator(sf).run_once()
+            # 把 WAL 內容併回主檔並清空 -wal，讓暫存檔本身自足——
+            # 之後 os.replace 只搬主檔，不會漏資料留在 -wal 裡。
+            with engine.begin() as conn:
+                conn.exec_driver_sql("PRAGMA wal_checkpoint(TRUNCATE)")
+        except Exception:
+            engine.dispose()
+            _remove_sqlite_files(tmp)
+            raise
+        engine.dispose()  # 釋放檔案 handle，才能安全 replace
+        # 切換前清掉暫存檔自己殘留的 -wal/-shm（TRUNCATE checkpoint 後理論上
+        # 已空，防禦性再清一次），以及目標檔案的舊 -wal/-shm（換了主檔後，
+        # 舊 sidecar 對新主檔無效，留著會被下個連線誤讀）。
+        _remove_sqlite_sidecars(tmp)
+        _remove_sqlite_sidecars(db)
+        os.replace(tmp, db)
+        meta = {"loaded": True, "rows": result["rows"], "files": result["files"],
+                "skipped": result["skipped"], "start": result["start"], "end": result["end"]}
+        _write_meta(cfg, meta)
+        return meta
     finally:
-        engine.dispose()  # 釋放檔案 handle，讓下次重建能安全刪檔
-    meta = {"loaded": True, "rows": result["rows"], "files": result["files"],
-            "skipped": result["skipped"], "start": result["start"], "end": result["end"]}
-    with open(_meta_path(cfg), "wb") as fh:
-        fh.write(orjson.dumps(meta))
-    return meta
+        _LOAD_LOCK.release()
 
 
 def review_status(cfg) -> dict:
     try:
         with open(_meta_path(cfg), "rb") as fh:
             return orjson.loads(fh.read())
-    except FileNotFoundError:
+    except (FileNotFoundError, orjson.JSONDecodeError):
         return {"loaded": False}

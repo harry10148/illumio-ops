@@ -2365,6 +2365,7 @@
   "gui_traffic_archive_no_files": "No archive files found in the selected range (current load unchanged)",
   "gui_traffic_archive_none": "No archive loaded",
   "gui_traffic_archive_load_error": "Archive load failed: {err}",
+  "gui_traffic_archive_load_busy": "Another archive load is already in progress, please try again shortly",
   "gui_traffic_rule_desc": "This rule monitors whether connection counts rise abnormally.",
   "gui_traffic_rule_saved": "Traffic rule saved",
   "gui_traffic_run_query_empty": "Run a query to view real-time traffic anomalies.",

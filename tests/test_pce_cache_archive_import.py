@@ -233,3 +233,101 @@ def test_review_session_factory_uses_nullpool(tmp_path, archive_dir):
     sf = review_session_factory(cfg)
     engine = sf.kw["bind"]            # sessionmaker 綁定的 engine
     assert type(engine.pool).__name__ == "NullPool"
+
+
+def test_load_review_concurrent_second_call_raises_busy(tmp_path, archive_dir, monkeypatch):
+    """兩個 load 併發：第一個進行中時，第二個必須立即被 module-level lock
+    擋下（non-blocking），而不是排隊等待或同時重建同一個 review DB。"""
+    import threading
+    from src.pce_cache import archive_import
+
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 1, "action": "allowed"}
+    _write(archive_dir, "traffic-2026-06-05.jsonl", [_traffic_line("c1", "2026-06-05", raw)])
+    cfg = _cfg(tmp_path, archive_dir)
+
+    started = threading.Event()
+    release = threading.Event()
+    orig_import_range = archive_import.ArchiveImporter.import_range
+
+    def slow_import_range(self, start, end):
+        started.set()
+        assert release.wait(timeout=5), "release 逾時未被設置"
+        return orig_import_range(self, start, end)
+
+    monkeypatch.setattr(archive_import.ArchiveImporter, "import_range", slow_import_range)
+
+    results = {}
+
+    def _first():
+        results["first"] = archive_import.load_archive_review(
+            cfg, date(2026, 6, 1), date(2026, 6, 30))
+
+    t = threading.Thread(target=_first)
+    t.start()
+    assert started.wait(timeout=5), "第一個 load 未進入 import_range"
+    with pytest.raises(archive_import.ArchiveLoadBusy):
+        archive_import.load_archive_review(cfg, date(2026, 6, 1), date(2026, 6, 30))
+    release.set()
+    t.join(timeout=5)
+    assert not t.is_alive()
+    assert results["first"]["loaded"] is True and results["first"]["rows"] == 1
+
+
+def test_load_review_failure_path_preserves_previous_db_and_meta(tmp_path, archive_dir, monkeypatch):
+    """核心不變量：mid-import 例外後，review DB 內容與 review_status 仍必須
+    一致地描述上一次成功載入，不可留下「meta 說 A、DB 是半個 B」的狀態。"""
+    from src.pce_cache import archive_import
+
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 1, "action": "allowed"}
+    _write(archive_dir, "traffic-2026-06-05.jsonl", [_traffic_line("keep", "2026-06-05", raw)])
+    cfg = _cfg(tmp_path, archive_dir)
+
+    good = archive_import.load_archive_review(cfg, date(2026, 6, 1), date(2026, 6, 30))
+    assert good["loaded"] is True
+
+    db_path = archive_import.review_db_path(cfg)
+    db_bytes_before = open(db_path, "rb").read()
+    status_before = archive_import.review_status(cfg)
+
+    def boom(self, start, end):
+        raise RuntimeError("mid-import boom")
+
+    monkeypatch.setattr(archive_import.ArchiveImporter, "import_range", boom)
+    _write(archive_dir, "traffic-2026-07-05.jsonl", [_traffic_line("new", "2026-07-05", raw)])
+
+    with pytest.raises(RuntimeError):
+        archive_import.load_archive_review(cfg, date(2026, 7, 1), date(2026, 7, 31))
+
+    # 舊 DB 檔案 bytes 不變（從未被動過，重建只灌到 .tmp）
+    assert open(db_path, "rb").read() == db_bytes_before
+    # status 仍回報舊 meta，不是失敗那次的半吊子結果
+    assert archive_import.review_status(cfg) == status_before
+    # 失敗路徑要把暫存檔清乾淨，不留半灌的 .tmp
+    assert not os.path.exists(db_path + ".tmp")
+    assert not os.path.exists(db_path + ".tmp-wal")
+    assert not os.path.exists(db_path + ".tmp-shm")
+
+
+def test_review_status_corrupted_meta_returns_not_loaded(tmp_path, archive_dir):
+    """半寫入或空的 meta 檔（崩潰造成）不可讓 review_status 拋
+    orjson.JSONDecodeError；應視同未載入。"""
+    from src.pce_cache.archive_import import review_status, _meta_path
+    cfg = _cfg(tmp_path, archive_dir)
+    with open(_meta_path(cfg), "wb") as fh:
+        fh.write(b"")
+    assert review_status(cfg) == {"loaded": False}
+
+    with open(_meta_path(cfg), "wb") as fh:
+        fh.write(b'{"loaded": true, "rows": ')  # 半寫入的 JSON
+    assert review_status(cfg) == {"loaded": False}
+
+
+def test_load_review_meta_write_is_atomic_no_tmp_leftover(tmp_path, archive_dir):
+    """成功路徑不留 meta 的暫存檔（temp + os.replace 完成後應清乾淨）。"""
+    from src.pce_cache.archive_import import load_archive_review, _meta_path
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 1, "action": "allowed"}
+    _write(archive_dir, "traffic-2026-06-05.jsonl", [_traffic_line("a1", "2026-06-05", raw)])
+    cfg = _cfg(tmp_path, archive_dir)
+
+    load_archive_review(cfg, date(2026, 6, 1), date(2026, 6, 30))
+    assert not os.path.exists(_meta_path(cfg) + ".tmp")

@@ -273,9 +273,10 @@ def put_cache_settings():
 @login_required
 def load_archive():
     from datetime import date
-    from src.pce_cache.archive_import import load_archive_review
+    from src.pce_cache.archive_import import ArchiveLoadBusy, load_archive_review
     cm = current_app.config['CM']
     cfg = cm.models.pce_cache
+    lang = cm.config.get('settings', {}).get('language', 'en')
     body = request.get_json(silent=True) or {}
     try:
         start = date.fromisoformat(body.get("start_date", ""))
@@ -291,6 +292,10 @@ def load_archive():
                         "error": f"range {span}d exceeds max {cfg.archive_review_max_days}d"}), 422
     try:
         meta = load_archive_review(cfg, start, end)
+    except ArchiveLoadBusy:
+        # 另一個 load 正在進行中（non-blocking lock 取得失敗）：立即回 409，不排隊。
+        return jsonify({"ok": False,
+                        "error": t("gui_traffic_archive_load_busy", lang=lang)}), 409
     except Exception as exc:  # noqa: BLE001
         logger.exception("archive load failed: {}", exc)
         return jsonify({"ok": False, "error": str(exc)}), 500
@@ -302,4 +307,8 @@ def load_archive():
 def archive_status():
     from src.pce_cache.archive_import import review_status
     cm = current_app.config['CM']
-    return jsonify(review_status(cm.models.pce_cache))
+    try:
+        return jsonify(review_status(cm.models.pce_cache))
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("archive status error: {}", exc)
+        return jsonify({"error": str(exc)}), 500

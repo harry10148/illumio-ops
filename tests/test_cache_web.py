@@ -314,6 +314,32 @@ def test_archive_load_no_files_flag(client, tmp_path):
     assert body["ok"] is True and body["no_files"] is True and body["files"] == 0
 
 
+def test_archive_load_returns_409_when_busy(client, tmp_path):
+    """module-level lock 被另一個 load 持有時，第二個請求要立即拿到 409，
+    而不是排隊或跟第一個一起重建同一個 review DB。"""
+    from src.pce_cache import archive_import
+    assert archive_import._LOAD_LOCK.acquire(blocking=False)
+    try:
+        resp = client.post("/api/cache/archive/load",
+                           json={"start_date": "2026-06-01", "end_date": "2026-06-30"},
+                           environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+        assert resp.status_code == 409
+        body = resp.get_json()
+        assert body["ok"] is False and body["error"]
+    finally:
+        archive_import._LOAD_LOCK.release()
+
+
+def test_archive_status_survives_corrupted_meta(client, tmp_path):
+    """半寫入/空的 meta 檔不可讓 /archive/status 500；應回 {"loaded": False}。"""
+    meta_path = tmp_path / "archive_review.sqlite.meta.json"
+    meta_path.write_bytes(b"")
+    resp = client.get("/api/cache/archive/status",
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    assert resp.get_json() == {"loaded": False}
+
+
 def test_archive_load_rejects_range_over_cap(client):
     resp = client.post("/api/cache/archive/load",
                        json={"start_date": "2026-01-01", "end_date": "2026-12-31"},
