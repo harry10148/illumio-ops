@@ -262,6 +262,62 @@ class TestAnalyzerOnCache(unittest.TestCase):
         cache_read_start = cr.read_flows_raw.call_args[0][0]
         self.assertEqual(cache_read_start, _CACHE_START)
 
+    def test_query_flows_hybrid_boundary_flow_counted_exactly_once(self):
+        """資料層行為鎖（Task C6）：last_detected 恰好等於 cache_start 的 flow，
+        在合併結果中必須恰好出現一次。
+
+        兩個 mock 資料來源皆持有同一筆 boundary flow，且各自忠實模擬
+        「兩端皆含端點」的查詢語意（API 依收到的 start/end 參數過濾、
+        cache 依 last_detected >= start 過濾）。修正前 API gap 以
+        cache_start 結束，兩側都會回傳 boundary flow → 合併後出現兩次；
+        修正後 gap 結束於 cache_start 之前，只有 cache 側回傳它 → 一次。
+        """
+        boundary_flow = {
+            "policy_decision": "allowed",
+            "last_detected": _CACHE_START.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            "id": "boundary",
+        }
+        gap_only_flow = {
+            "policy_decision": "allowed",
+            "last_detected": "2026-01-02T00:00:00Z",
+            "id": "gap-only",
+        }
+        all_flows = [gap_only_flow, boundary_flow]
+
+        def _parse(ts):
+            return datetime.datetime.strptime(ts, '%Y-%m-%dT%H:%M:%SZ').replace(
+                tzinfo=datetime.timezone.utc)
+
+        def _api_stream(start_str, end_str, *args, **kwargs):
+            # 模擬 PCE API：回傳 [start, end] 兩端皆含端點的 flow
+            s, e = _parse(start_str), _parse(end_str)
+            return iter([f for f in all_flows if s <= _parse(f["last_detected"]) <= e])
+
+        def _cache_read(start, end, *args, **kwargs):
+            # 模擬 read_flows_raw：last_detected >= start AND <= end（皆含端點）
+            return [f for f in all_flows if start <= _parse(f["last_detected"]) <= end]
+
+        az = _make_analyzer()
+        cr = MagicMock()
+        cr.cover_state.return_value = "partial"
+        cr.earliest_data_timestamp.return_value = _CACHE_START
+        cr.read_flows_raw.side_effect = _cache_read
+        az._cache_reader = cr
+        az.api.execute_traffic_query_stream.side_effect = _api_stream
+        az.api.build_traffic_query_spec = MagicMock(return_value=MagicMock(
+            report_only_filters={}, requires_draft_pd=False,
+        ))
+
+        flows, source = az._fetch_query_flows(
+            _START, _END, ["allowed"], az.api.build_traffic_query_spec({}), False,
+        )
+
+        merged = list(flows)
+        ids = [f["id"] for f in merged]
+        self.assertEqual(ids.count("boundary"), 1)  # 端點 flow 恰好一次
+        self.assertEqual(ids.count("gap-only"), 1)  # gap 段 flow 不受影響
+        self.assertEqual(source, "mixed")
+
 
 if __name__ == "__main__":
     unittest.main()

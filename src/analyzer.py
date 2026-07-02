@@ -32,9 +32,9 @@ PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
 STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
 
-# Number of top matches _dispatch_alerts keeps per triggered rule (see its
-# `top_10 = res['top_matches'][:10]`). _run_rule_engine bounds its per-rule
-# accumulation to this same N so it never grows past what dispatch uses.
+# _dispatch_alerts 對每條觸發規則實際保留的 top matches 筆數（見其
+# `top_10 = res['top_matches'][:10]`）。_run_rule_engine 以同一個 N 對
+# 每條規則的累積量設上界，確保累積永遠不超過 dispatch 端實際使用的筆數。
 TOP_MATCHES_LIMIT = 10
 
 # ─── Standalone Calculators (shared by Analyzer and Report modules) ──────────
@@ -716,15 +716,13 @@ class Analyzer:
 
     @staticmethod
     def _push_bounded_top_match(heap: list, metric_val: float, idx: int, item: dict, limit: int) -> None:
-        """Maintain `heap` as the bounded top-`limit` matches by metric_val.
+        """以 metric_val 為鍵，將 `heap` 維持為有界的 top-`limit` 匹配集合。
 
-        Tie-break matches the original 'accumulate everything, then stable
-        sort descending' behavior: on equal metric_val, the earlier-appended
-        flow (smaller idx) wins the remaining slot. Entries are
-        (metric_val, -idx, item) so heapq's min-heap root is always the
-        current worst entry (lowest metric_val; on ties, the most recently
-        appended one), which is exactly what a better/tied-but-later new
-        entry should evict.
+        tie-break 與原始「全量累積後 stable sort 降冪」行為一致：
+        metric_val 相同時，較早 append 的 flow（idx 較小）優先保留。
+        heap 元素為 (metric_val, -idx, item)，使 heapq min-heap 的
+        root 永遠是目前最差的一筆（metric_val 最低；同值時取最晚
+        append 的），正好就是新進的更佳（或同值但更早）項目該淘汰的對象。
         """
         entry = (metric_val, -idx, item)
         if len(heap) < limit:
@@ -744,12 +742,11 @@ class Analyzer:
             List of (rule, result_dict) pairs for ALL rules, each paired with
             its accumulated result containing max_val and top_matches.
 
-        top_matches accumulation is bounded to TOP_MATCHES_LIMIT per rule
-        (via a min-heap) instead of collecting every matching flow — dispatch
-        only ever keeps the top 10 anyway, so unbounded accumulation was
-        O(flows) memory for no observable benefit. The bounded structure
-        preserves the same top-N set and order dispatch would have derived
-        from the full accumulation (see _push_bounded_top_match tie-break).
+        top_matches 的累積以每規則 TOP_MATCHES_LIMIT 為上界（min-heap），
+        不再收集所有匹配的 flow —— dispatch 端本來就只保留前 10 筆，
+        無界累積只是 O(flows) 記憶體卻無任何可觀察效益。有界結構產出的
+        top-N 集合與順序，與 dispatch 從全量累積推導出的結果完全一致
+        （tie-break 見 _push_bounded_top_match）。
         """
         rule_results: dict[Any, dict[str, Any]] = {r['id']: {'max_val': 0.0, 'top_matches': []} for r in tr_rules}
         top_heaps: dict[Any, list] = {r['id']: [] for r in tr_rules}
@@ -798,9 +795,9 @@ class Analyzer:
 
         logger.info(t('found_traffic', count=count_processed))
 
-        # Restore append order (ascending idx) within each rule's bounded set
-        # so downstream consumers (_dispatch_alerts' own stable sort) see the
-        # same tie-break behavior as the original unbounded accumulation.
+        # 將每條規則的有界集合還原為原始 append 順序（idx 升冪），
+        # 使下游（_dispatch_alerts 自己的 stable sort）看到的 tie-break
+        # 行為與原始無界累積完全相同。
         for rid, heap in top_heaps.items():
             rule_results[rid]['top_matches'] = [
                 item for (_, _, item) in sorted(heap, key=lambda e: -e[1])
@@ -961,13 +958,21 @@ class Analyzer:
         if state == "partial":
             cache_start = self._cache_reader.earliest_data_timestamp("traffic")
             if cache_start is not None and cache_start > start_dt:
-                # Half-open gap window: cache.read_flows_raw is inclusive on
-                # both ends ('last_detected >= cache_start'), so an API gap
-                # query ending exactly at cache_start would double-count any
-                # flow whose last_detected == cache_start. Shift the API gap
-                # end back by 1s (the API's timestamp resolution) so the gap
-                # covers [start_dt, cache_start) and the cache covers
-                # [cache_start, end_dt] — each flow counted exactly once.
+                # 半開的 gap 視窗：cache.read_flows_raw 兩端皆含端點
+                # （'last_detected >= cache_start'），若 API gap 查詢
+                # 恰好以 cache_start 結束，落在 cache_start 精確時間戳
+                # 上的 flow 會被兩側各算一次。將 API gap 的結束時間
+                # 回退 1 秒（API 時間字串的解析度），使 gap 覆蓋
+                # [start_dt, cache_start)、cache 覆蓋 [cache_start,
+                # end_dt] —— 每筆 flow 恰好計一次。
+                #
+                # 假設與殘餘風險：此修法假設 PCE API 的 end_date 在
+                # 秒解析度下為 inclusive。實際支持證據是原本的雙算
+                # 確實存在（兩側皆含 cache_start 端點才會重複），反推
+                # API 端亦為 inclusive。此假設無法離線驗證；若 API
+                # end 實為 exclusive，則 cache_start-1s 那一整秒的
+                # flow 會被漏掉 —— 1 秒視窗的窄幅少算，屬已知取捨，
+                # 嚴格優於先前的雙算。
                 gap_end_dt = cache_start - datetime.timedelta(seconds=1)
                 logger.info(
                     "query_flows: hybrid fetch — API gap [{} → {}], cache [{} → {}]",
@@ -982,8 +987,8 @@ class Analyzer:
                         )
                         gap_list = list(gap_stream) if gap_stream is not None else []
                     else:
-                        # Sub-second gap: nothing meaningful left for the API
-                        # to fetch after the -1s shift.
+                        # 次秒級 gap：回退 1 秒後已無有意義的窗口
+                        # 可向 API 查詢。
                         gap_list = []
                 except Exception as exc:
                     logger.warning(
