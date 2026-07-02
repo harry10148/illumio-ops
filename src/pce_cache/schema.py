@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 from sqlalchemy import event, text
 from sqlalchemy.engine import Engine
 
@@ -14,6 +16,31 @@ def init_schema(engine: Engine) -> None:
     _ensure_added_indexes(engine)
     _drop_deprecated_indexes(engine)
     _normalize_agg_bucket_day(engine)
+
+
+# init_schema 本身雖然冪等，但每次呼叫仍要跑完整套 PRAGMA + create_all 反射
+# + table_info + 3 CREATE INDEX + 5 DROP INDEX 等十幾條 DDL/metadata 語句。
+# src/main.py 的 _make_cache_reader、_make_subscribers 與 archive_import.py
+# 的 review_session_factory 都是 per-request/per-query 熱路徑呼叫點，這筆
+# 開銷不該每次重付——用 db_path 記錄「這個 db 這個 process 生命週期內已
+# 確保過 schema」，之後同一個 db_path 直接略過，即使是不同 engine 物件。
+_schema_ensured_paths: set[str] = set()
+_schema_ensured_lock = threading.Lock()
+
+
+def _ensure_schema_once(engine: Engine, db_path: str) -> None:
+    """對同一個 db_path，在本 process 生命週期內只跑一次 init_schema。
+
+    邊界：若 db_path 對應的檔案被外部（非經本模組管理的流程，例如手動刪除
+    後重建）繞過，ensured-set 仍會誤以為該 db_path 已確保過，之後不會再跑
+    init_schema。這與 src/gui/_helpers.py 的 _get_cache_engine（process 快
+    取 Engine 物件）本來就有的既有假設暴露一致，不在本次範圍內額外處理。
+    """
+    with _schema_ensured_lock:
+        if db_path in _schema_ensured_paths:
+            return
+        init_schema(engine)
+        _schema_ensured_paths.add(db_path)
 
 
 # Columns added to pce_traffic_flows_raw after it first shipped (Tier-2a

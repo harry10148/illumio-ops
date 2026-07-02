@@ -182,13 +182,27 @@ def review_session_factory(cfg):
 
     此函式會被 per-query 呼叫，若用預設 pool（QueuePool）engine 又從不
     dispose，長跑程序會累積連線池與 SQLite FD 直到 GC。用 NullPool 讓
-    每個 session 各開各關自己的連線、不留池；讀路徑本就不需連線池。"""
+    每個 session 各開各關自己的連線、不留池；讀路徑本就不需連線池。
+
+    schema 只確保一次：_ensure_schema_once 以 db_path 為 key，同一個
+    db_path 在本 process 生命週期內只跑一次 init_schema（見下方正確性
+    論證）。"""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.pool import NullPool
-    from src.pce_cache.schema import init_schema
-    engine = create_engine(f"sqlite:///{review_db_path(cfg)}", poolclass=NullPool)
-    init_schema(engine)
+    from src.pce_cache.schema import _ensure_schema_once
+    db_path = review_db_path(cfg)
+    engine = create_engine(f"sqlite:///{db_path}", poolclass=NullPool)
+    # review DB 的正確性論證（ensure-once 為何對「會被整批重建」的 review DB
+    # 仍然安全）：review DB 由 load_archive_review 用 build-to-temp +
+    # os.replace 重建——重建時是先對「暫存檔的 engine」完整跑過 init_schema
+    # （含 PRAGMA user_version 遷移標記），確認匯入與聚合全部成功後才
+    # os.replace 原子切換成正式檔。也就是說，os.replace 之後、db_path 這條
+    # 路徑底下的新 DB，在被任何人讀到之前 schema 就已經完備。因此即使
+    # ensured-set 裡早就記著這個 db_path「舊一輪（換檔前）已確保過」，這裡
+    # 略過 init_schema 也不會讓呼叫端讀到缺 schema 的 DB——新 DB 的 schema
+    # 完備性是由 build-to-temp 階段保證的，不依賴 ensure-once 這層快取。
+    _ensure_schema_once(engine, db_path)
     return sessionmaker(engine)
 
 

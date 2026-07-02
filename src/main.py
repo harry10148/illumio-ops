@@ -30,11 +30,12 @@ def _make_subscribers(cm):
             return None, None
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
-        from src.pce_cache.schema import init_schema
+        from sqlalchemy.pool import NullPool
+        from src.pce_cache.schema import _ensure_schema_once
         from src.pce_cache.subscriber import CacheSubscriber
         cfg = cm.models.pce_cache
-        engine = create_engine(f"sqlite:///{cfg.db_path}")
-        init_schema(engine)
+        engine = create_engine(f"sqlite:///{cfg.db_path}", poolclass=NullPool)
+        _ensure_schema_once(engine, cfg.db_path)
         sf = sessionmaker(engine)
         sub_events = CacheSubscriber(sf, consumer="analyzer", source_table="pce_events")
         sub_flows = CacheSubscriber(sf, consumer="analyzer", source_table="pce_traffic_flows_raw")
@@ -55,15 +56,16 @@ def _make_cache_reader(cm, db_path: str | None = None):
     try:
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
+        from sqlalchemy.pool import NullPool
         from src.pce_cache.reader import CacheReader
-        from src.pce_cache.schema import init_schema
+        from src.pce_cache.schema import _ensure_schema_once
         cfg = cm.models.pce_cache
         if db_path is None:
             if not cfg.enabled:
                 return None
             db_path = cfg.db_path
-        engine = create_engine(f"sqlite:///{db_path}")
-        init_schema(engine)
+        engine = create_engine(f"sqlite:///{db_path}", poolclass=NullPool)
+        _ensure_schema_once(engine, db_path)
         sf = sessionmaker(engine)
         return CacheReader(
             session_factory=sf,
