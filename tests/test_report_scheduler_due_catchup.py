@@ -165,6 +165,72 @@ def test_cron_uses_global_tz_fallback_when_schedule_timezone_unset():
     assert s.should_run(sched, now_taipei_1700, last_run_str=None) is False
 
 
+# ─── (fix) aware last_run 必須「轉換」到 schedule tz，不能只剝 tzinfo ────────
+#
+# tick() 寫入 schedule-local naive 的 last_run，但 GUI「立即執行」路徑寫入
+# UTC-aware（gui/routes/reports.py 的 datetime.now(timezone.utc).isoformat()）。
+# 舊實作直接 replace(tzinfo=None) 把 UTC 牆鐘誤讀成 schedule-local——
+# Asia/Taipei daily 09:00：操作員 15:00 台北按 Run Now → last_run=07:00Z，
+# 下一 tick（15:01 台北）剝掉 tz 後 last_run=07:00 < target 09:00 且 gap 8h
+# 不擋 → 排程再跑一次、報表重寄。舊的精確分鐘比對恰好擋住這情境，catch-up
+# 重寫移除了該防護，因此讀取端必須改成 astimezone 轉換。
+
+def test_aware_utc_last_run_from_gui_run_now_blocks_same_day_refire():
+    """Run Now 於 15:00 台北（=07:00Z）寫入 aware-UTC last_run 後，
+    15:01 台北的 tick 不得再次觸發 daily 09:00 排程。"""
+    s = _make_scheduler()
+    sched = _sched(schedule_type="daily", hour=9, minute=0, timezone="Asia/Taipei")
+
+    last_run_utc = "2026-06-01T07:00:00+00:00"  # 15:00 Asia/Taipei
+    now_taipei = datetime.datetime(2026, 6, 1, 15, 1, 0)  # naive Taipei wall-clock
+    assert s.should_run(sched, now_taipei, last_run_str=last_run_utc) is False, \
+        "aware-UTC last_run must be converted to schedule tz, not just stripped"
+
+
+def test_aware_utc_last_run_beyond_gap_still_blocks_same_day_refire():
+    """同一情境但 tick 晚到 16:30（超出 3600s gap 的時段）——轉換後
+    last_run=15:00 >= target 09:00 才是正確的擋法，不是靠 gap。"""
+    s = _make_scheduler()
+    sched = _sched(schedule_type="daily", hour=9, minute=0, timezone="Asia/Taipei")
+
+    last_run_utc = "2026-06-01T07:00:00+00:00"  # 15:00 Asia/Taipei
+    now_taipei = datetime.datetime(2026, 6, 1, 16, 30, 0)
+    assert s.should_run(sched, now_taipei, last_run_str=last_run_utc) is False
+
+
+def test_aware_utc_last_run_yesterday_still_fires_today():
+    """正向案例：aware-UTC last_run 是昨天跑的，今天 09:01 tick 仍要正常觸發。"""
+    s = _make_scheduler()
+    sched = _sched(schedule_type="daily", hour=9, minute=0, timezone="Asia/Taipei")
+
+    last_run_utc = "2026-05-31T01:01:00+00:00"  # 昨日 09:01 Asia/Taipei
+    now_taipei = datetime.datetime(2026, 6, 1, 9, 1, 0)
+    assert s.should_run(sched, now_taipei, last_run_str=last_run_utc) is True
+
+
+def test_naive_last_run_interpretation_unchanged():
+    """tick() 寫入的 schedule-local naive last_run（以及舊 state 檔）維持
+    既有解讀：同日 target 之後的 naive last_run 擋住重跑。"""
+    s = _make_scheduler()
+    sched = _sched(schedule_type="daily", hour=9, minute=0, timezone="Asia/Taipei")
+
+    last_run_naive = "2026-06-01T09:01:30"  # naive schedule-local，今天已跑
+    now_taipei = datetime.datetime(2026, 6, 1, 15, 0, 0)
+    assert s.should_run(sched, now_taipei, last_run_str=last_run_naive) is False
+
+
+def test_aware_utc_last_run_cron_prev_labeled_correctly():
+    """cron 分支同樣受惠：aware-UTC last_run 轉換到 schedule tz 後才標
+    tzinfo 給 CronTrigger 的 prev——15:00 台北 Run Now 後，daily cron
+    '0 9 * * *'（Asia/Taipei）當天不得再觸發。"""
+    s = _make_scheduler()
+    sched = _sched(cron_expr="0 9 * * *", timezone="Asia/Taipei")
+
+    last_run_utc = "2026-06-01T07:00:00+00:00"  # 15:00 Asia/Taipei
+    now_taipei = datetime.datetime(2026, 6, 1, 15, 1, 0)
+    assert s.should_run(sched, now_taipei, last_run_str=last_run_utc) is False
+
+
 def test_tick_end_to_end_global_tz_fallback_taipei_0900(monkeypatch):
     """完整 tick() 路徑：global settings.timezone='Asia/Taipei'、schedule 無
     timezone，cron 0 9 * * * 在台北時間 09:00 應觸發並呼叫 run_schedule。"""

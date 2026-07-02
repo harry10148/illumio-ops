@@ -126,9 +126,31 @@ class ReportScheduler:
         next checks, while ``last_run`` moving past the target prevents a
         second fire the same day. ``_MIN_RERUN_GAP`` additionally guards
         this branch against re-trigger from clock/tick jitter.
+
+        Catch-up scope: limited to the TARGET DAY itself. weekly/monthly
+        still require ``now`` to fall on the scheduled weekday/day-of-month
+        (day_matches) — an outage that swallows the whole target day means
+        zero fires for that period (safe, no replay), NOT a later-in-the-week
+        make-up run.
         """
         if not schedule.get("enabled", False):
             return False
+
+        # Schedule 時區（tzinfo 物件），fallback 鏈與 tick() 一致：
+        # schedule.timezone → global settings.timezone → UTC。'local'/未設
+        # 比照 _now_in_schedule_tz 解讀成 UTC（不是伺服器本地）。`self.cm`
+        # 在 bare ReportScheduler.__new__() 測試替身上可能不存在。
+        cm = getattr(self, "cm", None)
+        global_tz = (cm.config.get('settings', {}).get('timezone', 'local')
+                     if cm is not None else None)
+        sched_tz = schedule.get("timezone") or global_tz
+        if not sched_tz or sched_tz == 'local':
+            tz_obj = datetime.timezone.utc
+        else:
+            # 統一走 tz_utils.resolve_tz——直接得到 tzinfo 物件（不是字串）
+            # 餵給 CronTrigger／now_aware，'UTC+N' 這類偏移字串才不會被
+            # zoneinfo 誤判成不存在的時區、每個 tick 都多印一次 warning。
+            tz_obj = resolve_tz(sched_tz)
 
         # Resolve last_run_str: use provided value or load from state file.
         if last_run_str is _UNSET:
@@ -140,10 +162,14 @@ class ReportScheduler:
         if last_run_str:
             try:
                 last_run_dt = datetime.datetime.fromisoformat(last_run_str)
-                # Strip tzinfo if present (legacy UTC-stored timestamps) so
-                # subtraction works against the naive schedule-local `now`.
+                # Aware timestamps（GUI「立即執行」路徑寫入 UTC-aware；tick()
+                # 寫入 schedule-local naive）必須先「轉換」到 schedule 時區再剝
+                # tzinfo——直接 replace(tzinfo=None) 會把 UTC 牆鐘誤讀成
+                # schedule-local，非 UTC 時區的排程在 Run Now 之後同一天會被
+                # 誤判為「尚未跑過」而重跑（報表重寄）。Naive timestamps 維持
+                # 既有解讀（本就是 schedule-local 牆鐘）。
                 if last_run_dt.tzinfo is not None:
-                    last_run_dt = last_run_dt.replace(tzinfo=None)
+                    last_run_dt = last_run_dt.astimezone(tz_obj).replace(tzinfo=None)
             except (ValueError, TypeError):
                 last_run_dt = None
 
@@ -157,17 +183,6 @@ class ReportScheduler:
         if cron_expr:
             try:
                 from apscheduler.triggers.cron import CronTrigger
-                # Fallback chain matches tick(): schedule.timezone, else the
-                # global settings.timezone, else UTC. `self.cm` may be absent
-                # on bare ReportScheduler.__new__() test doubles.
-                cm = getattr(self, "cm", None)
-                global_tz = (cm.config.get('settings', {}).get('timezone', 'local')
-                             if cm is not None else None)
-                sched_tz = schedule.get("timezone") or global_tz or "UTC"
-                # 統一走 tz_utils.resolve_tz——直接得到 tzinfo 物件（不是字串）
-                # 餵給 CronTrigger／now_aware，'UTC+N' 這類偏移字串才不會被
-                # zoneinfo 誤判成不存在的時區、每個 tick 都多印一次 warning。
-                tz_obj = resolve_tz(sched_tz)
                 trigger = CronTrigger.from_crontab(cron_expr, timezone=tz_obj)
                 now_aware = now_naive.replace(tzinfo=tz_obj)
                 prev = last_run_dt.replace(tzinfo=tz_obj) if last_run_dt else None
@@ -202,8 +217,10 @@ class ReportScheduler:
 
         # Catch-up 語意：今天的排程時刻已到（now >= target）且尚未於該時刻後
         # 執行過（last_run < target）即視為 due——取代舊版精確分鐘比對，讓 tick
-        # 因執行前一個排程而錯過整分鐘時仍能補跑一次，且只補一次。不回溯前一天
-        # 以前的錯過週期，避免長時間離線後補跑一大串。
+        # 因執行前一個排程而錯過整分鐘時仍能補跑一次，且只補一次。補跑範圍限
+        # 「目標日當天」：weekly/monthly 仍要求 now 落在目標 weekday/day
+        # （上面的 day_matches），停機吞掉整個目標日就是該期 0 次（安全、
+        # 不重放），不會在之後的日子補跑。
         target = now_naive.replace(hour=hour, minute=minute, second=0, microsecond=0)
         if now_naive < target:
             return False
