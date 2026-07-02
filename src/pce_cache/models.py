@@ -133,6 +133,9 @@ class SiemDispatch(Base):
         Index("ix_dispatch_queued_at", "queued_at"),
         Index("ix_dispatch_sent_at", "sent_at"),
         # Backs the enqueue_new_records anti-join (NOT EXISTS on source rows).
+        # The anti-join now also filters on destination, which this index does
+        # not cover — SQLite seeks by (source_table, source_id) and checks the
+        # destination predicate on the (few) matching dispatch rows per source.
         Index("ix_dispatch_source", "source_table", "source_id"),
     )
 

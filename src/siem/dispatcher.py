@@ -6,7 +6,7 @@ from typing import Optional
 
 import orjson
 from loguru import logger
-from sqlalchemy import select, update
+from sqlalchemy import or_, select, update
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import (
@@ -319,6 +319,13 @@ def enqueue_new_records(
     ingest-side filter so, e.g., an audit-only destination is never backfilled
     a traffic row and vice versa.
 
+    Steady-state cost: exactly one full scan of each source table per call,
+    independent of the number of destinations. This runs unconditionally
+    every dispatch tick (default 30s), so the candidate scan folds all
+    destinations' NOT EXISTS into a single OR'd query (phase 1); only the
+    normally-empty candidate set pays a second, indexed per-destination
+    resolution (phase 2).
+
     All new rows are inserted within a single transaction (chunked to respect
     SQLite's bound-parameter cap), not one transaction per row — backfilling a
     large cache on first SIEM enable would otherwise be a per-row fsync storm.
@@ -332,16 +339,17 @@ def enqueue_new_records(
     to_enqueue: list[tuple[str, int, str]] = []  # (source_table, source_id, destination)
     with session_factory() as s:
         for source_table, model in pairs:
-            for dest in destinations_by_source_table.get(source_table) or []:
-                # SQL anti-join scoped to THIS destination: cache rows with no
-                # SiemDispatch row for `dest` yet. Previously this loaded the
-                # entire dispatched-id set into Python and built
-                # `id NOT IN (... one bind per id ...)` without a destination
-                # filter, which (a) blew past SQLite's variable cap on a large
-                # cache and (b) meant a row dispatched to any destination could
-                # never be backfilled for a newly-enabled one. A correlated
-                # NOT EXISTS filtered on destination fixes both.
-                dispatched = (
+            dests = destinations_by_source_table.get(source_table) or []
+            if not dests:
+                continue
+
+            def _dispatched_to(dest: str):
+                # Anti-join 帶 destination 條件：曾為其他 destination enqueue
+                # 過的 row，對新啟用的 destination 仍補得到；同一
+                # (row, destination) pair 則被擋住。相比舊版「載入全部
+                # dispatched id + `id NOT IN (...)`」，correlated NOT EXISTS
+                # 也不會撞 SQLite 變數上限。
+                return (
                     select(SiemDispatch.id)
                     .where(
                         SiemDispatch.source_table == source_table,
@@ -350,10 +358,40 @@ def enqueue_new_records(
                     )
                     .exists()
                 )
-                new_ids = s.execute(
-                    select(model.id).where(~dispatched)
-                ).scalars().all()
-                to_enqueue.extend((source_table, sid, dest) for sid in new_ids)
+
+            # Phase 1：單次全表掃描找候選 —— 缺「任一」destination dispatch
+            # row 的 source rows（全部 destination 的 NOT EXISTS 以 OR 合併）。
+            # 正常情況（ingest 已 inline enqueue）回空集合，直接結束。
+            candidates = s.execute(
+                select(model.id).where(
+                    or_(*[~_dispatched_to(dest) for dest in dests])
+                )
+            ).scalars().all()
+            if not candidates:
+                continue
+
+            # Phase 2：僅對候選 id 精確判定缺哪些 (id, destination) pair。
+            # 以 chunked `id IN (...)` 走 ix_dispatch_source 索引查既有
+            # pair，再於 Python 補集 —— 成本與候選數成正比，與全表無關。
+            dest_set = set(dests)
+            for i in range(0, len(candidates), _SENT_UPDATE_CHUNK):
+                chunk = candidates[i:i + _SENT_UPDATE_CHUNK]
+                existing = set(
+                    s.execute(
+                        select(SiemDispatch.source_id, SiemDispatch.destination)
+                        .where(
+                            SiemDispatch.source_table == source_table,
+                            SiemDispatch.source_id.in_(chunk),
+                            SiemDispatch.destination.in_(dest_set),
+                        )
+                    ).all()
+                )
+                to_enqueue.extend(
+                    (source_table, sid, dest)
+                    for sid in chunk
+                    for dest in dests
+                    if (sid, dest) not in existing
+                )
 
     total = len(to_enqueue)
     if total:

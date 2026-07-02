@@ -253,6 +253,47 @@ def test_enqueue_new_records_does_not_backfill_traffic_to_audit_only_destination
     assert rows[0].destination == "audit-dest"
 
 
+def test_enqueue_new_records_scan_count_independent_of_destination_count(sf):
+    """效率回歸鎖定：候選掃描（唯一會全表掃 source table 的查詢）每
+    source_table 每次呼叫只發一次，與 destination 數無關。安全網每 tick
+    無條件執行且正常找不到東西，若掃描次數隨 destination 數線性成長，
+    成熟快取的穩態成本會倍增。"""
+    from sqlalchemy import event
+    from src.siem.dispatcher import enqueue_new_records
+
+    dests = ["d1", "d2", "d3"]
+    now = datetime.now(timezone.utc)
+    with sf.begin() as s:
+        for i in (1, 2):
+            s.add(PceEvent(
+                pce_href=f"/orgs/1/events/{i}", pce_event_id=f"uuid-{i}",
+                timestamp=now, event_type="policy.update", severity="info",
+                status="success", pce_fqdn="pce.test", raw_json="{}",
+                ingested_at=now,
+            ))
+            for d in dests:  # 已全部 dispatch → 穩態（無候選）
+                s.add(SiemDispatch(
+                    source_table="pce_events", source_id=i, destination=d,
+                    status="pending", retries=0, queued_at=now,
+                ))
+
+    engine = sf.kw["bind"]
+    statements: list[str] = []
+
+    def _spy(conn, cursor, statement, params, context, executemany):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", _spy)
+    try:
+        created = enqueue_new_records(sf, {"pce_events": dests})
+    finally:
+        event.remove(engine, "before_cursor_execute", _spy)
+
+    assert created == 0
+    scans = [st for st in statements if "FROM pce_events" in st]
+    assert len(scans) == 1  # 3 destinations 仍只掃 pce_events 一次
+
+
 def _seed_many_events_without_dispatch(sf, n: int) -> None:
     now = datetime.now(timezone.utc)
     with sf.begin() as s:
