@@ -19,9 +19,15 @@ from typing import Callable, Any
 import pandas as pd
 
 # ── Module registry ──────────────────────────────────────────────────────────
-# Each tuple: (module_id, dotted_module_path, function_name, call_builder)
+# Each tuple: (module_id, dotted_module_path, function_name, call_builder, profiles)
 #   call_builder: a callable (fn, df, report_cfg, top_n, lang) -> result
 #   This adapter handles the varying signatures of each module function.
+#   profiles: frozenset of profile names for which this module should run
+
+PROFILES = ("traffic", "security_risk", "network_inventory")
+_ALL = frozenset(PROFILES)
+_SEC_INV = frozenset({"security_risk", "network_inventory"})
+_TRAFFIC_TOO = frozenset({"traffic", "security_risk", "network_inventory"})
 
 def _supports_lang(fn) -> bool:
     """Check if a callable accepts a 'lang' kwarg."""
@@ -50,23 +56,23 @@ def _call_readiness(fn, df, _cfg, n, lang):
         return fn(df, workloads=None, top_n=n, lang=lang)
     return fn(df, workloads=None, top_n=n)
 
-TRAFFIC_MODULES: list[tuple[str, str, str, Callable]] = [
-    ('mod01', 'src.report.analysis.mod01_traffic_overview',     'traffic_overview',              _call_df),
-    ('mod02', 'src.report.analysis.mod02_policy_decisions',     'policy_decision_analysis',      _call_df_n),
-    ('mod03', 'src.report.analysis.mod03_uncovered_flows',      'uncovered_flows',               _call_df_n),
-    ('mod04', 'src.report.analysis.mod04_ransomware_exposure',  'ransomware_exposure',           _call_df_cfg_n),
+TRAFFIC_MODULES: list[tuple[str, str, str, Callable, frozenset]] = [
+    ('mod01', 'src.report.analysis.mod01_traffic_overview',     'traffic_overview',         _call_df,       _TRAFFIC_TOO),
+    ('mod02', 'src.report.analysis.mod02_policy_decisions',     'policy_decision_analysis', _call_df_n,     _TRAFFIC_TOO),
+    ('mod03', 'src.report.analysis.mod03_uncovered_flows',      'uncovered_flows',          _call_df_n,     _SEC_INV),
+    ('mod04', 'src.report.analysis.mod04_ransomware_exposure',  'ransomware_exposure',      _call_df_cfg_n, _SEC_INV),
     # mod05 (Remote Access) consolidated into mod15 (Lateral Movement Risk)
-    ('mod06', 'src.report.analysis.mod06_user_process',         'user_process_analysis',         _call_df_n),
-    ('mod07', 'src.report.analysis.mod07_cross_label_matrix',   'cross_label_flow_matrix',       _call_df_n),
-    ('mod08', 'src.report.analysis.mod08_unmanaged_hosts',      'unmanaged_traffic',             _call_df_n),
-    ('mod09', 'src.report.analysis.mod09_traffic_distribution', 'traffic_distribution',          _call_df_n),
-    ('mod10', 'src.report.analysis.mod10_allowed_traffic',      'allowed_traffic',               _call_df_n),
-    ('mod11', 'src.report.analysis.mod11_bandwidth',            'bandwidth_analysis',            _call_df_n),
-    ('mod13', 'src.report.analysis.mod13_readiness',            'enforcement_readiness',         _call_readiness),
-    ('mod14', 'src.report.analysis.mod14_infrastructure',       'infrastructure_scoring',        _call_df_n),
-    ('mod15', 'src.report.analysis.mod15_lateral_movement',     'lateral_movement_risk',         _call_df_n),
-    ('mod_draft_summary', 'src.report.analysis.mod_draft_summary', 'analyze',               _call_df),
-    ('mod_ringfence',     'src.report.analysis.mod_ringfence',     'analyze',               _call_df),
+    ('mod06', 'src.report.analysis.mod06_user_process',         'user_process_analysis',    _call_df_n,     _SEC_INV),
+    ('mod07', 'src.report.analysis.mod07_cross_label_matrix',   'cross_label_flow_matrix',  _call_df_n,     _SEC_INV),
+    ('mod08', 'src.report.analysis.mod08_unmanaged_hosts',      'unmanaged_traffic',        _call_df_n,     _TRAFFIC_TOO),
+    ('mod09', 'src.report.analysis.mod09_traffic_distribution', 'traffic_distribution',     _call_df_n,     _TRAFFIC_TOO),
+    ('mod10', 'src.report.analysis.mod10_allowed_traffic',      'allowed_traffic',          _call_df_n,     _SEC_INV),
+    ('mod11', 'src.report.analysis.mod11_bandwidth',            'bandwidth_analysis',       _call_df_n,     _TRAFFIC_TOO),
+    ('mod13', 'src.report.analysis.mod13_readiness',            'enforcement_readiness',    _call_readiness, _SEC_INV),
+    ('mod14', 'src.report.analysis.mod14_infrastructure',       'infrastructure_scoring',   _call_df_n,     _SEC_INV),
+    ('mod15', 'src.report.analysis.mod15_lateral_movement',     'lateral_movement_risk',    _call_df_n,     _SEC_INV),
+    ('mod_draft_summary', 'src.report.analysis.mod_draft_summary', 'analyze',               _call_df,       _SEC_INV),
+    ('mod_ringfence',     'src.report.analysis.mod_ringfence',     'analyze',               _call_df,       _SEC_INV),
 ]
 
 # Module 12 (executive_summary) runs last and depends on all other results.
@@ -77,10 +83,17 @@ def load_module_fn(module_path: str, func_name: str) -> Callable:
     mod = importlib.import_module(module_path)
     return getattr(mod, func_name)
 
-def get_traffic_modules() -> list[tuple[str, Callable, Callable]]:
-    """Return list of (mod_id, function, call_adapter) for all registered traffic modules."""
+def get_traffic_modules(profile: str | None = None) -> list[tuple[str, Callable, Callable]]:
+    """Return (mod_id, function, call_adapter) for modules in the given profile.
+
+    profile=None returns every registered module (legacy behavior).
+    """
+    if profile is not None and profile not in PROFILES:
+        raise ValueError(f"unknown traffic report profile: {profile!r}")
     result = []
-    for mod_id, mod_path, func_name, adapter in TRAFFIC_MODULES:
+    for mod_id, mod_path, func_name, adapter, profiles in TRAFFIC_MODULES:
+        if profile is not None and profile not in profiles:
+            continue
         try:
             fn = load_module_fn(mod_path, func_name)
             result.append((mod_id, fn, adapter))
