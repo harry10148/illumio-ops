@@ -66,20 +66,47 @@ def test_dlq_bulk_replay_wires_to_replay_ids(sf, cm, capsys):
     assert "replayed" in capsys.readouterr().out
 
 
-def test_dlq_bulk_purge_deletes_only_selected_ids(sf, cm, capsys):
+def test_dlq_bulk_purge_deletes_only_selected_ids_after_yes_confirm(sf, cm, capsys):
+    """purge 為不可逆刪除：輸入 yes 確認後才執行（照 _delete_destination 模式）。"""
     from src.siem_cli import _dlq_bulk
     _seed(sf, count=3)
     with sf() as s:
         ids = [e.id for e in s.execute(select(DeadLetter)).scalars().all()]
     to_purge, to_keep = ids[:2], ids[2:]
 
-    with patch.object(builtins, "input", _seq([",".join(str(i) for i in to_purge)])):
+    prompts: list[str] = []
+
+    def _input(prompt=""):
+        prompts.append(prompt)
+        return [",".join(str(i) for i in to_purge), "yes"][len(prompts) - 1]
+
+    with patch.object(builtins, "input", _input):
         _dlq_bulk(cm, action="purge")
 
     with sf() as s:
         remaining = [e.id for e in s.execute(select(DeadLetter)).scalars().all()]
     assert remaining == to_keep
     assert "purged 2 entries" in capsys.readouterr().out
+    # 確認提示要讓操作者看到將刪除的筆數與 id 清單摘要
+    confirm_prompt = prompts[1]
+    assert "2 entries" in confirm_prompt
+    assert all(str(i) in confirm_prompt for i in to_purge)
+
+
+def test_dlq_bulk_purge_cancelled_when_not_confirmed(sf, cm, capsys):
+    """非 yes（例如 no）一律取消，DLQ 列不動。"""
+    from src.siem_cli import _dlq_bulk
+    _seed(sf, count=3)
+    with sf() as s:
+        ids = [e.id for e in s.execute(select(DeadLetter)).scalars().all()]
+
+    with patch.object(builtins, "input", _seq([",".join(str(i) for i in ids), "no"])):
+        _dlq_bulk(cm, action="purge")
+
+    with sf() as s:
+        remaining = [e.id for e in s.execute(select(DeadLetter)).scalars().all()]
+    assert remaining == ids
+    assert "cancelled" in capsys.readouterr().out
 
 
 def test_dlq_bulk_empty_input_is_noop(sf, cm, capsys):

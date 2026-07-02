@@ -259,6 +259,11 @@ def _dlq_bulk(cm, action):
             print(f"  [{r['id']}] " + ("replayed" if r["ok"] else r["error"]))
     else:  # purge: 逐筆刪除選定的 DLQ id（dlq.py 的 purge() 只支援依 destination+
         # 天數批次刪除，選取特定 id 屬於獨立語意，直接刪除即可，不需擴充 dlq.py）。
+        # 刪除不可逆，照本檔既有安全模式（_delete_destination 的 yes 確認）先確認。
+        id_list = ", ".join(str(i) for i in ids)
+        if input(f"  confirm purge {len(ids)} entries (ids: {id_list})? (yes/no): ").strip().lower() != "yes":
+            print("  cancelled")
+            return
         from sqlalchemy import delete
         from src.pce_cache.models import DeadLetter
         with sf.begin() as s:
