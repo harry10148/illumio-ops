@@ -49,13 +49,28 @@ def make_actions_blueprint(
 
             api = ApiClient(cm)
             from src.main import _make_cache_reader
-            base_ana = Analyzer(cm, api, Reporter(cm),
-                                cache_reader=_make_cache_reader(cm))
+            # 資料來源：live（即時快取）預設，archive 則查已載入的 review DB。
+            source = d.get("source", "live")
+            reader_db = None
+            if source == "archive":
+                from src.pce_cache.archive_import import review_db_path
+                reader_db = review_db_path(cm.models.pce_cache)
+            cache_reader = _make_cache_reader(cm, db_path=reader_db)
+            base_ana = Analyzer(cm, api, Reporter(cm), cache_reader=cache_reader)
 
-            mins = int(d.get("mins", 30))
             now = datetime.datetime.now(datetime.timezone.utc)
-            start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
-            end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+            if source == "archive":
+                # archive 查閱：查詢窗設為 [review 最早資料, now]，讓 cover_state 判 full、
+                # 只讀 review DB，不 fallback 打即時 PCE API。review 空則直接回空。
+                earliest = cache_reader.earliest_data_timestamp("traffic") if cache_reader else None
+                if earliest is None:
+                    return jsonify({"ok": True, "data": []})
+                start_time = earliest.strftime("%Y-%m-%dT%H:%M:%SZ")
+                end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+            else:
+                mins = int(d.get("mins", 30))
+                start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
             # policy_decision now accepts string values: "blocked", "potentially_blocked", "allowed", or "-1"/""=all
             pd_val = str(d.get("policy_decision", "-1")).strip()
@@ -439,12 +454,19 @@ def make_actions_blueprint(
             from src.gui._helpers import _get_cache_engine
 
             cfg = cm.models.pce_cache
-            if not cfg.enabled:
+            # 資料來源：archive 查已載入的 review DB（不受 live cache enabled 守門）。
+            source = request.args.get("source", "live")
+            if source != "archive" and not cfg.enabled:
                 return jsonify({"ok": True, "buckets": []})
 
-            # Reuse a single cached Engine per db_path (avoids per-request
-            # Engine/connection leak). See _get_cache_engine().
-            sf = sessionmaker(_get_cache_engine(cfg.db_path))
+            if source == "archive":
+                # review DB 用 NullPool 的短命 sessionmaker（避免 per-request FD 洩漏）。
+                from src.pce_cache.archive_import import review_session_factory
+                sf = review_session_factory(cfg)
+            else:
+                # Reuse a single cached Engine per db_path (avoids per-request
+                # Engine/connection leak). See _get_cache_engine().
+                sf = sessionmaker(_get_cache_engine(cfg.db_path))
 
             now = datetime.datetime.now(datetime.timezone.utc)
             today = str(now.date())
@@ -452,17 +474,20 @@ def make_actions_blueprint(
             cutoff = now - datetime.timedelta(days=8)
 
             with sf() as session:
-                rows = session.execute(
-                    sa_select(
-                        func.date(PceTrafficFlowAgg.bucket_day).label("day"),
-                        PceTrafficFlowAgg.action.label("action"),
-                        func.sum(PceTrafficFlowAgg.flow_count).label("flows"),
-                    )
-                    .where(PceTrafficFlowAgg.bucket_day >= cutoff)
-                    .where(func.date(PceTrafficFlowAgg.bucket_day) < today)
-                    .group_by(func.date(PceTrafficFlowAgg.bucket_day), PceTrafficFlowAgg.action)
-                    .order_by(func.date(PceTrafficFlowAgg.bucket_day))
-                ).all()
+                q = sa_select(
+                    func.date(PceTrafficFlowAgg.bucket_day).label("day"),
+                    PceTrafficFlowAgg.action.label("action"),
+                    func.sum(PceTrafficFlowAgg.flow_count).label("flows"),
+                )
+                if source != "archive":
+                    # 即時：近 8 天且排除 today。archive：顯示所有已載入日子
+                    # （review DB 僅含載入範圍，通常整段都是過去），故不套近 8 天窗。
+                    q = q.where(PceTrafficFlowAgg.bucket_day >= cutoff).where(
+                        func.date(PceTrafficFlowAgg.bucket_day) < today)
+                q = q.group_by(
+                    func.date(PceTrafficFlowAgg.bucket_day), PceTrafficFlowAgg.action
+                ).order_by(func.date(PceTrafficFlowAgg.bucket_day))
+                rows = session.execute(q).all()
                 wm = session.execute(
                     sa_select(IngestionWatermark.last_sync_at)
                     .where(IngestionWatermark.source == "traffic_agg")
