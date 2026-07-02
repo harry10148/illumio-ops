@@ -37,6 +37,13 @@ def test_resolve_tz_unknown_falls_back_to_utc():
     assert resolve_tz("Not/AZone") == datetime.timezone.utc
 
 
+def test_resolve_tz_path_shaped_string_falls_back_to_utc():
+    """路徑形狀的字串會讓 zoneinfo.ZoneInfo 丟 ValueError（非 KeyError），
+    resolve_tz 必須接住並退回 UTC，不能讓錯誤 config 弄崩呼叫端。"""
+    for bad in ("../etc/passwd", "/etc/passwd", ".."):
+        assert resolve_tz(bad) == datetime.timezone.utc
+
+
 def test_now_in_tz_is_aware_and_close_to_utc_instant():
     utc_now = datetime.datetime.now(datetime.timezone.utc)
     dt = now_in_tz("Asia/Taipei")

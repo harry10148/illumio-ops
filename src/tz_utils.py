@@ -47,7 +47,10 @@ def resolve_tz(tz_str: str | None) -> datetime.tzinfo:
         return datetime.timezone(datetime.timedelta(hours=float(m.group(1) + m.group(2))))
     try:
         return zoneinfo.ZoneInfo(tz_str)
-    except (KeyError, zoneinfo.ZoneInfoNotFoundError):
+    except (KeyError, ValueError, zoneinfo.ZoneInfoNotFoundError):
+        # ValueError：路徑形狀的字串（例如 '../etc/passwd'、'/etc/passwd'、'..'）
+        # 會讓 zoneinfo 丟 ValueError 而非 KeyError，同樣必須退回 UTC，
+        # 不能讓錯誤的 config 字串弄崩呼叫端。
         logger.warning("Unknown timezone {!r}, falling back to UTC", tz_str)
         return datetime.timezone.utc
 

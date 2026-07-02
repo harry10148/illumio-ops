@@ -51,3 +51,11 @@ def test_parse_tz_unknown_still_falls_back_to_utc():
     """Truly invalid strings (not a valid IANA name either) still fall back
     to UTC, same end result as before — now via resolve_tz's fallback."""
     assert parse_tz("Not/AZone") == datetime.timezone.utc
+
+
+def test_parse_tz_path_shaped_string_falls_back_to_utc():
+    """修前的 parse_tz 對任何字串都不 raise（最後分支無條件回 UTC）；
+    委派 resolve_tz 後必須維持此契約——路徑形狀字串（zoneinfo 丟
+    ValueError）也要退 UTC，不能讓 ven_status_generator 崩潰。"""
+    for bad in ("../etc/passwd", "/etc/passwd", ".."):
+        assert parse_tz(bad) == datetime.timezone.utc
