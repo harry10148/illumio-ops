@@ -25,9 +25,13 @@ class TrafficAggregator:
         """
         src_wl = func.coalesce(PceTrafficFlowRaw.src_workload, "")
         dst_wl = func.coalesce(PceTrafficFlowRaw.dst_workload, "")
-        # 'start of day' yields a parseable "YYYY-MM-DD 00:00:00" datetime string
-        # in pure SQL, avoiding a Python date→datetime conversion per row.
-        day_col = func.datetime(PceTrafficFlowRaw.last_detected, "start of day")
+        # bucket_day 是 TEXT 欄位，SQLite 用字串比較做 range query，格式必須跟
+        # reader 端 SQLAlchemy 綁的 datetime 逐字元一致（含微秒），否則
+        # "...00:00:00" < "...00:00:00.000000"，午夜 start 會漏讀當日 bucket。
+        # 用 strftime 直接輸出目標格式，取代舊的 datetime(..., 'start of day')。
+        day_col = func.strftime(
+            "%Y-%m-%d 00:00:00.000000", PceTrafficFlowRaw.last_detected
+        )
         sel = (
             select(
                 day_col,

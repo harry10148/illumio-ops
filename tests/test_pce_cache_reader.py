@@ -141,6 +141,23 @@ def test_cover_state_full_when_backfill_old_data_with_recent_ingested_at(session
     assert rd.cover_state("events", now - timedelta(days=4), now) == "full"
 
 
+def test_read_flows_agg_includes_today_bucket_at_midnight_start(session_factory):
+    """Regression: aggregator writes bucket_day via SQL 'start of day' (no
+    microseconds, e.g. "...00:00:00"), but reader binds `start` via SQLAlchemy
+    which renders WITH microseconds (e.g. "...00:00:00.000000"). SQLite
+    compares DateTime TEXT columns as strings, so "...00:00:00" <
+    "...00:00:00.000000" — a midnight-start read used to miss today's bucket
+    entirely."""
+    from src.pce_cache.aggregator import TrafficAggregator
+    now = datetime.now(timezone.utc)
+    midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    _seed_flow(session_factory, now)
+    TrafficAggregator(session_factory).run_once()
+    rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
+    rows = rd.read_flows_agg(midnight, now)
+    assert len(rows) == 1
+
+
 def test_cover_state_full_for_backfilled_window_beyond_retention_cutoff(session_factory):
     """Regression: retention deletes raw flows by ingested_at, so a flow
     backfilled with an OLD last_detected (beyond the 7-day raw cutoff) still

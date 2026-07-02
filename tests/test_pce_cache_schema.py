@@ -123,6 +123,78 @@ def test_schema_creates_report_json_null_partial_index():
         assert "report_json IS NULL" in sql, f"index is not partial: {sql}"
 
 
+def test_schema_normalizes_agg_bucket_day_old_format():
+    """一次性遷移：既有 agg 列若 bucket_day 是舊格式（aggregator 過去用 SQL
+    'start of day' 產出，無微秒），init_schema 要把它正規化成跟 reader 端
+    SQLAlchemy 綁的 datetime 一致的新格式（含 .000000），資料不遺失。"""
+    from sqlalchemy import text
+    from src.pce_cache.schema import init_schema
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "cache.sqlite")
+        engine = create_engine(f"sqlite:///{path}")
+        init_schema(engine)
+        with engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO pce_traffic_flows_agg "
+                "(bucket_day, src_workload, dst_workload, port, protocol, action, "
+                "flow_count, bytes_total) VALUES "
+                "('2026-06-30 00:00:00', 'web', 'db', 443, 'tcp', 'blocked', 10, 3000)"
+            ))
+        init_schema(engine)  # 觸發遷移
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT bucket_day, flow_count, bytes_total FROM pce_traffic_flows_agg"
+            )).fetchall()
+        assert len(rows) == 1
+        assert rows[0].bucket_day == "2026-06-30 00:00:00.000000"
+        assert rows[0].flow_count == 10
+        assert rows[0].bytes_total == 3000
+
+        init_schema(engine)  # 再跑一次必須冪等，不重複也不出錯
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT bucket_day FROM pce_traffic_flows_agg"
+            )).fetchall()
+        assert len(rows) == 1
+        assert rows[0].bucket_day == "2026-06-30 00:00:00.000000"
+
+
+def test_schema_normalizes_agg_bucket_day_merges_on_collision():
+    """遷移碰撞情境：同一分組鍵舊格式與新格式列並存時，正規化不能直接
+    UPDATE（會撞 ix_agg_unique），必須 MAX 合併（與 aggregator 的
+    conflict-MAX 冪等語意一致）後刪除舊格式列，資料不遺失也不重複。"""
+    from sqlalchemy import text
+    from src.pce_cache.schema import init_schema
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "cache.sqlite")
+        engine = create_engine(f"sqlite:///{path}")
+        init_schema(engine)
+        with engine.begin() as conn:
+            conn.execute(text(
+                "INSERT INTO pce_traffic_flows_agg "
+                "(bucket_day, src_workload, dst_workload, port, protocol, action, "
+                "flow_count, bytes_total) VALUES "
+                "('2026-06-30 00:00:00', 'web', 'db', 443, 'tcp', 'blocked', 10, 3000)"
+            ))
+            conn.execute(text(
+                "INSERT INTO pce_traffic_flows_agg "
+                "(bucket_day, src_workload, dst_workload, port, protocol, action, "
+                "flow_count, bytes_total) VALUES "
+                "('2026-06-30 00:00:00.000000', 'web', 'db', 443, 'tcp', 'blocked', 7, 5000)"
+            ))
+        init_schema(engine)  # 觸發遷移，碰撞須合併
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT bucket_day, flow_count, bytes_total FROM pce_traffic_flows_agg"
+            )).fetchall()
+        assert len(rows) == 1, f"expected merge to 1 row, got {len(rows)}"
+        assert rows[0].bucket_day == "2026-06-30 00:00:00.000000"
+        assert rows[0].flow_count == 10     # MAX(10, 7)
+        assert rows[0].bytes_total == 5000  # MAX(3000, 5000)
+
+
 def test_schema_sets_read_perf_pragmas():
     """cache_size (64MB) + mmap_size (256MB) speed up large 240k-row scans."""
     from sqlalchemy import text
