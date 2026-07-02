@@ -257,19 +257,18 @@ class ReportScheduler:
 
         try:
             from src.api_client import ApiClient
-            api = ApiClient(self.cm)
+            with ApiClient(self.cm) as api:
+                result, paths = self._generate_report(
+                    report_type, api, fmt, output_dir, start_date, end_date, name,
+                    filters=schedule_filters, lang=lang, schedule=schedule)
 
-            result, paths = self._generate_report(
-                report_type, api, fmt, output_dir, start_date, end_date, name,
-                filters=schedule_filters, lang=lang, schedule=schedule)
+                if result is None:
+                    return False
 
-            if result is None:
-                return False
-
-            if send_email and paths:
-                self._send_report_email(schedule, result, paths, start_date, end_date,
-                                        custom_recipients, report_type=report_type,
-                                        lang=lang)
+                if send_email and paths:
+                    self._send_report_email(schedule, result, paths, start_date, end_date,
+                                            custom_recipients, report_type=report_type,
+                                            lang=lang)
 
             logger.info(f"[Scheduler] '{name}': completed, files={[os.path.basename(p) for p in paths]}")
             try:

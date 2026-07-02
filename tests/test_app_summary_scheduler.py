@@ -83,9 +83,21 @@ def test_app_summary_schedule_missing_app_records_error(monkeypatch):
     }
     sched = ReportScheduler(cm, reporter=None)
     monkeypatch.setattr(sched, "should_run", lambda s, now: True)
-    # ApiClient is constructed in run_schedule before dispatch; stub it so the
-    # missing-app ValueError (not an ApiClient error) is what gets recorded.
-    monkeypatch.setattr("src.api_client.ApiClient", lambda cm: object())
+    # ApiClient is constructed in run_schedule before dispatch (as a context
+    # manager, see run_schedule's `with ApiClient(cm) as api:`); stub it with a
+    # minimal context-manager fake so the missing-app ValueError (not an
+    # ApiClient error) is what gets recorded.
+    class _FakeApiClient:
+        def __init__(self, cm):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr("src.api_client.ApiClient", _FakeApiClient)
 
     saved = {}
 
