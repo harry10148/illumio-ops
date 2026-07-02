@@ -2362,6 +2362,7 @@
   "gui_traffic_archive_range": "封存日期範圍",
   "gui_traffic_archive_load": "載入封存",
   "gui_traffic_archive_loaded_fmt": "已載入：{start} 至 {end}（{n} 筆）",
+  "gui_traffic_archive_no_files": "選取範圍內找不到封存檔（目前載入未變更）",
   "gui_traffic_archive_none": "尚未載入封存",
   "gui_traffic_archive_load_error": "封存載入失敗：{err}",
   "gui_traffic_rule_desc": "這個規則用來監控連線次數是否異常升高。",

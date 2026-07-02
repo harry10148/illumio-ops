@@ -175,6 +175,25 @@ def test_load_review_rebuilds_on_second_load(tmp_path, archive_dir):
     assert hashes == {"second"}   # 前一次載入已被重建清掉
 
 
+def test_load_review_no_files_preserves_previous(tmp_path, archive_dir):
+    from src.pce_cache.archive_import import (
+        load_archive_review, review_session_factory, review_status)
+    from sqlalchemy import select
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 1, "action": "allowed"}
+    _write(archive_dir, "traffic-2026-06-05.jsonl", [_traffic_line("keep", "2026-06-05", raw)])
+    cfg = _cfg(tmp_path, archive_dir)
+
+    load_archive_review(cfg, date(2026, 6, 1), date(2026, 6, 30))   # 有資料
+    # 載入一個沒有任何封存檔的範圍 → 不重建、回 no_files、保留前次
+    res = load_archive_review(cfg, date(2026, 7, 1), date(2026, 7, 31))
+    assert res["no_files"] is True and res["files"] == 0
+
+    with review_session_factory(cfg)() as s:
+        hashes = {r.flow_hash for r in s.execute(select(PceTrafficFlowRaw)).scalars().all()}
+    assert hashes == {"keep"}                       # 上一次載入的資料仍在
+    assert review_status(cfg)["start"] == "2026-06-01"   # meta 未被覆寫
+
+
 def test_review_status_empty_when_never_loaded(tmp_path, archive_dir):
     from src.pce_cache.archive_import import review_status
     assert review_status(_cfg(tmp_path, archive_dir)) == {"loaded": False}

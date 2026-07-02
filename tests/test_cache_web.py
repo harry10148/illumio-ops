@@ -301,6 +301,19 @@ def test_archive_load_and_status_roundtrip(client, tmp_path):
     assert st["loaded"] is True and st["rows"] == 1
 
 
+def test_archive_load_no_files_flag(client, tmp_path):
+    arch = _seed_archive(tmp_path)  # 只種了 2026-06-20
+    client.put("/api/cache/settings", json={"archive_dir": arch},
+               environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    # 選一個沒有任何封存檔的範圍 → 回 no_files（防呆），非看似成功的 0 筆
+    resp = client.post("/api/cache/archive/load",
+                       json={"start_date": "2026-07-01", "end_date": "2026-07-31"},
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True and body["no_files"] is True and body["files"] == 0
+
+
 def test_archive_load_rejects_range_over_cap(client):
     resp = client.post("/api/cache/archive/load",
                        json={"start_date": "2026-01-01", "end_date": "2026-12-31"},

@@ -38,6 +38,28 @@ def _iter_lines(path: str):
                 yield line
 
 
+def _matching_traffic_files(archive_dir: str, start: date, end: date) -> list[str]:
+    """回傳 archive_dir 下檔名日期落在 [start, end]（含端點）的 traffic 日檔（排序）。
+    依檔名日期挑檔，不開檔讀內容。目錄不存在/不可讀 → 回空清單。"""
+    try:
+        names = sorted(os.listdir(archive_dir))
+    except OSError as exc:
+        logger.warning("archive: listdir {} failed: {}", archive_dir, exc)
+        return []
+    out = []
+    for name in names:
+        m = _TRAFFIC_FILE.match(name)
+        if not m:
+            continue
+        try:
+            file_date = date.fromisoformat(m.group(1))
+        except ValueError:
+            continue
+        if start <= file_date <= end:
+            out.append(name)
+    return out
+
+
 class ArchiveImporter:
     """把 archive 的 traffic JSONL 逐行還原成 PceTrafficFlowRaw 灌進指定的 review DB。"""
 
@@ -48,21 +70,7 @@ class ArchiveImporter:
     def import_range(self, start: date, end: date) -> dict:
         from src.report.parsers.api_parser import flatten_flow_record
         rows = files = skipped = 0
-        try:
-            names = sorted(os.listdir(self._dir))
-        except OSError as exc:
-            logger.warning("archive import: listdir {} failed: {}", self._dir, exc)
-            names = []
-        for name in names:
-            m = _TRAFFIC_FILE.match(name)
-            if not m:
-                continue
-            try:
-                file_date = date.fromisoformat(m.group(1))
-            except ValueError:
-                continue
-            if file_date < start or file_date > end:
-                continue
+        for name in _matching_traffic_files(self._dir, start, end):
             files += 1
             path = os.path.join(self._dir, name)
             for line in _iter_lines(path):
@@ -140,11 +148,20 @@ def review_session_factory(cfg):
 
 
 def load_archive_review(cfg, start: date, end: date) -> dict:
-    """重建 review DB → 匯入範圍內 traffic archive → 跑聚合 → 寫 sidecar meta。"""
+    """重建 review DB → 匯入範圍內 traffic archive → 跑聚合 → 寫 sidecar meta。
+
+    防呆：範圍內沒有任何封存檔時，不重建 review DB（保留目前已載入的資料）、
+    也不改 meta，回報 no_files=True，讓呼叫端明確提示，而非顯示看似成功的
+    「0 筆」並把上一次載入的資料洗掉。"""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from src.pce_cache.schema import init_schema
     from src.pce_cache.aggregator import TrafficAggregator
+    if not _matching_traffic_files(cfg.archive_dir, start, end):
+        prev = review_status(cfg)
+        return {"loaded": bool(prev.get("loaded")), "no_files": True,
+                "files": 0, "rows": 0, "skipped": 0,
+                "start": start.isoformat(), "end": end.isoformat()}
     db = review_db_path(cfg)
     for suffix in ("", "-wal", "-shm"):
         try:

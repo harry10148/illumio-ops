@@ -828,7 +828,10 @@ async function loadArchiveRange() {
   if (el) el.textContent = '…';
   try {
     const body = await post('/api/cache/archive/load', { start_date: start, end_date: end });
-    if (body && body.ok) {
+    if (body && body.no_files) {
+      // 防呆：範圍內沒有封存檔 → 明確提示（後端未重建、目前載入未變更）
+      if (el) el.textContent = _t('gui_traffic_archive_no_files');
+    } else if (body && body.ok) {
       refreshArchiveStatus();
     } else if (el) {
       el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', (body && body.error) || '');
