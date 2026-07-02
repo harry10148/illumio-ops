@@ -139,7 +139,38 @@ def _actmtx(key: str, lang: str, **kwargs) -> tuple[str, str]:
     return t(msg_key, lang=lang, **kwargs), t(reco_key, lang=lang, **kwargs)
 
 
+def _traffic_flows_summary(results: dict[str, Any], lang: str = "en") -> dict:
+    """Plain traffic-facts summary: scale KPIs only, no scoring or posture."""
+    mod01 = results.get("mod01", {})
+    kpis = [
+        {"label_key": "mod12_kpi_total_flows",       "label": t("mod12_kpi_total_flows", default="Total Flows", lang=lang), "value": _fmt(mod01.get("total_flows", 0))},
+        {"label_key": "mod12_kpi_total_connections", "label": t("mod12_kpi_total_connections", default="Total Connections", lang=lang), "value": _fmt(mod01.get("total_connections", 0))},
+        {"label_key": "mod12_kpi_unique_src_ips",    "label": t("mod12_kpi_unique_src_ips", default="Unique Source IPs", lang=lang), "value": _fmt(mod01.get("unique_src_ips", 0))},
+        {"label_key": "mod12_kpi_unique_dst_ips",    "label": t("mod12_kpi_unique_dst_ips", default="Unique Dest IPs", lang=lang), "value": _fmt(mod01.get("unique_dst_ips", 0))},
+        {"label_key": "mod12_kpi_allowed_flows",     "label": t("mod12_kpi_allowed_flows", default="Allowed Flows", lang=lang), "value": _fmt(mod01.get("allowed_flows", 0))},
+        {"label_key": "mod12_kpi_blocked_flows",     "label": t("mod12_kpi_blocked_flows", default="Blocked Flows", lang=lang), "value": _fmt(mod01.get("blocked_flows", 0))},
+        {"label_key": "mod12_kpi_pb_flows",          "label": t("mod12_kpi_pb_flows", default="Potentially Blocked Flows", lang=lang), "value": _fmt(mod01.get("potentially_blocked_flows", 0))},
+        {"label_key": "mod12_kpi_total_data_volume", "label": t("mod12_kpi_total_data_volume", default="Total Data Volume", lang=lang), "value": fmt_bytes_auto(mod01.get("total_mb", 0), input_unit="MB")},
+        {"label_key": "mod12_kpi_date_range",        "label": t("mod12_kpi_date_range", default="Date Range", lang=lang), "value": mod01.get("date_range", "N/A")},
+    ]
+    return {
+        "generated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "kpis": kpis,
+        "findings_summary": {},
+        "total_findings": 0,
+        "key_findings": [],
+        "findings": [],
+        "boundary_breaches": [],
+        "suspicious_pivot_behavior": [],
+        "blast_radius": [],
+        "blind_spots": [],
+        "action_matrix": [],
+    }
+
+
 def executive_summary(results: dict[str, Any], profile: str = "security_risk", lang: str = "en") -> dict:
+    if profile == "traffic":
+        return _traffic_flows_summary(results, lang=lang)
     mod01 = results.get("mod01", {})
     mod03 = results.get("mod03", {})
     mod04 = results.get("mod04", {})
