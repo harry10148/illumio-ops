@@ -75,13 +75,16 @@ class CacheReader:
             return result
 
     def read_events(self, start: datetime, end: datetime) -> list[dict]:
+        # Column-only select: only raw_json is used, so avoid materializing
+        # the full ORM entity (and its other columns) per row — same fast-path
+        # pattern as read_flows_df below.
         with self._sf() as s:
             q = (
-                select(PceEvent)
+                select(PceEvent.raw_json)
                 .where(PceEvent.timestamp >= start, PceEvent.timestamp <= end)
                 .order_by(PceEvent.timestamp)
             )
-            return [orjson.loads(r.raw_json) for r in s.execute(q).scalars()]
+            return [orjson.loads(rj) for (rj,) in s.execute(q)]
 
     def read_flows_raw(self, start: datetime, end: datetime,
                        workload_hrefs: list[str] | None = None) -> list[dict]:
@@ -92,9 +95,12 @@ class CacheReader:
         app's flows instead of the whole estate. The src/dst columns are
         indexed, so this is a fast index scan, not a full-table read.
         """
+        # Column-only select: only raw_json is used, so skip both ORM entity
+        # materialization and transferring the unused report_json blob per row
+        # (same fast-path pattern as read_flows_df below).
         with self._sf() as s:
             q = (
-                select(PceTrafficFlowRaw)
+                select(PceTrafficFlowRaw.raw_json)
                 .where(
                     PceTrafficFlowRaw.last_detected >= start,
                     PceTrafficFlowRaw.last_detected <= end,
@@ -107,7 +113,7 @@ class CacheReader:
                     PceTrafficFlowRaw.dst_workload.in_(hrefs),
                 ))
             q = q.order_by(PceTrafficFlowRaw.last_detected)
-            return [orjson.loads(r.raw_json) for r in s.execute(q).scalars()]
+            return [orjson.loads(rj) for (rj,) in s.execute(q)]
 
     def read_flows_df(self, start: datetime, end: datetime,
                       workload_hrefs: list[str] | None = None,

@@ -108,25 +108,27 @@ def siem_status(ctx: click.Context):
                     continue
                 seen.add(name)
                 merged.append(name)
+            # 一次 GROUP BY 取回所有 destination x status 的計數，取代原本每個
+            # destination 各 4 個 count 查詢（destinations 多時查詢數會線性成長）。
+            status_counts: dict[tuple[str, str], int] = {}
+            for dest, st, cnt in s.execute(
+                select(SiemDispatch.destination, SiemDispatch.status, func.count())
+                .group_by(SiemDispatch.destination, SiemDispatch.status)
+            ):
+                status_counts[(dest, st)] = cnt
+            dlq_counts: dict[str, int] = {}
+            for dest, cnt in s.execute(
+                select(DeadLetter.destination, func.count())
+                .group_by(DeadLetter.destination)
+            ):
+                dlq_counts[dest] = cnt
             for dest in merged:
-                counts = {}
-                for st in ["pending", "sent", "failed"]:
-                    cnt = s.execute(
-                        select(func.count()).select_from(SiemDispatch)
-                        .where(SiemDispatch.destination == dest)
-                        .where(SiemDispatch.status == st)
-                    ).scalar()
-                    counts[st] = cnt or 0
-                dlq_cnt = s.execute(
-                    select(func.count()).select_from(DeadLetter)
-                    .where(DeadLetter.destination == dest)
-                ).scalar() or 0
                 rows.append({
                     "destination": dest,
-                    "pending": counts["pending"],
-                    "sent": counts["sent"],
-                    "failed": counts["failed"],
-                    "dlq": dlq_cnt,
+                    "pending": status_counts.get((dest, "pending"), 0),
+                    "sent": status_counts.get((dest, "sent"), 0),
+                    "failed": status_counts.get((dest, "failed"), 0),
+                    "dlq": dlq_counts.get(dest, 0),
                 })
         if is_json(ctx):
             echo_json(ctx, rows)

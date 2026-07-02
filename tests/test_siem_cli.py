@@ -53,6 +53,56 @@ def test_siem_purge_empty_db(runner, tmp_path, monkeypatch):
     assert "0" in result.output or "Purged" in result.output
 
 
+def test_siem_status_counts_by_destination_and_status(runner, tmp_path):
+    """Regression: siem status must correctly aggregate counts per
+    (destination, status) — not conflate rows across destinations or
+    misclassify statuses. Guards the count-queries -> single GROUP BY
+    refactor against cross-destination/status bleed."""
+    import os
+    import json as _json
+    from datetime import datetime, timezone
+    from unittest.mock import MagicMock, patch
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.models import SiemDispatch, DeadLetter
+    from src.cli.root import cli
+
+    os.makedirs(tmp_path / "data", exist_ok=True)
+    db_path = str(tmp_path / "data" / "test.sqlite")
+    eng = create_engine(f"sqlite:///{db_path}")
+    init_schema(eng)
+    sf = sessionmaker(eng)
+    now = datetime.now(timezone.utc)
+    with sf.begin() as s:
+        # destA: 2 pending, 1 sent, 1 failed, 1 DLQ entry
+        for _ in range(2):
+            s.add(SiemDispatch(source_table="pce_events", source_id=1,
+                                destination="destA", status="pending", retries=0, queued_at=now))
+        s.add(SiemDispatch(source_table="pce_events", source_id=1,
+                            destination="destA", status="sent", retries=0, queued_at=now))
+        s.add(SiemDispatch(source_table="pce_events", source_id=1,
+                            destination="destA", status="failed", retries=0, queued_at=now))
+        s.add(DeadLetter(source_table="pce_events", source_id=1, destination="destA",
+                          retries=1, last_error="e", payload_preview="", quarantined_at=now))
+        # destB: 3 sent, no DLQ
+        for _ in range(3):
+            s.add(SiemDispatch(source_table="pce_events", source_id=1,
+                                destination="destB", status="sent", retries=0, queued_at=now))
+
+    mock_cm = MagicMock()
+    mock_cm.models.pce_cache.db_path = db_path
+    mock_cm.models.siem.destinations = []
+    with patch("src.config.ConfigManager", return_value=mock_cm):
+        result = runner.invoke(cli, ["--json", "siem", "status"])
+
+    assert result.exit_code == 0, result.output
+    payload = _json.loads(result.output)
+    by_dest = {r["destination"]: r for r in payload}
+    assert by_dest["destA"] == {"destination": "destA", "pending": 2, "sent": 1, "failed": 1, "dlq": 1}
+    assert by_dest["destB"] == {"destination": "destB", "pending": 0, "sent": 3, "failed": 0, "dlq": 0}
+
+
 def test_siem_test_bad_destination_exits_usage(runner):
     """siem test with unknown destination exits EXIT_USAGE (64)."""
     from src.cli.siem import siem_group

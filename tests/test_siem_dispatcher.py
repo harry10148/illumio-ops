@@ -231,6 +231,40 @@ def test_process_batch_marks_all_sent_in_one_transaction(sf):
     assert counting.begin_calls == 1     # 3 筆成功 → 僅一個寫交易
 
 
+def test_process_batch_missing_source_row_quarantines_without_affecting_others(sf):
+    """Missing source row (dispatch row outlived its source, or source was
+    deleted) must be quarantined via the payload_build_failed path, and must
+    not affect other rows loaded in the same batch — regression guard for the
+    single-session batch source load replacing the old per-row session."""
+    from src.siem.dispatcher import DestinationDispatcher
+    from src.siem.formatters.cef import CEFFormatter
+    now = datetime.now(timezone.utc)
+    _seed_event(sf, 1)  # valid row: source_id=1 exists in pce_events
+    with sf.begin() as s:
+        s.add(SiemDispatch(
+            source_table="pce_events", source_id=9999,  # no such PceEvent row
+            destination="test-dest", status="pending",
+            retries=0, queued_at=now,
+        ))
+    tr = SuccessTransport()
+    d = DestinationDispatcher("test-dest", sf, CEFFormatter(), tr)
+
+    result = d.tick()
+
+    assert result["sent"] == 1
+    assert result["quarantined"] == 1
+    assert len(tr.sent) == 1
+    with sf() as s:
+        dispatch_rows = s.execute(select(SiemDispatch)).scalars().all()
+        dlq_rows = s.execute(select(DeadLetter)).scalars().all()
+    statuses = {r.source_id: r.status for r in dispatch_rows}
+    assert statuses[1] == "sent"
+    assert statuses[9999] == "failed"
+    assert len(dlq_rows) == 1
+    assert dlq_rows[0].source_id == 9999
+    assert dlq_rows[0].last_error == "payload_build_failed"
+
+
 def test_process_batch_mixed_success_and_failure(sf):
     from src.siem.dispatcher import DestinationDispatcher
     for i in range(1, 4):

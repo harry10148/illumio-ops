@@ -89,9 +89,14 @@ class DestinationDispatcher:
                 .order_by(SiemDispatch.queued_at)
                 .limit(self._batch_size)
             ).scalars().all()
+            # 單一 session 批次載入本批的 source rows（原本每列各開一個
+            # session —— NullPool 下 batch=100 就是 100 條新 SQLite 連線）。
+            sources = self._load_sources(s, rows)
 
         for dispatch_row in rows:
-            payload = self._build_payload(dispatch_row)
+            payload = self._build_payload(
+                dispatch_row, sources.get((dispatch_row.source_table, dispatch_row.source_id))
+            )
             if payload is None:
                 # Route build failures through the DLQ (not a bare status='failed')
                 # so the dropped event stays inspectable and replayable.
@@ -138,27 +143,50 @@ class DestinationDispatcher:
 
         return {"sent": sent, "failed": failed, "quarantined": quarantined}
 
-    def _build_payload(self, row: SiemDispatch) -> Optional[str]:
+    _SOURCE_MODELS = {
+        "pce_events": PceEvent,
+        "pce_traffic_flows_raw": PceTrafficFlowRaw,
+    }
+
+    def _load_sources(self, s, rows: list[SiemDispatch]) -> dict[tuple[str, int], str]:
+        """依 source_table 分組後對本批 source_id 各發一次 IN 查詢，取回
+        raw_json（_build_payload 唯一用到的欄位，column-only select 同時省
+        去 report_json 等未用欄位）。缺列的 (source_table, source_id) 不會
+        出現在回傳的 dict 中 —— _build_payload 以此判斷缺 source row，維持
+        原本『找不到就回 None』的語意。
+        """
+        ids_by_table: dict[str, list[int]] = {}
+        for r in rows:
+            ids_by_table.setdefault(r.source_table, []).append(r.source_id)
+
+        loaded: dict[tuple[str, int], str] = {}
+        for table_name, ids in ids_by_table.items():
+            model = self._SOURCE_MODELS.get(table_name)
+            if model is None:
+                continue
+            for i in range(0, len(ids), _SENT_UPDATE_CHUNK):
+                chunk = ids[i:i + _SENT_UPDATE_CHUNK]
+                for src_id, raw_json in s.execute(
+                    select(model.id, model.raw_json).where(model.id.in_(chunk))
+                ):
+                    loaded[(table_name, src_id)] = raw_json
+        return loaded
+
+    def _build_payload(self, row: SiemDispatch, raw_json: Optional[str]) -> Optional[str]:
+        if raw_json is None:
+            return None
         try:
-            with self._sf() as s:
-                if row.source_table == "pce_events":
-                    src = s.get(PceEvent, row.source_id)
-                    if src is None:
-                        return None
-                    data = orjson.loads(src.raw_json)
-                    if self._mask_pii:
-                        from src.siem.mask import mask_event
-                        data = mask_event(data, mask_pii=True)
-                    return self._formatter.format_event(data)
-                elif row.source_table == "pce_traffic_flows_raw":
-                    src = s.get(PceTrafficFlowRaw, row.source_id)
-                    if src is None:
-                        return None
-                    data = orjson.loads(src.raw_json)
-                    if self._mask_pii:
-                        from src.siem.mask import mask_flow
-                        data = mask_flow(data, mask_pii=True)
-                    return self._formatter.format_flow(data)
+            data = orjson.loads(raw_json)
+            if row.source_table == "pce_events":
+                if self._mask_pii:
+                    from src.siem.mask import mask_event
+                    data = mask_event(data, mask_pii=True)
+                return self._formatter.format_event(data)
+            elif row.source_table == "pce_traffic_flows_raw":
+                if self._mask_pii:
+                    from src.siem.mask import mask_flow
+                    data = mask_flow(data, mask_pii=True)
+                return self._formatter.format_flow(data)
         except Exception as exc:
             logger.exception("Failed to build payload for dispatch row {}: {}", row.id, exc)
         return None

@@ -59,6 +59,23 @@ def test_read_events_returns_dict_rows(session_factory):
     assert rows[0]["event_type"] == "policy.update"
 
 
+def test_read_events_returns_full_dict_content(session_factory):
+    """Round-trip: read_events must return the full raw_json content, not just
+    a subset — guards the column-only-select fast path against dropping data."""
+    now = datetime.now(timezone.utc)
+    payload = {"event_type": "policy.update", "severity": "info", "nested": {"a": 1}, "list": [1, 2, 3]}
+    with session_factory.begin() as s:
+        s.add(PceEvent(
+            pce_href="/orgs/1/events/full", pce_event_id="full-1",
+            timestamp=now, event_type="policy.update", severity="info",
+            status="success", pce_fqdn="pce.example.com",
+            raw_json=json.dumps(payload), ingested_at=now,
+        ))
+    rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
+    rows = rd.read_events(now - timedelta(hours=1), now + timedelta(hours=1))
+    assert rows == [payload]
+
+
 def test_read_events_returns_empty_for_miss_range(session_factory):
     now = datetime.now(timezone.utc)
     rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
@@ -81,6 +98,33 @@ def _seed_flow(sf, ingested_at):
             raw_json='{}',
             ingested_at=ingested_at,
         ))
+
+
+def test_read_flows_raw_returns_full_dict_content(session_factory):
+    """Round-trip: read_flows_raw must return the full raw_json content, not
+    just a subset — guards the column-only-select fast path against dropping
+    data, and confirms ordering by last_detected is preserved."""
+    now = datetime.now(timezone.utc)
+    payload_older = {"n": "older", "nested": {"x": 1}, "list": [4, 5]}
+    payload_newer = {"n": "newer", "nested": {"y": 2}, "list": [6, 7]}
+    with session_factory.begin() as s:
+        s.add(PceTrafficFlowRaw(
+            flow_hash="older", first_detected=now - timedelta(hours=2),
+            last_detected=now - timedelta(hours=2),
+            src_ip="1.2.3.4", dst_ip="5.6.7.8", port=443, protocol="tcp",
+            action="allowed", flow_count=1, bytes_in=0, bytes_out=0,
+            raw_json=json.dumps(payload_older), ingested_at=now,
+        ))
+        s.add(PceTrafficFlowRaw(
+            flow_hash="newer", first_detected=now - timedelta(hours=1),
+            last_detected=now - timedelta(hours=1),
+            src_ip="1.2.3.4", dst_ip="5.6.7.8", port=443, protocol="tcp",
+            action="allowed", flow_count=1, bytes_in=0, bytes_out=0,
+            raw_json=json.dumps(payload_newer), ingested_at=now,
+        ))
+    rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
+    rows = rd.read_flows_raw(now - timedelta(hours=3), now)
+    assert rows == [payload_older, payload_newer]  # ordered by last_detected
 
 
 def test_earliest_ingested_at_returns_min(session_factory):
