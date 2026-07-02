@@ -484,6 +484,14 @@ class TrafficQueryBuilder:
         expected_matches = 0
         while time.monotonic() < deadline:
             time.sleep(interval)
+            # 低 rpm 設定與 poll 的交互：rate_limit_per_minute 下限是 10
+            # （config_models.py ge=10），rpm=10 時 limiter capacity=1、約 6 秒
+            # 補一枚 token，且與 ingestor_events 等其他限流呼叫端共搶同一個
+            # 行程級全域 bucket——rate_limit=True 時此處每次 acquire(timeout=30)
+            # 最壞阻塞 30 秒，阻塞時間會實質侵蝕上面的 900 秒 wall-clock
+            # deadline。降級路徑是優雅的：acquire 逾時丟 APIError，沿
+            # execute_traffic_query_stream 的 except 路徑記 log 回空 flows，
+            # ingest watermark 不推進、下輪重試。
             poll_status, poll_body = c._request(poll_url, timeout=15, rate_limit=rate_limit)
             if poll_status != 200:
                 continue
