@@ -641,6 +641,8 @@ illumio-ops cache retention --run             # run retention cleanup immediatel
 
 > Polling is incremental and watermark-based; there is no "full refresh" mode. A daily APScheduler job clears expired rows per their TTL; a separate lag monitor checks ingestion lag every 60 seconds and logs WARNING/ERROR when it exceeds the threshold.
 
+**Long-term archive export and Archive Review undercount:** the archiver (`ArchiveExporter`) incrementally exports `pce_events`/`pce_traffic_flows_raw` rows to per-day JSONL files, advancing a cursor by `ingested_at`. Because the ingestor's upsert only refreshes volatile columns (`last_detected`/`bytes_in`/`bytes_out`/`flow_count`) without bumping `ingested_at`, a long-lived flow that keeps growing in the live cache *after* it was first exported will not be re-exported with its updated totals — the row is already behind the cursor. Consequently, counts/volume reconstructed from the archive (e.g. the Archive Review DB) can be **lower** than the live PCE cache for long-lived flows; short-lived, one-shot flows are unaffected. This is a known, accepted limitation (not a bug) — see the `ArchiveExporter` docstring in `src/pce_cache/archive.py` for details.
+
 ### 8.2 Updates
 
 See [1.8 Update Procedure](#18-update-procedure). In short: for source installs use `git pull` + `pip install`; for offline bundles re-run `install.sh`/`install.ps1` (configuration is preserved), then restart the service.
@@ -711,6 +713,12 @@ Procedure for obtaining a CA-signed certificate in production (Settings → Secu
 > - Ensure the proxy preserves the real client IP and add ProxyFix yourself (trusting 1 hop) before the WSGI app, then use `allowed_ips`.
 >
 > If unsure, the safest approach is to bind illumio-ops only to `127.0.0.1` (`--host 127.0.0.1`) and let the front-end proxy handle TLS and access control.
+
+### 8.8 Dependency Watch List
+
+Packages that still work today but need an eye kept on them for a future maintenance pass:
+
+- **flask-talisman** (`requirements.txt` Phase 4, security headers): upstream project is **archived** (no further releases expected). Not an immediate problem — the package still functions — but plan an exit path before it becomes a real compatibility/CVE risk. Exit path if/when needed: replace with a self-written `after_request` hook (~100 lines) setting the same security headers (CSP, HSTS, X-Frame-Options, etc.) directly, dropping the dependency.
 
 ---
 

@@ -80,6 +80,19 @@ class ArchiveExporter:
     儲存語意：以 append + gzip 輪替 + remove 操作一般 POSIX 可讀寫目錄，
     非硬體 WORM 檔案系統（後者會拒絕 append/remove）。目錄不可寫時各操作
     以 logger.warning 安全降級，不會腐化既有檔案。
+
+    已知限制（設計決策：只文件化，不改行為）——長壽 flow 的 archive 計數可能
+    低於 live cache：
+      - 匯出游標依 (ingested_at, id) 前進；ingestor 的 upsert（見
+        ingestor_traffic.py 的 on_conflict_do_update）只刷新 volatile 欄位
+        （last_detected/bytes_in/bytes_out/flow_count），不會 bump ingested_at。
+      - 因此一筆 flow 一旦被匯出過（游標已越過它的 ingested_at），之後即使
+        live cache 端持續累積 bytes/flow_count，也不會再被這個增量匯出邏輯
+        撿到——它已經「早於游標」。
+      - 影響：從 archive JSONL 重建的 review DB，對長壽 flow（同一 flow_hash
+        持續被 upsert 更新很久）算出的流量/連線數會反映「首次匯出當下的快照
+        值」，而非 live cache 目前的最新累積值，兩邊對同一 flow 的計數可能不等
+        （review DB 偏低）。短命 flow（一次性、匯出後不再被 upsert）不受影響。
     """
 
     def __init__(self, session_factory: sessionmaker, archive_dir: str,

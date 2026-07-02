@@ -641,6 +641,8 @@ illumio-ops cache retention --run             # 立即執行保留清除
 
 > 採增量、watermark 為基的輪詢，無「全量刷新」模式。每日 APScheduler 工作會依 TTL 清除過期列；另有 lag 監控每 60 秒檢查擷取落後並於逾時時記 WARNING/ERROR。
 
+**長期 archive 匯出與 Archive Review 計數偏低：** archiver（`ArchiveExporter`）會把 `pce_events`／`pce_traffic_flows_raw` 依 `ingested_at` 游標增量匯出成逐日 JSONL 檔。由於 ingestor 的 upsert 只刷新 volatile 欄位（`last_detected`／`bytes_in`／`bytes_out`／`flow_count`），不會 bump `ingested_at`，一筆長壽 flow 若在首次匯出「之後」於 live cache 端持續成長，這些後續成長不會再被匯出——該列已經早於游標。因此從 archive 重建的計數（例如 Archive Review DB）對長壽 flow 的流量／連線數可能**低於** live PCE cache；一次性、短命的 flow 不受影響。這是已知且接受的限制（非 bug），細節見 `src/pce_cache/archive.py` 的 `ArchiveExporter` docstring。
+
 ### 8.2 更新
 
 見 [1.8 更新流程](#18-更新流程)。要點：原始碼用 `git pull` + `pip install`；離線 bundle 重跑 `install.sh`／`install.ps1`（保留設定）後重啟服務。
@@ -711,6 +713,12 @@ Web GUI 預設以 **HTTPS** 服務（`web_gui.tls.enabled: true`、`self_signed:
 > - 確保代理保留真實客戶端 IP，並在 WSGI 前自行加入 ProxyFix（信任 1 hop）後，才使用 `allowed_ips`。
 >
 > 若不確定，最安全的做法是讓 illumio-ops 只綁定 `127.0.0.1`（`--host 127.0.0.1`），由前端代理負責 TLS 與存取控制。
+
+### 8.8 相依套件觀察名單
+
+目前仍可正常運作、但需要留意後續維護動作的套件：
+
+- **flask-talisman**（`requirements.txt` Phase 4，安全 headers）：上游專案已**archived**（不再有後續發版）。目前不是急迫問題——套件本身仍可運作——但應在它真正變成相容性／CVE 風險之前規劃退場路徑。屆時的退場路徑：自寫一個 `after_request` hook（約 100 行），直接設定相同的安全 headers（CSP、HSTS、X-Frame-Options 等），移除此相依套件。
 
 ---
 
