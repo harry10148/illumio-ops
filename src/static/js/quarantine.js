@@ -263,6 +263,7 @@ async function runTrafficAnalyzer() {
 
   try {
     let payload = { mins, sort_by: sort, search: search };
+    payload.source = (document.getElementById('traffic-source') || {}).value || 'live';
     payload.policy_decision = pd || '-1';
     if (draftPd) payload.draft_policy_decision = draftPd;
 
@@ -781,7 +782,8 @@ async function loadTrafficTrend() {
   const meta = document.getElementById('tw-trend-meta');
   if (meta) meta.textContent = '— loading';
   try {
-    const r = await get('/api/traffic/trend');
+    const _src = (document.getElementById('traffic-source') || {}).value || 'live';
+    const r = await get('/api/traffic/trend' + (_src === 'archive' ? '?source=archive' : ''));
     renderTrafficTrend((r && r.buckets) ? r.buckets : []);
     const syncEl = document.getElementById('tw-trend-last-sync');
     if (syncEl) {
@@ -793,6 +795,46 @@ async function loadTrafficTrend() {
     renderTrafficTrend([]);
   } finally {
     _trendFetching = false;
+  }
+}
+
+// ─── Archive 查閱：資料來源切換 + 載入控制 ─────────────────────────────
+// 切換「即時快取 / Archive」：顯示/隱藏 archive 載入控制，選 archive 時刷新狀態。
+function onTrafficSourceChange() {
+  const sel = document.getElementById('traffic-source');
+  const box = document.getElementById('traffic-archive-controls');
+  const isArchive = sel && sel.value === 'archive';
+  if (box) box.style.display = isArchive ? 'flex' : 'none';
+  if (isArchive) refreshArchiveStatus();
+}
+
+async function refreshArchiveStatus() {
+  const el = document.getElementById('archive-status');
+  if (!el) return;
+  try {
+    const st = await get('/api/cache/archive/status');
+    el.textContent = (st && st.loaded)
+      ? _t('gui_traffic_archive_loaded_fmt')
+          .replace('{start}', st.start).replace('{end}', st.end).replace('{n}', st.rows)
+      : _t('gui_traffic_archive_none');
+  } catch (_) { el.textContent = ''; }
+}
+
+// 載入指定日期範圍的 archive 進 review DB（同步）；成功後刷新狀態。
+async function loadArchiveRange() {
+  const el = document.getElementById('archive-status');
+  const start = (document.getElementById('archive-start') || {}).value;
+  const end = (document.getElementById('archive-end') || {}).value;
+  if (el) el.textContent = '…';
+  try {
+    const body = await post('/api/cache/archive/load', { start_date: start, end_date: end });
+    if (body && body.ok) {
+      refreshArchiveStatus();
+    } else if (el) {
+      el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', (body && body.error) || '');
+    }
+  } catch (e) {
+    if (el) el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', String(e));
   }
 }
 

@@ -880,6 +880,22 @@
             </select>
           </div>
 
+          <div class="q-field">
+            <label data-i18n="gui_traffic_source">Data source</label>
+            <select id="traffic-source" data-on-change="onTrafficSourceChange">
+              <option value="live" data-i18n="gui_traffic_source_live">Live cache</option>
+              <option value="archive" data-i18n="gui_traffic_source_archive">Archive</option>
+            </select>
+          </div>
+          <div id="traffic-archive-controls" style="display:none;align-items:center;gap:6px;">
+            <label data-i18n="gui_traffic_archive_range">Archive date range</label>
+            <input type="date" id="archive-start">
+            <input type="date" id="archive-end">
+            <button class="btn btn-secondary" data-action="loadArchiveRange">
+              <span data-i18n="gui_traffic_archive_load">Load archive</span>
+            </button>
+            <span id="archive-status" style="font-size:.8rem;color:var(--dim);"></span>
+          </div>
           <div class="spacer"></div>
           <button class="btn btn-secondary" data-action="openQtFiltersModal"
             title="Advanced Filters" data-i18n-title="gui_adv_filters_tooltip">
