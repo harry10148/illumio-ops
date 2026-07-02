@@ -71,6 +71,63 @@ def test_import_restores_rows_with_fidelity(sf, archive_dir):
     assert r.last_detected.replace(tzinfo=timezone.utc).hour == 12
 
 
+def test_export_import_round_trip_preserves_first_detected_absent_from_raw(sf, tmp_path, archive_dir):
+    """B5：first_detected 與 last_detected 不同、且 raw 內完全沒有 first_detected
+    （raw 回推 fallback 派不上用場）的列，export → import 後 first_detected
+    必須保真，不能被 fallback 錯誤改寫成 last_detected。"""
+    from src.pce_cache.archive import ArchiveExporter
+    from src.pce_cache.archive_import import ArchiveImporter
+
+    cache_engine = create_engine(f"sqlite:///{tmp_path / 'cache.sqlite'}")
+    init_schema(cache_engine)
+    cache_sf = sessionmaker(cache_engine)
+
+    first_detected = datetime(2026, 6, 30, 9, 0, 0, tzinfo=timezone.utc)
+    last_detected = datetime(2026, 6, 30, 12, 0, 0, tzinfo=timezone.utc)
+    raw = {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 443, "action": "blocked"}
+    with cache_sf.begin() as s:
+        s.add(PceTrafficFlowRaw(
+            flow_hash="fd1", first_detected=first_detected, last_detected=last_detected,
+            src_ip="10.0.0.1", src_workload="web", dst_ip="10.0.0.2", dst_workload="db",
+            port=443, protocol="tcp", action="blocked", flow_count=1,
+            bytes_in=100, bytes_out=200, raw_json=orjson.dumps(raw).decode(),
+            ingested_at=last_detected,
+        ))
+
+    ArchiveExporter(cache_sf, archive_dir).run_once()
+    res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
+    assert res["rows"] == 1
+
+    r = _rows(sf)[0]
+    assert r.first_detected.replace(tzinfo=timezone.utc) == first_detected
+    assert r.last_detected.replace(tzinfo=timezone.utc) == last_detected
+
+
+def test_import_falls_back_to_raw_first_detected_for_old_archives_without_top_level_field(sf, archive_dir):
+    """向後相容：舊格式 archive（沒有頂層 first_detected 欄位）仍必須能透過
+    raw 回推 fallback 正常載入，不因新增頂層欄位而退化。"""
+    from src.pce_cache.archive_import import ArchiveImporter
+    raw = {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2",
+           "first_detected": "2026-06-30T11:00:00+00:00", "port": 443, "action": "blocked"}
+    # 舊格式：沒有頂層 first_detected 欄位
+    line = orjson.dumps({
+        "event_time": "2026-06-30T12:00:00+00:00",
+        "ingested_at": "2026-06-30T12:00:00+00:00",
+        "flow_hash": "old1", "src_ip": "10.0.0.1", "src_workload": "web",
+        "dst_ip": "10.0.0.2", "dst_workload": "db",
+        "port": 443, "protocol": "tcp", "action": "blocked", "flow_count": 1,
+        "bytes_in": 100, "bytes_out": 200, "raw": raw,
+    })
+    _write(archive_dir, "traffic-2026-06-30.jsonl", [line])
+
+    res = ArchiveImporter(archive_dir, sf).import_range(date(2026, 6, 1), date(2026, 6, 30))
+    assert res["rows"] == 1
+    r = _rows(sf)[0]
+    # 頂層無 first_detected → fallback 讀 raw.first_detected（11:00）
+    assert r.first_detected.replace(tzinfo=timezone.utc).hour == 11
+    assert r.last_detected.replace(tzinfo=timezone.utc).hour == 12
+
+
 def test_import_floors_timestamps_to_whole_seconds(sf, archive_dir):
     # archive 查閱靠「查詢窗=MIN(last_detected) 整秒」使 cover_state=full、不打即時 API。
     # 匯入時把時間戳 floor 到整秒，讓此不變量與來源精度無關。

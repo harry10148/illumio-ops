@@ -38,6 +38,9 @@ def _traffic_record(row: PceTrafficFlowRaw) -> dict:
     return {
         "event_time": _as_utc(row.last_detected).isoformat(),
         "ingested_at": _as_utc(row.ingested_at).isoformat(),
+        # 頂層補 first_detected，與 flow_hash/last_detected 同樣保真格式對稱，
+        # 避免 import 端只能靠 raw 回推（raw 缺值時會誤 fallback 成 last_detected）
+        "first_detected": _as_utc(row.first_detected).isoformat(),
         "flow_hash": row.flow_hash,
         "src_ip": row.src_ip, "src_workload": row.src_workload,
         "dst_ip": row.dst_ip, "dst_workload": row.dst_workload,

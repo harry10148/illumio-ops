@@ -107,8 +107,12 @@ class ArchiveImporter:
                 try:
                     last_detected = _parse_dt(rec["event_time"])
                     ingested_at = _parse_dt(rec["ingested_at"])
-                    ts_range = raw.get("timestamp_range") or {}
-                    fd_raw = raw.get("first_detected") or ts_range.get("first_detected", "")
+                    # 優先讀頂層 first_detected（新格式，export 端已對稱補上）；
+                    # 舊格式 archive 沒有頂層欄位時，才 fallback 回 raw 回推。
+                    fd_raw = rec.get("first_detected", "")
+                    if not fd_raw:
+                        ts_range = raw.get("timestamp_range") or {}
+                        fd_raw = raw.get("first_detected") or ts_range.get("first_detected", "")
                     first_detected = _parse_dt(fd_raw) if fd_raw else last_detected
                     flow_hash = rec["flow_hash"]
                 except (KeyError, ValueError):
