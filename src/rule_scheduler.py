@@ -263,7 +263,14 @@ class ScheduleEngine:
 
                 elif c['type'] == 'one_time':
                     expire_dt = datetime.datetime.fromisoformat(c['expire_at'])
-                    if item_now > expire_dt:
+                    # 正規化 aware/naive 再比較（同型修法見 report_scheduler.py:133-139
+                    # 與 compute_next_trigger 的 strip）：item_now 在 tz='local' 時是
+                    # aware UTC，expire_at 多半是 naive wall-clock，直接比較會丟
+                    # TypeError，且該例外會被下方的 per-item except 吃掉。
+                    if expire_dt.tzinfo is not None:
+                        expire_dt = expire_dt.replace(tzinfo=None)
+                    item_now_cmp = item_now.replace(tzinfo=None) if item_now.tzinfo is not None else item_now
+                    if item_now_cmp > expire_dt:
                         log(f"{Colors.FAIL}[EXPIRED] {c['name']} (ID:{extract_id(href)}) {t('rs_expired', default='has expired.')}{Colors.ENDC}")
                         self.api.toggle_and_provision(href, False, c.get('is_ruleset'))
                         self.api.update_rule_note(href, "", remove=True)
