@@ -49,7 +49,10 @@ def _now_in_schedule_tz(tz_str: str) -> datetime.datetime:
 # State key written to state.json
 _STATE_KEY = "report_schedule_states"
 
-# Gap to prevent re-trigger within the same hour window (seconds)
+# Gap to prevent re-trigger within the same hour window (seconds). Only guards
+# the daily/weekly/monthly branch of should_run() — the cron_expr branch's
+# anti-dupe comes from CronTrigger.get_next_fire_time(prev, now) instead, so
+# sub-hourly cron (e.g. '*/15 * * * *') isn't collapsed to firing once/hour.
 _MIN_RERUN_GAP = 3600
 
 # Sentinel for "not provided" — distinguishes None (never run) from missing arg
@@ -100,12 +103,29 @@ class ReportScheduler:
         schedule:
             Schedule dict (must contain at least ``id`` and ``enabled``).
         now:
-            Current naive datetime expressed in the schedule's local timezone.
+            Current datetime expressed in the schedule's local timezone
+            (naive or aware — normalised below).
         last_run_str:
             ISO-format string of the last run time, or ``None`` if never run.
             When omitted (sentinel), the value is loaded from the persisted
             state file — the normal production path.  Pass ``None`` explicitly
             in tests to skip state-file I/O.
+
+        Due semantics
+        -------------
+        cron_expr branch: delegates to APScheduler's CronTrigger. Anti-dupe
+        for "same cron trigger time only fires once" comes entirely from
+        ``get_next_fire_time(prev, now)`` (prev = last_run) — NOT from
+        ``_MIN_RERUN_GAP``, which would otherwise collapse sub-hourly cron
+        (e.g. ``*/15 * * * *``) down to firing once per hour.
+
+        daily/weekly/monthly branch: catch-up semantics — due when
+        ``now >= 排程時刻`` (today's hour:minute) AND
+        ``last_run < 排程時刻``. This lets a tick that missed the exact
+        minute (e.g. busy running a previous report) still fire once it
+        next checks, while ``last_run`` moving past the target prevents a
+        second fire the same day. ``_MIN_RERUN_GAP`` additionally guards
+        this branch against re-trigger from clock/tick jitter.
         """
         if not schedule.get("enabled", False):
             return False
@@ -124,35 +144,32 @@ class ReportScheduler:
                 # subtraction works against the naive schedule-local `now`.
                 if last_run_dt.tzinfo is not None:
                     last_run_dt = last_run_dt.replace(tzinfo=None)
-                # `now` is tz-AWARE for tz='local'/unset but NAIVE for
-                # 'UTC'/'UTC+N' (see _now_in_schedule_tz). Normalize to naive so
-                # the gap subtraction never mixes naive & aware datetimes — that
-                # TypeError previously escaped the ValueError-only guard and, via
-                # tick(), aborted ALL schedules on the first one with a stored
-                # last_run.
-                now_cmp = now.replace(tzinfo=None) if now.tzinfo else now
-                if (now_cmp - last_run_dt).total_seconds() < _MIN_RERUN_GAP:
-                    return False
             except (ValueError, TypeError):
-                pass
+                last_run_dt = None
 
-        # cron_expr branch: use APScheduler CronTrigger to decide if due
+        # `now` is tz-AWARE for tz='local'/unset but NAIVE for 'UTC'/'UTC+N'
+        # (see _now_in_schedule_tz). Normalize to naive throughout so
+        # comparisons never mix naive & aware datetimes.
+        now_naive = now.replace(tzinfo=None) if now.tzinfo else now
+
+        # cron_expr branch: use APScheduler CronTrigger to decide if due.
         cron_expr = schedule.get("cron_expr")
         if cron_expr:
             try:
-                import zoneinfo as _zi
                 from apscheduler.triggers.cron import CronTrigger
-                sched_tz = schedule.get("timezone") or "UTC"
-                try:
-                    tz_obj = _zi.ZoneInfo(sched_tz)
-                except (KeyError, _zi.ZoneInfoNotFoundError):
-                    logger.warning("Unknown timezone {!r} for schedule {}, falling back to UTC",
-                                   sched_tz, schedule.get("id"))
-                    tz_obj = _zi.ZoneInfo("UTC")
-                    sched_tz = "UTC"
-                trigger = CronTrigger.from_crontab(cron_expr, timezone=sched_tz)
-                # Attach the schedule-local timezone so APScheduler can compare correctly.
-                now_aware = now.replace(tzinfo=tz_obj)
+                # Fallback chain matches tick(): schedule.timezone, else the
+                # global settings.timezone, else UTC. `self.cm` may be absent
+                # on bare ReportScheduler.__new__() test doubles.
+                cm = getattr(self, "cm", None)
+                global_tz = (cm.config.get('settings', {}).get('timezone', 'local')
+                             if cm is not None else None)
+                sched_tz = schedule.get("timezone") or global_tz or "UTC"
+                # 統一走 tz_utils.resolve_tz——直接得到 tzinfo 物件（不是字串）
+                # 餵給 CronTrigger／now_aware，'UTC+N' 這類偏移字串才不會被
+                # zoneinfo 誤判成不存在的時區、每個 tick 都多印一次 warning。
+                tz_obj = resolve_tz(sched_tz)
+                trigger = CronTrigger.from_crontab(cron_expr, timezone=tz_obj)
+                now_aware = now_naive.replace(tzinfo=tz_obj)
                 prev = last_run_dt.replace(tzinfo=tz_obj) if last_run_dt else None
                 next_fire = trigger.get_next_fire_time(prev, now_aware)
                 return next_fire is not None and next_fire <= now_aware
@@ -160,23 +177,39 @@ class ReportScheduler:
                 logger.warning("Invalid cron_expr for schedule {}", schedule.get("id"))
                 return False
 
+        # Rerun-gap guard: only for the daily/weekly/monthly branch below.
+        # cron 的重跑保護交給上面「同一 cron 觸發時刻只跑一次」的 next_fire 判定。
+        if last_run_dt is not None and (now_naive - last_run_dt).total_seconds() < _MIN_RERUN_GAP:
+            return False
+
         stype = schedule.get("schedule_type", "weekly")
         hour = int(schedule.get("hour", 8))
         minute = int(schedule.get("minute", 0))
 
-        if now.hour != hour or now.minute != minute:
-            return False
-
         if stype == "daily":
-            return True
+            day_matches = True
         elif stype == "weekly":
             dow = schedule.get("day_of_week", "monday").lower()
-            return now.strftime("%A").lower() == dow
+            day_matches = now_naive.strftime("%A").lower() == dow
         elif stype == "monthly":
             dom = int(schedule.get("day_of_month", 1))
-            return now.day == dom
+            day_matches = now_naive.day == dom
+        else:
+            return False
 
-        return False
+        if not day_matches:
+            return False
+
+        # Catch-up 語意：今天的排程時刻已到（now >= target）且尚未於該時刻後
+        # 執行過（last_run < target）即視為 due——取代舊版精確分鐘比對，讓 tick
+        # 因執行前一個排程而錯過整分鐘時仍能補跑一次，且只補一次。不回溯前一天
+        # 以前的錯過週期，避免長時間離線後補跑一大串。
+        target = now_naive.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if now_naive < target:
+            return False
+        if last_run_dt is not None and last_run_dt >= target:
+            return False
+        return True
 
     # ─── Execution ───────────────────────────────────────────────────────────
 
