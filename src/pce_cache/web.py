@@ -267,3 +267,38 @@ def put_cache_settings():
     if result["ok"]:
         cm.load()
     return jsonify(result), (200 if result["ok"] else 422)
+
+
+@bp.route("/archive/load", methods=["POST"])
+@login_required
+def load_archive():
+    from datetime import date
+    from src.pce_cache.archive_import import load_archive_review
+    cm = current_app.config['CM']
+    cfg = cm.models.pce_cache
+    body = request.get_json(silent=True) or {}
+    try:
+        start = date.fromisoformat(body.get("start_date", ""))
+        end = date.fromisoformat(body.get("end_date", ""))
+    except ValueError:
+        return jsonify({"ok": False, "error": "invalid date (YYYY-MM-DD)"}), 400
+    if end < start:
+        return jsonify({"ok": False, "error": "end before start"}), 400
+    span = (end - start).days + 1
+    if span > int(cfg.archive_review_max_days):
+        return jsonify({"ok": False,
+                        "error": f"range {span}d exceeds max {cfg.archive_review_max_days}d"}), 422
+    try:
+        meta = load_archive_review(cfg, start, end)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("archive load failed: {}", exc)
+        return jsonify({"ok": False, "error": str(exc)}), 500
+    return jsonify({"ok": True, **meta})
+
+
+@bp.route("/archive/status", methods=["GET"])
+@login_required
+def archive_status():
+    from src.pce_cache.archive_import import review_status
+    cm = current_app.config['CM']
+    return jsonify(review_status(cm.models.pce_cache))

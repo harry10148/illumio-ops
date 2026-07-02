@@ -268,6 +268,54 @@ def test_cache_lag_surfaces_error(client, tmp_path):
     assert "boom" in (row["last_error"] or "")
 
 
+def _seed_archive(tmp_path):
+    import gzip  # noqa: F401
+    import orjson
+    d = tmp_path / "arch"
+    d.mkdir()
+    rec = orjson.dumps({
+        "event_time": "2026-06-20T12:00:00+00:00",
+        "ingested_at": "2026-06-20T12:00:00+00:00",
+        "flow_hash": "aw1", "src_ip": "10.0.0.1", "dst_ip": "10.0.0.2",
+        "port": 443, "protocol": "tcp", "action": "blocked",
+        "flow_count": 1, "bytes_in": 1, "bytes_out": 1,
+        "raw": {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 443, "action": "blocked"},
+    })
+    with open(d / "traffic-2026-06-20.jsonl", "wb") as fh:
+        fh.write(rec + b"\n")
+    return str(d)
+
+
+def test_archive_load_and_status_roundtrip(client, tmp_path):
+    arch = _seed_archive(tmp_path)
+    # 先把 archive_dir 指到種好的目錄（review DB 會放在 db_path 同目錄）
+    client.put("/api/cache/settings", json={"archive_dir": arch},
+               environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    resp = client.post("/api/cache/archive/load",
+                       json={"start_date": "2026-06-01", "end_date": "2026-06-30"},
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["ok"] is True and body["rows"] == 1
+    st = client.get("/api/cache/archive/status",
+                    environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
+    assert st["loaded"] is True and st["rows"] == 1
+
+
+def test_archive_load_rejects_range_over_cap(client):
+    resp = client.post("/api/cache/archive/load",
+                       json={"start_date": "2026-01-01", "end_date": "2026-12-31"},
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 422
+
+
+def test_archive_load_rejects_bad_dates(client):
+    resp = client.post("/api/cache/archive/load",
+                       json={"start_date": "nope", "end_date": "2026-06-30"},
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 400
+
+
 def test_cache_lag_requires_login(tmp_path):
     fd, path = tempfile.mkstemp(suffix=".json")
     os.close(fd)
