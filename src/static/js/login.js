@@ -84,7 +84,7 @@
 
     clearFieldErrors();
 
-    if (newPw.length < 8) {
+    if (newPw.length < 12) {
       showFieldError('new-password', 'err-new-password', i18n.pw_too_short);
       return;
     }
