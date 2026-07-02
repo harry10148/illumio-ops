@@ -7,7 +7,7 @@
 #   Phase 2 — HTTP client:     requests, orjson, cachetools
 #   Phase 3 — Settings:        pydantic
 #   Phase 4 — Web GUI security: flask-wtf, flask-limiter, flask-talisman, flask-login
-#   Phase 5 — Reports:         openpyxl, matplotlib, plotly, pygments
+#   Phase 5 — Reports:         openpyxl, matplotlib, pygments
 #   Phase 6 — Scheduler:       APScheduler, SQLAlchemy
 #   Phase 7 — Logging:         loguru
 #   Existing (mandatory):      flask, pandas, pyyaml, cheroot
@@ -42,10 +42,9 @@ flask-login>=0.6,<0.7
 argon2-cffi>=23.1,<25.0
 cryptography>=46.0.7,<48.0   # Phase 2: ECDSA cert (TLS); >= 46.0.7 fixes PYSEC-2026-36/35 + CVE-2026-26007
 
-# ── Phase 5: Reports (Excel + PDF + interactive charts) ──────────────────────
+# ── Phase 5: Reports (Excel + PDF) ────────────────────────────────────────────
 openpyxl>=3.1,<4.0
 matplotlib>=3.8,<4.0
-plotly>=5.20,<7.0
 pygments>=2.17,<3.0
 
 # ── Phase 6: Scheduler ───────────────────────────────────────────────────────

@@ -91,7 +91,7 @@ def policy_decision_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
     ])
     results['summary'] = summary
 
-    # chart_spec for HTML (plotly) + Excel (matplotlib PNG)
+    # chart_spec for HTML (static SVG) + Excel (matplotlib PNG)
     results['chart_spec'] = {
         'type': 'pie',
         'title': 'Policy Decision Breakdown',

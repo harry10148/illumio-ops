@@ -93,9 +93,6 @@ from src.gui._helpers import (  # noqa: F401
     _get_active_pce_url,
     _build_audit_dashboard_summary, _write_audit_dashboard_summary,
     _build_policy_usage_dashboard_summary, _write_policy_usage_dashboard_summary,
-    _spec_to_plotly_figure, _load_state_for_charts,
-    _build_traffic_timeline_spec, _build_policy_decisions_spec,
-    _build_ven_status_spec, _build_rule_hits_spec,
     # TLS helpers
     _SELF_SIGNED_VALIDITY_DAYS, _cert_has_san, _get_local_ips,
     _generate_self_signed_cert, _get_cert_info, _cert_days_remaining,

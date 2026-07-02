@@ -46,7 +46,6 @@ PRODUCTION = [
     # Phase 5
     Pkg("openpyxl", "openpyxl"),
     Pkg("matplotlib", "matplotlib"),
-    Pkg("plotly", "plotly"),
     Pkg("pygments", "pygments"),
     # Phase 6
     Pkg("APScheduler", "apscheduler"),

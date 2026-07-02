@@ -332,7 +332,7 @@ GUI 是單頁式應用：登入後以頂部分頁切換，內容由前端 JS 模
 
 依序為：**Dashboard｜Traffic & Workloads｜Event Viewer｜Rules｜Reports｜Rule Scheduler｜Integrations｜Settings**。
 
-**1) Dashboard**——即時總覽。顯示 Security Posture 分數與 Top Risk Findings、VEN 健康、Pipeline（cache 擷取）健康、OS 分佈、Enforcement 模式、以及 Health／Traffic／Risk 狀態卡；可選的即時 Plotly 圖（traffic timeline、policy decisions、VEN status、rule hits，每 60 秒刷新）。「auto-refresh 10m」勾選與 **Refresh** 鈕只是**重新抓取**最新快照（`GET /api/dashboard/*`），並不重新產生報表快照。
+**1) Dashboard**——即時總覽。顯示 Security Posture 分數與 Top Risk Findings、VEN 健康、Pipeline（cache 擷取）健康、OS 分佈、Enforcement 模式、以及 Health／Traffic／Risk 狀態卡。「auto-refresh 10m」勾選與 **Refresh** 鈕只是**重新抓取**最新快照（`GET /api/dashboard/*`），並不重新產生報表快照。
 
 **2) Traffic & Workloads**——流量分析與 Workload 搜尋。
 

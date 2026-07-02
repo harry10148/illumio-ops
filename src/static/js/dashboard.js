@@ -1343,7 +1343,6 @@ async function loadDashboard() {
     console.warn('[loadDashboard] status failed:', e);
   }
 
-  await loadDashboardCharts();
   await loadDashboardQueries();
 }
 
@@ -2012,35 +2011,10 @@ async function runTop10Query(idx) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Live Plotly dashboard charts (Phase 11)
-// ---------------------------------------------------------------------------
-async function loadDashboardCharts() {
-  const charts = ["traffic_timeline", "policy_decisions", "ven_status", "rule_hits"];
-  for (const id of charts) {
-    try {
-      const resp = await fetch(`/api/dashboard/chart/${id}`,
-                               { headers: { "X-CSRFToken": _csrfToken() } });
-      if (!resp.ok) continue;
-      const fig = await resp.json();
-      const el = document.getElementById(`chart-${id.replace(/_/g, '-')}`);
-      if (el && typeof Plotly !== 'undefined') {
-        Plotly.react(el, fig.data, fig.layout, { responsive: true });
-        el.style.display = '';
-        const parent = el.closest('.dashboard-charts');
-        if (parent) parent.style.display = 'grid';
-      }
-    } catch (_) {}
-  }
-}
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    loadDashboardCharts();
-    setInterval(loadDashboardCharts, 60000);
     setInterval(function () { if (typeof loadOverview === 'function') loadOverview(false); }, 600000);
   });
 } else {
-  loadDashboardCharts();
-  setInterval(loadDashboardCharts, 60000);
   setInterval(function () { if (typeof loadOverview === 'function') loadOverview(false); }, 600000);
 }

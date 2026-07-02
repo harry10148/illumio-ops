@@ -18,12 +18,6 @@ from src.gui._helpers import (
     _ui_translation_dict,
     _summarize_alert_channels,
     _get_active_pce_url,
-    _spec_to_plotly_figure,
-    _load_state_for_charts,
-    _build_traffic_timeline_spec,
-    _build_policy_decisions_spec,
-    _build_ven_status_spec,
-    _build_rule_hits_spec,
 )
 from src.i18n import t
 from src.dashboard_store import read_dashboard_summary
@@ -466,27 +460,6 @@ def make_dashboard_blueprint(
             return jsonify({"ok": True, "summary": data})
         except Exception as e:
             return _err_with_log("dashboard_policy_usage_summary", e, lang=lang)
-
-    @bp.route('/api/dashboard/chart/<chart_id>')
-    def api_dashboard_chart(chart_id: str):
-        cm.load()
-        lang = cm.config.get('settings', {}).get('language', 'en')
-        _builders = {
-            "traffic_timeline": _build_traffic_timeline_spec,
-            "policy_decisions": _build_policy_decisions_spec,
-            "ven_status": _build_ven_status_spec,
-            "rule_hits": _build_rule_hits_spec,
-        }
-        builder = _builders.get(chart_id)
-        if not builder:
-            return _err(t("gui_err_unknown_chart_id", lang=lang, chart_id=chart_id), 404)
-        try:
-            spec = builder(cm, lang=lang)
-            fig = _spec_to_plotly_figure(spec)
-            return jsonify(fig.to_plotly_json())
-        except Exception as exc:
-            logger.warning("Dashboard chart {} error: {}", chart_id, exc)
-            return _err(t("gui_err_chart_unavailable", lang=lang), 500)
 
     @bp.route('/api/dashboard/top10', methods=['POST'])
     @limiter.limit("30 per hour")

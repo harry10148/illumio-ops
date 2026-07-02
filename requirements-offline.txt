@@ -41,10 +41,9 @@ flask-login>=0.6,<0.7
 argon2-cffi>=23.1,<25.0
 cryptography>=46.0.7,<48.0   # Phase 2: ECDSA cert (TLS); >= 46.0.7 fixes PYSEC-2026-36/35 + CVE-2026-26007
 
-# ── Phase 5: Reports (Excel + interactive charts) ────────────────────────────
+# ── Phase 5: Reports (Excel) ──────────────────────────────────────────────────
 openpyxl>=3.1,<4.0
 matplotlib>=3.8,<4.0
-plotly>=5.20,<7.0
 pygments>=2.17,<3.0
 
 # ── Phase 6: Scheduler ───────────────────────────────────────────────────────

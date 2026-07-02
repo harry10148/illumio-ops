@@ -332,7 +332,7 @@ The GUI is a single-page application: after login you switch between top tabs, w
 
 In order: **Dashboard｜Traffic & Workloads｜Event Viewer｜Rules｜Reports｜Rule Scheduler｜Integrations｜Settings**.
 
-**1) Dashboard** — live overview. Shows the Security Posture score and Top Risk Findings, VEN health, Pipeline (cache ingestion) health, OS distribution, Enforcement modes, and the Health/Traffic/Risk status cards; plus optional live Plotly charts (traffic timeline, policy decisions, VEN status, rule hits, refreshed every 60 seconds). The "auto-refresh 10m" checkbox and the **Refresh** button only **re-fetch** the latest snapshot (`GET /api/dashboard/*`); they do not regenerate the report snapshot.
+**1) Dashboard** — live overview. Shows the Security Posture score and Top Risk Findings, VEN health, Pipeline (cache ingestion) health, OS distribution, Enforcement modes, and the Health/Traffic/Risk status cards. The "auto-refresh 10m" checkbox and the **Refresh** button only **re-fetch** the latest snapshot (`GET /api/dashboard/*`); they do not regenerate the report snapshot.
 
 **2) Traffic & Workloads** — traffic analysis and Workload search.
 
