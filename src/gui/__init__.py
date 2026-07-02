@@ -382,26 +382,23 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     # ── flask-talisman security headers ───────────────────────────────────────
     from flask_talisman import Talisman
 
-    # CSP: 'unsafe-inline' on script-src AND style-src.
+    # CSP: script-src is locked to 'self' — no 'unsafe-inline'.
     #
-    # Trade-off accepted on the code-review-fixes branch: 40+ dynamically-
-    # injected inline `onclick=` handlers across the JS codebase still need
-    # to function while the M1 dispatcher migration is incomplete. Per CSP
-    # Level 3, inline event handler attributes require 'unsafe-inline'
-    # (nonces don't cover them). Mixing 'nonce-...' with 'unsafe-inline'
-    # would make browsers IGNORE 'unsafe-inline', so the nonce is dropped
-    # from script-src entirely.
+    # The M1 data-action/data-on-change dispatcher sweep (task D1) removed
+    # every inline `onclick=`/`onchange=`/... handler, including the ones
+    # dynamically built inside JS template strings (the actual XSS surface —
+    # PCE-sourced fields like href/event_id were reaching inline handlers
+    # unescaped). Inline <script> blocks in index.html were externalized to
+    # static/js/_init_bootstrap.js and _i18n_apply.js for the same reason.
+    # All dynamic HTML insertions still go through escapeHtml/escapeAttr
+    # (utils.js:66 + integrations.js:7) as a second layer of defense.
     #
-    # Compensating controls: CSRF, IP allowlist, escapeHtml on all dynamic
-    # HTML insertions (utils.js:63 + integrations.js:7 — both escape ', ",
-    # <, >, &).
-    #
-    # Vulnerability scanners (Mozilla Observatory, securityheaders.com,
-    # Nessus, Qualys, OWASP ZAP, CIS benchmarks) WILL flag this — typically
-    # Low/Medium. Risk-accepted until the M1 data-action sweep finishes.
+    # style-src keeps 'unsafe-inline' — out of scope for this task (inline
+    # style="" attributes are pervasive and not part of the XSS surface
+    # addressed here).
     _csp = {
         'default-src': "'self'",
-        'script-src': ["'self'", "'unsafe-inline'"],
+        'script-src': ["'self'"],
         'style-src': ["'self'", "'unsafe-inline'"],
         'img-src': ["'self'", "data:"],
         # Fonts are bundled locally (src/static/fonts/); no external font CDN.
@@ -418,10 +415,13 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
         strict_transport_security_preload=use_https,
         session_cookie_secure=use_https,
         content_security_policy=_csp,
-        # No nonce injection: per CSP Level 3, the presence of a nonce in a
-        # directive causes browsers to IGNORE 'unsafe-inline' in the same
-        # directive. Inline <script nonce="..."> / <style nonce="..."> markers
-        # left in templates by csp_nonce() are harmless (unused) under this
+        # No nonce injection: script-src has no inline scripts left to nonce
+        # (all externalized, see _csp comment above); style-src intentionally
+        # keeps 'unsafe-inline', and per CSP Level 3 a nonce in a directive
+        # makes browsers IGNORE 'unsafe-inline' in that same directive, so
+        # enabling nonce_in=['style-src'] would break it. Any remaining
+        # <script nonce="..."> / <style nonce="..."> markers left by
+        # csp_nonce() (e.g. login.html) are harmless (unused) under this
         # policy.
         content_security_policy_nonce_in=[],
         frame_options='DENY',

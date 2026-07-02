@@ -17,15 +17,18 @@ def _parse_csp(headers) -> dict[str, str]:
     return result
 
 
-def test_csp_script_src_allows_unsafe_inline(header_client):
-    """script-src carries 'unsafe-inline' so 40+ dynamically-injected
-    inline onclick handlers across the JS codebase keep working while the
-    M1 dispatcher migration is incomplete. See the CSP comment in
-    src/gui/__init__.py for the trade-off and compensating controls."""
+def test_csp_script_src_no_unsafe_inline(header_client):
+    """script-src must NOT carry 'unsafe-inline' (task D1): every inline
+    onclick/onchange/... handler — including the ones dynamically built
+    inside JS template strings — was migrated to the data-action/
+    data-on-change dispatcher, and the remaining inline <script> blocks in
+    index.html/login.html were externalized to static/js files. See the
+    CSP comment in src/gui/__init__.py."""
     r = header_client.get("/login")
     csp = _parse_csp(r.headers)
-    assert "'unsafe-inline'" in csp.get("script-src", ""), \
-        "script-src must allow 'unsafe-inline' (see src/gui/__init__.py CSP comment)"
+    assert "'unsafe-inline'" not in csp.get("script-src", ""), \
+        "script-src must not allow 'unsafe-inline' (see src/gui/__init__.py CSP comment)"
+    assert "'self'" in csp.get("script-src", "")
 
 
 def test_csp_style_src_allows_unsafe_inline(header_client):
@@ -39,9 +42,10 @@ def test_csp_style_src_allows_unsafe_inline(header_client):
 
 
 def test_csp_no_nonce_anywhere(header_client):
-    """Per CSP Level 3, a nonce in any directive suppresses 'unsafe-inline'
-    in that same directive. Since both script-src and style-src rely on
-    'unsafe-inline', neither directive may carry a nonce."""
+    """script-src has no inline scripts left to nonce (all externalized).
+    style-src still relies on 'unsafe-inline', and per CSP Level 3 a nonce
+    in a directive suppresses 'unsafe-inline' in that same directive, so
+    neither directive may carry a nonce."""
     r = header_client.get("/login")
     csp = _parse_csp(r.headers)
     for directive in ("script-src", "style-src"):
