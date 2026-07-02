@@ -253,7 +253,7 @@ class ReportScheduler:
                 _rslog.error(f"Failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            logger.error(f"[Scheduler] '{name}': failed — {e}", exc_info=True)
+            logger.exception(f"[Scheduler] '{name}': failed — {e}")
             raise
 
     # ── Report type dispatch ────────────────────────────────────────────────

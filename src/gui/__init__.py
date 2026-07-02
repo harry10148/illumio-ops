@@ -148,7 +148,7 @@ def _rs_background_scheduler(cm: ConfigManager) -> None:
                 last_check = now
                 logger.info("[RuleScheduler] Auto-check completed ({} entries).", len(logs))
         except Exception as exc:
-            logger.error("[RuleScheduler] Background error: {}", exc, exc_info=True)
+            logger.exception("[RuleScheduler] Background error: {}", exc)
         # Interruptible wait — exits within 0-60s of shutdown signal
         if _shutdown_event.wait(60):
             break

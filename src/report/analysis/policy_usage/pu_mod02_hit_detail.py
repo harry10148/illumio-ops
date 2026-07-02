@@ -130,7 +130,7 @@ def _resolve_actors(actors: list, api_client) -> str:
         try:
             return api_client.resolve_actor_str(actors)
         except Exception:
-            logger.debug("resolve_actor_str failed", exc_info=True)
+            logger.opt(exception=True).debug("resolve_actor_str failed")
     parts = []
     for actor in actors:
         if not isinstance(actor, dict):
@@ -157,7 +157,7 @@ def _resolve_services(services: list, api_client) -> str:
         try:
             return api_client.resolve_service_str(services)
         except Exception:
-            logger.debug("resolve_service_str failed", exc_info=True)
+            logger.opt(exception=True).debug("resolve_service_str failed")
     parts = []
     for service in services:
         if not isinstance(service, dict):

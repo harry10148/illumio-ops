@@ -32,7 +32,7 @@ def run_monitor_cycle(cm) -> None:
             rep.send_alerts()
         mlog.info("Monitor cycle complete")
     except Exception as exc:
-        logger.error("Monitor cycle failed: {}", exc, exc_info=True)
+        logger.exception("Monitor cycle failed: {}", exc)
         mlog.error(f"Monitor cycle failed: {exc}")
 
 def tick_report_schedules(cm) -> None:
@@ -44,7 +44,7 @@ def tick_report_schedules(cm) -> None:
         scheduler = ReportScheduler(cm, Reporter(cm))
         scheduler.tick()
     except Exception as exc:
-        logger.error("Report schedule tick failed: {}", exc, exc_info=True)
+        logger.exception("Report schedule tick failed: {}", exc)
 
 def tick_rule_schedules(cm) -> None:
     """Check and fire any due rule schedules."""
@@ -73,7 +73,7 @@ def tick_rule_schedules(cm) -> None:
         except Exception:
             pass  # intentional fallback: GUI log append is optional; schedule tick must not fail if GUI is unavailable
     except Exception as exc:
-        logger.error("Rule schedule tick failed: {}", exc, exc_info=True)
+        logger.exception("Rule schedule tick failed: {}", exc)
         mlog.error(f"Rule schedule tick failed: {exc}")
 
 

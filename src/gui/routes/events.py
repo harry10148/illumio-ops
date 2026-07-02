@@ -74,7 +74,7 @@ def make_events_blueprint(
             logger.error("Event viewer fetch failed: {} - {}", exc.status, exc.message)
             return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300], lang=lang), 502)
         except Exception as exc:
-            logger.error("Event viewer fetch failed: {}", exc, exc_info=True)
+            logger.exception("Event viewer fetch failed: {}", exc)
             return _err(t("gui_err_pce_event_fetch", exc=exc, lang=lang), 502)
 
         items = []

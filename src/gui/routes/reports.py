@@ -280,7 +280,7 @@ def make_reports_blueprint(
                     _rlog.error(f"Traffic report failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            logger.error(f"Ad-hoc traffic report job {job_id} failed: {e}", exc_info=True)
+            logger.exception(f"Ad-hoc traffic report job {job_id} failed: {e}")
             record.update({"status": "error", "error": str(e),
                            "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
             try:
@@ -589,7 +589,7 @@ def make_reports_blueprint(
                                "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
                 _save_adhoc_job(jid, record)
             except Exception as e:  # noqa: BLE001
-                logger.error(f"App summary job {jid} failed: {e}", exc_info=True)
+                logger.exception(f"App summary job {jid} failed: {e}")
                 record.update({"status": "error", "error": str(e),
                                "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
                 try:
@@ -837,7 +837,7 @@ def make_reports_blueprint(
                 except Exception as e:
                     now_str = datetime.datetime.now(datetime.timezone.utc).isoformat()
                     scheduler._save_state(schedule_id, now_str, "failed", str(e))
-                    logger.error(f"GUI-triggered schedule {schedule_id} failed: {e}", exc_info=True)
+                    logger.exception(f"GUI-triggered schedule {schedule_id} failed: {e}")
 
             t_thread = threading.Thread(target=_run, daemon=True)
             t_thread.start()

@@ -532,7 +532,7 @@ class ReportGenerator:
                 paths.append(xlsx_path)
                 print(t("rpt_xlsx_saved", path=xlsx_path, lang=lang, default=f"XLSX saved: {xlsx_path}"))
             except Exception as exc:
-                logger.error('XLSX export failed: {}', exc, exc_info=True)
+                logger.exception('XLSX export failed: {}', exc)
                 self.last_export_errors['xlsx'] = str(exc) or exc.__class__.__name__
 
         if fmt in ('csv', 'all', 'all_raw'):
