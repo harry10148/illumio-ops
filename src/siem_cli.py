@@ -261,6 +261,7 @@ def _dlq_bulk(cm, action):
         # 天數批次刪除，選取特定 id 屬於獨立語意，直接刪除即可，不需擴充 dlq.py）。
         # 刪除不可逆，照本檔既有安全模式（_delete_destination 的 yes 確認）先確認。
         id_list = ", ".join(str(i) for i in ids)
+        # 確認模式：選定 id 清單風險範圍明確（僅這批 id），用 yes 二字確認即可。
         if input(f"  confirm purge {len(ids)} entries (ids: {id_list})? (yes/no): ").strip().lower() != "yes":
             print("  cancelled")
             return
@@ -268,13 +269,15 @@ def _dlq_bulk(cm, action):
         from src.pce_cache.models import DeadLetter
         with sf.begin() as s:
             result = s.execute(delete(DeadLetter).where(DeadLetter.id.in_(ids)))
-        print(f"  purged {result.rowcount} entries")
+        # 請求數與實刪數可能不同（部分 id 早已不存在），訊息同時呈現兩者避免誤解。
+        print(f"  requested {len(ids)}, purged {result.rowcount} entries")
 
 
 def _dlq_purge_all(cm):
     from src.siem.dlq import DeadLetterQueue
 
     name = input("  destination: ").strip()
+    # 確認模式：清空整個 destination 的 DLQ 影響範圍較大，要求輸入完整名稱以降低誤刪風險。
     if input(f"  type '{name}' to confirm: ").strip() != name:
         print("  cancelled")
         return
