@@ -120,11 +120,16 @@ def _meta_path(cfg) -> str:
 
 def review_session_factory(cfg):
     """對 review DB 建一個 sessionmaker（短命 engine，不用 process 快取，
-    避免 review DB 被重建後抓到舊連線）。"""
+    避免 review DB 被重建後抓到舊連線）。
+
+    此函式會被 per-query 呼叫，若用預設 pool（QueuePool）engine 又從不
+    dispose，長跑程序會累積連線池與 SQLite FD 直到 GC。用 NullPool 讓
+    每個 session 各開各關自己的連線、不留池；讀路徑本就不需連線池。"""
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import NullPool
     from src.pce_cache.schema import init_schema
-    engine = create_engine(f"sqlite:///{review_db_path(cfg)}")
+    engine = create_engine(f"sqlite:///{review_db_path(cfg)}", poolclass=NullPool)
     init_schema(engine)
     return sessionmaker(engine)
 

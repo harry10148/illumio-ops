@@ -158,3 +158,13 @@ def test_load_review_rebuilds_on_second_load(tmp_path, archive_dir):
 def test_review_status_empty_when_never_loaded(tmp_path, archive_dir):
     from src.pce_cache.archive_import import review_status
     assert review_status(_cfg(tmp_path, archive_dir)) == {"loaded": False}
+
+
+def test_review_session_factory_uses_nullpool(tmp_path, archive_dir):
+    # Task 6 會 per-query 呼叫 review_session_factory；預設 pool（QueuePool）
+    # 每次都留住連線池與 FD 直到 GC，長跑程序會累積洩漏。鎖定必須用 NullPool。
+    from src.pce_cache.archive_import import review_session_factory
+    cfg = _cfg(tmp_path, archive_dir)
+    sf = review_session_factory(cfg)
+    engine = sf.kw["bind"]            # sessionmaker 綁定的 engine
+    assert type(engine.pool).__name__ == "NullPool"
