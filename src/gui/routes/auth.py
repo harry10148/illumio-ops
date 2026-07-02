@@ -59,7 +59,24 @@ def make_auth_blueprint(
 
     @bp.route("/login", methods=["GET"])
     def login_page():
-        return render_template("login.html")
+        import json as _json
+        login_i18n = {
+            "signing_in": t("login_btn_signing_in"),
+            "success": t("login_btn_success"),
+            "btn_default": t("login_btn"),
+            "invalid_auth": t("gui_err_invalid_auth"),
+            "network_error": t("gui_err_network"),
+            "changing": t("login_btn_changing"),
+            "change_btn_default": t("login_change_pw_btn"),
+            "mismatch": t("login_err_pw_mismatch"),
+            "pw_too_short": t("login_err_pw_short"),
+        }
+        return render_template(
+            "login.html",
+            login_i18n_json=_json.dumps(
+                login_i18n, ensure_ascii=False
+            ).replace("</", "<\\/"),
+        )
 
     @bp.route("/api/login", methods=["POST"])
     @csrf.exempt
