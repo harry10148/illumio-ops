@@ -256,6 +256,23 @@ def test_import_flush_db_error_propagates(sf, archive_dir):
         importer.import_range(date(2026, 6, 1), date(2026, 6, 30))
 
 
+def test_import_flush_db_error_propagates_from_in_loop_chunk_flush(sf, archive_dir, monkeypatch):
+    # B3：上一個 propagates 測試只餵 1 行，只會走迴圈結束後的收尾 _flush
+    # （149-153 行），涵蓋不到迴圈內「批滿即 flush」的呼叫點（145-149 行）。
+    # 把 _CHUNK 降到 2、餵 3 行觸發迴圈內 flush，確認該呼叫點的例外一樣不被
+    # per-line except 吞掉。
+    from src.pce_cache.archive_import import ArchiveImporter
+    monkeypatch.setattr(ArchiveImporter, "_CHUNK", 2)
+    raw = {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 22, "action": "allowed"}
+    lines = [_traffic_line(f"h{i}", "2026-06-10", raw) for i in range(3)]
+    _write(archive_dir, "traffic-2026-06-10.jsonl", lines)
+
+    importer = ArchiveImporter(archive_dir, sf)
+    importer._flush = lambda chunk: (_ for _ in ()).throw(ValueError("db boom"))
+    with pytest.raises(ValueError, match="db boom"):
+        importer.import_range(date(2026, 6, 1), date(2026, 6, 30))
+
+
 def test_import_dedups_multiple_rows_within_same_batch(sf, archive_dir):
     # 同一批（500 列/transaction）內有 3 筆重複 flow_hash：只留第一筆，
     # skipped 由 rowcount 差額推得（3 筆嘗試 - 1 筆實際插入 = 2）。

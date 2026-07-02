@@ -29,3 +29,30 @@ def test_one_time_local_tz_expires_correctly(tmp_path):
 
     api.toggle_and_provision.assert_called_once_with(href, False, None)
     assert db.get(href) is None, "expired one_time schedule must be removed from db"
+
+
+def test_one_time_reverse_tz_naive_now_aware_expire_stays_active(tmp_path):
+    """反向情境（A1 對稱正規化的另一半）：schedule timezone 走 'UTC' 路徑，_now_in_tz
+    回傳 naive item_now；expire_at 則是帶 offset 的 aware ISO 字串。兩側正規化後應
+    可正確比較——expire_at 尚未到期時不得拋 TypeError，且必須維持啟用（target=True）。
+    """
+    db_path = tmp_path / "rule_schedules.json"
+    href = "/orgs/1/sec_policy/draft/rules/2"
+    db = ScheduleDB(str(db_path))
+    db.put(href, {
+        "type": "one_time",
+        "name": "test_rule_reverse",
+        "action": "allow",
+        "expire_at": "2999-01-01T00:00:00+00:00",  # aware，遠在未來
+        "timezone": "UTC",
+    })
+
+    api = MagicMock()
+    api.has_draft_changes.return_value = False
+    api.get_live_item.return_value = (200, {"enabled": False})
+    engine = ScheduleEngine(db, api)
+
+    engine.check(silent=True, tz_str="local")
+
+    api.toggle_and_provision.assert_called_once_with(href, True, None)
+    assert db.get(href) is not None, "not-yet-expired one_time schedule must stay in db"
