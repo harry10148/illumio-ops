@@ -393,6 +393,10 @@ class ApiClient:
     def resolve_service_str(self, services: list[dict[str, Any]] | None) -> str:
         return self._labels.resolve_service_str(services)
 
+    def expand_object_filters_for_df(self, filters: dict) -> dict:
+        """iplist/workload filter 展開成 CIDR/IP 清單（df 路徑用）。"""
+        return self._labels.expand_object_filters_for_df(filters)
+
     # ═══════════════════════════════════════════════════════════════════════
     # TrafficQueryBuilder delegation wrappers
     # ═══════════════════════════════════════════════════════════════════════

@@ -67,3 +67,62 @@ def test_ip_exact_and_cidr():
     assert apply_df_traffic_filters(_df(), {"src_ip": "10.0.1.5"})["src_app"].tolist() == ["DB"]
     out = apply_df_traffic_filters(_df(), {"src_ip": "10.0.0.0/16"})
     assert set(out["src_app"]) == {"Web", "DB"}  # 10.0.x.x, not 192.168
+
+
+def _df_two_apps():
+    return pd.DataFrame([
+        {"src_app": "erp", "src_env": "prod", "dst_app": "", "dst_env": "",
+         "src_extra_labels": {}, "dst_extra_labels": {},
+         "src_ip": "10.0.0.1", "dst_ip": "10.0.0.9", "port": 443, "proto": "TCP"},
+        {"src_app": "web", "src_env": "prod", "dst_app": "", "dst_env": "",
+         "src_extra_labels": {}, "dst_extra_labels": {},
+         "src_ip": "10.0.0.2", "dst_ip": "10.0.0.9", "port": 443, "proto": "TCP"},
+        {"src_app": "hr", "src_env": "dr", "dst_app": "", "dst_env": "",
+         "src_extra_labels": {}, "dst_extra_labels": {},
+         "src_ip": "10.0.0.3", "dst_ip": "10.0.0.9", "port": 443, "proto": "TCP"},
+    ])
+
+
+def test_same_key_labels_or_in_df_path():
+    out = apply_df_traffic_filters(_df_two_apps(), {"src_labels": ["app=erp", "app=web"]})
+    assert sorted(out["src_ip"]) == ["10.0.0.1", "10.0.0.2"]
+
+
+def test_cross_key_labels_still_and_in_df_path():
+    out = apply_df_traffic_filters(_df_two_apps(), {"src_labels": ["app=erp", "env=prod"]})
+    assert list(out["src_ip"]) == ["10.0.0.1"]
+
+
+def test_same_key_or_with_custom_dimension():
+    df = _df_two_apps()
+    df.at[0, "src_extra_labels"] = {"Net": "Server-A"}
+    df.at[2, "src_extra_labels"] = {"Net": "Server-B"}
+    out = apply_df_traffic_filters(df, {"src_labels": ["Net=Server-A", "Net=Server-B"]})
+    assert sorted(out["src_ip"]) == ["10.0.0.1", "10.0.0.3"]
+
+
+def test_unparseable_spec_forces_and_fail():
+    out = apply_df_traffic_filters(_df_two_apps(), {"src_labels": ["app=erp", "garbage"]})
+    assert out.empty
+
+
+def test_colon_separator_equivalent_to_equals():
+    colon_out = apply_df_traffic_filters(_df_two_apps(), {"src_labels": ["app:erp"]})
+    equals_out = apply_df_traffic_filters(_df_two_apps(), {"src_labels": ["app=erp"]})
+    assert sorted(colon_out["src_ip"]) == sorted(equals_out["src_ip"])
+    assert list(colon_out["src_ip"]) == ["10.0.0.1"]
+
+
+def test_object_cidrs_include_src():
+    out = apply_df_traffic_filters(_df_two_apps(), {"_src_object_cidrs": ["10.0.0.0/31"]})
+    assert sorted(out["src_ip"]) == ["10.0.0.1"]
+
+
+def test_object_cidrs_exclude_dst():
+    out = apply_df_traffic_filters(_df_two_apps(), {"_ex_dst_object_cidrs": ["10.0.0.9"]})
+    assert out.empty
+
+
+def test_object_cidrs_any_side():
+    out = apply_df_traffic_filters(_df_two_apps(), {"_any_object_cidrs": ["10.0.0.2"]})
+    assert list(out["src_ip"]) == ["10.0.0.2"]

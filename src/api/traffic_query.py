@@ -13,6 +13,7 @@ Delegates to:
 from __future__ import annotations
 
 import gzip
+import itertools
 import json
 import os
 import time
@@ -74,6 +75,10 @@ _TRAFFIC_FILTER_CAPABILITIES = {
     "any_ip": {"execution": "fallback", "notes": "Either-side semantics require client-side filtering."},
     "ex_any_label": {"execution": "fallback", "notes": "Either-side exclusion requires client-side filtering."},
     "ex_any_ip": {"execution": "fallback", "notes": "Either-side exclusion requires client-side filtering."},
+    "any_iplist": {"execution": "fallback", "notes": "Either-side ip_list membership requires client-side filtering."},
+    "any_workload": {"execution": "fallback", "notes": "Either-side workload match requires client-side filtering."},
+    "ex_any_iplist": {"execution": "fallback", "notes": "Either-side ip_list exclusion requires client-side filtering."},
+    "ex_any_workload": {"execution": "fallback", "notes": "Either-side workload exclusion requires client-side filtering."},
     "search": {"execution": "report_only", "notes": "Full-text matching is applied after flows are fetched."},
     "sort_by": {"execution": "report_only", "notes": "Sorting is applied after flows are fetched."},
     "draft_policy_decision": {"execution": "report_only", "notes": "Draft policy comparison is applied after query completion."},
@@ -89,7 +94,46 @@ _TRAFFIC_FILTER_CAPABILITIES = {
     "ex_src_label_groups": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to label_group hrefs and pushed to sources.exclude."},
     "ex_dst_label_group": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to label_group href and pushed to destinations.exclude."},
     "ex_dst_label_groups": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to label_group hrefs and pushed to destinations.exclude."},
+    "src_iplist": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list href and pushed to sources.include."},
+    "src_iplists": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list hrefs and pushed to sources.include."},
+    "dst_iplist": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list href and pushed to destinations.include."},
+    "dst_iplists": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list hrefs and pushed to destinations.include."},
+    "ex_src_iplist": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list href and pushed to sources.exclude."},
+    "ex_src_iplists": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list hrefs and pushed to sources.exclude."},
+    "ex_dst_iplist": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list href and pushed to destinations.exclude."},
+    "ex_dst_iplists": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list hrefs and pushed to destinations.exclude."},
+    "src_workload": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload href pushed to sources.include."},
+    "src_workloads": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload hrefs pushed to sources.include."},
+    "dst_workload": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload href pushed to destinations.include."},
+    "dst_workloads": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload hrefs pushed to destinations.include."},
+    "ex_src_workload": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload href pushed to sources.exclude."},
+    "ex_src_workloads": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload hrefs pushed to sources.exclude."},
+    "ex_dst_workload": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload href pushed to destinations.exclude."},
+    "ex_dst_workloads": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload hrefs pushed to destinations.exclude."},
 }
+
+_LABEL_OR_EXPANSION_CAP = 100  # 笛卡兒積組數上限，超過即整族降級 fallback
+
+
+def group_label_specs_by_key(values):
+    """把 label filter 字串依維度 key 分組（同 key OR、跨 key AND 的前置）。
+
+    "key=value" 與 "key:value" 皆可；無法解析 key 的字串各自成一組
+    （鍵用位置序號佔位）——維持舊有 AND 語意，不猜測。
+    回傳 dict（插入序即維度序，Python 3.7+ dict 保序）。
+    """
+    grouped = {}
+    for i, raw in enumerate(values):
+        text = str(raw).strip()
+        key = None
+        for sep in ("=", ":"):
+            if sep in text:
+                key = text.split(sep, 1)[0].strip().lower()
+                break
+        if not key:
+            key = f"__pos{i}"
+        grouped.setdefault(key, []).append(text)
+    return grouped
 
 
 @dataclass
@@ -249,12 +293,14 @@ class TrafficQueryBuilder:
             _consume_keys((key,))
 
         include_specs = [
-            (("src_label", "src_labels"), "sources", labels._resolve_label_filter_to_actor),
             (("src_label_group", "src_label_groups"), "sources", labels._resolve_label_group_filter_to_actor),
-            (("dst_label", "dst_labels"), "destinations", labels._resolve_label_filter_to_actor),
             (("dst_label_group", "dst_label_groups"), "destinations", labels._resolve_label_group_filter_to_actor),
             (("src_ip_in", "src_ip"), "sources", labels._resolve_ip_filter_to_actor),
             (("dst_ip_in", "dst_ip"), "destinations", labels._resolve_ip_filter_to_actor),
+            (("src_iplist", "src_iplists"), "sources", labels._resolve_iplist_filter_to_actor),
+            (("dst_iplist", "dst_iplists"), "destinations", labels._resolve_iplist_filter_to_actor),
+            (("src_workload", "src_workloads"), "sources", labels._resolve_workload_filter_to_actor),
+            (("dst_workload", "dst_workloads"), "destinations", labels._resolve_workload_filter_to_actor),
         ]
         exclude_specs = [
             (("ex_src_label", "ex_src_labels"), "sources", labels._resolve_label_filter_to_actor),
@@ -263,7 +309,50 @@ class TrafficQueryBuilder:
             (("ex_dst_label_group", "ex_dst_label_groups"), "destinations", labels._resolve_label_group_filter_to_actor),
             (("ex_src_ip",), "sources", labels._resolve_ip_filter_to_actor),
             (("ex_dst_ip",), "destinations", labels._resolve_ip_filter_to_actor),
+            (("ex_src_iplist", "ex_src_iplists"), "sources", labels._resolve_iplist_filter_to_actor),
+            (("ex_dst_iplist", "ex_dst_iplists"), "destinations", labels._resolve_iplist_filter_to_actor),
+            (("ex_src_workload", "ex_src_workloads"), "sources", labels._resolve_workload_filter_to_actor),
+            (("ex_dst_workload", "ex_dst_workloads"), "destinations", labels._resolve_workload_filter_to_actor),
         ]
+
+        # 同 key OR、跨 key AND（對齊 PCE 原生；spec §2.2 實測依據）：
+        # 依 key 分組 → 每 key 內各值為 OR 選項 → 跨 key 笛卡兒積展開成
+        # 多個 include group（外層 OR、內層 AND）。
+        for keys, side in ((("src_label", "src_labels"), "sources"),
+                           (("dst_label", "dst_labels"), "destinations")):
+            values, used_keys = _pop_many(keys)
+            if not values:
+                continue
+            grouped = group_label_specs_by_key(values)
+            per_key_actors = []
+            unresolved = False
+            n_combos = 1
+            for specs_for_key in grouped.values():
+                actors = []
+                for value in specs_for_key:
+                    item = labels._resolve_label_filter_to_actor(value)
+                    if item is None:
+                        unresolved = True
+                        break
+                    actors.append(item)
+                if unresolved:
+                    break
+                per_key_actors.append(actors)
+                n_combos *= len(actors)
+            if unresolved or n_combos > _LABEL_OR_EXPANSION_CAP:
+                if n_combos > _LABEL_OR_EXPANSION_CAP:
+                    logger.warning(
+                        "Label OR expansion exceeds cap ({} > {}); falling back to client-side",
+                        n_combos, _LABEL_OR_EXPANSION_CAP)
+                for key in used_keys:
+                    _record_unresolved(key, spec.native_filters.get(key))
+                _consume_keys(used_keys)
+                continue
+            for combo in itertools.product(*per_key_actors):
+                payload[side]["include"].append(labels._dedupe_query_group(list(combo)))
+            for key in used_keys:
+                _record_consumed(key, spec.native_filters.get(key))
+            _consume_keys(used_keys)
 
         for keys, side, resolver in include_specs:
             values, used_keys = _pop_many(keys)
@@ -689,12 +778,23 @@ class TrafficQueryBuilder:
                     return True
             return False
 
-        for lbl in (filters.get('src_labels') or []):
-            if lbl and not _label_match(src, lbl):
-                return False
-        for lbl in (filters.get('dst_labels') or []):
-            if lbl and not _label_match(dst, lbl):
-                return False
+        def _iplist_hit(side: dict, value: str) -> bool:
+            for ipl in side.get('ip_lists', []) or []:
+                if ipl.get('name') == value or ipl.get('href') == value:
+                    return True
+            return False
+
+        def _workload_hit(side: dict, value: str) -> bool:
+            return (side.get('workload') or {}).get('href') == value
+
+        # 同 key any、跨 key all —— 與 native 路徑的 OR 展開語意一致（spec §2.2）
+        for fkey, side_obj in (("src_labels", src), ("dst_labels", dst)):
+            specs = [s for s in (filters.get(fkey) or []) if s]
+            if not specs:
+                continue
+            for group in group_label_specs_by_key(specs).values():
+                if not any(_label_match(side_obj, s) for s in group):
+                    return False
         if filters.get('src_ip') and not _ip_match(src, filters['src_ip']):
             return False
         if filters.get('dst_ip') and not _ip_match(dst, filters['dst_ip']):
@@ -725,6 +825,44 @@ class TrafficQueryBuilder:
         any_ip = filters.get('any_ip')
         if any_ip:
             if not (_ip_match(src, any_ip) or _ip_match(dst, any_ip)):
+                return False
+
+        # 物件 filter 的 residual 比對（native 解析失敗降級、或 any_* 天生 fallback）
+        for fkey, side_obj, hit in (
+            ("src_iplist", src, _iplist_hit), ("src_iplists", src, _iplist_hit),
+            ("dst_iplist", dst, _iplist_hit), ("dst_iplists", dst, _iplist_hit),
+            ("src_workload", src, _workload_hit), ("src_workloads", src, _workload_hit),
+            ("dst_workload", dst, _workload_hit), ("dst_workloads", dst, _workload_hit),
+        ):
+            vals = filters.get(fkey)
+            if not vals:
+                continue
+            vals = vals if isinstance(vals, list) else [vals]
+            if not any(hit(side_obj, v) for v in vals if v):
+                return False
+
+        for fkey, hit in (("any_iplist", _iplist_hit), ("any_workload", _workload_hit)):
+            v = filters.get(fkey)
+            if v and not (hit(src, v) or hit(dst, v)):
+                return False
+        for fkey, hit in (("ex_any_iplist", _iplist_hit), ("ex_any_workload", _workload_hit)):
+            v = filters.get(fkey)
+            if v and (hit(src, v) or hit(dst, v)):
+                return False
+
+        # 排除路徑的 side-specific residual 比對（對稱於前面 include 側的 fallback
+        # 迴圈；native href 解析失敗降級到這裡時，不得靜默漏排除，安全方向優先）
+        for fkey, side_obj, hit in (
+            ("ex_src_iplist", src, _iplist_hit), ("ex_src_iplists", src, _iplist_hit),
+            ("ex_dst_iplist", dst, _iplist_hit), ("ex_dst_iplists", dst, _iplist_hit),
+            ("ex_src_workload", src, _workload_hit), ("ex_src_workloads", src, _workload_hit),
+            ("ex_dst_workload", dst, _workload_hit), ("ex_dst_workloads", dst, _workload_hit),
+        ):
+            vals = filters.get(fkey)
+            if not vals:
+                continue
+            vals = vals if isinstance(vals, list) else [vals]
+            if any(hit(side_obj, v) for v in vals if v):
                 return False
 
         for lbl in (filters.get('ex_src_labels') or []):
