@@ -1072,15 +1072,10 @@ class _TrafficReportBase:
         pa = m.get('per_dst_app')
         if pa is not None and hasattr(pa, 'empty') and not pa.empty:
             out += f'<h3>{_s("rpt_tr_managed_apps_unmanaged")}</h3>' + _df_to_html(pa, lang=_lang)
-        pp = m.get('per_port_proto')
-        if pp is not None and hasattr(pp, 'empty') and not pp.empty:
-            out += f'<h3>{_s("rpt_tr_exposed_ports_proto")}</h3>' + _df_to_html(pp, lang=_lang)
-        sp = m.get('src_port_detail')
-        if sp is not None and hasattr(sp, 'empty') and not sp.empty:
-            out += f'<h3>{_s("rpt_tr_unmanaged_src_port")}</h3>' + _df_to_html(sp, lang=_lang)
-        mh = m.get('managed_hosts_targeted_by_unmanaged')
-        if mh is not None and hasattr(mh, 'empty') and not mh.empty:
-            out += f'<h3>{_s("rpt_tr_managed_targeted")}</h3>' + _df_to_html(mh, lang=_lang)
+        epm = m.get('exposed_ports_merged')
+        if epm is not None and hasattr(epm, 'empty') and not epm.empty:
+            out += (self._subnote('rpt_tr_exposed_ports_merged_subnote')
+                    + f'<h3>{_s("rpt_tr_exposed_ports_merged")}</h3>' + _df_to_html(epm, lang=_lang))
         return out
 
     def _mod09_html(self):

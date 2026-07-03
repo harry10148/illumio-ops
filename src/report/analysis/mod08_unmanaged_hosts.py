@@ -74,6 +74,7 @@ def unmanaged_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
         'per_dst_app': per_dst_app,
         'per_port_proto': per_port_proto,
         'src_port_detail': src_port_detail,
+        'exposed_ports_merged': _exposed_ports_merged(unmanaged_src, per_port_proto),
         'chart_spec': {
             'type': 'pie',
             'title': 'Managed vs Unmanaged Flows',
@@ -159,3 +160,29 @@ def _src_port_detail(unmanaged_src: pd.DataFrame, top_n: int = 20) -> pd.DataFra
                                'connections': 'Connections',
                                'unique_dst': 'Unique Destinations'}))
     return result
+
+def _exposed_ports_merged(unmanaged: pd.DataFrame, per_port: pd.DataFrame) -> pd.DataFrame:
+    """暴露 port 合併版（spec C3）：per_port_proto 全欄 + 該 port 的
+    未受管來源 Top 3——吸收 src_port_detail 的來源×port 資訊供 HTML 單表呈現。"""
+    if per_port is None or per_port.empty:
+        return pd.DataFrame()
+    has_proto = 'proto' in unmanaged.columns and 'Protocol' in per_port.columns
+    keys = ['port', 'proto'] if has_proto else ['port']
+    src_series = unmanaged['src_ip'].fillna('(unknown)')
+    base = unmanaged.assign(src_ip=src_series)
+    per_src = (base[base['port'] > 0]
+               .groupby(keys + ['src_ip'], dropna=False)['num_connections'].sum().reset_index())
+
+    def _top_sources(row) -> str:
+        sel = per_src[per_src['port'] == row['Port']]
+        if has_proto:
+            sel = sel[sel['proto'] == row['Protocol']]
+        sel = sel.sort_values('num_connections', ascending=False)
+        ips = [str(s) for s in sel['src_ip']]
+        shown = ips[:3]
+        extra = len(ips) - len(shown)
+        return ', '.join(shown) + (f' +{extra}' if extra > 0 else '')
+
+    merged = per_port.copy()
+    merged['Top Unmanaged Sources'] = merged.apply(_top_sources, axis=1)
+    return merged

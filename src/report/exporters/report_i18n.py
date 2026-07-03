@@ -346,6 +346,7 @@ for suffix, entry in {
     "unique_src_apps": ("Unique Source Apps", "唯一來源 Apps 數"),
     "unique_src_apps_allowed": ("Unique Source Apps (Allowed)", "唯一 Allowed 來源 Apps"),
     "unique_unmanaged_dst": ("Unique Unmanaged Destinations", "唯一 Unmanaged 目的端"),
+    "top_unmanaged_sources": ("Top Unmanaged Sources", "主要 Unmanaged 來源"),
     "total": ("Total", "總計"),
 }.items():
     STRINGS[f"rpt_col_{suffix}"] = _entry(*entry)
