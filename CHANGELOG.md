@@ -24,8 +24,8 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   the Lateral Movement chapter is trimmed to 4 summary tables (service view, fan-out
   sources, allowed lateral flows, attack paths), with host-level detail (IP talkers/
   pairs, bridge nodes, reachable nodes, app chains) trimmed from HTML (detail
-  retained at the analysis layer; will surface in the XLSX export once export
-  unification ships); the
+  retained at the analysis layer and available in the XLSX export's Lateral
+  Movement sheet); the
   Policy Decisions chapter folds sub-1% decisions into an "Other" row (with a note
   listing which decisions were folded) and now surfaces the audit-flags table
   (unmanaged-source allowed traffic); the Uncovered Flows chapter merges the port/
@@ -38,14 +38,35 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   the traffic overview, traffic distribution, and bandwidth chapters are dropped
   from `report inventory` (still available via `report traffic`); the Cross-Label
   Matrix chapter keeps only the ENV/APP dimensions in HTML, with ROLE/LOC detail
-  trimmed from HTML (detail retained at the analysis layer; will surface in the
-  XLSX export once export unification ships); the Unmanaged Hosts chapter is
+  trimmed from HTML (detail retained at the analysis layer and available in the
+  XLSX export's Cross-Label sheet); the Unmanaged Hosts chapter is
   merged to 3 tables, with the exposed-ports table gaining a Top Unmanaged Sources
   column; a date-range parsing fix means flows with no valid timestamps now show
   a single "N/A" instead of "N/A → N/A"; the Change Impact chapter is now wired to
   the real posture KPI snapshot — the first run after upgrading shows a "no
   previous snapshot" note, and subsequent runs render an actual delta table
   (previously this chapter never rendered deltas due to a snapshot key mismatch).
+- XLSX export unification: the Audit, Policy Usage, VEN, and Traffic (all three
+  profiles) XLSX exporters now build every sheet directly from the same
+  `module_results` dict that drives the HTML report — no separate re-derivation
+  or raw-dataframe recompute path, so HTML and XLSX are guaranteed same-source.
+  Behavioral fixes that came with this: the Audit Correlations sheet, which was
+  always empty under the old exporter, now carries real correlated-sequence/
+  brute-force/off-hours data; the Policy Usage Unused Rules sheet now lists the
+  complete unused-rule set from `module_results` instead of a separate
+  recomputed-and-capped (500-row) query; the VEN XLSX sheets are renamed
+  Lost Today / Lost Yesterday and now map correctly to the 24h/24-48h buckets
+  (the old "Lost <24h" / "Lost 24-48h" sheet names were swapped relative to the
+  data they contained); the Traffic XLSX gains the six Lateral Movement and four
+  Cross-Label Matrix / three Unmanaged Hosts detail tables that phase 2/3 demoted
+  out of HTML (see above), fulfilling the "available in the XLSX export" notes;
+  the old from-raw-flows Top Talkers sheet is retired and superseded by the
+  Lateral Movement sheet's `ip_top_talkers` table (same source, no duplicate
+  recompute); every dataframe cell across all four XLSX exporters is now passed
+  through the shared formula-injection guard (leading `=`/`+`/`-`/`@` neutralized)
+  the same way the HTML exporters already were. Charts are an HTML-only feature —
+  the curated XLSX workbooks keep only the Executive Summary chart (stacked-table
+  sheets have no chart anchor point) and do not attempt chart parity with HTML.
 
 ### Added
 
