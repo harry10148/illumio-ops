@@ -55,6 +55,15 @@ class TestExpandObjectFiltersForDf(unittest.TestCase):
         out = self.client.expand_object_filters_for_df({"any_iplist": "prod-subnets"})
         assert "10.10.0.0/16" in out["_any_object_cidrs"]
 
+    def test_ex_any_iplist_expands_to_ex_any_cidrs(self):
+        out = self.client.expand_object_filters_for_df({"ex_any_iplist": "prod-subnets"})
+        assert "10.10.0.0/16" in out["_ex_any_object_cidrs"]
+
+    def test_ex_any_workload_expands_to_ex_any_cidrs(self):
+        out = self.client.expand_object_filters_for_df(
+            {"ex_any_workload": "/orgs/1/workloads/abc"})
+        assert "10.1.2.3" in out["_ex_any_object_cidrs"]
+
     def test_report_generator_expands_before_df_filter(self):
         from src.report.report_generator import ReportGenerator
         rg = ReportGenerator.__new__(ReportGenerator)  # 不跑完整 __init__

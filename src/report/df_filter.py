@@ -136,6 +136,11 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
     if any_cidrs and "src_ip" in df.columns and "dst_ip" in df.columns:
         mask &= _cidrs_mask("src_ip", any_cidrs) | _cidrs_mask("dst_ip", any_cidrs)
 
+    ex_any_cidrs = filters.get("_ex_any_object_cidrs")
+    if ex_any_cidrs and "src_ip" in df.columns and "dst_ip" in df.columns:
+        # either-side 排除：來源或目的命中任一 CIDR 即剔除（對稱於 _any_object_cidrs 的包含）
+        mask &= ~(_cidrs_mask("src_ip", ex_any_cidrs) | _cidrs_mask("dst_ip", ex_any_cidrs))
+
     port = _scalar(filters, "port")
     if port and "port" in df.columns:
         try:
