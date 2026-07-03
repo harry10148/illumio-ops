@@ -4160,5 +4160,6 @@
   "rpt_xlsx_lateral_unavailable": "Lateral movement data unavailable",
   "rpt_tr_lateral_xlsx_note": "Host-level detail (IP top talkers, host pairs, bridge nodes, reachable nodes, app chains, risk sources) has been trimmed from this report; it will be available in the XLSX export once export unification ships.",
   "rpt_xlsx_sheet_cross_label": "Cross-Label Matrix",
-  "rpt_tr_matrix_xlsx_note": "ROLE and LOC dimension detail has been trimmed from this report; it will be available in the XLSX export once export unification ships."
+  "rpt_tr_matrix_xlsx_note": "ROLE and LOC dimension detail has been trimmed from this report; it will be available in the XLSX export once export unification ships.",
+  "rpt_xlsx_no_data": "No data"
 }
