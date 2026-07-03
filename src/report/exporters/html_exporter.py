@@ -623,7 +623,10 @@ class _TrafficReportBase:
         exec_html = render_exec_summary_html(_traffic_mod00, report_name=t('gui_btn_traffic_report', lang=self._lang), lang=self._lang)
 
         # The summary hero: maturity block included only when the subclass opts in.
-        _maturity_block = (f'<h2>{_s("rpt_tr_maturity_heading")}</h2>' + maturity_html) if self._include_maturity() else ''
+        _maturity_block = ((f'<h2>{_s("rpt_tr_maturity_heading")}</h2>'
+                            + self._subnote('rpt_tr_maturity_subnote')
+                            + maturity_html)
+                           if self._include_maturity() else '')
         _badge_html = {
             "SecurityRisk": f'<div class="report-profile-badge report-profile-badge--security">{_s("rpt_kicker_security_risk")}</div>',
             "NetworkInventory": f'<div class="report-profile-badge report-profile-badge--inventory">{_s("rpt_kicker_network_inventory")}</div>',
@@ -1439,7 +1442,7 @@ class _TrafficReportBase:
             return f'<p class="note">{m["error"]}</p>'
         _s = self._s
         _lang = self._lang
-        html = (
+        html = self._subnote('rpt_tr_infrastructure_subnote') + (
             f'<p>{_s("rpt_tr_apps_analysed")} <b>{m.get("total_apps", 0)}</b> · '
             f'{_s("rpt_tr_comm_edges")} <b>{m.get("total_edges", 0)}</b></p>'
         )
