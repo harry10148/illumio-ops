@@ -23,7 +23,9 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   with attack posture items merged by subject and quantified with real evidence text;
   the Lateral Movement chapter is trimmed to 4 summary tables (service view, fan-out
   sources, allowed lateral flows, attack paths), with host-level detail (IP talkers/
-  pairs, bridge nodes, reachable nodes, app chains) moved to the XLSX export; the
+  pairs, bridge nodes, reachable nodes, app chains) trimmed from HTML (detail
+  retained at the analysis layer; will surface in the XLSX export once export
+  unification ships); the
   Policy Decisions chapter folds sub-1% decisions into an "Other" row (with a note
   listing which decisions were folded) and now surfaces the audit-flags table
   (unmanaged-source allowed traffic); the Uncovered Flows chapter merges the port/
@@ -36,7 +38,8 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   the traffic overview, traffic distribution, and bandwidth chapters are dropped
   from `report inventory` (still available via `report traffic`); the Cross-Label
   Matrix chapter keeps only the ENV/APP dimensions in HTML, with ROLE/LOC detail
-  demoted to the XLSX export's Cross-Label sheet; the Unmanaged Hosts chapter is
+  trimmed from HTML (detail retained at the analysis layer; will surface in the
+  XLSX export once export unification ships); the Unmanaged Hosts chapter is
   merged to 3 tables, with the exposed-ports table gaining a Top Unmanaged Sources
   column; a date-range parsing fix means flows with no valid timestamps now show
   a single "N/A" instead of "N/A → N/A"; the Change Impact chapter is now wired to

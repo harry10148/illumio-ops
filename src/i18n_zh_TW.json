@@ -4158,7 +4158,7 @@
   "rpt_xlsx_exec_unavailable": "無法取得 Executive Summary",
   "rpt_xlsx_no_lateral": "未偵測到橫向移動流量",
   "rpt_xlsx_lateral_unavailable": "無法取得橫向移動資料",
-  "rpt_tr_lateral_xlsx_note": "主機層明細（IP Top Talkers、主機配對、橋接節點、可達節點、App 鏈、風險來源）已移至 XLSX 匯出。",
+  "rpt_tr_lateral_xlsx_note": "主機層明細（IP Top Talkers、主機配對、橋接節點、可達節點、App 鏈、風險來源）已自本報表精簡；待 XLSX 匯出統一功能上線後將於 XLSX 提供。",
   "rpt_xlsx_sheet_cross_label": "跨 Label 矩陣",
-  "rpt_tr_matrix_xlsx_note": "ROLE 與 LOC 維度明細已移至 XLSX 匯出。"
+  "rpt_tr_matrix_xlsx_note": "ROLE 與 LOC 維度明細已自本報表精簡；待 XLSX 匯出統一功能上線後將於 XLSX 提供。"
 }
