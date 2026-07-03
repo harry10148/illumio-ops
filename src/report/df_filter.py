@@ -21,24 +21,31 @@ _PROTO_ALIAS = {"6": "TCP", "17": "UDP", "1": "ICMP", "58": "ICMPV6"}
 
 
 def _label_mask(df: pd.DataFrame, side: str, specs: list[str]) -> pd.Series:
-    """AND of each "key=value" spec for one side (src/dst)."""
-    m = pd.Series(True, index=df.index)
-    for spec in specs:
-        if "=" not in spec:
-            continue
+    """同 key 內 OR、跨 key AND（對齊 PCE 原生語意，spec §2.2）。"""
+    def one(spec: str) -> pd.Series:
         k, v = spec.split("=", 1)
         k, v = k.strip(), v.strip()
         col = f"{side}_{k}"
         if col in df.columns:
-            m &= df[col].astype(str) == v
-        else:  # custom label key → extra_labels dict column
-            exc = f"{side}_extra_labels"
-            if exc in df.columns:
-                m &= df[exc].apply(
-                    lambda d, _k=k, _v=v: isinstance(d, dict) and d.get(_k) == _v
-                )
-            else:
-                m &= False
+            return df[col].astype(str) == v
+        exc = f"{side}_extra_labels"  # custom label key → extra_labels dict column
+        if exc in df.columns:
+            return df[exc].apply(
+                lambda d, _k=k, _v=v: isinstance(d, dict) and d.get(_k) == _v)
+        return pd.Series(False, index=df.index)
+
+    by_key: dict[str, list[str]] = {}
+    for spec in specs:
+        if "=" not in spec:
+            continue
+        by_key.setdefault(spec.split("=", 1)[0].strip(), []).append(spec)
+
+    m = pd.Series(True, index=df.index)
+    for group in by_key.values():
+        gm = pd.Series(False, index=df.index)
+        for spec in group:
+            gm |= one(spec)
+        m &= gm
     return m
 
 
