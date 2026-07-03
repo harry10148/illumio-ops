@@ -478,7 +478,6 @@ class _TrafficReportBase:
             html.escape(kf.get('action', '')) + '</em></p>'
             for kf in mod12.get('key_findings', [])
         ) or f'<p class="note">{_s("rpt_no_findings")}</p>'
-        attack_summary_html = self._attack_summary_html(mod12) if profile == 'security_risk' else ''
 
         generated_at = mod12.get('generated_at', '')
         today_str = str(datetime.date.today())
@@ -637,8 +636,7 @@ class _TrafficReportBase:
             "NetworkInventory": "rpt_inventory_report_title",
             "Traffic": "rpt_traffic_flows_report_title",
         }[self.REPORT_KIND or "SecurityRisk"]
-        _findings_block = ((f'<h2>{_s("rpt_key_findings")}</h2>' + key_findings_html
-                            + attack_summary_html)
+        _findings_block = ((f'<h2>{_s("rpt_key_findings")}</h2>' + key_findings_html)
                            if self._hero_includes_findings() else '')
         _hero = (
             '<section id="summary" class="card report-hero">'
@@ -700,8 +698,8 @@ class _TrafficReportBase:
                           render_section_guidance('mod_change_impact', profile, detail_level, lang=self._lang) + self._mod_change_impact_html(), '', '') + '\n'),
             'findings': (
                 '<section id="findings" class="card">'
-                f'<h2>{_s("rpt_tr_sec_findings")} ({n_findings})</h2>'
-                + self._findings_html() + '</section>\n'),
+                f'<h2>{_s("rpt_tr_findings_actions")} ({n_findings})</h2>'
+                + self._findings_actions_html() + '</section>\n'),
         }
 
         body = exec_html + "".join(_sec.get(k, '') for k in self._ordered_section_keys())
@@ -787,37 +785,6 @@ class _TrafficReportBase:
         if text == i18n_key:
             text = en_text
         return f'<p class="note" style="font-size:12px;">{text}</p>'
-
-    def _attack_summary_html(self, mod12: dict) -> str:
-        def _rows(section_items):
-            if not section_items:
-                return f'<p class="note">{self._s("rpt_no_data")}</p>'
-            return ''.join(
-                '<p style="margin-bottom:8px"><span class="badge badge-' +
-                str(item.get('severity', 'INFO')) + '">' + str(item.get('severity', 'INFO')) +
-                '</span>&nbsp;' + html.escape(str(item.get('finding', ''))) +
-                ' <em style="color:#718096">&rarr; ' + html.escape(str(item.get('action', ''))) + '</em>' +
-                '</p>'
-                for item in section_items[:3]
-            )
-
-        action_matrix = mod12.get('action_matrix', []) or []
-        action_html = ''.join(
-            '<p style="margin-bottom:8px"><b>' + html.escape(str(item.get('action_code', ''))) + '</b>: ' +
-            html.escape(str(item.get('action', ''))) +
-            '</p>'
-            for item in action_matrix[:3]
-        ) or f'<p class="note">{self._s("rpt_no_data")}</p>'
-
-        _s = self._s
-        return (
-            f'<h2>{_s("rpt_tr_attack_summary")}</h2>'
-            f'<h3>{_s("rpt_tr_boundary_breaches")}</h3>' + _rows(mod12.get('boundary_breaches', [])) +
-            f'<h3>{_s("rpt_tr_suspicious_pivot_behavior")}</h3>' + _rows(mod12.get('suspicious_pivot_behavior', [])) +
-            f'<h3>{_s("rpt_tr_blast_radius")}</h3>' + _rows(mod12.get('blast_radius', [])) +
-            f'<h3>{_s("rpt_tr_blind_spots")}</h3>' + _rows(mod12.get('blind_spots', [])) +
-            f'<h3>{_s("rpt_tr_action_matrix")}</h3>' + action_html
-        )
 
     def _mod01_summary_table(self, mod01: dict) -> str:
         df = pd.DataFrame(
@@ -1219,6 +1186,55 @@ class _TrafficReportBase:
 
         return out
 
+    def _findings_actions_html(self):
+        """發現與行動（spec B1）：行動矩陣為主軸，每列掛嚴重度與量化證據；
+        規則發現卡片（rule id / evidence / 建議）依 category 併於其後。"""
+        _s = self._s
+        mod12 = self._r.get('mod12', {})
+
+        rows_html = ''
+        for item in mod12.get('action_matrix', []) or []:
+            sev = str(item.get('severity', 'INFO')).upper()
+            apps = item.get('apps') or []
+            apps_str = ', '.join(html.escape(str(a)) for a in apps[:5])
+            flow_total = item.get('flow_total', 0)
+            evidence_bits = [f"{item.get('count', 0)} {_s('rpt_fa_items_unit')}"]
+            if flow_total:
+                evidence_bits.append(f"{human_number(flow_total)} {_s('rpt_fa_flows_unit')}")
+            rows_html += (
+                '<tr>'
+                f'<td><span class="badge badge-{sev}">{sev}</span></td>'
+                f'<td><b>{html.escape(str(item.get("action_code", "")))}</b><br>'
+                f'{html.escape(str(item.get("action", "")))}</td>'
+                f'<td>{" · ".join(evidence_bits)}</td>'
+                f'<td>{apps_str}</td>'
+                '</tr>'
+            )
+        # 關鍵發現（coverage/ransomware/lateral/unmanaged/data volume 門檻觸發）併為行動列
+        for kf in mod12.get('key_findings', []) or []:
+            sev = str(kf.get('severity', 'INFO')).upper()
+            rows_html += (
+                '<tr>'
+                f'<td><span class="badge badge-{sev}">{sev}</span></td>'
+                f'<td>{html.escape(kf.get("action", ""))}</td>'
+                f'<td>{html.escape(kf.get("finding", ""))}</td>'
+                f'<td></td>'
+                '</tr>'
+            )
+        action_table = (
+            '<div class="report-table-wrap"><table class="report-table"><thead><tr>'
+            f'<th>{_s("rpt_fa_col_severity")}</th><th>{_s("rpt_fa_col_action")}</th>'
+            f'<th>{_s("rpt_fa_col_evidence")}</th><th>{_s("rpt_fa_col_scope")}</th>'
+            '</tr></thead>'
+            f'<tbody>{rows_html}</tbody></table></div>'
+        ) if rows_html else f'<p class="note">{_s("rpt_no_data")}</p>'
+        return (
+            self._subnote('rpt_fa_subnote')
+            + action_table
+            + f'<h3>{_s("rpt_fa_rule_findings")}</h3>'
+            + self._findings_html()
+        )
+
     def _findings_html(self):
         from src.report.exporters.report_i18n import STRINGS as _S
         _s = self._s
@@ -1602,6 +1618,10 @@ class SecurityRiskHtmlExporter(_TrafficReportBase):
     def _include_maturity(self) -> bool:
         return True
 
+    def _hero_includes_findings(self) -> bool:
+        # spec B1：關鍵發現/攻擊摘要移出 hero，併入「發現與行動」章
+        return False
+
     def _ordered_section_keys(self) -> list[str]:
         return ['summary', 'drift', 'overview', 'policy', 'uncovered', 'ransomware',
                 'vuln', 'user', 'readiness', 'infrastructure', 'lateral', 'findings']
@@ -1638,6 +1658,10 @@ class HtmlExporter(_TrafficReportBase):
 
     def _include_maturity(self) -> bool:
         return self._profile != "network_inventory"
+
+    def _hero_includes_findings(self) -> bool:
+        # spec B1：security 路徑同 SecurityRiskHtmlExporter，hero 不含發現；inventory 仍保留
+        return self._profile == 'network_inventory'
 
     def _ordered_section_keys(self) -> list[str]:
         if self._profile == "network_inventory":

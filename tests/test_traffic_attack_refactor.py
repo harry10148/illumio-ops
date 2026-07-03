@@ -8,6 +8,7 @@ from src.report.analysis.mod13_readiness import enforcement_readiness
 from src.report.analysis.mod14_infrastructure import infrastructure_scoring
 from src.report.analysis.mod15_lateral_movement import lateral_movement_risk
 from src.report.exporters.html_exporter import HtmlExporter
+from src.report.exporters.report_i18n import STRINGS
 from src.report.report_generator import ReportGenerator, _build_snapshot
 
 
@@ -164,8 +165,9 @@ def test_html_exporter_renders_attack_summary_sections():
         "findings": [],
     }
     html = HtmlExporter(results)._build()
-    assert "Boundary Breaches" in html
-    assert "Action Matrix" in html
+    # spec B1：三層攻擊摘要章併入單一「發現與行動」章
+    assert STRINGS["rpt_tr_findings_actions"]["en"] in html
+    assert "Boundary Breaches" not in html
 
 
 def test_report_email_body_renders_attack_summary():

@@ -56,15 +56,17 @@ def test_traffic_findings_html_escapes_pce_values():
     assert ESCAPED_MARK in html
 
 
-def test_traffic_attack_summary_html_is_escaped():
+def test_traffic_findings_actions_html_is_escaped():
+    # spec B1：攻擊摘要併入「發現與行動」章，行動矩陣列與 key_findings 列都須轉義
     from src.report.exporters.html_exporter import SecurityRiskHtmlExporter
-    exporter = SecurityRiskHtmlExporter({}, lang="en")
-    exporter._s = _en_s()
     mod12 = {
-        "boundary_breaches": [{"severity": "HIGH", "finding": PAYLOAD, "action": PAYLOAD}],
-        "action_matrix": [{"action_code": PAYLOAD, "action": PAYLOAD}],
+        "action_matrix": [{"action_code": PAYLOAD, "action": PAYLOAD, "severity": "HIGH",
+                           "count": 1, "apps": [PAYLOAD], "flow_total": 5}],
+        "key_findings": [{"severity": "HIGH", "finding": PAYLOAD, "action": PAYLOAD}],
     }
-    html = exporter._attack_summary_html(mod12)
+    exporter = SecurityRiskHtmlExporter({"mod12": mod12}, lang="en")
+    exporter._s = _en_s()
+    html = exporter._findings_actions_html()
     assert PAYLOAD not in html
     assert ESCAPED_MARK in html
 
