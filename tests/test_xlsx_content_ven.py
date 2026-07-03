@@ -60,7 +60,13 @@ def _hostnames(df):
 
 
 def test_heartbeat_boundary_buckets_are_correct(analysis):
-    """RED 關鍵：舊實作以 24h 門檻判定 online，61 分鐘案例會被誤判進 online。"""
+    """鎖定 _analyze 的 1 小時心跳分桶語意（59m→online、61m→lost_today）。
+
+    註：此測試直接驗 _analyze（該邏輯本就正確、非本次修改標的），
+    作為 K1 語意的回歸錨點；舊 generate_ven_xlsx 的 24h 門檻缺陷由
+    test_ven_xlsx_builder_no_self_bucketing_uses_provided_dict 與
+    sheets_match_analysis_buckets 從「禁止自行分桶」面向鎖住。
+    """
     assert _hostnames(analysis["online"]) == {"web-59m"}
     assert _hostnames(analysis["offline"]) == {"web-61m", "web-30h", "web-72h"}
     assert _hostnames(analysis["lost_today"]) == {"web-61m"}
