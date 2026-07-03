@@ -98,6 +98,8 @@ def calculate_volume_mb(flow: dict[str, Any]) -> tuple[float, str]:
     tbi = float(flow.get("dst_tbi") or flow.get("tbi") or flow.get("dst_bi") or 0)
     return (tbo + tbi) / 1024 / 1024, "(Total)"
 
+QUERY_RESULT_CAP = 500  # query_flows 單次回傳上限（截斷需回報，不可無聲）
+
 # ─── Analyzer Class ───────────────────────────────────────────────────────────
 
 class Analyzer:
@@ -126,6 +128,9 @@ class Analyzer:
         # Records the data origin of the most recent query_flows() call:
         # "cache" | "mixed" | "api". Useful for dashboard UI badges.
         self.last_query_source: str = "api"
+        # 記錄最近一次 query_flows() 的截斷統計：
+        # {"total_matches": int, "cap": int, "truncated": bool}
+        self.last_query_stats: dict[str, Any] = {}
         now_str = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
         self.state: dict[str, Any] = {
             "last_check": now_str,
@@ -1019,6 +1024,9 @@ class Analyzer:
           "search": "192.168.1.1" # optional text filter
         }
         """
+        # 每次查詢先重設統計——含 early-return 路徑（空結果不得殘留上次統計）
+        self.last_query_stats = {"total_matches": 0, "cap": QUERY_RESULT_CAP, "truncated": False}
+
         start_time = params.get("start_time")
         end_time = params.get("end_time")
         if not isinstance(start_time, str) or not isinstance(end_time, str):
@@ -1224,7 +1232,15 @@ class Analyzer:
             matches.append(f_copy)
 
         matches.sort(key=lambda x: x.get('_metric_val', 0), reverse=True)
-        return matches[:500]
+        total = len(matches)
+        # 截斷統計：仿 ApiClient.last_traffic_query_diagnostics 的屬性樣式，
+        # 回傳型別不變、既有呼叫者零影響（spec §11.3）
+        self.last_query_stats = {
+            "total_matches": total,
+            "cap": QUERY_RESULT_CAP,
+            "truncated": total > QUERY_RESULT_CAP,
+        }
+        return matches[:QUERY_RESULT_CAP]
 
     def run_debug_mode(self, mins: int | None = None, pd_sel: int | None = None, interactive: bool | None = None) -> None:
         # Interactive debug REPL: stdout is the contract here. The CLI menu

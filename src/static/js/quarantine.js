@@ -166,6 +166,8 @@ async function applyQuarantine() {
     return;
   }
 
+  if (!confirm(_qText('gui_q_confirm_apply').replace('{count}', hrefs.length).replace('{level}', sev))) return;
+
   const btn = document.getElementById('btn-apply-q');
   btn.disabled = true;
   btn.innerHTML = `<svg class="icon"><use href="#icon-settings"></use></svg> ${_qText('gui_q_applying')}`;
@@ -198,6 +200,21 @@ async function applyQuarantine() {
     btn.innerHTML = _qText('gui_q_apply');
   }
 }
+
+// 解除隔離：移除單一 workload 的 Quarantine 標籤（data-action 綁定，CSP 不允許 inline handler）。
+async function liftQuarantine(href) {
+  if (!confirm(_qText('gui_lift_confirm'))) return;
+  const r = await post('/api/quarantine/lift', { hrefs: [href] });
+  if (r && r.ok && r.results && r.results.success > 0) {
+    toast(_qText('gui_lift_done'));
+    if (document.getElementById('qbtn-workloads').classList.contains('active')) {
+      runWorkloadSearch();
+    }
+  } else {
+    toast((r && r.error) || _t('gui_q_apply_error'), 'err');
+  }
+}
+window.liftQuarantine = liftQuarantine;
 
 const renderSkeletonRow = (cols) => {
   let td = `<div class="skeleton skel-text"></div><div class="skeleton skel-text short"></div>`;
@@ -297,6 +314,7 @@ async function runTrafficAnalyzer() {
 
     // --- Pagination Logic ---
     _qt_data = r.data || [];
+    _qt_meta = { total: r.total_matches || _qt_data.length, truncated: !!r.truncated, cap: r.cap || 0 };
     _qt_page = 1;
     renderQtPage();
     // R5 Bug 1: previously the KPI strip (tw-kpi-flows / -conns / -dst-ips
@@ -369,6 +387,7 @@ window.updateTrafficKpis = updateTrafficKpis;
 
 let _qt_data = [];
 let _qt_page = 1;
+let _qt_meta = { total: 0, truncated: false, cap: 0 };
 
 function renderQtPage() {
   const bd = document.getElementById('qt-body');
@@ -384,7 +403,14 @@ function renderQtPage() {
 
   if (total > 0) {
     pagBar.style.display = 'flex';
-    totalLabel.textContent = (_t('gui_total_found')).replace('{count}', total);
+    if (_qt_meta.truncated) {
+      totalLabel.textContent = _t('gui_results_truncated')
+        .replace('{cap}', _qt_meta.cap).replace('{total}', _qt_meta.total);
+      totalLabel.classList.add('warn-text');
+    } else {
+      totalLabel.textContent = (_t('gui_total_found')).replace('{count}', total);
+      totalLabel.classList.remove('warn-text');
+    }
     pageNumDisplay.textContent = _qt_page;
   } else {
     pagBar.style.display = 'none';
@@ -604,7 +630,7 @@ function renderQwPage() {
           <td>
             <button class="btn btn-danger btn-sm" data-action="openQuarantineModal" data-args='${escapeHtml(JSON.stringify([href]))}'><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>
             ${accelBtn}
-            ${hasQuarantine ? `<span style="font-size:10px;color:var(--danger);font-weight:bold;margin-left:8px;">${_t('gui_isolated')}</span>` : ''}
+            ${hasQuarantine ? `<button class="btn btn-sm btn-warn" style="margin-left:8px;" data-action="liftQuarantine" data-args='${escapeHtml(JSON.stringify([href]))}'>${_t('gui_lift_quarantine')}</button>` : ''}
           </td>
         </tr>`;
   });

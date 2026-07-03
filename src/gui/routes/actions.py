@@ -8,6 +8,7 @@ from contextlib import redirect_stdout
 from flask import Blueprint, jsonify, request
 
 from src.alerts import PLUGIN_METADATA
+from src.analyzer import QUERY_RESULT_CAP
 from src.config import ConfigManager
 from src.gui._helpers import (
     _err,
@@ -28,6 +29,20 @@ def make_actions_blueprint(
     login_required,  # flask_login.login_required decorator (unused here, kept for consistent signature)
 ) -> Blueprint:
     bp = Blueprint("actions", __name__)
+
+    def _audit_action(action, **fields):
+        """隔離/解除隔離審計 log——best-effort，絕不阻斷主操作（spec §11.1）。"""
+        try:
+            from src.module_log import ModuleLog as _ML
+            try:
+                from flask_login import current_user
+                user = current_user.get_id() if getattr(current_user, "is_authenticated", False) else "?"
+            except Exception:
+                user = "?"
+            parts = " ".join(f"{k}={v}" for k, v in fields.items())
+            _ML.get("actions").info(f"{action}: user={user} {parts}")
+        except Exception:
+            pass
 
     @bp.route('/api/init_quarantine', methods=['POST'])
     def api_init_quarantine():
@@ -115,7 +130,14 @@ def make_actions_blueprint(
                 elif flow_pd == "potentially_blocked": r["pd"] = 1
                 else: r["pd"] = 2
 
-            return jsonify({"ok": True, "data": results})
+            stats = getattr(base_ana, "last_query_stats", {}) or {}
+            return jsonify({
+                "ok": True,
+                "data": results,
+                "total_matches": int(stats.get("total_matches", len(results))),
+                "truncated": bool(stats.get("truncated")),
+                "cap": int(stats.get("cap", QUERY_RESULT_CAP)),
+            })
         except Exception as e:
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
             return _err_with_log("quarantine_search", e, lang=lang)
@@ -223,6 +245,8 @@ def make_actions_blueprint(
 
             # 4. Commit
             success = api.update_workload_labels(href, new_labels)
+            _audit_action("quarantine_apply", href=href, level=level,
+                          result=("ok" if success else "update_failed"))
             if success:
                 return jsonify({"ok": True, "level": level})
             else:
@@ -270,9 +294,69 @@ def make_actions_blueprint(
                         if isinstance(failed_list, list):
                             failed_list.append(h)
 
+            _audit_action("quarantine_bulk_apply", level=level,
+                          success=results["success"], failed=len(results["failed"]),
+                          skipped_invalid=results["skipped_invalid"],
+                          hrefs=",".join(hrefs))
             return jsonify({"ok": True, "results": results})
         except Exception as e:
             return _err_with_log("quarantine_bulk_apply", e, lang=lang)
+
+    @bp.route('/api/quarantine/lift', methods=['POST'])
+    def api_quarantine_lift():
+        """解除隔離：移除 Quarantine 標籤、保留其餘標籤（spec §11.2）。
+
+        隔離是「附加」標籤（見 api_quarantine_apply 第 3 步），原標籤
+        未被動過，故解除＝過濾掉 q_hrefs 即可，無需還原機制。
+        """
+        d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+        raw_hrefs = d.get('hrefs', [])
+        hrefs = _normalize_quarantine_hrefs(raw_hrefs)
+        try:
+            if not hrefs:
+                return jsonify({"ok": False, "error": t("gui_q_no_targets", lang=lang)})
+            from src.api_client import ApiClient
+            api = ApiClient(cm)
+            q_hrefs = set(api.check_and_create_quarantine_labels().values())
+
+            invalid_count = sum(1 for h in (raw_hrefs or [])
+                                if str(h or "").strip() and not _is_workload_href(h))
+            results = {"success": 0, "failed": [], "skipped_invalid": invalid_count,
+                       "not_quarantined": 0}
+            import concurrent.futures
+
+            def process_wl(href):
+                if not _is_workload_href(href):
+                    return href, "invalid"
+                wl = api.get_workload(href)
+                if not wl:
+                    return href, "failed"
+                current = wl.get("labels", [])
+                kept = [{"href": l.get("href")} for l in current
+                        if l.get("href") not in q_hrefs]
+                if len(kept) == len(current):
+                    return href, "not_quarantined"
+                return href, ("ok" if api.update_workload_labels(href, kept) else "failed")
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+                futures = {ex.submit(process_wl, h): h for h in hrefs}
+                for f in concurrent.futures.as_completed(futures):
+                    h, st = f.result()
+                    if st == "ok":
+                        results["success"] += 1
+                    elif st == "not_quarantined":
+                        results["not_quarantined"] += 1
+                    elif st == "failed":
+                        results["failed"].append(h)
+
+            _audit_action("quarantine_lift", success=results["success"],
+                          failed=len(results["failed"]),
+                          not_quarantined=results["not_quarantined"],
+                          hrefs=",".join(hrefs))
+            return jsonify({"ok": True, "results": results})
+        except Exception as e:
+            return _err_with_log("quarantine_lift", e, lang=lang)
 
     @bp.route('/api/workloads/accelerate', methods=['POST'])
     def api_workloads_accelerate():
