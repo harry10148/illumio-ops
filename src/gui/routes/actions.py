@@ -115,7 +115,14 @@ def make_actions_blueprint(
                 elif flow_pd == "potentially_blocked": r["pd"] = 1
                 else: r["pd"] = 2
 
-            return jsonify({"ok": True, "data": results})
+            stats = getattr(base_ana, "last_query_stats", {}) or {}
+            return jsonify({
+                "ok": True,
+                "data": results,
+                "total_matches": int(stats.get("total_matches", len(results))),
+                "truncated": bool(stats.get("truncated")),
+                "cap": int(stats.get("cap", 0)),
+            })
         except Exception as e:
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
             return _err_with_log("quarantine_search", e, lang=lang)

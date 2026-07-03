@@ -66,3 +66,26 @@ def test_quarantine_translation_keys_present():
     assert messages["gui_q_both"]
     assert messages["gui_q_invalid_target"]
     set_language("en")
+
+
+def test_quarantine_search_reports_truncation(app_persistent, monkeypatch):
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    from src.analyzer import Analyzer, QUERY_RESULT_CAP
+
+    def fake_query(self, params):
+        self.last_query_stats = {"total_matches": 1234, "cap": QUERY_RESULT_CAP,
+                                 "truncated": True}
+        return [{"policy_decision": "allowed"}]
+
+    monkeypatch.setattr(Analyzer, "query_flows", fake_query)
+    r = client.post('/api/quarantine/search', json={"mins": 60},
+                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                    headers={'X-CSRF-Token': csrf_token})
+    assert r.status_code == 200
+    assert r.json["ok"] is True
+    assert r.json["total_matches"] == 1234
+    assert r.json["truncated"] is True
