@@ -111,3 +111,18 @@ def test_colon_separator_equivalent_to_equals():
     equals_out = apply_df_traffic_filters(_df_two_apps(), {"src_labels": ["app=erp"]})
     assert sorted(colon_out["src_ip"]) == sorted(equals_out["src_ip"])
     assert list(colon_out["src_ip"]) == ["10.0.0.1"]
+
+
+def test_object_cidrs_include_src():
+    out = apply_df_traffic_filters(_df_two_apps(), {"_src_object_cidrs": ["10.0.0.0/31"]})
+    assert sorted(out["src_ip"]) == ["10.0.0.1"]
+
+
+def test_object_cidrs_exclude_dst():
+    out = apply_df_traffic_filters(_df_two_apps(), {"_ex_dst_object_cidrs": ["10.0.0.9"]})
+    assert out.empty
+
+
+def test_object_cidrs_any_side():
+    out = apply_df_traffic_filters(_df_two_apps(), {"_any_object_cidrs": ["10.0.0.2"]})
+    assert list(out["src_ip"]) == ["10.0.0.2"]

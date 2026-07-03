@@ -243,6 +243,18 @@ class ReportGenerator:
         # reads far fewer rows (perf). The remaining filters (labels/ip/port) the
         # API applies server-side too, so re-apply them on the cache df.
         pds = (filters or {}).get("policy_decisions") or None
+        # iplist/workload 物件條件展開成 CIDR（df 無 href 欄位；spec §4.2）。
+        # 只在確實含物件 filter key 時才呼叫，避免對不相干的 filters（例如
+        # 純 label 條件）也觸發 API 呼叫（測試中 api 為泛用 mock 時尤其重要）。
+        _obj_filter_keys = (
+            "src_iplist", "src_iplists", "dst_iplist", "dst_iplists",
+            "src_workload", "src_workloads", "dst_workload", "dst_workloads",
+            "ex_src_iplist", "ex_src_iplists", "ex_dst_iplist", "ex_dst_iplists",
+            "ex_src_workload", "ex_src_workloads", "ex_dst_workload", "ex_dst_workloads",
+            "any_iplist", "any_workload",
+        )
+        if filters and self.api is not None and any(filters.get(k) for k in _obj_filter_keys):
+            filters = self.api.expand_object_filters_for_df(filters)
         if use_cache and self._cache is not None:
             state = self._cache.cover_state("traffic", start, end)
             if state == "full":

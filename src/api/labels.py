@@ -475,3 +475,75 @@ class LabelResolver:
             else:
                 svcs.append("RefObj")
         return ", ".join(svcs)
+
+    # ── Cache DataFrame object-filter expansion ─────────────────────────
+
+    def expand_object_filters_for_df(self, filters):
+        """iplist/workload 物件 filter → CIDR/IP 清單（cache df 路徑用）。
+
+        df 的統一 schema 沒有 workload href / ip_lists 欄位（api_parser
+        flatten 只留 ip/hostname/labels），物件條件必須先展開成 IP 集合
+        再交給 df_filter 的 CIDR mask。回傳淺拷貝；展開結果放底線前綴
+        內部 key，不進任何儲存格式。
+        """
+        import ipaddress
+
+        c = self._client
+        obj_keys = {
+            "_src_object_cidrs": ("src_iplist", "src_iplists", "src_workload", "src_workloads"),
+            "_dst_object_cidrs": ("dst_iplist", "dst_iplists", "dst_workload", "dst_workloads"),
+            "_ex_src_object_cidrs": ("ex_src_iplist", "ex_src_iplists", "ex_src_workload", "ex_src_workloads"),
+            "_ex_dst_object_cidrs": ("ex_dst_iplist", "ex_dst_iplists", "ex_dst_workload", "ex_dst_workloads"),
+            "_any_object_cidrs": ("any_iplist", "any_workload"),
+        }
+        if not filters or not any(
+                filters.get(k) for keys in obj_keys.values() for k in keys):
+            return filters
+
+        def _iplist_cidrs(value):
+            value = str(value).strip()
+            for ipl in (c.get_ip_lists() or []):
+                if ipl.get("name") == value or ipl.get("href") == value:
+                    out = []
+                    for r in ipl.get("ip_ranges", []) or []:
+                        frm = r.get("from_ip")
+                        to = r.get("to_ip")
+                        if not frm:
+                            continue
+                        if not to or "/" in frm:
+                            out.append(frm)
+                            continue
+                        try:
+                            nets = ipaddress.summarize_address_range(
+                                ipaddress.ip_address(frm), ipaddress.ip_address(to))
+                            out.extend(str(n) for n in nets)
+                        except ValueError:
+                            logger.warning("Bad ip_range in {}: {}-{}", value, frm, to)
+                    return out
+            return []
+
+        def _workload_ips(value):
+            value = str(value).strip()
+            if "/workloads/" not in value:
+                return []
+            wl = c.get_workload(value) or {}
+            ips = [i.get("address") for i in wl.get("interfaces", []) or [] if i.get("address")]
+            if wl.get("public_ip"):
+                ips.append(wl["public_ip"])
+            return ips
+
+        out = dict(filters)
+        for dest, keys in obj_keys.items():
+            cidrs = []
+            for k in keys:
+                vals = filters.get(k)
+                if not vals:
+                    continue
+                vals = vals if isinstance(vals, list) else [vals]
+                for v in vals:
+                    if not v:
+                        continue
+                    cidrs.extend(_iplist_cidrs(v) if "iplist" in k else _workload_ips(v))
+            if cidrs:
+                out[dest] = cidrs
+        return out

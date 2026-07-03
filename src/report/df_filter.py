@@ -115,6 +115,27 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
         if exv and col in df.columns:
             mask &= ~_ip_mask(df, col, exv)
 
+    def _cidrs_mask(col: str, values: list) -> pd.Series:
+        gm = pd.Series(False, index=df.index)
+        for v in values:
+            gm |= _ip_mask(df, col, str(v))
+        return gm
+
+    for fkey, col, negate in (
+        ("_src_object_cidrs", "src_ip", False),
+        ("_dst_object_cidrs", "dst_ip", False),
+        ("_ex_src_object_cidrs", "src_ip", True),
+        ("_ex_dst_object_cidrs", "dst_ip", True),
+    ):
+        vals = filters.get(fkey)
+        if vals and col in df.columns:
+            m = _cidrs_mask(col, vals)
+            mask &= ~m if negate else m
+
+    any_cidrs = filters.get("_any_object_cidrs")
+    if any_cidrs and "src_ip" in df.columns and "dst_ip" in df.columns:
+        mask &= _cidrs_mask("src_ip", any_cidrs) | _cidrs_mask("dst_ip", any_cidrs)
+
     port = _scalar(filters, "port")
     if port and "port" in df.columns:
         try:
