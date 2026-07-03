@@ -32,6 +32,17 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   plain-language "how to read this score" explanation; the dead mod05 (legacy IP
   host talkers) and mod10 (legacy allowed-traffic audit) modules were removed now
   that their outputs are covered by mod15 and mod02 respectively.
+- Inventory report simplification (phase 3): refocused on asset/label governance —
+  the traffic overview, traffic distribution, and bandwidth chapters are dropped
+  from `report inventory` (still available via `report traffic`); the Cross-Label
+  Matrix chapter keeps only the ENV/APP dimensions in HTML, with ROLE/LOC detail
+  demoted to the XLSX export's Cross-Label sheet; the Unmanaged Hosts chapter is
+  merged to 3 tables, with the exposed-ports table gaining a Top Unmanaged Sources
+  column; a date-range parsing fix means flows with no valid timestamps now show
+  a single "N/A" instead of "N/A → N/A"; the Change Impact chapter is now wired to
+  the real posture KPI snapshot — the first run after upgrading shows a "no
+  previous snapshot" note, and subsequent runs render an actual delta table
+  (previously this chapter never rendered deltas due to a snapshot key mismatch).
 
 ### Added
 
