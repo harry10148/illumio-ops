@@ -201,6 +201,21 @@ async function applyQuarantine() {
   }
 }
 
+// 解除隔離：移除單一 workload 的 Quarantine 標籤（data-action 綁定，CSP 不允許 inline handler）。
+async function liftQuarantine(href) {
+  if (!confirm(_qText('gui_lift_confirm'))) return;
+  const r = await post('/api/quarantine/lift', { hrefs: [href] });
+  if (r && r.ok && r.results && r.results.success > 0) {
+    toast(_qText('gui_lift_done'));
+    if (document.getElementById('qbtn-workloads').classList.contains('active')) {
+      runWorkloadSearch();
+    }
+  } else {
+    toast((r && r.error) || _t('gui_q_apply_error'), 'err');
+  }
+}
+window.liftQuarantine = liftQuarantine;
+
 const renderSkeletonRow = (cols) => {
   let td = `<div class="skeleton skel-text"></div><div class="skeleton skel-text short"></div>`;
   let res = `<tr class="skel-tr">`;
@@ -615,7 +630,7 @@ function renderQwPage() {
           <td>
             <button class="btn btn-danger btn-sm" data-action="openQuarantineModal" data-args='${escapeHtml(JSON.stringify([href]))}'><span data-i18n="gui_btn_isolate">${_t('gui_btn_isolate')}</span></button>
             ${accelBtn}
-            ${hasQuarantine ? `<span style="font-size:10px;color:var(--danger);font-weight:bold;margin-left:8px;">${_t('gui_isolated')}</span>` : ''}
+            ${hasQuarantine ? `<button class="btn btn-sm btn-warn" style="margin-left:8px;" data-action="liftQuarantine" data-args='${escapeHtml(JSON.stringify([href]))}'>${_t('gui_lift_quarantine')}</button>` : ''}
           </td>
         </tr>`;
   });

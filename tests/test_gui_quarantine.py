@@ -135,6 +135,56 @@ def test_quarantine_apply_writes_audit_log(app_persistent, monkeypatch):
     assert "user=admin" in audit[0]
 
 
+def test_quarantine_lift_removes_only_quarantine_labels(app_persistent, monkeypatch):
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    q = {"Mild": "/orgs/1/labels/1", "Moderate": "/orgs/1/labels/2", "Severe": "/orgs/1/labels/3"}
+    monkeypatch.setattr("src.api_client.ApiClient.check_and_create_quarantine_labels",
+                        lambda self: q)
+    monkeypatch.setattr("src.api_client.ApiClient.get_workload", lambda self, href: {
+        "href": href,
+        "labels": [{"href": "/orgs/1/labels/2"}, {"href": "/orgs/1/labels/77"}],
+    })
+    calls = []
+    monkeypatch.setattr("src.api_client.ApiClient.update_workload_labels",
+                        lambda self, href, labels: calls.append((href, labels)) or True)
+
+    r = client.post('/api/quarantine/lift',
+                    json={"hrefs": ["/orgs/1/workloads/1"]},
+                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                    headers={'X-CSRF-Token': csrf_token})
+    assert r.status_code == 200
+    assert r.json["ok"] is True
+    assert r.json["results"]["success"] == 1
+    assert calls == [("/orgs/1/workloads/1", [{"href": "/orgs/1/labels/77"}])]
+
+
+def test_quarantine_lift_skips_not_quarantined(app_persistent, monkeypatch):
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    monkeypatch.setattr("src.api_client.ApiClient.check_and_create_quarantine_labels",
+                        lambda self: {"Mild": "/orgs/1/labels/1"})
+    monkeypatch.setattr("src.api_client.ApiClient.get_workload", lambda self, href: {
+        "href": href, "labels": [{"href": "/orgs/1/labels/77"}]})
+    calls = []
+    monkeypatch.setattr("src.api_client.ApiClient.update_workload_labels",
+                        lambda self, href, labels: calls.append(href) or True)
+
+    r = client.post('/api/quarantine/lift',
+                    json={"hrefs": ["/orgs/1/workloads/1", "/orgs/1/labels/9"]},
+                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                    headers={'X-CSRF-Token': csrf_token})
+    assert r.json["results"]["not_quarantined"] == 1
+    assert r.json["results"]["skipped_invalid"] == 1
+    assert calls == []
+
+
 def test_quarantine_bulk_apply_writes_audit_log(app_persistent, monkeypatch):
     client = app_persistent.test_client()
     login = client.post('/api/login', json={"username": "admin", "password": "testpass"},

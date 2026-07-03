@@ -302,6 +302,62 @@ def make_actions_blueprint(
         except Exception as e:
             return _err_with_log("quarantine_bulk_apply", e, lang=lang)
 
+    @bp.route('/api/quarantine/lift', methods=['POST'])
+    def api_quarantine_lift():
+        """解除隔離：移除 Quarantine 標籤、保留其餘標籤（spec §11.2）。
+
+        隔離是「附加」標籤（見 api_quarantine_apply 第 3 步），原標籤
+        未被動過，故解除＝過濾掉 q_hrefs 即可，無需還原機制。
+        """
+        d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+        raw_hrefs = d.get('hrefs', [])
+        hrefs = _normalize_quarantine_hrefs(raw_hrefs)
+        try:
+            if not hrefs:
+                return jsonify({"ok": False, "error": t("gui_q_no_targets", lang=lang)})
+            from src.api_client import ApiClient
+            api = ApiClient(cm)
+            q_hrefs = set(api.check_and_create_quarantine_labels().values())
+
+            invalid_count = sum(1 for h in (raw_hrefs or [])
+                                if str(h or "").strip() and not _is_workload_href(h))
+            results = {"success": 0, "failed": [], "skipped_invalid": invalid_count,
+                       "not_quarantined": 0}
+            import concurrent.futures
+
+            def process_wl(href):
+                if not _is_workload_href(href):
+                    return href, "invalid"
+                wl = api.get_workload(href)
+                if not wl:
+                    return href, "failed"
+                current = wl.get("labels", [])
+                kept = [{"href": l.get("href")} for l in current
+                        if l.get("href") not in q_hrefs]
+                if len(kept) == len(current):
+                    return href, "not_quarantined"
+                return href, ("ok" if api.update_workload_labels(href, kept) else "failed")
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+                futures = {ex.submit(process_wl, h): h for h in hrefs}
+                for f in concurrent.futures.as_completed(futures):
+                    h, st = f.result()
+                    if st == "ok":
+                        results["success"] += 1
+                    elif st == "not_quarantined":
+                        results["not_quarantined"] += 1
+                    elif st == "failed":
+                        results["failed"].append(h)
+
+            _audit_action("quarantine_lift", success=results["success"],
+                          failed=len(results["failed"]),
+                          not_quarantined=results["not_quarantined"],
+                          hrefs=",".join(hrefs))
+            return jsonify({"ok": True, "results": results})
+        except Exception as e:
+            return _err_with_log("quarantine_lift", e, lang=lang)
+
     @bp.route('/api/workloads/accelerate', methods=['POST'])
     def api_workloads_accelerate():
         """Increase traffic update rate for the given workload hrefs.
