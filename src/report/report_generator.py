@@ -1063,5 +1063,27 @@ def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", 
     except Exception:
         ws.append(["src", "dst", "flows"])
 
+    # --- Cross-Label Matrix（role/loc 自 HTML 下放；spec C2）---
+    ws = wb.create_sheet(t("rpt_xlsx_sheet_cross_label", lang=lang))
+    try:
+        from src.report.analysis.mod07_cross_label_matrix import cross_label_flow_matrix
+        m07 = cross_label_flow_matrix(flows, top_n=top_n)
+        _wrote_any_m07 = False
+        for _dim in ('role', 'loc'):
+            _data = (m07.get('matrices') or {}).get(_dim) or {}
+            _tbl = _data.get('top_cross_pairs')
+            if _tbl is None or not hasattr(_tbl, 'empty') or _tbl.empty:
+                continue
+            ws.append([])
+            ws.append([f"{t('rpt_tr_label_key', lang=lang)} {_dim.upper()}"])
+            ws.append([str(c) for c in _tbl.columns])
+            for _, _row in _tbl.iterrows():
+                ws.append([str(v) for v in _row])
+            _wrote_any_m07 = True
+        if not _wrote_any_m07:
+            ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_no_matrix", lang=lang)])
+    except Exception:
+        ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_no_matrix", lang=lang)])
+
     wb.save(out_path)
     return out_path

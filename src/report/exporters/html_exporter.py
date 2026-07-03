@@ -1039,7 +1039,11 @@ class _TrafficReportBase:
         _lang = self._lang
         m = self._r.get('mod07', {})
         out = _render_chart_for_html(m.get('chart_spec'), lang=self._lang)
-        for key, data in m.get('matrices', {}).items():
+        # spec C2：HTML 只呈現 ENV/APP 兩維；ROLE/LOC 明細下放 XLSX
+        for key in ('env', 'app'):
+            data = m.get('matrices', {}).get(key)
+            if not data:
+                continue
             out += f'<h3>{_s("rpt_tr_label_key")} {key.upper()}</h3>'
             if 'note' in data:
                 out += f'<p class="note">{data["note"]}</p>'
@@ -1047,6 +1051,8 @@ class _TrafficReportBase:
                 kv = (f'{_s("rpt_tr_same_value")} {data.get("same_value_flows",0)} · '
                       f'{_s("rpt_tr_cross_value")} {data.get("cross_value_flows",0)}')
                 out += f'<p>{kv}</p>{_df_to_html(data.get("top_cross_pairs"), lang=_lang)}'
+        if out:
+            out += self._subnote('rpt_tr_matrix_xlsx_note')
         return out or f'<p class="note">{_s("rpt_no_matrix")}</p>'
 
     def _mod08_html(self):

@@ -124,3 +124,65 @@ def test_lateral_sheet_has_demoted_table_titles(sample_flows, tmp_path, monkeypa
                 "rpt_mod15_bridge_nodes", "rpt_mod15_top_reachable", "rpt_tr_app_chains"):
         title = t(key, lang="en")
         assert title in flat_str, f"demoted table title {key}='{title}' not in lateral sheet"
+
+
+def test_cross_label_sheet_has_role_loc_demoted_tables(sample_flows, tmp_path, monkeypatch):
+    """Cross-Label Matrix sheet 必須含 role/loc 的下放明細（spec C2）。"""
+    from src.report.report_generator import generate_traffic_xlsx
+    from src.i18n import t
+
+    def mock_cross_label_flow_matrix(df, top_n=20):
+        return {
+            "matrices": {
+                "env": {"top_cross_pairs": pd.DataFrame([{"Src ENV": "prod", "Dst ENV": "dev", "Connections": 9}])},
+                "app": {"top_cross_pairs": pd.DataFrame([{"Src APP": "web", "Dst APP": "db", "Connections": 8}])},
+                "role": {"top_cross_pairs": pd.DataFrame([{"Src ROLE": "web", "Dst ROLE": "db", "Connections": 7}])},
+                "loc": {"top_cross_pairs": pd.DataFrame([{"Src LOC": "us", "Dst LOC": "eu", "Connections": 6}])},
+            },
+        }
+
+    monkeypatch.setattr(
+        "src.report.analysis.mod07_cross_label_matrix.cross_label_flow_matrix",
+        mock_cross_label_flow_matrix,
+    )
+
+    out_path = tmp_path / "traffic.xlsx"
+    generate_traffic_xlsx(sample_flows, str(out_path), profile="security_risk")
+    wb = load_workbook(str(out_path))
+    sheet_name = t("rpt_xlsx_sheet_cross_label", lang="en")
+    assert sheet_name in wb.sheetnames
+    sheet = wb[sheet_name]
+    rows = list(sheet.iter_rows(values_only=True))
+    flat = [str(c) for r in rows for c in r if c is not None]
+    flat_str = " ".join(flat)
+    assert "web" in flat_str and "db" in flat_str  # role 表內容
+    assert "us" in flat_str and "eu" in flat_str  # loc 表內容
+    assert "ROLE" in flat_str and "LOC" in flat_str
+
+
+def test_cross_label_sheet_fallback_note_when_role_loc_empty(sample_flows, tmp_path, monkeypatch):
+    """role/loc 皆無 top_cross_pairs 時，落回 no-matrix 提示。"""
+    from src.report.report_generator import generate_traffic_xlsx
+    from src.i18n import t
+
+    def mock_cross_label_flow_matrix(df, top_n=20):
+        return {
+            "matrices": {
+                "role": {"top_cross_pairs": pd.DataFrame()},
+                "loc": {"top_cross_pairs": pd.DataFrame()},
+            },
+        }
+
+    monkeypatch.setattr(
+        "src.report.analysis.mod07_cross_label_matrix.cross_label_flow_matrix",
+        mock_cross_label_flow_matrix,
+    )
+
+    out_path = tmp_path / "traffic.xlsx"
+    generate_traffic_xlsx(sample_flows, str(out_path), profile="security_risk")
+    wb = load_workbook(str(out_path))
+    sheet_name = t("rpt_xlsx_sheet_cross_label", lang="en")
+    sheet = wb[sheet_name]
+    rows = list(sheet.iter_rows(values_only=True))
+    flat = [str(c) for r in rows for c in r if c is not None]
+    assert t("rpt_no_matrix", lang="en") in flat
