@@ -263,20 +263,10 @@ class PolicyUsageGenerator:
 
         if fmt in ('xlsx', 'all'):
             try:
-                from src.report.exporters.xlsx_exporter import export_xlsx
                 import datetime as _dt
                 ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
                 xlsx_path = os.path.join(output_dir, f'Illumio_PolicyUsage_Report_{ts_str}.xlsx')
-                xlsx_result = {
-                    'record_count': result.record_count,
-                    'metadata': {'title': 'Policy Usage Report'},
-                    'module_results': {
-                        k: {'summary': '', 'table': []}
-                        for k, v in (result.module_results or {}).items()
-                        if isinstance(v, dict)
-                    },
-                }
-                export_xlsx(xlsx_result, xlsx_path)
+                generate_policy_usage_xlsx(result.module_results or {}, xlsx_path, lang=lang)
                 paths.append(xlsx_path)
                 print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}", lang=lang))
             except Exception as exc:
@@ -563,80 +553,64 @@ class PolicyUsageGenerator:
         )
 
 
-def generate_policy_usage_xlsx(rules_df, out_path: str, top_n: int = 500) -> str:
-    """Generate a Policy Usage XLSX with real per-sheet DataFrames.
+def generate_policy_usage_xlsx(module_results: dict, out_path: str, *, lang: str = "en") -> str:
+    """依 _run_pipeline 產出的 module_results 組裝 Policy Usage XLSX，只讀不重算。
 
-    Uses direct DataFrame operations on rules_df columns:
-      hit_count, is_deny, name, rule_id, ruleset_name, enabled.
+    分頁對應：mod02.hit_df → Hit Rules（builder 端 cap 500，已於 pu_mod02_hit_detail
+    上游完成）、mod03.unused_df → Unused Rules（cap 1000 完整清單——取代舊版重算
+    cap 500 的語意，決策見 commit body）、mod04.deny_summary_df + deny_detail_df
+    → Deny Effectiveness（以 add_stacked_tables_sheet 堆疊）、mod01 純量 +
+    mod04 純量 → Execution Stats（KPI/Value 兩欄表）。缺 key 或空 df 一律寫 empty_note。
     """
     import pandas as pd
     from openpyxl import Workbook
+    from src.report.exporters.xlsx_exporter import add_df_sheet, add_stacked_tables_sheet
 
     wb = Workbook()
     wb.remove(wb.active)
 
-    def _write_df(ws, df):
-        if df is None or not hasattr(df, "empty") or df.empty:
-            ws.append(["Note", "No data"])
-            return
-        ws.append(list(df.columns))
-        for _, row in df.head(top_n).iterrows():
-            ws.append([str(v) for v in row])
+    mod01 = module_results.get("mod01") or {}
+    mod02 = module_results.get("mod02") or {}
+    mod03 = module_results.get("mod03") or {}
+    mod04 = module_results.get("mod04") or {}
 
-    hit_col = "hit_count" if "hit_count" in rules_df.columns else None
-    deny_col = "is_deny" if "is_deny" in rules_df.columns else None
+    add_df_sheet(
+        wb, t("rpt_xlsx_sheet_pu_hit", lang=lang), mod02.get("hit_df"), lang=lang,
+    )
 
-    # --- Hit Rules ---
-    ws = wb.create_sheet("Hit Rules")
-    try:
-        if hit_col:
-            hit_df = rules_df[rules_df[hit_col] > 0].copy()
-            _write_df(ws, hit_df)
-        else:
-            ws.append(list(rules_df.columns))
-            for _, row in rules_df.head(top_n).iterrows():
-                ws.append([str(v) for v in row])
-    except Exception:
-        ws.append(["Note", "Hit rules data unavailable"])
+    add_df_sheet(
+        wb, t("rpt_xlsx_sheet_pu_unused", lang=lang), mod03.get("unused_df"), lang=lang,
+    )
 
-    # --- Unused Rules ---
-    ws = wb.create_sheet("Unused Rules")
-    try:
-        if hit_col:
-            unused_df = rules_df[rules_df[hit_col] == 0].copy()
-            _write_df(ws, unused_df)
-        else:
-            ws.append(["Note", "hit_count column not present"])
-    except Exception:
-        ws.append(["Note", "Unused rules data unavailable"])
+    add_stacked_tables_sheet(
+        wb, t("rpt_xlsx_sheet_pu_deny", lang=lang),
+        [
+            ("Summary", mod04.get("deny_summary_df")),
+            ("Detail", mod04.get("deny_detail_df")),
+        ],
+        lang=lang,
+    )
 
-    # --- Deny Effectiveness ---
-    ws = wb.create_sheet("Deny Effectiveness")
-    try:
-        if deny_col:
-            deny_df = rules_df[rules_df[deny_col] == True].copy()
-            _write_df(ws, deny_df)
-        else:
-            ws.append(["Note", "is_deny column not present"])
-    except Exception:
-        ws.append(["Note", "Deny effectiveness data unavailable"])
-
-    # --- Execution Stats ---
-    ws = wb.create_sheet("Execution Stats")
-    try:
-        total = len(rules_df)
-        hit_count = int(rules_df[hit_col].gt(0).sum()) if hit_col else 0
-        unused_count = int(rules_df[hit_col].eq(0).sum()) if hit_col else 0
-        deny_count = int(rules_df[deny_col].sum()) if deny_col else 0
-        ws.append(["Metric", "Value"])
-        ws.append(["Total Rules", total])
-        ws.append(["Hit Rules", hit_count])
-        ws.append(["Unused Rules", unused_count])
-        ws.append(["Deny Rules", deny_count])
-        if total > 0 and hit_col:
-            ws.append(["Hit Rate %", round(hit_count / total * 100, 1)])
-    except Exception:
-        ws.append(["Note", "Stats unavailable"])
+    kpi_col = t("rpt_xlsx_col_kpi", lang=lang)
+    val_col = t("rpt_xlsx_col_value", lang=lang)
+    metrics = [
+        ("Total Rules", mod01.get("total_rules")),
+        ("Hit Count", mod01.get("hit_count")),
+        ("Unused Count", mod01.get("unused_count")),
+        ("Hit Rate %", mod01.get("hit_rate_pct")),
+        ("Total Deny", mod04.get("total_deny")),
+        ("Total Allow", mod04.get("total_allow")),
+        ("Deny Ratio %", mod04.get("deny_ratio_pct")),
+        ("Deny Hit Count", mod04.get("deny_hit_count")),
+        ("Deny Unused Count", mod04.get("deny_unused_count")),
+        ("Deny Hit Rate %", mod04.get("deny_hit_rate_pct")),
+        ("Override Deny Count", mod04.get("override_deny_count")),
+    ]
+    stats_rows = [{kpi_col: label, val_col: value} for label, value in metrics if value is not None]
+    stats_df = pd.DataFrame(stats_rows) if stats_rows else None
+    add_df_sheet(
+        wb, t("rpt_xlsx_sheet_pu_stats", lang=lang), stats_df, lang=lang,
+    )
 
     wb.save(out_path)
     return out_path

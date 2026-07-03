@@ -4166,5 +4166,9 @@
   "rpt_xlsx_sheet_audit_health": "Health",
   "rpt_xlsx_sheet_audit_users": "Users",
   "rpt_xlsx_sheet_audit_policy": "Policy Changes",
-  "rpt_xlsx_sheet_audit_correlations": "Correlations"
+  "rpt_xlsx_sheet_audit_correlations": "Correlations",
+  "rpt_xlsx_sheet_pu_hit": "Hit Rules",
+  "rpt_xlsx_sheet_pu_unused": "Unused Rules",
+  "rpt_xlsx_sheet_pu_deny": "Deny Effectiveness",
+  "rpt_xlsx_sheet_pu_stats": "Execution Stats"
 }

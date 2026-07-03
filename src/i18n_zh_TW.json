@@ -4166,5 +4166,9 @@
   "rpt_xlsx_sheet_audit_health": "系統健康",
   "rpt_xlsx_sheet_audit_users": "使用者",
   "rpt_xlsx_sheet_audit_policy": "Policy 變更",
-  "rpt_xlsx_sheet_audit_correlations": "事件關聯"
+  "rpt_xlsx_sheet_audit_correlations": "事件關聯",
+  "rpt_xlsx_sheet_pu_hit": "命中規則",
+  "rpt_xlsx_sheet_pu_unused": "未使用規則",
+  "rpt_xlsx_sheet_pu_deny": "Deny 有效性",
+  "rpt_xlsx_sheet_pu_stats": "執行統計"
 }
