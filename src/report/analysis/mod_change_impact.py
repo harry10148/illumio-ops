@@ -3,8 +3,31 @@ from __future__ import annotations
 
 from typing import Optional
 
-LOWER_BETTER = ("pb_uncovered_exposure", "high_risk_lateral_paths", "blocked_flows")
-HIGHER_BETTER = ("active_allow_coverage", "microsegmentation_maturity")
+# 方向名單對齊快照實際 key（原名單 key 全庫零生產者，屬過期殘留）。
+# staged_coverage_pct 語意雙向（staged→enforced 轉換使其下降是好事、
+# 新缺口使其上升是壞事）——刻意不列入任一名單，維持 neutral。
+LOWER_BETTER = ("true_gap_pct", "risk_flows_total")
+HIGHER_BETTER = ("enforced_coverage_pct", "maturity_score")
+
+_POSTURE_KEYS = ('enforced_coverage_pct', 'staged_coverage_pct', 'true_gap_pct',
+                 'maturity_score', 'maturity_grade', 'maturity_dimensions',
+                 'enforcement_mode_distribution')
+
+
+def collect_current_kpis(module_results: dict) -> dict:
+    """自 module_results 收集 Change Impact／快照共用的 posture KPI dict。
+
+    mod12 的顯示用 'kpis' 是 list；可比較的 posture 值住在 mod12 頂層 key。
+    此函式是快照寫入端（report_generator）與章節渲染端（html_exporter）的
+    單一事實來源——兩端 key 集合由此保持一致。
+    """
+    mod12 = module_results.get('mod12', {}) or {}
+    kpis = {k: mod12[k] for k in _POSTURE_KEYS if k in mod12}
+    for mid in ('mod04', 'mod15', 'mod12'):
+        m = module_results.get(mid, {})
+        if isinstance(m, dict) and 'risk_flows_total' in m and 'risk_flows_total' not in kpis:
+            kpis['risk_flows_total'] = m['risk_flows_total']
+    return kpis
 
 
 def compare(*, current_kpis: dict, previous: Optional[dict]) -> dict:

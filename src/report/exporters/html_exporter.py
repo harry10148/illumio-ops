@@ -1569,10 +1569,9 @@ class _TrafficReportBase:
     def _mod_change_impact_html(self) -> str:
         _s = self._s
         from src.report.snapshot_store import read_latest
-        from src.report.analysis.mod_change_impact import compare
-        mod12 = self._r.get('mod12', {})
-        current_kpis = mod12.get('kpis', {})
-        if not isinstance(current_kpis, dict) or not current_kpis:
+        from src.report.analysis.mod_change_impact import compare, collect_current_kpis
+        current_kpis = collect_current_kpis(self._r)
+        if not current_kpis:
             return f'<p class="note">{_s("rpt_mod_change_impact_no_kpi")}</p>'
         previous = read_latest('traffic', profile=self._profile)
         impact = compare(current_kpis=current_kpis, previous=previous)

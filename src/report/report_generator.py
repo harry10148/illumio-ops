@@ -622,18 +622,11 @@ class ReportGenerator:
         try:
             from datetime import datetime, timezone
             from src.report.snapshot_store import write_snapshot, cleanup_old
-            mod12_result = result.module_results.get('mod12', {})
             # Posture/maturity KPIs live as top-level keys in mod12 (the display
-            # 'kpis' is a list). Build the snapshot KPI dict from the real fields
-            # so Change Impact + the dashboard posture score have data to read.
-            _posture_keys = ('enforced_coverage_pct', 'staged_coverage_pct', 'true_gap_pct',
-                             'maturity_score', 'maturity_grade', 'maturity_dimensions',
-                             'enforcement_mode_distribution')
-            kpis_dict = {k: mod12_result[k] for k in _posture_keys if k in mod12_result}
-            for _mid in ('mod04', 'mod15', 'mod12'):
-                _m = result.module_results.get(_mid, {})
-                if isinstance(_m, dict) and 'risk_flows_total' in _m and 'risk_flows_total' not in kpis_dict:
-                    kpis_dict['risk_flows_total'] = _m['risk_flows_total']
+            # 'kpis' is a list). collect_current_kpis 是快照寫入端與章節渲染端的
+            # 單一事實來源，兩端 key 集合由此保持一致。
+            from src.report.analysis.mod_change_impact import collect_current_kpis
+            kpis_dict = collect_current_kpis(result.module_results)
             if isinstance(kpis_dict, dict) and kpis_dict:
                 retention = self.cm.models.report.snapshot_retention_days
                 snap = {
