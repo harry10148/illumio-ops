@@ -1508,45 +1508,19 @@ class _TrafficReportBase:
         service_summary = m.get('service_summary')
         if service_summary is not None and not service_summary.empty:
             html += f'<h4>{_s("rpt_tr_lateral_by_service")}</h4>' + _df_to_html(service_summary, lang=_lang)
-
-        # IP-level analysis (consolidated from former mod05)
-        ip_talkers = m.get('ip_top_talkers')
-        if ip_talkers is not None and not ip_talkers.empty:
-            html += (
-                self._subnote('rpt_tr_lateral_talkers_subnote', 'IP Top Talkers finds the hosts most active in lateral traffic, handy for checking whether they match known admin nodes.')
-                + f'<h4>{_s("rpt_tr_ip_top_talkers")}</h4>'
-                + _df_to_html(ip_talkers, lang=_lang)
-            )
-        ip_pairs = m.get('ip_top_pairs')
-        if ip_pairs is not None and not ip_pairs.empty:
-            html += f'<h4>{_s("rpt_tr_ip_top_pairs")}</h4>' + _df_to_html(ip_pairs, lang=_lang)
-
-        # App(Env)-level graph analysis
         fan_out = m.get('fan_out_sources')
         if fan_out is not None and not fan_out.empty:
             html += f'<h4>{_s("rpt_tr_fan_out")}</h4>' + _df_to_html(fan_out, lang=_lang)
         allowed_lateral = m.get('allowed_lateral_flows')
         if allowed_lateral is not None and not allowed_lateral.empty:
             html += f'<h4>{_s("rpt_tr_allowed_lateral")}</h4>' + _df_to_html(allowed_lateral, lang=_lang)
-        source_risk = m.get('source_risk_scores')
-        if source_risk is not None and not source_risk.empty:
-            html += f'<h4>{_s("rpt_tr_top_risk_sources")}</h4>' + _df_to_html(source_risk, lang=_lang)
-        bridge_nodes = m.get('bridge_nodes')
-        if bridge_nodes is not None and not bridge_nodes.empty:
-            html += f'<h4>{_s("rpt_mod15_bridge_nodes")}</h4>' + _df_to_html(bridge_nodes, lang=_lang)
-        reachable_nodes = m.get('top_reachable_nodes')
-        if reachable_nodes is not None and not reachable_nodes.empty:
-            _rn_drop = {"app_env_key", "Max Depth Used"}
-            _rn = reachable_nodes[[c for c in reachable_nodes.columns if c not in _rn_drop]]
-            html += f'<h4>{_s("rpt_mod15_top_reachable")}</h4>' + _df_to_html(_rn, lang=_lang)
         attack_paths = m.get('attack_paths')
         if attack_paths is not None and not attack_paths.empty:
             _ap_drop = {"Source App Env Key", "Target App Env Key"}
             _ap = attack_paths[[c for c in attack_paths.columns if c not in _ap_drop]]
             html += f'<h4>{_s("rpt_mod15_attack_paths")}</h4>' + _df_to_html(_ap, lang=_lang)
-        app_chains = m.get('app_chains')
-        if app_chains is not None and not app_chains.empty:
-            html += f'<h4>{_s("rpt_tr_app_chains")}</h4>' + _df_to_html(app_chains, lang=_lang)
+        # 主機層明細（IP talkers/配對、橋接、可達、App 鏈、風險來源）已下放 XLSX（spec B3）
+        html += self._subnote('rpt_tr_lateral_xlsx_note')
         return html
 
     def _mod_ringfence_html(self) -> str:

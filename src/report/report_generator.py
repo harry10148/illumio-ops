@@ -1023,7 +1023,24 @@ def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", 
             ws.append(list(service_summary.columns))
             for _, row in service_summary.iterrows():
                 ws.append([str(v) for v in row])
-        else:
+        # 自 HTML 下放的主機層明細（spec B3）：每表前空一列 + 標題列
+        _extra_tables = [
+            ("rpt_tr_ip_top_talkers", lat.get("ip_top_talkers")),
+            ("rpt_tr_ip_top_pairs", lat.get("ip_top_pairs")),
+            ("rpt_tr_top_risk_sources", lat.get("source_risk_scores")),
+            ("rpt_mod15_bridge_nodes", lat.get("bridge_nodes")),
+            ("rpt_mod15_top_reachable", lat.get("top_reachable_nodes")),
+            ("rpt_tr_app_chains", lat.get("app_chains")),
+        ]
+        for _title_key, _tbl in _extra_tables:
+            if _tbl is None or not hasattr(_tbl, "empty") or _tbl.empty:
+                continue
+            ws.append([])
+            ws.append([t(_title_key, lang=lang)])
+            ws.append([str(c) for c in _tbl.columns])
+            for _, _row in _tbl.iterrows():
+                ws.append([str(v) for v in _row])
+        if service_summary is None or not hasattr(service_summary, "empty") or service_summary.empty:
             ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_xlsx_no_lateral", lang=lang)])
     except Exception:
         ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_xlsx_lateral_unavailable", lang=lang)])
