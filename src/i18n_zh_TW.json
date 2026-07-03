@@ -1834,6 +1834,7 @@
   "gui_pu_stat_unused_rules": "未使用規則",
   "gui_pu_top_hit_ports": "熱門命中 Ports",
   "gui_q_applied": "已對 {count} 個 Workload 套用 {level} 隔離。",
+  "gui_q_confirm_apply": "確定要以嚴重度 {level} 隔離 {count} 台 workload 嗎？",
   "gui_q_apply": "套用隔離",
   "gui_q_apply_error": "套用隔離失敗",
   "gui_q_applying": "套用中...",

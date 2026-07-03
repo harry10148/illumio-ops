@@ -99,3 +99,68 @@ def test_quarantine_search_reports_truncation(app_persistent, monkeypatch):
     assert r.json["ok"] is True
     assert r.json["total_matches"] == 1234
     assert r.json["truncated"] is True
+
+
+def test_quarantine_apply_writes_audit_log(app_persistent, monkeypatch):
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    monkeypatch.setattr("src.api_client.ApiClient.check_and_create_quarantine_labels",
+                        lambda self: {"Mild": "/orgs/1/labels/1"})
+    monkeypatch.setattr("src.api_client.ApiClient.get_workload",
+                        lambda self, href: {"href": href, "labels": []})
+    monkeypatch.setattr("src.api_client.ApiClient.update_workload_labels",
+                        lambda self, href, labels: True)
+
+    records = []
+
+    class _Rec:
+        def info(self, msg):
+            records.append(msg)
+
+    from src.module_log import ModuleLog
+    monkeypatch.setattr(ModuleLog, "get", classmethod(lambda cls, name: _Rec()))
+
+    r = client.post('/api/quarantine/apply',
+                    json={"href": "/orgs/1/workloads/1", "level": "Mild"},
+                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                    headers={'X-CSRF-Token': csrf_token})
+    assert r.json["ok"] is True
+    audit = [m for m in records if "quarantine_apply" in m]
+    assert len(audit) == 1
+    assert "/orgs/1/workloads/1" in audit[0]
+    assert "Mild" in audit[0]
+    assert "user=admin" in audit[0]
+
+
+def test_quarantine_bulk_apply_writes_audit_log(app_persistent, monkeypatch):
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    monkeypatch.setattr("src.api_client.ApiClient.check_and_create_quarantine_labels",
+                        lambda self: {"Mild": "/orgs/1/labels/1"})
+    monkeypatch.setattr("src.api_client.ApiClient.get_workload",
+                        lambda self, href: {"href": href, "labels": []})
+    monkeypatch.setattr("src.api_client.ApiClient.update_workload_labels",
+                        lambda self, href, labels: True)
+
+    records = []
+
+    class _Rec:
+        def info(self, msg):
+            records.append(msg)
+
+    from src.module_log import ModuleLog
+    monkeypatch.setattr(ModuleLog, "get", classmethod(lambda cls, name: _Rec()))
+
+    client.post('/api/quarantine/bulk_apply',
+                json={"hrefs": ["/orgs/1/workloads/1", "/orgs/1/workloads/2"], "level": "Mild"},
+                environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                headers={'X-CSRF-Token': csrf_token})
+    audit = [m for m in records if "quarantine_bulk_apply" in m]
+    assert len(audit) == 1
+    assert "success=2" in audit[0]

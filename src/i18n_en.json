@@ -1834,6 +1834,7 @@
   "gui_pu_stat_unused_rules": "Unused Rules",
   "gui_pu_top_hit_ports": "Top Hit Ports",
   "gui_q_applied": "Applied quarantine to {count} workload(s) with {level}.",
+  "gui_q_confirm_apply": "Quarantine {count} workload(s) at severity {level}?",
   "gui_q_apply": "Apply Quarantine",
   "gui_q_apply_error": "Failed to apply quarantine",
   "gui_q_applying": "Applying...",

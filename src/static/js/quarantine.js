@@ -166,6 +166,8 @@ async function applyQuarantine() {
     return;
   }
 
+  if (!confirm(_qText('gui_q_confirm_apply').replace('{count}', hrefs.length).replace('{level}', sev))) return;
+
   const btn = document.getElementById('btn-apply-q');
   btn.disabled = true;
   btn.innerHTML = `<svg class="icon"><use href="#icon-settings"></use></svg> ${_qText('gui_q_applying')}`;

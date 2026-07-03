@@ -30,6 +30,20 @@ def make_actions_blueprint(
 ) -> Blueprint:
     bp = Blueprint("actions", __name__)
 
+    def _audit_action(action, **fields):
+        """隔離/解除隔離審計 log——best-effort，絕不阻斷主操作（spec §11.1）。"""
+        try:
+            from src.module_log import ModuleLog as _ML
+            try:
+                from flask_login import current_user
+                user = current_user.get_id() if getattr(current_user, "is_authenticated", False) else "?"
+            except Exception:
+                user = "?"
+            parts = " ".join(f"{k}={v}" for k, v in fields.items())
+            _ML.get("actions").info(f"{action}: user={user} {parts}")
+        except Exception:
+            pass
+
     @bp.route('/api/init_quarantine', methods=['POST'])
     def api_init_quarantine():
         """Ensure Quarantine labels exist on the PCE upon loading the new UI module."""
@@ -231,6 +245,8 @@ def make_actions_blueprint(
 
             # 4. Commit
             success = api.update_workload_labels(href, new_labels)
+            _audit_action("quarantine_apply", href=href, level=level,
+                          result=("ok" if success else "update_failed"))
             if success:
                 return jsonify({"ok": True, "level": level})
             else:
@@ -278,6 +294,10 @@ def make_actions_blueprint(
                         if isinstance(failed_list, list):
                             failed_list.append(h)
 
+            _audit_action("quarantine_bulk_apply", level=level,
+                          success=results["success"], failed=len(results["failed"]),
+                          skipped_invalid=results["skipped_invalid"],
+                          hrefs=",".join(hrefs))
             return jsonify({"ok": True, "results": results})
         except Exception as e:
             return _err_with_log("quarantine_bulk_apply", e, lang=lang)
