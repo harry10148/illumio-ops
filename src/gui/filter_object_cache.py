@@ -16,16 +16,25 @@ _CACHE_TTL_SECONDS = 300
 _lock = threading.RLock()
 # key: "labels"/"ip_lists"/"label_groups" → 完整物件清單
 _cache: TTLCache = TTLCache(maxsize=8, ttl=_CACHE_TTL_SECONDS)
+# 不過期的「最後成功值」store，供 TTL 過期後 refetch 失敗時 stale-serving 用。
+# 注意：TTLCache 對過期 key 視同不存在，_cache.get() 在過期後永遠拿不到舊值，
+# 故 stale-serving 不能依賴 _cache，需另外維護此 dict。
+_last_good: dict = {}
 
 
 def invalidate_object_cache() -> None:
     """清空 module 快取（測試用 / 手動失效）。"""
     with _lock:
         _cache.clear()
+        _last_good.clear()
 
 
 def _get_or_fill(api, key: str, fetch):
-    """TTL 內回快取；過期或未填則呼叫 fetch 全量抓。抓失敗且無舊值回 []。"""
+    """TTL 內走 _cache；過期後重抓。抓成功同時更新 _cache（TTL 計時）與
+    _last_good（不過期）；抓失敗或空結果則回 _last_good（真正的
+    stale-serving，而非依賴 TTLCache 對過期 key 的感知，因為過期後
+    TTLCache 會直接視為不存在）。皆無舊值時回 []。
+    """
     with _lock:
         if key in _cache:
             return _cache[key]
@@ -33,9 +42,10 @@ def _get_or_fill(api, key: str, fetch):
     with _lock:
         if data:
             _cache[key] = data
+            _last_good[key] = data
             return data
-        # 抓到空/失敗：若有殘留舊值（TTL 剛過）回舊值勝於無
-        return _cache.get(key, [])
+        # 抓到空/失敗：回最後一次成功值（stale 勝於無）
+        return _last_good.get(key, [])
 
 
 def _ip_list_summary(ipl: dict) -> str:

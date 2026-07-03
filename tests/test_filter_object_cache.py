@@ -1,4 +1,9 @@
+import time
 from unittest.mock import MagicMock
+
+from cachetools import TTLCache
+
+from src.gui import filter_object_cache
 from src.gui.filter_object_cache import search_cached_objects, invalidate_object_cache
 
 
@@ -67,3 +72,27 @@ def test_cache_reused_no_second_fetch():
 def test_types_filter_only_requested():
     r = search_cached_objects(_api(), "prod", ["iplist"], 10)
     assert "iplist" in r and "label" not in r
+
+
+def test_stale_served_on_refetch_failure_after_expiry():
+    orig_cache = filter_object_cache._cache
+    filter_object_cache._cache = TTLCache(maxsize=8, ttl=0.05)
+    try:
+        api_ok = _api()
+        r1 = search_cached_objects(api_ok, "server", ["label"], 10)
+        names1 = [i["name"] for i in r1["label"]["items"]]
+        assert "Net=Server-172.16.15" in names1
+
+        time.sleep(0.06)  # let TTL expire
+
+        api_fail = MagicMock()
+        api_fail.get_all_labels.return_value = []
+        r2 = search_cached_objects(api_fail, "server", ["label"], 10)
+        names2 = [i["name"] for i in r2["label"]["items"]]
+        assert "Net=Server-172.16.15" in names2, "expected stale-serving of last-known-good data"
+
+        invalidate_object_cache()
+        r3 = search_cached_objects(api_fail, "server", ["label"], 10)
+        assert r3["label"]["items"] == []
+    finally:
+        filter_object_cache._cache = orig_cache
