@@ -63,10 +63,14 @@ def traffic_overview(df: pd.DataFrame) -> dict:
     src_managed_pct = round(df['src_managed'].mean() * 100, 1) if total_flows else 0
     dst_managed_pct = round(df['dst_managed'].mean() * 100, 1) if total_flows else 0
 
-    # Date range
-    first = df['first_detected'].min()
-    last = df['last_detected'].max()
-    date_range = f"{first.date() if pd.notna(first) else 'N/A'} → {last.date() if pd.notna(last) else 'N/A'}"
+    # Date range — 用 coerce 容錯解析（沿用 _safe_parse_* helper）；
+    # 完全無有效時間戳時顯示單一 N/A，不再出現「N/A → N/A」（spec C4）
+    start_iso = _safe_parse_min(df['first_detected'] if 'first_detected' in df.columns else None)
+    end_iso = _safe_parse_max(df['last_detected'] if 'last_detected' in df.columns else None)
+    if start_iso or end_iso:
+        date_range = f"{start_iso[:10] if start_iso else 'N/A'} → {end_iso[:10] if end_iso else 'N/A'}"
+    else:
+        date_range = 'N/A'
 
     # Top ports (by flow count) — group by (port, proto) when available so the
     # table shows e.g. "53 / UDP" rather than a bare port number. Counts and
