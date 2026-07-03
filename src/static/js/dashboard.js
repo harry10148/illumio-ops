@@ -2005,6 +2005,12 @@ async function runTop10Query(idx) {
       bd.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--dim);padding:20px;">${_t('gui_top10_no_records')}</td></tr>`;
       _setStatusWithSourceBadge(ms, (_t('gui_done')) + '  (' + _fmtCacheTs(Date.now()) + ')', r.source);
     }
+    if (r.truncated) {
+      const warn = document.createElement('span');
+      warn.className = 'warn-text';
+      warn.textContent = ' ' + _t('gui_top10_truncated').replace('{cap}', r.cap);
+      ms.appendChild(warn);
+    }
   } catch (e) {
     ms.textContent = (_t('error_generic')).replace('{error}', e.message);
     bd.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--danger);padding:20px;">${_t('gui_top10_error')}</td></tr>`;

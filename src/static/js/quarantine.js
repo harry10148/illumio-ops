@@ -297,6 +297,7 @@ async function runTrafficAnalyzer() {
 
     // --- Pagination Logic ---
     _qt_data = r.data || [];
+    _qt_meta = { total: r.total_matches || _qt_data.length, truncated: !!r.truncated, cap: r.cap || 0 };
     _qt_page = 1;
     renderQtPage();
     // R5 Bug 1: previously the KPI strip (tw-kpi-flows / -conns / -dst-ips
@@ -369,6 +370,7 @@ window.updateTrafficKpis = updateTrafficKpis;
 
 let _qt_data = [];
 let _qt_page = 1;
+let _qt_meta = { total: 0, truncated: false, cap: 0 };
 
 function renderQtPage() {
   const bd = document.getElementById('qt-body');
@@ -384,7 +386,14 @@ function renderQtPage() {
 
   if (total > 0) {
     pagBar.style.display = 'flex';
-    totalLabel.textContent = (_t('gui_total_found')).replace('{count}', total);
+    if (_qt_meta.truncated) {
+      totalLabel.textContent = _t('gui_results_truncated')
+        .replace('{cap}', _qt_meta.cap).replace('{total}', _qt_meta.total);
+      totalLabel.classList.add('warn-text');
+    } else {
+      totalLabel.textContent = (_t('gui_total_found')).replace('{count}', total);
+      totalLabel.classList.remove('warn-text');
+    }
     pageNumDisplay.textContent = _qt_page;
   } else {
     pagBar.style.display = 'none';

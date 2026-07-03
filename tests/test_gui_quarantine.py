@@ -68,6 +68,16 @@ def test_quarantine_translation_keys_present():
     set_language("en")
 
 
+def test_truncation_translation_keys_present():
+    set_language("zh_TW")
+    messages = get_messages("zh_TW")
+    assert "{cap}" in messages["gui_results_truncated"]
+    assert "{cap}" in messages["gui_top10_truncated"]
+    en = get_messages("en")
+    assert "{cap}" in en["gui_results_truncated"]
+    set_language("en")
+
+
 def test_quarantine_search_reports_truncation(app_persistent, monkeypatch):
     client = app_persistent.test_client()
     login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
