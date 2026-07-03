@@ -13,6 +13,7 @@ Delegates to:
 from __future__ import annotations
 
 import gzip
+import itertools
 import json
 import os
 import time
@@ -90,6 +91,29 @@ _TRAFFIC_FILTER_CAPABILITIES = {
     "ex_dst_label_group": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to label_group href and pushed to destinations.exclude."},
     "ex_dst_label_groups": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to label_group hrefs and pushed to destinations.exclude."},
 }
+
+_LABEL_OR_EXPANSION_CAP = 100  # 笛卡兒積組數上限，超過即整族降級 fallback
+
+
+def group_label_specs_by_key(values):
+    """把 label filter 字串依維度 key 分組（同 key OR、跨 key AND 的前置）。
+
+    "key=value" 與 "key:value" 皆可；無法解析 key 的字串各自成一組
+    （鍵用位置序號佔位）——維持舊有 AND 語意，不猜測。
+    回傳 dict（插入序即維度序，Python 3.7+ dict 保序）。
+    """
+    grouped = {}
+    for i, raw in enumerate(values):
+        text = str(raw).strip()
+        key = None
+        for sep in ("=", ":"):
+            if sep in text:
+                key = text.split(sep, 1)[0].strip().lower()
+                break
+        if not key:
+            key = f"__pos{i}"
+        grouped.setdefault(key, []).append(text)
+    return grouped
 
 
 @dataclass
@@ -249,9 +273,7 @@ class TrafficQueryBuilder:
             _consume_keys((key,))
 
         include_specs = [
-            (("src_label", "src_labels"), "sources", labels._resolve_label_filter_to_actor),
             (("src_label_group", "src_label_groups"), "sources", labels._resolve_label_group_filter_to_actor),
-            (("dst_label", "dst_labels"), "destinations", labels._resolve_label_filter_to_actor),
             (("dst_label_group", "dst_label_groups"), "destinations", labels._resolve_label_group_filter_to_actor),
             (("src_ip_in", "src_ip"), "sources", labels._resolve_ip_filter_to_actor),
             (("dst_ip_in", "dst_ip"), "destinations", labels._resolve_ip_filter_to_actor),
@@ -264,6 +286,45 @@ class TrafficQueryBuilder:
             (("ex_src_ip",), "sources", labels._resolve_ip_filter_to_actor),
             (("ex_dst_ip",), "destinations", labels._resolve_ip_filter_to_actor),
         ]
+
+        # 同 key OR、跨 key AND（對齊 PCE 原生；spec §2.2 實測依據）：
+        # 依 key 分組 → 每 key 內各值為 OR 選項 → 跨 key 笛卡兒積展開成
+        # 多個 include group（外層 OR、內層 AND）。
+        for keys, side in ((("src_label", "src_labels"), "sources"),
+                           (("dst_label", "dst_labels"), "destinations")):
+            values, used_keys = _pop_many(keys)
+            if not values:
+                continue
+            grouped = group_label_specs_by_key(values)
+            per_key_actors = []
+            unresolved = False
+            n_combos = 1
+            for specs_for_key in grouped.values():
+                actors = []
+                for value in specs_for_key:
+                    item = labels._resolve_label_filter_to_actor(value)
+                    if item is None:
+                        unresolved = True
+                        break
+                    actors.append(item)
+                if unresolved:
+                    break
+                per_key_actors.append(actors)
+                n_combos *= len(actors)
+            if unresolved or n_combos > _LABEL_OR_EXPANSION_CAP:
+                if n_combos > _LABEL_OR_EXPANSION_CAP:
+                    logger.warning(
+                        "Label OR expansion exceeds cap ({} > {}); falling back to client-side",
+                        n_combos, _LABEL_OR_EXPANSION_CAP)
+                for key in used_keys:
+                    _record_unresolved(key, spec.native_filters.get(key))
+                _consume_keys(used_keys)
+                continue
+            for combo in itertools.product(*per_key_actors):
+                payload[side]["include"].append(labels._dedupe_query_group(list(combo)))
+            for key in used_keys:
+                _record_consumed(key, spec.native_filters.get(key))
+            _consume_keys(used_keys)
 
         for keys, side, resolver in include_specs:
             values, used_keys = _pop_many(keys)
