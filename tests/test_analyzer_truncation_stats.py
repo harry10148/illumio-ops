@@ -62,7 +62,7 @@ def test_empty_result_resets_stale_stats(monkeypatch):
 
     # 第二次查詢：空結果（stub 回傳 empty list）
     monkeypatch.setattr(ana.api, "execute_traffic_query_stream",
-                        lambda *a, **kw: iter([]), raising=False)
+                        lambda *a, **kw: [], raising=False)
     out2 = ana.query_flows(_params())
 
     # 統計必須重設：不得殘留第一次的 truncated=True
