@@ -167,20 +167,10 @@ class VenStatusGenerator:
 
         if fmt in ('xlsx', 'all'):
             try:
-                from src.report.exporters.xlsx_exporter import export_xlsx
                 import datetime as _dt
                 ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
                 xlsx_path = os.path.join(output_dir, f'Illumio_VEN_Report_{ts_str}.xlsx')
-                xlsx_result = {
-                    'record_count': result.record_count,
-                    'metadata': {'title': 'VEN Status Report'},
-                    'module_results': {
-                        k: {'summary': '', 'table': []}
-                        for k, v in (result.module_results or {}).items()
-                        if isinstance(v, dict)
-                    },
-                }
-                export_xlsx(xlsx_result, xlsx_path)
+                generate_ven_xlsx(result.module_results or {}, xlsx_path, lang=lang)
                 paths.append(xlsx_path)
                 print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}", lang=lang))
             except Exception as exc:
@@ -408,51 +398,33 @@ class VenStatusGenerator:
         }
 
 
-def generate_ven_xlsx(workloads_df, out_path: str, top_n: int = 1000) -> str:
-    """Generate a VEN status XLSX with workloads bucketed by status and heartbeat age."""
-    from datetime import datetime, timedelta, timezone
+def generate_ven_xlsx(analysis: dict, out_path: str, *, lang: str = "en") -> str:
+    """依 _analyze() 回傳的 analysis dict 組裝 VEN XLSX，只讀不重算（spec K1）。
+
+    online/offline/lost_today/lost_yesterday 皆為 _analyze() 已分桶完成的 DataFrame
+    （唯一分桶依據是 _ONLINE_HEARTBEAT_THRESHOLD_HOURS=1 小時心跳門檻），本函式不得
+    另行判定 ven_status 或計算心跳年齡。舊版 "Lost <24h"/"Lost 24-48h" 兩個 sheet
+    名稱與實際資料錯位（"Lost <24h" 裝的是 24-48h 資料、"Lost 24-48h" 裝的是
+    >=48h 資料）——新版改用 Lost Today / Lost Yesterday，並直接對應
+    analysis["lost_today"]（24h 內）/ analysis["lost_yesterday"]（24-48h）。
+    """
     from openpyxl import Workbook
     import pandas as pd
+    from src.report.exporters.xlsx_exporter import add_df_sheet
 
     wb = Workbook()
     wb.remove(wb.active)
 
-    now = datetime.now(timezone.utc)
+    add_df_sheet(wb, t("rpt_xlsx_sheet_ven_online", lang=lang), analysis.get("online"), lang=lang)
+    add_df_sheet(wb, t("rpt_xlsx_sheet_ven_offline", lang=lang), analysis.get("offline"), lang=lang)
+    add_df_sheet(wb, t("rpt_xlsx_sheet_ven_lost_today", lang=lang), analysis.get("lost_today"), lang=lang)
+    add_df_sheet(wb, t("rpt_xlsx_sheet_ven_lost_yesterday", lang=lang), analysis.get("lost_yesterday"), lang=lang)
 
-    def _write_sheet(name, df):
-        ws = wb.create_sheet(name)
-        if df is None or not hasattr(df, "empty") or df.empty:
-            ws.append(["Note", "No workloads in this category"])
-            return
-        ws.append(list(df.columns))
-        for _, row in df.head(top_n).iterrows():
-            ws.append([str(v) for v in row])
-
-    # Parse heartbeat timestamps
-    try:
-        hb = pd.to_datetime(workloads_df["last_heartbeat"], utc=True, errors="coerce")
-        age_h = (now - hb).dt.total_seconds() / 3600
-    except Exception:
-        age_h = pd.Series([float("inf")] * len(workloads_df), index=workloads_df.index)
-
-    has_status = "ven_status" in workloads_df.columns
-
-    if has_status:
-        is_active = workloads_df["ven_status"] == "active"
-        is_offline = workloads_df["ven_status"] == "offline"
-    else:
-        is_active = pd.Series(True, index=workloads_df.index)
-        is_offline = pd.Series(False, index=workloads_df.index)
-
-    online = workloads_df[is_active & (age_h < 24)]
-    offline = workloads_df[is_offline]
-    lost_lt24 = workloads_df[is_active & (age_h >= 24) & (age_h < 48)]
-    lost_24_48 = workloads_df[is_active & (age_h >= 48)]
-
-    _write_sheet("Online", online)
-    _write_sheet("Offline", offline)
-    _write_sheet("Lost <24h", lost_lt24)
-    _write_sheet("Lost 24-48h", lost_24_48)
+    by_version = analysis.get("by_version") or {}
+    versions_df = pd.DataFrame(
+        [{"Version": version, "Count": count} for version, count in by_version.items()]
+    ) if by_version else None
+    add_df_sheet(wb, t("rpt_xlsx_sheet_ven_versions", lang=lang), versions_df, lang=lang)
 
     wb.save(out_path)
     return out_path

@@ -4170,5 +4170,10 @@
   "rpt_xlsx_sheet_pu_hit": "Hit Rules",
   "rpt_xlsx_sheet_pu_unused": "Unused Rules",
   "rpt_xlsx_sheet_pu_deny": "Deny Effectiveness",
-  "rpt_xlsx_sheet_pu_stats": "Execution Stats"
+  "rpt_xlsx_sheet_pu_stats": "Execution Stats",
+  "rpt_xlsx_sheet_ven_online": "Online",
+  "rpt_xlsx_sheet_ven_offline": "Offline",
+  "rpt_xlsx_sheet_ven_lost_today": "Lost Today",
+  "rpt_xlsx_sheet_ven_lost_yesterday": "Lost Yesterday",
+  "rpt_xlsx_sheet_ven_versions": "Versions"
 }

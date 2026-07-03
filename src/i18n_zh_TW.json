@@ -4170,5 +4170,10 @@
   "rpt_xlsx_sheet_pu_hit": "命中規則",
   "rpt_xlsx_sheet_pu_unused": "未使用規則",
   "rpt_xlsx_sheet_pu_deny": "Deny 有效性",
-  "rpt_xlsx_sheet_pu_stats": "執行統計"
+  "rpt_xlsx_sheet_pu_stats": "執行統計",
+  "rpt_xlsx_sheet_ven_online": "Online",
+  "rpt_xlsx_sheet_ven_offline": "Offline",
+  "rpt_xlsx_sheet_ven_lost_today": "今日失聯",
+  "rpt_xlsx_sheet_ven_lost_yesterday": "昨日失聯",
+  "rpt_xlsx_sheet_ven_versions": "版本分布"
 }
