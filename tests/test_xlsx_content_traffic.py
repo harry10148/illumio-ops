@@ -79,3 +79,48 @@ def test_no_lateral_note_absent_when_any_table_has_data(monkeypatch, sample_flow
     assert "10.0.0.1" in flat_text, "Expected IP data should be in sheet"
     no_lateral_text = t("rpt_xlsx_no_lateral", lang="en")
     assert no_lateral_text not in flat_text, f"'{no_lateral_text}' must not appear when extra tables have data"
+
+
+def test_lateral_sheet_has_demoted_table_titles(sample_flows, tmp_path, monkeypatch):
+    """Lateral sheet must contain titles of demoted tables."""
+    from src.report.report_generator import generate_traffic_xlsx
+    from src.i18n import t
+
+    # Mock lateral_movement_risk to return test data with demoted tables
+    def mock_lateral_movement_risk(flows, top_n=20):
+        return {
+            "service_summary": pd.DataFrame([{"Service": "SMB", "Count": 5}]),
+            "ip_top_talkers": pd.DataFrame([{"Host": "10.0.0.1", "Connections": 10}]),
+            "ip_top_pairs": pd.DataFrame([{"Src": "10.0.0.1", "Dst": "10.0.0.2", "Count": 5}]),
+            "source_risk_scores": pd.DataFrame([{"Source": "10.0.0.1", "Risk": 0.8}]),
+            "bridge_nodes": pd.DataFrame([{"Node": "10.0.0.1", "Score": 0.6}]),
+            "top_reachable_nodes": pd.DataFrame([{"Node": "10.0.0.2", "Depth": 3}]),
+            "app_chains": pd.DataFrame([{"Chain": "app1->app2", "Count": 2}]),
+            "fan_out_sources": pd.DataFrame(),
+            "allowed_lateral_flows": pd.DataFrame(),
+            "attack_paths": pd.DataFrame(),
+            "attack_posture_items": [],
+            "total_lateral_flows": 0,
+            "unique_lateral_src": 0,
+            "unique_lateral_dst": 0,
+            "lateral_pct": 0.0,
+            "node_ips": {},
+            "chart_spec": None,
+            "articulation_proxies": pd.DataFrame(),
+        }
+
+    monkeypatch.setattr("src.report.analysis.mod15_lateral_movement.lateral_movement_risk", mock_lateral_movement_risk)
+
+    out_path = tmp_path / "traffic.xlsx"
+    generate_traffic_xlsx(sample_flows, str(out_path), profile="security_risk")
+    wb = load_workbook(str(out_path))
+    assert "Lateral Movement" in wb.sheetnames
+    sheet = wb["Lateral Movement"]
+    rows = list(sheet.iter_rows(values_only=True))
+    flat = [str(c) for r in rows for c in r if c is not None]
+    flat_str = " ".join(flat)
+    # 驗證下放表的標題出現在 XLSX 中
+    for key in ("rpt_tr_ip_top_talkers", "rpt_tr_ip_top_pairs", "rpt_tr_top_risk_sources",
+                "rpt_mod15_bridge_nodes", "rpt_mod15_top_reachable", "rpt_tr_app_chains"):
+        title = t(key, lang="en")
+        assert title in flat_str, f"demoted table title {key}='{title}' not in lateral sheet"
