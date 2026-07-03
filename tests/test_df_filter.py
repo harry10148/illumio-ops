@@ -99,3 +99,15 @@ def test_same_key_or_with_custom_dimension():
     df.at[2, "src_extra_labels"] = {"Net": "Server-B"}
     out = apply_df_traffic_filters(df, {"src_labels": ["Net=Server-A", "Net=Server-B"]})
     assert sorted(out["src_ip"]) == ["10.0.0.1", "10.0.0.3"]
+
+
+def test_unparseable_spec_forces_and_fail():
+    out = apply_df_traffic_filters(_df_two_apps(), {"src_labels": ["app=erp", "garbage"]})
+    assert out.empty
+
+
+def test_colon_separator_equivalent_to_equals():
+    colon_out = apply_df_traffic_filters(_df_two_apps(), {"src_labels": ["app:erp"]})
+    equals_out = apply_df_traffic_filters(_df_two_apps(), {"src_labels": ["app=erp"]})
+    assert sorted(colon_out["src_ip"]) == sorted(equals_out["src_ip"])
+    assert list(colon_out["src_ip"]) == ["10.0.0.1"]

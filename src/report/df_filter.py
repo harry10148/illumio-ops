@@ -22,23 +22,33 @@ _PROTO_ALIAS = {"6": "TCP", "17": "UDP", "1": "ICMP", "58": "ICMPV6"}
 
 def _label_mask(df: pd.DataFrame, side: str, specs: list[str]) -> pd.Series:
     """同 key 內 OR、跨 key AND（對齊 PCE 原生語意，spec §2.2）。"""
+    def split_spec(spec: str) -> tuple[str, str] | None:
+        # "=" 與 ":" 皆可為分隔符，取先出現者；無分隔符則視為無法解析
+        idx = min((i for i in (spec.find("="), spec.find(":")) if i != -1), default=-1)
+        if idx == -1:
+            return None
+        return spec[:idx].strip(), spec[idx + 1:].strip()
+
     def one(spec: str) -> pd.Series:
-        k, v = spec.split("=", 1)
-        k, v = k.strip(), v.strip()
+        parsed = split_spec(spec)
+        if parsed is None:
+            return pd.Series(False, index=df.index)
+        k, v = parsed
         col = f"{side}_{k}"
         if col in df.columns:
             return df[col].astype(str) == v
-        exc = f"{side}_extra_labels"  # custom label key → extra_labels dict column
+        exc = f"{side}_extra_labels"  # 自訂維度 key → extra_labels dict 欄
         if exc in df.columns:
             return df[exc].apply(
                 lambda d, _k=k, _v=v: isinstance(d, dict) and d.get(_k) == _v)
         return pd.Series(False, index=df.index)
 
     by_key: dict[str, list[str]] = {}
-    for spec in specs:
-        if "=" not in spec:
-            continue
-        by_key.setdefault(spec.split("=", 1)[0].strip(), []).append(spec)
+    for i, spec in enumerate(specs):
+        parsed = split_spec(spec)
+        # 無法解析的 spec 各自成一組（恆為 False），迫使跨 key AND 失敗，而非靜默略過
+        key = parsed[0] if parsed else f"__pos{i}"
+        by_key.setdefault(key, []).append(spec)
 
     m = pd.Series(True, index=df.index)
     for group in by_key.values():
