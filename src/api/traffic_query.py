@@ -75,6 +75,10 @@ _TRAFFIC_FILTER_CAPABILITIES = {
     "any_ip": {"execution": "fallback", "notes": "Either-side semantics require client-side filtering."},
     "ex_any_label": {"execution": "fallback", "notes": "Either-side exclusion requires client-side filtering."},
     "ex_any_ip": {"execution": "fallback", "notes": "Either-side exclusion requires client-side filtering."},
+    "any_iplist": {"execution": "fallback", "notes": "Either-side ip_list membership requires client-side filtering."},
+    "any_workload": {"execution": "fallback", "notes": "Either-side workload match requires client-side filtering."},
+    "ex_any_iplist": {"execution": "fallback", "notes": "Either-side ip_list exclusion requires client-side filtering."},
+    "ex_any_workload": {"execution": "fallback", "notes": "Either-side workload exclusion requires client-side filtering."},
     "search": {"execution": "report_only", "notes": "Full-text matching is applied after flows are fetched."},
     "sort_by": {"execution": "report_only", "notes": "Sorting is applied after flows are fetched."},
     "draft_policy_decision": {"execution": "report_only", "notes": "Draft policy comparison is applied after query completion."},
@@ -774,6 +778,15 @@ class TrafficQueryBuilder:
                     return True
             return False
 
+        def _iplist_hit(side: dict, value: str) -> bool:
+            for ipl in side.get('ip_lists', []) or []:
+                if ipl.get('name') == value or ipl.get('href') == value:
+                    return True
+            return False
+
+        def _workload_hit(side: dict, value: str) -> bool:
+            return (side.get('workload') or {}).get('href') == value
+
         # 同 key any、跨 key all —— 與 native 路徑的 OR 展開語意一致（spec §2.2）
         for fkey, side_obj in (("src_labels", src), ("dst_labels", dst)):
             specs = [s for s in (filters.get(fkey) or []) if s]
@@ -812,6 +825,29 @@ class TrafficQueryBuilder:
         any_ip = filters.get('any_ip')
         if any_ip:
             if not (_ip_match(src, any_ip) or _ip_match(dst, any_ip)):
+                return False
+
+        # 物件 filter 的 residual 比對（native 解析失敗降級、或 any_* 天生 fallback）
+        for fkey, side_obj, hit in (
+            ("src_iplist", src, _iplist_hit), ("src_iplists", src, _iplist_hit),
+            ("dst_iplist", dst, _iplist_hit), ("dst_iplists", dst, _iplist_hit),
+            ("src_workload", src, _workload_hit), ("src_workloads", src, _workload_hit),
+            ("dst_workload", dst, _workload_hit), ("dst_workloads", dst, _workload_hit),
+        ):
+            vals = filters.get(fkey)
+            if not vals:
+                continue
+            vals = vals if isinstance(vals, list) else [vals]
+            if not any(hit(side_obj, v) for v in vals if v):
+                return False
+
+        for fkey, hit in (("any_iplist", _iplist_hit), ("any_workload", _workload_hit)):
+            v = filters.get(fkey)
+            if v and not (hit(src, v) or hit(dst, v)):
+                return False
+        for fkey, hit in (("ex_any_iplist", _iplist_hit), ("ex_any_workload", _workload_hit)):
+            v = filters.get(fkey)
+            if v and (hit(src, v) or hit(dst, v)):
                 return False
 
         for lbl in (filters.get('ex_src_labels') or []):
