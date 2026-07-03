@@ -221,3 +221,25 @@ def test_report_endpoint_rejects_path_traversal_format(client):
     assert resp.status_code in (200, 400, 422), (
         f"Path-traversal format should be allowlisted; got {resp.status_code}"
     )
+
+
+def test_top10_reports_truncation_flag(app_persistent, monkeypatch):
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    from src.analyzer import Analyzer, QUERY_RESULT_CAP
+
+    def fake_query(self, params):
+        self.last_query_stats = {"total_matches": 2000, "cap": QUERY_RESULT_CAP,
+                                 "truncated": True}
+        return [{"policy_decision": "allowed"}]
+
+    monkeypatch.setattr(Analyzer, "query_flows", fake_query)
+    r = client.post('/api/dashboard/top10', json={"mins": 30},
+                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                    headers={'X-CSRF-Token': csrf_token})
+    assert r.status_code == 200
+    assert r.json.get("truncated") is True
+    assert r.json.get("cap") == QUERY_RESULT_CAP

@@ -467,7 +467,7 @@ def make_dashboard_blueprint(
         d = request.json or {}
         try:
             from src.api_client import ApiClient
-            from src.analyzer import Analyzer
+            from src.analyzer import Analyzer, QUERY_RESULT_CAP
             from src.reporter import Reporter
             import datetime
 
@@ -578,11 +578,14 @@ def make_dashboard_blueprint(
                     "draft_pd": item.get('draft_policy_decision', ''),
                 })
 
+            stats = getattr(base_ana, "last_query_stats", {}) or {}
             return jsonify({
                 "ok": True,
                 "data": top10,
                 "total": len(sorted_v),
                 "source": getattr(base_ana, "last_query_source", "api"),
+                "truncated": bool(stats.get("truncated")),
+                "cap": int(stats.get("cap", QUERY_RESULT_CAP)),
             })
         except Exception as e:
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
