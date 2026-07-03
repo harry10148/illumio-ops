@@ -992,12 +992,11 @@ class _TrafficReportBase:
             + f'<h3>{_s("rpt_tr_top_uncovered")}</h3>'
             + _df_to_html(m.get('top_flows'), lang=_lang)
         )
-        up = m.get('uncovered_ports')
-        if up is not None and hasattr(up, 'empty') and not up.empty:
-            out += self._subnote('rpt_tr_port_gaps_subnote') + f'<h3>{_s("rpt_tr_port_gaps")}</h3>' + _df_to_html(up, lang=_lang)
-        us = m.get('uncovered_services')
-        if us is not None and hasattr(us, 'empty') and not us.empty:
-            out += self._subnote('rpt_tr_service_gaps_subnote') + f'<h3>{_s("rpt_tr_service_gaps")}</h3>' + _df_to_html(us, lang=_lang)
+        ups = m.get('uncovered_port_services')
+        if ups is not None and hasattr(ups, 'empty') and not ups.empty:
+            out += (self._subnote('rpt_tr_port_service_gaps_subnote')
+                    + f'<h3>{_s("rpt_tr_port_service_gaps")}</h3>'
+                    + _df_to_html(ups, lang=_lang))
         out += f'<h3>{_s("rpt_tr_by_rec")}</h3>' + _df_to_html(m.get('by_recommendation'), lang=_lang)
         return out
 

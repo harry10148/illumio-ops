@@ -62,6 +62,7 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
             'by_recommendation': pd.DataFrame(),
             'uncovered_ports': pd.DataFrame(),
             'uncovered_services': pd.DataFrame(),
+            'uncovered_port_services': pd.DataFrame(),
             'chart_spec': {
                 'type': 'pie',
                 'title': 'Policy Coverage Tiers',
@@ -156,6 +157,7 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
         'by_recommendation': by_rec,
         'uncovered_ports': uncovered_ports,
         'uncovered_services': uncovered_services,
+        'uncovered_port_services': _port_service_gap_ranking(df, uncovered, top_n=top_n),
         'chart_spec': {
             'type': 'pie',
             'title': 'Policy Coverage Tiers',
@@ -221,3 +223,29 @@ def _service_gap_ranking(uncovered: pd.DataFrame, top_n: int = 20) -> pd.DataFra
     if 'Proto' in svc.columns and svc['Proto'].astype(str).str.strip().eq('').all():
         svc = svc.drop(columns=['Proto'])
     return svc
+
+def _port_service_gap_ranking(df: pd.DataFrame, uncovered: pd.DataFrame, top_n: int = 20) -> pd.DataFrame:
+    """(port, proto) 未覆蓋排行，附上該 port 未覆蓋連線數最高的目的 App——
+    合併原 port gap 與 service gap 兩表供 HTML 呈現（spec B5）。"""
+    base = _port_gap_ranking(df, uncovered, top_n=top_n)
+    if base.empty:
+        return base
+    has_proto = 'Proto' in base.columns and 'proto' in uncovered.columns
+    unc = uncovered[uncovered['port'] > 0]
+    keys = ['port', 'proto'] if has_proto else ['port']
+    per_app = (unc.groupby(keys + ['dst_app'])['num_connections'].sum().reset_index())
+
+    def _top_apps(row) -> str:
+        sel = per_app[per_app['port'] == row['Port']]
+        if has_proto:
+            sel = sel[sel['proto'] == row['Proto']]
+        sel = sel.sort_values('num_connections', ascending=False)
+        apps = [str(a) if str(a).strip() else '(unlabeled)' for a in sel['dst_app'].fillna('')]
+        shown = apps[:3]
+        extra = len(apps) - len(shown)
+        return ', '.join(shown) + (f' +{extra}' if extra > 0 else '')
+
+    base = base.copy()
+    base['Top Destination Apps'] = base.apply(_top_apps, axis=1)
+    return base
+
