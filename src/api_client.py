@@ -580,6 +580,20 @@ class ApiClient:
             logger.error(f"Fetch Labels Error: {e}")
             return []
 
+    def get_all_labels(self) -> list[dict[str, Any]]:
+        """Get every label across all dimensions (unscoped by key).
+
+        Unlike get_labels(key) which filters one dimension, this returns all
+        labels including custom dimensions (e.g. Net=) for the filter-object
+        suggest cache. Returns [] on error.
+        """
+        org = self.api_cfg['org_id']
+        status, data = self._api_get(f"/orgs/{org}/labels?max_results=10000")
+        if status == 200 and data:
+            return data
+        logger.warning(f"get_all_labels: status={status}, returned empty list")
+        return []
+
     def create_label(self, key: str, value: str) -> dict:
         try:
             url = f"{self.base_url}/labels"
