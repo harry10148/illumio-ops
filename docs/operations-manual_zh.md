@@ -480,7 +480,7 @@ illumio-ops 從即時 PCE 資料或本地 cache 產生多種報表，輸出於 `
 | 報表 | 子命令 | 用途 |
 |---|---|---|
 | Traffic Flow | `report traffic` | 純流量事實報表（overview、policy decision 摘要、app/env 分佈、頻寬、unmanaged 概覽）；不含安全評分 |
-| Security & Risk | `report security` | 綜合流量安全分析（policy decisions、ransomware 曝險、lateral movement、enforcement readiness 等 15 個模組）；固定 security_risk 取向；可帶 `--vuln-csv` 納入漏洞掃描（Qualys/Tenable） |
+| Security & Risk | `report security` | 綜合流量安全分析（policy decisions、ransomware 曝險、lateral movement、enforcement readiness 等 13 個模組）；規則發現與修復行動已併入單一「發現與行動」（Findings & Actions）章；橫向移動（Lateral Movement）章恰呈現 4 張摘要表（service 檢視、fan-out 來源、allowed lateral flows、attack paths）——主機層明細（IP talkers/配對、bridge nodes、可達節點、app 鏈）下放至 XLSX 匯出；固定 security_risk 取向；可帶 `--vuln-csv` 納入漏洞掃描（Qualys/Tenable） |
 | Network & Traffic Inventory | `report inventory` | 固定 network_inventory 取向的清單型報表 |
 | Audit | `report audit` | 稽核事件與 policy 變更（支援 `--start-date`/`--end-date`） |
 | VEN Status | `report ven-status` | VEN 狀態（online／offline）盤點，外加 unmanaged workloads（在 Illumio 中，「Unmanaged」是 Workload 狀態——以 IP 標記、未安裝 VEN 的端點——而非 VEN 狀態） |

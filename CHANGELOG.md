@@ -17,6 +17,21 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 - Trend and baseline-drift snapshots are now keyed per report profile
   (`traffic_security_risk`, `traffic_network_inventory`, `traffic_traffic`).
   The first run after upgrading has no previous baseline to compare against.
+- Security report simplification (phase 2): the three former attack-summary chapters
+  (boundary breaches, suspicious pivot behavior, blast radius, blind spots) and the
+  hero key-findings block are consolidated into a single Findings & Actions chapter,
+  with attack posture items merged by subject and quantified with real evidence text;
+  the Lateral Movement chapter is trimmed to 4 summary tables (service view, fan-out
+  sources, allowed lateral flows, attack paths), with host-level detail (IP talkers/
+  pairs, bridge nodes, reachable nodes, app chains) moved to the XLSX export; the
+  Policy Decisions chapter folds sub-1% decisions into an "Other" row (with a note
+  listing which decisions were folded) and now surfaces the audit-flags table
+  (unmanaged-source allowed traffic); the Uncovered Flows chapter merges the port/
+  service-gap view into one table with a Top Destination Apps column; the maturity,
+  enforcement-readiness, and infrastructure-scoring sections each gained a
+  plain-language "how to read this score" explanation; the dead mod05 (legacy IP
+  host talkers) and mod10 (legacy allowed-traffic audit) modules were removed now
+  that their outputs are covered by mod15 and mod02 respectively.
 
 ### Added
 
