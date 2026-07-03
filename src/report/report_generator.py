@@ -552,29 +552,21 @@ class ReportGenerator:
 
         if fmt in ('xlsx', 'all'):
             try:
-                from src.report.exporters.xlsx_exporter import export_xlsx
                 import datetime as _dt
                 ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
                 xlsx_path = os.path.join(output_dir, f'Illumio_Traffic_Report_{ts_str}.xlsx')
                 meta = self._build_report_metadata(result, file_format="xlsx")
-                xlsx_result = {
-                    'record_count': result.record_count,
-                    'metadata': {
-                        'title': 'Traffic Flow Report',
-                        'generated_at': meta.get('generated_at', ''),
-                        'start_date': result.date_range[0] if result.date_range else '',
-                        'end_date': result.date_range[1] if len(result.date_range) > 1 else '',
-                    },
-                    'module_results': {},
+                xlsx_metadata = {
+                    'title': 'Traffic Flow Report',
+                    'generated_at': meta.get('generated_at', ''),
+                    'start_date': result.date_range[0] if result.date_range else '',
+                    'end_date': result.date_range[1] if len(result.date_range) > 1 else '',
                 }
-                for mod_key, mod_data in (result.module_results or {}).items():
-                    if not isinstance(mod_data, dict):
-                        continue
-                    sheet_data = {'summary': '', 'table': []}
-                    if 'chart_spec' in mod_data:
-                        sheet_data['chart_spec'] = mod_data['chart_spec']
-                    xlsx_result['module_results'][mod_key] = sheet_data
-                export_xlsx(xlsx_result, xlsx_path)
+                build_traffic_xlsx(
+                    result.module_results or {}, xlsx_path,
+                    profile=traffic_report_profile, lang=lang,
+                    record_count=result.record_count, metadata=xlsx_metadata,
+                )
                 paths.append(xlsx_path)
                 print(t("rpt_xlsx_saved", path=xlsx_path, lang=lang, default=f"XLSX saved: {xlsx_path}"))
             except Exception as exc:
@@ -943,152 +935,141 @@ class ReportGenerator:
 </body></html>"""
 
 
-def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", top_n: int = 100, lang: str = "en") -> str:
-    """Generate a Traffic report XLSX with real per-sheet DataFrames."""
+def build_traffic_xlsx(module_results: dict, out_path: str, *, profile: str,
+                       lang: str = "en", record_count: int = 0,
+                       metadata: dict | None = None) -> str:
+    """依 _run_pipeline 產出的 module_results 組裝 Traffic curated workbook，只讀不重算。
+
+    分頁對應（key 缺，即該 profile 未跑該模組 → 整張 sheet 略過，不寫空 sheet）：
+      mod12.kpis → Executive Summary（KPI/Value 兩欄表，chart_spec 附掛）、
+      mod02 summary+port_coverage+audit_flags → Policy Decisions（堆疊）、
+      mod03 top_flows+uncovered_port_services+uncovered_ports+uncovered_services+
+        by_recommendation → Uncovered Flows（堆疊）、
+      mod15 service_summary+fan_out_sources+allowed_lateral_flows+attack_paths+
+        六下放表（ip_top_talkers/ip_top_pairs/source_risk_scores/bridge_nodes/
+        top_reachable_nodes/app_chains）→ Lateral Movement（堆疊；全空→no_lateral note）、
+      mod07.matrices 四維度 top_cross_pairs → Cross-Label Matrix（堆疊；全空→no_matrix note）、
+      mod08 top_unmanaged_src+per_dst_app+exposed_ports_merged+三下放表
+        （src_port_detail/managed_hosts_targeted_by_unmanaged/top_unmanaged_dst）
+        → Unmanaged Hosts（堆疊）。
+
+    同源鐵律：只讀 module_results，禁止 analysis import 或 raw df 重算。堆疊 sheet 無法附掛
+    chart_spec（helper 不支援），故僅 Executive Summary 附掛圖表，其餘 chart 省略。
+    舊 Top Talkers（原自 raw flows groupby 重算）已廢棄——同源約束下無重算空間，主機層
+    資訊改由 Lateral Movement 的 ip_top_talkers 提供。
+    """
     import pandas as pd
     from openpyxl import Workbook
-    from src.report.analysis.mod12_executive_summary import analyze as exec_analyze
-    from src.report.analysis.mod02_policy_decisions import policy_decision_analysis
-    from src.report.analysis.mod03_uncovered_flows import uncovered_flows
-    from src.report.analysis.mod15_lateral_movement import lateral_movement_risk
+    from openpyxl.styles import Font
+    from src.report.exporters.xlsx_exporter import add_df_sheet, add_stacked_tables_sheet
 
+    _ = profile  # profile 僅語意標記，sheet 取捨純看 key 是否存在
     wb = Workbook()
-    wb.remove(wb.active)
+    summary_ws = wb.active
+    summary_ws.title = "Summary"
+    meta = metadata or {}
+    summary_ws["A1"] = meta.get("title", "Traffic Flow Report")
+    summary_ws["A1"].font = Font(size=18, bold=True)
+    summary_ws["A2"] = f"Generated: {meta.get('generated_at', '')}"
+    if meta.get("start_date"):
+        summary_ws["A3"] = f"Period: {meta.get('start_date')} → {meta.get('end_date', '')}"
+    summary_ws["A4"] = f"Records: {record_count}"
+    summary_ws.freeze_panes = "A2"
 
-    # --- Executive Summary ---
-    ws = wb.create_sheet(t("rpt_xlsx_sheet_exec_summary", lang=lang))
-    try:
-        exec_data = exec_analyze(flows, profile=profile)
-        kpis = exec_data.get("kpis", {})
-        ws.append([t("rpt_xlsx_col_kpi", lang=lang), t("rpt_xlsx_col_value", lang=lang)])
-        if isinstance(kpis, dict):
-            for k, v in kpis.items():
-                if isinstance(v, dict):
-                    ws.append([str(k), str(v.get("text", str(v)))])
-                else:
-                    ws.append([str(k), str(v)])
-        elif isinstance(kpis, list):
-            for item in kpis:
-                ws.append([str(item.get("label", "")), str(item.get("value", ""))])
-    except Exception:
-        ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_xlsx_exec_unavailable", lang=lang)])
+    kpi_col = t("rpt_xlsx_col_kpi", lang=lang)
+    val_col = t("rpt_xlsx_col_value", lang=lang)
 
-    # --- Policy Decisions ---
-    ws = wb.create_sheet(t("rpt_xlsx_sheet_policy_decisions", lang=lang))
-    try:
-        pol = policy_decision_analysis(flows, top_n=top_n)
-        summary_rows = []
-        for decision in ("allowed", "blocked", "potentially_blocked", "unknown"):
-            stats = pol.get(decision, {})
-            if isinstance(stats, dict) and "count" in stats:
-                summary_rows.append({"Decision": decision, "Count": stats["count"],
-                                     "% of Total": stats.get("pct_of_total", 0)})
-        if summary_rows:
-            ws.append(list(summary_rows[0].keys()))
-            for row in summary_rows:
-                ws.append(list(row.values()))
-        else:
-            ws.append(["Decision", "Count"])
-    except Exception:
-        ws.append(["Decision", "Count"])
+    # --- Executive Summary（mod12）---
+    mod12 = module_results.get("mod12")
+    if mod12:
+        kpis = mod12.get("kpis") or []
+        kpi_df = (
+            pd.DataFrame([{kpi_col: k.get("label", ""), val_col: k.get("value", "")} for k in kpis])
+            if kpis else None
+        )
+        add_df_sheet(
+            wb, t("rpt_xlsx_sheet_exec_summary", lang=lang), kpi_df,
+            chart_spec=mod12.get("chart_spec"), lang=lang,
+        )
 
-    # --- Uncovered Flows ---
-    ws = wb.create_sheet(t("rpt_xlsx_sheet_uncovered_flows", lang=lang))
-    try:
-        unc = uncovered_flows(flows, top_n=top_n)
-        top_flows = unc.get("top_flows")
-        if top_flows is not None and hasattr(top_flows, "empty") and not top_flows.empty:
-            ws.append(list(top_flows.columns))
-            for _, row in top_flows.iterrows():
-                ws.append([str(v) for v in row])
-        else:
-            # Fallback: filter flows directly
-            if hasattr(flows, "columns") and "policy_decision" in flows.columns:
-                uncov = flows[flows["policy_decision"] != "allowed"]
-                ws.append(list(flows.columns))
-                for _, row in uncov.iterrows():
-                    ws.append([str(v) for v in row])
-            else:
-                ws.append(["Note", f"coverage_pct={unc.get('coverage_pct', 'N/A')}"])
-    except Exception:
-        if hasattr(flows, "columns") and "policy_decision" in flows.columns:
-            uncov = flows[flows["policy_decision"] != "allowed"]
-            ws.append(list(flows.columns))
-            for _, row in uncov.iterrows():
-                ws.append([str(v) for v in row])
-        else:
-            ws.append(["src", "dst", "port", "policy_decision"])
+    # --- Policy Decisions（mod02）---
+    mod02 = module_results.get("mod02")
+    if mod02:
+        add_stacked_tables_sheet(
+            wb, t("rpt_xlsx_sheet_policy_decisions", lang=lang),
+            [
+                (t("rpt_pd_chart_title", lang=lang), mod02.get("summary")),
+                (t("rpt_tr_port_coverage", lang=lang), mod02.get("port_coverage")),
+                (t("rpt_tr_audit_flags", lang=lang), mod02.get("audit_flags")),
+            ],
+            lang=lang,
+        )
 
-    # --- Lateral Movement ---
-    ws = wb.create_sheet(t("rpt_xlsx_sheet_lateral_movement", lang=lang))
-    try:
-        lat = lateral_movement_risk(flows, top_n=top_n)
-        service_summary = lat.get("service_summary")
-        _wrote_any = False
-        if service_summary is not None and hasattr(service_summary, "empty") and not service_summary.empty:
-            ws.append(list(service_summary.columns))
-            for _, row in service_summary.iterrows():
-                ws.append([str(v) for v in row])
-            _wrote_any = True
-        # 自 HTML 下放的主機層明細（spec B3）：每表前空一列 + 標題列
-        _extra_tables = [
-            ("rpt_tr_ip_top_talkers", lat.get("ip_top_talkers")),
-            ("rpt_tr_ip_top_pairs", lat.get("ip_top_pairs")),
-            ("rpt_tr_top_risk_sources", lat.get("source_risk_scores")),
-            ("rpt_mod15_bridge_nodes", lat.get("bridge_nodes")),
-            ("rpt_mod15_top_reachable", lat.get("top_reachable_nodes")),
-            ("rpt_tr_app_chains", lat.get("app_chains")),
+    # --- Uncovered Flows（mod03）---
+    mod03 = module_results.get("mod03")
+    if mod03:
+        add_stacked_tables_sheet(
+            wb, t("rpt_xlsx_sheet_uncovered_flows", lang=lang),
+            [
+                (t("rpt_tr_top_uncovered", lang=lang), mod03.get("top_flows")),
+                (t("rpt_tr_port_service_gaps", lang=lang), mod03.get("uncovered_port_services")),
+                (t("rpt_tr_uncovered_ports", lang=lang), mod03.get("uncovered_ports")),
+                (t("rpt_tr_uncovered_services", lang=lang), mod03.get("uncovered_services")),
+                (t("rpt_tr_by_rec", lang=lang), mod03.get("by_recommendation")),
+            ],
+            lang=lang,
+        )
+
+    # --- Lateral Movement（mod15；含六下放表，全空落回 no_lateral note）---
+    mod15 = module_results.get("mod15")
+    if mod15:
+        add_stacked_tables_sheet(
+            wb, t("rpt_xlsx_sheet_lateral_movement", lang=lang),
+            [
+                (t("rpt_tr_lateral_by_service", lang=lang), mod15.get("service_summary")),
+                (t("rpt_tr_fan_out", lang=lang), mod15.get("fan_out_sources")),
+                (t("rpt_tr_allowed_lateral", lang=lang), mod15.get("allowed_lateral_flows")),
+                (t("rpt_mod15_attack_paths", lang=lang), mod15.get("attack_paths")),
+                (t("rpt_tr_ip_top_talkers", lang=lang), mod15.get("ip_top_talkers")),
+                (t("rpt_tr_ip_top_pairs", lang=lang), mod15.get("ip_top_pairs")),
+                (t("rpt_tr_top_risk_sources", lang=lang), mod15.get("source_risk_scores")),
+                (t("rpt_mod15_bridge_nodes", lang=lang), mod15.get("bridge_nodes")),
+                (t("rpt_mod15_top_reachable", lang=lang), mod15.get("top_reachable_nodes")),
+                (t("rpt_tr_app_chains", lang=lang), mod15.get("app_chains")),
+            ],
+            empty_note=t("rpt_xlsx_no_lateral", lang=lang),
+            lang=lang,
+        )
+
+    # --- Cross-Label Matrix（mod07；四維度 top_cross_pairs，全空落回 no_matrix note）---
+    mod07 = module_results.get("mod07")
+    if mod07:
+        matrices = mod07.get("matrices") or {}
+        cross_tables = [
+            (f"{t('rpt_tr_label_key', lang=lang)} {dim.upper()}",
+             (matrices.get(dim) or {}).get("top_cross_pairs"))
+            for dim in ("env", "app", "role", "loc")
         ]
-        for _title_key, _tbl in _extra_tables:
-            if _tbl is None or not hasattr(_tbl, "empty") or _tbl.empty:
-                continue
-            ws.append([])
-            ws.append([t(_title_key, lang=lang)])
-            ws.append([str(c) for c in _tbl.columns])
-            for _, _row in _tbl.iterrows():
-                ws.append([str(v) for v in _row])
-            _wrote_any = True
-        if not _wrote_any:
-            ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_xlsx_no_lateral", lang=lang)])
-    except Exception:
-        ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_xlsx_lateral_unavailable", lang=lang)])
+        add_stacked_tables_sheet(
+            wb, t("rpt_xlsx_sheet_cross_label", lang=lang), cross_tables,
+            empty_note=t("rpt_no_matrix", lang=lang), lang=lang,
+        )
 
-    # --- Top Talkers ---
-    ws = wb.create_sheet(t("rpt_xlsx_sheet_top_talkers", lang=lang))
-    try:
-        if hasattr(flows, "columns") and "src" in flows.columns and "dst" in flows.columns:
-            talkers = (flows.groupby(["src", "dst"]).size()
-                       .sort_values(ascending=False).head(top_n)
-                       .reset_index(name="flows"))
-            ws.append(list(talkers.columns))
-            for row in talkers.itertuples(index=False):
-                ws.append(list(row))
-        else:
-            ws.append(["src", "dst", "flows"])
-    except Exception:
-        ws.append(["src", "dst", "flows"])
-
-    # --- Cross-Label Matrix（role/loc 自 HTML 下放；spec C2）---
-    ws = wb.create_sheet(t("rpt_xlsx_sheet_cross_label", lang=lang))
-    try:
-        from src.report.analysis.mod07_cross_label_matrix import cross_label_flow_matrix
-        m07 = cross_label_flow_matrix(flows, top_n=top_n)
-        _wrote_any_m07 = False
-        for _dim in ('role', 'loc'):
-            _data = (m07.get('matrices') or {}).get(_dim) or {}
-            _tbl = _data.get('top_cross_pairs')
-            if _tbl is None or not hasattr(_tbl, 'empty') or _tbl.empty:
-                continue
-            ws.append([])
-            ws.append([f"{t('rpt_tr_label_key', lang=lang)} {_dim.upper()}"])
-            ws.append([str(c) for c in _tbl.columns])
-            for _, _row in _tbl.iterrows():
-                ws.append([str(v) for v in _row])
-            _wrote_any_m07 = True
-        if not _wrote_any_m07:
-            ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_no_matrix", lang=lang)])
-    except Exception:
-        ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_no_matrix", lang=lang)])
+    # --- Unmanaged Hosts（mod08；含三下放表）---
+    mod08 = module_results.get("mod08")
+    if mod08:
+        add_stacked_tables_sheet(
+            wb, t("rpt_xlsx_sheet_unmanaged", lang=lang),
+            [
+                (t("rpt_tr_top_unmanaged", lang=lang), mod08.get("top_unmanaged_src")),
+                (t("rpt_tr_managed_apps_unmanaged", lang=lang), mod08.get("per_dst_app")),
+                (t("rpt_tr_exposed_ports_merged", lang=lang), mod08.get("exposed_ports_merged")),
+                (t("rpt_tr_src_port_detail", lang=lang), mod08.get("src_port_detail")),
+                (t("rpt_tr_managed_targeted", lang=lang), mod08.get("managed_hosts_targeted_by_unmanaged")),
+                (t("rpt_tr_top_unmanaged_dst", lang=lang), mod08.get("top_unmanaged_dst")),
+            ],
+            lang=lang,
+        )
 
     wb.save(out_path)
     return out_path
