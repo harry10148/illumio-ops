@@ -750,12 +750,14 @@ class TrafficQueryBuilder:
                     return True
             return False
 
-        for lbl in (filters.get('src_labels') or []):
-            if lbl and not _label_match(src, lbl):
-                return False
-        for lbl in (filters.get('dst_labels') or []):
-            if lbl and not _label_match(dst, lbl):
-                return False
+        # 同 key any、跨 key all —— 與 native 路徑的 OR 展開語意一致（spec §2.2）
+        for fkey, side_obj in (("src_labels", src), ("dst_labels", dst)):
+            specs = [s for s in (filters.get(fkey) or []) if s]
+            if not specs:
+                continue
+            for group in group_label_specs_by_key(specs).values():
+                if not any(_label_match(side_obj, s) for s in group):
+                    return False
         if filters.get('src_ip') and not _ip_match(src, filters['src_ip']):
             return False
         if filters.get('dst_ip') and not _ip_match(dst, filters['dst_ip']):
