@@ -740,20 +740,10 @@ class AuditGenerator:
 
         if fmt in ('xlsx', 'all'):
             try:
-                from src.report.exporters.xlsx_exporter import export_xlsx
                 import datetime as _dt
                 ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
                 xlsx_path = os.path.join(output_dir, f'Illumio_Audit_Report_{ts_str}.xlsx')
-                xlsx_result = {
-                    'record_count': result.record_count,
-                    'metadata': {'title': 'Audit Report'},
-                    'module_results': {
-                        k: {'summary': '', 'table': []}
-                        for k, v in (result.module_results or {}).items()
-                        if isinstance(v, dict)
-                    },
-                }
-                export_xlsx(xlsx_result, xlsx_path)
+                generate_audit_xlsx(result.module_results or {}, xlsx_path, lang=lang)
                 paths.append(xlsx_path)
                 print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}", lang=lang))
             except Exception as exc:
@@ -815,83 +805,58 @@ class AuditGenerator:
             json.dump(payload, fh, indent=2, ensure_ascii=False)
 
 
-def generate_audit_xlsx(events_df, out_path: str, top_n: int = 100) -> str:
-    """Generate an Audit report XLSX with real per-sheet DataFrames."""
+def generate_audit_xlsx(module_results: dict, out_path: str, *, lang: str = "en") -> str:
+    """依 _run_pipeline 產出的 module_results 組裝 Audit XLSX，只讀不重算。
+
+    分頁對應：mod00.kpis → Attention Required（KPI/Value 兩欄表）、
+    mod01.summary → Health、mod02.per_user → Users、mod03.summary → Policy Changes、
+    mod04 三個 DataFrame（correlated_sequences/brute_force_detections/off_hours_operations）
+    → Correlations（以 add_stacked_tables_sheet 堆疊）。缺 key 或空 df 一律寫 empty_note。
+    """
     from openpyxl import Workbook
-    from src.report.analysis.audit.audit_mod00_executive import audit_executive_summary
-    from src.report.analysis.audit.audit_mod01_health import audit_system_health
-    from src.report.analysis.audit.audit_mod02_users import audit_user_activity
-    from src.report.analysis.audit.audit_mod03_policy import audit_policy_changes
-    from src.report.analysis.audit.audit_mod04_correlation import audit_event_correlation
+    from src.report.exporters.xlsx_exporter import add_df_sheet, add_stacked_tables_sheet
 
     wb = Workbook()
     wb.remove(wb.active)
 
-    def _df_to_sheet(ws, df):
-        if df is None or not hasattr(df, "empty") or df.empty:
-            ws.append(["Note", "No data"])
-            return
-        ws.append(list(df.columns))
-        for _, row in df.head(top_n).iterrows():
-            ws.append([str(v) for v in row])
+    mod00 = module_results.get("mod00") or {}
+    mod01 = module_results.get("mod01") or {}
+    mod02 = module_results.get("mod02") or {}
+    mod03 = module_results.get("mod03") or {}
+    mod04 = module_results.get("mod04") or {}
 
-    # --- Attention Required (executive summary KPIs) ---
-    ws = wb.create_sheet("Attention Required")
-    try:
-        # audit_executive_summary expects results dict + df; build minimal results first
-        mod01 = audit_system_health(events_df)
-        mod02 = audit_user_activity(events_df)
-        mod03 = audit_policy_changes(events_df)
-        results = {"mod01": mod01, "mod02": mod02, "mod03": mod03}
-        exec_data = audit_executive_summary(results, events_df)
-        kpis = exec_data.get("kpis", [])
-        ws.append(["KPI", "Value"])
-        for item in kpis:
-            ws.append([str(item.get("label", "")), str(item.get("value", ""))])
-    except Exception:
-        ws.append(["Note", "Executive summary unavailable"])
+    kpis = mod00.get("kpis") or []
+    kpi_col = t("rpt_xlsx_col_kpi", lang=lang)
+    val_col = t("rpt_xlsx_col_value", lang=lang)
+    kpi_df = (
+        pd.DataFrame([{kpi_col: k.get("label", ""), val_col: k.get("value", "")} for k in kpis])
+        if kpis else None
+    )
+    add_df_sheet(
+        wb, t("rpt_xlsx_sheet_audit_attention", lang=lang), kpi_df, lang=lang,
+    )
 
-    # --- Health ---
-    ws = wb.create_sheet("Health")
-    try:
-        health_data = audit_system_health(events_df)
-        summary_df = health_data.get("summary")
-        _df_to_sheet(ws, summary_df)
-    except Exception:
-        ws.append(["Note", "Health data unavailable"])
+    add_df_sheet(
+        wb, t("rpt_xlsx_sheet_audit_health", lang=lang), mod01.get("summary"), lang=lang,
+    )
 
-    # --- Users ---
-    ws = wb.create_sheet("Users")
-    try:
-        users_data = audit_user_activity(events_df)
-        per_user_df = users_data.get("per_user")
-        _df_to_sheet(ws, per_user_df)
-    except Exception:
-        ws.append(["Note", "User data unavailable"])
+    add_df_sheet(
+        wb, t("rpt_xlsx_sheet_audit_users", lang=lang), mod02.get("per_user"), lang=lang,
+    )
 
-    # --- Policy Changes ---
-    ws = wb.create_sheet("Policy Changes")
-    try:
-        policy_data = audit_policy_changes(events_df)
-        summary_df = policy_data.get("summary")
-        _df_to_sheet(ws, summary_df)
-    except Exception:
-        ws.append(["Note", "Policy changes unavailable"])
+    add_df_sheet(
+        wb, t("rpt_xlsx_sheet_audit_policy", lang=lang), mod03.get("summary"), lang=lang,
+    )
 
-    # --- Correlations ---
-    ws = wb.create_sheet("Correlations")
-    try:
-        corr_data = audit_event_correlation(events_df)
-        if isinstance(corr_data, dict) and "error" not in corr_data:
-            # Flatten scalar KPIs
-            ws.append(["Metric", "Value"])
-            for k, v in corr_data.items():
-                if not hasattr(v, "empty"):
-                    ws.append([str(k), str(v)])
-        else:
-            ws.append(["Note", str(corr_data.get("error", "No correlation data"))])
-    except Exception:
-        ws.append(["Note", "Correlation data unavailable"])
+    add_stacked_tables_sheet(
+        wb, t("rpt_xlsx_sheet_audit_correlations", lang=lang),
+        [
+            ("correlated_sequences", mod04.get("correlated_sequences")),
+            ("brute_force_detections", mod04.get("brute_force_detections")),
+            ("off_hours_operations", mod04.get("off_hours_operations")),
+        ],
+        lang=lang,
+    )
 
     wb.save(out_path)
     return out_path
