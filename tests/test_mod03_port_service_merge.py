@@ -36,3 +36,17 @@ def test_merged_table_empty_when_no_uncovered():
     df["policy_decision"] = "allowed"
     out = uncovered_flows(df)
     assert out["uncovered_port_services"].empty
+
+
+def test_nan_dst_app_shows_unlabeled():
+    """dst_app 為 NaN 的未覆蓋流量必須顯示 (unlabeled)，不得整格空白。"""
+    import numpy as np
+    df = pd.DataFrame([
+        {"src_ip": "10.0.0.1", "dst_ip": "10.1.0.9", "port": 8443, "proto": "TCP",
+         "src_app": "web", "dst_app": np.nan, "policy_decision": "blocked",
+         "src_managed": True, "dst_managed": True, "num_connections": 12},
+    ])
+    out = uncovered_flows(df)
+    merged = out["uncovered_port_services"]
+    row = merged[merged["Port"] == 8443].iloc[0]
+    assert row["Top Destination Apps"] == "(unlabeled)"

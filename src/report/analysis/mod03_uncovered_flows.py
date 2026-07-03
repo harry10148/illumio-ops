@@ -233,7 +233,7 @@ def _port_service_gap_ranking(df: pd.DataFrame, uncovered: pd.DataFrame, top_n: 
     has_proto = 'Proto' in base.columns and 'proto' in uncovered.columns
     unc = uncovered[uncovered['port'] > 0]
     keys = ['port', 'proto'] if has_proto else ['port']
-    per_app = (unc.groupby(keys + ['dst_app'])['num_connections'].sum().reset_index())
+    per_app = (unc.groupby(keys + ['dst_app'], dropna=False)['num_connections'].sum().reset_index())
 
     def _top_apps(row) -> str:
         sel = per_app[per_app['port'] == row['Port']]
