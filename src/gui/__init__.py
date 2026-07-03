@@ -484,6 +484,10 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     from src.gui.routes.actions import make_actions_blueprint
     app.register_blueprint(make_actions_blueprint(cm, csrf, limiter, login_required))
 
+    # ── Filter Objects Blueprint ───────────────────────────────────────────────
+    from src.gui.routes.filter_objects import make_filter_objects_blueprint
+    app.register_blueprint(make_filter_objects_blueprint(cm, csrf, limiter, login_required))
+
     # ── Rule Scheduler Blueprint ───────────────────────────────────────────────
     from src.gui.routes.rule_scheduler import make_rule_scheduler_blueprint
     app.register_blueprint(make_rule_scheduler_blueprint(cm, login_required))
