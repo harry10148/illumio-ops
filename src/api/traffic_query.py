@@ -90,6 +90,22 @@ _TRAFFIC_FILTER_CAPABILITIES = {
     "ex_src_label_groups": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to label_group hrefs and pushed to sources.exclude."},
     "ex_dst_label_group": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to label_group href and pushed to destinations.exclude."},
     "ex_dst_label_groups": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to label_group hrefs and pushed to destinations.exclude."},
+    "src_iplist": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list href and pushed to sources.include."},
+    "src_iplists": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list hrefs and pushed to sources.include."},
+    "dst_iplist": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list href and pushed to destinations.include."},
+    "dst_iplists": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list hrefs and pushed to destinations.include."},
+    "ex_src_iplist": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list href and pushed to sources.exclude."},
+    "ex_src_iplists": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list hrefs and pushed to sources.exclude."},
+    "ex_dst_iplist": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list href and pushed to destinations.exclude."},
+    "ex_dst_iplists": {"execution": "native", "min_pce_version": "21.2", "notes": "Resolved to ip_list hrefs and pushed to destinations.exclude."},
+    "src_workload": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload href pushed to sources.include."},
+    "src_workloads": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload hrefs pushed to sources.include."},
+    "dst_workload": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload href pushed to destinations.include."},
+    "dst_workloads": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload hrefs pushed to destinations.include."},
+    "ex_src_workload": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload href pushed to sources.exclude."},
+    "ex_src_workloads": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload hrefs pushed to sources.exclude."},
+    "ex_dst_workload": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload href pushed to destinations.exclude."},
+    "ex_dst_workloads": {"execution": "native", "min_pce_version": "21.2", "notes": "Workload hrefs pushed to destinations.exclude."},
 }
 
 _LABEL_OR_EXPANSION_CAP = 100  # 笛卡兒積組數上限，超過即整族降級 fallback
@@ -277,6 +293,10 @@ class TrafficQueryBuilder:
             (("dst_label_group", "dst_label_groups"), "destinations", labels._resolve_label_group_filter_to_actor),
             (("src_ip_in", "src_ip"), "sources", labels._resolve_ip_filter_to_actor),
             (("dst_ip_in", "dst_ip"), "destinations", labels._resolve_ip_filter_to_actor),
+            (("src_iplist", "src_iplists"), "sources", labels._resolve_iplist_filter_to_actor),
+            (("dst_iplist", "dst_iplists"), "destinations", labels._resolve_iplist_filter_to_actor),
+            (("src_workload", "src_workloads"), "sources", labels._resolve_workload_filter_to_actor),
+            (("dst_workload", "dst_workloads"), "destinations", labels._resolve_workload_filter_to_actor),
         ]
         exclude_specs = [
             (("ex_src_label", "ex_src_labels"), "sources", labels._resolve_label_filter_to_actor),
@@ -285,6 +305,10 @@ class TrafficQueryBuilder:
             (("ex_dst_label_group", "ex_dst_label_groups"), "destinations", labels._resolve_label_group_filter_to_actor),
             (("ex_src_ip",), "sources", labels._resolve_ip_filter_to_actor),
             (("ex_dst_ip",), "destinations", labels._resolve_ip_filter_to_actor),
+            (("ex_src_iplist", "ex_src_iplists"), "sources", labels._resolve_iplist_filter_to_actor),
+            (("ex_dst_iplist", "ex_dst_iplists"), "destinations", labels._resolve_iplist_filter_to_actor),
+            (("ex_src_workload", "ex_src_workloads"), "sources", labels._resolve_workload_filter_to_actor),
+            (("ex_dst_workload", "ex_dst_workloads"), "destinations", labels._resolve_workload_filter_to_actor),
         ]
 
         # 同 key OR、跨 key AND（對齊 PCE 原生；spec §2.2 實測依據）：

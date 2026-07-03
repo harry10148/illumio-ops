@@ -402,6 +402,45 @@ class LabelResolver:
             return {"ip_list": {"href": href}}
         return None
 
+    def _resolve_iplist_filter_to_actor(self, iplist_filter):
+        """IP List 物件 filter → actor。接受 dict{href|name}、href 字串或名稱。
+        刻意不接受 IP literal——那是 src_ip 家族的職責。"""
+        c = self._client
+        if not iplist_filter:
+            return None
+        if isinstance(iplist_filter, dict):
+            href = iplist_filter.get("href")
+            if href and "/ip_lists/" in str(href):
+                return {"ip_list": {"href": str(href).strip()}}
+            iplist_filter = iplist_filter.get("name") or ""
+        candidate = str(iplist_filter).strip()
+        if not candidate or self._is_ip_literal(candidate):
+            return None
+        if self._is_href(candidate):
+            if "/ip_lists/" in candidate:
+                return {"ip_list": {"href": candidate}}
+            return None
+        self._ensure_query_lookup_cache()
+        href = c._iplist_href_cache.get(candidate)
+        if not href:
+            self._ensure_query_lookup_cache(force_refresh=True)
+            href = c._iplist_href_cache.get(candidate)
+        if href:
+            return {"ip_list": {"href": href}}
+        return None
+
+    def _resolve_workload_filter_to_actor(self, workload_filter):
+        """Workload 物件 filter → actor。只接受 href（dict 或字串）；
+        名稱搜尋交給 suggest 端點在選取當下轉 href。"""
+        if not workload_filter:
+            return None
+        if isinstance(workload_filter, dict):
+            workload_filter = workload_filter.get("href") or ""
+        candidate = str(workload_filter).strip()
+        if candidate and self._is_href(candidate) and "/workloads/" in candidate:
+            return {"workload": {"href": candidate}}
+        return None
+
     # ── Display resolution ──────────────────────────────────────────────
 
     def resolve_actor_str(self, actors):
