@@ -850,6 +850,21 @@ class TrafficQueryBuilder:
             if v and (hit(src, v) or hit(dst, v)):
                 return False
 
+        # 排除路徑的 side-specific residual 比對（對稱於前面 include 側的 fallback
+        # 迴圈；native href 解析失敗降級到這裡時，不得靜默漏排除，安全方向優先）
+        for fkey, side_obj, hit in (
+            ("ex_src_iplist", src, _iplist_hit), ("ex_src_iplists", src, _iplist_hit),
+            ("ex_dst_iplist", dst, _iplist_hit), ("ex_dst_iplists", dst, _iplist_hit),
+            ("ex_src_workload", src, _workload_hit), ("ex_src_workloads", src, _workload_hit),
+            ("ex_dst_workload", dst, _workload_hit), ("ex_dst_workloads", dst, _workload_hit),
+        ):
+            vals = filters.get(fkey)
+            if not vals:
+                continue
+            vals = vals if isinstance(vals, list) else [vals]
+            if any(hit(side_obj, v) for v in vals if v):
+                return False
+
         for lbl in (filters.get('ex_src_labels') or []):
             if lbl and _label_match(src, lbl):
                 return False

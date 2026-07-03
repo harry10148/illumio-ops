@@ -78,3 +78,27 @@ def test_residual_src_workload_side_specific():
     flow = _flow_with_objects(src_wl_href="/orgs/1/workloads/abc")
     assert _match(flow, {"src_workloads": ["/orgs/1/workloads/abc"]}) is True
     assert _match(flow, {"dst_workloads": ["/orgs/1/workloads/abc"]}) is False
+
+
+def test_ex_src_iplist_excludes_on_src_hit():
+    flow = _flow_with_objects(src_iplists=[("corp-vpn", "/orgs/1/sec_policy/active/ip_lists/3")])
+    assert _match(flow, {"ex_src_iplists": ["corp-vpn"]}) is False
+    assert _match(flow, {"ex_dst_iplists": ["corp-vpn"]}) is True
+
+
+def test_ex_dst_iplist_excludes_on_dst_hit():
+    flow = _flow_with_objects(dst_iplists=[("corp-vpn", "/orgs/1/sec_policy/active/ip_lists/3")])
+    assert _match(flow, {"ex_dst_iplists": ["corp-vpn"]}) is False
+    assert _match(flow, {"ex_src_iplists": ["corp-vpn"]}) is True
+
+
+def test_ex_src_workload_excludes_on_src_hit():
+    flow = _flow_with_objects(src_wl_href="/orgs/1/workloads/abc")
+    assert _match(flow, {"ex_src_workloads": ["/orgs/1/workloads/abc"]}) is False
+    assert _match(flow, {"ex_dst_workloads": ["/orgs/1/workloads/abc"]}) is True
+
+
+def test_ex_dst_workload_excludes_on_dst_hit():
+    flow = _flow_with_objects(dst_wl_href="/orgs/1/workloads/abc")
+    assert _match(flow, {"ex_dst_workloads": ["/orgs/1/workloads/abc"]}) is False
+    assert _match(flow, {"ex_src_workloads": ["/orgs/1/workloads/abc"]}) is True
