@@ -1028,20 +1028,6 @@ class _TrafficReportBase:
         )
         return out
 
-    def _mod05_html(self):
-        _s = self._s
-        _lang = self._lang
-        m = self._r.get('mod05', {})
-        if not isinstance(m, dict) or m.get('total_lateral_flows', 0) == 0:
-            return f'<p class="note">{_s("rpt_no_lateral")}</p>'
-        return (
-            self._subnote('rpt_tr_remote_services_subnote')
-            + _df_to_html(m.get('by_service'), lang=_lang)
-            + self._subnote('rpt_tr_remote_talkers_subnote')
-            + f'<h3>{_s("rpt_tr_top_talkers")}</h3>'
-            + _df_to_html(m.get('top_talkers'), lang=_lang)
-        )
-
     def _mod06_html(self):
         _s = self._s
         _lang = self._lang
