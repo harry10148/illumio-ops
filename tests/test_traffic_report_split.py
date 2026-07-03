@@ -38,9 +38,9 @@ def test_inventory_omits_maturity_and_readiness():
     # (bare ".score-hero" also lives in the embedded CSS, so match the live markup fragment).
     assert '<div class="score-hero">' not in html
     assert 'id="unmanaged"' in html
-    assert 'id="distribution"' in html
-    # shared sections kept in both:
-    assert 'id="overview"' in html and 'id="policy"' in html
+    assert 'id="distribution"' not in html  # spec C1: traffic chapters removed from inventory
+    # inventory keeps policy; overview/bandwidth moved to traffic report:
+    assert 'id="overview"' not in html and 'id="policy"' in html
 
 
 def test_facades_produce_files(tmp_path, monkeypatch):

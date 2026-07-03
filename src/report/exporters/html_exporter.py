@@ -1638,8 +1638,9 @@ class NetworkInventoryHtmlExporter(_TrafficReportBase):
         return False
 
     def _ordered_section_keys(self) -> list[str]:
-        return ['summary', 'overview', 'labels', 'policy', 'matrix', 'unmanaged',
-                'distribution', 'bandwidth', 'ringfence', 'change_impact']
+        # spec C1：流量總覽/流量分布/頻寬歸 Traffic 報表，inventory 聚焦資產與標籤治理
+        return ['summary', 'labels', 'policy', 'matrix', 'unmanaged',
+                'ringfence', 'change_impact']
 
 
 class HtmlExporter(_TrafficReportBase):
