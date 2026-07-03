@@ -50,3 +50,25 @@ def test_over_cap_truncated_and_counted(monkeypatch):
     assert len(out) == QUERY_RESULT_CAP
     assert ana.last_query_stats["total_matches"] == QUERY_RESULT_CAP + 37
     assert ana.last_query_stats["truncated"] is True
+
+
+def test_empty_result_resets_stale_stats(monkeypatch):
+    """同一 Analyzer 實例先跑超過上限的查詢（truncated=True），
+    再跑空結果查詢，確認第二次後統計不會殘留第一次的值。"""
+    ana = _analyzer_with_flows(monkeypatch, QUERY_RESULT_CAP + 37)
+    # 第一次查詢：超過上限，truncated 為 True
+    out1 = ana.query_flows(_params())
+    assert ana.last_query_stats["truncated"] is True
+
+    # 第二次查詢：空結果（stub 回傳 empty list）
+    monkeypatch.setattr(ana.api, "execute_traffic_query_stream",
+                        lambda *a, **kw: iter([]), raising=False)
+    out2 = ana.query_flows(_params())
+
+    # 統計必須重設：不得殘留第一次的 truncated=True
+    assert len(out2) == 0
+    assert ana.last_query_stats == {
+        "total_matches": 0,
+        "cap": QUERY_RESULT_CAP,
+        "truncated": False,
+    }

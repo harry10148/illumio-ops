@@ -8,6 +8,7 @@ from contextlib import redirect_stdout
 from flask import Blueprint, jsonify, request
 
 from src.alerts import PLUGIN_METADATA
+from src.analyzer import QUERY_RESULT_CAP
 from src.config import ConfigManager
 from src.gui._helpers import (
     _err,
@@ -121,7 +122,7 @@ def make_actions_blueprint(
                 "data": results,
                 "total_matches": int(stats.get("total_matches", len(results))),
                 "truncated": bool(stats.get("truncated")),
-                "cap": int(stats.get("cap", 0)),
+                "cap": int(stats.get("cap", QUERY_RESULT_CAP)),
             })
         except Exception as e:
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')

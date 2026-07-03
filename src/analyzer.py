@@ -1024,6 +1024,9 @@ class Analyzer:
           "search": "192.168.1.1" # optional text filter
         }
         """
+        # 每次查詢先重設統計——含 early-return 路徑（空結果不得殘留上次統計）
+        self.last_query_stats = {"total_matches": 0, "cap": QUERY_RESULT_CAP, "truncated": False}
+
         start_time = params.get("start_time")
         end_time = params.get("end_time")
         if not isinstance(start_time, str) or not isinstance(end_time, str):
