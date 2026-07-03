@@ -1019,10 +1019,12 @@ def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", 
     try:
         lat = lateral_movement_risk(flows, top_n=top_n)
         service_summary = lat.get("service_summary")
+        _wrote_any = False
         if service_summary is not None and hasattr(service_summary, "empty") and not service_summary.empty:
             ws.append(list(service_summary.columns))
             for _, row in service_summary.iterrows():
                 ws.append([str(v) for v in row])
+            _wrote_any = True
         # 自 HTML 下放的主機層明細（spec B3）：每表前空一列 + 標題列
         _extra_tables = [
             ("rpt_tr_ip_top_talkers", lat.get("ip_top_talkers")),
@@ -1040,7 +1042,8 @@ def generate_traffic_xlsx(flows, out_path: str, profile: str = "security_risk", 
             ws.append([str(c) for c in _tbl.columns])
             for _, _row in _tbl.iterrows():
                 ws.append([str(v) for v in _row])
-        if service_summary is None or not hasattr(service_summary, "empty") or service_summary.empty:
+            _wrote_any = True
+        if not _wrote_any:
             ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_xlsx_no_lateral", lang=lang)])
     except Exception:
         ws.append([t("rpt_xlsx_col_note", lang=lang), t("rpt_xlsx_lateral_unavailable", lang=lang)])

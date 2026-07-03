@@ -4134,4 +4134,3 @@
   "rpt_xlsx_lateral_unavailable": "Lateral movement data unavailable",
   "rpt_tr_lateral_xlsx_note": "Host-level detail (IP top talkers, host pairs, bridge nodes, reachable nodes, app chains, risk sources) has moved to the XLSX export."
 }
-
