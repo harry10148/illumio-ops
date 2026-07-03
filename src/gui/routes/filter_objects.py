@@ -55,7 +55,13 @@ def make_filter_objects_blueprint(cm, csrf, limiter, login_required):
 
 
 def _search_workloads(api, q: str, limit: int) -> dict:
-    """即時查 workload：name 與 hostname 各查一次、合併去重（by href）。"""
+    """即時查 workload：name 與 hostname 各查一次、合併去重（by href）。
+
+    ApiClient.search_workloads 失敗時會吞掉例外回傳 []（不 raise），所以無法
+    靠 except 分辨「PCE 不通」vs「真的無符合」。因此結果為空時，額外用
+    check_health 探測 PCE 連線狀態：非 200 視為 pce_unreachable，200 則是
+    真的沒有符合的 workload。
+    """
     try:
         seen, items = set(), []
         for param in ("name", "hostname"):
@@ -72,6 +78,10 @@ def _search_workloads(api, q: str, limit: int) -> dict:
                         break
                 items.append({"name": w.get("name") or w.get("hostname") or href,
                               "hostname": w.get("hostname", ""), "ip": ip, "href": href})
+        if not items:
+            status, _ = api.check_health()
+            if status != 200:
+                return {"items": [], "truncated": False, "error": "pce_unreachable"}
         return {"items": items[:limit], "truncated": len(items) > limit, "error": None}
     except Exception:
         return {"items": [], "truncated": False, "error": "pce_unreachable"}
