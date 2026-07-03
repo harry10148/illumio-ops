@@ -3199,6 +3199,8 @@
   "rpt_mod01_chart_title": "流量總覽",
   "rpt_mod02_top_inbound_ports": "Inbound 熱門 Ports",
   "rpt_mod02_top_outbound_ports": "Outbound 熱門 Ports",
+  "rpt_mod02_minor_decisions": "其他判定（各 <1%）",
+  "rpt_mod02_minor_note": "佔比低於 1% 的判定已摺疊：{names}。完整明細仍在資料匯出中。",
   "rpt_mod03_chart_title": "未覆蓋流量",
   "rpt_mod03_rec_cross_app": "Cross-App 流量：為此 src_app → dst_app 通訊新增 Ruleset 條目。",
   "rpt_mod03_rec_intra_app": "Intra-App 流量：在 App 範圍內新增 intra-scope 規則以 Allow 同一 App 內部流量。",

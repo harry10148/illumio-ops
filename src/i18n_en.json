@@ -3200,6 +3200,8 @@
   "rpt_mod01_chart_title": "Traffic Overview",
   "rpt_mod02_top_inbound_ports": "Top Inbound Ports",
   "rpt_mod02_top_outbound_ports": "Top Outbound Ports",
+  "rpt_mod02_minor_decisions": "Other (<1% each)",
+  "rpt_mod02_minor_note": "Folded decisions below 1% of total: {names}. Full detail remains in the data export.",
   "rpt_mod03_chart_title": "Uncovered Flows",
   "rpt_mod03_rec_cross_app": "Cross-app flow: add a rule-set entry for this src_app → dst_app communication.",
   "rpt_mod03_rec_intra_app": "Intra-app flow: add an intra-scope rule to allow traffic within the same application.",

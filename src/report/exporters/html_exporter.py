@@ -880,11 +880,37 @@ class _TrafficReportBase:
         intro_text = t('rpt_tr_sec_policy_intro', lang=_lang,
                        default='Break down the ratios and details of Allowed, Blocked, and Potentially Blocked to gauge how Policy is actually landing.')
         chart_html = _render_chart_for_html(m.get('chart_spec'), lang=self._lang)
-        table_html = self._subnote('rpt_tr_mod02_intro') + _df_to_html(m.get('summary'), lang=_lang)
+        # <1% decision 摺疊（僅 security_risk；spec B4）：
+        # ≥2 個 minor 且至少留 1 個主要列才摺疊，避免單列換單列的偽簡化。
+        summary_df = m.get('summary')
+        minor: list[str] = []
+        if (self._profile == 'security_risk' and summary_df is not None
+                and hasattr(summary_df, 'empty') and not summary_df.empty
+                and '% of Total' in summary_df.columns):
+            minor_mask = summary_df['% of Total'] < 1.0
+            if int(minor_mask.sum()) >= 2 and int((~minor_mask).sum()) >= 1:
+                minor = [str(x) for x in summary_df.loc[minor_mask, 'Decision']]
+                folded = {
+                    'Decision': t('rpt_mod02_minor_decisions', lang=_lang),
+                    'Flows': int(summary_df.loc[minor_mask, 'Flows'].sum()),
+                    '% of Total': round(float(summary_df.loc[minor_mask, '% of Total'].sum()), 1),
+                    'Inbound': int(summary_df.loc[minor_mask, 'Inbound'].sum()),
+                    'Outbound': int(summary_df.loc[minor_mask, 'Outbound'].sum()),
+                }
+                summary_df = pd.concat(
+                    [summary_df.loc[~minor_mask], pd.DataFrame([folded])],
+                    ignore_index=True,
+                )
+        table_html = self._subnote('rpt_tr_mod02_intro') + _df_to_html(summary_df, lang=_lang)
+        if minor:
+            table_html += (f'<p class="note" style="font-size:12px;">'
+                           f'{t("rpt_mod02_minor_note", lang=_lang, names=", ".join(minor))}</p>')
         pc = m.get('port_coverage')
         if pc is not None and hasattr(pc, 'empty') and not pc.empty:
             table_html += self._subnote('rpt_tr_port_coverage_subnote') + f'<h3>{_s("rpt_tr_port_coverage")}</h3>' + _df_to_html(pc, lang=_lang)
         for d in ('allowed', 'blocked', 'potentially_blocked'):
+            if d in minor:
+                continue
             dm = m.get(d, {})
             if not isinstance(dm, dict) or dm.get('count', 0) == 0:
                 continue
