@@ -103,7 +103,7 @@ def test_cover_page_empty_optional_fields():
 def _minimal_results() -> dict:
     return {k: {} for k in [
         "mod01", "mod02", "mod03", "mod04", "mod05", "mod06",
-        "mod07", "mod08", "mod09", "mod10", "mod11", "mod12",
+        "mod07", "mod08", "mod09", "mod11", "mod12",
         "mod13", "mod14", "mod15",
     ]}
 

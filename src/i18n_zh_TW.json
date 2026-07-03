@@ -2846,7 +2846,6 @@
   "rpt_chart_ransomware_exposure": "依風險等級的勒索軟體暴露面",
   "rpt_chart_readiness_factor_scores": "Enforcement 就緒度因子分數",
   "rpt_chart_top_activity_by_process_user": "依 Process/User 排行的活動",
-  "rpt_chart_top_allowed_ports": "Top Allowed Ports",
   "rpt_chart_top_apps_by_data_volume": "依資料量排行的 Apps",
   "rpt_chart_top_audit_event_types": "稽核事件類型排行",
   "rpt_chart_top_hit_rules": "命中前 10 名規則",

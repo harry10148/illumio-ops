@@ -66,7 +66,6 @@ TRAFFIC_MODULES: list[tuple[str, str, str, Callable, frozenset]] = [
     ('mod07', 'src.report.analysis.mod07_cross_label_matrix',   'cross_label_flow_matrix',  _call_df_n,     _SEC_INV),
     ('mod08', 'src.report.analysis.mod08_unmanaged_hosts',      'unmanaged_traffic',        _call_df_n,     _TRAFFIC_TOO),
     ('mod09', 'src.report.analysis.mod09_traffic_distribution', 'traffic_distribution',     _call_df_n,     _TRAFFIC_TOO),
-    ('mod10', 'src.report.analysis.mod10_allowed_traffic',      'allowed_traffic',          _call_df_n,     _SEC_INV),
     ('mod11', 'src.report.analysis.mod11_bandwidth',            'bandwidth_analysis',       _call_df_n,     _TRAFFIC_TOO),
     ('mod13', 'src.report.analysis.mod13_readiness',            'enforcement_readiness',    _call_readiness, _SEC_INV),
     ('mod14', 'src.report.analysis.mod14_infrastructure',       'infrastructure_scoring',   _call_df_n,     _SEC_INV),

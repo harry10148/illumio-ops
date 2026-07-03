@@ -29,7 +29,7 @@ def test_mod12_total_data_volume_uses_human_readable():
     mod_results = {
         "mod01": {"total_mb": 6062.0, "total_flows": 100},
         "mod02": {}, "mod03": {}, "mod04": {}, "mod05": {}, "mod06": {},
-        "mod07": {}, "mod08": {}, "mod09": {}, "mod10": {}, "mod11": {"total_mb": 6062.0},
+        "mod07": {}, "mod08": {}, "mod09": {}, "mod11": {"total_mb": 6062.0},
         "mod12": None, "mod13": {}, "mod14": {}, "mod15": {},
     }
     out = executive_summary(mod_results, profile="security_risk", lang="en")

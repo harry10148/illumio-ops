@@ -157,7 +157,6 @@ def test_html_exporter_renders_attack_summary_sections():
         "mod07": {},
         "mod08": {},
         "mod09": {},
-        "mod10": {},
         "mod11": {},
         "mod13": {"error": "No data"},
         "mod14": {"error": "No data"},

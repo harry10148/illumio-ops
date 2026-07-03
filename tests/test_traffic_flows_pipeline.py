@@ -39,7 +39,7 @@ def test_traffic_profile_runs_only_lightweight_modules():
     mods = set(result.module_results.keys())
     assert {"mod01", "mod02", "mod08", "mod09", "mod11", "mod12"} <= mods
     for heavy in ("mod03", "mod04", "mod13", "mod14", "mod15",
-                  "mod07", "mod10", "mod_ringfence", "mod_draft_summary"):
+                  "mod07", "mod_ringfence", "mod_draft_summary"):
         assert heavy not in mods, heavy
 
 

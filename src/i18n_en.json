@@ -2846,7 +2846,6 @@
   "rpt_chart_ransomware_exposure": "Ransomware Exposure by Risk Level",
   "rpt_chart_readiness_factor_scores": "Enforcement Readiness Factor Scores",
   "rpt_chart_top_activity_by_process_user": "Top Activity by Process/User",
-  "rpt_chart_top_allowed_ports": "Top Allowed Ports",
   "rpt_chart_top_apps_by_data_volume": "Top Apps by Data Volume",
   "rpt_chart_top_audit_event_types": "Top Audit Event Types",
   "rpt_chart_top_hit_rules": "Top 10 Hit Rules",

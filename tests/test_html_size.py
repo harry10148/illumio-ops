@@ -33,10 +33,6 @@ def results_with_charts():
             "matrices": {},
             "chart_spec": _make_chart_spec("bar", "Cross-Label Matrix"),
         },
-        "mod10": {
-            "chart_spec": _make_chart_spec("bar", "Allowed Traffic"),
-            "audit_flag_count": 0,
-        },
         "mod15": {
             "chart_spec": _make_chart_spec("bar", "Lateral Movement"),
             "total_lateral_flows": 0,

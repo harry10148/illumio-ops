@@ -17,7 +17,7 @@ def test_traffic_profile_runs_only_lightweight_modules():
 def test_security_risk_profile_unchanged_full_set():
     # Phase 1 keeps the existing behavior: security/inventory run everything.
     full = {"mod01", "mod02", "mod03", "mod04", "mod06", "mod07", "mod08",
-            "mod09", "mod10", "mod11", "mod13", "mod14", "mod15",
+            "mod09", "mod11", "mod13", "mod14", "mod15",
             "mod_draft_summary", "mod_ringfence"}
     assert _ids("security_risk") == full
     assert _ids("network_inventory") == full

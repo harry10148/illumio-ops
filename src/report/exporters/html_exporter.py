@@ -913,14 +913,12 @@ class _TrafficReportBase:
                 f'<h4>{_s("rpt_mod02_top_outbound_ports")} ({status})</h4>',
                 _df_to_html(dm.get('top_outbound_ports'), lang=_lang),
             )
-        # Folded in from the former standalone "Allowed Traffic" section:
-        # allowed-from-unmanaged audit flags are the security-relevant remainder.
-        m10 = self._r.get('mod10', {})
-        flags = m10.get('audit_flags')
+        # 稽核清單（allowed 且來源非受管）——資料已由 mod02 自產（原 mod10 遷入）
+        flags = m.get('audit_flags')
         if flags is not None and hasattr(flags, 'empty') and not flags.empty:
             table_html += (
                 self._subnote('rpt_tr_audit_flags_subnote')
-                + f'<h3>{_s("rpt_tr_audit_flags")} ({m10.get("audit_flag_count", 0)})</h3>'
+                + f'<h3>{_s("rpt_tr_audit_flags")} ({m.get("audit_flag_count", 0)})</h3>'
                 + _df_to_html(flags, lang=_lang)
             )
         return (

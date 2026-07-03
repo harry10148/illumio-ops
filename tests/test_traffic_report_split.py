@@ -9,7 +9,7 @@ def _results():
     return {
         "mod00": {}, "mod01": {"total_flows": 10}, "mod02": {}, "mod03": {},
         "mod04": {}, "mod06": {}, "mod07": {}, "mod08": {}, "mod09": {},
-        "mod10": {}, "mod11": {}, "mod13": {}, "mod14": {}, "mod15": {},
+        "mod11": {}, "mod13": {}, "mod14": {}, "mod15": {},
         "mod12": {"kpis": [], "key_findings": [], "maturity_score": 60,
                   "maturity_grade": "B", "maturity_dimensions": {}},
         "findings": [],

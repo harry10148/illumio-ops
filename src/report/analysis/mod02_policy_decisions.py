@@ -69,6 +69,30 @@ def policy_decision_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
     port_coverage = _compute_port_coverage(df, top_n=top_n)
     results['port_coverage'] = port_coverage
 
+    # 稽核清單：allowed 且來源非受管——自 mod10（Allowed Traffic）遷入，
+    # 使「audit flags 由本章產生並呈現」成立（spec B7 前提）。
+    allowed_df = df[df['policy_decision'] == 'allowed']
+    audit_src = allowed_df[allowed_df['src_managed'] == False].copy()
+    _audit_keys = (['src_ip', 'dst_ip', 'port', 'proto']
+                   if 'proto' in audit_src.columns else ['src_ip', 'dst_ip', 'port'])
+    if not audit_src.empty:
+        audit_table = (audit_src.groupby(_audit_keys)['num_connections']
+                       .sum().reset_index().nlargest(top_n, 'num_connections')
+                       .rename(columns={'src_ip': 'Unmanaged Source',
+                                        'dst_ip': 'Destination',
+                                        'port': 'Port', 'proto': 'Proto',
+                                        'num_connections': 'Connections'}))
+        if 'Port' in audit_table.columns:
+            audit_table['Port'] = audit_table['Port'].astype('Int64')
+        if 'Connections' in audit_table.columns:
+            audit_table['Connections'] = audit_table['Connections'].astype('Int64')
+        if 'Proto' in audit_table.columns and audit_table['Proto'].astype(str).str.strip().eq('').all():
+            audit_table = audit_table.drop(columns=['Proto'])
+    else:
+        audit_table = pd.DataFrame()
+    results['audit_flags'] = audit_table
+    results['audit_flag_count'] = len(audit_src)
+
     # Draft policy decision cross-tab (only when column is present)
     if "draft_policy_decision" in df.columns:
         results["draft_breakdown"] = (

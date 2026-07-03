@@ -60,7 +60,7 @@ def test_finding_card_renders_mitre_technique_chips():
 
 
 def test_audit_flags_fold_into_policy_section(tmp_path, monkeypatch):
-    """mod10 audit flags must appear inside the policy section, not as a standalone 'allowed' section."""
+    """mod02 audit flags must appear inside the policy section, not as a standalone 'allowed' section."""
     from src.report.report_generator import ReportGenerator, ReportResult
 
     monkeypatch.setattr("src.scheduler.jobs.run_posture_summary", lambda cm: None)
@@ -90,12 +90,8 @@ def test_audit_flags_fold_into_policy_section(tmp_path, monkeypatch):
                 "allowed": {"count": 10, "pct_of_total": 100, "inbound_count": 5,
                             "outbound_count": 5, "top_app_flows": None,
                             "top_inbound_ports": None, "top_outbound_ports": None},
-            },
-            "mod10": {
                 "audit_flags": audit_flags_df,
                 "audit_flag_count": 1,
-                "top_app_flows": None,
-                "chart_spec": None,
             },
             "mod12": {"kpis": []},
         },
