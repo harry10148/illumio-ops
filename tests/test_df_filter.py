@@ -126,3 +126,13 @@ def test_object_cidrs_exclude_dst():
 def test_object_cidrs_any_side():
     out = apply_df_traffic_filters(_df_two_apps(), {"_any_object_cidrs": ["10.0.0.2"]})
     assert list(out["src_ip"]) == ["10.0.0.2"]
+
+
+def test_ex_any_object_cidrs_excludes_either_side():
+    df = _df_two_apps()  # src_ip 10.0.0.1/2/3, dst_ip 10.0.0.9
+    out = apply_df_traffic_filters(df, {"_ex_any_object_cidrs": ["10.0.0.1"]})
+    # src 命中 10.0.0.1 的列被剔除
+    assert "10.0.0.1" not in out["src_ip"].tolist()
+    # dst 側命中也剔除
+    out2 = apply_df_traffic_filters(df, {"_ex_any_object_cidrs": ["10.0.0.9"]})
+    assert out2.empty  # 全部列 dst 都是 10.0.0.9

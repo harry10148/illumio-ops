@@ -495,6 +495,7 @@ class LabelResolver:
             "_ex_src_object_cidrs": ("ex_src_iplist", "ex_src_iplists", "ex_src_workload", "ex_src_workloads"),
             "_ex_dst_object_cidrs": ("ex_dst_iplist", "ex_dst_iplists", "ex_dst_workload", "ex_dst_workloads"),
             "_any_object_cidrs": ("any_iplist", "any_workload"),
+            "_ex_any_object_cidrs": ("ex_any_iplist", "ex_any_workload"),
         }
         if not filters or not any(
                 filters.get(k) for keys in obj_keys.values() for k in keys):
