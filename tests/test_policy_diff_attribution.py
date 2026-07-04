@@ -104,3 +104,36 @@ def test_object_changes_survive_missing_object_events_key():
                  "scope_expanded": False, "last_actor": "", "last_changed": "", "last_event": ""}])}
     out = attribute_changes(diff, {"draft_events": pd.DataFrame()})
     assert out["ip_list_changes"].iloc[0]["last_actor"] == ""
+
+
+def test_nan_timestamp_event_does_not_win():
+    diff = {
+        "ruleset_changes": pd.DataFrame([
+            {"change_type": "modified", "ruleset_name": "RS-A", "ruleset_id": "1",
+             "field": "enabled", "draft_value": "False", "active_value": "True",
+             "last_actor": "", "last_changed": "", "last_event": ""}]),
+        "rule_changes": pd.DataFrame(),
+    }
+    events = {"draft_events": pd.DataFrame([
+        {"resource_name": "RS-A", "actor": "alice@corp",
+         "timestamp": "2026-06-01T10:00:00Z", "event_type": "rule_set.update"},
+        {"resource_name": "RS-A", "actor": "bob@corp",
+         "timestamp": float("nan"), "event_type": "rule_set.update"},
+    ])}
+    out = attribute_changes(diff, events)
+    row = out["ruleset_changes"].iloc[0]
+    assert row["last_actor"] == "alice@corp"
+    assert row["last_changed"] == "2026-06-01T10:00:00Z"
+
+
+def test_none_actor_yields_empty_string_not_literal_none():
+    diff = {"ruleset_changes": pd.DataFrame([
+        {"change_type": "modified", "ruleset_name": "RS-B", "ruleset_id": "2",
+         "field": "name", "draft_value": "x", "active_value": "y",
+         "last_actor": "", "last_changed": "", "last_event": ""}]),
+        "rule_changes": pd.DataFrame()}
+    events = {"draft_events": pd.DataFrame([
+        {"resource_name": "RS-B", "actor": None,
+         "timestamp": "2026-06-02T10:00:00Z", "event_type": "rule_set.update"}])}
+    out = attribute_changes(diff, events)
+    assert out["ruleset_changes"].iloc[0]["last_actor"] == ""

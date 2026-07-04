@@ -17,6 +17,13 @@ import pandas as pd
 _OBJECT_TABLES = ("ip_list_changes", "service_changes", "label_group_changes")
 
 
+def _s(value) -> str:
+    """Normalize None/NaN to "" before stringifying (NaN is truthy, so `or ""` alone misses it)."""
+    if value is None or (isinstance(value, float) and value != value):
+        return ""
+    return str(value)
+
+
 def _latest_by_name(events) -> dict:
     """events 為 DataFrame（draft_events 或 object_events）；防禦同前。"""
     if not isinstance(events, pd.DataFrame) or events.empty:
@@ -26,15 +33,16 @@ def _latest_by_name(events) -> dict:
     df = events.copy()
     if "timestamp" not in df.columns:
         df["timestamp"] = ""
+    df["timestamp"] = df["timestamp"].fillna("")
     df = df.sort_values("timestamp", ascending=True)
     latest = {}
     for _, row in df.iterrows():
         name = str(row.get("resource_name", "")).strip()
         if name:
             latest[name] = {
-                "actor": str(row.get("actor", "")),
-                "timestamp": str(row.get("timestamp", "")),
-                "event_type": str(row.get("event_type", "")),
+                "actor": _s(row.get("actor", "")),
+                "timestamp": _s(row.get("timestamp", "")),
+                "event_type": _s(row.get("event_type", "")),
             }
     return latest
 
