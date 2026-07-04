@@ -67,6 +67,29 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   the same way the HTML exporters already were. Charts are an HTML-only feature —
   the curated XLSX workbooks keep only the Executive Summary chart (stacked-table
   sheets have no chart anchor point) and do not attempt chart parity with HTML.
+- Report simplification (phase 5 — Audit / Policy Usage / VEN Status): the Audit
+  report's Health, Users, and Policy Changes chapters now show only the 10 most
+  recent events each in HTML (previously the full, up to 50-row, list), with a
+  note pointing to the complete list; the XLSX export gained a Recent Events
+  sub-table on each of those three sheets so the full (up to 50-row) list is
+  still available there. Audit executive-summary KPI labels (and the XLSX
+  Attention Required sheet) now resolve through their i18n key first, so zh_TW
+  reports show real Chinese labels (e.g. "事件總數") instead of the English label
+  leaking through; the traffic/VEN/policy-usage exec summaries, which already had
+  localized labels, are unaffected. Embedded chart SVGs (used across audit,
+  traffic, and policy-usage reports) no longer carry a `<metadata>` block
+  (creation date/tool), for a small size reduction with no visual change. The
+  Policy Usage report's Unused Rules chapter shows the first 50 rules in HTML
+  (previously unbounded, up to the analysis layer's existing 1000-row cap) with a
+  note giving the shown/total count and pointing to the full list in CSV/XLSX;
+  the Hit Rules chapter is unaffected. The Policy Usage report's three separate
+  Draft Policy Risk tables (visibility risk, draft conflicts, draft coverage) are
+  merged into a single Top At-Risk Flow Pairs table with a new Risk Type column
+  (each type keeps its own top-20 ranking); the by-subtype summary pills for all
+  three categories are unchanged. The VEN Status report's Online chapter now
+  shows a count plus a version-distribution summary instead of a per-host table;
+  per-host online detail moved to the XLSX/CSV export only (the Offline / Lost
+  Today / Lost Yesterday chapters, and the XLSX/CSV exports, are unaffected).
 
 ### Added
 
