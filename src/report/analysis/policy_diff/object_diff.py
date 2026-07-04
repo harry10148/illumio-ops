@@ -131,6 +131,40 @@ def diff_objects(draft: list[dict], active: list[dict], *, kind: str,
     return df
 
 
+def scan_object_refs(active_rulesets: list[dict]) -> dict[str, int]:
+    """掃 ACTIVE enabled allow 規則，統計 ip_list/service/label_group 引用次數。
+
+    只讀 rs["rules"]（allow）；deny 規則引用不構成暴露面，不計。
+    key 形如 "ip_list:5"（kind:href 尾段 id）。
+    """
+    refs: dict[str, int] = {}
+
+    def _bump(kind: str, href) -> None:
+        oid = _id_from_href(str(href or ""))
+        if oid:
+            key = f"{kind}:{oid}"
+            refs[key] = refs.get(key, 0) + 1
+
+    for rs in active_rulesets or []:
+        if not isinstance(rs, dict) or not rs.get("enabled", True):
+            continue
+        for rule in rs.get("rules") or []:
+            if not isinstance(rule, dict) or not rule.get("enabled", True):
+                continue
+            for side in ("providers", "consumers"):
+                for it in rule.get(side) or []:
+                    if not isinstance(it, dict):
+                        continue
+                    if isinstance(it.get("ip_list"), dict):
+                        _bump("ip_list", it["ip_list"].get("href"))
+                    elif isinstance(it.get("label_group"), dict):
+                        _bump("label_group", it["label_group"].get("href"))
+            for svc in rule.get("ingress_services") or []:
+                if isinstance(svc, dict) and svc.get("href"):
+                    _bump("service", svc["href"])
+    return refs
+
+
 def object_change_counts(df: pd.DataFrame) -> tuple[int, int, int]:
     """(added, removed, modified)；modified 以物件數計，非變動列數。"""
     if df is None or df.empty:

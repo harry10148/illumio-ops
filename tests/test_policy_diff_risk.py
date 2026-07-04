@@ -43,3 +43,45 @@ def test_empty_frames_pass_through():
     d = {"ruleset_changes": pd.DataFrame(), "rule_changes": None, "summary": {}}
     out = grade_changes(d)  # 不得 raise
     assert out["rule_changes"] is None
+
+
+def _obj_row(**over):
+    row = {"change_type": "modified", "object_kind": "ip_list", "name": "L",
+           "object_id": "5", "field": "ip_ranges", "draft_value": "x",
+           "active_value": "y", "scope_expanded": True,
+           "last_actor": "", "last_changed": "", "last_event": ""}
+    row.update(over)
+    return row
+
+
+def _diff_with(rows):
+    return {"ruleset_changes": pd.DataFrame(), "rule_changes": pd.DataFrame(),
+            "ip_list_changes": pd.DataFrame(rows)}
+
+
+def test_expanded_and_referenced_is_high():
+    diff = grade_changes(_diff_with([_obj_row()]), object_refs={"ip_list:5": 3})
+    assert diff["ip_list_changes"].iloc[0]["risk"] == "HIGH"
+
+
+def test_expanded_but_unreferenced_is_blank():
+    diff = grade_changes(_diff_with([_obj_row()]), object_refs={})
+    assert diff["ip_list_changes"].iloc[0]["risk"] == ""
+
+
+def test_not_expanded_referenced_is_blank():
+    diff = grade_changes(_diff_with([_obj_row(scope_expanded=False)]),
+                         object_refs={"ip_list:5": 1})
+    assert diff["ip_list_changes"].iloc[0]["risk"] == ""
+
+
+def test_removed_object_is_medium():
+    diff = grade_changes(_diff_with([_obj_row(change_type="removed", field="*",
+                                              scope_expanded=False)]))
+    assert diff["ip_list_changes"].iloc[0]["risk"] == "MEDIUM"
+
+
+def test_added_object_is_blank():
+    diff = grade_changes(_diff_with([_obj_row(change_type="added", field="*",
+                                              scope_expanded=False)]))
+    assert diff["ip_list_changes"].iloc[0]["risk"] == ""

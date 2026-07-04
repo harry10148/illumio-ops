@@ -5,6 +5,7 @@ import pandas as pd
 from src.report.analysis.policy_diff.object_diff import (
     diff_objects,
     object_change_counts,
+    scan_object_refs,
 )
 
 
@@ -130,3 +131,27 @@ def test_object_change_counts():
                       fields=["ip_ranges", "fqdns", "description"])
     added, removed, modified = object_change_counts(df)
     assert (added, removed, modified) == (1, 1, 1)  # C 改兩欄仍算 1 個 modified 物件
+
+
+def _active_rs(rules=None, enabled=True):
+    return {"href": "/orgs/1/sec_policy/active/rule_sets/1", "name": "RS",
+            "enabled": enabled, "rules": rules or [], "scopes": [[]]}
+
+
+def test_scan_object_refs_counts_allow_rule_references():
+    rule = {"enabled": True,
+            "providers": [{"ip_list": {"href": "/orgs/1/sec_policy/active/ip_lists/5"}}],
+            "consumers": [{"label_group": {"href": "/orgs/1/sec_policy/active/label_groups/8"}}],
+            "ingress_services": [{"href": "/orgs/1/sec_policy/active/services/7"},
+                                 {"port": 22, "proto": 6}]}
+    refs = scan_object_refs([_active_rs(rules=[rule, rule])])
+    assert refs == {"ip_list:5": 2, "label_group:8": 2, "service:7": 2}
+
+
+def test_scan_object_refs_skips_disabled():
+    rule = {"enabled": False,
+            "providers": [{"ip_list": {"href": "/orgs/1/sec_policy/active/ip_lists/5"}}],
+            "consumers": [], "ingress_services": []}
+    assert scan_object_refs([_active_rs(rules=[rule])]) == {}
+    on_rule = dict(rule, enabled=True)
+    assert scan_object_refs([_active_rs(rules=[on_rule], enabled=False)]) == {}

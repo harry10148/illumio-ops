@@ -10,6 +10,11 @@ heuristics:
            containment when provisioned.
   MEDIUM — a ruleset or rule is being re-enabled, or removed entirely.
   ""     — everything else (informational).
+
+Also grades the object tables (ip_list_changes / service_changes /
+label_group_changes, if present): removed → MEDIUM; modified with
+scope_expanded and hit in ``object_refs`` (allow-rule reference counts from
+``scan_object_refs``) → HIGH; otherwise "".
 """
 from __future__ import annotations
 
@@ -39,7 +44,28 @@ def _apply(df: pd.DataFrame | None) -> pd.DataFrame | None:
     return df
 
 
-def grade_changes(diff: dict) -> dict:
+_OBJECT_TABLES = ("ip_list_changes", "service_changes", "label_group_changes")
+
+
+def _grade_object_row(row: pd.Series, refs: dict) -> str:
+    change = str(row.get("change_type", ""))
+    if change == "removed":
+        return "MEDIUM"
+    if change == "modified" and bool(row.get("scope_expanded")):
+        key = f"{row.get('object_kind', '')}:{row.get('object_id', '')}"
+        if refs.get(key, 0) > 0:
+            return "HIGH"
+    return ""
+
+
+def grade_changes(diff: dict, *, object_refs: dict | None = None) -> dict:
     diff["ruleset_changes"] = _apply(diff.get("ruleset_changes"))
     diff["rule_changes"] = _apply(diff.get("rule_changes"))
+    refs = object_refs or {}
+    for key in _OBJECT_TABLES:
+        df = diff.get(key)
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            df = df.copy()
+            df["risk"] = df.apply(lambda r: _grade_object_row(r, refs), axis=1)
+            diff[key] = df
     return diff
