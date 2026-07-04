@@ -3106,6 +3106,7 @@
   "rpt_filter_ex_dst": "Exclude destination",
   "rpt_filter_ex_port": "Exclude port",
   "rpt_filter_ex_src": "Exclude source",
+  "rpt_filter_objects": "Source / Destination / Either Side (Labels, IPs, Workloads, IP Lists)",
   "rpt_filter_pd": "Policy Decision",
   "rpt_filter_port": "Port",
   "rpt_filter_proto": "Protocol",

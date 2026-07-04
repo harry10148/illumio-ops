@@ -347,17 +347,43 @@ def make_reports_blueprint(
             if raw_filters:
                 report_filters = {
                     'policy_decisions': raw_filters.get('policy_decisions') or None,
-                    'src_labels': [s for s in (raw_filters.get('src_labels') or []) if s],
-                    'dst_labels': [s for s in (raw_filters.get('dst_labels') or []) if s],
                     'src_ip': (raw_filters.get('src_ip') or '').strip(),
                     'dst_ip': (raw_filters.get('dst_ip') or '').strip(),
                     'port': (raw_filters.get('port') or '').strip(),
                     'proto': raw_filters.get('proto'),
-                    'ex_src_labels': [s for s in (raw_filters.get('ex_src_labels') or []) if s],
-                    'ex_dst_labels': [s for s in (raw_filters.get('ex_dst_labels') or []) if s],
-                    'ex_src_ip': (raw_filters.get('ex_src_ip') or '').strip(),
-                    'ex_dst_ip': (raw_filters.get('ex_dst_ip') or '').strip(),
                     'ex_port': (raw_filters.get('ex_port') or '').strip(),
+                    # Phase 4a：forward FilterBar 的 object/複數/any key（原 whitelist 漏收
+                    # any_*、iplists、workloads、label_groups、src_ip_in——含 any_* 既有 bug）。
+                    # ex_src_ip/ex_dst_ip 一併改為原樣 forward（FilterBar 送 list，取代舊版
+                    # 僅接受 scalar 字串再 strip() 的寫法；前端 legacy 輸入框已在 JS 端 trim()）。
+                    'src_labels': raw_filters.get('src_labels', []),
+                    'dst_labels': raw_filters.get('dst_labels', []),
+                    'ex_src_labels': raw_filters.get('ex_src_labels', []),
+                    'ex_dst_labels': raw_filters.get('ex_dst_labels', []),
+                    'src_label_groups': raw_filters.get('src_label_groups', []),
+                    'dst_label_groups': raw_filters.get('dst_label_groups', []),
+                    'ex_src_label_groups': raw_filters.get('ex_src_label_groups', []),
+                    'ex_dst_label_groups': raw_filters.get('ex_dst_label_groups', []),
+                    'src_iplists': raw_filters.get('src_iplists', []),
+                    'dst_iplists': raw_filters.get('dst_iplists', []),
+                    'ex_src_iplists': raw_filters.get('ex_src_iplists', []),
+                    'ex_dst_iplists': raw_filters.get('ex_dst_iplists', []),
+                    'src_workloads': raw_filters.get('src_workloads', []),
+                    'dst_workloads': raw_filters.get('dst_workloads', []),
+                    'ex_src_workloads': raw_filters.get('ex_src_workloads', []),
+                    'ex_dst_workloads': raw_filters.get('ex_dst_workloads', []),
+                    'src_ip_in': raw_filters.get('src_ip_in', []),
+                    'dst_ip_in': raw_filters.get('dst_ip_in', []),
+                    'ex_src_ip': raw_filters.get('ex_src_ip', []),
+                    'ex_dst_ip': raw_filters.get('ex_dst_ip', []),
+                    'any_label': raw_filters.get('any_label', ''),
+                    'any_ip': raw_filters.get('any_ip', ''),
+                    'any_iplist': raw_filters.get('any_iplist', ''),
+                    'any_workload': raw_filters.get('any_workload', ''),
+                    'ex_any_label': raw_filters.get('ex_any_label', ''),
+                    'ex_any_ip': raw_filters.get('ex_any_ip', ''),
+                    'ex_any_iplist': raw_filters.get('ex_any_iplist', ''),
+                    'ex_any_workload': raw_filters.get('ex_any_workload', ''),
                 }
                 if not any(v for v in report_filters.values() if v):
                     report_filters = None

@@ -81,3 +81,23 @@ class TestExpandObjectFiltersForDf(unittest.TestCase):
         rg._fetch_traffic_df(dt.datetime(2026, 7, 1), dt.datetime(2026, 7, 2),
                              filters={"src_iplist": "prod-subnets"}, use_cache=False)
         assert "_src_object_cidrs" in captured
+
+    def test_report_generator_expands_ex_any_iplist_before_df_filter(self):
+        """迴歸測試：filters 僅含 ex_any_iplist 時，_fetch_traffic_df 的
+        _obj_filter_keys gate 也必須觸發 expand_object_filters_for_df，
+        否則排除型 any-side iplist/workload 條件會被靜默忽略（cache df
+        過度納入流量）。"""
+        from src.report.report_generator import ReportGenerator
+        rg = ReportGenerator.__new__(ReportGenerator)
+        rg.api = self.client
+        rg._cache = None
+        captured = {}
+        def fake_fetch(start_time_str, end_time_str, filters=None, compute_draft=False):
+            captured.update(filters or {})
+            return []
+        self.client.fetch_traffic_for_report = fake_fetch
+        rg._parse_api = lambda flows: __import__("pandas").DataFrame()
+        import datetime as dt
+        rg._fetch_traffic_df(dt.datetime(2026, 7, 1), dt.datetime(2026, 7, 2),
+                             filters={"ex_any_iplist": "prod-subnets"}, use_cache=False)
+        assert "_ex_any_object_cidrs" in captured

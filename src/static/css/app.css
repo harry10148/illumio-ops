@@ -2506,6 +2506,9 @@ select {
 .objfb-bar {
   position: relative;
   display: flex;
+  /* wrap 讓 .objfb-hint（width:100%）換行自成一列；nowrap 時 hint 會擠進
+     同列把 .objfb-fbar 壓扁（任一側 pill 顯示提示時 pill 文字被裁掉） */
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--toolbar-gap);
 }

@@ -36,6 +36,14 @@ def test_filter_bar_css_class_present():
     assert ".objfb-pill" in css
 
 
+def test_filter_bar_css_bar_wraps_hint_row():
+    # .objfb-hint 是 width:100% 的整列提示；.objfb-bar 必須 flex-wrap: wrap，
+    # 否則 hint 顯示時（任一側 pill 存在）會擠進同列把 .objfb-fbar 壓扁、pill 文字被裁掉
+    css = _CSS.read_text(encoding="utf-8")
+    bar_block = css.split(".objfb-bar {", 1)[1].split("}", 1)[0]
+    assert "flex-wrap: wrap" in bar_block
+
+
 def test_filter_bar_i18n_keys_present():
     import json
     en = json.loads(_EN.read_text(encoding="utf-8"))
@@ -105,3 +113,69 @@ def test_quarantine_js_uses_filter_bar_for_traffic_analyzer():
     assert "_ensureQtFilterBar().getFilters()" in js
     for removed_id in ("qt-src", "qt-dst", "qt-exsrc", "qt-exdst", "qt-any-label", "qt-any-ip"):
         assert f"getElementById('{removed_id}')" not in js
+
+
+def test_instant_report_modal_mounts_filter_bar():
+    """Phase 4a Task 3: rpt-src/rpt-dst/rpt-ex-*/rpt-any-* 分欄已換成單一 FilterBar 掛載點。"""
+    html = _INDEX.read_text(encoding="utf-8")
+    assert 'id="rpt-filter-bar"' in html
+    for removed_id in (
+        "rpt-src", "rpt-dst", "rpt-ex-src", "rpt-ex-dst",
+        "rpt-any-label", "rpt-any-ip", "rpt-ex-any-label", "rpt-ex-any-ip",
+    ):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from m-gen-filters"
+    # pd checkbox/proto/port/ex-port 保留（不屬 FilterBar 範圍）
+    assert 'id="rpt-pd-blocked"' in html
+    assert 'id="rpt-proto"' in html
+    assert 'id="rpt-port"' in html
+    assert 'id="rpt-ex-port"' in html
+
+
+def test_dashboard_js_uses_filter_bar_for_instant_report():
+    js = Path("src/static/js/dashboard.js").read_text(encoding="utf-8")
+    assert "function _ensureRptFilterBar()" in js
+    assert "createFilterBar(document.getElementById('rpt-filter-bar')" in js
+    assert "_ensureRptFilterBar().getFilters()" in js
+    for removed_id in (
+        "rpt-src", "rpt-dst", "rpt-ex-src", "rpt-ex-dst",
+        "rpt-any-label", "rpt-any-ip", "rpt-ex-any-label", "rpt-ex-any-ip",
+    ):
+        assert f"getElementById('{removed_id}')" not in js
+        assert f"'{removed_id}'" not in js
+
+
+def test_scheduled_report_modal_mounts_filter_bar():
+    """Phase 4a Task 4: sched-src/dst/ex-*/any-* 分欄已換成單一 FilterBar 掛載點。"""
+    html = _INDEX.read_text(encoding="utf-8")
+    assert 'id="sched-filter-bar"' in html
+    for removed_id in (
+        "sched-src", "sched-dst", "sched-ex-src", "sched-ex-dst",
+        "sched-any-label", "sched-any-ip", "sched-ex-any-label", "sched-ex-any-ip",
+    ):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from sched-filter-section"
+    # pd checkbox/proto/port/ex-port 保留（不屬 FilterBar 範圍）
+    assert 'id="sched-pd-blocked"' in html
+    assert 'id="sched-proto"' in html
+    assert 'id="sched-port"' in html
+    assert 'id="sched-ex-port"' in html
+
+
+def test_dashboard_js_uses_filter_bar_for_scheduled_report():
+    js = Path("src/static/js/dashboard.js").read_text(encoding="utf-8")
+    assert "function _ensureSchedFilterBar()" in js
+    assert "createFilterBar(document.getElementById('sched-filter-bar')" in js
+    assert "_ensureSchedFilterBar().getFilters()" in js
+    assert "_ensureSchedFilterBar().setFilters(" in js
+    for removed_id in (
+        "sched-src", "sched-dst", "sched-ex-src", "sched-ex-dst",
+        "sched-any-label", "sched-any-ip", "sched-ex-any-label", "sched-ex-any-ip",
+    ):
+        assert f"getElementById('{removed_id}')" not in js
+        assert f"'{removed_id}'" not in js
+
+
+def test_filter_bar_deserialize_accepts_legacy_scalar_ip():
+    """既有排程存的是舊格式 src_ip/dst_ip scalar（非 src_ip_in list）；
+    _objfbDeserialize 須認得這個 scalar key 才能讓 setFilters 正確回填舊排程。"""
+    js = _JS.read_text(encoding="utf-8")
+    assert "asList(d[`${dir}_ip_in`]).concat(asList(d[`${dir}_ip`]))" in js

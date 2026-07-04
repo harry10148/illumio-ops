@@ -871,10 +871,13 @@ class TrafficQueryBuilder:
         for lbl in (filters.get('ex_dst_labels') or []):
             if lbl and _label_match(dst, lbl):
                 return False
-        if filters.get('ex_src_ip') and _ip_match(src, filters['ex_src_ip']):
-            return False
-        if filters.get('ex_dst_ip') and _ip_match(dst, filters['ex_dst_ip']):
-            return False
+        for fkey, side_obj in (("ex_src_ip", src), ("ex_dst_ip", dst)):
+            vals = filters.get(fkey)
+            if not vals:
+                continue
+            vals = vals if isinstance(vals, list) else [vals]
+            if any(_ip_match(side_obj, v) for v in vals if v):
+                return False
 
         ex_port = filters.get('ex_port', '')
         if ex_port:

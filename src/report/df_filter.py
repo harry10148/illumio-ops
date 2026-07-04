@@ -82,6 +82,18 @@ def _scalar(filters: dict, key: str) -> str:
     return v.strip() if isinstance(v, str) else (str(v) if v else "")
 
 
+def _list_or_scalar(filters: dict, key: str) -> list[str]:
+    """排除值正規化：FilterBar 送 list，舊前端送 scalar，皆歸一成清單（濾除空值/空白）。"""
+    v = filters.get(key)
+    vals = v if isinstance(v, list) else [v]
+    out = []
+    for item in vals:
+        s = item.strip() if isinstance(item, str) else (str(item) if item else "")
+        if s:
+            out.append(s)
+    return out
+
+
 def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataFrame:
     """Return df filtered by the report's traffic filters (labels/ip/port/proto
     + exclusions). policy_decisions is intentionally skipped — it is pushed to
@@ -111,9 +123,11 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
         v = _scalar(filters, key)
         if v and col in df.columns:
             mask &= _ip_mask(df, col, v)
-        exv = _scalar(filters, f"ex_{key}")
-        if exv and col in df.columns:
-            mask &= ~_ip_mask(df, col, exv)
+        if col in df.columns:
+            # ex_src_ip/ex_dst_ip：FilterBar 送 list、舊前端送 scalar，皆需支援；
+            # 語意同 ex_{side}_ip_in（逐值 AND-exclude）
+            for exv in _list_or_scalar(filters, f"ex_{key}"):
+                mask &= ~_ip_mask(df, col, exv)
 
     def _cidrs_mask(col: str, values: list) -> pd.Series:
         gm = pd.Series(False, index=df.index)
@@ -153,6 +167,36 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
             mask &= df["port"] != int(ex_port)
         except (ValueError, TypeError):
             pass
+
+    # src_ip_in / dst_ip_in（FilterBar 送 list；多 IP/CIDR 取 OR）。既有 src_ip（scalar）保留相容。
+    for side in ("src", "dst"):
+        inc = [s for s in (filters.get(f"{side}_ip_in") or []) if s]
+        if inc and f"{side}_ip" in df.columns:
+            m = pd.Series(False, index=df.index)
+            for v in inc:
+                m |= _ip_mask(df, f"{side}_ip", v)
+            mask &= m
+        exi = [s for s in (filters.get(f"ex_{side}_ip_in") or []) if s]
+        if exi and f"{side}_ip" in df.columns:
+            for v in exi:
+                mask &= ~_ip_mask(df, f"{side}_ip", v)
+
+    # any_label / ex_any_label（either-side label：src 或 dst 命中）。用既有 _label_mask 單值。
+    any_lbl = _scalar(filters, "any_label")
+    if any_lbl:
+        mask &= (_label_mask(df, "src", [any_lbl]) | _label_mask(df, "dst", [any_lbl]))
+    ex_any_lbl = _scalar(filters, "ex_any_label")
+    if ex_any_lbl:
+        mask &= ~(_label_mask(df, "src", [ex_any_lbl]) | _label_mask(df, "dst", [ex_any_lbl]))
+
+    # any_ip / ex_any_ip（either-side IP/CIDR：src 或 dst 命中）。同 any_label 樣式，
+    # 並比照 _any_object_cidrs 區塊的欄位存在守衛（src_ip/dst_ip 任一不存在則略過此條件）。
+    any_ip = _scalar(filters, "any_ip")
+    if any_ip and "src_ip" in df.columns and "dst_ip" in df.columns:
+        mask &= (_ip_mask(df, "src_ip", any_ip) | _ip_mask(df, "dst_ip", any_ip))
+    ex_any_ip = _scalar(filters, "ex_any_ip")
+    if ex_any_ip and "src_ip" in df.columns and "dst_ip" in df.columns:
+        mask &= ~(_ip_mask(df, "src_ip", ex_any_ip) | _ip_mask(df, "dst_ip", ex_any_ip))
 
     proto = _scalar(filters, "proto")
     if proto and "proto" in df.columns:

@@ -3106,6 +3106,7 @@
   "rpt_filter_ex_dst": "排除目的端",
   "rpt_filter_ex_port": "排除 Port",
   "rpt_filter_ex_src": "排除來源端",
+  "rpt_filter_objects": "來源／目的／任一側（Labels、IP、Workloads、IP Lists）",
   "rpt_filter_pd": "Policy 判定",
   "rpt_filter_port": "Port",
   "rpt_filter_proto": "Protocol",

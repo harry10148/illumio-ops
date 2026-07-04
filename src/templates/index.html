@@ -1639,44 +1639,16 @@
             </select>
           </div>
           <div>
-            <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_src">Source</label>
-            <input type="text" id="sched-src" placeholder="env=Production" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-          </div>
-          <div>
-            <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_dst">Destination</label>
-            <input type="text" id="sched-dst" placeholder="app=Database" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-          </div>
-          <div>
             <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_port">Port</label>
             <input type="text" id="sched-port" placeholder="443" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-          </div>
-          <div>
-            <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_ex_src">Exclude Source</label>
-            <input type="text" id="sched-ex-src" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-          </div>
-          <div>
-            <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_ex_dst">Exclude Destination</label>
-            <input type="text" id="sched-ex-dst" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
           </div>
           <div>
             <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_ex_port">Exclude Port</label>
             <input type="text" id="sched-ex-port" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
           </div>
-          <div>
-            <label style="font-size:11px; color:var(--dim);" data-i18n="gui_any_label">Either Side Label (src OR dst)</label>
-            <input type="text" id="sched-any-label" placeholder="env=Production" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-          </div>
-          <div>
-            <label style="font-size:11px; color:var(--dim);" data-i18n="gui_any_ip">Either Side IP (src OR dst)</label>
-            <input type="text" id="sched-any-ip" placeholder="10.0.1.5" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-          </div>
-          <div>
-            <label style="font-size:11px; color:var(--dim);" data-i18n="gui_ex_any_label">Exclude Either Side Label</label>
-            <input type="text" id="sched-ex-any-label" placeholder="env=Dev" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-          </div>
-          <div>
-            <label style="font-size:11px; color:var(--dim);" data-i18n="gui_ex_any_ip">Exclude Either Side IP</label>
-            <input type="text" id="sched-ex-any-ip" placeholder="192.168.0.0/16" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
+          <div style="grid-column:1 / -1;">
+            <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_objects">Source / Destination / Either Side (Labels, IPs, Workloads, IP Lists)</label>
+            <div id="sched-filter-bar" style="margin-top:4px;"></div>
           </div>
         </div>
       </div>
@@ -2892,45 +2864,16 @@
               </select>
             </div>
             <div>
-              <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_src">Source (label key:val or IP)</label>
-              <input type="text" id="rpt-src" placeholder="env=Production" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-            </div>
-            <div>
-              <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_dst">Destination (label key=value or IP)</label>
-              <input type="text" id="rpt-dst" placeholder="app=Database" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-            </div>
-            <div>
               <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_port">Port</label>
               <input type="text" id="rpt-port" placeholder="443" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-            </div>
-            <div></div>
-            <div>
-              <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_ex_src">Exclude Source</label>
-              <input type="text" id="rpt-ex-src" placeholder="env=Dev" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-            </div>
-            <div>
-              <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_ex_dst">Exclude Destination</label>
-              <input type="text" id="rpt-ex-dst" placeholder="" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
             </div>
             <div>
               <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_ex_port">Exclude Port</label>
               <input type="text" id="rpt-ex-port" placeholder="" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
             </div>
-            <div>
-              <label style="font-size:11px; color:var(--dim);" data-i18n="gui_any_label">Either Side Label (src OR dst)</label>
-              <input type="text" id="rpt-any-label" placeholder="env=Production" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-            </div>
-            <div>
-              <label style="font-size:11px; color:var(--dim);" data-i18n="gui_any_ip">Either Side IP (src OR dst)</label>
-              <input type="text" id="rpt-any-ip" placeholder="10.0.1.5" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-            </div>
-            <div>
-              <label style="font-size:11px; color:var(--dim);" data-i18n="gui_ex_any_label">Exclude Either Side Label</label>
-              <input type="text" id="rpt-ex-any-label" placeholder="env=Dev" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
-            </div>
-            <div>
-              <label style="font-size:11px; color:var(--dim);" data-i18n="gui_ex_any_ip">Exclude Either Side IP</label>
-              <input type="text" id="rpt-ex-any-ip" placeholder="192.168.0.0/16" style="width:100%; padding:4px; font-size:11px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px; margin-top:4px; box-sizing:border-box;">
+            <div style="grid-column:1 / -1;">
+              <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_objects">Source / Destination / Either Side (Labels, IPs, Workloads, IP Lists)</label>
+              <div id="rpt-filter-bar" style="margin-top:4px;"></div>
             </div>
           </div>
         </details>

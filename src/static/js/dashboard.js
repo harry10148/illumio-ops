@@ -412,13 +412,9 @@ function openSchedModal(sched) {
   if ($('sched-app'))     $('sched-app').value = sched ? (sched.app || '') : '';
   if ($('sched-env'))     $('sched-env').value = sched ? (sched.env || '') : '';
   if ($('sched-app-row')) $('sched-app-row').style.display = rt === 'app_summary' ? '' : 'none';
-  ['sched-pd-blocked','sched-pd-potential','sched-pd-allowed'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.checked = false;
-  });
-  ['sched-proto','sched-src','sched-dst','sched-port','sched-ex-src','sched-ex-dst','sched-ex-port'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
-  if (isTraffic && sched && sched.filters) _populateSchedFilters(sched.filters);
+  // pd/proto/port/ex-port 與 FilterBar 皆由 _populateSchedFilters 統一重置與回填
+  // （排程編輯有回填需求：呼叫時已確保 FilterBar 建立，見 _ensureSchedFilterBar）
+  _populateSchedFilters(isTraffic && sched ? sched.filters : null);
 
   onSchedFreqChange();
   $('m-sched').classList.add('show');
@@ -654,10 +650,10 @@ function openReportGenModal(type) {
     ['rpt-pd-blocked','rpt-pd-potential','rpt-pd-allowed'].forEach(id => {
       const el = document.getElementById(id); if (el) el.checked = false;
     });
-    ['rpt-proto','rpt-src','rpt-dst','rpt-port','rpt-ex-src','rpt-ex-dst','rpt-ex-port',
-     'rpt-any-label','rpt-any-ip','rpt-ex-any-label','rpt-ex-any-ip'].forEach(id => {
+    ['rpt-proto','rpt-port','rpt-ex-port'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
+    _ensureRptFilterBar().setFilters({});
   } else if (type === 'policy_usage') {
     // Policy-usage supports api/csv source (no traffic filters/profile).
     $('m-gen-source-row').style.display = '';
@@ -752,6 +748,17 @@ async function confirmReportGen() {
   else if (_genReportType === 'app_summary')  await _doGenerateAppSummary();
 }
 
+// FilterBar 實例（Phase 4a）：延遲初始化，避免依賴 <script defer> 執行順序
+// （dashboard.js 在 filter-bar.js 之前解析，模組作用域頂層不能直接呼叫
+// createFilterBar）；存於此變數供 openReportGenModal 與 _collectReportFilters 取用。
+let _rptFb = null;
+function _ensureRptFilterBar() {
+  if (!_rptFb) {
+    _rptFb = createFilterBar(document.getElementById('rpt-filter-bar'), {});
+  }
+  return _rptFb;
+}
+
 function _collectReportFilters() {
   const get = id => {
     const el = document.getElementById(id);
@@ -767,51 +774,32 @@ function _collectReportFilters() {
   if (pdAllowed  && pdAllowed.checked)   pds.push('allowed');
   if (!pds.length) pds = null; // null means all
 
-  const src        = get('rpt-src');
-  const dst        = get('rpt-dst');
   const port       = get('rpt-port');
   const proto      = get('rpt-proto');
-  const exSrc      = get('rpt-ex-src');
-  const exDst      = get('rpt-ex-dst');
   const exPort     = get('rpt-ex-port');
-  const anyLabel   = get('rpt-any-label');
-  const anyIp      = get('rpt-any-ip');
-  const exAnyLabel = get('rpt-ex-any-label');
-  const exAnyIp    = get('rpt-ex-any-ip');
+  const objFilters = _ensureRptFilterBar().getFilters();
 
-  // Heuristic: if value contains digit+dot or slash, treat as IP/CIDR; else as label key:value
-  const parseSrcDst = val => {
-    if (!val) return { labels: [], ip: '' };
-    if (/[\d.\/:]/.test(val)) return { labels: [], ip: val };
-    return { labels: [val], ip: '' };
-  };
-
-  const srcP   = parseSrcDst(src);
-  const dstP   = parseSrcDst(dst);
-  const exSrcP = parseSrcDst(exSrc);
-  const exDstP = parseSrcDst(exDst);
-
-  const hasFilter = pds || src || dst || port || proto || exSrc || exDst || exPort || anyLabel || anyIp || exAnyLabel || exAnyIp;
+  const hasFilter = pds || port || proto || exPort || Object.keys(objFilters).length > 0;
   if (!hasFilter) return null;
 
-  return {
+  const filters = {
     policy_decisions: pds,
-    src_labels:    srcP.labels,
-    dst_labels:    dstP.labels,
-    src_ip:        srcP.ip,
-    dst_ip:        dstP.ip,
-    port:          port,
-    proto:         proto ? parseInt(proto) : null,
-    ex_src_labels: exSrcP.labels,
-    ex_src_ip:     exSrcP.ip,
-    ex_dst_labels: exDstP.labels,
-    ex_dst_ip:     exDstP.ip,
-    ex_port:       exPort,
-    any_label:     anyLabel || null,
-    any_ip:        anyIp || null,
-    ex_any_label:  exAnyLabel || null,
-    ex_any_ip:     exAnyIp || null,
+    port:             port,
+    proto:            proto ? parseInt(proto) : null,
+    ex_port:          exPort,
   };
+  Object.assign(filters, objFilters);
+  return filters;
+}
+
+// FilterBar 實例（Phase 4a）：延遲初始化，理由同 _ensureRptFilterBar；
+// 存於此變數供 openSchedModal、_collectSchedFilters、_populateSchedFilters 取用。
+let _schedFb = null;
+function _ensureSchedFilterBar() {
+  if (!_schedFb) {
+    _schedFb = createFilterBar(document.getElementById('sched-filter-bar'), {});
+  }
+  return _schedFb;
 }
 
 function _collectSchedFilters() {
@@ -829,77 +817,40 @@ function _collectSchedFilters() {
   if (pdAllowed  && pdAllowed.checked)   pds.push('allowed');
   if (!pds.length) pds = null;
 
-  const src        = get('sched-src');
-  const dst        = get('sched-dst');
   const port       = get('sched-port');
   const proto      = get('sched-proto');
-  const exSrc      = get('sched-ex-src');
-  const exDst      = get('sched-ex-dst');
   const exPort     = get('sched-ex-port');
-  const anyLabel   = get('sched-any-label');
-  const anyIp      = get('sched-any-ip');
-  const exAnyLabel = get('sched-ex-any-label');
-  const exAnyIp    = get('sched-ex-any-ip');
+  const objFilters = _ensureSchedFilterBar().getFilters();
 
-  const parseSrcDst = val => {
-    if (!val) return { labels: [], ip: '' };
-    if (/[\d.\/:]/.test(val)) return { labels: [], ip: val };
-    return { labels: [val], ip: '' };
-  };
-
-  const srcP   = parseSrcDst(src);
-  const dstP   = parseSrcDst(dst);
-  const exSrcP = parseSrcDst(exSrc);
-  const exDstP = parseSrcDst(exDst);
-
-  const hasFilter = pds || src || dst || port || proto || exSrc || exDst || exPort || anyLabel || anyIp || exAnyLabel || exAnyIp;
+  const hasFilter = pds || port || proto || exPort || Object.keys(objFilters).length > 0;
   if (!hasFilter) return null;
 
-  return {
+  const filters = {
     policy_decisions: pds,
-    src_labels:    srcP.labels,
-    dst_labels:    dstP.labels,
-    src_ip:        srcP.ip,
-    dst_ip:        dstP.ip,
-    port:          port,
-    proto:         proto ? parseInt(proto) : null,
-    ex_src_labels: exSrcP.labels,
-    ex_src_ip:     exSrcP.ip,
-    ex_dst_labels: exDstP.labels,
-    ex_dst_ip:     exDstP.ip,
-    ex_port:       exPort,
-    any_label:     anyLabel || null,
-    any_ip:        anyIp || null,
-    ex_any_label:  exAnyLabel || null,
-    ex_any_ip:     exAnyIp || null,
+    port:             port,
+    proto:            proto ? parseInt(proto) : null,
+    ex_port:          exPort,
   };
+  Object.assign(filters, objFilters);
+  return filters;
 }
 
+// 排程編輯回填：filters 可能是舊格式（src_labels 單元素 list、src_ip/dst_ip
+// scalar、any_label 純量）或新格式（FilterBar getFilters() 輸出）；FilterBar
+// setFilters（_objfbDeserialize）兩種皆認，此處不需分流。
 function _populateSchedFilters(filters) {
-  if (!filters) return;
   const setChk = (id, arr, val) => {
     const el = document.getElementById(id);
     if (el) el.checked = Array.isArray(arr) && arr.includes(val);
   };
-  setChk('sched-pd-blocked',  filters.policy_decisions, 'blocked');
-  setChk('sched-pd-potential', filters.policy_decisions, 'potentially_blocked');
-  setChk('sched-pd-allowed',  filters.policy_decisions, 'allowed');
+  setChk('sched-pd-blocked',  filters && filters.policy_decisions, 'blocked');
+  setChk('sched-pd-potential', filters && filters.policy_decisions, 'potentially_blocked');
+  setChk('sched-pd-allowed',  filters && filters.policy_decisions, 'allowed');
   const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-  const srcLabel = (filters.src_labels || []).join('');
-  setVal('sched-src',    srcLabel || filters.src_ip || '');
-  const dstLabel = (filters.dst_labels || []).join('');
-  setVal('sched-dst',    dstLabel || filters.dst_ip || '');
-  setVal('sched-port',   filters.port || '');
-  setVal('sched-proto',  filters.proto != null ? String(filters.proto) : '');
-  const exSrcLabel = (filters.ex_src_labels || []).join('');
-  setVal('sched-ex-src', exSrcLabel || filters.ex_src_ip || '');
-  const exDstLabel = (filters.ex_dst_labels || []).join('');
-  setVal('sched-ex-dst', exDstLabel || filters.ex_dst_ip || '');
-  setVal('sched-ex-port',     filters.ex_port || '');
-  setVal('sched-any-label',   filters.any_label || '');
-  setVal('sched-any-ip',      filters.any_ip || '');
-  setVal('sched-ex-any-label', filters.ex_any_label || '');
-  setVal('sched-ex-any-ip',   filters.ex_any_ip || '');
+  setVal('sched-port',   filters && filters.port || '');
+  setVal('sched-proto',  filters && filters.proto != null ? String(filters.proto) : '');
+  setVal('sched-ex-port', filters && filters.ex_port || '');
+  _ensureSchedFilterBar().setFilters(filters || {});
 }
 
 // Poll an async ad-hoc report job until it finishes. The POST endpoints now
