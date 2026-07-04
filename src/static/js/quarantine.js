@@ -224,8 +224,21 @@ const renderSkeletonRow = (cols) => {
 };
 
 // --- Traffic Analyzer Filters Modal ---
+// FilterBar 實例（Phase 3）：延遲初始化，避免依賴 <script defer> 執行順序
+// （quarantine.js 在 filter-bar.js 之前解析，模組作用域頂層不能直接呼叫
+// createFilterBar）；存於此變數供 runTrafficAnalyzer 與本檔其他函式取用。
+let _qtFb = null;
+function _ensureQtFilterBar() {
+  if (!_qtFb) {
+    _qtFb = createFilterBar(document.getElementById('qt-filter-bar'), {});
+  }
+  return _qtFb;
+}
+
 function openQtFiltersModal() {
   // Just visually open it, values remain in the inputs
+  const fb = _ensureQtFilterBar();
+  fb.setFilters(fb.getFilters()); // 回填既有值（重繪 pill，維持 modal 重開時的狀態）
   document.getElementById('modal-qt-filters').classList.add('show');
 }
 
@@ -260,17 +273,9 @@ async function runTrafficAnalyzer() {
   const search = document.getElementById('qt-search').value;
   const mins = parseInt(document.getElementById('qt-mins').value);
 
-  const srcStr = document.getElementById('qt-src').value.trim();
-  const dstStr = document.getElementById('qt-dst').value.trim();
-  const exSrcStr = document.getElementById('qt-exsrc').value.trim();
-  const exDstStr = document.getElementById('qt-exdst').value.trim();
   const expStr = document.getElementById('qt-expt').value.trim();
   const port = document.getElementById('qt-port').value.trim();
   const proto = document.getElementById('qt-proto').value;
-  const anyLabelStr = document.getElementById('qt-any-label').value.trim();
-  const anyIpStr = document.getElementById('qt-any-ip').value.trim();
-  const exAnyLabelStr = document.getElementById('qt-ex-any-label').value.trim();
-  const exAnyIpStr = document.getElementById('qt-ex-any-ip').value.trim();
 
   const bd = document.getElementById('qt-body');
   bd.innerHTML = renderSkeletonRow(8);
@@ -284,29 +289,10 @@ async function runTrafficAnalyzer() {
     payload.policy_decision = pd || '-1';
     if (draftPd) payload.draft_policy_decision = draftPd;
 
-    if (srcStr) {
-      if (srcStr.includes('=')) payload.src_label = srcStr;
-      else payload.src_ip_in = srcStr;
-    }
-    if (dstStr) {
-      if (dstStr.includes('=')) payload.dst_label = dstStr;
-      else payload.dst_ip_in = dstStr;
-    }
-    if (exSrcStr) {
-      if (exSrcStr.includes('=')) payload.ex_src_label = exSrcStr;
-      else payload.ex_src_ip = exSrcStr;
-    }
-    if (exDstStr) {
-      if (exDstStr.includes('=')) payload.ex_dst_label = exDstStr;
-      else payload.ex_dst_ip = exDstStr;
-    }
     if (port) payload.port = port;
     if (expStr) payload.ex_port = expStr;
     if (proto) payload.proto = proto;
-    if (anyLabelStr) payload.any_label = anyLabelStr;
-    if (anyIpStr) payload.any_ip = anyIpStr;
-    if (exAnyLabelStr) payload.ex_any_label = exAnyLabelStr;
-    if (exAnyIpStr) payload.ex_any_ip = exAnyIpStr;
+    Object.assign(payload, _ensureQtFilterBar().getFilters());
 
     const r = await post('/api/quarantine/search', payload);
 

@@ -4198,5 +4198,6 @@
   "gui_fb_cat_label_group": "Label Groups",
   "gui_fb_cat_iplist": "IP Lists",
   "gui_fb_cat_workload": "Workloads",
-  "gui_fb_scope_hint": "輸入文字搜尋所有類別，或點類別縮小範圍"
+  "gui_fb_scope_hint": "輸入文字搜尋所有類別，或點類別縮小範圍",
+  "gui_qt_object_filters": "來源／目的／任一側（Labels、IP、Workloads、IP Lists）"
 }

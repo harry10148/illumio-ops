@@ -82,3 +82,26 @@ def test_filter_bar_handles_offline():
     src = _JS.read_text(encoding="utf-8")
     # 消費 workload 的 pce_unreachable error 欄
     assert "pce_unreachable" in src
+
+
+def test_traffic_analyzer_modal_mounts_filter_bar():
+    """Phase 3 Task 4: qt-src/qt-dst/qt-any-*/qt-ex* 分欄已換成單一 FilterBar 掛載點。"""
+    html = _INDEX.read_text(encoding="utf-8")
+    assert 'id="qt-filter-bar"' in html
+    for removed_id in (
+        "qt-src", "qt-dst", "qt-any-label", "qt-any-ip",
+        "qt-exsrc", "qt-exdst", "qt-ex-any-label", "qt-ex-any-ip",
+    ):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from modal-qt-filters"
+    # port/proto/PD radio 保留（不屬 FilterBar 範圍）
+    assert 'id="qt-port"' in html
+    assert 'id="qt-proto"' in html
+    assert 'name="qt-pd-radio"' in html
+
+
+def test_quarantine_js_uses_filter_bar_for_traffic_analyzer():
+    js = Path("src/static/js/quarantine.js").read_text(encoding="utf-8")
+    assert "createFilterBar(document.getElementById('qt-filter-bar')" in js
+    assert "_ensureQtFilterBar().getFilters()" in js
+    for removed_id in ("qt-src", "qt-dst", "qt-exsrc", "qt-exdst", "qt-any-label", "qt-any-ip"):
+        assert f"getElementById('{removed_id}')" not in js
