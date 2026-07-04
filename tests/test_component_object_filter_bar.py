@@ -134,3 +134,40 @@ def test_dashboard_js_uses_filter_bar_for_instant_report():
     ):
         assert f"getElementById('{removed_id}')" not in js
         assert f"'{removed_id}'" not in js
+
+
+def test_scheduled_report_modal_mounts_filter_bar():
+    """Phase 4a Task 4: sched-src/dst/ex-*/any-* 分欄已換成單一 FilterBar 掛載點。"""
+    html = _INDEX.read_text(encoding="utf-8")
+    assert 'id="sched-filter-bar"' in html
+    for removed_id in (
+        "sched-src", "sched-dst", "sched-ex-src", "sched-ex-dst",
+        "sched-any-label", "sched-any-ip", "sched-ex-any-label", "sched-ex-any-ip",
+    ):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from sched-filter-section"
+    # pd checkbox/proto/port/ex-port 保留（不屬 FilterBar 範圍）
+    assert 'id="sched-pd-blocked"' in html
+    assert 'id="sched-proto"' in html
+    assert 'id="sched-port"' in html
+    assert 'id="sched-ex-port"' in html
+
+
+def test_dashboard_js_uses_filter_bar_for_scheduled_report():
+    js = Path("src/static/js/dashboard.js").read_text(encoding="utf-8")
+    assert "function _ensureSchedFilterBar()" in js
+    assert "createFilterBar(document.getElementById('sched-filter-bar')" in js
+    assert "_ensureSchedFilterBar().getFilters()" in js
+    assert "_ensureSchedFilterBar().setFilters(" in js
+    for removed_id in (
+        "sched-src", "sched-dst", "sched-ex-src", "sched-ex-dst",
+        "sched-any-label", "sched-any-ip", "sched-ex-any-label", "sched-ex-any-ip",
+    ):
+        assert f"getElementById('{removed_id}')" not in js
+        assert f"'{removed_id}'" not in js
+
+
+def test_filter_bar_deserialize_accepts_legacy_scalar_ip():
+    """既有排程存的是舊格式 src_ip/dst_ip scalar（非 src_ip_in list）；
+    _objfbDeserialize 須認得這個 scalar key 才能讓 setFilters 正確回填舊排程。"""
+    js = _JS.read_text(encoding="utf-8")
+    assert "asList(d[`${dir}_ip_in`]).concat(asList(d[`${dir}_ip`]))" in js
