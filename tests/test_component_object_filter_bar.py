@@ -36,6 +36,14 @@ def test_filter_bar_css_class_present():
     assert ".objfb-pill" in css
 
 
+def test_filter_bar_css_bar_wraps_hint_row():
+    # .objfb-hint 是 width:100% 的整列提示；.objfb-bar 必須 flex-wrap: wrap，
+    # 否則 hint 顯示時（任一側 pill 存在）會擠進同列把 .objfb-fbar 壓扁、pill 文字被裁掉
+    css = _CSS.read_text(encoding="utf-8")
+    bar_block = css.split(".objfb-bar {", 1)[1].split("}", 1)[0]
+    assert "flex-wrap: wrap" in bar_block
+
+
 def test_filter_bar_i18n_keys_present():
     import json
     en = json.loads(_EN.read_text(encoding="utf-8"))
