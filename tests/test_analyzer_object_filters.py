@@ -13,6 +13,7 @@
   Part C  label_groups 類 key 兩套比對器都無法在 client 端評估——
           帶此類 filter 時跳過 cache、強制走 API（PCE native 過濾）
 """
+import datetime
 import unittest
 from unittest.mock import MagicMock
 
@@ -261,6 +262,64 @@ class TestQueryFlowsLabelGroupCacheBypass(unittest.TestCase):
         cr.read_flows_raw.assert_called_once()
         api.execute_traffic_query_stream.assert_not_called()
         self.assertEqual(az.last_query_source, "cache")
+
+
+# ─── Phase 4c：規則引擎（_run_rule_engine 路徑）物件/複數 key 比對 ────────────
+
+class TestRuleEngineObjectFilters(unittest.TestCase):
+    """修前 check_flow_match 對物件/複數 key pass-through，帶這類 filter 的
+    規則會誤發告警（全部 flow 誤命中）——本類鎖住 _match_flow_filters 修正後
+    的行為，走 _run_rule_engine 真實路徑，不 stub 比對器。"""
+
+    def setUp(self):
+        self.az = Analyzer(MagicMock(), MagicMock(), MagicMock())
+        self.flows = [
+            _flow("erp-flow", src_ip="10.0.1.1", src_labels=[("app", "erp")]),
+            _flow("web-flow", src_ip="10.0.1.2", src_labels=[("app", "web")]),
+            _flow("other-flow", src_ip="10.0.1.3", src_labels=[("app", "crm")]),
+            _flow("iplist-flow", src_ip="10.0.1.4", src_iplists=["7"]),
+            _flow("wl-src-flow", src_ip="10.0.1.5", src_wl="abc"),
+            _flow("wl-dst-flow", src_ip="10.0.1.6", dst_wl="abc"),
+        ]
+        # flow fixture 固定 timestamp 2026-06-01T00:10:00Z；now_utc 貼近避免
+        # threshold_window 滑動視窗把 fixture flow 濾掉。
+        self.now_utc = datetime.datetime(2026, 6, 1, 0, 15, tzinfo=datetime.timezone.utc)
+
+    def _rule(self, **kw):
+        base = {"id": "r1", "type": "traffic", "name": "R", "pd": -1,
+                "threshold_type": "count", "threshold_count": 1, "threshold_window": 10}
+        base.update(kw)
+        return base
+
+    def match(self, rule):
+        """走 _run_rule_engine 真實路徑，回傳命中的 flow id 集合。"""
+        results = self.az._run_rule_engine(self.flows, [rule], self.now_utc)
+        _, res = results[0]
+        return {m["id"] for m in res["top_matches"]}
+
+    def test_rule_plural_src_labels_or_semantics(self):
+        # src_labels 複數：同 key OR——app=erp 或 app=web 命中
+        matched = self.match(self._rule(src_labels=["app=erp", "app=web"]))
+        self.assertEqual(matched, {"erp-flow", "web-flow"})
+
+    def test_rule_src_iplists_href_match(self):
+        matched = self.match(self._rule(
+            src_iplists=["/orgs/1/sec_policy/active/ip_lists/7"]))
+        self.assertEqual(matched, {"iplist-flow"})
+
+    def test_rule_any_workload_either_side(self):
+        matched = self.match(self._rule(any_workload="/orgs/1/workloads/abc"))
+        self.assertEqual(matched, {"wl-src-flow", "wl-dst-flow"})
+
+    def test_rule_object_key_no_false_alert(self):
+        # 修前行為：未知 key pass-through → 全部誤命中（本測試是 RED 主鎖）
+        matched = self.match(self._rule(src_labels=["app=nonexistent"]))
+        self.assertEqual(matched, set())
+
+    def test_rule_legacy_scalar_parity(self):
+        # legacy 純量 key 行為逐位不變
+        matched = self.match(self._rule(src_label="app=erp"))
+        self.assertEqual(matched, {"erp-flow"})
 
 
 if __name__ == "__main__":
