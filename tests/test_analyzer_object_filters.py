@@ -1,13 +1,23 @@
 """Phase 4b critical fix：dashboard/analyzer 路徑的 client-side flow 比對。
 
-Part A（C1/I3）：check_flow_match 的 IP 比對 list-aware——list 形
-src_ip_in/dst_ip_in/ex_src_ip/ex_dst_ip（Phase 4b FilterBar 新儲存格式）
-任一值命中即 match / 命中即排除；scalar 行為逐位不變。
+涵蓋三個 final-review 缺陷：
+  C1  list 形 src_ip_in/dst_ip_in（新儲存格式）在 check_flow_match 永不命中
+  C2  物件/複數 filter key（src_labels/_iplists/_workloads/any_* 等）被
+      check_flow_match 靜默 pass-through——cache 全覆蓋時完全未過濾
+  I3  list 形 ex_src_ip/ex_dst_ip 的 client-side 排除 no-op
+
+修法：
+  Part A  check_flow_match 的 IP 比對 list-aware（任一值命中）
+  Part B  query_flows 殘餘比對將物件/複數 key 委派給報表路徑同一套
+          比對器 TrafficQueryBuilder._flow_matches_filters
+  Part C  label_groups 類 key 兩套比對器都無法在 client 端評估——
+          帶此類 filter 時跳過 cache、強制走 API（PCE native 過濾）
 """
 import unittest
 from unittest.mock import MagicMock
 
 from src.analyzer import Analyzer
+from src.api.traffic_query import TrafficQueryBuilder
 
 
 # ─── PCE flow fixture（與 API stream / cache raw_json 同形狀）─────────────────
@@ -40,6 +50,42 @@ def _flow(fid, src_ip="10.0.0.1", dst_ip="10.9.9.9",
         "service": {"port": port, "proto": 6},
         "num_connections": 1,
     }
+
+
+def _make_analyzer(cache_flows=None, api_flows=None):
+    """Analyzer + 真 build_traffic_query_spec + mock cache/API。"""
+    mock_cm = MagicMock()
+    mock_cm.config = {"rules": []}
+    mock_api = MagicMock()
+    builder = TrafficQueryBuilder(MagicMock())
+    mock_api.build_traffic_query_spec.side_effect = builder.build_traffic_query_spec
+    mock_api.execute_traffic_query_stream.side_effect = (
+        lambda *a, **kw: iter(list(api_flows or []))
+    )
+    az = Analyzer(mock_cm, mock_api, MagicMock())
+    az.load_state = MagicMock()
+    az.save_state = MagicMock()
+    cr = None
+    if cache_flows is not None:
+        cr = MagicMock()
+        cr.cover_state.return_value = "full"
+        cr.read_flows_raw.return_value = list(cache_flows)
+        az._cache_reader = cr
+    return az, mock_api, cr
+
+
+def _params(**extra):
+    p = {
+        "start_time": "2026-06-01T00:00:00Z",
+        "end_time": "2026-06-01T01:00:00Z",
+        "sort_by": "connections",
+    }
+    p.update(extra)
+    return p
+
+
+def _ids(results):
+    return sorted(r.get("id") for r in results)
 
 
 # ─── Part A：check_flow_match 的 IP 比對 list-aware（C1/I3）───────────────────
@@ -81,6 +127,140 @@ class TestCheckFlowMatchListIp(unittest.TestCase):
             {"type": "connections", "pd": -1, "ex_dst_ip": "10.9.9.9"}, self.flow, None))
         self.assertTrue(self.az.check_flow_match(
             {"type": "connections", "pd": -1, "ex_dst_ip": "1.2.3.4"}, self.flow, None))
+
+
+# ─── Part B：query_flows 物件 key 委派 _flow_matches_filters（C2 主體）────────
+
+class TestQueryFlowsObjectFilters(unittest.TestCase):
+    """cache 全覆蓋（cover_state='full'）：check_flow_match/_flow_matches_filters
+    是唯一一道過濾——物件 pill 必須在這裡生效。"""
+
+    FLOWS = [
+        _flow("web", src_ip="10.0.0.1", src_labels=[("role", "web"), ("app", "erp")],
+              src_wl="web1", dst_iplists=["CorpNet"]),
+        _flow("db", src_ip="10.0.0.2", src_labels=[("role", "db"), ("app", "erp")],
+              src_wl="db1", dst_iplists=["BadNet"]),
+        _flow("lb", src_ip="10.0.0.3", src_labels=[("role", "lb"), ("app", "crm")],
+              src_wl="lb1"),
+    ]
+
+    def test_src_labels_same_key_or(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(src_labels=["role=web", "role=db"]))
+        self.assertEqual(_ids(res), ["db", "web"])
+        self.assertEqual(az.last_query_source, "cache")
+
+    def test_src_labels_cross_key_and(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(src_labels=["role=web", "app=erp"]))
+        self.assertEqual(_ids(res), ["web"])
+
+    def test_src_ip_in_list_on_cache_path(self):
+        # C1 實測情境：帶 IP pill 的新儲存查詢，修正前 top10 恆空
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(src_ip_in=["10.0.0.1"]))
+        self.assertEqual(_ids(res), ["web"])
+
+    def test_src_workloads_href(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(src_workloads=["/orgs/1/workloads/db1"]))
+        self.assertEqual(_ids(res), ["db"])
+
+    def test_ex_dst_iplists_excludes(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(ex_dst_iplists=["BadNet"]))
+        self.assertEqual(_ids(res), ["lb", "web"])
+
+    def test_any_iplist_on_cache_path(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(any_iplist="CorpNet"))
+        self.assertEqual(_ids(res), ["web"])
+
+    def test_any_workload_on_api_path(self):
+        # C2(b)：fallback-capability 的 any_workload 連 API 路徑都要 client 過濾
+        az, _, _ = _make_analyzer(api_flows=self.FLOWS)  # 無 cache reader
+        res = az.query_flows(_params(any_workload="/orgs/1/workloads/lb1"))
+        self.assertEqual(_ids(res), ["lb"])
+        self.assertEqual(az.last_query_source, "api")
+
+    def test_ex_any_iplist_on_api_path(self):
+        az, _, _ = _make_analyzer(api_flows=self.FLOWS)
+        res = az.query_flows(_params(ex_any_iplist="BadNet"))
+        self.assertEqual(_ids(res), ["lb", "web"])
+
+
+class TestQueryFlowsLegacyParity(unittest.TestCase):
+    """legacy scalar key 對照：委派後過濾結果必須與 check_flow_match 舊行為一致。"""
+
+    FLOWS = TestQueryFlowsObjectFilters.FLOWS
+
+    def test_scalar_src_label(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(src_label="role=web"))
+        self.assertEqual(_ids(res), ["web"])
+
+    def test_scalar_ex_src_label(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(ex_src_label="role=lb"))
+        self.assertEqual(_ids(res), ["db", "web"])
+
+    def test_scalar_src_ip_in(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(src_ip_in="10.0.0.3"))
+        self.assertEqual(_ids(res), ["lb"])
+
+    def test_scalar_ex_dst_ip(self):
+        flows = [
+            _flow("a", dst_ip="10.9.9.9"),
+            _flow("b", src_ip="10.0.0.2", dst_ip="10.9.9.8"),
+        ]
+        az, _, _ = _make_analyzer(cache_flows=flows)
+        res = az.query_flows(_params(ex_dst_ip="10.9.9.9"))
+        self.assertEqual(_ids(res), ["b"])
+
+    def test_scalar_any_label(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(any_label="role=db"))
+        self.assertEqual(_ids(res), ["db"])
+
+    def test_port_filter(self):
+        flows = [_flow("a", port=443), _flow("b", src_ip="10.0.0.2", port=80)]
+        az, _, _ = _make_analyzer(cache_flows=flows)
+        res = az.query_flows(_params(port=443))
+        self.assertEqual(_ids(res), ["a"])
+
+    def test_no_filters_returns_all(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params())
+        self.assertEqual(_ids(res), ["db", "lb", "web"])
+
+
+# ─── Part C：label_groups 無法 client 端評估 → cache bypass ───────────────────
+
+class TestQueryFlowsLabelGroupCacheBypass(unittest.TestCase):
+    FLOWS = TestQueryFlowsObjectFilters.FLOWS
+
+    def test_label_groups_bypasses_cache(self):
+        az, api, cr = _make_analyzer(cache_flows=self.FLOWS, api_flows=self.FLOWS)
+        az.query_flows(_params(
+            src_label_groups=["/orgs/1/sec_policy/active/label_groups/g1"]))
+        cr.read_flows_raw.assert_not_called()
+        api.execute_traffic_query_stream.assert_called_once()
+        self.assertEqual(az.last_query_source, "api")
+
+    def test_ex_dst_label_groups_bypasses_cache(self):
+        az, api, cr = _make_analyzer(cache_flows=self.FLOWS, api_flows=self.FLOWS)
+        az.query_flows(_params(
+            ex_dst_label_groups=["/orgs/1/sec_policy/active/label_groups/g2"]))
+        cr.read_flows_raw.assert_not_called()
+        self.assertEqual(az.last_query_source, "api")
+
+    def test_without_label_groups_cache_still_used(self):
+        az, api, cr = _make_analyzer(cache_flows=self.FLOWS, api_flows=self.FLOWS)
+        az.query_flows(_params(src_labels=["role=web"]))
+        cr.read_flows_raw.assert_called_once()
+        api.execute_traffic_query_stream.assert_not_called()
+        self.assertEqual(az.last_query_source, "cache")
 
 
 if __name__ == "__main__":

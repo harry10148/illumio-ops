@@ -26,6 +26,7 @@ from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
 from src.state_store import load_state_file, update_state_file
 from src.interfaces import IApiClient, IReporter
+from src.api.traffic_query import TrafficQueryBuilder
 
 # Refine Root Dir for State File
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -36,6 +37,29 @@ STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
 # `top_10 = res['top_matches'][:10]`）。_run_rule_engine 以同一個 N 對
 # 每條規則的累積量設上界，確保累積永遠不超過 dispatch 端實際使用的筆數。
 TOP_MATCHES_LIMIT = 10
+
+# query_flows 殘餘比對的委派範圍：check_flow_match 只認 legacy scalar key，
+# 下列物件/複數 key（Phase 3 FilterBar）委派給報表路徑同一套比對器
+# TrafficQueryBuilder._flow_matches_filters 評估——cache 命中時 client 端
+# 比對是唯一一道過濾，這些 key 不得靜默 pass-through。
+_OBJECT_FILTER_KEYS = (
+    "src_labels", "dst_labels", "ex_src_labels", "ex_dst_labels",
+    "src_iplist", "src_iplists", "dst_iplist", "dst_iplists",
+    "ex_src_iplist", "ex_src_iplists", "ex_dst_iplist", "ex_dst_iplists",
+    "src_workload", "src_workloads", "dst_workload", "dst_workloads",
+    "ex_src_workload", "ex_src_workloads", "ex_dst_workload", "ex_dst_workloads",
+    "any_iplist", "any_workload", "ex_any_iplist", "ex_any_workload",
+)
+
+# 兩套 client-side 比對器（check_flow_match 與 _flow_matches_filters）都無法
+# 評估的 filter key：label group 成員展開只存在於 PCE 端。帶這些 key 時
+# cache 路徑必須讓路給 API（PCE native 過濾），否則 cache 全覆蓋時會靜默
+# 回傳未過濾資料。
+_CACHE_UNEVALUABLE_FILTER_KEYS = (
+    "src_label_group", "src_label_groups", "dst_label_group", "dst_label_groups",
+    "ex_src_label_group", "ex_src_label_groups",
+    "ex_dst_label_group", "ex_dst_label_groups",
+)
 
 # ─── Standalone Calculators (shared by Analyzer and Report modules) ──────────
 
@@ -920,6 +944,7 @@ class Analyzer:
         query_pds: list[str],
         query_spec: Any,
         needs_draft: bool,
+        cache_bypass_keys: list[str] | None = None,
     ) -> tuple[Any, str]:
         """Cache-aware fetch for query_flows. Returns (flow_iterable, source).
 
@@ -927,11 +952,28 @@ class Analyzer:
         partial → API fills the gap, cache covers the rest; otherwise → API.
         Note: cache rows are pre-decoded PCE flow dicts, so they are drop-in
         compatible with the downstream pipeline that consumes the API stream.
-        Filtering (native + fallback) still happens in check_flow_match below,
-        so cache returning unfiltered flows is safe.
+        Client-side filtering still happens in query_flows below（legacy scalar
+        key 走 check_flow_match、物件/複數 key 委派 _flow_matches_filters），
+        so cache returning unfiltered flows is safe——前提是 filters 全部可在
+        client 端評估；無法評估的 key（label_groups 類）由 caller 透過
+        cache_bypass_keys 要求跳過 cache、改走 API（PCE native 過濾）。
         """
         # Without a cache reader, behaviour is identical to the pre-cache path.
         if self._cache_reader is None:
+            stream = self.api.execute_traffic_query_stream(
+                start_time, end_time, query_pds,
+                filters=query_spec, compute_draft=needs_draft,
+            )
+            return stream, "api"
+
+        if cache_bypass_keys:
+            # client 端比對器無法評估這些 key——cache 資料未經 PCE 過濾，
+            # 用了會靜默回傳未過濾結果，故強制走 API。
+            logger.debug(
+                "query_flows: cache bypassed — filters {} cannot be evaluated "
+                "client-side; using API so the PCE applies them natively",
+                cache_bypass_keys,
+            )
             stream = self.api.execute_traffic_query_stream(
                 start_time, end_time, query_pds,
                 filters=query_spec, compute_draft=needs_draft,
@@ -1117,8 +1159,14 @@ class Analyzer:
         # because the draft EB may affect flows whose reported PD is "allowed".
         query_pds = pds if not needs_draft else ["blocked", "potentially_blocked", "allowed"]
 
+        # label_groups 類 key 無法在 client 端比對（成員展開只在 PCE 端）——
+        # 帶這些 filter 時不可使用 cache（cache 資料未過濾），強制走 API。
+        cache_bypass_keys = [
+            k for k in _CACHE_UNEVALUABLE_FILTER_KEYS if query_filters.get(k)
+        ]
         traffic_stream, self.last_query_source = self._fetch_query_flows(
             start_time, end_time, query_pds, query_spec, needs_draft,
+            cache_bypass_keys=cache_bypass_keys,
         )
         if not traffic_stream:
             return []
@@ -1137,6 +1185,13 @@ class Analyzer:
         rule["type"] = sort_by if sort_by in ["bandwidth", "volume"] else "connections"
         rule["pd"] = -1
 
+        # 殘餘比對分工：legacy scalar key（src_label/src_ip_in/ex_*/any_label/
+        # any_ip/port/proto…）與 pd/時間窗仍由 check_flow_match 處理（含 Part A
+        # 的 list 形 IP）；物件/複數 key 委派給報表路徑同一套比對器
+        # _flow_matches_filters（同 key OR、跨 key AND，與 native 語意一致）。
+        # cache 命中時 PCE 未過濾，這兩道 client 端比對是唯一的過濾。
+        object_rule = {k: rule[k] for k in _OBJECT_FILTER_KEYS if rule.get(k)}
+
         for f in traffic_stream:
             if strict_pd and f.get("policy_decision") not in strict_pd:
                 continue
@@ -1146,7 +1201,11 @@ class Analyzer:
 
             if not self.check_flow_match(rule, f, start_dt):
                 continue
-                
+
+            if object_rule and not TrafficQueryBuilder._flow_matches_filters(f, object_rule):
+                continue
+
+
             src = f.get('src', {})
             dst = f.get('dst', {})
             svc = f.get('service', {})
