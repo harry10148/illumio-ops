@@ -323,7 +323,11 @@ class LabelResolver:
             if value.get("href"):
                 return self._resolve_ip_filter_to_actor(value.get("href"))
             if value.get("ip_address"):
-                return {"ip_address": {"value": str(value["ip_address"]).strip()}}
+                # PCE (21.5+) 對 traffic_flows include/exclude 的 ip_address
+                # native actor 只接受 plain string；nested {"value": ...} 會
+                # 回 406 input_validation_error 且被 stream 層吞掉、靜默回 0
+                # 筆（實測 2026-07-04）。
+                return {"ip_address": str(value["ip_address"]).strip()}
             if value.get("workload"):
                 href = value["workload"].get("href") if isinstance(value["workload"], dict) else value["workload"]
                 if href:
@@ -401,7 +405,11 @@ class LabelResolver:
                 return {"workload": {"href": candidate}}
             return None
         if self._is_ip_literal(candidate):
-            return {"ip_address": {"value": candidate}}
+            # PCE (21.5+) 對 traffic_flows include/exclude 的 ip_address
+            # native actor 只接受 plain string；nested {"value": ...} 會
+            # 回 406 input_validation_error 且被 stream 層吞掉、靜默回 0
+            # 筆（實測 2026-07-04）。
+            return {"ip_address": candidate}
         self._ensure_query_lookup_cache()
         href = c._iplist_href_cache.get(candidate)
         if not href:
