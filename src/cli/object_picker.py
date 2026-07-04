@@ -24,6 +24,7 @@ _CAT_TITLES = {
 }
 
 _DONE = "__done__"
+_CLEAR_PREFIX = "__clear__"
 
 
 def _interactive_ok():
@@ -108,10 +109,21 @@ def _manual_text_entry(cat, key, result, lang):
 
 
 def _pick_tty(api, cats, result, title, lang):
-    choices = [questionary.Choice(title=_CAT_TITLES[c], value=c) for c in _CAT_ORDER if c in cats]
-    choices.append(questionary.Choice(title=t("cli_pick_done", lang=lang, default="-- Done --"), value=_DONE))
-
     while True:
+        choices = [questionary.Choice(title=_CAT_TITLES[c], value=c) for c in _CAT_ORDER if c in cats]
+        for c in _CAT_ORDER:
+            if c not in cats:
+                continue
+            n = len(result.get(_CAT_RESULT_KEY[c], []))
+            if n:
+                # 已有選值的類別才附加「清空」選項（不做逐項移除，見 Task 1 report follow-up）
+                choices.append(questionary.Choice(
+                    title=t("cli_pick_clear_cat", lang=lang, cat=_CAT_TITLES[c], n=n,
+                            default="Clear {cat} ({n} items)"),
+                    value=_CLEAR_PREFIX + c,
+                ))
+        choices.append(questionary.Choice(title=t("cli_pick_done", lang=lang, default="-- Done --"), value=_DONE))
+
         selection = questionary.select(
             t("cli_pick_category", lang=lang, title=title, default="Select object category for '{title}':"),
             choices=choices,
@@ -119,6 +131,10 @@ def _pick_tty(api, cats, result, title, lang):
         ).unsafe_ask()
         if selection is None or selection == _DONE:
             break
+
+        if isinstance(selection, str) and selection.startswith(_CLEAR_PREFIX):
+            result.pop(_CAT_RESULT_KEY[selection[len(_CLEAR_PREFIX):]], None)
+            continue
 
         cat = selection
         key = _CAT_RESULT_KEY[cat]
@@ -134,8 +150,8 @@ def _pick_tty(api, cats, result, title, lang):
                 _manual_text_entry(cat, key, result, lang)
             else:
                 if not candidates:
-                    print(t("cli_pick_offline_hint", lang=lang, cat=cat,
-                            default="No '{cat}' candidates found; falling back to manual input."))
+                    # 候選載入成功但為空 ≠ PCE 離線，需獨立訊息（避免誤報 offline_hint）
+                    print(t("cli_pick_no_candidates", lang=lang, cat=cat))
                     _manual_text_entry(cat, key, result, lang)
                 else:
                     cand_map = {display: value for display, value in candidates}
@@ -158,7 +174,7 @@ def pick_objects(api, cats, title, preselected=None, lang=None):
 
     回傳只含非空類別的 dict，key 為 labels/label_groups/iplists/workloads/ips。
     """
-    result = dict(preselected or {})
+    result = {k: list(v) for k, v in (preselected or {}).items() if v}  # 斷開別名，避免就地修改污染呼叫端
 
     if _interactive_ok():
         _pick_tty(api, cats, result, title, lang)

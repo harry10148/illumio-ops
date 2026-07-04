@@ -86,3 +86,44 @@ def test_preselected_backfill(monkeypatch):
     out = op.pick_objects(_api(), cats=("label", "ip"), title="src",
                           preselected={"labels": ["app=old"], "ips": ["1.2.3.4"]})
     assert out == {"labels": ["app=old"], "ips": ["1.2.3.4"]}
+
+
+def test_preselected_not_aliased(monkeypatch):
+    # Finding 1：preselected 的內層 list 不得被就地修改（呼叫端物件與精靈取消後皆不受污染）
+    from src.cli import object_picker as op
+    monkeypatch.setattr(op, "_interactive_ok", lambda: True)
+    preselected = {"labels": ["app=old"]}
+    with patch("questionary.select") as msel, patch("questionary.autocomplete") as mauto:
+        msel.return_value.unsafe_ask.side_effect = ["label", "__done__"]
+        mauto.return_value.unsafe_ask.side_effect = ["app=erp"]
+        out = op.pick_objects(_api(), cats=("label",), title="src", preselected=preselected)
+    assert preselected == {"labels": ["app=old"]}  # 呼叫端原物件逐位不變
+    assert out["labels"] == ["app=old", "app=erp"]
+    assert out["labels"] is not preselected["labels"]  # 回傳 list 非同一物件
+
+
+def test_empty_candidates_shows_no_candidates_message(monkeypatch, capsys):
+    # Finding 2：候選載入成功但回 [] 時，不得誤報 offline，須顯示專屬的 no_candidates 訊息
+    from src.cli import object_picker as op
+    from src.i18n import t as i18n_t
+    monkeypatch.setattr(op, "_interactive_ok", lambda: True)
+    api = _api()
+    api.get_all_labels.return_value = []
+    with patch("questionary.select") as msel, patch("questionary.text") as mtext:
+        msel.return_value.unsafe_ask.side_effect = ["label", "__done__"]
+        mtext.return_value.unsafe_ask.side_effect = ["env=dev"]
+        op.pick_objects(api, cats=("label",), title="src")
+    out = capsys.readouterr().out
+    assert i18n_t("cli_pick_no_candidates", lang=None, cat="label") in out
+    assert i18n_t("cli_pick_offline_hint", lang=None, cat="label") not in out
+
+
+def test_tty_clear_category_option(monkeypatch):
+    # Finding 3：類別選單在已有選值時附加「清空」選項，選了就整類移除
+    from src.cli import object_picker as op
+    monkeypatch.setattr(op, "_interactive_ok", lambda: True)
+    preselected = {"labels": ["app=old"]}
+    with patch("questionary.select") as msel:
+        msel.return_value.unsafe_ask.side_effect = [f"{op._CLEAR_PREFIX}label", "__done__"]
+        out = op.pick_objects(_api(), cats=("label",), title="src", preselected=preselected)
+    assert out == {}
