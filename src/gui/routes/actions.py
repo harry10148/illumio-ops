@@ -121,6 +121,31 @@ def make_actions_blueprint(
                 "any_ip": d.get("any_ip", ""),
                 "ex_any_label": d.get("ex_any_label", ""),
                 "ex_any_ip": d.get("ex_any_ip", ""),
+                # 物件 filter key（Phase 1 analyzer 已支援；FilterBar 送複數 list）
+                "src_labels": d.get("src_labels", []),
+                "dst_labels": d.get("dst_labels", []),
+                "ex_src_labels": d.get("ex_src_labels", []),
+                "ex_dst_labels": d.get("ex_dst_labels", []),
+                # FilterBar 的 label group pill 序列化 key，須與 analyzer.py query_flows
+                # whitelist（~1053-1064）及 _TRAFFIC_FILTER_CAPABILITIES（traffic_query.py ~90-96）保持一致
+                "src_label_groups": d.get("src_label_groups", []),
+                "dst_label_groups": d.get("dst_label_groups", []),
+                "ex_src_label_groups": d.get("ex_src_label_groups", []),
+                "ex_dst_label_groups": d.get("ex_dst_label_groups", []),
+                "src_iplist": d.get("src_iplist", ""),
+                "src_iplists": d.get("src_iplists", []),
+                "dst_iplist": d.get("dst_iplist", ""),
+                "dst_iplists": d.get("dst_iplists", []),
+                "ex_src_iplists": d.get("ex_src_iplists", []),
+                "ex_dst_iplists": d.get("ex_dst_iplists", []),
+                "src_workloads": d.get("src_workloads", []),
+                "dst_workloads": d.get("dst_workloads", []),
+                "ex_src_workloads": d.get("ex_src_workloads", []),
+                "ex_dst_workloads": d.get("ex_dst_workloads", []),
+                "any_iplist": d.get("any_iplist", ""),
+                "any_workload": d.get("any_workload", ""),
+                "ex_any_iplist": d.get("ex_any_iplist", ""),
+                "ex_any_workload": d.get("ex_any_workload", ""),
             }
             results = base_ana.query_flows(params)
 

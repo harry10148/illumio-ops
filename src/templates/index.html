@@ -2448,17 +2448,9 @@
               <option value="17" data-i18n="gui_udp">UDP</option>
             </select></div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label data-i18n="gui_source">Source (Label/IP)</label><input id="qt-src"
-              placeholder="e.g. role=Web, 10.0.0.0/8" data-i18n-placeholder="gui_ph_src"></div>
-          <div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="qt-dst"
-              placeholder="e.g. app=DB, 10.1.1.5" data-i18n-placeholder="gui_ph_dst"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label data-i18n="gui_any_label">Either Side Label (src OR dst)</label><input id="qt-any-label"
-              placeholder="e.g. env=Production, role:Web" data-i18n-placeholder="gui_ph_any_label"></div>
-          <div class="form-group"><label data-i18n="gui_any_ip">Either Side IP (src OR dst)</label><input id="qt-any-ip"
-              placeholder="e.g. 10.0.1.5, IPList name" data-i18n-placeholder="gui_ph_any_ip"></div>
+        <div class="form-group">
+          <label data-i18n="gui_qt_object_filters">Source / Destination / Either Side (Labels, IPs, Workloads, IP Lists)</label>
+          <div id="qt-filter-bar"></div>
         </div>
       </fieldset>
       <fieldset>
@@ -2484,19 +2476,9 @@
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_excludes">Excludes (Optional)</legend>
-        <div class="form-row-3">
+        <div class="form-row">
           <div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="qt-expt"
               placeholder="e.g. 22" data-i18n-placeholder="gui_ph_ex_port"></div>
-          <div class="form-group"><label data-i18n="gui_ex_src">Exclude Source</label><input id="qt-exsrc"
-              placeholder="e.g. env=Kube, 10.9.9.9" data-i18n-placeholder="gui_ph_ex_src"></div>
-          <div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="qt-exdst"
-              placeholder="e.g. 8.8.8.8" data-i18n-placeholder="gui_ph_ex_dst"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label data-i18n="gui_ex_any_label">Exclude Either Side Label</label><input id="qt-ex-any-label"
-              placeholder="e.g. env=Dev" data-i18n-placeholder="gui_ph_ex_any_label"></div>
-          <div class="form-group"><label data-i18n="gui_ex_any_ip">Exclude Either Side IP</label><input id="qt-ex-any-ip"
-              placeholder="e.g. 192.168.0.0/16" data-i18n-placeholder="gui_ph_ex_any_ip"></div>
         </div>
       </fieldset>
       <div class="modal-actions">
@@ -3080,6 +3062,7 @@
   <script defer src="/static/js/settings.js"></script>
   <script defer src="/static/js/actions.js"></script>
   <script defer src="/static/js/quarantine.js"></script>
+  <script defer src="/static/js/filter-bar.js"></script>
   <script defer src="/static/js/rule-scheduler.js"></script>
   <script defer src="/static/js/module-log.js"></script>
   </main>
