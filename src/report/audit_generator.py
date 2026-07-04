@@ -836,16 +836,25 @@ def generate_audit_xlsx(module_results: dict, out_path: str, *, lang: str = "en"
         wb, t("rpt_xlsx_sheet_audit_attention", lang=lang), kpi_df, lang=lang,
     )
 
-    add_df_sheet(
-        wb, t("rpt_xlsx_sheet_audit_health", lang=lang), mod01.get("summary"), lang=lang,
+    summary_subtitle = t("rpt_au_summary_type", lang=lang)
+    recent_subtitle = t("rpt_au_recent", lang=lang)
+
+    add_stacked_tables_sheet(
+        wb, t("rpt_xlsx_sheet_audit_health", lang=lang),
+        [(summary_subtitle, mod01.get("summary")), (recent_subtitle, mod01.get("recent"))],
+        lang=lang,
     )
 
-    add_df_sheet(
-        wb, t("rpt_xlsx_sheet_audit_users", lang=lang), mod02.get("per_user"), lang=lang,
+    add_stacked_tables_sheet(
+        wb, t("rpt_xlsx_sheet_audit_users", lang=lang),
+        [(t("rpt_au_per_user", lang=lang), mod02.get("per_user")), (recent_subtitle, mod02.get("recent"))],
+        lang=lang,
     )
 
-    add_df_sheet(
-        wb, t("rpt_xlsx_sheet_audit_policy", lang=lang), mod03.get("summary"), lang=lang,
+    add_stacked_tables_sheet(
+        wb, t("rpt_xlsx_sheet_audit_policy", lang=lang),
+        [(summary_subtitle, mod03.get("summary")), (recent_subtitle, mod03.get("recent"))],
+        lang=lang,
     )
 
     add_stacked_tables_sheet(

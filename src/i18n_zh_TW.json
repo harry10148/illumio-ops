@@ -2772,7 +2772,7 @@
   "rpt_au_provision_title": "Policy Provision 事件",
   "rpt_au_provisions": "Provision 次數：",
   "rpt_au_rec": "建議：",
-  "rpt_au_recent": "近期事件（最多 50 筆）",
+  "rpt_au_recent": "近期事件（顯示前 10 筆，完整清單見 CSV/XLSX 匯出）",
   "rpt_au_resource": "資源：",
   "rpt_au_rule_changes": "Draft 規則變更：",
   "rpt_au_sec_concern_desc": "Tampering、suspend 或 clone 相關事件，可能代表主機或 Agent 已遭異常操作，建議立即檢查。",

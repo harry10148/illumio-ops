@@ -20,6 +20,11 @@ def sample_module_results():
                 {"metric": "success_rate", "value": "98%"},
                 {"metric": "failure_count", "value": 2},
             ]),
+            "recent": pd.DataFrame([
+                {"event_type": "audit.recent.1", "severity": "info"},
+                {"event_type": "audit.recent.2", "severity": "info"},
+                {"event_type": "audit.recent.3", "severity": "info"},
+            ]),
         },
         "mod02": {
             "per_user": pd.DataFrame([
@@ -82,6 +87,18 @@ def test_audit_xlsx_attention_has_kpi_label(sample_module_results, tmp_path):
     wb = load_workbook(str(out_path))
     flat = [v for r in wb["Attention Required"].iter_rows(values_only=True) for v in r]
     assert "Total Events" in flat
+
+
+def test_audit_xlsx_health_has_recent_stacked_table(sample_module_results, tmp_path):
+    """spec I1：Health sheet 為 summary + recent 兩段堆疊表，recent 補足 HTML 只顯示 10 筆的完整清單。"""
+    from src.i18n import t
+    from src.report.audit_generator import generate_audit_xlsx
+    out_path = tmp_path / "audit.xlsx"
+    generate_audit_xlsx(sample_module_results, str(out_path))
+    wb = load_workbook(str(out_path))
+    flat = [v for r in wb["Health"].iter_rows(values_only=True) for v in r]
+    assert "audit.recent.3" in flat, "Health sheet 應含 recent 子表資料列"
+    assert t("rpt_au_recent", lang="en") in flat, "Health sheet 應含 recent 子標題列"
 
 
 def test_audit_xlsx_missing_keys_write_empty_note_without_crash(tmp_path):

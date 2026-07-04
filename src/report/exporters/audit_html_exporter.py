@@ -73,6 +73,16 @@ def _truncate_long_cell(text: str, limit: int = _LONG_TEXT_TRUNCATE_AT) -> str:
     )
 
 
+_RECENT_HTML_LIMIT = 10
+
+
+def _capped_recent(df, limit: int = _RECENT_HTML_LIMIT):
+    """近期事件表僅顯示前 limit 筆，完整清單見 CSV/XLSX 匯出（spec I1）。"""
+    if df is None or not hasattr(df, "empty") or df.empty:
+        return df
+    return df.head(limit)
+
+
 def _df_to_html(df, no_data_key: str = "rpt_no_data", show_risk: bool = False, lang: str = "en") -> str:
     event_type_col = None
     long_text_cols: set[str] = set()
@@ -378,7 +388,7 @@ class AuditHtmlExporter:
 
         html += f'<h3>{_s("rpt_au_severity_breakdown")}</h3>' + _df_to_html(m.get("severity_breakdown"), lang=_lang)
         html += f'<h3>{_s("rpt_au_summary_type")}</h3>' + _df_to_html(m.get("summary"), lang=_lang)
-        html += f'<h3>{_s("rpt_au_recent")}</h3>' + _df_to_html(m.get("recent"), show_risk=True, lang=_lang)
+        html += f'<h3>{_s("rpt_au_recent")}</h3>' + _df_to_html(_capped_recent(m.get("recent")), show_risk=True, lang=_lang)
         return "".join(html_parts) + html
 
     def _mod02_html(self) -> str:
@@ -421,7 +431,7 @@ class AuditHtmlExporter:
             )
 
         html += f'<h3>{_s("rpt_au_summary_type")}</h3>' + _df_to_html(m.get("summary"), lang=_lang)
-        html += f'<h3>{_s("rpt_au_recent")}</h3>' + _df_to_html(m.get("recent"), show_risk=True, lang=_lang)
+        html += f'<h3>{_s("rpt_au_recent")}</h3>' + _df_to_html(_capped_recent(m.get("recent")), show_risk=True, lang=_lang)
         return "".join(html_parts) + html
 
     def _mod03_html(self) -> str:
@@ -483,7 +493,7 @@ class AuditHtmlExporter:
             )
 
         html += f'<h3>{_s("rpt_au_summary_type")}</h3>' + _df_to_html(m.get("summary"), lang=_lang)
-        html += f'<h3>{_s("rpt_au_recent")}</h3>' + _df_to_html(m.get("recent"), show_risk=True, lang=_lang)
+        html += f'<h3>{_s("rpt_au_recent")}</h3>' + _df_to_html(_capped_recent(m.get("recent")), show_risk=True, lang=_lang)
         return "".join(html_parts) + html
 
     def _mod04_html(self) -> str:

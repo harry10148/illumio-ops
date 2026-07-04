@@ -2772,7 +2772,7 @@
   "rpt_au_provision_title": "Policy Provision Events",
   "rpt_au_provisions": "Provisions:",
   "rpt_au_rec": "Recommendation:",
-  "rpt_au_recent": "Recent Events (up to 50)",
+  "rpt_au_recent": "Recent Events (top 10 — full list in CSV/XLSX)",
   "rpt_au_resource": "Resource:",
   "rpt_au_rule_changes": "Rule Changes (Draft):",
   "rpt_au_sec_concern_desc": "Tampering, suspend, or clone-related events may indicate compromise and should be reviewed immediately.",
