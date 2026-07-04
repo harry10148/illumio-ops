@@ -196,3 +196,57 @@ def test_update_rule_legacy_branch_unchanged(client):
     updated = client.get('/api/rules', environ_overrides={'REMOTE_ADDR': '127.0.0.1'}).get_json()[idx]
     assert updated["src_label"] == "app=erp"
     assert updated["dst_ip_in"] == "10.0.0.5"
+
+
+def test_update_rule_rejects_top_level_label_groups(client, app_persistent):
+    """final review Finding 1：PUT body 把 src_label_groups 直接放在頂層（不在
+    filters dict 內）必須一樣被拒絕——不可經 old.update(d) 繞過白名單靜默存入。
+    直讀 cm 活物件，理由同 test_update_rule_rejects_label_groups。"""
+    csrf_token = _login(client)
+    cm = app_persistent.config["CM"]
+
+    r = client.post('/api/rules/traffic', json={
+        "name": "PutTopInject", "src": "app=erp", "dst": "10.0.0.9",
+        "threshold_count": 5, "threshold_window": 10,
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
+    assert r.status_code == 200
+    idx = next(i for i, x in enumerate(cm.config['rules']) if x["name"] == "PutTopInject")
+    before = dict(cm.config['rules'][idx])
+
+    r2 = client.put(f'/api/rules/{idx}', json={
+        "src_label_groups": ["PG-Prod"],
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
+    assert r2.status_code == 400
+    assert r2.get_json()["ok"] is False
+
+    after = cm.config['rules'][idx]
+    assert "src_label_groups" not in after
+    for key, val in before.items():
+        assert after[key] == val, f"field {key!r} changed after rejected PUT: {val!r} -> {after[key]!r}"
+
+
+def test_update_rule_filters_replace_clears_legacy_top_level_injection(client, app_persistent):
+    """模擬歷史殘留：手動在 cm 活物件塞入曾經頂層注入成功的 src_label_groups
+    （修法前的產物），確認之後帶 filters 的 PUT 會把殘留一併清掉，不會跟新值
+    混存。"""
+    csrf_token = _login(client)
+    cm = app_persistent.config["CM"]
+
+    r = client.post('/api/rules/traffic', json={
+        "name": "PutClearsResidue", "threshold_count": 5, "threshold_window": 10,
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
+    assert r.status_code == 200
+    idx = next(i for i, x in enumerate(cm.config['rules']) if x["name"] == "PutClearsResidue")
+    cm.config['rules'][idx]["src_label_groups"] = ["PG-Legacy-Residue"]
+    # PUT handler 內部會 cm.load() 從磁碟重載，手動注入必須先落盤才不會被蓋掉。
+    cm.save()
+
+    r2 = client.put(f'/api/rules/{idx}', json={
+        "filters": {"src_workloads": ["/orgs/1/workloads/abc"]},
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
+    assert r2.status_code == 200
+    assert r2.get_json()["ok"] is True
+
+    updated = cm.config['rules'][idx]
+    assert "src_label_groups" not in updated
+    assert updated["src_workloads"] == ["/orgs/1/workloads/abc"]

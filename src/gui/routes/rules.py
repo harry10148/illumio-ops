@@ -341,6 +341,13 @@ def make_rules_blueprint(
                         d['match_fields'] = _normalize_match_fields(d.get('match_fields'))
                     except ValueError as exc:
                         return _err(str(exc), 400)
+                # Phase 4c final review Finding 1：label_group 拒絕檢查除了 filters
+                # dict 外，也要擋 d 頂層直注入（PUT body 把 src_label_groups 等放在
+                # filters 外層），否則會繞過白名單經 old.update(d) 存進 rule——
+                # 檢查同樣須在動到 old 之前完成，400 時 old 完全未被動過。
+                bad_top = [k for k in _RULE_REJECTED_KEYS if d.get(k)]
+                if bad_top:
+                    return _err(t("gui_rule_label_group_unsupported", lang=lang), 400)
                 # Phase 4c：filters dict 另外處理（整組替換），不隨 old.update(d) 混入。
                 # label_group 拒絕檢查須在動到 old 之前完成——400 時 old 必須完全未被
                 # 動過（見 filter-selector Phase 4c review：動了才拒絕會讓共用的 rule
@@ -368,8 +375,10 @@ def make_rules_blueprint(
                                 old[prefix + '_ip_in'] = raw or None
                 if flat is not None:
                     # 整組替換：先清掉舊 rule 中所有 filter key（object/複數 + legacy
-                    # scalar），避免新舊混存，再套用新的 flat 值。
-                    for k in _RULE_FB_KEYS + _RULE_LEGACY_SCALAR_KEYS:
+                    # scalar + label_group 歷史注入殘留），避免新舊混存，再套用新的
+                    # flat 值。_RULE_REJECTED_KEYS 加入是為了讓帶 filters 的 PUT 能
+                    # 順便清掉過去頂層注入留下的殘留值（見 Finding 1）。
+                    for k in _RULE_FB_KEYS + _RULE_LEGACY_SCALAR_KEYS + _RULE_REJECTED_KEYS:
                         old.pop(k, None)
                     old.update(flat)
                 # Cast numeric fields

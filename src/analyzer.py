@@ -390,7 +390,9 @@ class Analyzer:
         同一套 _flow_matches_filters（兩者 AND）。三個呼叫點共用：規則引擎、
         規則測試預覽、dashboard query_flows。label_groups 類 key 無 client-side
         成員展開——規則端點拒收、query_flows 走 cache-bypass；此處防禦性忽略
-        並記 debug（不可靜默影響比對結果）。"""
+        （不影響比對結果）。此函式在 per-flow 熱迴圈內被逐筆呼叫，故不在此記
+        debug log（會被洗版）；只有手改 alerts.json 繞過端點拒收才會走到這個
+        分支，屬邊角情境。"""
         if not self.check_flow_match(rule, f, window_start):
             return False
         object_rule = {k: rule[k] for k in _OBJECT_FILTER_KEYS if rule.get(k)}
