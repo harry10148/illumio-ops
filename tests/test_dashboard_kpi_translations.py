@@ -20,7 +20,6 @@ APPROVED_ZH = {
     "gui_card_unknown_types":  "未知事件類型",
     "gui_card_suppressed":     "已抑制",
     "gui_card_ransomware_exp": "Ransomware 暴露面",
-    "gui_attack_summary_title": "攻擊摘要（Boundary/Pivot/Blast Radius/Blind Spots/行動）",
     "gui_cooldown_title":      "冷卻中規則",
 }
 

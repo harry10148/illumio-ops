@@ -283,7 +283,6 @@
   "gui_api_status": "API 狀態",
   "gui_api_update_failed": "透過 API 更新 Workload 失敗。",
   "gui_api_url": "API URL",
-  "gui_attack_summary_title": "攻擊摘要（Boundary/Pivot/Blast Radius/Blind Spots/行動）",
   "gui_auth_settings": "驗證設定",
   "gui_auto": "自動",
   "gui_best_practices": "載入最佳實踐",
