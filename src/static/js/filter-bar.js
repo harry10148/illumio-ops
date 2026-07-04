@@ -84,6 +84,10 @@ function _objfbDeserialize(state, dict) {
   for (const dir of ['src', 'dst']) {
     for (const spec of asList(d[`${dir}_labels`]).concat(asList(d[`${dir}_label`]))) add('label', spec, dir, false);
     for (const spec of asList(d[`ex_${dir}_labels`]).concat(asList(d[`ex_${dir}_label`]))) add('label', spec, dir, true);
+    // label_group：序列化端有送（{ex_}{dir}_label_groups），漏在這裡會使
+    // 編輯回填時 label_group pill 靜默消失、再存檔即永久遺失
+    for (const spec of asList(d[`${dir}_label_groups`])) add('label_group', spec, dir, false);
+    for (const spec of asList(d[`ex_${dir}_label_groups`])) add('label_group', spec, dir, true);
     for (const h of asList(d[`${dir}_iplists`]).concat(asList(d[`${dir}_iplist`]))) add('iplist', h, dir, false, { href: h });
     for (const h of asList(d[`ex_${dir}_iplists`])) add('iplist', h, dir, true, { href: h });
     for (const h of asList(d[`${dir}_workloads`])) add('workload', h, dir, false, { href: h });

@@ -222,3 +222,11 @@ def test_save_dashboard_query_sends_filters_dict():
     assert "_ensureDqFilterBar().getFilters()" in fn_src
     for removed_key in ("src:", "dst:", "ex_src:", "ex_dst:", "any_label:", "any_ip:", "ex_any_label:", "ex_any_ip:"):
         assert removed_key not in fn_src, f"{removed_key} should no longer be read directly in saveDashboardQuery"
+
+
+def test_filter_bar_deserialize_restores_label_group_pills():
+    """序列化端會送 {ex_}{dir}_label_groups；deserialize 漏認會使編輯回填時
+    label_group pill 靜默消失、再存檔即永久遺失（排程報表/儲存查詢/modal 重開共用）。"""
+    js = _JS.read_text(encoding="utf-8")
+    assert "asList(d[`${dir}_label_groups`])" in js
+    assert "asList(d[`ex_${dir}_label_groups`])" in js
