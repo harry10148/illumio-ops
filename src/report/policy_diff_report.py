@@ -83,6 +83,15 @@ class PolicyDiffReport:
             active_inv[kind] = fetch() if fetch else []
             draft_inv[kind] = fetch(pversion="draft") if fetch else []
         names = self._build_name_map(*active_inv.values())
+        # 個別 label 無 name 欄，以 PCE 慣例 key:value 呈現，供 label_group 成員解析
+        labels = self.api.get_all_labels() if self.api else []
+        if not isinstance(labels, list):
+            labels = []
+        names.update({
+            str(l["href"]): f"{l.get('key', '')}:{l.get('value', '')}"
+            for l in labels
+            if isinstance(l, dict) and l.get("href")
+        })
         diff = diff_rulesets(draft, active, names=names)
         for key, method, kind, fields in self._OBJECT_SPECS:
             df = diff_objects(draft_inv[kind], active_inv[kind],

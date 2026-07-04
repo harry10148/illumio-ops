@@ -105,6 +105,29 @@ def test_build_object_layers_draft_and_active_fetched():
         assert kwargs_seen == {"active", "draft"}
 
 
+def test_label_group_members_resolve_via_all_labels():
+    api = MagicMock()
+    api.get_all_rulesets.return_value = []
+    api.get_active_rulesets.return_value = []
+    api.get_ip_lists.side_effect = lambda pversion="active": []
+    api.get_services.side_effect = lambda pversion="active": []
+    api.get_label_groups.side_effect = lambda pversion="active": {
+        "active": [{"href": "/orgs/1/sec_policy/active/label_groups/8", "name": "G",
+                    "labels": [], "sub_groups": [], "description": ""}],
+        "draft": [{"href": "/orgs/1/sec_policy/draft/label_groups/8", "name": "G",
+                   "labels": [{"href": "/orgs/1/labels/9"}], "sub_groups": [],
+                   "description": ""}],
+    }[pversion]
+    api.get_all_labels.return_value = [
+        {"href": "/orgs/1/labels/9", "key": "role", "value": "web"}]
+    rep = PolicyDiffReport(MagicMock(), api_client=api)
+    with patch.object(rep, "_fetch_policy_events", return_value={"draft_events": None}):
+        diff = rep.build()
+    row = diff["label_group_changes"].iloc[0]
+    assert "role:web" in row["draft_value"]
+    assert "/orgs/1/labels/9" not in row["draft_value"]
+
+
 def test_attribution_window_is_configurable():
     from src.report.policy_diff_report import PolicyDiffReport
 
