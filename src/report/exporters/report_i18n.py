@@ -233,6 +233,7 @@ for suffix, entry in {
     "recommendation": ("Recommendation", "建議"),
     "flow": ("Flow", "Flow"),
     "flow_app": ("Flow (src_app->dst_app)", "Flow（src_app -> dst_app）"),
+    "risk_type": ("Risk Type", "風險類型"),
     "unique_ports": ("Unique Ports", "唯一 Ports 數"),
     "unique_dst_hosts": ("Unique Dst Hosts", "唯一目的端主機數"),
     "unique_src_ips": ("Unique Src IPs", "唯一來源 IP 數"),

@@ -159,3 +159,6 @@ class TestMod05HtmlSingleMergedTable:
         assert "Draft 衝突" in html
         assert "Draft 覆蓋" in html
         assert "Visibility Risk" not in html
+        # 欄標題也必須在地化（final review 發現的 COL_I18N 缺線）
+        assert "風險類型" in html
+        assert ">Risk Type<" not in html
