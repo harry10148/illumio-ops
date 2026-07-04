@@ -3720,6 +3720,7 @@
   "rpt_ven_nav_online": "Online VEN",
   "rpt_ven_nav_summary": "摘要",
   "rpt_ven_no_data": "沒有 VEN 資料。",
+  "rpt_ven_online_detail_note": "Online 主機逐台明細見 XLSX/CSV 匯出。",
   "rpt_ven_sec_lost_today_intro": "近 24 小時內失聯，建議優先排查。這些通常最有機會對應到新發生的網路、Agent 或主機異常。",
   "rpt_ven_sec_lost_today_title": "近 24 小時失聯",
   "rpt_ven_sec_lost_yest_intro": "已失聯超過一天，但仍屬近期事件，建議在成為陳舊資產前完成確認。這張表可用來追蹤持續未恢復的中短期異常。",

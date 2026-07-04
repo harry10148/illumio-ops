@@ -3720,6 +3720,7 @@
   "rpt_ven_nav_online": "Online VENs",
   "rpt_ven_nav_summary": "Executive Summary",
   "rpt_ven_no_data": "No VEN data.",
+  "rpt_ven_online_detail_note": "Per-host online detail is available in the XLSX/CSV export.",
   "rpt_ven_sec_lost_today_intro": "Lost heartbeat within the last 24 hours — investigate first. These usually map to recent network, agent, or host incidents.",
   "rpt_ven_sec_lost_today_title": "Lost Connection in Last 24h",
   "rpt_ven_sec_lost_yest_intro": "Lost heartbeat for more than a day but still recent. Confirm root cause before they become stale assets. Useful for tracking mid-term outages.",

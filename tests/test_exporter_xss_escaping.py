@@ -126,8 +126,11 @@ def test_audit_high_impact_provisions_is_escaped():
 
 def test_ven_table_cell_is_escaped():
     from src.report.exporters.ven_html_exporter import VenHtmlExporter
+    # Online 章已改為版本分布摘要（明細留 XLSX/CSV），逐台表的逸出改由
+    # offline 章驗證；online 章另以 VEN Version 帶 payload 驗證版本小表逸出。
     df = pd.DataFrame([{"hostname": PAYLOAD, "os": PAYLOAD}])
-    exporter = VenHtmlExporter({"online": df}, lang="en")
+    df_online = pd.DataFrame([{"Hostname": "h1", "VEN Version": PAYLOAD}])
+    exporter = VenHtmlExporter({"online": df_online, "offline": df}, lang="en")
     html = exporter._build()
     assert PAYLOAD not in html
     assert ESCAPED_MARK in html

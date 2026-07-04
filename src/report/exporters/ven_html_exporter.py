@@ -165,6 +165,29 @@ class VenHtmlExporter:
             return render_df_table(df, col_i18n=_COL_I18N, no_data_key=no_data_key,
                                    render_cell=_render_cell, lang=_sl)
 
+        def _online_summary_html(df) -> str:
+            # spec K2：Online 章不再列逐台明細（明細留給 XLSX/CSV），改為版本
+            # 分布小表（online 桶限定，與 Estate 段的全 estate by_version 不同語意）。
+            if df is None or df.empty or "VEN Version" not in df.columns:
+                version_table = f'<p>{_s("rpt_no_records")}</p>'
+            else:
+                counts = (df["VEN Version"].fillna("").astype(str)
+                          .replace("", "(unknown)").value_counts())
+                rows = "".join(
+                    f"<tr><td>{html.escape(str(ver))}</td><td>{cnt}</td></tr>"
+                    for ver, cnt in counts.items()
+                )
+                version_table = (
+                    '<div class="report-table-panel report-table-panel--compact">'
+                    f'<div class="report-table-wrap"><table class="report-table">'
+                    f'<thead><tr><th>{_s("rpt_col_ven_version")}</th>'
+                    f'<th>{_s("rpt_ei_count")}</th></tr></thead>'
+                    f'<tbody>{rows}</tbody></table></div></div>'
+                )
+            heading = f'{_s("rpt_ven_by_version")} — {_s("rpt_ven_sec_online_title")}'
+            note_html = f'<p class="section-intro">{_s("rpt_ven_online_detail_note")}</p>'
+            return f'<h3>{heading}</h3>{version_table}{note_html}'
+
         exec_html = render_exec_summary_html(_ven_mod00, report_name=t('gui_btn_ven_report', lang=self._lang), lang=self._lang)
         _deltas = (self._r or {}).get("_trend_deltas") or []
         if _deltas:
@@ -181,7 +204,7 @@ class VenHtmlExporter:
             + self._summary_pills(online_count, offline_count, today_count, yest_count)
             + status_chart_html
             + "</section>\n"
-            + self._section("online", "rpt_ven_sec_online_title", online_count, _df_to_html(df_online), "rpt_ven_sec_online_intro", "online", "ven_online_inventory")
+            + self._section("online", "rpt_ven_sec_online_title", online_count, _online_summary_html(df_online), "rpt_ven_sec_online_intro", "online", "ven_online_inventory")
             + "\n"
             + (self._section("offline", "rpt_ven_sec_offline_title", offline_count, _df_to_html(df_offline), "rpt_ven_sec_offline_intro", "offline", "ven_offline")
                + "\n"
