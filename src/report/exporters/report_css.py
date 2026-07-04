@@ -123,7 +123,7 @@ BASE_CSS = """\
   .report-table thead th { background: var(--cyan-110); color: #fff; position: sticky; top: 0; z-index: 2; padding: 10px 28px 10px 12px; vertical-align: middle; border-right: 1px solid rgba(255,255,255,.18); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; letter-spacing: .01em; }
   .report-table thead th:hover { background: var(--cyan-100); }
   .report-table thead th:last-child { border-right: none; }
-  .report-table tbody td { padding: 8px 12px; vertical-align: top; border-bottom: 1px solid var(--slate-20); color: var(--slate); line-height: 1.5; font-variant-numeric: tabular-nums; }
+  .report-table tbody td { padding: 8px 12px; vertical-align: top; border-bottom: 1px solid var(--slate-20); color: var(--slate); line-height: 1.5; font-variant-numeric: tabular-nums; overflow-wrap: break-word; }
   .report-table tbody td, .report-table tbody td * { color: var(--slate); }
   .report-table tbody td .badge { color: #fff; }
   .report-table tbody td code { color: var(--cyan-120); background: rgba(26,44,50,.06); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; }

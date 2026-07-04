@@ -125,3 +125,11 @@ def test_html_exporter_data_report_title():
     html = exp.build()
     assert 'data-report-title="' in html
     assert 'data-report-title=""' not in html
+
+
+def test_screen_td_breaks_long_words():
+    # Screen layout must break long words in table cells to prevent
+    # horizontal scrolling on narrow viewports (URLs, hostnames, etc.).
+    screen_part = BASE_CSS.split('@media print')[0]
+    td_rule = [ln for ln in screen_part.splitlines() if '.report-table tbody td' in ln]
+    assert td_rule and 'overflow-wrap: break-word' in td_rule[0]
