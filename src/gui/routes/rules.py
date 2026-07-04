@@ -19,6 +19,41 @@ from src.gui._helpers import (
 )
 
 
+# Phase 4c：規則版 FilterBar key whitelist（= dashboard 28 key 減 label_groups 4 key）。
+# label_group 在規則路徑結構性不可支援（共用未過濾 stream、無 client-side 成員展開），
+# 收到一律 400 明確拒絕——不可靜默丟棄。
+_RULE_FB_KEYS = (
+    "src_labels", "dst_labels", "ex_src_labels", "ex_dst_labels",
+    "src_iplists", "dst_iplists", "ex_src_iplists", "ex_dst_iplists",
+    "src_workloads", "dst_workloads", "ex_src_workloads", "ex_dst_workloads",
+    "src_ip_in", "dst_ip_in", "ex_src_ip", "ex_dst_ip",
+    "any_label", "any_ip", "any_iplist", "any_workload",
+    "ex_any_label", "ex_any_ip", "ex_any_iplist", "ex_any_workload",
+)
+_RULE_REJECTED_KEYS = (
+    "src_label_groups", "dst_label_groups", "ex_src_label_groups", "ex_dst_label_groups",
+    "src_label_group", "dst_label_group", "ex_src_label_group", "ex_dst_label_group",
+)
+# PUT 整組替換時，連同 _RULE_FB_KEYS 一起從舊 rule 移除的 legacy scalar filter key。
+_RULE_LEGACY_SCALAR_KEYS = (
+    "src_label", "dst_label", "src_ip_in", "dst_ip_in",
+    "ex_src_label", "ex_dst_label", "ex_src_ip", "ex_dst_ip",
+)
+
+
+def _extract_rule_filters(f, lang):
+    """filters dict → (flat_dict, error_response|None)。label_group key 回 400。"""
+    bad = [k for k in _RULE_REJECTED_KEYS if f.get(k)]
+    if bad:
+        return None, _err(t("gui_rule_label_group_unsupported", lang=lang), 400)
+    out = {}
+    for k in _RULE_FB_KEYS:
+        v = f.get(k)
+        if v:
+            out[k] = v
+    return out, None
+
+
 def make_rules_blueprint(
     cm: ConfigManager,
     csrf,           # flask_wtf.csrf.CSRFProtect instance (unused here, kept for consistent signature)
@@ -166,24 +201,47 @@ def make_rules_blueprint(
             try: proto = int(proto)
             except (ValueError, TypeError): proto = None
 
-        cm.add_or_update_rule({
-            "id": gen_rule_id(),
-            "type": "traffic",
-            "name": d.get('name', ''),
-            "pd": int(d.get('pd', 2)),
-            "port": port, "proto": proto,
-            "src_label": src_label, "dst_label": dst_label,
-            "src_ip_in": src_ip, "dst_ip_in": dst_ip,
-            "ex_port": ex_port,
-            "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
-            "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip,
-            "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_policy", lang=lang, default="Check Policy"),
-            "threshold_type": "count",
-            "threshold_count": int(d.get('threshold_count', 10)),
-            "threshold_window": int(d.get('threshold_window', 10)),
-            "cooldown_minutes": int(d.get('cooldown_minutes', 10)),
-            "throttle": throttle,
-        })
+        f = d.get('filters')
+        if isinstance(f, dict):
+            # Phase 4c：前端 FilterBar 直送 filters dict——照 whitelist 展平存入，
+            # label_group key 明確拒絕（見 _extract_rule_filters）。
+            flat, err_resp = _extract_rule_filters(f, lang)
+            if err_resp is not None:
+                return err_resp
+            cm.add_or_update_rule({
+                "id": gen_rule_id(),
+                "type": "traffic",
+                "name": d.get('name', ''),
+                "pd": int(d.get('pd', 2)),
+                "port": port, "proto": proto,
+                "ex_port": ex_port,
+                "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_policy", lang=lang, default="Check Policy"),
+                "threshold_type": "count",
+                "threshold_count": int(d.get('threshold_count', 10)),
+                "threshold_window": int(d.get('threshold_window', 10)),
+                "cooldown_minutes": int(d.get('cooldown_minutes', 10)),
+                "throttle": throttle,
+                **flat,
+            })
+        else:
+            cm.add_or_update_rule({
+                "id": gen_rule_id(),
+                "type": "traffic",
+                "name": d.get('name', ''),
+                "pd": int(d.get('pd', 2)),
+                "port": port, "proto": proto,
+                "src_label": src_label, "dst_label": dst_label,
+                "src_ip_in": src_ip, "dst_ip_in": dst_ip,
+                "ex_port": ex_port,
+                "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
+                "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip,
+                "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_policy", lang=lang, default="Check Policy"),
+                "threshold_type": "count",
+                "threshold_count": int(d.get('threshold_count', 10)),
+                "threshold_window": int(d.get('threshold_window', 10)),
+                "cooldown_minutes": int(d.get('cooldown_minutes', 10)),
+                "throttle": throttle,
+            })
         return jsonify({"ok": True})
 
     @bp.route('/api/rules/bandwidth', methods=['POST'])
@@ -211,24 +269,47 @@ def make_rules_blueprint(
             try: ex_port = int(ex_port)
             except (ValueError, TypeError): ex_port = None
 
-        cm.add_or_update_rule({
-            "id": gen_rule_id(),
-            "type": d.get('rule_type', 'bandwidth'),
-            "name": d.get('name', ''),
-            "pd": int(d.get('pd', -1)),
-            "port": port, "proto": None,
-            "src_label": src_label, "dst_label": dst_label,
-            "src_ip_in": src_ip, "dst_ip_in": dst_ip,
-            "ex_port": ex_port,
-            "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
-            "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip,
-            "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
-            "threshold_type": "count",
-            "threshold_count": float(d.get('threshold_count', 100)),
-            "threshold_window": int(d.get('threshold_window', 10)),
-            "cooldown_minutes": int(d.get('cooldown_minutes', 30)),
-            "throttle": throttle,
-        })
+        f = d.get('filters')
+        if isinstance(f, dict):
+            # Phase 4c：前端 FilterBar 直送 filters dict——照 whitelist 展平存入，
+            # label_group key 明確拒絕（見 _extract_rule_filters）。
+            flat, err_resp = _extract_rule_filters(f, lang)
+            if err_resp is not None:
+                return err_resp
+            cm.add_or_update_rule({
+                "id": gen_rule_id(),
+                "type": d.get('rule_type', 'bandwidth'),
+                "name": d.get('name', ''),
+                "pd": int(d.get('pd', -1)),
+                "port": port, "proto": None,
+                "ex_port": ex_port,
+                "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
+                "threshold_type": "count",
+                "threshold_count": float(d.get('threshold_count', 100)),
+                "threshold_window": int(d.get('threshold_window', 10)),
+                "cooldown_minutes": int(d.get('cooldown_minutes', 30)),
+                "throttle": throttle,
+                **flat,
+            })
+        else:
+            cm.add_or_update_rule({
+                "id": gen_rule_id(),
+                "type": d.get('rule_type', 'bandwidth'),
+                "name": d.get('name', ''),
+                "pd": int(d.get('pd', -1)),
+                "port": port, "proto": None,
+                "src_label": src_label, "dst_label": dst_label,
+                "src_ip_in": src_ip, "dst_ip_in": dst_ip,
+                "ex_port": ex_port,
+                "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
+                "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip,
+                "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
+                "threshold_type": "count",
+                "threshold_count": float(d.get('threshold_count', 100)),
+                "threshold_window": int(d.get('threshold_window', 10)),
+                "cooldown_minutes": int(d.get('cooldown_minutes', 30)),
+                "throttle": throttle,
+            })
         return jsonify({"ok": True})
 
     @bp.route('/api/rules/<int:idx>')
@@ -260,6 +341,23 @@ def make_rules_blueprint(
                         d['match_fields'] = _normalize_match_fields(d.get('match_fields'))
                     except ValueError as exc:
                         return _err(str(exc), 400)
+                # Phase 4c final review Finding 1：label_group 拒絕檢查除了 filters
+                # dict 外，也要擋 d 頂層直注入（PUT body 把 src_label_groups 等放在
+                # filters 外層），否則會繞過白名單經 old.update(d) 存進 rule——
+                # 檢查同樣須在動到 old 之前完成，400 時 old 完全未被動過。
+                bad_top = [k for k in _RULE_REJECTED_KEYS if d.get(k)]
+                if bad_top:
+                    return _err(t("gui_rule_label_group_unsupported", lang=lang), 400)
+                # Phase 4c：filters dict 另外處理（整組替換），不隨 old.update(d) 混入。
+                # label_group 拒絕檢查須在動到 old 之前完成——400 時 old 必須完全未被
+                # 動過（見 filter-selector Phase 4c review：動了才拒絕會讓共用的 rule
+                # dict 在 monitor 執行緒讀到的瞬間被改壞，造成靜默漏告警）。
+                f = d.pop('filters', None)
+                flat = None
+                if isinstance(f, dict):
+                    flat, err_resp = _extract_rule_filters(f, lang)
+                    if err_resp is not None:
+                        return err_resp
                 old.update(d)
                 # Re-parse label/ip fields for traffic and bw/vol
                 for prefix in ('src', 'dst', 'ex_src', 'ex_dst'):
@@ -275,6 +373,14 @@ def make_rules_blueprint(
                                 old[prefix + '_ip'] = raw or None
                             else:
                                 old[prefix + '_ip_in'] = raw or None
+                if flat is not None:
+                    # 整組替換：先清掉舊 rule 中所有 filter key（object/複數 + legacy
+                    # scalar + label_group 歷史注入殘留），避免新舊混存，再套用新的
+                    # flat 值。_RULE_REJECTED_KEYS 加入是為了讓帶 filters 的 PUT 能
+                    # 順便清掉過去頂層注入留下的殘留值（見 Finding 1）。
+                    for k in _RULE_FB_KEYS + _RULE_LEGACY_SCALAR_KEYS + _RULE_REJECTED_KEYS:
+                        old.pop(k, None)
+                    old.update(flat)
                 # Cast numeric fields
                 for k in ('port', 'ex_port', 'proto', 'threshold_count', 'threshold_window', 'cooldown_minutes', 'pd'):
                     if k in old and old[k] is not None:

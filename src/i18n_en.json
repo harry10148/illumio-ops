@@ -2019,6 +2019,7 @@
   "gui_rs_wed": "Wednesday",
   "gui_rule_default_rec_check_logs": "Check Logs",
   "gui_rule_default_rec_check_policy": "Check Policy",
+  "gui_rule_label_group_unsupported": "Label Groups are not supported in alert rules (rules match a shared unfiltered stream client-side). Use individual labels instead.",
   "gui_rule_name": "Rule Name",
   "gui_rule_not_found": "Rule not found",
   "gui_rule_saved": "Rule saved",

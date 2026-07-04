@@ -230,3 +230,95 @@ def test_filter_bar_deserialize_restores_label_group_pills():
     js = _JS.read_text(encoding="utf-8")
     assert "asList(d[`${dir}_label_groups`])" in js
     assert "asList(d[`ex_${dir}_label_groups`])" in js
+
+
+def test_traffic_rule_modal_mounts_filter_bar():
+    """Phase 4c Task 3: tr-src/tr-dst/tr-exsrc/tr-exdst 已換成單一 FilterBar 掛載點。"""
+    html = _INDEX.read_text(encoding="utf-8")
+    assert 'id="tr-filter-bar"' in html
+    for removed_id in ("tr-src", "tr-dst", "tr-exsrc", "tr-exdst"):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from m-traffic"
+    # name/pd/port/proto/ex-port/threshold/window/cooldown 保留（不屬 FilterBar 範圍）
+    assert 'id="tr-name"' in html
+    assert 'name="tr-pd"' in html
+    assert 'id="tr-port"' in html
+    assert 'id="tr-proto"' in html
+    assert 'id="tr-expt"' in html
+    assert 'id="tr-cnt"' in html
+    assert 'id="tr-win"' in html
+    assert 'id="tr-cd"' in html
+
+
+def test_bw_rule_modal_mounts_filter_bar():
+    """Phase 4c Task 3: bw-src/bw-dst/bw-exsrc/bw-exdst 已換成單一 FilterBar 掛載點。"""
+    html = _INDEX.read_text(encoding="utf-8")
+    assert 'id="bw-filter-bar"' in html
+    for removed_id in ("bw-src", "bw-dst", "bw-exsrc", "bw-exdst"):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from m-bw"
+    assert 'id="bw-name"' in html
+    assert 'name="bw-mt"' in html
+    assert 'name="bw-pd"' in html
+    assert 'id="bw-port"' in html
+    assert 'id="bw-expt"' in html
+    assert 'id="bw-val"' in html
+    assert 'id="bw-win"' in html
+    assert 'id="bw-cd"' in html
+
+
+def test_filter_bar_suggest_types_derived_from_cats():
+    """cats 選項必須貫穿到 suggest 請求：無 scope 時 types 不可寫死含 label_group，
+    須由 state.cats 交集 suggest 支援類別導出。否則規則 modal（cats 排除 label_group）
+    自由輸入時 label_group 候選仍會出現，選取成 pill 後儲存被後端 400。"""
+    js = _JS.read_text(encoding="utf-8")
+    fn_src = js.split("function _objfbQuerySuggest(state, q)", 1)[1].split("\nfunction ", 1)[0]
+    assert "'label,label_group,iplist,workload'" not in fn_src, "types 不可寫死 fallback 字串"
+    assert "state.cats" in fn_src, "types 須由 state.cats 導出"
+
+
+def test_filter_bar_dropdown_render_filters_by_cats():
+    """下拉候選分類迭代須照 state.cats 過濾，與 _objfbUpdateDropdown 的分類快選鈕契約一致
+    （後者已經照 state.cats 過濾，此為補齊另一半）。"""
+    js = _JS.read_text(encoding="utf-8")
+    fn_src = js.split("function _objfbRenderDropdown(state, q)", 1)[1].split("\nfunction ", 1)[0]
+    assert "state.cats.includes(c)" in fn_src
+
+
+def test_filter_bar_suggest_cats_order_locked():
+    """suggest 支援類別的固定順序鎖定：未傳 cats 的既有實例（流量分析器/報表/排程/
+    dashboard）預設 cats 含全類別，types 字串與下拉分類順序須與現行逐位相同。"""
+    js = _JS.read_text(encoding="utf-8")
+    assert "const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload'];" in js
+
+
+def test_rules_js_uses_filter_bar_for_traffic_and_bw():
+    js = Path("src/static/js/rules.js").read_text(encoding="utf-8")
+    assert "function _ensureTrFilterBar()" in js
+    assert "function _ensureBwFilterBar()" in js
+    assert "createFilterBar(document.getElementById('tr-filter-bar'), { cats:" in js
+    assert "createFilterBar(document.getElementById('bw-filter-bar'), { cats:" in js
+    # 規則路徑不支援 label_group（後端 400）；前端建構時排除該類別
+    for fn_name in ("_ensureTrFilterBar", "_ensureBwFilterBar"):
+        fn_src = js.split(f"function {fn_name}()", 1)[1].split("\n}", 1)[0]
+        assert "cats:" in fn_src
+        assert "label_group" not in fn_src
+    assert "_ensureTrFilterBar().getFilters()" in js
+    assert "_ensureTrFilterBar().setFilters(" in js
+    assert "_ensureBwFilterBar().getFilters()" in js
+    assert "_ensureBwFilterBar().setFilters(" in js
+    for removed_id in ("tr-src", "tr-dst", "tr-exsrc", "tr-exdst", "bw-src", "bw-dst", "bw-exsrc", "bw-exdst"):
+        assert f"getElementById('{removed_id}')" not in js
+        assert f"'{removed_id}'" not in js
+
+
+def test_save_traffic_and_bw_send_filters_dict():
+    """saveTraffic/saveBW 改送 filters dict，不再逐欄讀 src/dst/ex_src/ex_dst scalar。"""
+    js = Path("src/static/js/rules.js").read_text(encoding="utf-8")
+    tr_src = js.split("async function saveTraffic()", 1)[1].split("\nasync function ", 1)[0]
+    assert "filters:" in tr_src
+    assert "_ensureTrFilterBar().getFilters()" in tr_src
+    bw_src = js.split("async function saveBW()", 1)[1].split("\nasync function ", 1)[0]
+    assert "filters:" in bw_src
+    assert "_ensureBwFilterBar().getFilters()" in bw_src
+    for removed_key in ("src:", "dst:", "ex_src:", "ex_dst:"):
+        assert removed_key not in tr_src, f"{removed_key} should no longer be read directly in saveTraffic"
+        assert removed_key not in bw_src, f"{removed_key} should no longer be read directly in saveBW"

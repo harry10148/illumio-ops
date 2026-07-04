@@ -2672,23 +2672,15 @@
               <option value="17" data-i18n="gui_udp">UDP</option>
             </select></div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label data-i18n="gui_source">Source (Label/IP)</label><input id="tr-src"
-              placeholder="e.g. role=Web, 10.0.0.0/8, 192.168.1.1" data-i18n-placeholder="gui_ph_src"></div>
-          <div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="tr-dst"
-              placeholder="e.g. app=DB, 10.1.1.5" data-i18n-placeholder="gui_ph_dst"></div>
+        <div class="form-group">
+          <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_objects">Source / Destination / Either Side (Labels, IPs, Workloads, IP Lists)</label>
+          <div id="tr-filter-bar" style="margin-top:4px;"></div>
         </div>
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_excludes">Excludes (Optional)</legend>
-        <div class="form-row-3">
-          <div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="tr-expt"
-              placeholder="e.g. 22" data-i18n-placeholder="gui_ph_ex_port"></div>
-          <div class="form-group"><label data-i18n="gui_ex_src">Exclude Source</label><input id="tr-exsrc"
-              placeholder="e.g. env=Kube, 10.9.9.9" data-i18n-placeholder="gui_ph_ex_src"></div>
-          <div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="tr-exdst"
-              placeholder="e.g. 8.8.8.8" data-i18n-placeholder="gui_ph_ex_dst"></div>
-        </div>
+        <div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="tr-expt"
+            placeholder="e.g. 22" data-i18n-placeholder="gui_ph_ex_port"></div>
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_threshold">Threshold</legend>
@@ -2734,25 +2726,17 @@
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_col_filters">Filters</legend>
-        <div class="form-row-3">
-          <div class="form-group"><label data-i18n="gui_port">Port</label><input id="bw-port" placeholder="e.g. 443" data-i18n-placeholder="gui_ph_port">
-          </div>
-          <div class="form-group"><label data-i18n="gui_source">Source (Label/IP)</label><input id="bw-src"
-              placeholder="e.g. role=Web, 10.0.0.0/8" data-i18n-placeholder="gui_ph_src"></div>
-          <div class="form-group"><label data-i18n="gui_dest">Destination (Label/IP)</label><input id="bw-dst"
-              placeholder="e.g. app=DB, 10.1.1.5" data-i18n-placeholder="gui_ph_dst"></div>
+        <div class="form-group"><label data-i18n="gui_port">Port</label><input id="bw-port" placeholder="e.g. 443" data-i18n-placeholder="gui_ph_port">
+        </div>
+        <div class="form-group">
+          <label style="font-size:11px; color:var(--dim);" data-i18n="rpt_filter_objects">Source / Destination / Either Side (Labels, IPs, Workloads, IP Lists)</label>
+          <div id="bw-filter-bar" style="margin-top:4px;"></div>
         </div>
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_excludes">Excludes (Optional)</legend>
-        <div class="form-row-3">
-          <div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="bw-expt"
-              placeholder="e.g. 22" data-i18n-placeholder="gui_ph_ex_port"></div>
-          <div class="form-group"><label data-i18n="gui_ex_src">Exclude Source</label><input id="bw-exsrc"
-              placeholder="e.g. env=Kube, 10.9.9.9" data-i18n-placeholder="gui_ph_ex_src"></div>
-          <div class="form-group"><label data-i18n="gui_ex_dest">Exclude Destination</label><input id="bw-exdst"
-              placeholder="e.g. 8.8.8.8" data-i18n-placeholder="gui_ph_ex_dst"></div>
-        </div>
+        <div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="bw-expt"
+            placeholder="e.g. 22" data-i18n-placeholder="gui_ph_ex_port"></div>
       </fieldset>
       <fieldset>
         <legend data-i18n="gui_threshold">Threshold</legend>

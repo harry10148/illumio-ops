@@ -384,6 +384,23 @@ class Analyzer:
 
         return True
 
+    def _match_flow_filters(self, rule: dict[str, Any], f: dict[str, Any], window_start: datetime.datetime | None) -> bool:
+        """統一的 flow×filter 比對：legacy 純量 key 走 check_flow_match（含
+        pd/時間窗/port/proto/list 形 IP），物件/複數 key 投影委派給報表路徑
+        同一套 _flow_matches_filters（兩者 AND）。三個呼叫點共用：規則引擎、
+        規則測試預覽、dashboard query_flows。label_groups 類 key 無 client-side
+        成員展開——規則端點拒收、query_flows 走 cache-bypass；此處防禦性忽略
+        （不影響比對結果）。此函式在 per-flow 熱迴圈內被逐筆呼叫，故不在此記
+        debug log（會被洗版）；只有手改 alerts.json 繞過端點拒收才會走到這個
+        分支，屬邊角情境。"""
+        if not self.check_flow_match(rule, f, window_start):
+            return False
+        object_rule = {k: rule[k] for k in _OBJECT_FILTER_KEYS if rule.get(k)}
+        if object_rule:
+            if not TrafficQueryBuilder._flow_matches_filters(f, object_rule):
+                return False
+        return True
+
     def _check_flow_labels(self, flow_side: dict[str, Any], filter_str: str) -> bool:
         if not filter_str:
             return True
@@ -799,7 +816,7 @@ class Analyzer:
                 r_win = rule.get("threshold_window", 10)
                 r_start = now_utc - datetime.timedelta(minutes=r_win)
 
-                if not self.check_flow_match(rule, f, r_start):
+                if not self._match_flow_filters(rule, f, r_start):
                     continue
 
                 res = rule_results[rid]
@@ -1185,13 +1202,10 @@ class Analyzer:
         rule["type"] = sort_by if sort_by in ["bandwidth", "volume"] else "connections"
         rule["pd"] = -1
 
-        # 殘餘比對分工：legacy scalar key（src_label/src_ip_in/ex_*/any_label/
-        # any_ip/port/proto…）與 pd/時間窗仍由 check_flow_match 處理（含 Part A
-        # 的 list 形 IP）；物件/複數 key 委派給報表路徑同一套比對器
-        # _flow_matches_filters（同 key OR、跨 key AND，與 native 語意一致）。
-        # cache 命中時 PCE 未過濾，這兩道 client 端比對是唯一的過濾。
-        object_rule = {k: rule[k] for k in _OBJECT_FILTER_KEYS if rule.get(k)}
-
+        # 殘餘比對分工（legacy scalar key 走 check_flow_match、物件/複數 key
+        # 委派報表路徑同一套比對器 _flow_matches_filters，同 key OR、跨 key
+        # AND，與 native 語意一致）統一由 _match_flow_filters 處理——cache
+        # 命中時 PCE 未過濾，這是唯一的 client 端過濾。
         for f in traffic_stream:
             if strict_pd and f.get("policy_decision") not in strict_pd:
                 continue
@@ -1199,10 +1213,7 @@ class Analyzer:
             if draft_pd_filter and (f.get("draft_policy_decision") or "").lower() != draft_pd_filter:
                 continue
 
-            if not self.check_flow_match(rule, f, start_dt):
-                continue
-
-            if object_rule and not TrafficQueryBuilder._flow_matches_filters(f, object_rule):
+            if not self._match_flow_filters(rule, f, start_dt):
                 continue
 
 
@@ -1461,7 +1472,7 @@ class Analyzer:
             else:
                 # Traffic / BW / Vol Logic
                 for f in traffic:
-                    if self.check_flow_match(rule, f, rule_start):
+                    if self._match_flow_filters(rule, f, rule_start):
                         f_copy = f.copy()
                         if rtype == "bandwidth":
                             v, note, _, _ = self.calculate_mbps(f)
