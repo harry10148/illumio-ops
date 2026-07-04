@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
@@ -295,3 +296,63 @@ def test_bandwidth_wizard_edit_legacy_rule_migrates_keys(monkeypatch):
     assert rule["src_labels"] == ["app=old"]
     assert rule["src_ip_in"] == ["1.2.3.4"]
     assert "src_label" not in rule
+
+
+# ─── Task 2 review fix：TTY 下 pick_objects 遇 Ctrl-C 須優雅回選單、不存檔 ──
+#
+# 舊碼用 safe_input(allow_cancel=True) 時，KeyboardInterrupt 在 _render.py 內被接住
+# 回 None，精靈原地 return。改用 pick_objects 後，其 TTY 路徑的
+# questionary.*.unsafe_ask() 沒有本地 except，KeyboardInterrupt 會穿透精靈、
+# manage_rules_menu，直達 main.py 頂層 handler，讓整個 CLI 應用結束。
+# 以下測試釘住 TTY 路徑（monkeypatch _interactive_ok -> True）並讓
+# questionary.select().unsafe_ask() 拋出 KeyboardInterrupt，驗證精靈優雅
+# return（無新規則寫入 cm.config["rules"]），不再穿透。
+
+
+def _prepare_wizard_tty_chain(monkeypatch, raw_inputs):
+    inputs = iter(raw_inputs)
+    monkeypatch.setattr("os.system", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("src.cli.menus.traffic.draw_panel", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("src.cli.menus.bandwidth.draw_panel", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("src.api_client.ApiClient", lambda _cm: object())
+    # 這裡要走 pick_objects 的 TTY questionary 路徑（與非 TTY 降級路徑相反）
+    monkeypatch.setattr("src.cli.object_picker._interactive_ok", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda *_args, **_kwargs: next(inputs))
+
+
+def test_traffic_wizard_ctrl_c_during_object_picking_returns_to_menu(monkeypatch):
+    cm = _fake_cm_for_wizard()
+    _prepare_wizard_tty_chain(
+        monkeypatch,
+        [
+            "Flat Rule",  # name
+            "3",          # pd_sel -> Allowed
+            "443",        # port_in
+            "",           # proto_in -> default (both)
+        ],
+    )
+
+    with patch("questionary.select") as msel:
+        msel.return_value.unsafe_ask.side_effect = KeyboardInterrupt
+        settings_module.add_traffic_menu(cm)
+
+    assert cm.config["rules"] == []
+
+
+def test_bandwidth_wizard_ctrl_c_during_object_picking_returns_to_menu(monkeypatch):
+    cm = _fake_cm_for_wizard()
+    _prepare_wizard_tty_chain(
+        monkeypatch,
+        [
+            "BW Flat Rule",  # name
+            "1",             # m_sel -> bandwidth
+            "443",           # port_in
+            "",              # proto_in -> default (both)
+        ],
+    )
+
+    with patch("questionary.select") as msel:
+        msel.return_value.unsafe_ask.side_effect = KeyboardInterrupt
+        settings_module.add_bandwidth_volume_menu(cm)
+
+    assert cm.config["rules"] == []

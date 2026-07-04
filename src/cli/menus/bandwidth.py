@@ -18,6 +18,19 @@ from src.cli.object_picker import pick_objects, legacy_rule_to_preselected, pick
 _PICK_CATS = ("label", "iplist", "workload", "ip")  # 4c 規則不支援 label_group，故不含
 
 
+def _pick_or_cancel(api, cats, title, preselected=None, lang=None):
+    """包 pick_objects：TTY 下 questionary 的 unsafe_ask() 遇 Ctrl-C 會拋
+    KeyboardInterrupt（BaseException），沒有本地 except 就會穿透精靈直達
+    main.py 頂層 handler、整個 CLI 結束。這裡接住並回傳 None，鏡射舊版
+    safe_input(allow_cancel=True) 遇 Ctrl-C 的取消語意（見 _render.py:256-258：
+    接住、不印訊息、回 None），呼叫端一律以 `if picked is None: return` 退回選單。
+    """
+    try:
+        return pick_objects(api, cats=cats, title=title, preselected=preselected, lang=lang)
+    except KeyboardInterrupt:
+        return None
+
+
 def _fmt_picked(picked):
     # 精靈回顧摘要用：把 pick_objects 回傳 dict 攤平成一行文字
     parts = [f"{k}={','.join(v)}" for k in ("labels", "iplists", "workloads", "ips") for v in [picked.get(k, [])] if v]
@@ -122,14 +135,18 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
     from src.api_client import ApiClient
 
     api = ApiClient(cm)
-    src_picked = pick_objects(
+    src_picked = _pick_or_cancel(
         api, cats=_PICK_CATS, title=t("src_input"),
         preselected=legacy_rule_to_preselected(edit_rule, "src", exclude=False) if edit_rule else None,
     )
-    dst_picked = pick_objects(
+    if src_picked is None:
+        return
+    dst_picked = _pick_or_cancel(
         api, cats=_PICK_CATS, title=t("dst_input"),
         preselected=legacy_rule_to_preselected(edit_rule, "dst", exclude=False) if edit_rule else None,
     )
+    if dst_picked is None:
+        return
 
     _wizard_step(4, 5, t("wiz_threshold"))
     print(f"\n{Colors.CYAN}{t('step_3_threshold')}{Colors.ENDC}")
@@ -201,14 +218,18 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
                 add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
             return
 
-    ex_src_picked = pick_objects(
+    ex_src_picked = _pick_or_cancel(
         api, cats=_PICK_CATS, title=t("ex_src_input"),
         preselected=legacy_rule_to_preselected(edit_rule, "src", exclude=True) if edit_rule else None,
     )
-    ex_dst_picked = pick_objects(
+    if ex_src_picked is None:
+        return
+    ex_dst_picked = _pick_or_cancel(
         api, cats=_PICK_CATS, title=t("ex_dst_input"),
         preselected=legacy_rule_to_preselected(edit_rule, "dst", exclude=True) if edit_rule else None,
     )
+    if ex_dst_picked is None:
+        return
 
     rid = edit_rule.get("id", gen_rule_id()) if edit_rule else gen_rule_id()
 
