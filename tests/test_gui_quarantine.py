@@ -122,6 +122,8 @@ def test_quarantine_search_forwards_object_filter_keys(app_persistent, monkeypat
         "ex_dst_workloads": ["/orgs/1/workloads/zzz"],
         "any_iplist": "corp-vpn",
         "ex_any_workload": "/orgs/1/workloads/q",
+        "src_label_groups": ["app_group"],
+        "ex_dst_label_groups": ["dmz_group"],
     }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
        headers={'X-CSRF-Token': csrf_token})
 
@@ -131,6 +133,8 @@ def test_quarantine_search_forwards_object_filter_keys(app_persistent, monkeypat
     assert captured.get("ex_dst_workloads") == ["/orgs/1/workloads/zzz"]
     assert captured.get("any_iplist") == "corp-vpn"
     assert captured.get("ex_any_workload") == "/orgs/1/workloads/q"
+    assert captured.get("src_label_groups") == ["app_group"]
+    assert captured.get("ex_dst_label_groups") == ["dmz_group"]
 
 
 def test_quarantine_apply_writes_audit_log(app_persistent, monkeypatch):

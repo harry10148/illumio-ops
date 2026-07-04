@@ -126,6 +126,12 @@ def make_actions_blueprint(
                 "dst_labels": d.get("dst_labels", []),
                 "ex_src_labels": d.get("ex_src_labels", []),
                 "ex_dst_labels": d.get("ex_dst_labels", []),
+                # FilterBar 的 label group pill 序列化 key，須與 analyzer.py query_flows
+                # whitelist（~1053-1064）及 _TRAFFIC_FILTER_CAPABILITIES（traffic_query.py ~90-96）保持一致
+                "src_label_groups": d.get("src_label_groups", []),
+                "dst_label_groups": d.get("dst_label_groups", []),
+                "ex_src_label_groups": d.get("ex_src_label_groups", []),
+                "ex_dst_label_groups": d.get("ex_dst_label_groups", []),
                 "src_iplist": d.get("src_iplist", ""),
                 "src_iplists": d.get("src_iplists", []),
                 "dst_iplist": d.get("dst_iplist", ""),
