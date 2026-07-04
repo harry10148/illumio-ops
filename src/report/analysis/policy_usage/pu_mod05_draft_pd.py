@@ -20,6 +20,13 @@ _GROUP_A = frozenset({"potentially_blocked_by_boundary", "potentially_blocked_by
 _GROUP_B = frozenset({"blocked_by_override_deny", "allowed_across_boundary"})
 _GROUP_C_DRAFT = frozenset({"allowed", "blocked_by_boundary"})
 
+# 風險類型欄的穩定英文值（渲染層以 value_i18n_maps 轉譯，見 report_i18n.RISK_TYPE_VALUE_I18N）
+_RISK_TYPE_LABELS = {
+    "visibility_risk": "Visibility Risk",
+    "draft_conflicts": "Draft Conflict",
+    "draft_coverage": "Draft Coverage",
+}
+
 
 def pu_draft_pd_summary(rows: list[dict]) -> dict:
     if not rows:
@@ -33,12 +40,33 @@ def pu_draft_pd_summary(rows: list[dict]) -> dict:
         and r.get("draft_policy_decision") in _GROUP_C_DRAFT
     ]
 
-    return {
-        "total": len(group_a) + len(group_b) + len(group_c),
+    groups = {
         "visibility_risk": _build_group(group_a),
         "draft_conflicts": _build_group(group_b),
         "draft_coverage": _build_group(group_c),
     }
+
+    return {
+        "total": len(group_a) + len(group_b) + len(group_c),
+        "visibility_risk": groups["visibility_risk"],
+        "draft_conflicts": groups["draft_conflicts"],
+        "draft_coverage": groups["draft_coverage"],
+        "merged_top_pairs": _merge_top_pairs(groups),
+    }
+
+
+def _merge_top_pairs(groups: dict) -> pd.DataFrame:
+    """各類型各自 Top 20（既有 top_pairs）加上 Risk Type 欄後合併，類型分組、類內 Connections 降序。"""
+    tagged = []
+    for key, label in _RISK_TYPE_LABELS.items():
+        tp = groups[key]["top_pairs"]
+        if not tp.empty:
+            frame = tp.copy()
+            frame.insert(0, "Risk Type", label)
+            tagged.append(frame)
+    if not tagged:
+        return pd.DataFrame()
+    return pd.concat(tagged, ignore_index=True)
 
 
 def _build_group(rows: list[dict]) -> dict:

@@ -454,5 +454,11 @@ MOD01_METRIC_VALUE_I18N: dict[str, str] = {
     "Date Range":                            "rpt_metric_date_range",
 }
 
+RISK_TYPE_VALUE_I18N: dict[str, str] = {
+    "Visibility Risk": "rpt_pu_risk_type_visibility",
+    "Draft Conflict":  "rpt_pu_risk_type_conflict",
+    "Draft Coverage":  "rpt_pu_risk_type_coverage",
+}
+
 def lang_btn_html() -> str:
     return ''

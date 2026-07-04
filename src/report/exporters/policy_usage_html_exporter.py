@@ -12,6 +12,7 @@ import pandas as pd
 from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS
+from .report_i18n import RISK_TYPE_VALUE_I18N
 from .table_renderer import render_df_table
 from .chart_renderer import render_matplotlib_svg
 from .code_highlighter import get_highlight_css
@@ -101,7 +102,12 @@ def _rule_cards_html(df, mode: str = "hit", lang: str = "en") -> str:
     return '<div class="pu-cards">' + "".join(rows_html) + "</div>"
 
 
-def _df_to_html(df, no_data_key: str = "rpt_no_data", lang: str = "en") -> str:
+def _df_to_html(
+    df,
+    no_data_key: str = "rpt_no_data",
+    lang: str = "en",
+    value_i18n_maps: dict[str, dict[str, str]] | None = None,
+) -> str:
     _s = lambda k: STRINGS[k].get(lang) or STRINGS[k]["en"]
 
     def _render_cell(col, val, _row):
@@ -117,6 +123,7 @@ def _df_to_html(df, no_data_key: str = "rpt_no_data", lang: str = "en") -> str:
         col_i18n=_COL_I18N,
         no_data_key=no_data_key,
         render_cell=_render_cell,
+        value_i18n_maps=value_i18n_maps,
         lang=lang,
     )
 
@@ -307,10 +314,6 @@ class PolicyUsageHtmlExporter:
                 f'<span class="summary-pill-value">{by_sub.get("potentially_blocked_by_override_deny", 0):,}</span></div>'
                 '</div>'
             )
-            tp = vis.get("top_pairs")
-            if tp is not None and not tp.empty:
-                html += (f'<h4>{_s("rpt_pu_draft_pd_top_pairs")}</h4>'
-                         + _df_to_html(tp, no_data_key="rpt_no_records", lang=self._lang))
 
         conf = m.get("draft_conflicts", {})
         if conf.get("total", 0):
@@ -324,10 +327,6 @@ class PolicyUsageHtmlExporter:
                 f'<span class="summary-pill-value">{by_sub.get("allowed_across_boundary", 0):,}</span></div>'
                 '</div>'
             )
-            tp = conf.get("top_pairs")
-            if tp is not None and not tp.empty:
-                html += (f'<h4>{_s("rpt_pu_draft_pd_top_pairs")}</h4>'
-                         + _df_to_html(tp, no_data_key="rpt_no_records", lang=self._lang))
 
         cov = m.get("draft_coverage", {})
         if cov.get("total", 0):
@@ -341,10 +340,16 @@ class PolicyUsageHtmlExporter:
                 f'<span class="summary-pill-value">{by_sub.get("blocked_by_boundary", 0):,}</span></div>'
                 '</div>'
             )
-            tp = cov.get("top_pairs")
-            if tp is not None and not tp.empty:
-                html += (f'<h4>{_s("rpt_pu_draft_pd_top_pairs")}</h4>'
-                         + _df_to_html(tp, no_data_key="rpt_no_records", lang=self._lang))
+
+        merged = m.get("merged_top_pairs")
+        if merged is not None and not merged.empty:
+            html += (f'<h4>{_s("rpt_pu_draft_pd_top_pairs")}</h4>'
+                     + _df_to_html(
+                         merged,
+                         no_data_key="rpt_no_records",
+                         lang=self._lang,
+                         value_i18n_maps={"Risk Type": RISK_TYPE_VALUE_I18N},
+                     ))
 
         return html
 
