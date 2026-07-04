@@ -179,3 +179,46 @@ def test_filter_bar_deserialize_accepts_legacy_scalar_ip():
     _objfbDeserialize 須認得這個 scalar key 才能讓 setFilters 正確回填舊排程。"""
     js = _JS.read_text(encoding="utf-8")
     assert "asList(d[`${dir}_ip_in`]).concat(asList(d[`${dir}_ip`]))" in js
+
+
+def test_dashboard_query_modal_mounts_filter_bar():
+    """Phase 4b Task 3: dq-src/dst/exsrc/exdst/any-*/ex-any-* 8 分欄已換成單一 FilterBar 掛載點。"""
+    html = _INDEX.read_text(encoding="utf-8")
+    assert 'id="dq-filter-bar"' in html
+    for removed_id in (
+        "dq-src", "dq-dst", "dq-exsrc", "dq-exdst",
+        "dq-any-label", "dq-any-ip", "dq-ex-any-label", "dq-ex-any-ip",
+    ):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from m-query"
+    # name/rank/pd radio/port/proto/ex-port/idx 保留（不屬 FilterBar 範圍）
+    assert 'id="dq-name"' in html
+    assert 'id="dq-rank"' in html
+    assert 'name="dq-pd"' in html
+    assert 'id="dq-port"' in html
+    assert 'id="dq-proto"' in html
+    assert 'id="dq-expt"' in html
+    assert 'id="dq-idx"' in html
+
+
+def test_dashboard_js_uses_filter_bar_for_saved_query():
+    js = Path("src/static/js/dashboard.js").read_text(encoding="utf-8")
+    assert "function _ensureDqFilterBar()" in js
+    assert "createFilterBar(document.getElementById('dq-filter-bar')" in js
+    assert "_ensureDqFilterBar().getFilters()" in js
+    assert "_ensureDqFilterBar().setFilters(" in js
+    for removed_id in (
+        "dq-src", "dq-dst", "dq-exsrc", "dq-exdst",
+        "dq-any-label", "dq-any-ip", "dq-ex-any-label", "dq-ex-any-ip",
+    ):
+        assert f"getElementById('{removed_id}')" not in js
+        assert f"'{removed_id}'" not in js
+
+
+def test_save_dashboard_query_sends_filters_dict():
+    """saveDashboardQuery 改送 filters dict，不再逐欄讀 src/dst/ex_*/any_* scalar。"""
+    js = Path("src/static/js/dashboard.js").read_text(encoding="utf-8")
+    fn_src = js.split("async function saveDashboardQuery()", 1)[1].split("\nasync function ", 1)[0]
+    assert "filters:" in fn_src
+    assert "_ensureDqFilterBar().getFilters()" in fn_src
+    for removed_key in ("src:", "dst:", "ex_src:", "ex_dst:", "any_label:", "any_ip:", "ex_any_label:", "ex_any_ip:"):
+        assert removed_key not in fn_src, f"{removed_key} should no longer be read directly in saveDashboardQuery"
