@@ -24,6 +24,12 @@ def test_svg_unsupported_type_raises():
         render_matplotlib_svg({"type": "sankey", "data": {}}, lang="en")
 
 
+def test_svg_has_no_metadata_block():
+    svg = render_matplotlib_svg(BAR_SPEC, lang="en")
+    assert "<metadata" not in svg
+    assert "dc:date" not in svg
+
+
 def test_png_still_works_after_refactor():
     png = render_matplotlib_png(BAR_SPEC, lang="en")
     assert isinstance(png, (bytes, bytearray))

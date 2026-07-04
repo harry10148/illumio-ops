@@ -239,9 +239,15 @@ def render_matplotlib_svg(spec: dict[str, Any], *, lang: str = "en") -> str:
     """Render chart spec as inline-embeddable SVG markup (for HTML reports)."""
     fig = _build_matplotlib_figure(spec, lang=lang)
     buf = io.BytesIO()
-    fig.savefig(buf, format="svg")
+    # Omit metadata fields (Date, Creator) to reduce SVG size for embedded reports.
+    fig.savefig(buf, format="svg", metadata={"Date": None, "Creator": None})
     plt.close(fig)
     svg = buf.getvalue().decode("utf-8")
     # Strip XML declaration / DOCTYPE so the markup embeds directly in HTML.
     idx = svg.find("<svg")
-    return svg[idx:] if idx != -1 else svg
+    svg = svg[idx:] if idx != -1 else svg
+    # Remove the entire <metadata>...</metadata> block to further reduce size.
+    # Matplotlib's SVG backend still emits the block even when Date/Creator are None.
+    import re
+    svg = re.sub(r'\s*<metadata>.*?</metadata>\s*', '', svg, flags=re.DOTALL)
+    return svg
