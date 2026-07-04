@@ -118,6 +118,43 @@ def test_empty_candidates_shows_no_candidates_message(monkeypatch, capsys):
     assert i18n_t("cli_pick_offline_hint", lang=None, cat="label") not in out
 
 
+def test_label_key_filter_restricts_candidates_to_dimension(monkeypatch):
+    # label_key_filter 僅過濾 label 候選 dimension（env-only），供 pce_cache_cli 的
+    # workload_label_env 槽使用——候選只列 key == "env" 的 label。
+    from src.cli import object_picker as op
+    monkeypatch.setattr(op, "_interactive_ok", lambda: True)
+    with patch("questionary.select") as msel, patch("questionary.autocomplete") as mauto:
+        msel.return_value.unsafe_ask.side_effect = ["label", "__done__"]
+        mauto.return_value.unsafe_ask.side_effect = ["env=prod"]
+        out = op.pick_objects(_api(), cats=("label",), title="src", label_key_filter="env")
+    choices = mauto.call_args.kwargs.get("choices") or mauto.call_args.args[1]
+    assert choices == ["env=prod"]  # app=erp 已被 dimension 過濾掉
+    assert out == {"labels": ["env=prod"]}
+
+
+def test_label_key_filter_default_none_keeps_all_dimensions(monkeypatch):
+    # 預設 None＝現行為，既有呼叫端（規則精靈等）不受影響
+    from src.cli import object_picker as op
+    monkeypatch.setattr(op, "_interactive_ok", lambda: True)
+    with patch("questionary.select") as msel, patch("questionary.autocomplete") as mauto:
+        msel.return_value.unsafe_ask.side_effect = ["label", "__done__"]
+        mauto.return_value.unsafe_ask.side_effect = ["app=erp"]
+        out = op.pick_objects(_api(), cats=("label",), title="src")
+    choices = mauto.call_args.kwargs.get("choices") or mauto.call_args.args[1]
+    assert set(choices) == {"app=erp", "env=prod"}
+    assert out == {"labels": ["app=erp"]}
+
+
+def test_label_key_filter_ignored_on_non_tty_path(monkeypatch):
+    # 非 TTY 路徑不載入候選、不受 label_key_filter 影響——只驗證參數不炸、行為不變
+    from src.cli import object_picker as op
+    monkeypatch.setattr(op, "_interactive_ok", lambda: False)
+    inputs = iter(["env=prod, app=erp"])
+    monkeypatch.setattr("builtins.input", lambda *_: next(inputs))
+    out = op.pick_objects(_api(), cats=("label",), title="src", label_key_filter="env")
+    assert out == {"labels": ["env=prod", "app=erp"]}
+
+
 def test_tty_clear_category_option(monkeypatch):
     # Finding 3：類別選單在已有選值時附加「清空」選項，選了就整類移除
     from src.cli import object_picker as op

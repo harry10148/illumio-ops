@@ -43,10 +43,15 @@ def _valid_ip_or_cidr(text):
         return False
 
 
-def _load_candidates(api, cat):
+def _load_candidates(api, cat, label_key_filter=None):
     # 回傳 [(display, value)]；value 是要存進 filter 的字串（label 用 key=value、物件用 href、label_group 用名稱）
+    # label_key_filter：只保留 key 相符的 label 候選（如 "env"）——供 pce_cache_cli 的
+    # workload_label_env 槽等單一 dimension 呼叫端使用；預設 None＝不過濾（現行為，僅影響 TTY 候選載入）。
     if cat == "label":
-        return [(f"{l['key']}={l['value']}", f"{l['key']}={l['value']}") for l in api.get_all_labels()]
+        labels = api.get_all_labels()
+        if label_key_filter is not None:
+            labels = [l for l in labels if l.get("key") == label_key_filter]
+        return [(f"{l['key']}={l['value']}", f"{l['key']}={l['value']}") for l in labels]
     if cat == "iplist":
         return [(ipl["name"], ipl["href"]) for ipl in api.get_ip_lists()]
     if cat == "label_group":
@@ -108,7 +113,7 @@ def _manual_text_entry(cat, key, result, lang):
         _append_unique(result, key, v)
 
 
-def _pick_tty(api, cats, result, title, lang):
+def _pick_tty(api, cats, result, title, lang, label_key_filter=None):
     while True:
         choices = [questionary.Choice(title=_CAT_TITLES[c], value=c) for c in _CAT_ORDER if c in cats]
         for c in _CAT_ORDER:
@@ -143,7 +148,7 @@ def _pick_tty(api, cats, result, title, lang):
             _manual_text_entry(cat, key, result, lang)
         else:
             try:
-                candidates = _load_candidates(api, cat)
+                candidates = _load_candidates(api, cat, label_key_filter=label_key_filter)
             except Exception:
                 print(t("cli_pick_offline_hint", lang=lang, cat=cat,
                         default="PCE unreachable while loading '{cat}' candidates; falling back to manual input."))
@@ -169,15 +174,18 @@ def _pick_tty(api, cats, result, title, lang):
     return result
 
 
-def pick_objects(api, cats, title, preselected=None, lang=None):
+def pick_objects(api, cats, title, preselected=None, lang=None, label_key_filter=None):
     """兩段式物件選擇器：TTY 走 questionary（類別 → autocomplete/手動），非 TTY 走 input() 降級。
 
     回傳只含非空類別的 dict，key 為 labels/label_groups/iplists/workloads/ips。
+
+    label_key_filter：僅過濾 label 候選的 dimension（如 "env"），只影響 TTY 候選載入；
+    非 TTY 路徑（手動輸入）不受影響。預設 None＝現行為（不過濾，全 dimension 皆可選）。
     """
     result = {k: list(v) for k, v in (preselected or {}).items() if v}  # 斷開別名，避免就地修改污染呼叫端
 
     if _interactive_ok():
-        _pick_tty(api, cats, result, title, lang)
+        _pick_tty(api, cats, result, title, lang, label_key_filter=label_key_filter)
     else:
         _pick_non_tty(api, cats, result, lang)
 

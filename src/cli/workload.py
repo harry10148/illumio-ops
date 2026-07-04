@@ -9,6 +9,7 @@ from rich.table import Table
 from src.cli._output import (
     echo_error,
     echo_json,
+    echo_warning,
     is_json,
     is_quiet,
 )
@@ -32,8 +33,12 @@ def workload_group() -> None:
 )
 @click.option("--managed-only", is_flag=True, default=False,
               help="Show only VEN-managed workloads")
+@click.option("--pick", is_flag=True, default=False,
+              help="Interactively pick label(s) to filter by (requires a TTY)")
 @click.pass_context
-def list_workloads(ctx: click.Context, env: str | None, limit: int, enforcement: str, managed_only: bool) -> None:
+def list_workloads(
+    ctx: click.Context, env: str | None, limit: int, enforcement: str, managed_only: bool, pick: bool
+) -> None:
     """Fetch and display workloads from PCE."""
     from src.config import ConfigManager
     from src.api_client import ApiClient
@@ -78,6 +83,27 @@ def list_workloads(ctx: click.Context, env: str | None, limit: int, enforcement:
         ]
     if enforcement != "all":
         workloads = [w for w in workloads if w.get("enforcement_mode") == enforcement]
+
+    if pick:
+        from src.cli import object_picker
+
+        if object_picker._interactive_ok():
+            try:
+                picked = object_picker.pick_objects(
+                    api, cats=("label",), title=t("cli_wl_pick_title", default="Workload label filter"),
+                )
+            except KeyboardInterrupt:
+                # Ctrl-C：取消挑選，list 是唯讀查詢指令，不因取消而中斷，繼續顯示未過濾結果
+                picked = None
+            selected_labels = set(picked["labels"]) if picked and picked.get("labels") else None
+            if selected_labels:
+                # 與既有 --env 過濾同語意：workload 的 labels 含任一選中 label 即保留
+                workloads = [
+                    w for w in workloads
+                    if selected_labels & {f"{lbl.get('key')}={lbl.get('value')}" for lbl in w.get("labels", [])}
+                ]
+        else:
+            echo_warning(ctx, t("cli_wl_pick_non_tty_hint"))
 
     workloads = workloads[:limit]
 
