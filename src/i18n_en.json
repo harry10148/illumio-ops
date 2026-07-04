@@ -4181,5 +4181,22 @@
   "rpt_xlsx_sheet_ven_offline": "Offline",
   "rpt_xlsx_sheet_ven_lost_today": "Lost Today",
   "rpt_xlsx_sheet_ven_lost_yesterday": "Lost Yesterday",
-  "rpt_xlsx_sheet_ven_versions": "Versions"
+  "rpt_xlsx_sheet_ven_versions": "Versions",
+  "gui_fb_dir_src": "Source",
+  "gui_fb_dir_dst": "Destination",
+  "gui_fb_dir_any": "Either",
+  "gui_fb_placeholder": "Search labels, workloads, IP lists… or type IP/CIDR",
+  "gui_fb_add_ipcidr": "Add IP/CIDR",
+  "gui_fb_include": "Include",
+  "gui_fb_exclude": "Exclude",
+  "gui_fb_remove": "Remove",
+  "gui_fb_or": "or",
+  "gui_fb_any_slow": "includes either-side condition — query is slower",
+  "gui_fb_offline": "PCE unreachable — object search unavailable (manual input still works)",
+  "gui_fb_no_match": "No matching objects",
+  "gui_fb_cat_label": "Labels",
+  "gui_fb_cat_label_group": "Label Groups",
+  "gui_fb_cat_iplist": "IP Lists",
+  "gui_fb_cat_workload": "Workloads",
+  "gui_fb_scope_hint": "Type to search all categories, or pick a category to narrow"
 }
