@@ -1,9 +1,10 @@
 'use strict';
 /* PCE 風格 filter 物件選擇器元件（Phase 3）。
-   可重複實例化：createFilterBar(container, options) → { getFilters, setFilters, onChange, destroy }。
-   CSP：動態 pill/下拉用 data-action/data-on-* 委派（_event_dispatcher），handler 掛 window.*。
-   suggest 查詢（debounce 250ms + AbortController 取消舊請求 + 離線降級）見 _objfbQuerySuggest /
-   _objfbRenderDropdown；其餘為 pill 資料模型 + 序列化 + 生命週期。 */
+ * 可重複實例化：createFilterBar(container, options) → { getFilters, setFilters, onChange, destroy }。
+ * CSP：動態 pill/下拉用 data-action/data-on-* 委派（_event_dispatcher），handler 掛 window.*。
+ * suggest 查詢（debounce 250ms + AbortController 取消舊請求 + 離線降級）見 _objfbQuerySuggest /
+ * _objfbRenderDropdown；其餘為 pill 資料模型 + 序列化 + 生命週期。
+ */
 
 // 每個 FilterBar 實例存於此註冊表，供 window handler 依 container id 找回實例
 const _objfbInstances = {};
@@ -26,9 +27,12 @@ function createFilterBar(container, options) {
     addDir: dirs[0],
     scopeCat: null,
     changeCb: null,
-    _abort: null,       // 進行中 suggest fetch 的 AbortController
-    _suggest: null,     // 最近一次 suggest 回應（依分類分組），或 {_error:true}
-    _suggestQ: null,    // _suggest 對應的查詢字串（供比對是否過期）
+    // 進行中 suggest fetch 的 AbortController
+    _abort: null,
+    // 最近一次 suggest 回應（依分類分組），或 {_error:true}
+    _suggest: null,
+    // _suggest 對應的查詢字串（供比對是否過期）
+    _suggestQ: null,
   };
   state._debouncedSuggest = window.debounce((q) => _objfbQuerySuggest(state, q), 250);
   _objfbInstances[id] = state;
@@ -118,8 +122,9 @@ function _objfbApplyI18n(root) {
 }
 
 /* ── 完整重繪：方向分段 + pill 搜尋列（pill + scope chip + input + 下拉）+ any 提示 + 編輯 popover ──
-   呼叫時機：初始化、setFilters、加入/移除/編輯 pill 之後。下拉候選（輸入中）改由
-   _objfbUpdateDropdown 局部更新，避免每個按鍵都整段重建導致輸入框失焦。 */
+ * 呼叫時機：初始化、setFilters、加入/移除/編輯 pill 之後。下拉候選（輸入中）改由
+ * _objfbUpdateDropdown 局部更新，避免每個按鍵都整段重建導致輸入框失焦。
+ */
 function _objfbRender(state) {
   const c = state.container;
   c.innerHTML = '';
@@ -146,7 +151,8 @@ function _objfbRender(state) {
   fbar.setAttribute('data-on-click', '_objfbInput');
   fbar.dataset.args = JSON.stringify([state.id]);
 
-  let prevKeyDir = null; // 追蹤同側同 key label pill，插入 or 分隔
+  // 追蹤同側同 key label pill，插入 or 分隔
+  let prevKeyDir = null;
   state.pills.forEach((p, i) => {
     const derivedKey = p.key || (p.cat === 'label' && String(p.name).includes('=') ? String(p.name).split('=')[0] : null);
     if (prevKeyDir && p.cat === 'label' && derivedKey && prevKeyDir.dir === p.dir && prevKeyDir.key === derivedKey) {
@@ -254,9 +260,10 @@ function _objfbBuildPill(state, p, idx) {
 }
 
 /* ── 下拉局部更新（不重繪整個 bar，保留輸入框焦點/游標）──
-   空輸入：顯示類別捷徑。非空輸入：委派 _objfbRenderDropdown 立即畫出同步
-   可得的候選（IP/CIDR 置頂、手動 key=value），並觸發 debounce suggest 查詢
-   （250ms 後打後端、結果回來時再由 _objfbRenderDropdown 併入分類分組）。 */
+ * 空輸入：顯示類別捷徑。非空輸入：委派 _objfbRenderDropdown 立即畫出同步
+ * 可得的候選（IP/CIDR 置頂、手動 key=value），並觸發 debounce suggest 查詢
+ * （250ms 後打後端、結果回來時再由 _objfbRenderDropdown 併入分類分組）。
+ */
 function _objfbUpdateDropdown(state) {
   const dd = state.els.dd;
   const q = state.els.input.value.trim();
@@ -302,9 +309,10 @@ function _objfbUpdateDropdown(state) {
 }
 
 /* ── suggest 查詢：debounce 250ms 後由 state._debouncedSuggest 呼叫。
-   AbortController 取消上一個尚未回應的請求，避免競態下舊回應覆蓋新輸入的下拉。
-   GET 端點（Phase 2）不需 CSRF header，直接 fetch，不走 utils.js 的 get()
-   （get() 目前不支援傳入 signal）。*/
+ * AbortController 取消上一個尚未回應的請求，避免競態下舊回應覆蓋新輸入的下拉。
+ * GET 端點（Phase 2）不需 CSRF header，直接 fetch，不走 utils.js 的 get()
+ * （get() 目前不支援傳入 signal）。
+ */
 function _objfbQuerySuggest(state, q) {
   if (state._abort) state._abort.abort();
   const ctrl = new AbortController();
@@ -320,7 +328,8 @@ function _objfbQuerySuggest(state, q) {
       _objfbRenderDropdown(state, q);
     })
     .catch(e => {
-      if (e.name === 'AbortError') return; // 已被更新的輸入取消，交給後繼請求畫下拉
+      // 已被更新的輸入取消，交給後繼請求畫下拉
+      if (e.name === 'AbortError') return;
       state._suggest = { _error: true };
       state._suggestQ = q;
       _objfbRenderDropdown(state, q);
@@ -328,10 +337,11 @@ function _objfbQuerySuggest(state, q) {
 }
 
 /* ── 下拉完整重繪（非空輸入）：IP/CIDR 置頂 + 手動 key=value 加入 + suggest
-   分類分組（label/label_group/iplist/workload）。workload 類遇
-   results.workload.error === 'pce_unreachable' 時顯示 gui_fb_offline 警示、
-   其他類照常；整體 fetch 失敗（_error）顯示同一警示但不影響自由輸入。
-   輸入框當下內容與 q 不符（使用者已改變輸入）時略過，避免過期回應覆蓋畫面。 */
+ * 分類分組（label/label_group/iplist/workload）。workload 類遇
+ * results.workload.error === 'pce_unreachable' 時顯示 gui_fb_offline 警示、
+ * 其他類照常；整體 fetch 失敗（_error）顯示同一警示但不影響自由輸入。
+ * 輸入框當下內容與 q 不符（使用者已改變輸入）時略過，避免過期回應覆蓋畫面。
+ */
 function _objfbRenderDropdown(state, q) {
   if (!state.els || state.els.input.value.trim() !== q) return;
   const dd = state.els.dd;

@@ -238,7 +238,8 @@ function _ensureQtFilterBar() {
 function openQtFiltersModal() {
   // Just visually open it, values remain in the inputs
   const fb = _ensureQtFilterBar();
-  fb.setFilters(fb.getFilters()); // 回填既有值（重繪 pill，維持 modal 重開時的狀態）
+  // 回填既有值（重繪 pill，維持 modal 重開時的狀態）
+  fb.setFilters(fb.getFilters());
   document.getElementById('modal-qt-filters').classList.add('show');
 }
 
