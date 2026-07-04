@@ -25,8 +25,8 @@ def _export(profile, tmp_path):
     gen = _gen()
     with patch("src.report.trend_store.load_previous", return_value=None) as lp, \
          patch("src.report.trend_store.save_snapshot") as ss, \
-         patch("src.report.flow_history.load_previous_signatures",
-               return_value=(None, None)) as ls, \
+         patch("src.report.flow_history.load_previous_baseline",
+               return_value=(None, None, None)) as ls, \
          patch("src.report.flow_history.save_signatures") as sv, \
          patch.object(gen, "_build_report_metadata", return_value={"kpis": [], "generated_at": ""}):
         gen.export(_result(), fmt="csv", output_dir=str(tmp_path),

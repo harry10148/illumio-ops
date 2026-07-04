@@ -532,13 +532,15 @@ class ReportGenerator:
             # Baseline drift is a security_risk-only section; other profiles
             # neither render nor archive flow signatures.
             if traffic_report_profile == "security_risk":
-                from src.report.flow_history import build_signatures, load_previous_signatures, save_signatures
+                from src.report.flow_history import build_signatures, load_previous_baseline, save_signatures
                 from src.report.analysis.mod_drift import baseline_drift
                 if result.dataframe is not None and not result.dataframe.empty:
-                    _prev_sigs, _prev_ts = load_previous_signatures(output_dir, _trend_key)
+                    _prev_sigs, _prev_ts, _prev_meta = load_previous_baseline(output_dir, _trend_key)
                     result.module_results["mod_drift"] = baseline_drift(
-                        result.dataframe, prev_signatures=_prev_sigs, prev_generated_at=_prev_ts)
-                    save_signatures(output_dir, _trend_key, build_signatures(result.dataframe), generated_at=ts)
+                        result.dataframe, prev_signatures=_prev_sigs, prev_generated_at=_prev_ts,
+                        prev_meta=_prev_meta, current_meta=_snapshot_meta)
+                    save_signatures(output_dir, _trend_key, build_signatures(result.dataframe),
+                                    generated_at=ts, meta=_snapshot_meta)
         except Exception as e:
             logger.warning(f"[ReportGenerator] Trend snapshot failed: {e}")
 

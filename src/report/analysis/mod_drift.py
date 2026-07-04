@@ -11,6 +11,7 @@ from __future__ import annotations
 import pandas as pd
 
 from src.report.flow_history import UNLABELED, build_signatures
+from src.report.trend_store import snapshot_mismatch
 
 _EPHEMERAL_PORT_MIN = 49152   # IANA 動態/私有埠起點；repo 無既有先例，於此定錨
 _NOISE_PROTOS = ("ICMP", "ICMPv6")
@@ -51,9 +52,28 @@ def baseline_drift(
     prev_signatures: set[str] | None,
     prev_generated_at: str | None,
     top_n: int = 20,
+    *,
+    prev_meta: dict | None = None,
+    current_meta: dict | None = None,
 ) -> dict:
     if prev_signatures is None:
         return {"available": False}
+
+    # 中繼資料一致性檢查——僅在兩期都有 _meta 時進行；舊 baseline 檔無 meta →
+    # 完全略過（不附加 comparable/mismatch 鍵），行為與升級前逐字一致。
+    mismatch: list[dict] = []
+    if prev_meta and current_meta:
+        mismatch = snapshot_mismatch(current_meta, {"_meta": prev_meta})
+
+    # 視窗天數差過大 → 拒絕比較：不做差集（效能＋語意——視窗長度差會把整批
+    # 上期連線誤判為 disappeared），僅回報不一致並照常在產生端存本期 baseline。
+    if any(mis.get("field") == "window" for mis in mismatch):
+        return {
+            "available": True,
+            "comparable": False,
+            "mismatch": mismatch,
+            "prev_generated_at": prev_generated_at,
+        }
 
     # 過濾在 current 與 prev 兩集合對稱套用後才做差集：若只濾 current，
     # prev 獨有的雜訊簽名（例如舊 baseline 檔裡的 ICMP）會被誤判為 disappeared。
@@ -85,7 +105,7 @@ def baseline_drift(
     new_rows.sort(key=lambda r: r["Connections"], reverse=True)
     gone_rows = [_sig_to_row(s) for s in gone_sigs]
 
-    return {
+    result = {
         "available": True,
         "prev_generated_at": prev_generated_at,
         "new_count": len(new_sigs),
@@ -95,3 +115,9 @@ def baseline_drift(
         "new_pairs": pd.DataFrame(new_rows[:top_n]),
         "disappeared_pairs": pd.DataFrame(gone_rows[:top_n]),
     }
+    # data_source/profile 不一致仍照常比較，但帶警語欄；僅在做過 meta 比較時
+    # 附加 comparable/mismatch，舊檔路徑維持原形狀。
+    if prev_meta and current_meta:
+        result["comparable"] = True
+        result["mismatch"] = mismatch
+    return result

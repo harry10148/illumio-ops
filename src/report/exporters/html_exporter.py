@@ -1125,11 +1125,27 @@ class _TrafficReportBase:
         m = self._r.get('mod_drift', {})
         if not m.get('available'):
             return f'<p class="note">{t("rpt_drift_first_run", lang=_lang)}</p>'
+        # 視窗不一致 → 拒絕比較：以 note 取代兩表，避免視窗長度差造成的假性消失。
+        if m.get('comparable') is False:
+            from src.report.trend_store import _window_span_days
+            win_mis = next(
+                (x for x in (m.get('mismatch') or []) if x.get('field') == 'window'), {})
+            prev_days = _window_span_days(win_mis.get('previous') or {})
+            curr_days = _window_span_days(win_mis.get('current') or {})
+            return (
+                f'<p class="note note-warn">'
+                f'{t("rpt_drift_incomparable", prev=prev_days, curr=curr_days, lang=_lang)}</p>'
+            )
         head = (
             f'<p class="section-intro">{t("rpt_drift_baseline_from", lang=_lang)}'
             f' {(m.get("prev_generated_at") or "")[:16]}</p>'
             f'<p class="note">{t("rpt_drift_noise_filtered", lang=_lang)}</p>'
         )
+        # data_source/profile 不一致但仍可比較 → head 加警語（重用 Task 2 的 key）。
+        mismatch = m.get('mismatch') or []
+        if mismatch:
+            fields = ", ".join(x.get("field", "") for x in mismatch)
+            head += f'<p class="note note-warn">{t("rpt_trend_mismatch_warning", fields=fields, lang=_lang)}</p>'
         new_unlabeled = m.get('new_unlabeled_collapsed', 0)
         disappeared_unlabeled = m.get('disappeared_unlabeled_collapsed', 0)
         new_collapsed_note = (
