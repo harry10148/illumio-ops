@@ -29,6 +29,19 @@ def test_save_snapshot_without_meta_omits_key(tmp_path):
     assert "_meta" not in prev
 
 
+# ── (a2) load_previous 呼叫序為 load-before-save：最新檔即上一次 run ────────
+
+def test_load_previous_returns_the_latest_snapshot_not_the_one_before(tmp_path):
+    """四個 generator 都是「先 load 後 save」：load_previous 被呼叫的當下，
+    磁碟上最新的快照就是「上一次 run」，不是「上上次 run」。"""
+    out = str(tmp_path)
+    save_snapshot(out, "traffic", {"mod12_kpi_total_flows": "100"}, generated_at="2026-06-01T00:00:00")
+    save_snapshot(out, "traffic", {"mod12_kpi_total_flows": "150"}, generated_at="2026-06-02T00:00:00")
+    save_snapshot(out, "traffic", {"mod12_kpi_total_flows": "200"}, generated_at="2026-06-03T00:00:00")
+    prev = load_previous(out, "traffic")
+    assert prev["mod12_kpi_total_flows"] == "200"
+
+
 # ── (b) compute_deltas 不把 _meta 當 KPI ────────────────────────────────────
 
 def test_compute_deltas_skips_meta_key():

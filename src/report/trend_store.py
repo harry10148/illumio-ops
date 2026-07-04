@@ -75,14 +75,19 @@ def save_snapshot(
     return str(path)
 
 def load_previous(output_dir: str, report_type: str) -> dict[str, Any] | None:
-    """Load the most recent previous snapshot (excluding the newest)."""
+    """Load the most recent previous snapshot.
+
+    呼叫序永遠是「先 load 後 save」——每個 generator 都在寫入本次快照之前
+    呼叫這個函式，所以呼叫當下磁碟上最新的檔案就是「上一次 run」，不是
+    「上上次 run」。第一次 run 時目錄裡還沒有任何快照，回傳 None。
+    """
     hdir = _history_dir(output_dir, report_type)
     if not hdir.is_dir():
         return None
     files = sorted(hdir.glob("*.json"))
-    if len(files) < 2:
-        return None  # Need at least 2 snapshots for a delta
-    prev = files[-2]
+    if not files:
+        return None  # 第一次 run，尚無任何快照可比較
+    prev = files[-1]
     try:
         with open(prev, encoding="utf-8") as f:
             return json.load(f)

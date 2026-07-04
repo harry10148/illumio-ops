@@ -41,9 +41,11 @@ def test_drift_section_reaches_html_output(tmp_path, monkeypatch):
     """mod_drift must be injected BEFORE exporters consume module_results.
 
     Two consecutive export() runs: the second run's HTML must contain drift
-    data (new-pairs heading with a count), not the first-run note.
-    A third run additionally checks the trend section (trend_store needs two
-    archived snapshots before load_previous returns a baseline).
+    data (new-pairs heading with a count), not the first-run note. It must
+    also already contain trend deltas — trend_store.load_previous is called
+    before save_snapshot on every run, so the snapshot written by run 1 is
+    "the previous run" the moment run 2 calls load_previous; no third run
+    is needed to see a trend-chip.
     """
     import datetime
     from unittest.mock import MagicMock
@@ -85,7 +87,7 @@ def test_drift_section_reaches_html_output(tmp_path, monkeypatch):
     assert "No previous flow baseline" not in html2
     assert "New App-to-App Pairs (not seen last period) (1)" in html2
 
-    # Run 3: trend deltas must reach the HTML too (same dead-on-arrival bug).
-    html3 = _export(df2, run_no=2, kpi_value=12)
-    assert "No previous snapshot" not in html3
-    assert "trend-chip" in html3
+    # Trend deltas must reach the HTML on this very run too (same
+    # dead-on-arrival bug), not only after a third export.
+    assert "No previous snapshot" not in html2
+    assert "trend-chip" in html2

@@ -46,12 +46,13 @@ def test_cross_language_snapshots_now_produce_deltas(tmp_path):
     out = str(tmp_path)
     # 模擬：前一份報表以 zh_TW 產生（舊格式：本地化 key）
     save_snapshot(out, "traffic", {"流量總數": "100"}, generated_at="2026-06-01T00:00:00")
-    # 本次報表以 en 產生（新格式：canonical key）
+    # 本次報表以 en 產生（新格式：canonical key）—— 呼叫序照實際 generator：
+    # load_previous 先於本次 save_snapshot。
+    prev = load_previous(out, "traffic")
     current = build_kpi_dict_from_metadata(
         [{"label_key": "mod12_kpi_total_flows", "label": "Total Flows", "value": "150"}]
     )
     save_snapshot(out, "traffic", current, generated_at="2026-06-02T00:00:00")
-    prev = load_previous(out, "traffic")
     prev = canonicalize_legacy_keys(prev, candidate_keys=list(current.keys()))
     deltas = compute_deltas(current, prev)
     assert len(deltas) == 1
