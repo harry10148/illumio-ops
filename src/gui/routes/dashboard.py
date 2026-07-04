@@ -365,17 +365,42 @@ def make_dashboard_blueprint(
             except (ValueError, TypeError): proto = None
 
         idx = d.get('idx')
-        query_def = {
-            "name": name,
-            "rank_by": rank_by,
-            "pd": pd_sel,
-            "port": port, "proto": proto,
-            "src_label": src_label, "dst_label": dst_label,
-            "src_ip_in": src_ip, "dst_ip_in": dst_ip,
-            "ex_port": ex_port,
-            "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
-            "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip
-        }
+        f = d.get('filters')
+        if isinstance(f, dict):
+            # Phase 4b：前端 FilterBar 直送序列化 dict——照 whitelist 展平存入
+            # query_def 頂層（flat，與舊 scalar 格式 key 共存；src_ip_in 舊為
+            # scalar 新為 list，下游 query_flows 與前端 deserialize 兩種形狀都認）。
+            # 原啟發式分支的 whitelist 丟棄 any_*（前端有送）——新分支修正此缺口。
+            _fb_keys = (
+                "src_labels", "dst_labels", "ex_src_labels", "ex_dst_labels",
+                "src_label_groups", "dst_label_groups",
+                "ex_src_label_groups", "ex_dst_label_groups",
+                "src_iplists", "dst_iplists", "ex_src_iplists", "ex_dst_iplists",
+                "src_workloads", "dst_workloads", "ex_src_workloads", "ex_dst_workloads",
+                "src_ip_in", "dst_ip_in", "ex_src_ip", "ex_dst_ip",
+                "any_label", "any_ip", "any_iplist", "any_workload",
+                "ex_any_label", "ex_any_ip", "ex_any_iplist", "ex_any_workload",
+            )
+            query_def = {
+                "name": name, "rank_by": rank_by, "pd": pd_sel,
+                "port": port, "proto": proto, "ex_port": ex_port,
+            }
+            for k in _fb_keys:
+                v = f.get(k)
+                if v:
+                    query_def[k] = v
+        else:
+            query_def = {
+                "name": name,
+                "rank_by": rank_by,
+                "pd": pd_sel,
+                "port": port, "proto": proto,
+                "src_label": src_label, "dst_label": dst_label,
+                "src_ip_in": src_ip, "dst_ip_in": dst_ip,
+                "ex_port": ex_port,
+                "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
+                "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip
+            }
 
         # Serialize load→mutate→save under the shared config lock so concurrent
         # saves (cheroot multi-thread pool) cannot lose a query.

@@ -243,3 +243,58 @@ def test_top10_reports_truncation_flag(app_persistent, monkeypatch):
     assert r.status_code == 200
     assert r.json.get("truncated") is True
     assert r.json.get("cap") == QUERY_RESULT_CAP
+
+
+def test_save_dashboard_query_stores_filterbar_keys(client):
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    r = client.post('/api/dashboard/queries', json={
+        "name": "Q1", "rank_by": "count", "pd": 3,
+        "filters": {
+            "src_labels": ["app=erp", "app=web"],
+            "dst_iplists": ["/orgs/1/sec_policy/active/ip_lists/7"],
+            "src_workloads": ["/orgs/1/workloads/abc"],
+            "src_label_groups": ["PG-Prod"],
+            "src_ip_in": ["10.0.0.1"],
+            "ex_dst_ip": ["10.9.9.9"],
+            "any_label": "env=prod",
+            "any_iplist": "corp-vpn",
+            "ex_any_workload": "/orgs/1/workloads/xyz",
+        },
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
+    assert r.status_code == 200
+    assert r.json["ok"] is True
+
+    saved = client.get('/api/dashboard/queries',
+                       environ_overrides={'REMOTE_ADDR': '127.0.0.1'}).get_json()[-1]
+    assert saved["src_labels"] == ["app=erp", "app=web"]
+    assert saved["dst_iplists"] == ["/orgs/1/sec_policy/active/ip_lists/7"]
+    assert saved["src_workloads"] == ["/orgs/1/workloads/abc"]
+    assert saved["src_label_groups"] == ["PG-Prod"]
+    assert saved["src_ip_in"] == ["10.0.0.1"]
+    assert saved["ex_dst_ip"] == ["10.9.9.9"]
+    assert saved["any_label"] == "env=prod"          # 既有 bug 修復
+    assert saved["any_iplist"] == "corp-vpn"
+    assert saved["ex_any_workload"] == "/orgs/1/workloads/xyz"
+    assert saved["name"] == "Q1"
+
+
+def test_save_dashboard_query_legacy_branch_unchanged(client):
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    r = client.post('/api/dashboard/queries', json={
+        "name": "Legacy", "rank_by": "count", "pd": 3,
+        "src": "app=erp", "dst": "10.0.0.5", "ex_src": "env=dev",
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
+    assert r.status_code == 200
+    assert r.json["ok"] is True
+
+    saved = client.get('/api/dashboard/queries',
+                       environ_overrides={'REMOTE_ADDR': '127.0.0.1'}).get_json()[-1]
+    assert saved["src_label"] == "app=erp"
+    assert saved["dst_ip_in"] == "10.0.0.5"
+    assert saved["ex_src_label"] == "env=dev"
