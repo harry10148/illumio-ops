@@ -468,9 +468,9 @@ MODERN_SHELL_CSS = """\
 .report-toc a::before { content: counter(chap, decimal-leading-zero); font-family: var(--font-mono); font-size: 11px; color: #a8a8a8; margin-right: 6px; }
 .report-toc a:hover { color: var(--slate); background: var(--slate-10); }
 .report-main { margin-left: 0; padding: 48px 56px 96px; max-width: 1300px; }
-/* Exporters without a TOC sidebar (app_summary, policy_diff) render <main> as the
-   only shell child; span both grid columns so it isn't squished into the 240px
-   TOC track. No effect on TOC exporters, whose <main> is not :only-child. */
+/* 防禦性 fallback：Phase 4 起所有 exporter 的 shell 都帶 aside（至少含列印按鈕），
+   此規則目前無現役消費者；保留給未來若有無側欄的 exporter 時，<main> 作為唯一
+   子元素可跨滿兩個 grid 欄，不被壓進 240px 的 TOC 軌。 */
 .report-shell > .report-main:only-child { grid-column: 1 / -1; }
 .report-cover-block { margin-bottom: 40px; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
 .report-cover-block .eyebrow { font-size: 12px; color: var(--slate-50); text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 8px; }
