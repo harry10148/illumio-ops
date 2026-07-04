@@ -2,7 +2,8 @@
 /* PCE 風格 filter 物件選擇器元件（Phase 3）。
    可重複實例化：createFilterBar(container, options) → { getFilters, setFilters, onChange, destroy }。
    CSP：動態 pill/下拉用 data-action/data-on-* 委派（_event_dispatcher），handler 掛 window.*。
-   suggest 整合在 Task 3；本檔核心為 pill 資料模型 + 序列化 + 生命週期。 */
+   suggest 查詢（debounce 250ms + AbortController 取消舊請求 + 離線降級）見 _objfbQuerySuggest /
+   _objfbRenderDropdown；其餘為 pill 資料模型 + 序列化 + 生命週期。 */
 
 // 每個 FilterBar 實例存於此註冊表，供 window handler 依 container id 找回實例
 const _objfbInstances = {};
@@ -25,7 +26,11 @@ function createFilterBar(container, options) {
     addDir: dirs[0],
     scopeCat: null,
     changeCb: null,
+    _abort: null,       // 進行中 suggest fetch 的 AbortController
+    _suggest: null,     // 最近一次 suggest 回應（依分類分組），或 {_error:true}
+    _suggestQ: null,    // _suggest 對應的查詢字串（供比對是否過期）
   };
+  state._debouncedSuggest = window.debounce((q) => _objfbQuerySuggest(state, q), 250);
   _objfbInstances[id] = state;
   container.dataset.objfbId = id;
   container.classList.add('objfb-bar');
@@ -249,8 +254,9 @@ function _objfbBuildPill(state, p, idx) {
 }
 
 /* ── 下拉局部更新（不重繪整個 bar，保留輸入框焦點/游標）──
-   Task 2 範圍：空輸入顯示類別捷徑；IP/CIDR 置頂加入；手動 key=value 加入。
-   真正的物件 suggest（labels/workloads/iplists 後端查詢）留給 Task 3。 */
+   空輸入：顯示類別捷徑。非空輸入：委派 _objfbRenderDropdown 立即畫出同步
+   可得的候選（IP/CIDR 置頂、手動 key=value），並觸發 debounce suggest 查詢
+   （250ms 後打後端、結果回來時再由 _objfbRenderDropdown 併入分類分組）。 */
 function _objfbUpdateDropdown(state) {
   const dd = state.els.dd;
   const q = state.els.input.value.trim();
@@ -258,6 +264,9 @@ function _objfbUpdateDropdown(state) {
   state.ddItems = [];
 
   if (!q) {
+    if (state._abort) { state._abort.abort(); state._abort = null; }
+    state._suggest = null;
+    state._suggestQ = null;
     const catsWrap = document.createElement('div');
     catsWrap.className = 'objfb-dd-cats';
     for (const c of state.cats.filter((c) => c !== 'ip')) {
@@ -288,6 +297,47 @@ function _objfbUpdateDropdown(state) {
     return;
   }
 
+  _objfbRenderDropdown(state, q);
+  state._debouncedSuggest(q);
+}
+
+/* ── suggest 查詢：debounce 250ms 後由 state._debouncedSuggest 呼叫。
+   AbortController 取消上一個尚未回應的請求，避免競態下舊回應覆蓋新輸入的下拉。
+   GET 端點（Phase 2）不需 CSRF header，直接 fetch，不走 utils.js 的 get()
+   （get() 目前不支援傳入 signal）。*/
+function _objfbQuerySuggest(state, q) {
+  if (state._abort) state._abort.abort();
+  const ctrl = new AbortController();
+  state._abort = ctrl;
+  const scope = state.scopeCat;
+  const types = scope ? scope : 'label,label_group,iplist,workload';
+  const url = `/api/filter-objects/suggest?q=${encodeURIComponent(q)}&types=${types}&limit=10`;
+  fetch(url, { signal: ctrl.signal, credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(body => {
+      state._suggest = body.results || {};
+      state._suggestQ = q;
+      _objfbRenderDropdown(state, q);
+    })
+    .catch(e => {
+      if (e.name === 'AbortError') return; // 已被更新的輸入取消，交給後繼請求畫下拉
+      state._suggest = { _error: true };
+      state._suggestQ = q;
+      _objfbRenderDropdown(state, q);
+    });
+}
+
+/* ── 下拉完整重繪（非空輸入）：IP/CIDR 置頂 + 手動 key=value 加入 + suggest
+   分類分組（label/label_group/iplist/workload）。workload 類遇
+   results.workload.error === 'pce_unreachable' 時顯示 gui_fb_offline 警示、
+   其他類照常；整體 fetch 失敗（_error）顯示同一警示但不影響自由輸入。
+   輸入框當下內容與 q 不符（使用者已改變輸入）時略過，避免過期回應覆蓋畫面。 */
+function _objfbRenderDropdown(state, q) {
+  if (!state.els || state.els.input.value.trim() !== q) return;
+  const dd = state.els.dd;
+  dd.innerHTML = '';
+  state.ddItems = [];
+
   if (_objfbIsIpLike(q) && !state.scopeCat) {
     _objfbAddDdGroup(state, [{ cat: 'ip', name: q }], 'gui_fb_add_ipcidr', 'Add IP/CIDR');
   } else if (!state.scopeCat || state.scopeCat === 'label') {
@@ -297,6 +347,26 @@ function _objfbUpdateDropdown(state) {
       const v = q.slice(eq + 1).trim();
       if (k && v) {
         _objfbAddDdGroup(state, [{ cat: 'label', name: q, key: k, value: v }], 'gui_fb_cat_label', 'Labels');
+      }
+    }
+  }
+
+  const sug = (state._suggestQ === q) ? state._suggest : null;
+  if (sug) {
+    if (sug._error) {
+      _objfbAddDdNote(dd, 'gui_fb_offline', 'PCE unreachable');
+    } else {
+      for (const cat of ['label', 'label_group', 'iplist', 'workload']) {
+        const r = sug[cat];
+        if (!r) continue;
+        if (cat === 'workload' && r.error === 'pce_unreachable') {
+          _objfbAddDdNote(dd, 'gui_fb_offline', 'PCE unreachable');
+          continue;
+        }
+        if (r.items && r.items.length) {
+          const meta = _OBJFB_CATS[cat];
+          _objfbAddDdGroup(state, r.items.map((it) => Object.assign({ cat }, it)), meta.i18n, meta.fallback);
+        }
       }
     }
   }
@@ -312,6 +382,14 @@ function _objfbUpdateDropdown(state) {
   state.actIdx = state.ddItems.length ? 0 : -1;
   _objfbMarkActive(state);
   dd.classList.add('open');
+}
+
+function _objfbAddDdNote(dd, i18nKey, fallback) {
+  const note = document.createElement('div');
+  note.className = 'objfb-dd-note';
+  note.setAttribute('data-i18n', i18nKey);
+  note.textContent = fallback;
+  dd.appendChild(note);
 }
 
 function _objfbAddDdGroup(state, items, headerI18nKey, headerFallback) {

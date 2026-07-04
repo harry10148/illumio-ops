@@ -65,3 +65,20 @@ def test_filter_bar_any_dir_distinct_style_and_hint():
     src = _JS.read_text(encoding="utf-8")
     assert "objfb-any" in src
     assert "gui_fb_any_slow" in src
+
+
+def test_filter_bar_uses_suggest_endpoint():
+    src = _JS.read_text(encoding="utf-8")
+    assert "/api/filter-objects/suggest" in src
+
+
+def test_filter_bar_uses_debounce_and_abort():
+    src = _JS.read_text(encoding="utf-8")
+    assert "AbortController" in src
+    assert "debounce" in src
+
+
+def test_filter_bar_handles_offline():
+    src = _JS.read_text(encoding="utf-8")
+    # 消費 workload 的 pce_unreachable error 欄
+    assert "pce_unreachable" in src
