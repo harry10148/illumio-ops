@@ -3043,7 +3043,7 @@
   "rpt_drift_baseline_from": "Baseline: previous report generated at",
   "rpt_drift_disappeared": "Disappeared Pairs (seen last period, absent now)",
   "rpt_drift_first_run": "No previous flow baseline — drift will appear from the next report onward.",
-  "rpt_drift_incomparable": "Baseline window differs materially from this run ({prev} vs {curr}) — drift comparison skipped to avoid false disappearances. A fresh baseline has been saved.",
+  "rpt_drift_incomparable": "Baseline window differs materially from this run ({prev} days vs {curr} days) — drift comparison skipped to avoid false disappearances. A fresh baseline has been saved.",
   "rpt_drift_new_pairs": "New App-to-App Pairs (not seen last period)",
   "rpt_drift_noise_filtered": "Noise pairs (ICMP, port 0, ephemeral ports ≥49152) are excluded from drift comparison.",
   "rpt_drift_unlabeled_collapsed": "{n} (unlabeled) → (unlabeled) pairs collapsed into this summary line.",
