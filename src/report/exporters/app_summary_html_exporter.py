@@ -143,6 +143,12 @@ class AppSummaryHtmlExporter:
                 + self._section("findings", _esc(t("rpt_app_findings", lang=lang)), self._findings_section())
             )
 
+        nav_html = (
+            '<aside class="report-toc screen-only">'
+            f'<button class="print-btn" onclick="window.print()">{t("rpt_nav_print_pdf", lang=lang)}</button>'
+            '</aside>'
+        )
+
         lang_attr = "zh-TW" if lang == "zh_TW" else "en"
         return (
             f'<!DOCTYPE html><html lang="{lang_attr}"><head>\n'
@@ -152,7 +158,9 @@ class AppSummaryHtmlExporter:
             + "</head>\n"
             + f'<body data-report-title="{_esc(title)}">'
             + cover_html
-            + '<div class="report-shell"><main class="report-main">'
+            + '<div class="report-shell">'
+            + nav_html
+            + '<main class="report-main">'
             + sections
             + "</main></div>"
             + TABLE_JS
