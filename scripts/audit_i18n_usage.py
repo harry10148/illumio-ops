@@ -101,6 +101,11 @@ BILINGUAL_DATA_LINES: set[tuple[str, str]] = {
     # as zh so the pandas column name maps to the HTML header translation.
     ("src/report/analysis/policy_usage/pu_mod01_overview.py", "已命中"),
     ("src/report/analysis/policy_usage/pu_mod01_overview.py", "未使用"),
+    # Port column-name match keyword, not a display string (same as _INT_COL_KEYWORDS).
+    ("src/report/exporters/html_exporter.py", "_PORT_EXACT_COLS"),
+    # Box-drawing chars (U+2500 ─) in the injected CSS shell are decorative
+    # rule dividers, not CJK display text (same as normalizeCellValue).
+    ("src/report/exporters/report_css.py", "Modern SaaS report shell"),
 }
 
 # Files skipped entirely (tests, caches, third-party).
