@@ -123,6 +123,17 @@ def _build_row(rule: dict, ruleset_map: dict, hit_count: int, port_detail: dict,
         "Enabled": rule.get("enabled", True),
     }
 
+def _readable_ref(actor) -> str:
+    """未知 actor 形狀的可讀 fallback，絕不印 raw dict（同 src/api/labels.py 的 _readable_ref，
+    跨層 import 不妥故本地複製一份，spec F1）。"""
+    if not isinstance(actor, dict):
+        return str(actor)
+    for key, val in actor.items():
+        if isinstance(val, dict) and val.get("href"):
+            tail = str(val["href"]).rstrip("/").rsplit("/", 1)[-1]
+            return f"{key}:{tail}"
+    return ", ".join(str(k) for k in actor.keys()) or "Unknown"
+
 def _resolve_actors(actors: list, api_client) -> str:
     if not actors:
         return "Any"
@@ -134,9 +145,11 @@ def _resolve_actors(actors: list, api_client) -> str:
     parts = []
     for actor in actors:
         if not isinstance(actor, dict):
-            parts.append(str(actor))
+            parts.append(_readable_ref(actor))
             continue
-        if "actors" in actor:
+        if actor.get("actors") == "ams":
+            parts.append("All Workloads")
+        elif "actors" in actor:
             parts.append(str(actor["actors"]))
         elif "label" in actor:
             parts.append(actor["label"].get("href", "label"))
@@ -147,7 +160,7 @@ def _resolve_actors(actors: list, api_client) -> str:
         elif "workload" in actor:
             parts.append(actor["workload"].get("href", "workload"))
         else:
-            parts.append(str(actor))
+            parts.append(_readable_ref(actor))
     return ", ".join(parts) if parts else "Any"
 
 def _resolve_services(services: list, api_client) -> str:

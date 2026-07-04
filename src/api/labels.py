@@ -13,6 +13,15 @@ import time
 from loguru import logger
 
 
+def _readable_ref(actor: dict) -> str:
+    """未知 actor 形狀的可讀 fallback：型別:href 尾段，絕不印 raw dict（spec F1）。"""
+    for key, val in actor.items():
+        if isinstance(val, dict) and val.get('href'):
+            tail = str(val['href']).rstrip('/').rsplit('/', 1)[-1]
+            return f"{key}:{tail}"
+    return ", ".join(str(k) for k in actor.keys()) or "Unknown"
+
+
 class LabelResolver:
     """Owns label/service/IP-list lookup logic for ApiClient.
 
@@ -450,12 +459,23 @@ class LabelResolver:
             return "Any"
         names = []
         for a in actors:
-            if 'label' in a:
+            if not isinstance(a, dict):
+                names.append(str(a))
+            elif 'label' in a:
                 names.append(c.label_cache.get(a['label']['href'], "Label"))
+            elif 'label_group' in a:
+                names.append(c.label_cache.get(a['label_group']['href'], "LabelGroup"))
             elif 'ip_list' in a:
                 names.append(c.label_cache.get(a['ip_list']['href'], "IPList"))
+            elif 'workload' in a:
+                names.append(c.label_cache.get(a['workload']['href'], "Workload"))
+            elif a.get('actors') == 'ams':
+                # 顯示層對應：API payload 的 'ams' 一律呈現 All Workloads（spec F1）
+                names.append("All Workloads")
             elif 'actors' in a:
                 names.append(str(a.get('actors')))
+            else:
+                names.append(_readable_ref(a))
         return ", ".join(names)
 
     def resolve_service_str(self, services):
