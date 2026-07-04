@@ -1116,12 +1116,25 @@ class _TrafficReportBase:
         head = (
             f'<p class="section-intro">{t("rpt_drift_baseline_from", lang=_lang)}'
             f' {(m.get("prev_generated_at") or "")[:16]}</p>'
+            f'<p class="note">{t("rpt_drift_noise_filtered", lang=_lang)}</p>'
+        )
+        new_unlabeled = m.get('new_unlabeled_collapsed', 0)
+        disappeared_unlabeled = m.get('disappeared_unlabeled_collapsed', 0)
+        new_collapsed_note = (
+            f'<p class="note">{t("rpt_drift_unlabeled_collapsed", n=new_unlabeled, lang=_lang)}</p>'
+            if new_unlabeled > 0 else ''
+        )
+        disappeared_collapsed_note = (
+            f'<p class="note">{t("rpt_drift_unlabeled_collapsed", n=disappeared_unlabeled, lang=_lang)}</p>'
+            if disappeared_unlabeled > 0 else ''
         )
         return (
             head
             + f'<h3>{t("rpt_drift_new_pairs", lang=_lang)} ({m.get("new_count", 0)})</h3>'
+            + new_collapsed_note
             + _df_to_html(m.get('new_pairs'), lang=_lang)
             + f'<h3>{t("rpt_drift_disappeared", lang=_lang)} ({m.get("disappeared_count", 0)})</h3>'
+            + disappeared_collapsed_note
             + _df_to_html(m.get('disappeared_pairs'), lang=_lang)
         )
 

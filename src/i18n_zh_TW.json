@@ -3044,6 +3044,8 @@
   "rpt_drift_disappeared": "消失的連線配對（上期有、本期無）",
   "rpt_drift_first_run": "尚無前期流量基準 — 從下一次報表開始顯示漂移。",
   "rpt_drift_new_pairs": "新出現的 App 對 App 連線（上期未見）",
+  "rpt_drift_noise_filtered": "雜訊配對（ICMP、port 0、ephemeral 高 port ≥49152）已排除於漂移比較之外。",
+  "rpt_drift_unlabeled_collapsed": "{n} 組 (unlabeled) → (unlabeled) 配對已收合為此統計行。",
   "rpt_ei_by_network": "依網路",
   "rpt_ei_count": "數量",
   "rpt_ei_enforcement": "Enforcement 體質",

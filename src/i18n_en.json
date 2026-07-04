@@ -3044,6 +3044,8 @@
   "rpt_drift_disappeared": "Disappeared Pairs (seen last period, absent now)",
   "rpt_drift_first_run": "No previous flow baseline — drift will appear from the next report onward.",
   "rpt_drift_new_pairs": "New App-to-App Pairs (not seen last period)",
+  "rpt_drift_noise_filtered": "Noise pairs (ICMP, port 0, ephemeral ports ≥49152) are excluded from drift comparison.",
+  "rpt_drift_unlabeled_collapsed": "{n} (unlabeled) → (unlabeled) pairs collapsed into this summary line.",
   "rpt_ei_by_network": "By Network",
   "rpt_ei_count": "Count",
   "rpt_ei_enforcement": "Enforcement Posture",
