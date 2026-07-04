@@ -98,8 +98,11 @@ def test_snapshot_mismatch_invalid_date_string_skips_window_comparison():
 
 def test_snapshot_mismatch_one_sided_missing_window_skips_comparison():
     """只有一邊有 window（另一邊缺）時跳過 window 比較，不誤判為不一致。"""
-    current_meta = {"window": {"start": "2026-06-01", "end": "2026-06-08"}}
-    previous_payload = {"_meta": {}}  # 前一份快照沒有記錄 window
+    # 前一份 _meta 非空（避免走 not previous_meta 的 early-return）但無 window——
+    # 讓斷言真正命中 window guard（review 複核發現原 fixture 走錯路徑）
+    current_meta = {"window": {"start": "2026-06-01", "end": "2026-06-08"},
+                    "data_source": "api"}
+    previous_payload = {"_meta": {"data_source": "api"}}
     assert snapshot_mismatch(current_meta, previous_payload) == []
 
 
