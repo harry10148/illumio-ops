@@ -73,6 +73,31 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 - Plain Traffic Flow Report profile (`traffic`): overview, policy decision summary,
   app/env distribution, bandwidth, unmanaged overview. Runs only lightweight modules.
 
+### Fixed
+
+- Display-layer fixes (phase 4): actor names resolve to readable text instead of a raw
+  Python dict literal across the report layer and the Rule Scheduler CLI — `ams` now
+  renders as "All Workloads" (CLI live-view truncation width widened from 12 to 15 so
+  it isn't cut mid-word), and any other unrecognized actor shape falls back to a
+  human-readable `key:href-tail` form (or the shape's key names) rather than printing
+  the dict.
+- Attack posture badge removed from the GUI Reports list (it duplicated the Dashboard's
+  Security Posture score without adding information); the underlying data chain
+  (`attack_summary_counts`, the `reports.py` API field, email rendering) is untouched —
+  only the reports-list badge markup and its now-orphaned i18n key were removed.
+- Findings from the draft-policy rules (R01-R05) now render under a translated
+  "Draft Policy" / "草稿 Policy" category card in the Security & Risk report instead of
+  falling back to the raw internal category key.
+- Port-value columns (`Port`) in HTML report tables no longer get a thousands
+  separator (e.g. `8080`, not `8,080`); count columns that merely mention "port"
+  (`Unique Ports`, `Top Hit Ports`, ...) are unaffected and keep grouping.
+- Policy Diff and App Summary HTML reports gained a print/PDF button (they previously
+  had no sidebar and no way to trigger print from the page); a guard test now scans
+  all six HTML exporters for the button so this can't silently regress again.
+- Long unbreakable strings (e.g. a 100+ character hostname) in report tables now wrap
+  inside the cell on screen instead of forcing horizontal scroll; print layout was
+  already unaffected and remains untouched.
+
 ## [4.1.0] — 2026-06-21
 
 ### Changed

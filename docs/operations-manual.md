@@ -495,7 +495,7 @@ illumio-ops generates several report types from live PCE data or the local cache
 
 | Format | Output | Notes |
 |---|---|---|
-| `html` | Interactive report (with charts and a sidebar nav) | |
+| `html` | Interactive report (with charts and a sidebar nav) | Policy Diff and App Summary show a print-button-only sidebar (no chapter nav list); every HTML report includes a print button |
 | `csv` | Raw traffic-data zip | Suitable for SIEM import |
 | `xlsx` | Excel (one worksheet per module) | |
 | `pdf` | **Print-ready HTML** (`@media print` A4 layout) | ReportLab PDF has been removed; use the browser's "Print to PDF" |

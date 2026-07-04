@@ -495,7 +495,7 @@ illumio-ops 從即時 PCE 資料或本地 cache 產生多種報表，輸出於 `
 
 | 格式 | 產出 | 備註 |
 |---|---|---|
-| `html` | 互動式報表（含圖表、側欄導覽） | |
+| `html` | 互動式報表（含圖表、側欄導覽） | Policy Diff 與 App Summary 的側欄僅有列印按鈕（無章節導覽清單）；所有 HTML 報表皆含列印按鈕 |
 | `csv` | 原始流量資料 zip | 適合 SIEM 匯入 |
 | `xlsx` | Excel（每模組一工作表） | |
 | `pdf` | **列印就緒的 HTML**（`@media print` A4 版面） | ReportLab PDF 已移除；用瀏覽器「列印成 PDF」 |
