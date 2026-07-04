@@ -189,6 +189,15 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
     if ex_any_lbl:
         mask &= ~(_label_mask(df, "src", [ex_any_lbl]) | _label_mask(df, "dst", [ex_any_lbl]))
 
+    # any_ip / ex_any_ip（either-side IP/CIDR：src 或 dst 命中）。同 any_label 樣式，
+    # 並比照 _any_object_cidrs 區塊的欄位存在守衛（src_ip/dst_ip 任一不存在則略過此條件）。
+    any_ip = _scalar(filters, "any_ip")
+    if any_ip and "src_ip" in df.columns and "dst_ip" in df.columns:
+        mask &= (_ip_mask(df, "src_ip", any_ip) | _ip_mask(df, "dst_ip", any_ip))
+    ex_any_ip = _scalar(filters, "ex_any_ip")
+    if ex_any_ip and "src_ip" in df.columns and "dst_ip" in df.columns:
+        mask &= ~(_ip_mask(df, "src_ip", ex_any_ip) | _ip_mask(df, "dst_ip", ex_any_ip))
+
     proto = _scalar(filters, "proto")
     if proto and "proto" in df.columns:
         want = _PROTO_ALIAS.get(proto, proto).upper()

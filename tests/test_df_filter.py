@@ -189,3 +189,27 @@ def test_ex_dst_ip_list_excludes():
     df = _df_two_apps()
     out = apply_df_traffic_filters(df, {"ex_dst_ip": ["10.0.0.9"]})
     assert out.empty  # 全部列 dst_ip 皆為 10.0.0.9
+
+
+def test_any_ip_matches_src_side():
+    # src_ip 10.0.0.1/2/3，dst_ip 皆為 10.0.0.9 → any_ip=10.0.0.1 只命中 row0 的 src 側
+    out = apply_df_traffic_filters(_df_two_apps(), {"any_ip": "10.0.0.1"})
+    assert sorted(out["src_ip"]) == ["10.0.0.1"]
+
+
+def test_any_ip_matches_dst_side():
+    # any_ip=10.0.0.9 命中所有列的 dst 側
+    out = apply_df_traffic_filters(_df_two_apps(), {"any_ip": "10.0.0.9"})
+    assert len(out) == 3
+
+
+def test_any_ip_cidr_form():
+    # CIDR 涵蓋 10.0.0.0-10.0.0.3，透過 src 側命中全部三列
+    out = apply_df_traffic_filters(_df_two_apps(), {"any_ip": "10.0.0.0/30"})
+    assert len(out) == 3
+
+
+def test_ex_any_ip_excludes_either_side():
+    # ex_any_ip=10.0.0.1 命中 row0 的 src 側 → 該列被剔除，其餘保留
+    out = apply_df_traffic_filters(_df_two_apps(), {"ex_any_ip": "10.0.0.1"})
+    assert sorted(out["src_ip"]) == ["10.0.0.2", "10.0.0.3"]
