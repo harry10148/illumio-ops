@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pandas as pd
 
@@ -97,3 +98,44 @@ def test_blank_attribution_renders_em_dash_with_tooltip(tmp_path):
     assert 'title="' in html
     # tooltip should contain the attribution note text
     assert "Attribution" in html or "attribution" in html.lower()
+
+
+def _object_results():
+    ipl = pd.DataFrame([
+        {"risk": "HIGH", "change_type": "modified", "object_kind": "ip_list",
+         "name": "Corp-Nets", "object_id": "5", "field": "ip_ranges",
+         "draft_value": "0.0.0.0/0, 10.0.0.0/8", "active_value": "10.0.0.0/8",
+         "scope_expanded": True, "last_actor": "alice", "last_changed": "t", "last_event": "ip_list.update"},
+    ])
+    return {"ruleset_changes": pd.DataFrame(), "rule_changes": pd.DataFrame(),
+            "ip_list_changes": ipl, "service_changes": pd.DataFrame(),
+            "label_group_changes": pd.DataFrame(),
+            "summary": {"rulesets_added": 0, "rulesets_removed": 0, "rulesets_modified": 0,
+                        "rules_added": 0, "rules_removed": 0, "rules_modified": 0,
+                        "ip_lists_added": 0, "ip_lists_removed": 0, "ip_lists_modified": 1,
+                        "services_added": 0, "services_removed": 0, "services_modified": 0,
+                        "label_groups_added": 0, "label_groups_removed": 0,
+                        "label_groups_modified": 0, "total_changes": 1}}
+
+
+def test_object_sections_rendered(tmp_path):
+    path = PolicyDiffHtmlExporter(_object_results(), lang="en").export(str(tmp_path))
+    html = Path(path).read_text(encoding="utf-8")
+    assert 'id="ip-list-changes"' in html
+    assert 'id="service-changes"' in html
+    assert 'id="label-group-changes"' in html
+    assert "Corp-Nets" in html
+    assert 'class="pd-risk-high"' in html
+    # 空的 service 章顯示 no-changes note 而非空表（用實際 div 開頭 tag 計數，避開
+    # 共用 CSS/JS 字面內容裡本來就含有的 "report-table-wrap" 字串）
+    assert html.count('<div class="report-table-wrap">') == 1
+
+
+def test_object_section_headers_localized(tmp_path):
+    path = PolicyDiffHtmlExporter(_object_results(), lang="zh_TW").export(str(tmp_path))
+    html = Path(path).read_text(encoding="utf-8")
+    assert "[MISSING" not in html
+    assert "IP List" in html  # glossary：物件型別名保持英文
+    # 內部欄位 scope_expanded / object_kind 不出現在表頭
+    assert "scope_expanded" not in html
+    assert "object_kind" not in html

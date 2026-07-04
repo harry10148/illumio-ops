@@ -58,6 +58,8 @@ class PolicyDiffHtmlExporter:
         "active_value": "rpt_policy_diff_col_active",
         "last_actor": "rpt_policy_diff_col_actor",
         "last_changed": "rpt_policy_diff_col_changed",
+        "name": "rpt_policy_diff_col_name",
+        "object_id": "rpt_policy_diff_col_object_id",
     }
 
     def _header(self, col: str) -> str:
@@ -66,14 +68,14 @@ class PolicyDiffHtmlExporter:
 
     _RISK_RANK = {"HIGH": 0, "MEDIUM": 1}
 
-    def _table(self, df: pd.DataFrame, id_col: str) -> str:
+    def _table(self, df: pd.DataFrame, id_col: str, name_col: str = "ruleset_name") -> str:
         if df is None or df.empty:
             return f'<p class="note">{_esc(t("rpt_policy_diff_no_changes", lang=self._lang))}</p>'
         if "risk" in df.columns:
             df = df.copy()
             df["_rank"] = df["risk"].map(self._RISK_RANK).fillna(9)
             df = df.sort_values("_rank", kind="stable").drop(columns="_rank")
-        cols = ["risk", "change_type", "ruleset_name", id_col, "field",
+        cols = ["risk", "change_type", name_col, id_col, "field",
                 "draft_value", "active_value", "last_actor", "last_changed"]
         cols = [c for c in cols if c in df.columns]
         head = "".join(f"<th>{self._header(c)}</th>" for c in cols)
@@ -116,6 +118,16 @@ class PolicyDiffHtmlExporter:
             lang=lang,
         )
 
+        object_sections = ""
+        for section_id, title_key, df_key in (
+            ("ip-list-changes", "rpt_policy_diff_ip_list_changes", "ip_list_changes"),
+            ("service-changes", "rpt_policy_diff_service_changes", "service_changes"),
+            ("label-group-changes", "rpt_policy_diff_label_group_changes", "label_group_changes"),
+        ):
+            object_sections += self._section(
+                section_id, t(title_key, lang=lang),
+                self._table(self._r.get(df_key), "object_id", name_col="name"))
+
         sections = (
             f'<section class="card"><div class="kpi-grid">{self._kpi_row()}</div></section>'
             + self._section(
@@ -128,6 +140,7 @@ class PolicyDiffHtmlExporter:
                 _esc(t("rpt_policy_diff_rule_changes", lang=lang)),
                 self._table(self._r.get("rule_changes"), "rule_id"),
             )
+            + object_sections
             + f'<p class="note">{_esc(t("rpt_policy_diff_attribution_note", lang=lang))}</p>'
         )
 

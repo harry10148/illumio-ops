@@ -56,6 +56,53 @@ def test_build_without_api_returns_empty_diff():
     assert diff["summary"]["total_changes"] == 0
     assert diff["ruleset_changes"].empty
     assert diff["rule_changes"].empty
+    assert diff["summary"]["ip_lists_added"] == 0
+    assert diff["summary"]["ip_lists_removed"] == 0
+    assert diff["summary"]["ip_lists_modified"] == 0
+    assert diff["summary"]["services_added"] == 0
+    assert diff["summary"]["services_removed"] == 0
+    assert diff["summary"]["services_modified"] == 0
+    assert diff["summary"]["label_groups_added"] == 0
+    assert diff["summary"]["label_groups_removed"] == 0
+    assert diff["summary"]["label_groups_modified"] == 0
+
+
+def test_build_includes_object_layers():
+    api = MagicMock()
+    api.get_all_rulesets.return_value = []
+    api.get_active_rulesets.return_value = []
+    api.get_ip_lists.side_effect = lambda pversion="active": {
+        "active": [{"href": "/orgs/1/sec_policy/active/ip_lists/5", "name": "L",
+                    "ip_ranges": [{"from_ip": "10.0.0.0/8"}], "fqdns": [], "description": ""}],
+        "draft": [{"href": "/orgs/1/sec_policy/draft/ip_lists/5", "name": "L",
+                   "ip_ranges": [{"from_ip": "10.0.0.0/8"}, {"from_ip": "0.0.0.0/0"}],
+                   "fqdns": [], "description": ""}],
+    }[pversion]
+    api.get_services.side_effect = lambda pversion="active": []
+    api.get_label_groups.side_effect = lambda pversion="active": []
+    rep = PolicyDiffReport(MagicMock(), api_client=api)
+    with patch.object(rep, "_fetch_policy_events", return_value={"draft_events": None}):
+        diff = rep.build()
+    assert len(diff["ip_list_changes"]) == 1
+    assert diff["summary"]["ip_lists_modified"] == 1
+    assert diff["summary"]["services_added"] == 0
+    assert diff["summary"]["total_changes"] == 1
+    assert "risk" in diff["ip_list_changes"].columns
+
+
+def test_build_object_layers_draft_and_active_fetched():
+    api = MagicMock()
+    api.get_all_rulesets.return_value = []
+    api.get_active_rulesets.return_value = []
+    api.get_ip_lists.return_value = []
+    api.get_services.return_value = []
+    api.get_label_groups.return_value = []
+    rep = PolicyDiffReport(MagicMock(), api_client=api)
+    with patch.object(rep, "_fetch_policy_events", return_value={"draft_events": None}):
+        rep.build()
+    for m in (api.get_ip_lists, api.get_services, api.get_label_groups):
+        kwargs_seen = {c.kwargs.get("pversion", "active") for c in m.call_args_list}
+        assert kwargs_seen == {"active", "draft"}
 
 
 def test_attribution_window_is_configurable():
