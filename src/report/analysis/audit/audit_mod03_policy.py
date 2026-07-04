@@ -24,9 +24,11 @@ _POLICY_EVENTS = [
     "ip_list.create",
     "ip_list.update",
     "ip_list.delete",
+    "ip_lists.delete",
     "service.create",
     "service.update",
     "service.delete",
+    "services.delete",
     "enforcement_boundary.create",
     "enforcement_boundary.update",
     "enforcement_boundary.delete",
@@ -50,6 +52,11 @@ _DRAFT_RULE_EVENTS = {
     "sec_rule.create",
     "sec_rule.update",
     "sec_rule.delete",
+}
+_DRAFT_OBJECT_EVENTS = {
+    "ip_list.create", "ip_list.update", "ip_list.delete", "ip_lists.delete",
+    "service.create", "service.update", "service.delete", "services.delete",
+    "label_group.create", "label_group.update", "label_group.delete",
 }
 _HIGH_RISK_EVENTS = {
     "workloads.unpair",
@@ -93,6 +100,7 @@ def audit_policy_changes(df: pd.DataFrame) -> dict:
             "per_user": pd.DataFrame(),
             "provisions": pd.DataFrame(),
             "draft_events": pd.DataFrame(),
+            "object_events": pd.DataFrame(),
             "recent": pd.DataFrame(),
             "total_workloads_affected": 0,
             "max_workloads_affected": 0,
@@ -110,6 +118,14 @@ def audit_policy_changes(df: pd.DataFrame) -> dict:
         draft_df = target_df[draft_mask]
         cols = _select_cols(draft_df, ["timestamp", "event_type", "severity"], extra_cols=("resource_name", "action", "src_ip", "change_detail"))
         draft_events = draft_df[cols].sort_values("timestamp", ascending=False).head(50)
+
+    obj_mask = target_df["event_type"].isin(_DRAFT_OBJECT_EVENTS)
+    object_events = pd.DataFrame()
+    if obj_mask.any():
+        obj_df = target_df[obj_mask]
+        cols = _select_cols(obj_df, ["timestamp", "event_type", "severity"],
+                            extra_cols=("resource_name", "action", "src_ip", "change_detail"))
+        object_events = obj_df[cols].sort_values("timestamp", ascending=False).head(50)
 
     prov_mask = target_df["event_type"].isin(_PROVISION_EVENTS)
     provision_count = int(prov_mask.sum())
@@ -198,6 +214,7 @@ def audit_policy_changes(df: pd.DataFrame) -> dict:
         "per_user": per_user,
         "provisions": provisions,
         "draft_events": draft_events,
+        "object_events": object_events,
         "recent": recent,
         "chart_spec": chart_spec,
     }

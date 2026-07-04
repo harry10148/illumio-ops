@@ -71,3 +71,36 @@ def test_garbage_events_value_does_not_raise():
     diff = _diff_with_one_modified_ruleset()
     out = attribute_changes(diff, "not a dict")
     assert out["ruleset_changes"].to_dict("records")[0]["last_actor"] == ""
+
+
+def test_object_changes_attributed_from_object_events():
+    diff = {
+        "ruleset_changes": pd.DataFrame(),
+        "rule_changes": pd.DataFrame(),
+        "ip_list_changes": pd.DataFrame([
+            {"change_type": "modified", "object_kind": "ip_list", "name": "Corp-Nets",
+             "object_id": "5", "field": "ip_ranges", "draft_value": "x", "active_value": "y",
+             "scope_expanded": True, "last_actor": "", "last_changed": "", "last_event": ""},
+        ]),
+    }
+    events = {
+        "draft_events": pd.DataFrame(),
+        "object_events": pd.DataFrame([
+            {"resource_name": "Corp-Nets", "actor": "alice@corp",
+             "timestamp": "2026-07-03T10:00:00Z", "event_type": "ip_list.update"},
+        ]),
+    }
+    out = attribute_changes(diff, events)
+    row = out["ip_list_changes"].iloc[0]
+    assert row["last_actor"] == "alice@corp"
+    assert row["last_event"] == "ip_list.update"
+
+
+def test_object_changes_survive_missing_object_events_key():
+    diff = {"ruleset_changes": pd.DataFrame(), "rule_changes": pd.DataFrame(),
+            "ip_list_changes": pd.DataFrame([
+                {"change_type": "removed", "object_kind": "ip_list", "name": "L",
+                 "object_id": "1", "field": "*", "draft_value": "", "active_value": "L",
+                 "scope_expanded": False, "last_actor": "", "last_changed": "", "last_event": ""}])}
+    out = attribute_changes(diff, {"draft_events": pd.DataFrame()})
+    assert out["ip_list_changes"].iloc[0]["last_actor"] == ""
