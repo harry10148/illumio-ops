@@ -2019,6 +2019,7 @@
   "gui_rs_wed": "星期三",
   "gui_rule_default_rec_check_logs": "檢查日誌",
   "gui_rule_default_rec_check_policy": "檢查 Policy 設定",
+  "gui_rule_label_group_unsupported": "告警規則不支援 Label Group（規則在共用未過濾流量上做客戶端比對，無法展開群組成員），請改用個別 Label。",
   "gui_rule_name": "規則名稱",
   "gui_rule_not_found": "找不到規則",
   "gui_rule_saved": "規則已儲存",
