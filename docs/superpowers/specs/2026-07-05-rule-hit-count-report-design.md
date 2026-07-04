@@ -55,7 +55,7 @@
 
 **啟用精靈**（CLI questionary / GUI 確認對話框，共用後端函式）：
 1. 顯示現狀與影響，**明確警告**：VEN 端啟用需修改 draft firewall_settings 並執行 policy provision（生產 policy 寫入操作）。
-2. 詢問範圍：全部 VEN（`[[]]`）或指定 label scope（重用 filter 物件選擇器）。
+2. 詢問範圍：全部 VEN（`[[]]`）或指定 label scope。CLI 精靈兩者皆支援（label 用既有 `pick_objects` 物件選擇器）；GUI 對話框 v1 僅支援全部 VEN，並提示指定 scope 請用 CLI（後端 `enable_rule_hit_count(api, scopes)` 共用，GUI 之後可補）。
 3. 依序執行：PCE 端 PUT → VEN 端 PUT draft → provision（`update_description: "Enable rule hit count (illumio-ops)"`）。
 4. 成功後提示 VEN 需時間回報，**不**立刻自動產報表。
 5. 全程 ModuleLog；任一步失敗即停，回報已完成/未完成步驟與補救指令。
