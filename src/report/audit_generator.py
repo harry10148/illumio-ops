@@ -22,6 +22,7 @@ from typing import Optional
 
 from src.events import normalize_event
 from src.i18n import t
+from src.report.exporters._exec_summary import _resolve_label
 from src.report.dashboard_summaries import write_audit_dashboard_summary
 from src.report.report_metadata import (
     attack_summary_counts,
@@ -829,7 +830,7 @@ def generate_audit_xlsx(module_results: dict, out_path: str, *, lang: str = "en"
     kpi_col = t("rpt_xlsx_col_kpi", lang=lang)
     val_col = t("rpt_xlsx_col_value", lang=lang)
     kpi_df = (
-        pd.DataFrame([{kpi_col: k.get("label", ""), val_col: k.get("value", "")} for k in kpis])
+        pd.DataFrame([{kpi_col: _resolve_label(k, lang), val_col: k.get("value", "")} for k in kpis])
         if kpis else None
     )
     add_df_sheet(

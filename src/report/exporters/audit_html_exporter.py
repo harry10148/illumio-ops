@@ -187,18 +187,6 @@ class AuditHtmlExporter:
             f'<button class="print-btn" onclick="window.print()">{_s("rpt_nav_print_pdf")}</button>'
             '</aside>'
         )
-        def _kpi_label(k: dict) -> str:
-            lk = k.get("label_key")
-            if lk:
-                txt = t(lk, lang=self._lang)
-                if txt and not txt.startswith("[MISSING:"):
-                    return txt
-            return k.get("label", "")
-        kpi_cards = "".join(
-            '<div class="kpi-card"><div class="kpi-label">' + _kpi_label(k) + "</div>"
-            '<div class="kpi-value">' + k["value"] + "</div></div>"
-            for k in mod00.get("kpis", [])
-        )
         date_str = " ~ ".join(self._date_range) if any(self._date_range) else ""
         today_str = str(datetime.date.today())
         period_part = (

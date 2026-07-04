@@ -7,19 +7,22 @@ from __future__ import annotations
 from html import escape
 
 from src.i18n import t
-from .report_i18n import STRINGS
 
 
 def _resolve_label(k: dict, lang: str) -> str:
-    # Some generators (e.g. ven_status_generator) emit lang-agnostic 'i18n_key'
-    # so the exporter can resolve at render time; others emit pre-resolved 'label'.
+    # Prefer resolving the i18n key ('label_key' or 'i18n_key') at render time
+    # so reports render in `lang` even when the generator baked in an English
+    # 'label' (e.g. audit_mod00_executive.py). A key "resolves" when t()
+    # returns something other than the raw key and not a [MISSING:...]
+    # placeholder; otherwise fall back to the pre-resolved 'label'.
+    key = k.get('label_key') or k.get('i18n_key')
+    if key:
+        resolved = t(key, lang=lang)
+        if resolved and resolved != key and not resolved.startswith('[MISSING:'):
+            return resolved
     if k.get('label'):
         return str(k['label'])
-    key = k.get('i18n_key')
-    if key and key in STRINGS:
-        entry = STRINGS[key]
-        return entry.get(lang) or entry.get('en') or ''
-    return ''
+    return key or ''
 
 
 def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en') -> str:
