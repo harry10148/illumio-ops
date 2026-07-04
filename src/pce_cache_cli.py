@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from src.config_models import PceCacheSettings
 from src.gui.settings_helpers import save_section
+from src.cli.object_picker import pick_objects
 
 
 MENU = (
@@ -37,6 +38,15 @@ def manage_pce_cache_menu(cm) -> None:
             _run_retention(cm)
         else:
             print("invalid choice; please enter 0-6")
+
+
+def _pick_or_cancel(api, cats, title, preselected=None, label_key_filter=None):
+    """包 pick_objects：TTY 下 Ctrl-C 會拋 KeyboardInterrupt（見 src/cli/menus/traffic.py
+    同名函式），這裡接住並回傳 None，呼叫端據此保留該 key 原值，不中斷整個選單。"""
+    try:
+        return pick_objects(api, cats=cats, title=title, preselected=preselected, label_key_filter=label_key_filter)
+    except KeyboardInterrupt:
+        return None
 
 
 def _prompt(name, current, cast=str):
@@ -103,11 +113,37 @@ def _edit_traffic_filter(cm):
     print()
     c = cm.models.pce_cache.model_dump(mode="json")
     tf = c.setdefault("traffic_filter", {})
-    for key in ("actions", "protocols", "workload_label_env", "exclude_src_ips"):
+    for key in ("actions", "protocols"):
         cur = tf.get(key, [])
         raw = input(f"  {key} (comma, [{','.join(str(x) for x in cur)}]): ").strip()
         if raw:
             tf[key] = [x.strip() for x in raw.split(",") if x.strip()]
+
+    from src.api_client import ApiClient
+    api = ApiClient(cm)
+
+    # workload_label_env：候選只列 env dimension（label_key_filter="env"）。
+    # picker 內部以 "env=value" 候選格式往返，但既有 config 只存 value 字串，
+    # preselected 時包回 "env=X" 形餵給 picker，存檔前再剝除 "env=" 前綴。
+    cur_env = tf.get("workload_label_env", [])
+    picked_env = _pick_or_cancel(
+        api, cats=("label",), title="workload_label_env",
+        preselected={"labels": [f"env={v}" for v in cur_env]} if cur_env else None,
+        label_key_filter="env",
+    )
+    if picked_env is not None:
+        tf["workload_label_env"] = [
+            v[len("env="):] if v.startswith("env=") else v for v in picked_env.get("labels", [])
+        ]
+
+    cur_ips = tf.get("exclude_src_ips", [])
+    picked_ips = _pick_or_cancel(
+        api, cats=("ip",), title="exclude_src_ips",
+        preselected={"ips": cur_ips} if cur_ips else None,
+    )
+    if picked_ips is not None:
+        tf["exclude_src_ips"] = picked_ips.get("ips", [])
+
     cur_ports = tf.get("ports", [])
     raw = input(f"  ports (comma, [{','.join(str(p) for p in cur_ports)}]): ").strip()
     if raw:
