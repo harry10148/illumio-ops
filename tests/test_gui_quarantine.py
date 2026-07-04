@@ -101,6 +101,38 @@ def test_quarantine_search_reports_truncation(app_persistent, monkeypatch):
     assert r.json["truncated"] is True
 
 
+def test_quarantine_search_forwards_object_filter_keys(app_persistent, monkeypatch):
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    captured = {}
+    from src.analyzer import Analyzer
+    def fake_query(self, params):
+        captured.update(params)
+        return []
+    monkeypatch.setattr(Analyzer, "query_flows", fake_query)
+
+    client.post('/api/quarantine/search', json={
+        "mins": 60,
+        "src_labels": ["app=erp", "app=web"],
+        "dst_iplists": ["/orgs/1/sec_policy/active/ip_lists/7"],
+        "src_workloads": ["/orgs/1/workloads/abc"],
+        "ex_dst_workloads": ["/orgs/1/workloads/zzz"],
+        "any_iplist": "corp-vpn",
+        "ex_any_workload": "/orgs/1/workloads/q",
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+       headers={'X-CSRF-Token': csrf_token})
+
+    assert captured.get("src_labels") == ["app=erp", "app=web"]
+    assert captured.get("dst_iplists") == ["/orgs/1/sec_policy/active/ip_lists/7"]
+    assert captured.get("src_workloads") == ["/orgs/1/workloads/abc"]
+    assert captured.get("ex_dst_workloads") == ["/orgs/1/workloads/zzz"]
+    assert captured.get("any_iplist") == "corp-vpn"
+    assert captured.get("ex_any_workload") == "/orgs/1/workloads/q"
+
+
 def test_quarantine_apply_writes_audit_log(app_persistent, monkeypatch):
     client = app_persistent.test_client()
     login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
