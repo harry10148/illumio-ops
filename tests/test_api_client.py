@@ -60,9 +60,11 @@ class TestApiClientNativeTrafficBuilder(unittest.TestCase):
             payload["sources"]["include"],
             [[{"label": {"href": "/orgs/1/labels/1"}}, {"actors": "ams"}]],
         )
+        # PCE (21.5+) 對 IP literal native actor 只接受 plain string，回傳
+        # 406 input_validation_error（實測 2026-07-04，見 labels.py 註解）。
         self.assertEqual(
             payload["destinations"]["include"],
-            [[{"ip_address": {"value": "10.0.0.5"}}]],
+            [[{"ip_address": "10.0.0.5"}]],
         )
         self.assertEqual(
             payload["sources"]["exclude"],
@@ -157,10 +159,12 @@ class TestApiClientNativeTrafficBuilder(unittest.TestCase):
             },
         )
 
+        # PCE (21.5+) 對 IP literal native actor 只接受 plain string，回傳
+        # 406 input_validation_error（實測 2026-07-04，見 labels.py 註解）。
         self.assertEqual(
             payload["sources"]["include"],
             [
-                [{"label": {"href": "/orgs/1/labels/1"}}, {"ip_address": {"value": "10.0.0.5"}}],
+                [{"label": {"href": "/orgs/1/labels/1"}}, {"ip_address": "10.0.0.5"}],
                 [{"actors": "ams"}],
             ],
         )

@@ -1673,6 +1673,16 @@ document.addEventListener('click', function (e) {
   if (qtab && window.switchQTab) window.switchQTab(qtab);
 });
 
+// FilterBar 實例（Phase 4b）：延遲初始化，理由同 _ensureRptFilterBar；
+// 存於此變數供 openQueryModal、saveDashboardQuery 取用。
+let _dqFb = null;
+function _ensureDqFilterBar() {
+  if (!_dqFb) {
+    _dqFb = createFilterBar(document.getElementById('dq-filter-bar'), {});
+  }
+  return _dqFb;
+}
+
 function openQueryModal(idx = -1) {
   $('dq-idx').value = idx;
   if (idx < 0) {
@@ -1681,10 +1691,8 @@ function openQueryModal(idx = -1) {
     $('dq-rank').value = 'count';
     document.querySelector('input[name="dq-pd"][value="3"]').checked = true;
     $('dq-port').value = ''; $('dq-proto').value = '';
-    $('dq-src').value = ''; $('dq-dst').value = '';
-    $('dq-expt').value = ''; $('dq-exsrc').value = ''; $('dq-exdst').value = '';
-    $('dq-any-label').value = ''; $('dq-any-ip').value = '';
-    $('dq-ex-any-label').value = ''; $('dq-ex-any-ip').value = '';
+    $('dq-expt').value = '';
+    _ensureDqFilterBar().setFilters({});
   } else {
     $('mq-title').textContent = _t('gui_edit_query_widget');
     const q = _dashboardQueries[idx];
@@ -1694,15 +1702,10 @@ function openQueryModal(idx = -1) {
     if (pdRad) pdRad.checked = true;
     $('dq-port').value = q.port || '';
     $('dq-proto').value = q.proto || '';
-    $('dq-src').value = (q.src_label || '') + (q.src_ip_in ? (q.src_label ? ', ' : '') + q.src_ip_in : '');
-    $('dq-dst').value = (q.dst_label || '') + (q.dst_ip_in ? (q.dst_label ? ', ' : '') + q.dst_ip_in : '');
     $('dq-expt').value = q.ex_port || '';
-    $('dq-exsrc').value = (q.ex_src_label || '') + (q.ex_src_ip ? (q.ex_src_label ? ', ' : '') + q.ex_src_ip : '');
-    $('dq-exdst').value = (q.ex_dst_label || '') + (q.ex_dst_ip ? (q.ex_dst_label ? ', ' : '') + q.ex_dst_ip : '');
-    $('dq-any-label').value = q.any_label || '';
-    $('dq-any-ip').value = q.any_ip || '';
-    $('dq-ex-any-label').value = q.ex_any_label || '';
-    $('dq-ex-any-ip').value = q.ex_any_ip || '';
+    // flat query_def 直接餵：deserialize 只讀已知 key，name/rank_by 等頂層
+    // 欄位自然忽略；舊格式 src_label/src_ip_in scalar 原生相容。
+    _ensureDqFilterBar().setFilters(q);
   }
   let btn = document.querySelector('#m-query .modal-actions');
   let isEdit = idx >= 0;
@@ -1732,13 +1735,8 @@ async function saveDashboardQuery() {
     pd: pdMatch ? parseInt(pdMatch.value) : 3,
     port: parseInt($('dq-port').value) || null,
     proto: parseInt($('dq-proto').value) || null,
-    src: $('dq-src').value, dst: $('dq-dst').value,
     ex_port: parseInt($('dq-expt').value) || null,
-    ex_src: $('dq-exsrc').value, ex_dst: $('dq-exdst').value,
-    any_label: $('dq-any-label').value.trim() || null,
-    any_ip: $('dq-any-ip').value.trim() || null,
-    ex_any_label: $('dq-ex-any-label').value.trim() || null,
-    ex_any_ip: $('dq-ex-any-ip').value.trim() || null,
+    filters: _ensureDqFilterBar().getFilters(),
   };
 
   const r = await post('/api/dashboard/queries', d);
