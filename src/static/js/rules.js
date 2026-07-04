@@ -23,6 +23,24 @@ function onBwMetricTypeChange() {
   }
 }
 
+// FilterBar 實例（Phase 4c）：延遲初始化，理由同 dashboard.js 的 _ensureRptFilterBar
+// （rules.js 在 filter-bar.js 之前解析，模組作用域頂層不能直接呼叫 createFilterBar）；
+// cats 排除 label_group——規則引擎後端只認 label/iplist/workload/ip，label_group 會 400。
+let _trFb = null;
+function _ensureTrFilterBar() {
+  if (!_trFb) {
+    _trFb = createFilterBar(document.getElementById('tr-filter-bar'), { cats: ['label', 'iplist', 'workload', 'ip'] });
+  }
+  return _trFb;
+}
+let _bwFb = null;
+function _ensureBwFilterBar() {
+  if (!_bwFb) {
+    _bwFb = createFilterBar(document.getElementById('bw-filter-bar'), { cats: ['label', 'iplist', 'workload', 'ip'] });
+  }
+  return _bwFb;
+}
+
 function _serializeMatchFields(matchFields) {
   return Object.entries(matchFields || {}).map(([key, value]) => `${key}=${value}`).join('\n');
 }
@@ -139,9 +157,13 @@ function openModal(id, isEdit) {
   }
   if (id === 'm-event' && _editIdx !== null) { onEvTtChange(); }
   // R5 simplify: throttle reset lines removed — field deprecated in UI
+  if (id === 'm-traffic' && _editIdx === null) {
+    _ensureTrFilterBar().setFilters({});
+  }
   if (id === 'm-bw' && _editIdx === null) {
     setRv('bw-mt', 'bandwidth');
     onBwMetricTypeChange();
+    _ensureBwFilterBar().setFilters({});
   }
   if (id === 'm-system' && _editIdx === null) {
     $('sys-name').value = _t('rule_pce_health');
@@ -449,11 +471,8 @@ async function editRule(idx, type) {
       setRv('tr-pd', String(r.pd ?? 2));
       $('tr-port').value = r.port || '';
       $('tr-proto').value = r.proto ? String(r.proto) : '';
-      $('tr-src').value = r.src_label || r.src_ip_in || '';
-      $('tr-dst').value = r.dst_label || r.dst_ip_in || '';
       $('tr-expt').value = r.ex_port || '';
-      $('tr-exsrc').value = r.ex_src_label || r.ex_src_ip || '';
-      $('tr-exdst').value = r.ex_dst_label || r.ex_dst_ip || '';
+      _ensureTrFilterBar().setFilters(r);
       $('tr-cnt').value = r.threshold_count || 10;
       $('tr-win').value = r.threshold_window || 10;
       $('tr-cd').value = r.cooldown_minutes || 10;
@@ -464,11 +483,8 @@ async function editRule(idx, type) {
       onBwMetricTypeChange();
       setRv('bw-pd', String(r.pd ?? -1));
       $('bw-port').value = r.port || '';
-      $('bw-src').value = r.src_label || r.src_ip_in || '';
-      $('bw-dst').value = r.dst_label || r.dst_ip_in || '';
       $('bw-expt').value = r.ex_port || '';
-      $('bw-exsrc').value = r.ex_src_label || r.ex_src_ip || '';
-      $('bw-exdst').value = r.ex_dst_label || r.ex_dst_ip || '';
+      _ensureBwFilterBar().setFilters(r);
       $('bw-val').value = r.threshold_count || 100;
       $('bw-win').value = r.threshold_window || 10;
       $('bw-cd').value = r.cooldown_minutes || 30;
@@ -522,7 +538,7 @@ async function saveSystemRule() {
 }
 async function saveTraffic() {
   const name = $('tr-name').value.trim(); if (!name) { toast(_t('gui_msg_name_required'), 'err'); return }
-  const data = { name, pd: rv('tr-pd'), port: $('tr-port').value, proto: $('tr-proto').value, src: $('tr-src').value, dst: $('tr-dst').value, ex_port: $('tr-expt').value, ex_src: $('tr-exsrc').value, ex_dst: $('tr-exdst').value, threshold_count: $('tr-cnt').value, threshold_window: $('tr-win').value, cooldown_minutes: $('tr-cd').value };
+  const data = { name, pd: rv('tr-pd'), port: $('tr-port').value, proto: $('tr-proto').value, ex_port: $('tr-expt').value, threshold_count: $('tr-cnt').value, threshold_window: $('tr-win').value, cooldown_minutes: $('tr-cd').value, filters: _ensureTrFilterBar().getFilters() };
   if (_editIdx !== null) await put('/api/rules/' + _editIdx, data); else await post('/api/rules/traffic', data);
   closeModal('m-traffic'); toast(_t('gui_msg_traffic_rule_saved')); loadRules(); loadDashboard();
 }
@@ -530,9 +546,10 @@ async function saveBW() {
   const name = $('bw-name').value.trim(); if (!name) { toast(_t('gui_msg_name_required'), 'err'); return }
   const data = {
     name, rule_type: rv('bw-mt'), pd: rv('bw-pd'),
-    port: $('bw-port').value, src: $('bw-src').value, dst: $('bw-dst').value,
-    ex_port: $('bw-expt').value, ex_src: $('bw-exsrc').value, ex_dst: $('bw-exdst').value,
-    threshold_count: $('bw-val').value, threshold_window: $('bw-win').value, cooldown_minutes: $('bw-cd').value
+    port: $('bw-port').value,
+    ex_port: $('bw-expt').value,
+    threshold_count: $('bw-val').value, threshold_window: $('bw-win').value, cooldown_minutes: $('bw-cd').value,
+    filters: _ensureBwFilterBar().getFilters()
   };
   if (_editIdx !== null) await put('/api/rules/' + _editIdx, { ...data, type: data.rule_type }); else await post('/api/rules/bandwidth', data);
   closeModal('m-bw'); toast(_t('gui_msg_rule_saved')); loadRules(); loadDashboard();
