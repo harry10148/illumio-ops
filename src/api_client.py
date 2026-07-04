@@ -790,44 +790,52 @@ class ApiClient:
         logger.warning(f"get_active_rulesets: status={status}, returned empty list")
         return []
 
-    def get_ip_lists(self) -> list[dict[str, Any]]:
-        """Get all IP Lists with their ip_ranges/fqdns (active definitions).
+    def get_ip_lists(self, pversion: str = "active") -> list[dict[str, Any]]:
+        """Get all IP Lists with their ip_ranges/fqdns.
 
-        Fetched from ACTIVE (not draft) so the returned hrefs
-        (/sec_policy/active/ip_lists/...) match the actor references inside
-        active rulesets; draft hrefs would never match the active rule graph.
+        Default ACTIVE so returned hrefs (/sec_policy/active/ip_lists/...)
+        match actor references inside active rulesets; pass pversion="draft"
+        for the draft-side inventory (policy diff).
         """
+        if pversion not in ("active", "draft"):
+            raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
         status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/active/ip_lists?max_results=10000"
+            f"/orgs/{org}/sec_policy/{pversion}/ip_lists?max_results=10000"
         )
         if status == 200 and data:
             return data
         logger.warning(f"get_ip_lists: status={status}, returned empty list")
         return []
 
-    def get_label_groups(self) -> list[dict[str, Any]]:
-        """Get all Label Groups with their member labels + sub_groups (active).
+    def get_label_groups(self, pversion: str = "active") -> list[dict[str, Any]]:
+        """Get all Label Groups with their member labels + sub_groups.
 
-        ACTIVE so hrefs align with active-ruleset actor references.
+        Default ACTIVE so hrefs align with active-ruleset actor references;
+        pass pversion="draft" for the draft-side inventory (policy diff).
         """
+        if pversion not in ("active", "draft"):
+            raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
         status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/active/label_groups?max_results=10000"
+            f"/orgs/{org}/sec_policy/{pversion}/label_groups?max_results=10000"
         )
         if status == 200 and data:
             return data
         logger.warning(f"get_label_groups: status={status}, returned empty list")
         return []
 
-    def get_services(self) -> list[dict[str, Any]]:
-        """Get all Service definitions with their service_ports (active).
+    def get_services(self, pversion: str = "active") -> list[dict[str, Any]]:
+        """Get all Service definitions with their service_ports.
 
-        ACTIVE so hrefs align with active-ruleset ingress_services references.
+        Default ACTIVE so hrefs align with active-ruleset ingress_services
+        references; pass pversion="draft" for the draft-side inventory (policy diff).
         """
+        if pversion not in ("active", "draft"):
+            raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
         status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/active/services?max_results=10000"
+            f"/orgs/{org}/sec_policy/{pversion}/services?max_results=10000"
         )
         if status == 200 and data:
             return data
