@@ -502,8 +502,14 @@ class PolicyUsageHtmlExporter:
                 + f'<p class="note">{self._s("rpt_pu_no_unused_rules")}</p>'
             )
         else:
-            note = f'<p style="color:#718096;font-size:12px;">{count} rows</p>' if count else ""
-            html_parts.append(caveat_html + note + _rule_cards_html(unused_df, mode="unused", lang=self._lang))
+            if count > 50:
+                note_text = t("rpt_pu_unused_truncated", lang=self._lang, count=count)
+            else:
+                note_text = f"{count} rows" if count else ""
+            note = f'<p style="color:#718096;font-size:12px;">{note_text}</p>' if note_text else ""
+            html_parts.append(
+                caveat_html + note + _rule_cards_html(unused_df.head(50), mode="unused", lang=self._lang)
+            )
         return "".join(html_parts)
 
     def _mod04_html(self) -> str:

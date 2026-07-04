@@ -3397,6 +3397,7 @@
   "rpt_pu_total_rules": "Total Active Rules",
   "rpt_pu_unused_caveat": "Rules listed here had no observed traffic hits in the selected lookback window. This does not automatically mean the rules are safe to remove because the PCE traffic retention window, low-frequency workloads, or exceptional failover paths may hide valid usage.",
   "rpt_pu_unused_rules": "Unused Rules",
+  "rpt_pu_unused_truncated": "Showing first 50 of {count} unused rules — full list in CSV/XLSX export.",
   "rpt_querying_traffic": "Querying traffic ({start} to {end})...",
   "rpt_r_enforcement": "Enforcement",
   "rpt_r_policy": "Policy",
