@@ -342,7 +342,15 @@ def make_rules_blueprint(
                     except ValueError as exc:
                         return _err(str(exc), 400)
                 # Phase 4c：filters dict 另外處理（整組替換），不隨 old.update(d) 混入。
+                # label_group 拒絕檢查須在動到 old 之前完成——400 時 old 必須完全未被
+                # 動過（見 filter-selector Phase 4c review：動了才拒絕會讓共用的 rule
+                # dict 在 monitor 執行緒讀到的瞬間被改壞，造成靜默漏告警）。
                 f = d.pop('filters', None)
+                flat = None
+                if isinstance(f, dict):
+                    flat, err_resp = _extract_rule_filters(f, lang)
+                    if err_resp is not None:
+                        return err_resp
                 old.update(d)
                 # Re-parse label/ip fields for traffic and bw/vol
                 for prefix in ('src', 'dst', 'ex_src', 'ex_dst'):
@@ -358,10 +366,7 @@ def make_rules_blueprint(
                                 old[prefix + '_ip'] = raw or None
                             else:
                                 old[prefix + '_ip_in'] = raw or None
-                if isinstance(f, dict):
-                    flat, err_resp = _extract_rule_filters(f, lang)
-                    if err_resp is not None:
-                        return err_resp
+                if flat is not None:
                     # 整組替換：先清掉舊 rule 中所有 filter key（object/複數 + legacy
                     # scalar），避免新舊混存，再套用新的 flat 值。
                     for k in _RULE_FB_KEYS + _RULE_LEGACY_SCALAR_KEYS:
