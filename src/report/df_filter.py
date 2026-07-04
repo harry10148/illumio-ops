@@ -154,6 +154,27 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
         except (ValueError, TypeError):
             pass
 
+    # src_ip_in / dst_ip_in（FilterBar 送 list；多 IP/CIDR 取 OR）。既有 src_ip（scalar）保留相容。
+    for side in ("src", "dst"):
+        inc = [s for s in (filters.get(f"{side}_ip_in") or []) if s]
+        if inc and f"{side}_ip" in df.columns:
+            m = pd.Series(False, index=df.index)
+            for v in inc:
+                m |= _ip_mask(df, f"{side}_ip", v)
+            mask &= m
+        exi = [s for s in (filters.get(f"ex_{side}_ip_in") or []) if s]
+        if exi and f"{side}_ip" in df.columns:
+            for v in exi:
+                mask &= ~_ip_mask(df, f"{side}_ip", v)
+
+    # any_label / ex_any_label（either-side label：src 或 dst 命中）。用既有 _label_mask 單值。
+    any_lbl = _scalar(filters, "any_label")
+    if any_lbl:
+        mask &= (_label_mask(df, "src", [any_lbl]) | _label_mask(df, "dst", [any_lbl]))
+    ex_any_lbl = _scalar(filters, "ex_any_label")
+    if ex_any_lbl:
+        mask &= ~(_label_mask(df, "src", [ex_any_lbl]) | _label_mask(df, "dst", [ex_any_lbl]))
+
     proto = _scalar(filters, "proto")
     if proto and "proto" in df.columns:
         want = _PROTO_ALIAS.get(proto, proto).upper()

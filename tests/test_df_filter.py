@@ -136,3 +136,37 @@ def test_ex_any_object_cidrs_excludes_either_side():
     # dst 側命中也剔除
     out2 = apply_df_traffic_filters(df, {"_ex_any_object_cidrs": ["10.0.0.9"]})
     assert out2.empty  # 全部列 dst 都是 10.0.0.9
+
+
+def test_src_ip_in_list_matches_any():
+    out = apply_df_traffic_filters(_df_two_apps(), {"src_ip_in": ["10.0.0.1", "10.0.0.3"]})
+    assert sorted(out["src_ip"]) == ["10.0.0.1", "10.0.0.3"]
+
+
+def test_src_ip_in_cidr():
+    out = apply_df_traffic_filters(_df_two_apps(), {"src_ip_in": ["10.0.0.0/31"]})
+    assert sorted(out["src_ip"]) == ["10.0.0.1"]
+
+
+def test_dst_ip_in_matches():
+    # dst_ip 全部列都是 10.0.0.9，dst_ip_in 命中應保留全部列
+    out = apply_df_traffic_filters(_df_two_apps(), {"dst_ip_in": ["10.0.0.9"]})
+    assert len(out) == 3
+
+
+def test_ex_src_ip_in_excludes():
+    out = apply_df_traffic_filters(_df_two_apps(), {"ex_src_ip_in": ["10.0.0.1", "10.0.0.3"]})
+    assert sorted(out["src_ip"]) == ["10.0.0.2"]
+
+
+def test_any_label_either_side():
+    # src_app=erp/web/hr，dst_app 皆空字串 → any_label=app=erp 只有 row0（src 命中）
+    out = apply_df_traffic_filters(_df_two_apps(), {"any_label": "app=erp"})
+    assert "erp" in out["src_app"].tolist()
+    assert set(out["src_app"]) == {"erp"}
+
+
+def test_ex_any_label_excludes_either_side():
+    out = apply_df_traffic_filters(_df_two_apps(), {"ex_any_label": "app=erp"})
+    assert "erp" not in out["src_app"].tolist()
+    assert set(out["src_app"]) == {"web", "hr"}
