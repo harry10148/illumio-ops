@@ -1078,6 +1078,28 @@ class Analyzer:
             "search": params.get("search"),
             "sort_by": params.get("sort_by"),
             "draft_policy_decision": params.get("draft_policy_decision"),
+            # Phase 3 FilterBar 送來的物件/複數 filter key——需與 actions.py
+            # 的 params dict 及 _TRAFFIC_FILTER_CAPABILITIES 的鍵名一致，
+            # 否則會在這個 whitelist 被靜默丟棄，永遠到不了
+            # build_traffic_query_spec / _flow_matches_filters。
+            "src_labels": params.get("src_labels", []),
+            "dst_labels": params.get("dst_labels", []),
+            "ex_src_labels": params.get("ex_src_labels", []),
+            "ex_dst_labels": params.get("ex_dst_labels", []),
+            "src_iplist": params.get("src_iplist", ""),
+            "src_iplists": params.get("src_iplists", []),
+            "dst_iplist": params.get("dst_iplist", ""),
+            "dst_iplists": params.get("dst_iplists", []),
+            "ex_src_iplists": params.get("ex_src_iplists", []),
+            "ex_dst_iplists": params.get("ex_dst_iplists", []),
+            "src_workloads": params.get("src_workloads", []),
+            "dst_workloads": params.get("dst_workloads", []),
+            "ex_src_workloads": params.get("ex_src_workloads", []),
+            "ex_dst_workloads": params.get("ex_dst_workloads", []),
+            "any_iplist": params.get("any_iplist", ""),
+            "any_workload": params.get("any_workload", ""),
+            "ex_any_iplist": params.get("ex_any_iplist", ""),
+            "ex_any_workload": params.get("ex_any_workload", ""),
         }
         query_spec = self.api.build_traffic_query_spec(query_filters)
         draft_pd_filter = (query_spec.report_only_filters.get("draft_policy_decision") or "").strip().lower()
