@@ -274,7 +274,10 @@ class AuditHtmlExporter:
         return f'<section id="{id_}" class="card"><h2>{self._s(i18n_key)}</h2>{content}</section>'
 
     def _trend_deltas_html(self) -> str:
-        return _trend_deltas_section(self._r.get("_trend_deltas"), lang=self._lang)
+        return _trend_deltas_section(
+            self._r.get("_trend_deltas"), lang=self._lang,
+            mismatch=self._r.get("_trend_mismatch"),
+        )
 
     def _subnote(self, i18n_key: str, en_text: str = "") -> str:
         text = self._s(i18n_key) if i18n_key else en_text

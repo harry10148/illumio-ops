@@ -215,13 +215,22 @@ def _trend_chip(direction: str, delta: float, delta_pct: float | None, metric: s
         f'</span>'
     )
 
-def _trend_deltas_section(deltas: list | None, lang: str = "en") -> str:
-    """Heading + chip-bearing table; or a friendly first-run note when empty."""
+def _trend_deltas_section(deltas: list | None, lang: str = "en", mismatch: list | None = None) -> str:
+    """Heading + chip-bearing table; or a friendly first-run note when empty.
+
+    When ``mismatch`` (snapshot_mismatch() output) is non-empty, a warning
+    note is inserted after the heading so readers know the comparison spans
+    a different window/data_source/profile than the previous snapshot.
+    """
     _s = lambda k: STRINGS[k].get(lang) or STRINGS[k]["en"]
     heading = f'<h3>{_s("rpt_tr_trend_heading")}</h3>'
+    warning_html = ''
+    if mismatch:
+        fields = ", ".join(m.get("field", "") for m in mismatch)
+        warning_html = f'<p class="note note-warn">{t("rpt_trend_mismatch_warning", fields=fields, lang=lang)}</p>'
     if not deltas:
         return (
-            heading
+            heading + warning_html
             + '<div class="trend-empty-note" data-trend-empty="true">'
             '<span class="trend-empty-dot" aria-hidden="true"></span>'
             f'<span>{_s("rpt_tr_trend_empty")}</span>'
@@ -257,7 +266,7 @@ def _trend_deltas_section(deltas: list | None, lang: str = "en") -> str:
                 return str(val) if val is not None else ''
         return str(val) if val is not None else ''
 
-    return heading + render_df_table(
+    return heading + warning_html + render_df_table(
         df,
         col_i18n=_COL_I18N,
         render_cell=_render_cell,
@@ -796,7 +805,10 @@ class _TrafficReportBase:
         )
 
     def _trend_deltas_html(self) -> str:
-        return _trend_deltas_section(self._r.get("_trend_deltas"), lang=self._lang)
+        return _trend_deltas_section(
+            self._r.get("_trend_deltas"), lang=self._lang,
+            mismatch=self._r.get("_trend_mismatch"),
+        )
 
     def _subnote(self, i18n_key: str, en_text: str = "") -> str:
         text = self._s(i18n_key)

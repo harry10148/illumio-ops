@@ -49,14 +49,25 @@ def save_snapshot(
     report_type: str,
     kpi_dict: dict[str, Any],
     generated_at: str | None = None,
+    *,
+    meta: dict[str, Any] | None = None,
 ) -> str:
-    """Persist a KPI snapshot and return the file path."""
+    """Persist a KPI snapshot and return the file path.
+
+    ``meta`` (window/data_source/profile) is stored under the single
+    ``_meta`` key — the leading underscore means compute_deltas already
+    skips it as a KPI. Snapshots saved without ``meta`` (or by older code)
+    simply omit the key, which snapshot_mismatch() treats as "no previous
+    metadata to compare" and silently returns no warnings for.
+    """
     ts = generated_at or datetime.datetime.now().isoformat(timespec="seconds")
     safe_ts = ts.replace(":", "").replace("-", "").replace("T", "_")[:15]
     hdir = _history_dir(output_dir, report_type)
     hdir.mkdir(parents=True, exist_ok=True)
 
     payload = {"_generated_at": ts, **kpi_dict}
+    if meta:
+        payload["_meta"] = meta
     path = hdir / f"{safe_ts}.json"
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, default=str)
@@ -117,6 +128,51 @@ def compute_deltas(
             "direction": direction,
         })
     return deltas
+
+def _window_span_days(window: dict[str, Any]) -> int | None:
+    """Span in days between a ``{"start", "end"}`` window's two dates."""
+    start, end = window.get("start"), window.get("end")
+    if not start or not end:
+        return None
+    try:
+        d1 = datetime.date.fromisoformat(str(start)[:10])
+        d2 = datetime.date.fromisoformat(str(end)[:10])
+    except ValueError:
+        return None
+    return (d2 - d1).days
+
+def snapshot_mismatch(
+    current_meta: dict[str, Any] | None,
+    previous_payload: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """回傳不一致欄位清單 [{"field", "previous", "current"}]。
+
+    只比對兩邊都存在的欄位（舊快照無 _meta → 空清單，靜默相容）。
+    window 以天數比較（差 >1 天視為不一致）；data_source/profile 字串不等即不一致。
+    """
+    if not current_meta or not previous_payload:
+        return []
+    previous_meta = previous_payload.get("_meta")
+    if not previous_meta:
+        return []
+
+    mismatches: list[dict[str, Any]] = []
+
+    cur_window = current_meta.get("window")
+    prev_window = previous_meta.get("window")
+    if cur_window and prev_window:
+        cur_span = _window_span_days(cur_window)
+        prev_span = _window_span_days(prev_window)
+        if cur_span is not None and prev_span is not None and abs(cur_span - prev_span) > 1:
+            mismatches.append({"field": "window", "previous": prev_window, "current": cur_window})
+
+    for field in ("data_source", "profile"):
+        cur_val = current_meta.get(field)
+        prev_val = previous_meta.get(field)
+        if cur_val is not None and prev_val is not None and cur_val != prev_val:
+            mismatches.append({"field": field, "previous": prev_val, "current": cur_val})
+
+    return mismatches
 
 def build_kpi_dict_from_metadata(kpis: list[dict]) -> dict[str, Any]:
     """Convert the KPI list from metadata.json format to a flat dict.

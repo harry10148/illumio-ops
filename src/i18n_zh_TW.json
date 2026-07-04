@@ -3704,6 +3704,7 @@
   "rpt_tr_unmanaged_subnote": "先看非 Managed 流量的整體規模，再往下確認哪些來源最活躍，以及它們主要打到哪些 Managed Services。",
   "rpt_tr_what_it_measures": "衡量內容",
   "rpt_traffic_flows_report_title": "Illumio 網路流量報表",
+  "rpt_trend_mismatch_warning": "比較注意：{fields} 與前次快照不一致——差異值可能非同基準比較。",
   "rpt_user": "使用者",
   "rpt_ven_analysis_done": "VEN 狀態分析完成。",
   "rpt_ven_by_version": "VEN 版本分布",

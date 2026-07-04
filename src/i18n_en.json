@@ -3704,6 +3704,7 @@
   "rpt_tr_unmanaged_subnote": "Start with the scale of unmanaged traffic, then drill into which sources are most active and which managed Services they target.",
   "rpt_tr_what_it_measures": "What it measures",
   "rpt_traffic_flows_report_title": "Illumio Traffic Flow Report",
+  "rpt_trend_mismatch_warning": "Comparison caveat: {fields} differ from the previous snapshot — deltas may not be like-for-like.",
   "rpt_user": "User",
   "rpt_ven_analysis_done": "VEN status analysis complete.",
   "rpt_ven_by_version": "VEN Version Distribution",

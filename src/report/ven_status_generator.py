@@ -137,13 +137,17 @@ class VenStatusGenerator:
 
         from src.report.trend_store import (
             load_previous, save_snapshot, compute_deltas, build_kpi_dict_from_metadata, canonicalize_legacy_keys,
+            snapshot_mismatch,
         )
         try:
             _kpi_dict = build_kpi_dict_from_metadata(result.module_results.get("kpis", []))
             _prev = load_previous(output_dir, "ven")
             _prev = canonicalize_legacy_keys(_prev, candidate_keys=list(_kpi_dict.keys()))
-            save_snapshot(output_dir, "ven", _kpi_dict, generated_at=result.generated_at.isoformat(timespec="seconds"))
+            # 時點快照（無 window）——只傳 profile 級最小 meta。
+            _snapshot_meta = {"profile": "ven"}
+            save_snapshot(output_dir, "ven", _kpi_dict, generated_at=result.generated_at.isoformat(timespec="seconds"), meta=_snapshot_meta)
             result.module_results["_trend_deltas"] = compute_deltas(_kpi_dict, _prev) if _prev else []
+            result.module_results["_trend_mismatch"] = snapshot_mismatch(_snapshot_meta, _prev) if _prev else []
         except Exception as e:
             logger.warning("VEN trend delta skipped: {}", e)
             result.module_results["_trend_deltas"] = []

@@ -191,7 +191,9 @@ class VenHtmlExporter:
         exec_html = render_exec_summary_html(_ven_mod00, report_name=t('gui_btn_ven_report', lang=self._lang), lang=self._lang)
         _deltas = (self._r or {}).get("_trend_deltas") or []
         if _deltas:
-            exec_html += _trend_deltas_section(_deltas, self._lang)
+            exec_html += _trend_deltas_section(
+                _deltas, self._lang, mismatch=(self._r or {}).get("_trend_mismatch"),
+            )
         body = (
             exec_html
             + '<section id="summary" class="card report-hero">'

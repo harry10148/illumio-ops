@@ -309,15 +309,23 @@ class PolicyUsageGenerator:
 
         # Trend analysis: archive snapshot and compute deltas
         try:
-            from src.report.trend_store import save_snapshot, load_previous, compute_deltas, build_kpi_dict_from_metadata, canonicalize_legacy_keys
+            from src.report.trend_store import save_snapshot, load_previous, compute_deltas, build_kpi_dict_from_metadata, canonicalize_legacy_keys, snapshot_mismatch
             meta = self._build_report_metadata(result, file_format="snapshot")
             kpi_dict = build_kpi_dict_from_metadata(meta.get("kpis", []))
             ts = meta.get("generated_at", "")
             prev = load_previous(output_dir, "policy_usage")
             prev = canonicalize_legacy_keys(prev, candidate_keys=list(kpi_dict.keys()))
-            save_snapshot(output_dir, "policy_usage", kpi_dict, generated_at=ts)
+            # PolicyUsageResult 無 data_source 欄位——只傳 window（時窗，非時點快照）。
+            _snapshot_meta = {
+                "window": {
+                    "start": result.date_range[0] if result.date_range else "",
+                    "end": result.date_range[1] if len(result.date_range) > 1 else "",
+                },
+            }
+            save_snapshot(output_dir, "policy_usage", kpi_dict, generated_at=ts, meta=_snapshot_meta)
             if prev:
                 result.module_results["_trend_deltas"] = compute_deltas(kpi_dict, prev)
+                result.module_results["_trend_mismatch"] = snapshot_mismatch(_snapshot_meta, prev)
         except Exception as exc:
             logger.warning(f"[PolicyUsageGenerator] Trend snapshot failed: {exc}")
 
