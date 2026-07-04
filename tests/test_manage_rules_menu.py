@@ -117,3 +117,181 @@ def test_manage_rules_menu_cancelled_modify_keeps_rule(monkeypatch):
 
     assert removed == []
     assert cm.config["rules"][1] == original_rule
+
+
+# ─── Phase 5 Task 2：traffic/bandwidth 精靈接 object picker、flat filter key ──
+#
+# 以下測試沿真實鏈（不 stub picker 本身）：只 monkeypatch builtins.input、
+# os.system、draw_panel、src.api_client.ApiClient（非 TTY 降級路徑不觸碰 api，
+# 佔位物件即可）。每個物件方向槽（src/dst/ex_src/ex_dst）在非 TTY 降級路徑下，
+# 依 object_picker._CAT_ORDER 交集 cats=(label, iplist, workload, ip) 各問一次，
+# 順序固定為 label → iplist → workload → ip。
+
+
+def _fake_cm_for_wizard():
+    cm = SimpleNamespace(config={"rules": []})
+    cm.add_or_update_rule = lambda rule: cm.config["rules"].append(rule)
+    return cm
+
+
+def _prepare_wizard_real_chain(monkeypatch, raw_inputs):
+    inputs = iter(raw_inputs)
+    monkeypatch.setattr("os.system", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("src.cli.menus.traffic.draw_panel", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("src.cli.menus.bandwidth.draw_panel", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("src.api_client.ApiClient", lambda _cm: object())
+    # 環境的 stdin/stdout isatty() 判定不可控（CI/pty 皆可能）；本測試針對非 TTY 降級
+    # 路徑的真實鏈驗證，故明確釘住 _interactive_ok，避免受執行環境影響。
+    monkeypatch.setattr("src.cli.object_picker._interactive_ok", lambda: False)
+    monkeypatch.setattr("builtins.input", lambda *_args, **_kwargs: next(inputs))
+
+
+def test_traffic_wizard_saves_flat_object_keys(monkeypatch):
+    cm = _fake_cm_for_wizard()
+    _prepare_wizard_real_chain(
+        monkeypatch,
+        [
+            "Flat Rule",             # name
+            "3",                     # pd_sel -> Allowed
+            "443",                   # port_in
+            "",                      # proto_in -> default (both)
+            "app=erp, app=web", "", "", "10.0.0.1",  # src: label/iplist/workload/ip
+            "", "", "", "",          # dst: all empty
+            "10",                    # win_in
+            "5",                     # cnt_in
+            "10",                    # cd_in
+            "8080",                  # ex_port_in
+            "", "", "", "",          # ex_src: all empty
+            "", "", "", "",          # ex_dst: all empty
+            "",                      # confirm
+            "",                      # rule saved pause
+        ],
+    )
+
+    settings_module.add_traffic_menu(cm)
+
+    assert len(cm.config["rules"]) == 1
+    rule = cm.config["rules"][-1]
+    assert rule["src_labels"] == ["app=erp", "app=web"]
+    assert rule["src_ip_in"] == ["10.0.0.1"]
+    assert "src_label" not in rule
+    assert "dst_label" not in rule
+    assert "dst_labels" not in rule
+
+
+def test_traffic_wizard_edit_legacy_rule_migrates_keys(monkeypatch):
+    cm = _fake_cm_for_wizard()
+    edit_rule = {
+        "id": 42,
+        "type": "traffic",
+        "name": "Legacy Rule",
+        "pd": -1,
+        "port": 0,
+        "src_label": "app=old",
+        "src_ip_in": "1.2.3.4",
+        "threshold_window": 10,
+        "threshold_count": 5,
+        "cooldown_minutes": 10,
+        "ex_port": 0,
+    }
+    _prepare_wizard_real_chain(
+        monkeypatch,
+        [
+            "",                      # name -> keep
+            "",                      # pd_sel -> default
+            "",                      # port_in -> default (0, falsy -> no proto prompt)
+            "", "", "", "",          # src: all empty -> keep preselected
+            "", "", "", "",          # dst: all empty
+            "",                      # win_in -> default
+            "",                      # cnt_in -> default
+            "",                      # cd_in -> default
+            "",                      # ex_port_in -> default
+            "", "", "", "",          # ex_src: all empty
+            "", "", "", "",          # ex_dst: all empty
+            "",                      # confirm
+            "",                      # rule saved pause
+        ],
+    )
+
+    settings_module.add_traffic_menu(cm, edit_rule=edit_rule)
+
+    assert len(cm.config["rules"]) == 1
+    rule = cm.config["rules"][-1]
+    assert rule["src_labels"] == ["app=old"]
+    assert rule["src_ip_in"] == ["1.2.3.4"]
+    assert "src_label" not in rule
+
+
+def test_bandwidth_wizard_saves_flat_object_keys(monkeypatch):
+    cm = _fake_cm_for_wizard()
+    _prepare_wizard_real_chain(
+        monkeypatch,
+        [
+            "BW Flat Rule",          # name
+            "1",                     # m_sel -> bandwidth
+            "443",                   # port_in
+            "",                      # proto_in -> default (both)
+            "app=erp, app=web", "", "", "10.0.0.1",  # src: label/iplist/workload/ip
+            "", "", "", "",          # dst: all empty
+            "100",                   # th_in
+            "10",                    # win_in
+            "10",                    # cd_in
+            "8080",                  # ex_port_in
+            "", "", "", "",          # ex_src: all empty
+            "", "", "", "",          # ex_dst: all empty
+            "",                      # confirm
+            "",                      # rule saved pause
+        ],
+    )
+
+    settings_module.add_bandwidth_volume_menu(cm)
+
+    assert len(cm.config["rules"]) == 1
+    rule = cm.config["rules"][-1]
+    assert rule["src_labels"] == ["app=erp", "app=web"]
+    assert rule["src_ip_in"] == ["10.0.0.1"]
+    assert "src_label" not in rule
+    assert "dst_label" not in rule
+    assert "dst_labels" not in rule
+
+
+def test_bandwidth_wizard_edit_legacy_rule_migrates_keys(monkeypatch):
+    cm = _fake_cm_for_wizard()
+    edit_rule = {
+        "id": 7,
+        "type": "bandwidth",
+        "name": "Legacy BW Rule",
+        "port": 0,
+        "src_label": "app=old",
+        "src_ip_in": "1.2.3.4",
+        "threshold_count": 50.0,
+        "threshold_window": 10,
+        "cooldown_minutes": 10,
+        "ex_port": 0,
+    }
+    _prepare_wizard_real_chain(
+        monkeypatch,
+        [
+            "",                      # name -> keep
+            "",                      # m_sel -> default (bandwidth)
+            "",                      # port_in -> default (0, falsy -> no proto prompt)
+            "", "", "", "",          # src: all empty -> keep preselected
+            "", "", "", "",          # dst: all empty
+            "",                      # th_in -> default
+            "",                      # win_in -> default
+            "",                      # cd_in -> default
+            "",                      # ex_port_in -> default
+            "", "", "", "",          # ex_src: all empty
+            "", "", "", "",          # ex_dst: all empty
+            "",                      # confirm
+            "",                      # rule saved pause
+        ],
+    )
+
+    settings_module.add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
+
+    assert len(cm.config["rules"]) == 1
+    rule = cm.config["rules"][-1]
+    assert rule["src_labels"] == ["app=old"]
+    assert rule["src_ip_in"] == ["1.2.3.4"]
+    assert "src_label" not in rule

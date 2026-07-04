@@ -182,3 +182,54 @@ def pick_objects(api, cats, title, preselected=None, lang=None):
         _pick_non_tty(api, cats, result, lang)
 
     return {k: v for k, v in result.items() if v}
+
+
+def _as_list(v):
+    # 純量轉單元素 list；None/"" 視為無值（供 legacy 轉換共用）
+    if v is None or v == "":
+        return []
+    return list(v) if isinstance(v, list) else [v]
+
+
+def legacy_rule_to_preselected(rule, dir_prefix, exclude=False):
+    """把規則 dict 轉為 pick_objects 用的 preselected dict，供 traffic/bandwidth 精靈編輯既有規則回填。
+
+    同時支援兩種來源：舊版純量 key（src_label/ex_src_ip 等）與既有 4c flat key
+    （src_labels/src_iplists/... 等）——後者直接照鍵餵，前者轉為單元素 list。
+    dir_prefix 固定傳 "src"/"dst"；exclude=True 時轉換 ex_src/ex_dst 方向。
+    """
+    if not rule:
+        return None
+    prefix = f"ex_{dir_prefix}" if exclude else dir_prefix
+
+    result = {}
+    labels = _as_list(rule.get(f"{prefix}_labels", rule.get(f"{prefix}_label")))
+    if labels:
+        result["labels"] = labels
+    iplists = _as_list(rule.get(f"{prefix}_iplists"))
+    if iplists:
+        result["iplists"] = iplists
+    workloads = _as_list(rule.get(f"{prefix}_workloads"))
+    if workloads:
+        result["workloads"] = workloads
+    ip_key = f"{dir_prefix}_ip_in" if not exclude else f"ex_{dir_prefix}_ip"
+    ips = _as_list(rule.get(ip_key))
+    if ips:
+        result["ips"] = ips
+    return result or None
+
+
+def picked_to_flat_filters(picked, dir_prefix, exclude=False):
+    """把 pick_objects 回傳的 dict 轉為要合併進規則的 4c flat filter key（只含非空）。"""
+    prefix = f"ex_{dir_prefix}" if exclude else dir_prefix
+    out = {}
+    if picked.get("labels"):
+        out[f"{prefix}_labels"] = picked["labels"]
+    if picked.get("iplists"):
+        out[f"{prefix}_iplists"] = picked["iplists"]
+    if picked.get("workloads"):
+        out[f"{prefix}_workloads"] = picked["workloads"]
+    if picked.get("ips"):
+        ip_key = f"{dir_prefix}_ip_in" if not exclude else f"ex_{dir_prefix}_ip"
+        out[ip_key] = picked["ips"]
+    return out

@@ -13,6 +13,15 @@ from src.cli.menus._helpers import (
     _wizard_confirm,
     _empty_uses_default,
 )
+from src.cli.object_picker import pick_objects, legacy_rule_to_preselected, picked_to_flat_filters
+
+_PICK_CATS = ("label", "iplist", "workload", "ip")  # 4c 規則不支援 label_group，故不含
+
+
+def _fmt_picked(picked):
+    # 精靈回顧摘要用：把 pick_objects 回傳 dict 攤平成一行文字
+    parts = [f"{k}={','.join(v)}" for k in ("labels", "iplists", "workloads", "ips") for v in [picked.get(k, [])] if v]
+    return "; ".join(parts) if parts else "-"
 
 
 def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
@@ -110,29 +119,16 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
         elif p_sel == 0:
             proto_in = None
 
-    def_src = (
-        edit_rule.get("src_label", edit_rule.get("src_ip_in", "")) if edit_rule else ""
-    )
-    src_in = safe_input(t("src_input"), str, allow_cancel=True, hint=def_src)
-    if src_in is None:
-        if should_restart_flow():
-            add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
-        return
+    from src.api_client import ApiClient
 
-    def_dst = (
-        edit_rule.get("dst_label", edit_rule.get("dst_ip_in", "")) if edit_rule else ""
+    api = ApiClient(cm)
+    src_picked = pick_objects(
+        api, cats=_PICK_CATS, title=t("src_input"),
+        preselected=legacy_rule_to_preselected(edit_rule, "src", exclude=False) if edit_rule else None,
     )
-    dst_in = safe_input(t("dst_input"), str, allow_cancel=True, hint=def_dst)
-    if dst_in is None:
-        if should_restart_flow():
-            add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
-        return
-
-    src_label_val, src_ip_val = (
-        (src_in, None) if src_in and "=" in src_in else (None, src_in)
-    )
-    dst_label_val, dst_ip_val = (
-        (dst_in, None) if dst_in and "=" in dst_in else (None, dst_in)
+    dst_picked = pick_objects(
+        api, cats=_PICK_CATS, title=t("dst_input"),
+        preselected=legacy_rule_to_preselected(edit_rule, "dst", exclude=False) if edit_rule else None,
     )
 
     _wizard_step(4, 5, t("wiz_threshold"))
@@ -205,33 +201,13 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
                 add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
             return
 
-    def_ex_src = (
-        edit_rule.get("ex_src_label", edit_rule.get("ex_src_ip", ""))
-        if edit_rule
-        else ""
+    ex_src_picked = pick_objects(
+        api, cats=_PICK_CATS, title=t("ex_src_input"),
+        preselected=legacy_rule_to_preselected(edit_rule, "src", exclude=True) if edit_rule else None,
     )
-    ex_src_in = safe_input(t("ex_src_input"), str, allow_cancel=True, hint=def_ex_src)
-    if ex_src_in is None:
-        if should_restart_flow():
-            add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
-        return
-
-    def_ex_dst = (
-        edit_rule.get("ex_dst_label", edit_rule.get("ex_dst_ip", ""))
-        if edit_rule
-        else ""
-    )
-    ex_dst_in = safe_input(t("ex_dst_input"), str, allow_cancel=True, hint=def_ex_dst)
-    if ex_dst_in is None:
-        if should_restart_flow():
-            add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
-        return
-
-    ex_src_label_val, ex_src_ip_val = (
-        (ex_src_in, None) if ex_src_in and "=" in ex_src_in else (None, ex_src_in)
-    )
-    ex_dst_label_val, ex_dst_ip_val = (
-        (ex_dst_in, None) if ex_dst_in and "=" in ex_dst_in else (None, ex_dst_in)
+    ex_dst_picked = pick_objects(
+        api, cats=_PICK_CATS, title=t("ex_dst_input"),
+        preselected=legacy_rule_to_preselected(edit_rule, "dst", exclude=True) if edit_rule else None,
     )
 
     rid = edit_rule.get("id", gen_rule_id()) if edit_rule else gen_rule_id()
@@ -242,38 +218,33 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
         f"{t('sum_name')}: {name}",
         f"{t('sum_unit_threshold')}: {unit_prompt} / {th}",
         f"{t('sum_port_proto')}: {port_in or '-'} / {proto_in or 'both'}",
-        f"{t('sum_src_dst')}: {src_in or '-'} -> {dst_in or '-'}",
+        f"{t('sum_src_dst')}: {_fmt_picked(src_picked)} -> {_fmt_picked(dst_picked)}",
         f"{t('sum_window_cooldown')}: {win}m / {cd}m",
-        f"{t('sum_exclude')}: port={ex_port_in or '-'}, src={ex_src_in or '-'}, dst={ex_dst_in or '-'}",
+        f"{t('sum_exclude')}: port={ex_port_in or '-'}, src={_fmt_picked(ex_src_picked)}, dst={_fmt_picked(ex_dst_picked)}",
     ]
     if not _wizard_confirm(summary):
         return
 
-    cm.add_or_update_rule(
-        {
-            "id": rid,
-            "type": rtype,
-            "name": name,
-            "pd": edit_rule.get("pd", -1) if edit_rule else -1,
-            "port": port_in,
-            "proto": proto_in,
-            "src_label": src_label_val,
-            "dst_label": dst_label_val,
-            "src_ip_in": src_ip_val,
-            "dst_ip_in": dst_ip_val,
-            "ex_port": ex_port_in,
-            "ex_src_label": ex_src_label_val,
-            "ex_dst_label": ex_dst_label_val,
-            "ex_src_ip": ex_src_ip_val,
-            "ex_dst_ip": ex_dst_ip_val,
-            "threshold_type": "immediate",
-            "threshold_count": th,
-            "threshold_window": win,
-            "cooldown_minutes": cd,
-            "desc": t("alert_desc", type=rtype, threshold=th, unit=unit_prompt),
-            "rec": t("check_network"),
-        }
-    )
+    new_rule = {
+        "id": rid,
+        "type": rtype,
+        "name": name,
+        "pd": edit_rule.get("pd", -1) if edit_rule else -1,
+        "port": port_in,
+        "proto": proto_in,
+        "ex_port": ex_port_in,
+        "threshold_type": "immediate",
+        "threshold_count": th,
+        "threshold_window": win,
+        "cooldown_minutes": cd,
+        "desc": t("alert_desc", type=rtype, threshold=th, unit=unit_prompt),
+        "rec": t("check_network"),
+    }
+    new_rule.update(picked_to_flat_filters(src_picked, "src", exclude=False))
+    new_rule.update(picked_to_flat_filters(dst_picked, "dst", exclude=False))
+    new_rule.update(picked_to_flat_filters(ex_src_picked, "src", exclude=True))
+    new_rule.update(picked_to_flat_filters(ex_dst_picked, "dst", exclude=True))
+    cm.add_or_update_rule(new_rule)
     input(
         f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('rule_saved')} {Colors.GREEN}❯{Colors.ENDC} "
     )
