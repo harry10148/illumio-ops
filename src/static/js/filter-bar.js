@@ -121,6 +121,10 @@ const _OBJFB_CATS = {
 };
 const _OBJFB_DIR_TAG = { src: 'S', dst: 'D', any: 'S/D' };
 
+// suggest 端支援的類別，固定順序（'ip' 不支援 suggest，不列入）；
+// _objfbQuerySuggest 與 _objfbRenderDropdown 皆以此清單交集 state.cats。
+const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload'];
+
 function _objfbApplyI18n(root) {
   if (typeof window.i18nApply === 'function') window.i18nApply(root);
 }
@@ -322,7 +326,10 @@ function _objfbQuerySuggest(state, q) {
   const ctrl = new AbortController();
   state._abort = ctrl;
   const scope = state.scopeCat;
-  const types = scope ? scope : 'label,label_group,iplist,workload';
+  // 無 scope（自由輸入）時 types 須由 state.cats 導出，交集 suggest 端支援的類別
+  // （'ip' 不是 suggest 類別，不列入）；有 scope 時 scope 本身已受
+  // _objfbUpdateDropdown 的分類快選鈕過濾，天然是 state.cats 的子集。
+  const types = scope ? scope : _OBJFB_SUGGEST_CATS.filter((c) => state.cats.includes(c)).join(',');
   const url = `/api/filter-objects/suggest?q=${encodeURIComponent(q)}&types=${types}&limit=10`;
   fetch(url, { signal: ctrl.signal, credentials: 'same-origin' })
     .then(r => r.json())
@@ -370,7 +377,9 @@ function _objfbRenderDropdown(state, q) {
     if (sug._error) {
       _objfbAddDdNote(dd, 'gui_fb_offline', 'PCE unreachable');
     } else {
-      for (const cat of ['label', 'label_group', 'iplist', 'workload']) {
+      // 迭代清單須照 state.cats 過濾，否則被排除的分類（如規則 modal 排除的
+      // label_group）仍會出現在下拉，選取後儲存會被後端拒絕。
+      for (const cat of _OBJFB_SUGGEST_CATS.filter((c) => state.cats.includes(c))) {
         const r = sug[cat];
         if (!r) continue;
         if (cat === 'workload' && r.error === 'pce_unreachable') {

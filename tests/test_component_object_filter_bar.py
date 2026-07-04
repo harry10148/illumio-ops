@@ -265,6 +265,31 @@ def test_bw_rule_modal_mounts_filter_bar():
     assert 'id="bw-cd"' in html
 
 
+def test_filter_bar_suggest_types_derived_from_cats():
+    """cats 選項必須貫穿到 suggest 請求：無 scope 時 types 不可寫死含 label_group，
+    須由 state.cats 交集 suggest 支援類別導出。否則規則 modal（cats 排除 label_group）
+    自由輸入時 label_group 候選仍會出現，選取成 pill 後儲存被後端 400。"""
+    js = _JS.read_text(encoding="utf-8")
+    fn_src = js.split("function _objfbQuerySuggest(state, q)", 1)[1].split("\nfunction ", 1)[0]
+    assert "'label,label_group,iplist,workload'" not in fn_src, "types 不可寫死 fallback 字串"
+    assert "state.cats" in fn_src, "types 須由 state.cats 導出"
+
+
+def test_filter_bar_dropdown_render_filters_by_cats():
+    """下拉候選分類迭代須照 state.cats 過濾，與 _objfbUpdateDropdown 的分類快選鈕契約一致
+    （後者已經照 state.cats 過濾，此為補齊另一半）。"""
+    js = _JS.read_text(encoding="utf-8")
+    fn_src = js.split("function _objfbRenderDropdown(state, q)", 1)[1].split("\nfunction ", 1)[0]
+    assert "state.cats.includes(c)" in fn_src
+
+
+def test_filter_bar_suggest_cats_order_locked():
+    """suggest 支援類別的固定順序鎖定：未傳 cats 的既有實例（流量分析器/報表/排程/
+    dashboard）預設 cats 含全類別，types 字串與下拉分類順序須與現行逐位相同。"""
+    js = _JS.read_text(encoding="utf-8")
+    assert "const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload'];" in js
+
+
 def test_rules_js_uses_filter_bar_for_traffic_and_bw():
     js = Path("src/static/js/rules.js").read_text(encoding="utf-8")
     assert "function _ensureTrFilterBar()" in js
