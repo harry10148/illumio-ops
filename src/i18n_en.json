@@ -294,6 +294,7 @@
   "cli_generated": "Generated",
   "cli_no_field_help": "No extra help for this field.",
   "cli_path_label": "Path: {path}",
+  "cli_pick_any_preserved": "Either-side (any) filters from GUI are preserved: {keys}",
   "cli_pick_category": "Select object category for '{title}':",
   "cli_pick_clear_cat": "Clear {cat} ({n} items)",
   "cli_pick_done": "-- Done --",

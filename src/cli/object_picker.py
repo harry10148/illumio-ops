@@ -227,6 +227,23 @@ def legacy_rule_to_preselected(rule, dir_prefix, exclude=False):
     return result or None
 
 
+_ANY_FILTER_KEYS = (
+    "any_label", "any_ip", "any_iplist", "any_workload",
+    "ex_any_label", "ex_any_ip", "ex_any_iplist", "ex_any_workload",
+)
+
+
+def preserve_any_filters(edit_rule):
+    """回傳 edit_rule 中 8 個 either-side（any_*/ex_any_*）filter key 的非空子集。
+
+    CLI 精靈的 picker 無任一側槽位可編輯這些 GUI FilterBar 專屬 key，故編輯時
+    應原樣保留、而非隨 new_rule 從零重建而靜默消失。呼叫端於 new_rule.update(...)。
+    """
+    if not edit_rule:
+        return {}
+    return {k: edit_rule[k] for k in _ANY_FILTER_KEYS if edit_rule.get(k)}
+
+
 def picked_to_flat_filters(picked, dir_prefix, exclude=False):
     """把 pick_objects 回傳的 dict 轉為要合併進規則的 4c flat filter key（只含非空）。"""
     prefix = f"ex_{dir_prefix}" if exclude else dir_prefix

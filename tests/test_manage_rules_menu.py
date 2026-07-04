@@ -298,6 +298,98 @@ def test_bandwidth_wizard_edit_legacy_rule_migrates_keys(monkeypatch):
     assert "src_label" not in rule
 
 
+# ─── Phase 5 final-review 修補：CLI 精靈編輯不得靜默丟棄 GUI 產的 any_*/ex_any_* ──
+#
+# GUI FilterBar 可產生 any_label/ex_any_workload 等 8 個 either-side filter key，
+# CLI 精靈的 picker 無對應槽位可編輯，故編輯時應原樣保留這些 key（而非隨
+# new_rule 從零重建而消失）。以下兩測試釘住 traffic/bandwidth 精靈：帶
+# any_label/ex_any_workload 的 GUI 形規則、全空輸入空跑編輯後，兩 key 仍在
+# 且值不變。
+
+
+def test_traffic_wizard_preserves_any_filters_on_edit(monkeypatch):
+    cm = _fake_cm_for_wizard()
+    edit_rule = {
+        "id": 99,
+        "type": "traffic",
+        "name": "GUI Rule",
+        "pd": -1,
+        "port": 0,
+        "any_label": "app=erp",
+        "ex_any_workload": "10.0.0.5",
+        "threshold_window": 10,
+        "threshold_count": 5,
+        "cooldown_minutes": 10,
+        "ex_port": 0,
+    }
+    _prepare_wizard_real_chain(
+        monkeypatch,
+        [
+            "",                      # name -> keep
+            "",                      # pd_sel -> default
+            "",                      # port_in -> default (0, falsy -> no proto prompt)
+            "", "", "", "",          # src: all empty -> keep preselected
+            "", "", "", "",          # dst: all empty
+            "",                      # win_in -> default
+            "",                      # cnt_in -> default
+            "",                      # cd_in -> default
+            "",                      # ex_port_in -> default
+            "", "", "", "",          # ex_src: all empty
+            "", "", "", "",          # ex_dst: all empty
+            "",                      # confirm
+            "",                      # rule saved pause
+        ],
+    )
+
+    settings_module.add_traffic_menu(cm, edit_rule=edit_rule)
+
+    assert len(cm.config["rules"]) == 1
+    rule = cm.config["rules"][-1]
+    assert rule["any_label"] == "app=erp"
+    assert rule["ex_any_workload"] == "10.0.0.5"
+
+
+def test_bandwidth_wizard_preserves_any_filters_on_edit(monkeypatch):
+    cm = _fake_cm_for_wizard()
+    edit_rule = {
+        "id": 100,
+        "type": "bandwidth",
+        "name": "GUI BW Rule",
+        "port": 0,
+        "any_label": "app=erp",
+        "ex_any_workload": "10.0.0.5",
+        "threshold_count": 50.0,
+        "threshold_window": 10,
+        "cooldown_minutes": 10,
+        "ex_port": 0,
+    }
+    _prepare_wizard_real_chain(
+        monkeypatch,
+        [
+            "",                      # name -> keep
+            "",                      # m_sel -> default (bandwidth)
+            "",                      # port_in -> default (0, falsy -> no proto prompt)
+            "", "", "", "",          # src: all empty -> keep preselected
+            "", "", "", "",          # dst: all empty
+            "",                      # th_in -> default
+            "",                      # win_in -> default
+            "",                      # cd_in -> default
+            "",                      # ex_port_in -> default
+            "", "", "", "",          # ex_src: all empty
+            "", "", "", "",          # ex_dst: all empty
+            "",                      # confirm
+            "",                      # rule saved pause
+        ],
+    )
+
+    settings_module.add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
+
+    assert len(cm.config["rules"]) == 1
+    rule = cm.config["rules"][-1]
+    assert rule["any_label"] == "app=erp"
+    assert rule["ex_any_workload"] == "10.0.0.5"
+
+
 # ─── Task 2 review fix：TTY 下 pick_objects 遇 Ctrl-C 須優雅回選單、不存檔 ──
 #
 # 舊碼用 safe_input(allow_cancel=True) 時，KeyboardInterrupt 在 _render.py 內被接住

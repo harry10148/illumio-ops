@@ -13,7 +13,12 @@ from src.cli.menus._helpers import (
     _wizard_confirm,
     _empty_uses_default,
 )
-from src.cli.object_picker import pick_objects, legacy_rule_to_preselected, picked_to_flat_filters
+from src.cli.object_picker import (
+    pick_objects,
+    legacy_rule_to_preselected,
+    picked_to_flat_filters,
+    preserve_any_filters,
+)
 
 _PICK_CATS = ("label", "iplist", "workload", "ip")  # 4c 規則不支援 label_group，故不含
 
@@ -232,6 +237,7 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
         return
 
     rid = edit_rule.get("id", gen_rule_id()) if edit_rule else gen_rule_id()
+    preserved_any = preserve_any_filters(edit_rule)
 
     _wizard_step(5, 5, t("wiz_review_save"))
     summary = [
@@ -243,6 +249,8 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
         f"{t('sum_window_cooldown')}: {win}m / {cd}m",
         f"{t('sum_exclude')}: port={ex_port_in or '-'}, src={_fmt_picked(ex_src_picked)}, dst={_fmt_picked(ex_dst_picked)}",
     ]
+    if preserved_any:
+        summary.append(t("cli_pick_any_preserved", keys=", ".join(preserved_any.keys())))
     if not _wizard_confirm(summary):
         return
 
@@ -265,6 +273,7 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
     new_rule.update(picked_to_flat_filters(dst_picked, "dst", exclude=False))
     new_rule.update(picked_to_flat_filters(ex_src_picked, "src", exclude=True))
     new_rule.update(picked_to_flat_filters(ex_dst_picked, "dst", exclude=True))
+    new_rule.update(preserved_any)
     cm.add_or_update_rule(new_rule)
     input(
         f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('rule_saved')} {Colors.GREEN}❯{Colors.ENDC} "

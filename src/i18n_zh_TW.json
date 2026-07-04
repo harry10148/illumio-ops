@@ -294,6 +294,7 @@
   "cli_generated": "產出",
   "cli_no_field_help": "這個欄位沒有額外說明。",
   "cli_path_label": "路徑：{path}",
+  "cli_pick_any_preserved": "保留來自 GUI 的任一側（any）filter：{keys}",
   "cli_pick_category": "為 '{title}' 選擇物件類別：",
   "cli_pick_clear_cat": "清空 {cat}（{n} 項）",
   "cli_pick_done": "-- 完成 --",
