@@ -4,7 +4,11 @@ from src.report.analysis.policy_usage.pu_mod02_hit_detail import _resolve_actors
 
 
 class _FakeClient:
-    label_cache = {"/orgs/1/labels/7": "app:web", "/orgs/1/ip_lists/3": "PCI-scope"}
+    label_cache = {
+        "/orgs/1/labels/7": "app:web",
+        "/orgs/1/ip_lists/3": "PCI-scope",
+        "/orgs/1/workloads/11": "db-01",
+    }
 
 
 def test_ams_renders_all_workloads_via_labels_layer():
@@ -16,6 +20,16 @@ def test_ams_renders_all_workloads_via_labels_layer():
     out = resolver.resolve_actor_str([{"label_group": {"href": "/x/label_groups/9"}}])
     assert "{'" not in out and '{"' not in out
     assert out == "LabelGroup"
+
+
+def test_workload_actor_resolves_via_label_cache():
+    resolver = LabelResolver(_FakeClient())
+
+    assert resolver.resolve_actor_str([{"workload": {"href": "/orgs/1/workloads/11"}}]) == "db-01"
+
+    out = resolver.resolve_actor_str([{"workload": {"href": "/orgs/1/workloads/99"}}])
+    assert "{'" not in out and '{"' not in out
+    assert out == "Workload"
 
 
 def test_unknown_actor_shape_uses_readable_ref_not_raw_dict():
