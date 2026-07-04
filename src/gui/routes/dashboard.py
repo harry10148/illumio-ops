@@ -529,6 +529,28 @@ def make_dashboard_blueprint(
                 "proto": d.get("proto"),
                 "any_label": d.get("any_label"), "any_ip": d.get("any_ip"),
                 "ex_any_label": d.get("ex_any_label"), "ex_any_ip": d.get("ex_any_ip"),
+                # Phase 4b：forward FilterBar 的 object/複數 key（原 params dict 漏收，
+                # 會在此被靜默丟棄；下游 query_flows whitelist 已全支援）。
+                "src_labels": d.get("src_labels", []),
+                "dst_labels": d.get("dst_labels", []),
+                "ex_src_labels": d.get("ex_src_labels", []),
+                "ex_dst_labels": d.get("ex_dst_labels", []),
+                "src_label_groups": d.get("src_label_groups", []),
+                "dst_label_groups": d.get("dst_label_groups", []),
+                "ex_src_label_groups": d.get("ex_src_label_groups", []),
+                "ex_dst_label_groups": d.get("ex_dst_label_groups", []),
+                "src_iplists": d.get("src_iplists", []),
+                "dst_iplists": d.get("dst_iplists", []),
+                "ex_src_iplists": d.get("ex_src_iplists", []),
+                "ex_dst_iplists": d.get("ex_dst_iplists", []),
+                "src_workloads": d.get("src_workloads", []),
+                "dst_workloads": d.get("dst_workloads", []),
+                "ex_src_workloads": d.get("ex_src_workloads", []),
+                "ex_dst_workloads": d.get("ex_dst_workloads", []),
+                "any_iplist": d.get("any_iplist", ""),
+                "any_workload": d.get("any_workload", ""),
+                "ex_any_iplist": d.get("ex_any_iplist", ""),
+                "ex_any_workload": d.get("ex_any_workload", ""),
             }
             results = base_ana.query_flows(params)
 

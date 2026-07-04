@@ -298,3 +298,40 @@ def test_save_dashboard_query_legacy_branch_unchanged(client):
     assert saved["src_label"] == "app=erp"
     assert saved["dst_ip_in"] == "10.0.0.5"
     assert saved["ex_src_label"] == "env=dev"
+
+
+def test_top10_forwards_object_and_plural_filters(app_persistent, monkeypatch):
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    from src.analyzer import Analyzer
+    captured = {}
+
+    def fake_query_flows(self, params):
+        captured.update(params)
+        return []
+
+    monkeypatch.setattr(Analyzer, "query_flows", fake_query_flows)
+    r = client.post('/api/dashboard/top10', json={
+        "mins": 30, "pd": 3, "rank_by": "count",
+        "src_labels": ["app=erp", "app=web"],
+        "dst_iplists": ["/orgs/1/sec_policy/active/ip_lists/7"],
+        "src_workloads": ["/orgs/1/workloads/abc"],
+        "src_label_groups": ["PG-Prod"],
+        "ex_dst_labels": ["env=dev"],
+        "any_iplist": "corp-vpn",
+        "ex_any_workload": "/orgs/1/workloads/xyz",
+        "src_label": "role=db",
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
+    assert r.status_code == 200
+
+    assert captured.get("src_labels") == ["app=erp", "app=web"]
+    assert captured.get("dst_iplists") == ["/orgs/1/sec_policy/active/ip_lists/7"]
+    assert captured.get("src_workloads") == ["/orgs/1/workloads/abc"]
+    assert captured.get("src_label_groups") == ["PG-Prod"]
+    assert captured.get("ex_dst_labels") == ["env=dev"]
+    assert captured.get("any_iplist") == "corp-vpn"
+    assert captured.get("ex_any_workload") == "/orgs/1/workloads/xyz"
+    assert captured.get("src_label") == "role=db"    # 舊 scalar key 不回歸
