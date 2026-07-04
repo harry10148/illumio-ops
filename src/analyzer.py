@@ -374,14 +374,20 @@ class Analyzer:
                 return False
         return False
 
-    def _check_ip_filter(self, flow_side: dict[str, Any], filter_val: str) -> bool:
+    def _check_ip_filter(self, flow_side: dict[str, Any], filter_val: str | list) -> bool:
         if not filter_val:
             return True
-        if flow_side.get('ip') == filter_val:
-            return True
-        for ipl in flow_side.get('ip_lists', []):
-            if ipl.get('name') == filter_val:
+        # list 形（Phase 4b FilterBar 新儲存格式）：任一值命中即 match；
+        # scalar 行為逐位不變。exclude 呼叫端以「命中即排除」使用同一語意。
+        vals = filter_val if isinstance(filter_val, list) else [filter_val]
+        for val in vals:
+            if not val:
+                continue
+            if flow_side.get('ip') == val:
                 return True
+            for ipl in flow_side.get('ip_lists', []):
+                if ipl.get('name') == val:
+                    return True
         return False
 
     def get_traffic_details_key(self, flow: dict[str, Any]) -> str:
