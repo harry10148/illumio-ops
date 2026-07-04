@@ -122,6 +122,14 @@ for key, pair in {
         "Large transfer patterns that may indicate staging or exfiltration.",
         "聚焦異常大量傳輸與可能的資料暫存、外洩模式。",
     ),
+    "draftpolicy": (
+        "Draft Policy",
+        "草稿 Policy",
+        "Findings from draft-policy simulation: draft deny hits, override denies, "
+        "visibility-boundary breaches and draft-vs-reported mismatches.",
+        "草稿 Policy 模擬產生的發現：draft deny 命中、override deny、"
+        "可視性邊界穿越、draft 與實際回報不一致。",
+    ),
 }.items():
     name_en, name_zh, desc_en, desc_zh = pair
     STRINGS[f"rpt_cat_{key}_name"] = _entry(name_en, name_zh)

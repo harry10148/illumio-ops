@@ -324,13 +324,21 @@ _SEVERITY_TOKENS = {'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'}
 _INT_COL_KEYWORDS = ('port', '連接埠', 'flow count', 'connections', 'flows',
                      'allowed', 'blocked', 'count')
 
+# Port columns (exact match) that should NOT apply thousands separators
+_PORT_EXACT_COLS = ('port', '連接埠')
+
 def _norm_col(name) -> str:
     """Normalize a column name for tolerant matching (case-insensitive, trimmed)."""
     return str(name).strip().lower().replace(' ', '_')
 
-def _fmt_int_cell(val) -> str:
+def _fmt_int_cell(val, group: bool = True) -> str:
     """Format an integer-valued cell with thousands separators; bare floats like
-    53.0 render as '53', not '53.0'. Falls back to str(val) on non-numerics."""
+    53.0 render as '53', not '53.0'. Falls back to str(val) on non-numerics.
+
+    Args:
+        val: The value to format.
+        group: If True, apply thousands separators. If False, render as plain integer.
+    """
     if val is None:
         return ''
     try:
@@ -340,8 +348,14 @@ def _fmt_int_cell(val) -> str:
     if f != f:  # NaN
         return ''
     if f.is_integer():
-        return f'{int(f):,}'
-    return f'{f:,.1f}'
+        if group:
+            return f'{int(f):,}'
+        else:
+            return str(int(f))
+    if group:
+        return f'{f:,.1f}'
+    else:
+        return f'{f:.1f}'
 
 def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
                 no_data_key: str = "rpt_no_data", lang: str = "en",
@@ -351,7 +365,7 @@ def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
 
     # Determine which columns contain raw byte / bandwidth / integer-count values
     if df is None or (hasattr(df, 'empty') and df.empty):
-        byte_cols = bw_cols = int_cols = set()
+        byte_cols = bw_cols = int_cols = port_cols = set()
     else:
         byte_cols = {col for col in df.columns
                      if any(kw in str(col).lower() for kw in _BYTE_COL_KEYWORDS)}
@@ -360,6 +374,8 @@ def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
         int_cols = {col for col in df.columns
                     if any(kw in str(col).lower() for kw in _INT_COL_KEYWORDS)
                     and col not in byte_cols and col not in bw_cols}
+        port_cols = {col for col in df.columns
+                     if _norm_col(col) in _PORT_EXACT_COLS}
 
     sev_target = _norm_col(severity_col) if severity_col else None
 
@@ -381,6 +397,8 @@ def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
         if col in bw_cols:
             return _fmt_bw(val)
         if col in int_cols:
+            if col in port_cols:
+                return _fmt_int_cell(val, group=False)
             return _fmt_int_cell(val)
         return '' if val is None else html.escape(str(val))
 
