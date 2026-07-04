@@ -654,10 +654,10 @@ function openReportGenModal(type) {
     ['rpt-pd-blocked','rpt-pd-potential','rpt-pd-allowed'].forEach(id => {
       const el = document.getElementById(id); if (el) el.checked = false;
     });
-    ['rpt-proto','rpt-src','rpt-dst','rpt-port','rpt-ex-src','rpt-ex-dst','rpt-ex-port',
-     'rpt-any-label','rpt-any-ip','rpt-ex-any-label','rpt-ex-any-ip'].forEach(id => {
+    ['rpt-proto','rpt-port','rpt-ex-port'].forEach(id => {
       const el = document.getElementById(id); if (el) el.value = '';
     });
+    _ensureRptFilterBar().setFilters({});
   } else if (type === 'policy_usage') {
     // Policy-usage supports api/csv source (no traffic filters/profile).
     $('m-gen-source-row').style.display = '';
@@ -752,6 +752,17 @@ async function confirmReportGen() {
   else if (_genReportType === 'app_summary')  await _doGenerateAppSummary();
 }
 
+// FilterBar 實例（Phase 4a）：延遲初始化，避免依賴 <script defer> 執行順序
+// （dashboard.js 在 filter-bar.js 之前解析，模組作用域頂層不能直接呼叫
+// createFilterBar）；存於此變數供 openReportGenModal 與 _collectReportFilters 取用。
+let _rptFb = null;
+function _ensureRptFilterBar() {
+  if (!_rptFb) {
+    _rptFb = createFilterBar(document.getElementById('rpt-filter-bar'), {});
+  }
+  return _rptFb;
+}
+
 function _collectReportFilters() {
   const get = id => {
     const el = document.getElementById(id);
@@ -767,51 +778,22 @@ function _collectReportFilters() {
   if (pdAllowed  && pdAllowed.checked)   pds.push('allowed');
   if (!pds.length) pds = null; // null means all
 
-  const src        = get('rpt-src');
-  const dst        = get('rpt-dst');
   const port       = get('rpt-port');
   const proto      = get('rpt-proto');
-  const exSrc      = get('rpt-ex-src');
-  const exDst      = get('rpt-ex-dst');
   const exPort     = get('rpt-ex-port');
-  const anyLabel   = get('rpt-any-label');
-  const anyIp      = get('rpt-any-ip');
-  const exAnyLabel = get('rpt-ex-any-label');
-  const exAnyIp    = get('rpt-ex-any-ip');
+  const objFilters = _ensureRptFilterBar().getFilters();
 
-  // Heuristic: if value contains digit+dot or slash, treat as IP/CIDR; else as label key:value
-  const parseSrcDst = val => {
-    if (!val) return { labels: [], ip: '' };
-    if (/[\d.\/:]/.test(val)) return { labels: [], ip: val };
-    return { labels: [val], ip: '' };
-  };
-
-  const srcP   = parseSrcDst(src);
-  const dstP   = parseSrcDst(dst);
-  const exSrcP = parseSrcDst(exSrc);
-  const exDstP = parseSrcDst(exDst);
-
-  const hasFilter = pds || src || dst || port || proto || exSrc || exDst || exPort || anyLabel || anyIp || exAnyLabel || exAnyIp;
+  const hasFilter = pds || port || proto || exPort || Object.keys(objFilters).length > 0;
   if (!hasFilter) return null;
 
-  return {
+  const filters = {
     policy_decisions: pds,
-    src_labels:    srcP.labels,
-    dst_labels:    dstP.labels,
-    src_ip:        srcP.ip,
-    dst_ip:        dstP.ip,
-    port:          port,
-    proto:         proto ? parseInt(proto) : null,
-    ex_src_labels: exSrcP.labels,
-    ex_src_ip:     exSrcP.ip,
-    ex_dst_labels: exDstP.labels,
-    ex_dst_ip:     exDstP.ip,
-    ex_port:       exPort,
-    any_label:     anyLabel || null,
-    any_ip:        anyIp || null,
-    ex_any_label:  exAnyLabel || null,
-    ex_any_ip:     exAnyIp || null,
+    port:             port,
+    proto:            proto ? parseInt(proto) : null,
+    ex_port:          exPort,
   };
+  Object.assign(filters, objFilters);
+  return filters;
 }
 
 function _collectSchedFilters() {

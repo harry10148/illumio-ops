@@ -105,3 +105,32 @@ def test_quarantine_js_uses_filter_bar_for_traffic_analyzer():
     assert "_ensureQtFilterBar().getFilters()" in js
     for removed_id in ("qt-src", "qt-dst", "qt-exsrc", "qt-exdst", "qt-any-label", "qt-any-ip"):
         assert f"getElementById('{removed_id}')" not in js
+
+
+def test_instant_report_modal_mounts_filter_bar():
+    """Phase 4a Task 3: rpt-src/rpt-dst/rpt-ex-*/rpt-any-* 分欄已換成單一 FilterBar 掛載點。"""
+    html = _INDEX.read_text(encoding="utf-8")
+    assert 'id="rpt-filter-bar"' in html
+    for removed_id in (
+        "rpt-src", "rpt-dst", "rpt-ex-src", "rpt-ex-dst",
+        "rpt-any-label", "rpt-any-ip", "rpt-ex-any-label", "rpt-ex-any-ip",
+    ):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from m-gen-filters"
+    # pd checkbox/proto/port/ex-port 保留（不屬 FilterBar 範圍）
+    assert 'id="rpt-pd-blocked"' in html
+    assert 'id="rpt-proto"' in html
+    assert 'id="rpt-port"' in html
+    assert 'id="rpt-ex-port"' in html
+
+
+def test_dashboard_js_uses_filter_bar_for_instant_report():
+    js = Path("src/static/js/dashboard.js").read_text(encoding="utf-8")
+    assert "function _ensureRptFilterBar()" in js
+    assert "createFilterBar(document.getElementById('rpt-filter-bar')" in js
+    assert "_ensureRptFilterBar().getFilters()" in js
+    for removed_id in (
+        "rpt-src", "rpt-dst", "rpt-ex-src", "rpt-ex-dst",
+        "rpt-any-label", "rpt-any-ip", "rpt-ex-any-label", "rpt-ex-any-ip",
+    ):
+        assert f"getElementById('{removed_id}')" not in js
+        assert f"'{removed_id}'" not in js
