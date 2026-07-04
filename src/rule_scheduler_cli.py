@@ -512,8 +512,8 @@ class _RuleSchedulerCLI:
                         c['pce_status'] = 'active'
                         self.db.put(h, c)
                     dest_field = live_data.get('destinations', live_data.get('consumers', []))
-                    src = truncate(self.api.resolve_actor_str(dest_field), 12)
-                    dst = truncate(self.api.resolve_actor_str(live_data.get('providers', [])), 12)
+                    src = truncate(self.api.resolve_actor_str(dest_field), 15)
+                    dst = truncate(self.api.resolve_actor_str(live_data.get('providers', [])), 15)
                     svc = truncate(self.api.resolve_service_str(live_data.get('ingress_services', [])), 16)
 
                     rule_action = live_data.get('action', 'allow')
