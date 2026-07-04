@@ -1,6 +1,7 @@
 # tests/test_trend_meta.py
 """Trend 快照中繼資料（window/data_source/profile）與不一致警語。"""
 from src.report.trend_store import (
+    canonicalize_legacy_keys,
     compute_deltas,
     load_previous,
     save_snapshot,
@@ -73,6 +74,31 @@ def test_snapshot_mismatch_no_previous_meta_is_silent():
 
 def test_snapshot_mismatch_no_current_meta_is_silent():
     assert snapshot_mismatch(None, {"_meta": {"data_source": "api"}}) == []
+
+
+def test_snapshot_mismatch_invalid_date_string_skips_window_comparison():
+    """window 內含無法解析的日期字串時不炸，且該欄位比較被跳過。"""
+    current_meta = {"window": {"start": "not-a-date", "end": "2026-06-08"}}
+    previous_payload = {"_meta": {"window": {"start": "2026-05-01", "end": "2026-05-02"}}}
+    assert snapshot_mismatch(current_meta, previous_payload) == []
+
+
+def test_snapshot_mismatch_one_sided_missing_window_skips_comparison():
+    """只有一邊有 window（另一邊缺）時跳過 window 比較，不誤判為不一致。"""
+    current_meta = {"window": {"start": "2026-06-01", "end": "2026-06-08"}}
+    previous_payload = {"_meta": {}}  # 前一份快照沒有記錄 window
+    assert snapshot_mismatch(current_meta, previous_payload) == []
+
+
+# ── (e) canonicalize_legacy_keys 不動 _meta ─────────────────────────────────
+
+def test_canonicalize_legacy_keys_preserves_meta_key():
+    """_meta 的值應原樣保留，不被當成 KPI 標籤改名。"""
+    meta = {"window": {"start": "2026-06-01", "end": "2026-06-07"}, "data_source": "api"}
+    legacy = {"_generated_at": "x", "_meta": meta, "流量總數": "20,282"}
+    canon = canonicalize_legacy_keys(legacy, candidate_keys=["mod12_kpi_total_flows"])
+    assert canon["_meta"] == meta
+    assert canon["mod12_kpi_total_flows"] == "20,282"
 
 
 # ── (d) 渲染級：警語只在 mismatch 非空時出現 ─────────────────────────────────
