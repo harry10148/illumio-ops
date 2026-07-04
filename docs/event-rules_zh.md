@@ -352,8 +352,9 @@ mod13/mod14/mod15 共用的去確定性 posture 層：`make_posture_item`（scop
 - **`mod_draft_actions`**：可行動分析 — `override_deny`、`potentially_blocked_by_override_deny`、`allowed_across_boundary` 的 top pairs 與修補/審查工作流，加 `what_if_summary`（reported 與 draft 不同的 `would_change_share`）。
 - **`ransomware_posture`**：PCE-native（非 flow-based）勒索 posture — 由 workload 的 `risk_summary.ransomware`（exposure severity、protection %）與 `open_service_ports` 交叉，輸出 KPI（各 exposure 等級數、avg protection %）、per-VEN 與高風險開放 port 清單。
 - **`mod_ringfence`**：per-app 相依輪廓 ＋ candidate allow rules ＋ boundary deny 候選。
-- **`mod_drift`**：基線漂移 — 與上次執行相比，新增/消失的 app→app 連線對（純簽章比對）。
+- **`mod_drift`**：基線漂移 — 與上次執行相比，新增/消失的 app→app 連線對（純簽章比對）。雜訊簽名（ICMP、port 0、ephemeral 高 port ≥49152）與 `(unlabeled)→(unlabeled)` 配對會從兩表與其計數中排除（後者改收合為單一統計行）。當前次基線帶有中繼資料（window/data_source/profile）且本次視窗與其差異過大時，直接拒絕比較（仍會存入新基線），避免整批基線換血被誤報為大量消失；在此中繼資料出現前存下的舊基線則完全照舊比較（不拒絕、不警語）。
 - **`mod_change_impact`**：與上次快照比較 KPI；`LOWER_BETTER=(pb_uncovered_exposure, high_risk_lateral_paths, blocked_flows)`、`HIGHER_BETTER=(active_allow_coverage, microsegmentation_maturity)`。
+- **趨勢差異（`trend_store`）**：traffic/audit/policy_usage/VEN 四種報表各自保存每次執行的 KPI 快照，並與前次快照算出差異渲染（`load_previous` 讀磁碟上最新一份——因為存檔緊接在讀取之後，差異從下一次執行起就看得到，不必等到再下一次）。快照同樣帶 window/data_source/profile 中繼資料；與前次快照不一致時，Trend 區塊會顯示列出差異欄位的警語，而非靜默比較不同基準的期間。此中繼資料出現前存下的舊快照則完全照舊比較（無警語）。
 
 ---
 

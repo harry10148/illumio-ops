@@ -95,6 +95,21 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 - Plain Traffic Flow Report profile (`traffic`): overview, policy decision summary,
   app/env distribution, bandwidth, unmanaged overview. Runs only lightweight modules.
+- Trend/drift credibility hardening (phase 6): the Baseline Drift chapter now excludes
+  noise signatures (ICMP, port 0, ephemeral ports ≥49152) from both the new/disappeared
+  tables and their counts, and collapses `(unlabeled)→(unlabeled)` pairs into a single
+  summary line instead of listing them as individual pairs. Both the Baseline Drift
+  chapter and the per-report Trend section now carry snapshot metadata (window/
+  data_source/profile); when a run's window differs materially from the previous
+  baseline/snapshot, drift comparison is refused (a note explains why, and a fresh
+  baseline is still saved) and the Trend section shows a caveat naming the differing
+  fields — snapshots saved before this metadata existed compare exactly as before (no
+  refusal, no caveat). Also fixed an off-by-one in the trend snapshot lookup that made
+  the Trend delta always compare against the run before the previous one instead of
+  the previous run itself; it now appears from the very next report after a baseline
+  exists. This closes out the 2026-07-02 traffic/security report-split spec — all six
+  phases (report split, security/inventory simplification, XLSX unification, audit/
+  policy-usage/VEN slimming, and this trend/drift hardening) have now shipped.
 
 ### Fixed
 
