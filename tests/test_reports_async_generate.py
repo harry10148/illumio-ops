@@ -99,6 +99,7 @@ def test_traffic_generate_forwards_object_and_any_filters(client_logged_in):
                 "any_label": "env=prod",
                 "any_iplist": "corp-vpn",
                 "src_ip_in": ["10.0.0.1"],
+                "ex_src_ip": ["10.9.9.9"],
             },
         })
         assert r.status_code == 200
@@ -122,3 +123,4 @@ def test_traffic_generate_forwards_object_and_any_filters(client_logged_in):
         assert filters["any_label"] == "env=prod"          # 既有 bug 修復
         assert filters["any_iplist"] == "corp-vpn"
         assert filters["src_ip_in"] == ["10.0.0.1"]
+        assert filters["ex_src_ip"] == ["10.9.9.9"]  # list 形狀 forward（見 filter-bar.js 排除 IP pill）

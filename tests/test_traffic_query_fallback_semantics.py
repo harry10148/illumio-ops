@@ -102,3 +102,29 @@ def test_ex_dst_workload_excludes_on_dst_hit():
     flow = _flow_with_objects(dst_wl_href="/orgs/1/workloads/abc")
     assert _match(flow, {"ex_dst_workloads": ["/orgs/1/workloads/abc"]}) is False
     assert _match(flow, {"ex_src_workloads": ["/orgs/1/workloads/abc"]}) is True
+
+
+def _flow_with_ips(src_ip="", dst_ip=""):
+    return {"src": {"ip": src_ip, "ip_lists": [], "workload": {"labels": []}},
+            "dst": {"ip": dst_ip, "ip_lists": [], "workload": {"labels": []}},
+            "service": {}}
+
+
+def test_ex_src_ip_scalar_excludes_on_src_hit():
+    # 舊前端送 scalar：既有行為不可回歸
+    flow = _flow_with_ips(src_ip="10.0.0.1")
+    assert _match(flow, {"ex_src_ip": "10.0.0.1"}) is False
+    assert _match(flow, {"ex_src_ip": "10.0.0.2"}) is True
+
+
+def test_ex_src_ip_list_excludes_on_src_hit():
+    # FilterBar 送 list（filter-bar.js 排除 IP pill 序列化）：任一值命中即排除
+    flow = _flow_with_ips(src_ip="10.0.0.1")
+    assert _match(flow, {"ex_src_ip": ["10.0.0.1", "10.0.0.9"]}) is False
+    assert _match(flow, {"ex_dst_ip": ["10.0.0.1"]}) is True
+
+
+def test_ex_dst_ip_list_excludes_on_dst_hit():
+    flow = _flow_with_ips(dst_ip="10.0.0.5")
+    assert _match(flow, {"ex_dst_ip": ["10.0.0.5", "10.0.0.9"]}) is False
+    assert _match(flow, {"ex_src_ip": ["10.0.0.5"]}) is True

@@ -82,6 +82,18 @@ def _scalar(filters: dict, key: str) -> str:
     return v.strip() if isinstance(v, str) else (str(v) if v else "")
 
 
+def _list_or_scalar(filters: dict, key: str) -> list[str]:
+    """排除值正規化：FilterBar 送 list，舊前端送 scalar，皆歸一成清單（濾除空值/空白）。"""
+    v = filters.get(key)
+    vals = v if isinstance(v, list) else [v]
+    out = []
+    for item in vals:
+        s = item.strip() if isinstance(item, str) else (str(item) if item else "")
+        if s:
+            out.append(s)
+    return out
+
+
 def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataFrame:
     """Return df filtered by the report's traffic filters (labels/ip/port/proto
     + exclusions). policy_decisions is intentionally skipped — it is pushed to
@@ -111,9 +123,11 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
         v = _scalar(filters, key)
         if v and col in df.columns:
             mask &= _ip_mask(df, col, v)
-        exv = _scalar(filters, f"ex_{key}")
-        if exv and col in df.columns:
-            mask &= ~_ip_mask(df, col, exv)
+        if col in df.columns:
+            # ex_src_ip/ex_dst_ip：FilterBar 送 list、舊前端送 scalar，皆需支援；
+            # 語意同 ex_{side}_ip_in（逐值 AND-exclude）
+            for exv in _list_or_scalar(filters, f"ex_{key}"):
+                mask &= ~_ip_mask(df, col, exv)
 
     def _cidrs_mask(col: str, values: list) -> pd.Series:
         gm = pd.Series(False, index=df.index)

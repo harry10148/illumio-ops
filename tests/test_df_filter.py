@@ -170,3 +170,22 @@ def test_ex_any_label_excludes_either_side():
     out = apply_df_traffic_filters(_df_two_apps(), {"ex_any_label": "app=erp"})
     assert "erp" not in out["src_app"].tolist()
     assert set(out["src_app"]) == {"web", "hr"}
+
+
+def test_ex_src_ip_scalar_excludes():
+    # 舊前端送 scalar：既有行為不可回歸
+    out = apply_df_traffic_filters(_df_two_apps(), {"ex_src_ip": "10.0.0.1"})
+    assert sorted(out["src_ip"]) == ["10.0.0.2", "10.0.0.3"]
+
+
+def test_ex_src_ip_list_excludes():
+    # FilterBar 送 list（見 filter-bar.js 排除 IP pill 序列化）：list 須逐值 AND-exclude，
+    # 不可被 str(list) 當成單一垃圾字串比對而靜默失效
+    out = apply_df_traffic_filters(_df_two_apps(), {"ex_src_ip": ["10.0.0.1", "10.0.0.3"]})
+    assert sorted(out["src_ip"]) == ["10.0.0.2"]
+
+
+def test_ex_dst_ip_list_excludes():
+    df = _df_two_apps()
+    out = apply_df_traffic_filters(df, {"ex_dst_ip": ["10.0.0.9"]})
+    assert out.empty  # 全部列 dst_ip 皆為 10.0.0.9
