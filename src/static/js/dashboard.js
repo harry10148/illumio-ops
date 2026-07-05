@@ -307,6 +307,8 @@ function renderSchedules() {
   }
   const typeLabels = {
     traffic: _t('gui_sched_rt_traffic'),
+    security_risk: _t('gui_sched_rt_security'),
+    network_inventory: _t('gui_sched_rt_inventory'),
     audit: _t('gui_sched_rt_audit'),
     ven_status: _t('gui_sched_rt_ven'),
     policy_usage: _t('gui_sched_rt_pu'),
@@ -369,7 +371,7 @@ function onSchedFreqChange() {
 
 function onSchedReportTypeChange() {
   const rt = $('sched-report-type').value;
-  $('sched-filter-section').style.display = rt === 'traffic' ? '' : 'none';
+  $('sched-filter-section').style.display = TRAFFIC_PROFILE_TYPES.includes(rt) ? '' : 'none';
   const appRow = $('sched-app-row');
   if (appRow) appRow.style.display = rt === 'app_summary' ? '' : 'none';
 }
@@ -407,7 +409,7 @@ function openSchedModal(sched) {
 
   // Show filter section only for traffic reports; reset then populate from saved schedule
   const rt = sched ? (sched.report_type || 'traffic') : 'traffic';
-  const isTraffic = rt === 'traffic';
+  const isTraffic = TRAFFIC_PROFILE_TYPES.includes(rt);
   $('sched-filter-section').style.display = isTraffic ? '' : 'none';
   if ($('sched-app'))     $('sched-app').value = sched ? (sched.app || '') : '';
   if ($('sched-env'))     $('sched-env').value = sched ? (sched.env || '') : '';
@@ -435,7 +437,7 @@ async function saveSchedule() {
   const recipients = recipsRaw ? recipsRaw.split('\n').map(r => r.trim()).filter(Boolean) : [];
 
   const reportType = $('sched-report-type').value;
-  const schedFilters = reportType === 'traffic' ? _collectSchedFilters() : null;
+  const schedFilters = TRAFFIC_PROFILE_TYPES.includes(reportType) ? _collectSchedFilters() : null;
   if (reportType === 'app_summary' && !($('sched-app') && $('sched-app').value.trim())) {
     toast(_t('gui_app_required'), true); return;
   }

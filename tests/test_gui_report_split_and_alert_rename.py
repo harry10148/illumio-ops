@@ -77,3 +77,16 @@ def test_profile_dropdown_removed():
 
 def test_shared_traffic_profile_types_constant():
     assert "TRAFFIC_PROFILE_TYPES" in DASHBOARD_JS
+
+
+def test_scheduler_has_security_and_inventory_options():
+    assert 'value="security_risk"' in INDEX_HTML
+    assert 'value="network_inventory"' in INDEX_HTML
+    assert "gui_sched_rt_security" in INDEX_HTML
+    assert "gui_sched_rt_inventory" in INDEX_HTML
+
+
+def test_schedule_list_typelabels_cover_new_types():
+    # both scheduler typeLabels maps must resolve the new report types
+    assert DASHBOARD_JS.count("gui_sched_rt_security") >= 1
+    assert DASHBOARD_JS.count("gui_sched_rt_inventory") >= 1
