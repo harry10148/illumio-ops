@@ -1334,12 +1334,38 @@
         <div class="rcard" data-rtype="traffic">
           <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg></div>
           <div class="rcard-body">
-            <h3 data-i18n="gui_btn_traffic_report">Traffic Flow Report</h3>
-            <p data-i18n="gui_rcard_traffic_desc">Traffic summary across Security Risk / Network Inventory views</p>
+            <h3 data-i18n="gui_btn_traffic_report">Traffic Report</h3>
+            <p data-i18n="gui_rcard_traffic_desc">Pure traffic facts — connections, Ports &amp; Protocols, bandwidth and volume</p>
             <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-report" data-action="openReportGenModal" data-args='["traffic"]'>
                 <svg class="icon"><use href="#icon-play"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="rcard" data-rtype="security_risk">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_rcard_security_title">Security &amp; Risk Report</h3>
+            <p data-i18n="gui_rcard_security_desc">Security posture, attack surface, and risk findings</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-security" data-action="openReportGenModal" data-args='["security_risk"]'>
+                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="rcard" data-rtype="network_inventory">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_rcard_inventory_title">Network Inventory Report</h3>
+            <p data-i18n="gui_rcard_inventory_desc">Asset and Label governance across your environment</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-inventory" data-action="openReportGenModal" data-args='["network_inventory"]'>
+                <svg class="icon"><use href="#icon-search"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
               </button>
             </div>
           </div>

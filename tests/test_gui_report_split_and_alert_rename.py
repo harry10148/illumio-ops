@@ -44,3 +44,17 @@ def test_tab_alerts_label():
     # gui_tab_rules unchanged — still used by the in-page sub-tab
     assert EN["gui_tab_rules"] == "Rules"
     assert ZH["gui_tab_rules"] == "規則"
+
+
+INDEX_HTML = (ROOT / "src" / "templates" / "index.html").read_text(encoding="utf-8")
+
+
+def test_three_adhoc_report_cards_present():
+    for args in ('["traffic"]', '["security_risk"]', '["network_inventory"]'):
+        assert f"data-action=\"openReportGenModal\" data-args='{args}'" in INDEX_HTML, \
+            f"missing ad-hoc report card button for {args}"
+
+
+def test_security_and_inventory_cards_use_new_i18n_keys():
+    assert "gui_rcard_security_title" in INDEX_HTML
+    assert "gui_rcard_inventory_title" in INDEX_HTML
