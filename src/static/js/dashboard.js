@@ -238,6 +238,15 @@ async function loadRcardMeta() {
   const latestByType = {};
   reports.forEach(rp => {
     let t = rp.report_type || '';
+    // The traffic-family metadata sidecar always writes report_type: "traffic"
+    // (report_generator.py hardcodes it for traffic/security_risk/network_inventory
+    // alike), so it can never distinguish the three. Override by filename prefix,
+    // mirroring report_scheduler.py's _REPORT_PREFIXES — the specific SecurityRisk/
+    // NetworkInventory prefixes must be checked before the bare dated traffic
+    // pattern, since 'Illumio_Traffic_Report_' is a strict prefix of both.
+    if (rp.filename && rp.filename.startsWith('Illumio_Traffic_Report_SecurityRisk_')) t = 'security_risk';
+    else if (rp.filename && rp.filename.startsWith('Illumio_Traffic_Report_NetworkInventory_')) t = 'network_inventory';
+    else if (rp.filename && /^Illumio_Traffic_Report_\d{4}-/.test(rp.filename)) t = 'traffic';
     // Policy Diff reports carry no metadata sidecar — derive type from filename prefix.
     if (!t && rp.filename && rp.filename.startsWith('Illumio_Policy_Diff_Report_')) t = 'policy_diff';
     if (!t && rp.filename && rp.filename.startsWith('Illumio_Policy_Resolver_')) t = 'policy_resolver';
@@ -636,7 +645,7 @@ function openReportGenModal(type) {
   _genReportType = type;
   const meta = {
     traffic:      { titleKey: 'gui_gen_traffic_title', icon: '#icon-play',   dates: true  },
-    security_risk:     { titleKey: 'gui_gen_security_title',   icon: '#icon-shield', dates: true },
+    security_risk: { titleKey: 'gui_gen_security_title',   icon: '#icon-shield', dates: true },
     network_inventory: { titleKey: 'gui_gen_inventory_title',  icon: '#icon-search', dates: true },
     audit:        { titleKey: 'gui_gen_audit_title',   icon: '#icon-shield', dates: true  },
     ven:          { titleKey: 'gui_gen_ven_title',     icon: '#icon-cpu',    dates: false },

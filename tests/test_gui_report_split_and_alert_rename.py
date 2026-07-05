@@ -58,6 +58,8 @@ def test_three_adhoc_report_cards_present():
 def test_security_and_inventory_cards_use_new_i18n_keys():
     assert "gui_rcard_security_title" in INDEX_HTML
     assert "gui_rcard_inventory_title" in INDEX_HTML
+    assert "gui_rcard_security_desc" in INDEX_HTML
+    assert "gui_rcard_inventory_desc" in INDEX_HTML
 
 
 DASHBOARD_JS = (ROOT / "src" / "static" / "js" / "dashboard.js").read_text(encoding="utf-8")
@@ -90,6 +92,14 @@ def test_schedule_list_typelabels_cover_new_types():
     # both scheduler typeLabels maps must resolve the new report types
     assert DASHBOARD_JS.count("gui_sched_rt_security") >= 1
     assert DASHBOARD_JS.count("gui_sched_rt_inventory") >= 1
+
+
+def test_last_run_map_disambiguates_traffic_family_by_filename():
+    # The metadata sidecar hardcodes report_type="traffic" for all three
+    # traffic-family reports (security_risk, network_inventory, traffic), so
+    # the "Last run" map must override it using the filename prefix.
+    assert "Illumio_Traffic_Report_SecurityRisk_" in DASHBOARD_JS
+    assert "Illumio_Traffic_Report_NetworkInventory_" in DASHBOARD_JS
 
 
 import re
