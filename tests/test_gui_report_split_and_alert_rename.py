@@ -58,3 +58,22 @@ def test_three_adhoc_report_cards_present():
 def test_security_and_inventory_cards_use_new_i18n_keys():
     assert "gui_rcard_security_title" in INDEX_HTML
     assert "gui_rcard_inventory_title" in INDEX_HTML
+
+
+DASHBOARD_JS = (ROOT / "src" / "static" / "js" / "dashboard.js").read_text(encoding="utf-8")
+
+
+def test_modal_meta_has_three_profile_types():
+    assert "security_risk:" in DASHBOARD_JS
+    assert "network_inventory:" in DASHBOARD_JS
+    assert "gui_gen_security_title" in DASHBOARD_JS
+    assert "gui_gen_inventory_title" in DASHBOARD_JS
+
+
+def test_profile_dropdown_removed():
+    assert "m-gen-profile-row" not in INDEX_HTML, "profile dropdown row must be removed"
+    assert "m-gen-profile" not in DASHBOARD_JS, "no code should read the removed profile select"
+
+
+def test_shared_traffic_profile_types_constant():
+    assert "TRAFFIC_PROFILE_TYPES" in DASHBOARD_JS

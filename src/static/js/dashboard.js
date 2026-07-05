@@ -626,10 +626,16 @@ function syncReportLangToUi() {
   el.value = lang === 'zh_TW' ? 'zh_TW' : 'en';
 }
 
+// The three traffic-based report profiles share one generation pipeline and
+// modal layout; each maps 1:1 to a backend traffic_report_profile / report_type.
+const TRAFFIC_PROFILE_TYPES = ['traffic', 'security_risk', 'network_inventory'];
+
 function openReportGenModal(type) {
   _genReportType = type;
   const meta = {
     traffic:      { titleKey: 'gui_gen_traffic_title', icon: '#icon-play',   dates: true  },
+    security_risk:     { titleKey: 'gui_gen_security_title',   icon: '#icon-shield', dates: true },
+    network_inventory: { titleKey: 'gui_gen_inventory_title',  icon: '#icon-search', dates: true },
     audit:        { titleKey: 'gui_gen_audit_title',   icon: '#icon-shield', dates: true  },
     ven:          { titleKey: 'gui_gen_ven_title',     icon: '#icon-cpu',    dates: false },
     policy_usage: { titleKey: 'gui_gen_pu_title',      icon: '#icon-shield', dates: true  },
@@ -640,11 +646,10 @@ function openReportGenModal(type) {
   const m = meta[type] || meta.traffic;
   $('m-gen-title').innerHTML =
     `<svg class="icon" aria-hidden="true"><use href="${m.icon}"></use></svg> ${_t(m.titleKey)}`;
-  
-  if (type === 'traffic') {
+
+  if (TRAFFIC_PROFILE_TYPES.includes(type)) {
     $('m-gen-source-row').style.display = '';
     $('m-gen-filters').style.display = '';
-    $('m-gen-profile-row').style.display = '';
     toggleTrafficSource();
     // Reset filter fields
     ['rpt-pd-blocked','rpt-pd-potential','rpt-pd-allowed'].forEach(id => {
@@ -658,14 +663,12 @@ function openReportGenModal(type) {
     // Policy-usage supports api/csv source (no traffic filters/profile).
     $('m-gen-source-row').style.display = '';
     $('m-gen-filters').style.display = 'none';
-    $('m-gen-profile-row').style.display = 'none';
     toggleTrafficSource();  // sets dates/csv-upload per the current source radio
   } else {
     $('m-gen-source-row').style.display = 'none';
     $('m-gen-csv-upload').style.display = 'none';
     $('m-gen-dates').style.display = m.dates ? '' : 'none';
     $('m-gen-filters').style.display = 'none';
-    $('m-gen-profile-row').style.display = 'none';
   }
 
   const appRow = $('m-gen-app-row');
@@ -678,7 +681,7 @@ function openReportGenModal(type) {
   // and only when the PCE cache is actually available.
   const dsRow = $('m-gen-data-source-row');
   if (dsRow) {
-    const supportsCache = (type === 'traffic' || type === 'app_summary');
+    const supportsCache = (TRAFFIC_PROFILE_TYPES.includes(type) || type === 'app_summary');
     dsRow.style.display = (supportsCache && window._CACHE_AVAILABLE) ? '' : 'none';
     const dsSel = $('m-gen-data-source');
     if (dsSel) dsSel.value = 'hybrid';  // default each open
@@ -722,7 +725,7 @@ function toggleTrafficSource() {
     $('m-gen-dates').style.display = '';
     $('m-gen-csv-upload').style.display = 'none';
     // Cache-mode selector only applies to cache-capable report types.
-    const supportsCache = (_genReportType === 'traffic' || _genReportType === 'app_summary');
+    const supportsCache = (TRAFFIC_PROFILE_TYPES.includes(_genReportType) || _genReportType === 'app_summary');
     $('m-gen-data-source-row').style.display = (supportsCache && window._CACHE_AVAILABLE) ? '' : 'none';
   }
 }
@@ -730,6 +733,8 @@ function toggleTrafficSource() {
 async function confirmReportGen() {
   const typeLabels = {
     traffic:      _t('gui_gen_traffic_title'),
+    security_risk: _t('gui_gen_security_title'),
+    network_inventory: _t('gui_gen_inventory_title'),
     audit:        _t('gui_gen_audit_title'),
     ven:          _t('gui_gen_ven_title'),
     policy_usage: _t('gui_gen_pu_title'),
@@ -739,7 +744,7 @@ async function confirmReportGen() {
   };
   _showGenProgress(typeLabels[_genReportType] || _t('gui_gen_fallback_title'));
   closeModal('m-gen-report');
-  if      (_genReportType === 'traffic')      await _doGenerateTraffic();
+  if      (TRAFFIC_PROFILE_TYPES.includes(_genReportType)) await _doGenerateTraffic();
   else if (_genReportType === 'audit')        await _doGenerateAudit();
   else if (_genReportType === 'ven')          await _doGenerateVen();
   else if (_genReportType === 'policy_usage') await _doGeneratePolicyUsageClean();
@@ -917,8 +922,7 @@ async function _doGenerateTraffic() {
       formData.append('source', 'csv');
       const fmtEl = document.getElementById('m-gen-format');
       formData.append('format', fmtEl ? fmtEl.value : 'all');
-      const profileElCsv = document.getElementById('m-gen-profile');
-      formData.append('traffic_report_profile', profileElCsv ? profileElCsv.value : 'security_risk');
+      formData.append('traffic_report_profile', _genReportType);
       const langElCsv = document.getElementById('m-gen-lang');
       formData.append('lang', langElCsv ? langElCsv.value : 'en');
       formData.append('file', fileInput.files[0]);
@@ -951,14 +955,13 @@ async function _doGenerateTraffic() {
       _updateGenStep(_t('gui_gen_step_fetching'));
       const reportFilters = _collectReportFilters();
       const fmtEl2 = document.getElementById('m-gen-format');
-      const profileEl = document.getElementById('m-gen-profile');
       const langEl = document.getElementById('m-gen-lang');
       const dsEl = document.getElementById('m-gen-data-source');
       const dataSource = (window._CACHE_AVAILABLE && dsEl) ? dsEl.value : 'live';
       const r = await post('/api/reports/generate', {
         source: 'api', format: fmtEl2 ? fmtEl2.value : 'all',
         start_date: startDate, end_date: endDate,
-        traffic_report_profile: profileEl ? profileEl.value : 'security_risk',
+        traffic_report_profile: _genReportType,
         lang: langEl ? langEl.value : 'en',
         data_source: dataSource,
         ...(reportFilters ? { filters: reportFilters } : {}),
