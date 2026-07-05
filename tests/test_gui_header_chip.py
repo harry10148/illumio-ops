@@ -41,6 +41,6 @@ def test_chip_aria_label_i18n_key_present() -> None:
     en = json.loads(EN.read_text(encoding="utf-8"))
     zh = json.loads(ZH.read_text(encoding="utf-8"))
     assert en.get("gui_hdr_chip_aria") == \
-        "PCE connection status, {rules} rules, {schedules} schedules, loaded {loaded}"
+        "PCE connection status, {rules} alerts, {schedules} schedules, loaded {loaded}"
     assert zh.get("gui_hdr_chip_aria") == \
-        "PCE 連線狀態，{rules} 條規則，{schedules} 個排程，載入於 {loaded}"
+        "PCE 連線狀態，{rules} 條告警，{schedules} 個排程，載入於 {loaded}"

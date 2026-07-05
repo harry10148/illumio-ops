@@ -116,7 +116,7 @@
       <span id="hdr-chip-dot" class="status-dot" data-status="unknown" aria-hidden="true"></span>
       <span id="hdr-chip-host" class="pce-host">{{ (pce_url or '—') }}</span>
       <span class="chip-sep" aria-hidden="true">|</span>
-      <span class="chip-kpi"><span data-i18n="gui_rules_count">Rules</span> <strong>{{ rules_count | human_number }}</strong></span>
+      <span class="chip-kpi"><span data-i18n="gui_rules_count">Alerts</span> <strong>{{ rules_count | human_number }}</strong></span>
       <span class="chip-dot" aria-hidden="true">·</span>
       <span class="chip-kpi"><span data-i18n="gui_schedules_count">Schedules</span> <strong>{{ schedules_count | human_number }}</strong></span>
       <span class="chip-dot" aria-hidden="true">·</span>
@@ -184,10 +184,10 @@
         <use href="#icon-search"></use>
       </svg> <span data-i18n="gui_tab_events">Event Viewer</span>
     </button>
-    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-rules" data-tab="rules" data-action="switchTab" data-args='["rules"]' data-i18n="gui_tab_rules">
+    <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-rules" data-tab="rules" data-action="switchTab" data-args='["rules"]' data-i18n="gui_tab_alerts">
       <svg class="icon">
         <use href="#icon-shield"></use>
-      </svg> Rules
+      </svg> Alerts
     </button>
     <button class="tab" type="button" role="tab" aria-selected="false" aria-controls="p-reports" data-tab="reports" data-action="switchTab" data-args='["reports"]' data-i18n="gui_tab_reports">
       <svg class="icon">
@@ -1334,12 +1334,38 @@
         <div class="rcard" data-rtype="traffic">
           <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg></div>
           <div class="rcard-body">
-            <h3 data-i18n="gui_btn_traffic_report">Traffic Flow Report</h3>
-            <p data-i18n="gui_rcard_traffic_desc">Traffic summary across Security Risk / Network Inventory views</p>
+            <h3 data-i18n="gui_btn_traffic_report">Traffic Report</h3>
+            <p data-i18n="gui_rcard_traffic_desc">Pure traffic facts — connections, Ports &amp; Protocols, bandwidth and volume</p>
             <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-report" data-action="openReportGenModal" data-args='["traffic"]'>
                 <svg class="icon"><use href="#icon-play"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="rcard" data-rtype="security_risk">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_rcard_security_title">Security &amp; Risk Report</h3>
+            <p data-i18n="gui_rcard_security_desc">Security posture, attack surface, and risk findings</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-security" data-action="openReportGenModal" data-args='["security_risk"]'>
+                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="rcard" data-rtype="network_inventory">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_rcard_inventory_title">Network Inventory Report</h3>
+            <p data-i18n="gui_rcard_inventory_desc">Asset and Label governance across your environment</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-inventory" data-action="openReportGenModal" data-args='["network_inventory"]'>
+                <svg class="icon"><use href="#icon-search"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
               </button>
             </div>
           </div>
@@ -1520,6 +1546,8 @@
           <label data-i18n="gui_sched_report_type">Report Type</label>
           <select id="sched-report-type" style="width:100%;" data-on-change="onSchedReportTypeChange">
             <option value="traffic" data-i18n="gui_sched_rt_traffic">Traffic Flow Report</option>
+            <option value="security_risk" data-i18n="gui_sched_rt_security">Security &amp; Risk Report</option>
+            <option value="network_inventory" data-i18n="gui_sched_rt_inventory">Network Inventory Report</option>
             <option value="audit" data-i18n="gui_sched_rt_audit">Audit Report</option>
             <option value="ven_status" data-i18n="gui_sched_rt_ven">VEN Status Report</option>
             <option value="policy_usage" data-i18n="gui_sched_rt_pu">Policy Usage Report</option>
@@ -2838,13 +2866,6 @@
             </div>
           </div>
         </details>
-      </div>
-      <div id="m-gen-profile-row" style="margin-top:10px; display:none;">
-        <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--dim);" data-i18n="gui_report_profile_label">Traffic Report Profile</label>
-        <select id="m-gen-profile" style="width:100%; padding:6px; background:var(--surface,var(--bg2)); color:var(--fg); border:1px solid var(--border); border-radius:4px;">
-          <option value="security_risk" data-i18n="gui_report_profile_security_risk" selected>Security Risk</option>
-          <option value="network_inventory" data-i18n="gui_report_profile_network_inventory">Network Inventory</option>
-        </select>
       </div>
       <div id="m-gen-data-source-row" style="margin-top:10px; display:none;">
         <label style="display:block;margin-bottom:6px;font-size:0.85rem;color:var(--dim);" data-i18n="gui_rpt_data_source">Data source</label>
