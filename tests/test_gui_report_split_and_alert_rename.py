@@ -90,3 +90,20 @@ def test_schedule_list_typelabels_cover_new_types():
     # both scheduler typeLabels maps must resolve the new report types
     assert DASHBOARD_JS.count("gui_sched_rt_security") >= 1
     assert DASHBOARD_JS.count("gui_sched_rt_inventory") >= 1
+
+
+import re
+
+
+def test_main_tab_uses_alerts_key_subtab_keeps_rules():
+    # main nav tab button (controls p-rules) now labelled via gui_tab_alerts
+    main_tab = re.search(
+        r'<button[^>]*aria-controls="p-rules"[^>]*data-i18n="([^"]+)"', INDEX_HTML
+    )
+    assert main_tab and main_tab.group(1) == "gui_tab_alerts", \
+        "main Rules tab should use gui_tab_alerts"
+    # in-page sub-tab button still uses gui_tab_rules
+    assert 'id="rules-tab-rules" data-i18n="gui_tab_rules"' in INDEX_HTML
+    # tab wiring unchanged
+    assert 'data-tab="rules"' in INDEX_HTML
+    assert 'aria-controls="p-rules"' in INDEX_HTML
