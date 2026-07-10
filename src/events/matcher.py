@@ -73,6 +73,16 @@ def matches_event_rule(rule: dict[str, Any], event: dict[str, Any]) -> bool:
 
     match_fields = rule.get("match_fields") or rule.get("filter_match_fields") or {}
     for field_path, pattern in match_fields.items():
+        if field_path == "notification_type":
+            notifications = event.get("notifications")
+            values = [
+                str(entry.get("notification_type") or "")
+                for entry in notifications
+                if isinstance(entry, dict)
+            ] if isinstance(notifications, list) else []
+            if not any(_value_matches(str(pattern), v) for v in values):
+                return False
+            continue
         if not _value_matches(str(pattern), _extract_nested(event, field_path)):
             return False
 
