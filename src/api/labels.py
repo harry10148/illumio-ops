@@ -418,6 +418,44 @@ class LabelResolver:
             return {"ip_list": {"href": href}}
         return None
 
+    @staticmethod
+    def _parse_ip_range(value):
+        """IPv4 range 字串 'a.b.c.d-a.b.c.d' → (from, to) IPv4Address tuple，
+        from>to 自動對調。無 '-' 或兩側非合法 IPv4 → None（非 range，交由呼叫端
+        走既有單一 IP/CIDR/href 解析路徑）。IPv6 range 不支援（對齊既有
+        _objfbIsIpLike 只收 IPv4 的既有行為）。"""
+        text = str(value).strip()
+        if "-" not in text:
+            return None
+        left, _, right = text.partition("-")
+        try:
+            frm = ipaddress.IPv4Address(left.strip())
+            to = ipaddress.IPv4Address(right.strip())
+        except ValueError:
+            return None
+        if frm > to:
+            frm, to = to, frm
+        return frm, to
+
+    def _resolve_ip_filter_to_actors(self, ip_filter):
+        """IP filter 值 → native actor 清單。
+
+        單一 IP/CIDR/href：委派 `_resolve_ip_filter_to_actor`，回傳 0-1 筆。
+        IP range：展開成涵蓋該範圍的最小 CIDR 集合（`summarize_address_range`），
+        每個 CIDR 各自一筆——呼叫端（traffic_query 的 src_ip_in/dst_ip_in 等）
+        需把清單中每一筆各自放進獨立的 include 組，讓多個 CIDR 之間是 OR
+        （PCE traffic query 的 ip_address actor 只吃 literal/CIDR 字串、無
+        range 欄位，range 必須在我方展開）。查無/非法回空清單。
+        """
+        if not ip_filter:
+            return []
+        ip_range = self._parse_ip_range(ip_filter)
+        if ip_range is not None:
+            frm, to = ip_range
+            return [{"ip_address": str(net)} for net in ipaddress.summarize_address_range(frm, to)]
+        actor = self._resolve_ip_filter_to_actor(ip_filter)
+        return [actor] if actor is not None else []
+
     def _resolve_iplist_filter_to_actor(self, iplist_filter):
         """IP List 物件 filter → actor。接受 dict{href|name}、href 字串或名稱。
         刻意不接受 IP literal——那是 src_ip 家族的職責。"""

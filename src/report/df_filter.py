@@ -84,7 +84,10 @@ def _label_mask(df: pd.DataFrame, side: str, specs: list[str]) -> pd.Series:
 
 
 def _ip_mask(df: pd.DataFrame, col: str, value: str) -> pd.Series:
-    """Exact IP match, or CIDR containment when value has a '/'."""
+    """Exact IP match, CIDR containment when value has a '/', or IP range
+    containment ('a.b.c.d-a.b.c.d', from>to auto-swapped) when value has a '-'.
+    Illegal CIDR/range values match everything (existing fail-open convention
+    for this cache-display path)."""
     if "/" in value:
         try:
             net = ipaddress.ip_network(value, strict=False)
@@ -98,6 +101,23 @@ def _ip_mask(df: pd.DataFrame, col: str, value: str) -> pd.Series:
                 return False
 
         return df[col].apply(_in)
+    if "-" in value:
+        left, _, right = value.partition("-")
+        try:
+            frm = ipaddress.ip_address(left.strip())
+            to = ipaddress.ip_address(right.strip())
+        except ValueError:
+            return pd.Series(True, index=df.index)
+        if frm > to:
+            frm, to = to, frm
+
+        def _in_range(ip):
+            try:
+                return frm <= ipaddress.ip_address(str(ip)) <= to
+            except ValueError:
+                return False
+
+        return df[col].apply(_in_range)
     return df[col].astype(str) == value
 
 
