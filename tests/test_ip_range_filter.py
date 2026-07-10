@@ -59,6 +59,30 @@ def test_resolve_ip_filter_to_actors_single_ip(client):
     assert client._labels._resolve_ip_filter_to_actors("1.1.1.1") == [{"ip_address": "1.1.1.1"}]
 
 
+# ─── CIDR literal 應直接走 ip_address native actor（非 IP List 名稱查找）───
+
+def test_is_ip_literal_accepts_cidr(client):
+    assert client._labels._is_ip_literal("10.0.0.0/24") is True
+    assert client._labels._is_ip_literal("172.16.15.106/32") is True
+
+
+def test_resolve_ip_filter_to_actor_accepts_cidr(client):
+    assert client._labels._resolve_ip_filter_to_actor("10.0.0.0/24") == {"ip_address": "10.0.0.0/24"}
+
+
+def test_resolve_ip_filter_to_actors_single_cidr(client):
+    assert client._labels._resolve_ip_filter_to_actors("10.0.0.0/24") == [{"ip_address": "10.0.0.0/24"}]
+
+
+def test_src_ip_in_cidr_native_payload_consumed(client):
+    p = _payload(client, {"src_ip_in": ["10.0.0.0/24"]})
+    include = p["sources"]["include"]
+    assert [{"ip_address": "10.0.0.0/24"}] in include
+    diag = client.last_traffic_query_diagnostics
+    assert "src_ip_in" in diag["native_filters"]
+    assert "src_ip_in" not in diag.get("unresolved_native_filters", {})
+
+
 def test_resolve_ip_filter_to_actors_range_expands_to_cidrs(client):
     items = client._labels._resolve_ip_filter_to_actors("10.0.0.5-10.0.0.6")
     assert items == [{"ip_address": "10.0.0.5/32"}, {"ip_address": "10.0.0.6/32"}]
