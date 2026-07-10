@@ -100,38 +100,8 @@ class LabelResolver:
 
     @staticmethod
     def _parse_port_range_entry(value, default_proto=None):
-        proto = default_proto
-        if isinstance(value, (list, tuple)):
-            if len(value) == 2:
-                start, end = value
-            elif len(value) == 3:
-                start, end, proto = value
-            else:
-                return None
-        else:
-            text = str(value).strip()
-            if not text:
-                return None
-            range_part = text
-            if "/" in text:
-                range_part, proto_part = text.split("/", 1)
-                proto = proto_part
-            elif ":" in text and text.count(":") == 1 and "-" in text:
-                range_part, proto_part = text.split(":", 1)
-                proto = proto_part
-            if "-" not in range_part:
-                return None
-            start, end = [part.strip() for part in range_part.split("-", 1)]
-        try:
-            start = int(start)
-            end = int(end)
-            if start > end:
-                start, end = end, start
-            if proto in (None, ""):
-                return {"port": start, "to_port": end}
-            return {"port": start, "to_port": end, "proto": int(proto)}
-        except (TypeError, ValueError):
-            return None
+        from src.port_token import parse_port_token
+        return parse_port_token(value, default_proto=default_proto)
 
     @staticmethod
     def _dedupe_query_group(items):
