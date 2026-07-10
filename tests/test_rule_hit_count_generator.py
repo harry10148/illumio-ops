@@ -157,6 +157,48 @@ class TestCsvEnrichment(unittest.TestCase):
         self.assertEqual(result.record_count, 3)
         self.assertTrue(result.module_results.get("enrich_failed"))
 
+    def test_enriches_when_ruleset_hrefs_are_draft_and_csv_hrefs_are_active(self):
+        """Production shape: get_all_rulesets() always returns DRAFT-form hrefs
+        (api_client.py hits /sec_policy/draft/...), but the native Rule Hit Count
+        CSV export always carries ACTIVE-form Rule HREFs (counts only cover
+        Active rules). A naive href == href join finds nothing and the report
+        silently ships with blank detail columns despite enrich_failed=False."""
+        api = MagicMock()
+        api.get_all_rulesets.return_value = _sample_rulesets()  # draft-form hrefs
+        api.resolve_actor_str.return_value = "All Workloads"
+        api.resolve_service_str.return_value = "443/tcp"
+        gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "rhc.csv")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "Rule HREF,Rule Hit Count\n"
+                    # active-form href, as real PCE CSV exports always are
+                    "/orgs/1/sec_policy/active/rule_sets/10/sec_rules/100,7\n"
+                )
+            result = gen.generate_from_csv(path)
+        self.assertFalse(result.module_results.get("enrich_failed"))
+        row = result.dataframe[result.dataframe["rule_id"] == "100"].iloc[0]
+        self.assertEqual(row["consumers"], "All Workloads")
+        self.assertEqual(row["services"], "443/tcp")
+        self.assertEqual(row["ruleset"], "RS-A")
+        self.assertEqual(row["rule_type"], "Allow")
+        self.assertEqual(row["enabled"], True)
+
+
+class TestGenerateFromCsvEmptyFile(unittest.TestCase):
+    def test_zero_byte_csv_raises_friendly_valueerror(self):
+        gen = RuleHitCountGenerator(MagicMock(), api_client=None)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "empty.csv")
+            open(path, "w").close()  # 0-byte file
+            with self.assertRaises(ValueError) as ctx:
+                gen.generate_from_csv(path)
+            # Should be a friendly, actionable message (like the missing-columns
+            # error), not pandas' raw "No columns to parse from file".
+            self.assertIn("empty", str(ctx.exception).lower())
+            self.assertNotIn("No columns to parse", str(ctx.exception))
+
 
 if __name__ == "__main__":
     unittest.main()

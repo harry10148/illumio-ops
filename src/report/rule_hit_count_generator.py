@@ -71,7 +71,10 @@ class RuleHitCountGenerator:
         if not os.path.isfile(csv_path):
             raise FileNotFoundError(f"CSV not found: {csv_path}")
 
-        df = pd.read_csv(csv_path, encoding='utf-8-sig')
+        try:
+            df = pd.read_csv(csv_path, encoding='utf-8-sig')
+        except pd.errors.EmptyDataError:
+            raise ValueError(f"rule hit count CSV is empty: {csv_path}") from None
         df.columns = [_norm_header(c) for c in df.columns]
         df = df.rename(columns={c: _CSV_ALIASES[c] for c in df.columns if c in _CSV_ALIASES})
         logger.info(f"Loaded rule hit count CSV: {len(df)} rows, columns={list(df.columns)}")
@@ -146,7 +149,19 @@ class RuleHitCountGenerator:
         except Exception as exc:
             logger.warning("Rule detail enrichment skipped: {}", exc)
             return True
-        by_href = {r.get('href', ''): r for r in flat_rules}
+        # get_all_rulesets() always hits the DRAFT sec_policy endpoint, so rule
+        # hrefs here are draft-form. The native Rule Hit Count CSV export always
+        # carries ACTIVE-form Rule HREFs (hit counts only cover Active rules).
+        # Key both forms so the join below matches regardless of which shape
+        # the CSV or a future native-API path supplies (cf. label_cache /
+        # service_ports_cache double-keying in src/api/labels.py).
+        by_href = {}
+        for r in flat_rules:
+            href = r.get('href', '')
+            if not href:
+                continue
+            by_href[href] = r
+            by_href[href.replace('/draft/', '/active/')] = r
         for row in rows:
             rule = by_href.get(row['rule_href'])
             if not rule:
