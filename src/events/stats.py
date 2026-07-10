@@ -67,6 +67,17 @@ class StatsTracker:
         pce_stats = self.state.setdefault("pce_stats", {})
         pce_stats["last_success"] = now_str
         pce_stats["consecutive_failures"] = 0
+        # A real PCE probe succeeding means any prior watchdog incident is
+        # over: clear its cooldown timestamp so a fresh run of failures isn't
+        # suppressed by the previous incident's alert. watchdog_last_alert_at
+        # is a top-level analyzer-owned key (not part of pce_stats); self.state
+        # here is always the full top-level state dict (Analyzer's own state,
+        # or the scheduler's on-disk state via _record_ingest_pce_result), so
+        # it is reachable from here. Set to None rather than popped: Analyzer's
+        # save_state() merge overlay (self.state onto disk's existing) only
+        # overwrites keys present in self.state, so a pop would leave a stale
+        # on-disk value in place, but a None value overwrites it correctly.
+        self.state["watchdog_last_alert_at"] = None
         if stage == "health":
             pce_stats["health_status"] = "ok"
             pce_stats["last_health_check"] = now_str
