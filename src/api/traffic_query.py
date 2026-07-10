@@ -25,6 +25,7 @@ import orjson
 from loguru import logger
 
 from src.i18n import t
+from src.port_token import parse_port_token
 
 MAX_TRAFFIC_RESULTS = 200000
 
@@ -53,6 +54,8 @@ _TRAFFIC_FILTER_CAPABILITIES = {
     "port": {"execution": "native", "min_pce_version": "21.2", "notes": "Pushed to services.include."},
     "proto": {"execution": "native", "min_pce_version": "21.2", "notes": "Combined with port or port range in services.include."},
     "ex_port": {"execution": "native", "min_pce_version": "21.2", "notes": "Pushed to services.exclude."},
+    "ports": {"execution": "native", "min_pce_version": "21.2", "notes": "Port tokens (80, 443/tcp, 1000-2000/tcp) pushed to services.include."},
+    "ex_ports": {"execution": "native", "min_pce_version": "21.2", "notes": "Port tokens pushed to services.exclude."},
     "port_range": {"execution": "native", "min_pce_version": "21.2", "notes": "Single port range expression for services.include."},
     "port_ranges": {"execution": "native", "min_pce_version": "21.2", "notes": "Multiple port range expressions for services.include."},
     "ex_port_range": {"execution": "native", "min_pce_version": "21.2", "notes": "Single port range expression for services.exclude."},
@@ -443,6 +446,26 @@ class TrafficQueryBuilder:
                 _record_unresolved("ex_port", spec.native_filters.get("ex_port"))
                 _consume_keys(("ex_port",))
 
+        for key, target in (("ports", "include"), ("ex_ports", "exclude")):
+            values = native_filters.get(key)
+            if not values:
+                continue
+            entries = values if isinstance(values, (list, tuple)) else [values]
+            parsed_entries = []
+            unresolved = False
+            for entry in entries:
+                parsed = parse_port_token(entry)
+                if not parsed:
+                    unresolved = True
+                    break
+                parsed_entries.append(parsed)
+            if unresolved:
+                _record_unresolved(key, spec.native_filters.get(key))
+            else:
+                payload["services"][target].extend(parsed_entries)
+                _record_consumed(key, spec.native_filters.get(key))
+            _consume_keys((key,))
+
         default_proto = native_filters.get("proto")
         for key, target in (("port_range", "include"), ("port_ranges", "include"),
                             ("ex_port_range", "exclude"), ("ex_port_ranges", "exclude")):
@@ -787,6 +810,24 @@ class TrafficQueryBuilder:
         def _workload_hit(side: dict, value: str) -> bool:
             return (side.get('workload') or {}).get('href') == value
 
+        def _port_entry_hit(svc, flow, entry):
+            """flow 的 service port/proto 是否命中一個 parse_port_token 條目。"""
+            try:
+                flow_port = svc.get('port') or flow.get('dst_port')
+                flow_proto = svc.get('proto') or flow.get('proto')
+                if "port" in entry:
+                    if flow_port is None:
+                        return False
+                    p = int(flow_port)
+                    if not (entry["port"] <= p <= entry.get("to_port", entry["port"])):
+                        return False
+                if entry.get("proto") is not None:
+                    if flow_proto is None or int(flow_proto) != int(entry["proto"]):
+                        return False
+                return True
+            except (TypeError, ValueError):
+                return False
+
         # 同 key any、跨 key all —— 與 native 路徑的 OR 展開語意一致（spec §2.2）
         for fkey, side_obj in (("src_labels", src), ("dst_labels", dst)):
             specs = [s for s in (filters.get(fkey) or []) if s]
@@ -808,6 +849,14 @@ class TrafficQueryBuilder:
                     return False
             except (ValueError, TypeError):
                 pass
+
+        ports_inc = filters.get('ports')
+        if ports_inc:
+            ports_inc = ports_inc if isinstance(ports_inc, list) else [ports_inc]
+            tokens = [t_ for t_ in (parse_port_token(v) for v in ports_inc) if t_]
+            # fail-closed：有條件但全數無法解析 → 不命中
+            if not any(_port_entry_hit(svc, flow, t_) for t_ in tokens):
+                return False
 
         proto_filter = filters.get('proto')
         if proto_filter:
@@ -887,6 +936,13 @@ class TrafficQueryBuilder:
                     return False
             except (ValueError, TypeError):
                 pass
+
+        ports_exc = filters.get('ex_ports')
+        if ports_exc:
+            ports_exc = ports_exc if isinstance(ports_exc, list) else [ports_exc]
+            for t_ in (parse_port_token(v) for v in ports_exc):
+                if t_ and _port_entry_hit(svc, flow, t_):
+                    return False
 
         ex_any_label = filters.get('ex_any_label')
         if ex_any_label:
