@@ -305,7 +305,7 @@ def make_events_blueprint(
 
     @bp.route('/api/event-catalog')
     def api_event_catalog():
-        from src.events.catalog import LOCAL_EXTENSION_EVENT_TYPES
+        from src.events.catalog import OBSERVED_EXTENSION_EVENT_TYPES
         from src.settings import FULL_EVENT_CATALOG, ACTION_EVENTS, SEVERITY_FILTER_EVENTS, EVENT_DESCRIPTION_KEYS, EVENT_TIPS_KEYS
         from src.i18n import t
 
@@ -366,7 +366,7 @@ def make_events_blueprint(
                     'description': description,
                     'tips': tips,
                     'related_events': related,
-                    'source': 'local_extension' if event_id in LOCAL_EXTENSION_EVENT_TYPES else 'vendor_baseline',
+                    'source': 'local_extension' if event_id in OBSERVED_EXTENSION_EVENT_TYPES else 'vendor_baseline',
                     'supports_status': supports_status,
                     'supports_severity': supports_severity,
                     'group_id': group_id,
