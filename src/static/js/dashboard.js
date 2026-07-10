@@ -1279,6 +1279,12 @@ async function _doGenerateRuleHitCount() {
       } else {
         toast(r.error || _t('gui_toast_rhc_fail'), 'err');
       }
+    } else if (r.pull_timeout) {
+      // PCE hasn't finished preparing the native report yet — this is not a
+      // hard failure, so use the 'warn' toast/framing and point at retry
+      // instead of the generic failure path (mirrors needs_enablement above).
+      _hideGenProgress(false, r.error || _t('gui_rhc_pull_timeout'));
+      toast(r.error || _t('gui_rhc_pull_timeout'), 'warn');
     } else {
       _hideGenProgress(false, r.error || _t('gui_toast_rhc_fail'));
       toast(r.error || _t('gui_toast_rhc_fail'), 'err');
