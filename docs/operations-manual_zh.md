@@ -720,6 +720,56 @@ Web GUI 預設以 **HTTPS** 服務（`web_gui.tls.enabled: true`、`self_signed:
 
 - **flask-talisman**（`requirements.txt` Phase 4，安全 headers）：上游專案已**archived**（不再有後續發版）。目前不是急迫問題——套件本身仍可運作——但應在它真正變成相容性／CVE 風險之前規劃退場路徑。屆時的退場路徑：自寫一個 `after_request` hook（約 100 行），直接設定相同的安全 headers（CSP、HSTS、X-Frame-Options 等），移除此相依套件。
 
+### 8.9 容量規劃與 7/24 維運（Capacity Planning & 24/7 Operation）
+
+#### 容量基準
+
+實測基準（測試機）：12,056 筆 raw flow 佔 27.6MB——每列全成本約 **2.3KB**（含索引與 raw/report JSON 欄位）。以 7 天線上窗口（`traffic_raw_retention_days` 預設 7）推估：
+
+| Flows/day | 7 天 cache 估計大小 |
+|---|---|
+| 10,000 | 約 160MB |
+| 100,000 | 約 1.6GB |
+| 1,000,000 | 約 16GB |
+
+archiver 把舊檔 gzip 壓縮後（`archive_gzip_after_days`，預設 7 天），長期 JSONL archive 目錄的成長率約為每 100 萬筆/日 **120MB/天**——這是與上面 cache 大小分開的另一筆預算；請據此規劃 archive 磁碟容量，並依賴 `archive_retention_days` 修剪來長期控制上限。
+
+#### 調校旋鈕一覽
+
+| 設定 | 預設 | 作用 |
+|---|---|---|
+| `traffic_poll_interval_seconds` | 600 | 流量輪詢間隔——這是隨附 `config.json.example` 範本實際填的值，也是 [8.1](#81-pce-cache保留策略) 記載的實際生效預設；若 key 完全從自行編輯的 config 中省略，Pydantic schema 的裸預設值是 `3600` |
+| ingest `max_results` | 200000 | 單次 PCE 流量查詢視窗的硬上限。當某視窗結果數碰到此上限，ingestor 會自動二分該視窗（binary split，最深 6 層、1 分鐘 floor）抽乾，而不是無聲丟資料——細節見下 |
+| SIEM `batch_size` × `dispatch_tick_seconds` | 100 × 5 | 隨附 `config.json.example` 範本的預設值（`dispatch_tick_seconds: 5`，與 [7.2](#72-設定-destination) 一致）把每個目的地的 SIEM 吞吐上限約束在 100 × (86400s / 5s) ≈ **173 萬筆/天**；若 key 完全省略，Pydantic schema 的裸預設值是 30 秒（≈ 28.8 萬筆/天）——若某目的地需要更高吞吐，調大 `batch_size`（上限 10000） |
+| `cache_read_max_rows` | 500000 | 每次報表 cache 讀取的列數護欄（防 OOM）；超過時 fallback 走即時 PCE API 並記 WARNING |
+| `disk_free_warn_gb` | 10 | 容量監控對磁碟剩餘空間的 WARNING 門檻 |
+| `siem_pending_warn_rows` | 50000 | 容量監控對 SIEM 派送積壓的 WARNING 門檻 |
+| `archive_retention_days` | 0（＝永久保留） | JSONL archive 修剪視窗；`0` 代表完全不修剪——若維持 0，務必確保磁碟監控（`disk_free_warn_gb`）真的有開啟並被盯著 |
+
+> 即時（非 cache）流量查詢有自己另一道硬上限 `MAX_TRAFFIC_RESULTS = 200000`（`src/api/traffic_query.py`）。碰到此上限同樣會記 WARNING，代表上限之外可能還有更多 flow。
+
+**ingest 自動二分細節：** 當某次流量 ingest 視窗結果數碰到 `max_results`（200000），ingestor 不會截斷資料，而是遞迴二分該視窗，最深 6 層、floor 為 1 分鐘。若連 1 分鐘 floor 視窗仍碰頂，ingestor 會放棄該視窗並記 WARNING，代表該分鐘資料可能不完整——這只會在持續 **每秒約 3,300 筆以上**（200,000 ÷ 60s）的流量下發生，遠超一般 PCE 流量規模。
+
+#### 7/24 營運注意
+
+- 正式常駐一律只用 **`--monitor-gui`**。systemd unit（`deploy/illumio-ops.service`）啟動指令為 `--monitor-gui --interval 10`，並配 `Restart=on-failure`。
+- **絕不可**用 `--gui`（GUI-only 模式）常駐正式環境：該模式不啟動任何排程，cache 的 ingestion／aggregation／retention 都不會自動觸發——cache 只能靠手動 Backfill 填入，也不再被清理。程式碼本身即有明確警語（`src/cli/_runtime.py:97-106`）：
+  > 「GUI-only mode: PCE cache is enabled but no scheduler runs here — automatic ingestion/aggregation/retention will NOT fire (manual Backfill only). Use 'monitor-gui' for live cache ingestion.」
+- 修改 `config.json` 中屬於**排程類**的設定（輪詢間隔、archive 開關等）後，需讓 daemon 重新載入才生效：呼叫 `POST /api/daemon/restart`，或重啟服務（`sudo systemctl restart illumio-ops`）。此重啟端點僅在 daemon 由 GUI 行程內管理時可用（即 `--monitor-gui` 模式）；其他情況會回傳 `409`，須改用完整服務重啟。
+- 日誌 rotation 已內建——每檔 10MB × 10 份輪替，輪替時自動 gzip 壓縮——不需外部 logrotate 設定。
+
+#### 要盯的三個預警數字
+
+一併呈現於 `/api/cache/health` 的 `capacity` 欄位（容量監控 job 每 30 分鐘也會記一次 log）；若 snapshot 本身失敗會降級為 `null`，因此 `capacity` 欄位缺席本身就值得追查：
+
+1. **磁碟剩餘空間**——低於 `disk_free_warn_gb`（預設 10GB）時 WARNING。
+2. **`siem_pending`**——SIEM 派送佇列中的待處理列數；超過 `siem_pending_warn_rows`（預設 50000）時 WARNING。
+3. **`archiver_lag_seconds`**（分 traffic／audit 兩來源）——超過 `archive_interval_hours` 的 2 倍（預設 24 小時 → 48 小時告警），或某來源有資料但從未被封存過時 WARNING。**這是三者中最急迫的一個**：`archive_enabled` 開啟時，retention 的刪除步驟只會刪「已封存」的列——若某來源的 archiver 從未跑過、或落後於 retention 的刪除界線，retention 會對該來源完全停止刪除（log 為 `retention guard: ... withholding un-archived rows`）。`archiver_lag_seconds` 持續上升，代表 DB 正卡在一個停滯的 archiver 後面無上限成長——須立即查 archive job。
+
+#### 交叉引用
+
+告警送達可靠性與 dead-man's switch（偵測告警管線整體靜默）屬另一計畫，見 `docs/superpowers/plans/2026-07-04-alert-reliability-and-event-catalog-audit.md`。
+
 ---
 
 ## 9. 疑難排解

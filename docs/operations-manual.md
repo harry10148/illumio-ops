@@ -720,6 +720,56 @@ Packages that still work today but need an eye kept on them for a future mainten
 
 - **flask-talisman** (`requirements.txt` Phase 4, security headers): upstream project is **archived** (no further releases expected). Not an immediate problem — the package still functions — but plan an exit path before it becomes a real compatibility/CVE risk. Exit path if/when needed: replace with a self-written `after_request` hook (~100 lines) setting the same security headers (CSP, HSTS, X-Frame-Options, etc.) directly, dropping the dependency.
 
+### 8.9 Capacity Planning & 24/7 Operation
+
+#### Capacity baseline
+
+Measured on a test host: 12,056 raw flow rows occupied 27.6 MB — an all-in cost of about **2.3 KB per raw flow row** (indexes plus the raw/report JSON columns included). Extrapolated to a 7-day online window (`traffic_raw_retention_days` default 7):
+
+| Flows/day | Estimated 7-day cache size |
+|---|---|
+| 10,000 | ~160 MB |
+| 100,000 | ~1.6 GB |
+| 1,000,000 | ~16 GB |
+
+Once the archiver gzip-compresses old files (`archive_gzip_after_days`, default 7 days), the long-term JSONL archive directory grows at roughly **120 MB/day per 1,000,000 flows/day** — a separate budget from the live cache above; size the archive volume accordingly and rely on `archive_retention_days` pruning to bound it long-term.
+
+#### Tuning knobs
+
+| Setting | Default | Effect |
+|---|---|---|
+| `traffic_poll_interval_seconds` | 600 | Traffic poller interval — the value shipped in `config.json.example` and what [8.1](#81-pce-cache-and-retention-policy) documents as the effective default; the bare Pydantic schema fallback is `3600` if the key is entirely absent from a hand-edited config |
+| ingest `max_results` | 200000 | Hard cap per PCE traffic query window. When a window's result count hits this cap, the ingestor auto-bisects the window (binary split, max depth 6, 1-minute floor) instead of silently dropping data — see below |
+| SIEM `batch_size` × `dispatch_tick_seconds` | 100 × 5 | The shipped `config.json.example` default (`dispatch_tick_seconds: 5`, matching [7.2](#72-configuring-a-destination)) bounds default SIEM throughput to about 100 × (86400s / 5s) ≈ **1.73M records/day per destination**; the bare Pydantic schema fallback is 30s if the key is entirely absent (≈ 288,000 records/day) — raise `batch_size` (up to 10000) if a destination needs to sustain more |
+| `cache_read_max_rows` | 500000 | Per-report cache-read row guard against OOM; exceeding it falls back to the live PCE API with a WARNING log |
+| `disk_free_warn_gb` | 10 | Capacity monitor WARNING threshold for free disk space |
+| `siem_pending_warn_rows` | 50000 | Capacity monitor WARNING threshold for the SIEM dispatch backlog |
+| `archive_retention_days` | 0 (= keep forever) | JSONL archive pruning window; `0` disables pruning entirely — leave it at 0 only if disk-space monitoring (`disk_free_warn_gb`) is actually enabled and watched |
+
+> Live (non-cache) traffic queries have their own separate hard ceiling, `MAX_TRAFFIC_RESULTS = 200000` (`src/api/traffic_query.py`). Hitting it also logs a WARNING that more flows may exist beyond the cap.
+
+**Ingest auto-bisect in detail:** when a traffic ingest window's result count reaches `max_results` (200000), the ingestor recursively bisects the window rather than truncating it, down to a maximum depth of 6, with a 1-minute floor. If the 1-minute floor window *still* hits the cap, the ingestor gives up on that window and logs a WARNING that the minute's data may be incomplete — this only happens above roughly **3,300 flows/second sustained** (200,000 ÷ 60s), well beyond ordinary PCE traffic volumes.
+
+#### 24/7 operation
+
+- Run production instances with **`--monitor-gui`** only. The systemd unit (`deploy/illumio-ops.service`) invokes `--monitor-gui --interval 10` with `Restart=on-failure`.
+- **Never** run `--gui` (GUI-only mode) as the persistent production process. GUI-only mode starts no scheduler, so cache ingestion/aggregation/retention never fire automatically — the cache only fills via manual Backfill, and it stops being cleaned up. The code itself warns loudly about this (`src/cli/_runtime.py:97-106`):
+  > "GUI-only mode: PCE cache is enabled but no scheduler runs here — automatic ingestion/aggregation/retention will NOT fire (manual Backfill only). Use 'monitor-gui' for live cache ingestion."
+- After changing a *scheduling*-related setting (poll intervals, archive on/off, etc.) in `config.json`, the change does not take effect until the daemon reloads it: call `POST /api/daemon/restart`, or restart the service (`sudo systemctl restart illumio-ops`). The restart endpoint only works when the GUI owns the daemon in-process (i.e. under `--monitor-gui`); otherwise it returns `409` and a full service restart is required.
+- Log rotation is built in — 10 MB per file × 10 rotations, gzip-compressed automatically on rotation — no external logrotate configuration needed.
+
+#### Three numbers to watch
+
+Surfaced together in `/api/cache/health`'s `capacity` field (and logged every 30 minutes by the capacity monitor job); the field degrades to `null` if the snapshot itself fails, so a missing `capacity` field is itself worth investigating:
+
+1. **Free disk space** — WARNING below `disk_free_warn_gb` (default 10 GB).
+2. **`siem_pending`** — pending rows in the SIEM dispatch queue; WARNING above `siem_pending_warn_rows` (default 50000).
+3. **`archiver_lag_seconds`** (per source: traffic/audit) — WARNING when it exceeds 2× `archive_interval_hours` (default 24h → 48h), or when a source has data but has never been archived. **This is the most urgent of the three**: when `archive_enabled` is on, retention's delete step only ever deletes rows that are already archived — if the archiver has never run for a source, or is behind the retention cutoff, retention withholds deletion for that source entirely (logged as `retention guard: ... withholding un-archived rows`). A rising `archiver_lag_seconds` therefore means the database is growing unbounded behind a stalled archiver — investigate the archive job immediately.
+
+#### Cross-reference
+
+Alert delivery reliability and the dead-man's-switch (detecting a fully silent alerting pipeline) are covered by a separate initiative — see `docs/superpowers/plans/2026-07-04-alert-reliability-and-event-catalog-audit.md`.
+
 ---
 
 ## 9. Troubleshooting
