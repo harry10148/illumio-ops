@@ -858,7 +858,8 @@ async function loadArchiveRange() {
         if (el) el.textContent = _t('gui_traffic_archive_no_files');
         return;
       }
-      break; // done → 以既有 status 呈現邏輯刷新
+      // done → 以既有 status 呈現邏輯刷新
+      break;
     }
   } catch (e) {
     if (el) el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', String(e));
