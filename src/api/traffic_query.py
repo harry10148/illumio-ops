@@ -734,6 +734,7 @@ class TrafficQueryBuilder:
             if state == "failed":
                 print(f" {t('query_failed', default='Failed.')}")
                 logger.error("Traffic query failed.")
+                c.last_fetch_error = f"async query state failed: {state}"
                 return
             print(".", end="", flush=True)
             interval = min(interval + 1, 10)
@@ -743,6 +744,7 @@ class TrafficQueryBuilder:
                 "Traffic query timed out after {}s (PCE still computing).",
                 _ASYNC_QUERY_MAX_WAIT_SECONDS,
             )
+            c.last_fetch_error = f"async query poll timeout after {_ASYNC_QUERY_MAX_WAIT_SECONDS}s"
             return
 
         if compute_draft:
@@ -785,6 +787,7 @@ class TrafficQueryBuilder:
             dl_status, dl_body = c._request(dl_url, timeout=60, rate_limit=rate_limit)
             if dl_status != 200:
                 logger.error(f"Download failed: {dl_status}")
+                c.last_fetch_error = f"async query download failed: HTTP {dl_status}"
                 return None
             rows = []
             buffer = BytesIO(dl_body)

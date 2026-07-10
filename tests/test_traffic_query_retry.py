@@ -228,6 +228,69 @@ def test_execute_traffic_query_stream_threads_rate_limit(monkeypatch):
     assert captured.get("rate_limit") is True
 
 
+# ── Task 1 (Hardening follow-ups): remaining three swallowed-error branches
+# in _submit_and_stream_async_query (poll timeout, state=="failed", download
+# failure) must also surface into last_fetch_error, same convention as the
+# submit-failure / connection-failure fix above.
+
+
+def test_poll_timeout_sets_last_fetch_error(monkeypatch):
+    c = _client()
+    c.last_fetch_error = None
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        if url.endswith("/async_queries"):
+            return 202, json.dumps({"href": "/orgs/1/traffic_flows/async_queries/q1"}).encode()
+        return 200, json.dumps({"status": "running"}).encode()
+
+    c._request.side_effect = fake_request
+    monkeypatch.setattr("src.api.traffic_query._ASYNC_QUERY_MAX_WAIT_SECONDS", 0)
+    b = TrafficQueryBuilder(c)
+    with patch("src.api.traffic_query.time.sleep", lambda *a, **k: None):
+        rows = list(b._submit_and_stream_async_query({}))
+
+    assert rows == []
+    assert c.last_fetch_error is not None and "timeout" in c.last_fetch_error.lower()
+
+
+def test_query_state_failed_sets_last_fetch_error():
+    c = _client()
+    c.last_fetch_error = None
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        if url.endswith("/async_queries"):
+            return 202, json.dumps({"href": "/orgs/1/traffic_flows/async_queries/q1"}).encode()
+        return 200, json.dumps({"status": "failed"}).encode()
+
+    c._request.side_effect = fake_request
+    b = TrafficQueryBuilder(c)
+    with patch("src.api.traffic_query.time.sleep", lambda *a, **k: None):
+        rows = list(b._submit_and_stream_async_query({}))
+
+    assert rows == []
+    assert c.last_fetch_error is not None and "failed" in c.last_fetch_error.lower()
+
+
+def test_download_failure_sets_last_fetch_error():
+    c = _client()
+    c.last_fetch_error = None
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        if url.endswith("/async_queries"):
+            return 202, json.dumps({"href": "/orgs/1/traffic_flows/async_queries/q1"}).encode()
+        if url.endswith("/download"):
+            return 500, None
+        return 200, json.dumps({"status": "completed", "matches_count": 1}).encode()
+
+    c._request.side_effect = fake_request
+    b = TrafficQueryBuilder(c)
+    with patch("src.api.traffic_query.time.sleep", lambda *a, **k: None):
+        rows = list(b._submit_and_stream_async_query({}))
+
+    assert rows == []
+    assert c.last_fetch_error is not None and "download" in c.last_fetch_error.lower()
+
+
 def test_fetch_traffic_for_report_threads_rate_limit(monkeypatch):
     """fetch_traffic_for_report must forward rate_limit down to
     execute_traffic_query_stream."""
