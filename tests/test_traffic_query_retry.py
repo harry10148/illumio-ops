@@ -271,6 +271,23 @@ def test_query_state_failed_sets_last_fetch_error():
     assert c.last_fetch_error is not None and "failed" in c.last_fetch_error.lower()
 
 
+def test_submit_accepted_but_no_href_sets_last_fetch_error():
+    c = _client()
+    c.last_fetch_error = None
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        if url.endswith("/async_queries"):
+            return 202, json.dumps({"status": "queued"}).encode()
+        return 200, json.dumps({"status": "completed", "matches_count": 1}).encode()
+
+    c._request.side_effect = fake_request
+    b = TrafficQueryBuilder(c)
+    rows = list(b._submit_and_stream_async_query({}))
+
+    assert rows == []
+    assert c.last_fetch_error is not None and "href" in c.last_fetch_error.lower()
+
+
 def test_download_failure_sets_last_fetch_error():
     c = _client()
     c.last_fetch_error = None

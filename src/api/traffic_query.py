@@ -695,6 +695,7 @@ class TrafficQueryBuilder:
         result = orjson.loads(body)
         if result.get("status") in ("queued", "pending") and not result.get("href"):
             logger.error(f"Async query accepted but no href returned: {result}")
+            c.last_fetch_error = f"async query submit returned no href (status={result.get('status')})"
             return
         job_url = result.get("href")
         print(t('waiting_traffic', default='Waiting for traffic calculation...'), end="", flush=True)
