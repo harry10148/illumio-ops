@@ -38,6 +38,11 @@ def _valid_ip_or_cidr(text):
     try:
         if "/" in text:
             ipaddress.ip_network(text, strict=False)
+        elif "-" in text:
+            # IPv4 range：a.b.c.d-a.b.c.d，兩側各自須為合法 IP（from>to 由展開端對調）
+            left, _, right = text.partition("-")
+            ipaddress.IPv4Address(left.strip())
+            ipaddress.IPv4Address(right.strip())
         else:
             ipaddress.ip_address(text)
         return True

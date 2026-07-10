@@ -78,6 +78,27 @@ def test_invalid_cidr_rejected(monkeypatch):
     assert out == {"ips": ["10.0.0.1"]}
 
 
+def test_valid_ip_or_cidr_accepts_range():
+    from src.cli.object_picker import _valid_ip_or_cidr
+    assert _valid_ip_or_cidr("10.0.0.5-10.0.0.50") is True
+    assert _valid_ip_or_cidr("10.0.0.50-10.0.0.5") is True  # from>to 仍是合法字面值，展開端才對調
+
+
+def test_valid_ip_or_cidr_rejects_illegal_range():
+    from src.cli.object_picker import _valid_ip_or_cidr
+    assert _valid_ip_or_cidr("10.0.0.5-not-an-ip") is False
+    assert _valid_ip_or_cidr("999.1.1.1-10.0.0.50") is False
+
+
+def test_non_tty_manual_path_accepts_ip_range(monkeypatch):
+    from src.cli import object_picker as op
+    monkeypatch.setattr(op, "_interactive_ok", lambda: False)
+    inputs = iter(["", "10.0.0.5-10.0.0.50, 10.0.0.5-not-an-ip"])
+    monkeypatch.setattr("builtins.input", lambda *_: next(inputs))
+    out = op.pick_objects(_api(), cats=("label", "ip"), title="src")
+    assert out == {"ips": ["10.0.0.5-10.0.0.50"]}
+
+
 def test_preselected_backfill(monkeypatch):
     # 編輯回填：preselected 直接帶入結果（非 TTY 空輸入=保留）
     from src.cli import object_picker as op

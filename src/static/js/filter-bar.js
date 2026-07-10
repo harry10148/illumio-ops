@@ -12,8 +12,13 @@ let _objfbSeq = 0;
 
 function _objfbIsIpLike(s) {
   const t = String(s).trim();
-  return /^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(t) &&
-    t.split('/')[0].split('.').every(o => +o <= 255);
+  // 單一 IP、CIDR（/prefix），或 IPv4 range（a.b.c.d-a.b.c.d，兩側各自過八位組檢查）。
+  const octetsOk = (ip) => ip.split('.').every(o => +o <= 255);
+  const m = t.match(/^(\d{1,3}(?:\.\d{1,3}){3})(?:\/(\d{1,2})|-(\d{1,3}(?:\.\d{1,3}){3}))?$/);
+  if (!m) return false;
+  if (!octetsOk(m[1])) return false;
+  if (m[3] && !octetsOk(m[3])) return false;
+  return true;
 }
 
 // port token：80 / 443/tcp / 1000-2000 / 1000-2000/udp（proto 也收數字）
