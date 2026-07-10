@@ -209,12 +209,15 @@ def api_cache_health():
             denom=totals["denom"],
             dlq=totals["dlq"],
         )
+        from src.pce_cache.capacity import capacity_snapshot
+        capacity = capacity_snapshot(sf, current_app.config["CM"].models.pce_cache)
         return jsonify({
             "verdict": verdict,
             "lag_levels": levels,
             "cache_lag": cache_lag,
             "siem_success_1h": success_1h,
             "dlq": totals["dlq"],
+            "capacity": capacity,
         })
     except Exception as e:
         return _err_with_log("cache_health", e, lang=lang)

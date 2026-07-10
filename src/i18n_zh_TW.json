@@ -1,8 +1,11 @@
 {
   "advanced_filters": "--- 進階篩選 ---",
+  "alert_archiver_behind": "封存匯出落後（{source}）：約 {hours} 小時資料尚未封存——retention 守門已暫停刪除",
+  "alert_cache_disk_low": "磁碟剩餘空間不足：僅 {free_gb} GB（門檻 {warn_gb} GB）",
   "alert_cache_ingest_failing": "Cache 擷取持續失敗：來源={source} 最近錯誤={err}",
   "alert_cache_lag_error": "快取擷取器停止響應：來源={source} 延遲={lag}秒",
   "alert_cache_lag_warning": "快取擷取器延遲警告：來源={source} 延遲={lag}秒",
+  "alert_siem_backlog": "SIEM 派送積壓：{pending} 筆待送（門檻 {warn}）",
   "alert_cat_authentication_settings": "認證設定",
   "alert_cat_authz_csrf": "CSRF 驗證",
   "alert_cat_cluster": "叢集",

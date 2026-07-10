@@ -142,6 +142,10 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
                           executor="cache_writer")
             sched.add_job(run_cache_lag_monitor, _IT(seconds=60),
                           args=[cm], id="cache_lag_monitor", replace_existing=True)
+            from src.scheduler.jobs import run_capacity_monitor
+            sched.add_job(run_capacity_monitor, _IT(minutes=30),
+                          args=[cm], id="pce_cache_capacity_monitor",
+                          replace_existing=True)
             if cache_cfg.archive_enabled:
                 sched.add_job(run_cache_archive, _IT(hours=cache_cfg.archive_interval_hours),
                               args=[cm], id="pce_cache_archive", replace_existing=True,

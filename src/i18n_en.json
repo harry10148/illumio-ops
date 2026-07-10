@@ -1,8 +1,11 @@
 {
   "advanced_filters": "--- Advanced Filters ---",
+  "alert_archiver_behind": "Archive exporter behind for {source}: {hours} hours of data not yet archived — retention is withholding deletion",
+  "alert_cache_disk_low": "Low disk space: {free_gb} GB free (threshold {warn_gb} GB)",
   "alert_cache_ingest_failing": "Cache ingest keeps failing: source={source} last_error={err}",
   "alert_cache_lag_error": "Cache ingestor stalled: source={source} lag={lag}s",
   "alert_cache_lag_warning": "Cache ingestor lag warning: source={source} lag={lag}s",
+  "alert_siem_backlog": "SIEM dispatch backlog: {pending} pending rows (threshold {warn})",
   "alert_cat_authentication_settings": "Auth settings",
   "alert_cat_authz_csrf": "CSRF check",
   "alert_cat_cluster": "Cluster",

@@ -286,6 +286,28 @@ def run_posture_summary(cm) -> None:
             pass
 
 
+def run_capacity_monitor(cm) -> None:
+    """容量監控：唯讀，走 default executor（不佔 cache_writer）。"""
+    from sqlalchemy.orm import sessionmaker as _SM
+    from src.gui._helpers import _get_cache_engine
+    from src.pce_cache.capacity import capacity_snapshot, capacity_warnings
+    try:
+        cfg = cm.models.pce_cache
+        sf = _SM(_get_cache_engine(cfg.db_path))
+        snap = capacity_snapshot(sf, cfg)
+        logger.info(
+            "Capacity: db={}MB free={}GB siem_pending={} archiver_lag={}",
+            round(snap["db_bytes"] / (1 << 20), 1),
+            (round(snap["disk_free_bytes"] / (1 << 30), 1)
+             if snap["disk_free_bytes"] is not None else "n/a"),
+            snap["siem_pending"], snap["archiver_lag_seconds"],
+        )
+        for msg in capacity_warnings(snap, cfg):
+            logger.warning(msg)
+    except Exception:
+        logger.exception("Capacity monitor failed")
+
+
 def run_siem_dispatch(cm) -> None:
     from sqlalchemy.orm import sessionmaker
     from src.siem.dispatcher import enqueue_new_records, build_dispatcher

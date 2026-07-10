@@ -260,6 +260,8 @@ class PceCacheSettings(_Base):
     archive_gzip_after_days: int = Field(default=7, ge=1)
     archive_retention_days: int = Field(default=0, ge=0)  # 0 = 永久保留（不刪 archive 檔）
     archive_review_max_days: int = Field(default=31, ge=1)  # archive 查閱單次載入的日期範圍上限
+    disk_free_warn_gb: int = Field(default=10, ge=1)        # 磁碟剩餘低於此 GB 數告警
+    siem_pending_warn_rows: int = Field(default=50000, ge=1000)  # SIEM 佇列積壓告警門檻
 
 
 class SiemDestinationSettings(_Base):
