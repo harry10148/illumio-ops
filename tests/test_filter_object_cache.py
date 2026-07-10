@@ -23,6 +23,13 @@ def _api():
     api.get_label_groups.return_value = [
         {"name": "PG-Prod-Apps", "href": "/orgs/1/sec_policy/active/label_groups/5"},
     ]
+    api.get_services.return_value = [
+        {"name": "Web-Ports", "href": "/s/1",
+         "service_ports": [{"port": 80, "proto": 6}, {"port": 443, "proto": 6}]},
+        {"name": "RDP", "href": "/s/2",
+         "service_ports": [{"port": 3389, "proto": 6}],
+         "windows_services": [{"service_name": "TermService"}]},
+    ]
     return api
 
 
@@ -96,3 +103,25 @@ def test_stale_served_on_refetch_failure_after_expiry():
         assert r3["label"]["items"] == []
     finally:
         filter_object_cache._cache = orig_cache
+
+
+def test_search_service_with_summary():
+    api = MagicMock()
+    api.get_services.return_value = [
+        {"name": "Web-Ports", "href": "/s/1",
+         "service_ports": [{"port": 80, "proto": 6}, {"port": 443, "proto": 6}]},
+        {"name": "RDP", "href": "/s/2",
+         "service_ports": [{"port": 3389, "proto": 6}],
+         "windows_services": [{"service_name": "TermService"}]},
+    ]
+    invalidate_object_cache()
+    out = search_cached_objects(api, "web", ["service"], 10)
+    assert out["service"]["items"] == [
+        {"name": "Web-Ports", "href": "/s/1", "summary": "tcp/80, tcp/443"}]
+
+
+def test_service_summary_truncates_with_ellipsis():
+    from src.gui.filter_object_cache import _service_summary
+    svc = {"service_ports": [{"port": p, "proto": 6} for p in (1, 2, 3, 4, 5)]}
+    s = _service_summary(svc)
+    assert s.endswith(", …") and s.count(",") == 3  # 3 segments + ellipsis

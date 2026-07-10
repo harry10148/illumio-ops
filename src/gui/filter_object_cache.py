@@ -59,6 +59,27 @@ def _ip_list_summary(ipl: dict) -> str:
     return ", ".join(p for p in parts if p) + (", …" if more else "")
 
 
+_PROTO_NUM_TO_NAME = {6: "tcp", 17: "udp", 1: "icmp", 58: "icmpv6"}
+
+
+def _service_summary(svc: dict) -> str:
+    """service 條目組顯示摘要，最多 3 段，超出以 … 提示（不無聲截斷）。"""
+    parts = []
+    for sp in svc.get("service_ports") or []:
+        p = sp.get("port")
+        proto = _PROTO_NUM_TO_NAME.get(sp.get("proto"), str(sp.get("proto") or ""))
+        if p:
+            top = f"-{sp['to_port']}" if sp.get("to_port") else ""
+            parts.append(f"{proto}/{p}{top}" if proto else f"{p}{top}")
+        elif sp.get("proto") is not None:
+            parts.append(proto)
+    for w in svc.get("windows_services") or []:
+        n = w.get("service_name") or w.get("process_name")
+        if n:
+            parts.append(n)
+    return ", ".join(parts[:3]) + (", …" if len(parts) > 3 else "")
+
+
 def _match_labels(objs, q, limit):
     ql = q.lower()
     hits = []
@@ -70,35 +91,39 @@ def _match_labels(objs, q, limit):
     return hits[:limit], len(hits) > limit
 
 
-def _match_named(objs, q, limit, with_summary=False):
+def _match_named(objs, q, limit, summary_fn=None):
     ql = q.lower()
     hits = []
     for o in objs:
         name = o.get("name", "")
         if ql in name.lower():
             item = {"name": name, "href": o.get("href")}
-            if with_summary:
-                item["summary"] = _ip_list_summary(o)
+            if summary_fn:
+                item["summary"] = summary_fn(o)
             hits.append(item)
     return hits[:limit], len(hits) > limit
 
 
 def search_cached_objects(api, q: str, types: list[str], limit: int) -> dict[str, Any]:
-    """對 cached 三類（label/label_group/iplist）做子字串比對，回分類分組結果。
+    """對 cached 四類（label/label_group/iplist/service）做子字串比對，回分類分組結果。
 
-    只處理 types 中屬 cached 三類者；workload 由端點另行即時查。
+    只處理 types 中屬 cached 四類者；workload 由端點另行即時查。
     """
     out: dict[str, Any] = {}
     if "label" in types:
         objs = _get_or_fill(api, "labels", lambda a: a.get_all_labels())
         items, trunc = _match_labels(objs, q, limit)
-        out["label"] = {"items": items, "truncated": trunc}
+        out["label"] = {"items": items, "truncated": trunc, "error": None}
     if "iplist" in types:
         objs = _get_or_fill(api, "ip_lists", lambda a: a.get_ip_lists())
-        items, trunc = _match_named(objs, q, limit, with_summary=True)
-        out["iplist"] = {"items": items, "truncated": trunc}
+        items, trunc = _match_named(objs, q, limit, summary_fn=_ip_list_summary)
+        out["iplist"] = {"items": items, "truncated": trunc, "error": None}
     if "label_group" in types:
         objs = _get_or_fill(api, "label_groups", lambda a: a.get_label_groups())
         items, trunc = _match_named(objs, q, limit)
-        out["label_group"] = {"items": items, "truncated": trunc}
+        out["label_group"] = {"items": items, "truncated": trunc, "error": None}
+    if "service" in types:
+        objs = _get_or_fill(api, "services", lambda a: a.get_services())
+        items, trunc = _match_named(objs, q, limit, summary_fn=_service_summary)
+        out["service"] = {"items": items, "truncated": trunc, "error": None}
     return out

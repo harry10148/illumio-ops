@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-_CACHED_TYPES = ("label", "label_group", "iplist")
+_CACHED_TYPES = ("label", "label_group", "iplist", "service")
 _ALL_TYPES = _CACHED_TYPES + ("workload",)
 _MAX_LIMIT = 25
 
@@ -42,6 +42,12 @@ def make_filter_objects_blueprint(cm, csrf, limiter, login_required):
             # 快取類：module cache 若已填則離線也可回；填充失敗回空清單、不整體失敗
             try:
                 results.update(search_cached_objects(api, q, cached_types, limit))
+                # 檢查 PCE 健康狀況，若不通且 cached type 返回空，設置離線錯誤
+                status, _ = api.check_health()
+                if status != 200:
+                    for t in cached_types:
+                        if not results[t]["items"]:
+                            results[t]["error"] = "pce_unreachable"
             except Exception:
                 for t in cached_types:
                     results[t] = {"items": [], "error": "pce_unreachable"}
