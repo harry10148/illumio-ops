@@ -6,6 +6,7 @@ import pytest
 from src.api_client import ApiClient
 
 SVC_HREF = "/orgs/1/sec_policy/active/services/10"
+ALL_HREF = "/x/services/all"
 
 
 @pytest.fixture
@@ -174,3 +175,14 @@ def test_services_fallback_flow_match(client):
     resolve = client._labels.resolve_service_entries
     assert client._traffic._flow_matches_filters(flow, {"services": [SVC_HREF]}, resolve)
     assert not client._traffic._flow_matches_filters(flow, {"ex_services": [SVC_HREF]}, resolve)
+
+
+def test_services_mixed_href_wildcard_and_normal(client):
+    """混合 ALL_HREF（wildcard）與一般 SVC_HREF 時，整 services key
+    無約束（include 為空），且記為 consumed 而非 unresolved。"""
+    client.service_ports_cache[ALL_HREF] = [{"wildcard": True}]
+    client.service_ports_cache[SVC_HREF] = [{"port": 443, "proto": 6}]
+    p = _payload(client, {"services": [ALL_HREF, SVC_HREF]})
+    assert p["services"]["include"] == []
+    diag = client.last_traffic_query_diagnostics
+    assert "services" not in diag["unresolved_native_filters"]

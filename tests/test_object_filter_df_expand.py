@@ -109,6 +109,13 @@ class TestExpandObjectFiltersForDf(unittest.TestCase):
         out = self.client.expand_object_filters_for_df({"services": ["/x/services/1"]})
         assert out["_svc_port_entries"] == [{"port": 443, "proto": 6}]
 
+    def test_expand_wildcard_service_preserves_entry(self):
+        """All Services（{"wildcard": True}）條目應透過 cache 路徑保留，
+        不被當名稱型條目丟棄。"""
+        self.client.service_ports_cache["/x/services/all"] = [{"wildcard": True}]
+        out = self.client.expand_object_filters_for_df({"services": ["/x/services/all"]})
+        assert out["_svc_port_entries"] == [{"wildcard": True}]
+
     def test_report_generator_expands_services_before_df_filter(self):
         """迴歸測試：filters 僅含 services（無任何 iplist/workload key）時，
         _fetch_traffic_df 的 _obj_filter_keys gate 也必須觸發
