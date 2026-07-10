@@ -312,10 +312,12 @@ function _objfbUpdateDropdown(state) {
     state._suggest = null;
     state._suggestQ = null;
     if (state.scopeCat && state.scopeCat !== 'ip' && state.scopeCat !== 'port') {
-      _objfbRenderBrowse(state);   // 有 scope：空輸入即瀏覽該類別
+      // 有 scope：空輸入即瀏覽該類別
+      _objfbRenderBrowse(state);
       return;
     }
-    _objfbRenderCatChips(state);   // 無 scope：類別 chip 列（含 totals）
+    // 無 scope：類別 chip 列（含 totals）
+    _objfbRenderCatChips(state);
     return;
   }
 
@@ -400,7 +402,8 @@ function _objfbRenderBrowse(state, append) {
   fetch(`/api/filter-objects/browse?type=${cat}&offset=${offset}&limit=20`, { credentials: 'same-origin' })
     .then(r => r.json())
     .then(body => {
-      if (!state.els || state.els.input.value.trim() || state.scopeCat !== cat) return; // 已改變，放棄
+      // 已改變，放棄
+      if (!state.els || state.els.input.value.trim() || state.scopeCat !== cat) return;
       if (!body.ok) throw new Error(body.error || 'browse');
       const prev = (append && state._browse && state._browse.type === cat) ? state._browse.items : [];
       state._browse = { type: cat, items: prev.concat(body.items), total: body.total, groups: body.groups || null };
