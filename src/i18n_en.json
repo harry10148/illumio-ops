@@ -1,5 +1,6 @@
 {
   "advanced_filters": "--- Advanced Filters ---",
+  "alert_cache_ingest_failing": "Cache ingest keeps failing: source={source} last_error={err}",
   "alert_cache_lag_error": "Cache ingestor stalled: source={source} lag={lag}s",
   "alert_cache_lag_warning": "Cache ingestor lag warning: source={source} lag={lag}s",
   "alert_cat_authentication_settings": "Auth settings",

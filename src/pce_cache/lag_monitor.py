@@ -47,6 +47,23 @@ def check_cache_lag(session_factory: sessionmaker, max_lag_seconds: int = 300) -
     return results
 
 
+def status_alerts(results: list[dict]) -> list[str]:
+    """last_status=='error' 的來源 → 告警訊息。
+
+    時間基準的 level 看不出「持續失敗」：失敗的 ingest 仍會 bump
+    last_sync_at（見 check_cache_lag docstring），所以 PCE 長期不可達時
+    lag 永遠正常。此函式補上以結果狀態為準的第二道判斷。"""
+    msgs = []
+    for r in results:
+        if r.get("last_status") == "error":
+            msgs.append(t(
+                "alert_cache_ingest_failing",
+                source=r.get("source", "?"),
+                err=(r.get("last_error") or "")[:200],
+            ))
+    return msgs
+
+
 def run_cache_lag_monitor(cm) -> None:
     """APScheduler job: check ingestor lag, log if stalled."""
     from sqlalchemy.orm import sessionmaker as _SM
@@ -74,3 +91,6 @@ def run_cache_lag_monitor(cm) -> None:
             logger.warning(
                 t("alert_cache_lag_warning", source=r["source"], lag=int(r["lag_seconds"]))
             )
+
+    for msg in status_alerts(results):
+        logger.error(msg)

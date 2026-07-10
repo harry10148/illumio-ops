@@ -1,5 +1,6 @@
 {
   "advanced_filters": "--- 進階篩選 ---",
+  "alert_cache_ingest_failing": "Cache 擷取持續失敗：來源={source} 最近錯誤={err}",
   "alert_cache_lag_error": "快取擷取器停止響應：來源={source} 延遲={lag}秒",
   "alert_cache_lag_warning": "快取擷取器延遲警告：來源={source} 延遲={lag}秒",
   "alert_cat_authentication_settings": "認證設定",
