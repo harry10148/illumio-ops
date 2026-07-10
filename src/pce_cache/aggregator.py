@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import sessionmaker
@@ -8,10 +10,16 @@ from src.pce_cache.models import PceTrafficFlowAgg, PceTrafficFlowRaw
 
 
 class TrafficAggregator:
+    # 增量視窗：agg 非空時只重算近 N 天的 bucket。更舊 bucket 的 raw 只會因
+    # retention 減少，而 MAX 合併本就把它們凍結在歷史峰值——略過重算與 MAX
+    # 守門結果等價，把每小時全表掃描縮成 O(近幾天)。3 天 > ingest grace(5m)
+    # 與跨午夜 bucket 移動的任何情境。
+    _WINDOW_DAYS = 3
+
     def __init__(self, session_factory: sessionmaker):
         self._sf = session_factory
 
-    def run_once(self) -> int:
+    def run_once(self, full: bool = False) -> int:
         """Rollup raw flows into daily agg in a single set-based statement.
 
         One INSERT…SELECT…GROUP BY…ON CONFLICT DO UPDATE — not a per-group Python
@@ -52,6 +60,9 @@ class TrafficAggregator:
                 PceTrafficFlowRaw.action,
             )
         )
+        if not full and self._has_agg_rows():
+            cutoff = datetime.now(timezone.utc) - timedelta(days=self._WINDOW_DAYS)
+            sel = sel.where(PceTrafficFlowRaw.last_detected >= cutoff)
         stmt = sqlite_insert(PceTrafficFlowAgg.__table__).from_select(
             ["bucket_day", "src_workload", "dst_workload", "port",
              "protocol", "action", "flow_count", "bytes_total"],
@@ -79,3 +90,8 @@ class TrafficAggregator:
         with self._sf.begin() as s:
             result = s.execute(stmt)
             return result.rowcount or 0
+
+    def _has_agg_rows(self) -> bool:
+        with self._sf() as s:
+            return s.execute(
+                select(PceTrafficFlowAgg.id).limit(1)).first() is not None

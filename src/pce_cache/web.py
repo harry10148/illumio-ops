@@ -74,6 +74,10 @@ def api_cache_backfill():
             result = runner.run_events(since_dt, until_dt)
         else:
             result = runner.run_traffic(since_dt, until_dt)
+            # backfill 會灌入舊日期資料，落在 aggregator 增量視窗之外，
+            # 必須顯式全量重算一次，否則趨勢圖看不到 backfill 的 bucket。
+            from src.pce_cache.aggregator import TrafficAggregator
+            TrafficAggregator(sf).run_once(full=True)
         return jsonify({
             "total_rows": result.total_rows,
             "inserted": result.inserted,
