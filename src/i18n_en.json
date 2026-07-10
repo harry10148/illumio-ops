@@ -6,6 +6,8 @@
   "alert_cache_lag_error": "Cache ingestor stalled: source={source} lag={lag}s",
   "alert_cache_lag_warning": "Cache ingestor lag warning: source={source} lag={lag}s",
   "alert_siem_backlog": "SIEM dispatch backlog: {pending} pending rows (threshold {warn})",
+  "alert_watchdog_rule": "PCE connectivity watchdog",
+  "alert_watchdog_details": "PCE polling has failed {count} consecutive cycles; event and traffic alerting is blind. Last error: {error}",
   "alert_cat_authentication_settings": "Auth settings",
   "alert_cat_authz_csrf": "CSRF check",
   "alert_cat_cluster": "Cluster",

@@ -6,6 +6,8 @@
   "alert_cache_lag_error": "快取擷取器停止響應：來源={source} 延遲={lag}秒",
   "alert_cache_lag_warning": "快取擷取器延遲警告：來源={source} 延遲={lag}秒",
   "alert_siem_backlog": "SIEM 派送積壓：{pending} 筆待送（門檻 {warn}）",
+  "alert_watchdog_rule": "PCE 連線看門狗",
+  "alert_watchdog_details": "PCE 輪詢已連續失敗 {count} 個週期，事件與流量告警目前處於盲區。最近錯誤：{error}",
   "alert_cat_authentication_settings": "認證設定",
   "alert_cat_authz_csrf": "CSRF 驗證",
   "alert_cat_cluster": "叢集",

@@ -39,6 +39,13 @@ STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
 # 每條規則的累積量設上界，確保累積永遠不超過 dispatch 端實際使用的筆數。
 TOP_MATCHES_LIMIT = 10
 
+# Dead-man's switch: after this many consecutive PCE polling failures the
+# analyzer self-alerts (via _check_watchdog), because a dead poller otherwise
+# fails silent — no events polled, no alerts fired. Own cooldown keeps a
+# long outage to one alert per hour instead of one per cycle.
+WATCHDOG_FAILURE_THRESHOLD = 3
+WATCHDOG_COOLDOWN_MINUTES = 60
+
 # query_flows 殘餘比對的委派範圍：check_flow_match 只認 legacy scalar key，
 # 下列物件/複數 key（Phase 3 FilterBar）委派給報表路徑同一套比對器
 # TrafficQueryBuilder._flow_matches_filters 評估——cache 命中時 client 端
@@ -598,6 +605,30 @@ class Analyzer:
             self.stats.record_pce_success("health", status=h_status, message=h_msg[:120])
         return True
 
+    def _check_watchdog(self) -> None:
+        """Self-alert when the PCE has been unreachable for N consecutive cycles.
+
+        Without this, a dead poller fails silent: no events, no alerts, and the
+        operator assumes all is well. Uses its own cooldown so a long outage
+        produces one alert per hour instead of one per cycle.
+        """
+        failures = int(self.state.get("pce_stats", {}).get("consecutive_failures", 0))
+        if failures < WATCHDOG_FAILURE_THRESHOLD:
+            return
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        last = parse_event_timestamp(self.state.get("watchdog_last_alert_at"))
+        if last and (now_utc - last).total_seconds() < WATCHDOG_COOLDOWN_MINUTES * 60:
+            return
+        self.state["watchdog_last_alert_at"] = format_utc(now_utc)
+        last_error = self.state.get("pce_stats", {}).get("last_error", "")
+        self.reporter.add_health_alert({
+            "time": now_utc.strftime('%Y-%m-%d %H:%M:%S'),
+            "rule": t('alert_watchdog_rule'),
+            "status": "critical",
+            "details": t('alert_watchdog_details', count=failures, error=last_error[:120]),
+        })
+        logger.error(f"Watchdog: {failures} consecutive PCE failures — self-alert dispatched")
+
     def run_analysis(self) -> None:
         logger.info("Starting analysis cycle.")
         # 1. Health Check (only runs when a system rule with filter_value=pce_health is configured)
@@ -614,6 +645,8 @@ class Analyzer:
 
         # 4. Dispatch alerts for traffic triggers
         self._dispatch_alerts(triggers, tr_rules)
+
+        self._check_watchdog()
 
         self.save_state()
         logger.info("Analysis cycle completed.")
