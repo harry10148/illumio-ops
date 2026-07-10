@@ -280,7 +280,7 @@ def put_cache_settings():
 @login_required
 def load_archive():
     from datetime import date
-    from src.pce_cache.archive_import import ArchiveLoadBusy, load_archive_review
+    from src.pce_cache.archive_import import ArchiveLoadBusy, start_archive_load
     cm = current_app.config['CM']
     cfg = cm.models.pce_cache
     lang = cm.config.get('settings', {}).get('language', 'en')
@@ -298,23 +298,25 @@ def load_archive():
         return jsonify({"ok": False,
                         "error": f"range {span}d exceeds max {cfg.archive_review_max_days}d"}), 422
     try:
-        meta = load_archive_review(cfg, start, end)
+        res = start_archive_load(cfg, start, end)
     except ArchiveLoadBusy:
         # 另一個 load 正在進行中（non-blocking lock 取得失敗）：立即回 409，不排隊。
         return jsonify({"ok": False,
                         "error": t("gui_traffic_archive_load_busy", lang=lang)}), 409
     except Exception as exc:  # noqa: BLE001
         return _err_with_log("cache_archive_load", exc, lang=lang)
-    return jsonify({"ok": True, **meta})
+    return jsonify({"ok": True, **res}), 202
 
 
 @bp.route("/archive/status", methods=["GET"])
 @login_required
 def archive_status():
-    from src.pce_cache.archive_import import review_status
+    from src.pce_cache.archive_import import review_status, load_progress
     cm = current_app.config['CM']
     lang = cm.config.get('settings', {}).get('language', 'en')
     try:
-        return jsonify(review_status(cm.models.pce_cache))
+        st = review_status(cm.models.pce_cache)
+        st["load"] = load_progress()
+        return jsonify(st)
     except Exception as exc:  # noqa: BLE001
         return _err_with_log("cache_archive_status", exc, lang=lang)

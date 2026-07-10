@@ -832,7 +832,7 @@ async function refreshArchiveStatus() {
   } catch (_) { el.textContent = ''; }
 }
 
-// 載入指定日期範圍的 archive 進 review DB（同步）；成功後刷新狀態。
+// 載入指定日期範圍的 archive（背景執行）：POST 立即回 202，之後輪詢 status。
 async function loadArchiveRange() {
   const el = document.getElementById('archive-status');
   const start = (document.getElementById('archive-start') || {}).value;
@@ -840,17 +840,31 @@ async function loadArchiveRange() {
   if (el) el.textContent = '…';
   try {
     const body = await post('/api/cache/archive/load', { start_date: start, end_date: end });
-    if (body && body.no_files) {
-      // 防呆：範圍內沒有封存檔 → 明確提示（後端未重建、目前載入未變更）
-      if (el) el.textContent = _t('gui_traffic_archive_no_files');
-    } else if (body && body.ok) {
-      refreshArchiveStatus();
-    } else if (el) {
-      el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', (body && body.error) || '');
+    if (!body || body.ok === false) {
+      if (el) el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', (body && body.error) || '');
+      return;
+    }
+    if (el) el.textContent = _t('gui_traffic_archive_loading');
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const st = await get('/api/cache/archive/status');
+      const load = (st && st.load) || {};
+      if (load.state === 'running') continue;
+      if (load.state === 'error') {
+        if (el) el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', load.error || '');
+        return;
+      }
+      if (load.no_files) {
+        if (el) el.textContent = _t('gui_traffic_archive_no_files');
+        return;
+      }
+      break; // done → 以既有 status 呈現邏輯刷新
     }
   } catch (e) {
     if (el) el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', String(e));
+    return;
   }
+  await refreshArchiveStatus();
 }
 
 function _svgEl(tag, attrs) {

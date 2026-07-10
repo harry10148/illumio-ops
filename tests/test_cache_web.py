@@ -336,6 +336,19 @@ def _seed_archive(tmp_path):
     return str(d)
 
 
+def _wait_load_terminal(client, timeout=15):
+    import time
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        st = client.get("/api/cache/archive/status",
+                        environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
+        load = st.get("load") or {}
+        if load.get("state") in ("done", "error"):
+            return st
+        time.sleep(0.1)
+    raise AssertionError("archive load did not finish in time")
+
+
 def test_archive_load_and_status_roundtrip(client, tmp_path):
     arch = _seed_archive(tmp_path)
     # 先把 archive_dir 指到種好的目錄（review DB 會放在 db_path 同目錄）
@@ -344,11 +357,12 @@ def test_archive_load_and_status_roundtrip(client, tmp_path):
     resp = client.post("/api/cache/archive/load",
                        json={"start_date": "2026-06-01", "end_date": "2026-06-30"},
                        environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
-    assert resp.status_code == 200
+    assert resp.status_code == 202
     body = resp.get_json()
-    assert body["ok"] is True and body["rows"] == 1
-    st = client.get("/api/cache/archive/status",
-                    environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
+    assert body["ok"] is True and body["started"] is True
+    st = _wait_load_terminal(client)
+    assert st["load"]["state"] == "done"
+    assert st["load"]["rows"] == 1
     assert st["loaded"] is True and st["rows"] == 1
 
 
@@ -360,9 +374,11 @@ def test_archive_load_no_files_flag(client, tmp_path):
     resp = client.post("/api/cache/archive/load",
                        json={"start_date": "2026-07-01", "end_date": "2026-07-31"},
                        environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
-    assert resp.status_code == 200
+    assert resp.status_code == 202
     body = resp.get_json()
-    assert body["ok"] is True and body["no_files"] is True and body["files"] == 0
+    assert body["ok"] is True and body["started"] is True
+    st = _wait_load_terminal(client)
+    assert st["load"]["no_files"] is True and st["load"]["files"] == 0
 
 
 def test_archive_load_returns_409_when_busy(client, tmp_path):
@@ -388,7 +404,11 @@ def test_archive_status_survives_corrupted_meta(client, tmp_path):
     resp = client.get("/api/cache/archive/status",
                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert resp.status_code == 200
-    assert resp.get_json() == {"loaded": False}
+    body = resp.get_json()
+    assert body["loaded"] is False
+    # "load" 反映 module-level 背景進度（跨測試共用），本測試只驗證欄位存在，
+    # 不斷言其值——避免跟同檔案內其他 load 測試留下的 _PROGRESS 狀態耦合。
+    assert "load" in body
 
 
 def test_archive_load_rejects_range_over_cap(client):
