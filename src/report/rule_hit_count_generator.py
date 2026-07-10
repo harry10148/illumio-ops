@@ -17,8 +17,12 @@ import datetime
 import os
 import re
 from dataclasses import dataclass, field
+from typing import Optional
 
 from loguru import logger
+
+from src.i18n import t
+from src.report.rule_hit_count_enablement import RuleHitCountNotEnabled, check_enablement
 
 CLEANUP_DAYS_THRESHOLD = 90   # vendor: counts are retained 90 days
 
@@ -63,6 +67,40 @@ class RuleHitCountGenerator:
         self._lang = "en"
 
     # ── Public interface ──────────────────────────────────────────────────
+
+    def generate_from_native(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        lang: str = "en",
+    ) -> RuleHitCountResult:
+        """Pull the PCE-native report and parse it. Raises RuleHitCountNotEnabled
+        when the feature is not fully enabled — callers decide whether to run
+        the enablement wizard (interactive) or skip (scheduler)."""
+        if not self.api:
+            raise RuntimeError("api_client required for native rule hit count generation")
+        self._lang = lang
+
+        status = check_enablement(self.api)
+        if status.state != "enabled":
+            raise RuleHitCountNotEnabled(status)
+
+        print(t("rpt_rhc_pulling", lang=lang))
+        kwargs = {}
+        if start_date and end_date:
+            kwargs = {"start_date": start_date, "end_date": end_date}
+        else:
+            kwargs = {"last_num_days": 30}
+        csv_path = self.api.pull_rule_hit_count_report(**kwargs)
+        try:
+            result = self.generate_from_csv(csv_path, lang=lang)
+        finally:
+            try:
+                os.unlink(csv_path)
+            except OSError:
+                pass
+        result.source = 'native'
+        return result
 
     def generate_from_csv(self, csv_path: str, lang: str = "en") -> RuleHitCountResult:
         """Parse the PCE-native Rule Hit Count CSV (needs Rule HREF + Rule Hit Count)."""

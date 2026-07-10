@@ -200,5 +200,55 @@ class TestGenerateFromCsvEmptyFile(unittest.TestCase):
             self.assertNotIn("No columns to parse", str(ctx.exception))
 
 
+class TestGenerateFromNative(unittest.TestCase):
+    def _api(self, tmpdir):
+        api = MagicMock()
+        api.get_all_rulesets.return_value = []
+        api.pull_rule_hit_count_report.return_value = _write_native_csv(tmpdir)
+        return api
+
+    def test_pulls_and_parses_when_enabled(self):
+        from unittest.mock import patch
+        from src.report.rule_hit_count_enablement import EnablementStatus
+        with tempfile.TemporaryDirectory() as td:
+            api = self._api(td)
+            gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+            with patch("src.report.rule_hit_count_generator.check_enablement",
+                       return_value=EnablementStatus("enabled", True, True, "")):
+                result = gen.generate_from_native(start_date="2026-06-01T00:00:00Z",
+                                                  end_date="2026-07-01T00:00:00Z")
+        self.assertEqual(result.source, "native")
+        self.assertEqual(result.record_count, 3)
+        kwargs = api.pull_rule_hit_count_report.call_args.kwargs
+        self.assertEqual(kwargs["start_date"], "2026-06-01T00:00:00Z")
+
+    def test_raises_when_not_enabled(self):
+        from unittest.mock import patch
+        from src.report.rule_hit_count_enablement import (
+            EnablementStatus, RuleHitCountNotEnabled)
+        gen = RuleHitCountGenerator(MagicMock(), api_client=MagicMock())
+        with patch("src.report.rule_hit_count_generator.check_enablement",
+                   return_value=EnablementStatus("disabled", False, False, "off")):
+            with self.assertRaises(RuleHitCountNotEnabled):
+                gen.generate_from_native()
+
+    def test_temp_csv_is_cleaned_up(self):
+        from unittest.mock import patch
+        from src.report.rule_hit_count_enablement import EnablementStatus
+        with tempfile.TemporaryDirectory() as td:
+            api = self._api(td)
+            path = api.pull_rule_hit_count_report.return_value
+            gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+            with patch("src.report.rule_hit_count_generator.check_enablement",
+                       return_value=EnablementStatus("enabled", True, True, "")):
+                gen.generate_from_native()
+            self.assertFalse(os.path.exists(path))
+
+    def test_requires_api_client(self):
+        gen = RuleHitCountGenerator(MagicMock(), api_client=None)
+        with self.assertRaises(RuntimeError):
+            gen.generate_from_native()
+
+
 if __name__ == "__main__":
     unittest.main()
