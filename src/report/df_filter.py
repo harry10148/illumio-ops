@@ -189,14 +189,19 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
         except (ValueError, TypeError):
             pass
 
-    ports_inc = [s for s in (filters.get("ports") or []) if s]
+    ports_raw = filters.get("ports")
+    ports_list = ports_raw if isinstance(ports_raw, (list, tuple)) else [ports_raw]
+    ports_inc = [s for s in ports_list if s]
     if ports_inc:
         tokens = [t for t in (parse_port_token(v) for v in ports_inc) if t]
         mask &= _port_entries_mask(df, tokens)  # 全數無法解析 → tokens 空 → mask False（fail-closed）
-    for v in (filters.get("ex_ports") or []):
-        t = parse_port_token(v)
-        if t:
-            mask &= ~_port_entries_mask(df, [t])
+    ex_ports_raw = filters.get("ex_ports")
+    ex_ports_list = ex_ports_raw if isinstance(ex_ports_raw, (list, tuple)) else [ex_ports_raw]
+    for v in ex_ports_list:
+        if v:
+            t = parse_port_token(v)
+            if t:
+                mask &= ~_port_entries_mask(df, [t])
 
     svc_inc = filters.get("_svc_port_entries")
     if svc_inc:

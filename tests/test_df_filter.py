@@ -243,3 +243,16 @@ def test_svc_port_entries_internal_keys():
 def test_ports_include_all_invalid_fail_closed():
     out = apply_df_traffic_filters(_ports_df(), {"ports": ["nonsense"]})
     assert out.empty
+
+
+def test_ports_scalar_string_matches_exact():
+    # Scalar string "80" should match port 80 only, not iterate as "8", "0"
+    out = apply_df_traffic_filters(_ports_df(), {"ports": "80"})
+    assert out["port"].tolist() == [80]
+
+
+def test_ex_ports_scalar_string_excludes():
+    # Scalar string "443/tcp" should exclude port 443/TCP, not fail silently
+    out = apply_df_traffic_filters(_ports_df(), {"ex_ports": "443/tcp"})
+    assert 443 not in out["port"].tolist()
+    assert sorted(out["port"].tolist()) == [80, 1500]
