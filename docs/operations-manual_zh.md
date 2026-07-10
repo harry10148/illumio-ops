@@ -722,6 +722,8 @@ Web GUI 預設以 **HTTPS** 服務（`web_gui.tls.enabled: true`、`self_signed:
 
 ### 8.9 容量規劃與 7/24 維運（Capacity Planning & 24/7 Operation）
 
+> 範圍說明：本節討論的是本機 sidecar 自身的容量（SQLite 大小、磁碟、SIEM backlog、archiver lag）。遠端 PCE 自身事件資料庫的容量（soft/hard limit 清理）是另一套機制——見告警 runbook 的 `pce-capacity` 類別。
+
 #### 容量基準
 
 實測基準（測試機）：12,056 筆 raw flow 佔 27.6MB——每列全成本約 **2.3KB**（含索引與 raw/report JSON 欄位）。以 7 天線上窗口（`traffic_raw_retention_days` 預設 7）推估：

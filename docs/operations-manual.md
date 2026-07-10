@@ -722,6 +722,8 @@ Packages that still work today but need an eye kept on them for a future mainten
 
 ### 8.9 Capacity Planning & 24/7 Operation
 
+> Scope note: this section covers the local sidecar's own capacity (SQLite size, disk, SIEM backlog, archiver lag). The remote PCE's internal event-database capacity (soft/hard limit pruning) is a different mechanism — see the `pce-capacity` alert runbook category.
+
 #### Capacity baseline
 
 Measured on a test host: 12,056 raw flow rows occupied 27.6 MB — an all-in cost of about **2.3 KB per raw flow row** (indexes plus the raw/report JSON columns included). Extrapolated to a 7-day online window (`traffic_raw_retention_days` default 7):
