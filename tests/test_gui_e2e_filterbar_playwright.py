@@ -117,20 +117,22 @@ def page(_logged_in_context):
 def _open_traffic_filter_modal(page):
     """Navigate: Traffic & Workload tab → Filter Settings → filters modal.
 
-    Returns the filter bar's text input element handle.
+    Returns the filter bar's text input as a Playwright locator (re-resolved
+    on every action, so it survives re-renders instead of going stale like a
+    snapshotted ElementHandle would).
     """
-    tab = page.wait_for_selector(
-        '[data-args=\'["traffic-workload"]\']', state="visible", timeout=10000)
-    tab.click()
-    btn = page.wait_for_selector(
-        "[data-action='openQtFiltersModal']", state="visible", timeout=10000)
-    btn.click()
+    tab = page.locator('[data-args=\'["traffic-workload"]\']')
+    tab.click(timeout=10000)
+    btn = page.locator("[data-action='openQtFiltersModal']")
+    btn.click(timeout=10000)
     page.wait_for_selector("#modal-qt-filters.show", state="visible", timeout=10000)
-    return page.wait_for_selector(f"{FB} .objfb-input", state="visible", timeout=10000)
+    inp = page.locator(f"{FB} .objfb-input")
+    inp.wait_for(state="visible", timeout=10000)
+    return inp
 
 
 def _pill_count(page) -> int:
-    return len(page.query_selector_all(f"{FB} .objfb-pill"))
+    return page.locator(f"{FB} .objfb-pill").count()
 
 
 def _open_service_browse(page, inp):
@@ -140,12 +142,13 @@ def _open_service_browse(page, inp):
     inp.click()
     page.wait_for_selector(
         f"{FB} .objfb-dd.open .objfb-cat-btn", state="visible", timeout=10000)
-    page.click(f"{FB} .objfb-dd-cats .objfb-cat-btn[data-args*='service']")
+    page.locator(
+        f"{FB} .objfb-dd-cats .objfb-cat-btn[data-args*='service']").click()
     try:
         page.wait_for_selector(f"{FB} .objfb-dd-item", state="visible", timeout=15000)
     except PWTimeout:
-        assert page.query_selector(
-            f"{FB} .objfb-dd [data-i18n='gui_fb_browse_error']") is None, \
+        assert page.locator(
+            f"{FB} .objfb-dd [data-i18n='gui_fb_browse_error']").count() == 0, \
             "filter-objects browse endpoint returned an error"
         pytest.skip("target PCE object cache has no services to browse")
 
@@ -163,34 +166,36 @@ def test_filter_modal_service_browse_to_pill(page):
     # workload / service — 'ip' and 'port' are manual-only, no chips).
     page.wait_for_selector(
         f"{FB} .objfb-dd.open .objfb-cat-btn", state="visible", timeout=10000)
-    chips = page.query_selector_all(f"{FB} .objfb-dd-cats .objfb-cat-btn")
-    assert len(chips) == 5, f"expected 5 category chips, got {len(chips)}"
+    chips = page.locator(f"{FB} .objfb-dd-cats .objfb-cat-btn")
+    assert chips.count() == 5, f"expected 5 category chips, got {chips.count()}"
 
     # Totals arrive async from /api/filter-objects/browse?type=_totals and
     # re-render the chips with a "(N)" count suffix.
-    cnt = page.wait_for_selector(
-        f"{FB} .objfb-chip-cnt", state="visible", timeout=15000)
-    assert re.search(r"\(\d+\)", cnt.inner_text()), \
-        f"chip count malformed: {cnt.inner_text()!r}"
+    cnt = page.locator(f"{FB} .objfb-chip-cnt").first
+    cnt.wait_for(state="visible", timeout=15000)
+    cnt_text = cnt.inner_text()
+    assert re.search(r"\(\d+\)", cnt_text), f"chip count malformed: {cnt_text!r}"
 
     _open_service_browse(page, inp)
 
     # "Load more" pagination (only rendered when total > page size).
-    n0 = len(page.query_selector_all(f"{FB} .objfb-dd-item"))
-    more = page.query_selector(f"{FB} .objfb-dd-more[data-i18n='gui_fb_load_more']")
-    if more is not None:
+    items = page.locator(f"{FB} .objfb-dd-item")
+    n0 = items.count()
+    more = page.locator(f"{FB} .objfb-dd-more[data-i18n='gui_fb_load_more']")
+    if more.count() > 0:
         more.click()
         page.wait_for_function(
             "n => document.querySelectorAll('#qt-filter-bar .objfb-dd-item').length > n",
             arg=n0, timeout=15000)
 
     # Pick the first service → pill (service pills are direction-less).
-    first = page.query_selector(f"{FB} .objfb-dd-item")
+    first = page.locator(f"{FB} .objfb-dd-item").first
     item_name = first.inner_text().split(" — ")[0].strip()
     first.click()
-    pill = page.wait_for_selector(f"{FB} .objfb-pill", state="visible", timeout=10000)
+    pill = page.locator(f"{FB} .objfb-pill").first
+    pill.wait_for(state="visible", timeout=10000)
     assert item_name in pill.inner_text()
-    assert pill.query_selector(".objfb-pill-dir") is None, \
+    assert pill.locator(".objfb-pill-dir").count() == 0, \
         "service pill must not carry a src/dst direction tag"
 
 
@@ -211,23 +216,24 @@ def test_manual_port_token_pill_and_popover(page):
         state="visible", timeout=10000)
     inp.press("Enter")
 
-    pill = page.wait_for_selector(f"{FB} .objfb-pill", state="visible", timeout=10000)
+    pill = page.locator(f"{FB} .objfb-pill").first
+    pill.wait_for(state="visible", timeout=10000)
     assert "443/tcp" in pill.inner_text()
-    assert pill.query_selector(".objfb-pill-dir") is None, \
+    assert pill.locator(".objfb-pill-dir").count() == 0, \
         "port pill must not carry a src/dst direction tag"
 
     # Open the edit popover by clicking the pill body.
-    pill.query_selector(".objfb-pill-txt").click()
+    pill.locator(".objfb-pill-txt").click()
     page.wait_for_selector(f"{FB} .objfb-pop.open", state="visible", timeout=10000)
 
     # Direction-less category ⇒ no src/dst/any segment in the popover…
-    dir_btns = page.query_selector_all(f"{FB} .objfb-pop [data-i18n^='gui_fb_dir_']")
-    assert not dir_btns, "port pill popover must not render a direction row"
+    dir_btns = page.locator(f"{FB} .objfb-pop [data-i18n^='gui_fb_dir_']")
+    assert dir_btns.count() == 0, "port pill popover must not render a direction row"
     # …but the include/exclude toggle is present and functional.
-    page.click(f"{FB} .objfb-pop .objfb-pop-btn-danger")
+    page.locator(f"{FB} .objfb-pop .objfb-pop-btn-danger").click()
     page.wait_for_selector(
         f"{FB} .objfb-pill.objfb-excl", state="visible", timeout=10000)
-    txt = page.query_selector(f"{FB} .objfb-pill .objfb-pill-txt").inner_text()
+    txt = page.locator(f"{FB} .objfb-pill .objfb-pill-txt").first.inner_text()
     assert txt.startswith("!"), f"excluded pill text should start with '!': {txt!r}"
 
 
@@ -241,28 +247,28 @@ def test_browse_all_modal_labels_multi_add(page):
     inp.click()
     page.wait_for_selector(
         f"{FB} .objfb-dd.open .objfb-cat-btn", state="visible", timeout=10000)
-    page.click(f"{FB} .objfb-dd-more[data-i18n='gui_fb_browse_all']")
+    page.locator(f"{FB} .objfb-dd-more[data-i18n='gui_fb_browse_all']").click()
     page.wait_for_selector("#modal-obj-browser.show", state="visible", timeout=10000)
 
     # Switch to the Labels tab explicitly (it is also the default).
     page.wait_for_selector("#ob-body .ob-tab", state="visible", timeout=10000)
-    page.click("#ob-body .ob-tab[data-i18n='gui_fb_cat_label']")
+    page.locator("#ob-body .ob-tab[data-i18n='gui_fb_cat_label']").click()
     try:
         page.wait_for_selector(
             "#ob-table .ob-row input[type=checkbox]", state="attached", timeout=15000)
     except PWTimeout:
-        assert page.query_selector(
-            "#ob-table [data-i18n='gui_fb_browse_error']") is None, \
+        assert page.locator(
+            "#ob-table [data-i18n='gui_fb_browse_error']").count() == 0, \
             "filter-objects browse endpoint returned an error"
         pytest.skip("target PCE object cache has no labels to browse")
 
-    boxes = page.query_selector_all("#ob-table .ob-row input[type=checkbox]")
-    if len(boxes) < 2:
+    boxes = page.locator("#ob-table .ob-row input[type=checkbox]")
+    if boxes.count() < 2:
         pytest.skip("fewer than 2 labels on target PCE")
-    boxes[0].check()
-    boxes[1].check()
+    boxes.nth(0).check()
+    boxes.nth(1).check()
 
-    page.click("#ob-add-btn")
+    page.locator("#ob-add-btn").click()
     # closeModal() drops the .show class — the selector stops matching.
     page.wait_for_selector("#modal-obj-browser.show", state="detached", timeout=10000)
     assert _pill_count(page) == 2, \
@@ -304,7 +310,7 @@ def test_query_payload_contains_services_and_ports(page):
     # Service pill via the Services category browse (input was cleared after
     # the pick, so the dropdown is back on the category chip row).
     _open_service_browse(page, inp)
-    page.query_selector(f"{FB} .objfb-dd-item").click()
+    page.locator(f"{FB} .objfb-dd-item").first.click()
     page.wait_for_function(
         "() => document.querySelectorAll('#qt-filter-bar .objfb-pill').length === 2",
         timeout=10000)
@@ -315,7 +321,7 @@ def test_query_payload_contains_services_and_ports(page):
         lambda r: "/api/quarantine/search" in r.url and r.method == "POST",
         timeout=15000,
     ) as req_info:
-        page.click("#modal-qt-filters [data-action='applyQtFilters']")
+        page.locator("#modal-qt-filters [data-action='applyQtFilters']").click()
     payload = req_info.value.post_data_json
 
     assert payload.get("ports") == ["443/tcp"], \
