@@ -2484,6 +2484,7 @@
   "line_alert_failed": "LINE 告警送出失敗（status={status}）：{error}",
   "line_alert_sent": "LINE 告警已送出。",
   "line_config_missing": "LINE 告警略過：尚未設定 Token 或 Target ID。",
+  "line_section_more": "……還有 {more} 筆（完整列表請見郵件或儀表板）",
   "line_target_id_input": "LINE Target ID",
   "line_token_input": "LINE Channel Token",
   "loading_best_practices": "正在載入官方 Best Practices（會清除現有規則）...",

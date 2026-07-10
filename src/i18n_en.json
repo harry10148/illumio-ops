@@ -2484,6 +2484,7 @@
   "line_alert_failed": "LINE alert failed (status={status}): {error}",
   "line_alert_sent": "LINE alert sent.",
   "line_config_missing": "LINE alert skipped: token or target ID not configured.",
+  "line_section_more": "... and {more} more entries (see mail or dashboard for full list)",
   "line_target_id_input": "LINE Target ID",
   "line_token_input": "LINE Channel Token",
   "loading_best_practices": "Loading Best Practices (will clear existing rules)...",

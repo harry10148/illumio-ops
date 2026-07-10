@@ -1072,6 +1072,8 @@ class Reporter:
                 health_section_lines.append(f"{time_lbl}：{self._compact_text(alert.get('time', ''))}")
                 health_section_lines.append(f"{summary_lbl}：{self._compact_text(alert.get('details', ''))}")
                 health_section_lines.append("")
+            if len(self.health_alerts) > 2:
+                health_section_lines.append(t('line_section_more', more=len(self.health_alerts) - 2))
 
         event_section_lines = []
         if self.event_alerts:
@@ -1119,6 +1121,8 @@ class Reporter:
                 if alert.get("count") is not None:
                     traffic_section_lines.append(f"{count_lbl}：{self._compact_text(alert.get('count', ''))}")
                 traffic_section_lines.append("")
+            if len(self.traffic_alerts) > 2:
+                traffic_section_lines.append(t('line_section_more', more=len(self.traffic_alerts) - 2))
 
         metric_section_lines = []
         if self.metric_alerts:
@@ -1131,6 +1135,8 @@ class Reporter:
                 if alert.get("count") is not None:
                     metric_section_lines.append(f"{value_lbl}：{self._compact_text(alert.get('count', ''))}")
                 metric_section_lines.append("")
+            if len(self.metric_alerts) > 2:
+                metric_section_lines.append(t('line_section_more', more=len(self.metric_alerts) - 2))
 
         return render_alert_template(
             "line_digest.txt.tmpl",
