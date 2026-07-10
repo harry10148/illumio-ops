@@ -13,7 +13,8 @@ from src.report.rule_hit_count_enablement import (
 )
 
 
-def _api(tpl=(200, {"enabled": True}), fw=(200, {"rule_hit_count_enabled_scopes": [[]]})):
+def _api(tpl=(200, {"enabled": True}), fw=(200, {"rule_hit_count_enabled_scopes": [[]]}),
+         version=(200, {"version": "24.2.0"})):
     api = MagicMock()
     api.api_cfg = {"org_id": 1}
 
@@ -22,6 +23,8 @@ def _api(tpl=(200, {"enabled": True}), fw=(200, {"rule_hit_count_enabled_scopes"
             return tpl
         if "firewall_settings" in endpoint:
             return fw
+        if "product_version" in endpoint:
+            return version
         raise AssertionError(f"unexpected GET {endpoint}")
 
     api._api_get.side_effect = _get
@@ -53,6 +56,46 @@ class TestCheckEnablement(unittest.TestCase):
     def test_connection_failure_raises(self):
         with self.assertRaises(ConnectionError):
             check_enablement(_api(tpl=(0, None)))
+
+    def test_template_404_version_confirmed_below_floor(self):
+        st = check_enablement(_api(tpl=(404, None), version=(200, {"version": "22.1.0"})))
+        self.assertEqual(st.state, "unsupported")
+        self.assertIn("22.1.0", st.detail)
+        self.assertIn("below floor", st.detail)
+
+    def test_template_404_version_meets_conservative_floor_but_still_absent(self):
+        st = check_enablement(_api(tpl=(404, None), version=(200, {"version": "23.6.0"})))
+        self.assertEqual(st.state, "unsupported")
+        self.assertIn("feature absent", st.detail)
+        self.assertNotIn("below floor", st.detail)
+
+    def test_template_404_without_version_evidence_keeps_hedged_detail(self):
+        st = check_enablement(_api(tpl=(404, None), version=(0, None)))
+        self.assertEqual(st.state, "unsupported")
+        self.assertIn("or feature absent", st.detail)
+        self.assertIn("version floor", st.detail)
+
+    def test_template_404_version_parses_hotfix_suffix(self):
+        st = check_enablement(_api(tpl=(404, None), version=(200, {"version": "24.2.0-hotfix"})))
+        self.assertEqual(st.state, "unsupported")
+        self.assertIn("24.2.0-hotfix", st.detail)
+        self.assertIn("feature absent", st.detail)
+
+    def test_template_404_version_endpoint_raises_degrades_to_hedged(self):
+        api = MagicMock()
+        api.api_cfg = {"org_id": 1}
+
+        def _get(endpoint, timeout=15):
+            if "report_templates" in endpoint:
+                return 404, None
+            if "product_version" in endpoint:
+                raise RuntimeError("connection reset")
+            raise AssertionError(f"unexpected GET {endpoint}")
+
+        api._api_get.side_effect = _get
+        st = check_enablement(api)
+        self.assertEqual(st.state, "unsupported")
+        self.assertIn("or feature absent", st.detail)
 
 
 class TestEnable(unittest.TestCase):
