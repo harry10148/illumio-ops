@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import heapq
+import ipaddress
 import json
 import gc
 import os
@@ -9,6 +10,7 @@ import sys
 from typing import Any, Iterator
 from loguru import logger
 from collections import Counter
+from src.api.labels import LabelResolver
 from src.events import (
     AlertThrottler,
     EventPoller,
@@ -428,15 +430,46 @@ class Analyzer:
             return True
         # list 形（Phase 4b FilterBar 新儲存格式）：任一值命中即 match；
         # scalar 行為逐位不變。exclude 呼叫端以「命中即排除」使用同一語意。
+        # 每值依序判斷：bare IP 等值 → CIDR containment（'/'）→ IPv4 range
+        # containment（'-'）→ ip_lists 名稱等值。containment 語意對齊
+        # src.report.df_filter._ip_mask；range 解析委用 LabelResolver.
+        # _parse_ip_range，不重寫第三份。
         vals = filter_val if isinstance(filter_val, list) else [filter_val]
+        flow_ip = flow_side.get('ip')
         for val in vals:
             if not val:
                 continue
-            if flow_side.get('ip') == val:
+            if flow_ip == val:
+                return True
+            if self._ip_value_contains(flow_ip, val):
                 return True
             for ipl in flow_side.get('ip_lists', []):
                 if ipl.get('name') == val:
                     return True
+        return False
+
+    @staticmethod
+    def _ip_value_contains(flow_ip: Any, val: str) -> bool:
+        """CIDR ('/') 或 IPv4 range ('-') containment：flow_ip 是否落在
+        filter 值 val 所描述的範圍內。非法 CIDR/range → 不命中（fail-closed；
+        此函式把關 live 查詢/告警結果，不套用 df_filter._ip_mask 的 cache
+        顯示 fail-open 慣例）。"""
+        text = str(val)
+        if "/" in text:
+            try:
+                net = ipaddress.ip_network(text, strict=False)
+                return ipaddress.ip_address(str(flow_ip)) in net
+            except ValueError:
+                return False
+        if "-" in text:
+            ip_range = LabelResolver._parse_ip_range(text)
+            if ip_range is None:
+                return False
+            frm, to = ip_range
+            try:
+                return frm <= ipaddress.IPv4Address(str(flow_ip)) <= to
+            except ValueError:
+                return False
         return False
 
     def get_traffic_details_key(self, flow: dict[str, Any]) -> str:

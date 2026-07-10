@@ -129,6 +129,47 @@ class TestCheckFlowMatchListIp(unittest.TestCase):
         self.assertTrue(self.az.check_flow_match(
             {"type": "connections", "pd": -1, "ex_dst_ip": "1.2.3.4"}, self.flow, None))
 
+    # ─── /32、CIDR、range containment（live repro：172.16.15.106/32 → 0 rows）───
+
+    def test_src_ip_in_slash32_hit(self):
+        # /32 必須等同 bare IP——修正前這裡是字串精確比對，恆為 False
+        rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.0.1/32"]}
+        self.assertTrue(self.az.check_flow_match(rule, self.flow, None))
+
+    def test_src_ip_in_slash32_miss(self):
+        rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.0.2/32"]}
+        self.assertFalse(self.az.check_flow_match(rule, self.flow, None))
+
+    def test_src_ip_in_cidr_containment_hit(self):
+        rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.0.0/24"]}
+        self.assertTrue(self.az.check_flow_match(rule, self.flow, None))
+
+    def test_src_ip_in_cidr_containment_miss(self):
+        rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.1.0/24"]}
+        self.assertFalse(self.az.check_flow_match(rule, self.flow, None))
+
+    def test_src_ip_in_range_containment_hit(self):
+        rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.0.0-10.0.0.10"]}
+        self.assertTrue(self.az.check_flow_match(rule, self.flow, None))
+
+    def test_src_ip_in_range_containment_miss(self):
+        rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.0.2-10.0.0.10"]}
+        self.assertFalse(self.az.check_flow_match(rule, self.flow, None))
+
+    def test_src_ip_in_range_from_gt_to_auto_swaps(self):
+        rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.0.10-10.0.0.0"]}
+        self.assertTrue(self.az.check_flow_match(rule, self.flow, None))
+
+    def test_ex_src_ip_cidr_excludes(self):
+        rule = {"type": "connections", "pd": -1, "ex_src_ip": ["10.0.0.0/24"]}
+        self.assertFalse(self.az.check_flow_match(rule, self.flow, None))
+
+    def test_src_ip_in_illegal_cidr_no_match(self):
+        # 非法 CIDR → 不命中（fail-closed；此路徑把關 live 查詢/告警結果，
+        # 不是 df_filter._ip_mask 的 cache 顯示 fail-open 慣例）
+        rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.0.1/nope"]}
+        self.assertFalse(self.az.check_flow_match(rule, self.flow, None))
+
 
 # ─── Part B：query_flows 物件 key 委派 _flow_matches_filters（C2 主體）────────
 
@@ -161,6 +202,22 @@ class TestQueryFlowsObjectFilters(unittest.TestCase):
         az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
         res = az.query_flows(_params(src_ip_in=["10.0.0.1"]))
         self.assertEqual(_ids(res), ["web"])
+
+    def test_src_ip_in_slash32_on_cache_path(self):
+        # 測試機實測 172.16.15.106/32 → 0 rows（矛盾：/32 應等同 bare IP）
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(src_ip_in=["10.0.0.1/32"]))
+        self.assertEqual(_ids(res), ["web"])
+
+    def test_src_ip_in_cidr_on_cache_path(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(src_ip_in=["10.0.0.0/24"]))
+        self.assertEqual(_ids(res), ["db", "lb", "web"])
+
+    def test_src_ip_in_range_on_cache_path(self):
+        az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
+        res = az.query_flows(_params(src_ip_in=["10.0.0.1-10.0.0.2"]))
+        self.assertEqual(_ids(res), ["db", "web"])
 
     def test_src_workloads_href(self):
         az, _, _ = _make_analyzer(cache_flows=self.FLOWS)
