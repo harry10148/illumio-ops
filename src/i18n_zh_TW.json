@@ -4225,6 +4225,7 @@
   "gui_fb_dir_any": "任一",
   "gui_fb_placeholder": "搜尋 Labels、Workloads、IP Lists… 或輸入 IP/CIDR",
   "gui_fb_add_ipcidr": "加入 IP/CIDR",
+  "gui_fb_add_port": "加入 Port",
   "gui_fb_include": "包含",
   "gui_fb_exclude": "排除",
   "gui_fb_remove": "移除",
@@ -4236,6 +4237,8 @@
   "gui_fb_cat_label_group": "Label Groups",
   "gui_fb_cat_iplist": "IP Lists",
   "gui_fb_cat_workload": "Workloads",
+  "gui_fb_cat_service": "Services",
+  "gui_fb_cat_port": "Port",
   "gui_fb_scope_hint": "輸入文字搜尋所有類別，或點類別縮小範圍",
   "gui_qt_object_filters": "來源／目的／任一側（Labels、IP、Workloads、IP Lists）"
 }

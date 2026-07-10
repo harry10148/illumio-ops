@@ -4225,6 +4225,7 @@
   "gui_fb_dir_any": "Either",
   "gui_fb_placeholder": "Search labels, workloads, IP lists… or type IP/CIDR",
   "gui_fb_add_ipcidr": "Add IP/CIDR",
+  "gui_fb_add_port": "Add Port",
   "gui_fb_include": "Include",
   "gui_fb_exclude": "Exclude",
   "gui_fb_remove": "Remove",
@@ -4236,6 +4237,8 @@
   "gui_fb_cat_label_group": "Label Groups",
   "gui_fb_cat_iplist": "IP Lists",
   "gui_fb_cat_workload": "Workloads",
+  "gui_fb_cat_service": "Services",
+  "gui_fb_cat_port": "Port",
   "gui_fb_scope_hint": "Type to search all categories, or pick a category to narrow",
   "gui_qt_object_filters": "Source / Destination / Either Side (Labels, IPs, Workloads, IP Lists)"
 }

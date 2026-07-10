@@ -287,7 +287,7 @@ def test_filter_bar_suggest_cats_order_locked():
     """suggest 支援類別的固定順序鎖定：未傳 cats 的既有實例（流量分析器/報表/排程/
     dashboard）預設 cats 含全類別，types 字串與下拉分類順序須與現行逐位相同。"""
     js = _JS.read_text(encoding="utf-8")
-    assert "const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload'];" in js
+    assert "const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload', 'service'];" in js
 
 
 def test_rules_js_uses_filter_bar_for_traffic_and_bw():
@@ -322,3 +322,33 @@ def test_save_traffic_and_bw_send_filters_dict():
     for removed_key in ("src:", "dst:", "ex_src:", "ex_dst:"):
         assert removed_key not in tr_src, f"{removed_key} should no longer be read directly in saveTraffic"
         assert removed_key not in bw_src, f"{removed_key} should no longer be read directly in saveBW"
+
+
+def test_filter_bar_service_port_categories_defined():
+    src = _JS.read_text(encoding="utf-8")
+    assert "gui_fb_cat_service" in src and "gui_fb_cat_port" in src
+    assert "objfb-dot-service" in src and "objfb-dot-port" in src
+
+
+def test_filter_bar_serializes_services_and_ports_keys():
+    src = _JS.read_text(encoding="utf-8")
+    for key in ("services", "ex_services", "ports", "ex_ports"):
+        assert f"'{key}'" in src or f"`${{ex}}{key.removeprefix('ex_')}`" in src, key
+
+
+def test_filter_bar_port_like_validator_present():
+    src = _JS.read_text(encoding="utf-8")
+    assert "_objfbIsPortLike" in src
+
+
+def test_filter_bar_dirless_cats():
+    src = _JS.read_text(encoding="utf-8")
+    assert "_OBJFB_DIRLESS" in src
+
+
+def test_filter_bar_service_i18n_keys_bilingual():
+    import json
+    en = json.loads(_EN.read_text(encoding="utf-8"))
+    zh = json.loads(_ZH.read_text(encoding="utf-8"))
+    for k in ("gui_fb_cat_service", "gui_fb_cat_port", "gui_fb_add_port"):
+        assert k in en and k in zh

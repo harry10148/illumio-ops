@@ -16,10 +16,18 @@ function _objfbIsIpLike(s) {
     t.split('/')[0].split('.').every(o => +o <= 255);
 }
 
+// port token：80 / 443/tcp / 1000-2000 / 1000-2000/udp（proto 也收數字）
+function _objfbIsPortLike(s) {
+  const m = String(s).trim().toLowerCase().match(/^(\d{1,5})(?:-(\d{1,5}))?(?:\/(tcp|udp|icmp|icmpv6|\d{1,3}))?$/);
+  if (!m) return false;
+  const lo = +m[1], hi = m[2] ? +m[2] : +m[1];
+  return lo >= 1 && lo <= 65535 && hi >= 1 && hi <= 65535;
+}
+
 function createFilterBar(container, options) {
   const opts = options || {};
   const dirs = opts.dirs || ['src', 'dst', 'any'];
-  const cats = opts.cats || ['label', 'label_group', 'iplist', 'workload', 'ip'];
+  const cats = opts.cats || ['label', 'label_group', 'iplist', 'workload', 'ip', 'service', 'port'];
   const id = 'objfb-' + (++_objfbSeq);
   const state = {
     id, container, dirs, cats,
@@ -55,6 +63,8 @@ function _objfbSerialize(state) {
   const setScalar = (k, v) => { out[k] = v; };
   for (const p of state.pills) {
     const ex = p.neg ? 'ex_' : '';
+    if (p.cat === 'service') { push(`${ex}services`, p.href || p.name); continue; }
+    if (p.cat === 'port')    { push(`${ex}ports`, p.name); continue; }
     if (p.dir === 'any') {
       // any 方向：Phase 1 單值 key（多個同類取最後值）
       if (p.cat === 'label')         setScalar(`${ex}any_label`, p.name);
@@ -81,6 +91,16 @@ function _objfbDeserialize(state, dict) {
     state.pills.push(Object.assign({ cat, name, href: null, key: null, value: null, dir, neg }, extra || {}));
   const d = dict || {};
   const asList = (v) => Array.isArray(v) ? v : (v ? [v] : []);
+  for (const h of asList(d['services'])) add('service', h, null, false, { href: h });
+  for (const h of asList(d['ex_services'])) add('service', h, null, true, { href: h });
+  for (const tok of asList(d['ports'])) add('port', tok, null, false);
+  for (const tok of asList(d['ex_ports'])) add('port', tok, null, true);
+  // 舊 scalar port/proto/ex_port 回填成 port pill（讀取相容，零遷移）
+  if (d['port']) {
+    const protoName = { '6': 'tcp', '17': 'udp' }[String(d['proto'] || '')] || null;
+    add('port', protoName ? `${d['port']}/${protoName}` : String(d['port']), null, false);
+  }
+  if (d['ex_port']) add('port', String(d['ex_port']), null, true);
   for (const dir of ['src', 'dst']) {
     for (const spec of asList(d[`${dir}_labels`]).concat(asList(d[`${dir}_label`]))) add('label', spec, dir, false);
     for (const spec of asList(d[`ex_${dir}_labels`]).concat(asList(d[`ex_${dir}_label`]))) add('label', spec, dir, true);
@@ -105,7 +125,8 @@ function _objfbDeserialize(state, dict) {
 function _objfbAddPill(state, obj) {
   state.pills.push({
     cat: obj.cat, name: obj.name, href: obj.href || null,
-    key: obj.key || null, value: obj.value || null, dir: state.addDir, neg: false,
+    key: obj.key || null, value: obj.value || null,
+    dir: _OBJFB_DIRLESS.has(obj.cat) ? null : state.addDir, neg: false,
   });
   _objfbRender(state);
   if (state.changeCb) state.changeCb();
@@ -118,12 +139,17 @@ const _OBJFB_CATS = {
   iplist:      { i18n: 'gui_fb_cat_iplist',      dot: 'objfb-dot-iplist',  fallback: 'IP Lists' },
   workload:    { i18n: 'gui_fb_cat_workload',    dot: 'objfb-dot-workload', fallback: 'Workloads' },
   ip:          { i18n: null,                     dot: 'objfb-dot-ip',       fallback: 'IP/CIDR' },
+  service:     { i18n: 'gui_fb_cat_service',     dot: 'objfb-dot-service',  fallback: 'Services' },
+  port:        { i18n: 'gui_fb_cat_port',        dot: 'objfb-dot-port',     fallback: 'Port' },
 };
 const _OBJFB_DIR_TAG = { src: 'S', dst: 'D', any: 'S/D' };
 
+// 無方向類別：pill 不帶 src/dst/any、序列化不吃 dir、popover 不顯示方向列
+const _OBJFB_DIRLESS = new Set(['service', 'port']);
+
 // suggest 端支援的類別，固定順序（'ip' 不支援 suggest，不列入）；
 // _objfbQuerySuggest 與 _objfbRenderDropdown 皆以此清單交集 state.cats。
-const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload'];
+const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload', 'service'];
 
 function _objfbApplyI18n(root) {
   if (typeof window.i18nApply === 'function') window.i18nApply(root);
@@ -239,10 +265,12 @@ function _objfbBuildPill(state, p, idx) {
   el.dataset.args = JSON.stringify([state.id, idx]);
   el.setAttribute('data-pass-event', '1');
 
-  const dirTag = document.createElement('span');
-  dirTag.className = 'objfb-pill-dir';
-  dirTag.textContent = _OBJFB_DIR_TAG[p.dir] || p.dir;
-  el.appendChild(dirTag);
+  if (p.dir !== null) {
+    const dirTag = document.createElement('span');
+    dirTag.className = 'objfb-pill-dir';
+    dirTag.textContent = _OBJFB_DIR_TAG[p.dir] || p.dir;
+    el.appendChild(dirTag);
+  }
 
   const dot = document.createElement('i');
   const meta = _OBJFB_CATS[p.cat];
@@ -371,6 +399,9 @@ function _objfbRenderDropdown(state, q) {
       }
     }
   }
+  if (_objfbIsPortLike(q) && state.cats.includes('port') && (!state.scopeCat || state.scopeCat === 'service' || state.scopeCat === 'port')) {
+    _objfbAddDdGroup(state, [{ cat: 'port', name: q.trim() }], 'gui_fb_add_port', 'Add Port');
+  }
 
   const sug = (state._suggestQ === q) ? state._suggest : null;
   if (sug) {
@@ -453,21 +484,23 @@ function _objfbOpenPop(state, idx, pillEl) {
   state.popIdx = idx;
   pop.innerHTML = '';
 
-  const dirRow = document.createElement('div');
-  dirRow.className = 'objfb-pop-row';
-  const dirSeg = document.createElement('div');
-  dirSeg.className = 'objfb-pop-seg';
-  for (const d of state.dirs) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'objfb-pop-btn' + (p.dir === d ? ' on' : '');
-    b.setAttribute('data-i18n', 'gui_fb_dir_' + d);
-    b.setAttribute('data-on-click', '_objfbPopAction');
-    b.dataset.args = JSON.stringify([state.id, idx, 'dir', d]);
-    dirSeg.appendChild(b);
+  if (!_OBJFB_DIRLESS.has(p.cat)) {
+    const dirRow = document.createElement('div');
+    dirRow.className = 'objfb-pop-row';
+    const dirSeg = document.createElement('div');
+    dirSeg.className = 'objfb-pop-seg';
+    for (const d of state.dirs) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'objfb-pop-btn' + (p.dir === d ? ' on' : '');
+      b.setAttribute('data-i18n', 'gui_fb_dir_' + d);
+      b.setAttribute('data-on-click', '_objfbPopAction');
+      b.dataset.args = JSON.stringify([state.id, idx, 'dir', d]);
+      dirSeg.appendChild(b);
+    }
+    dirRow.appendChild(dirSeg);
+    pop.appendChild(dirRow);
   }
-  dirRow.appendChild(dirSeg);
-  pop.appendChild(dirRow);
 
   const negRow = document.createElement('div');
   negRow.className = 'objfb-pop-row';
@@ -534,6 +567,10 @@ window._objfbKeydown = function (id, ev) {
       window._objfbPickItem(id, s.ddItems[s.actIdx].o);
     } else {
       const q = s.els.input.value.trim();
+      if (_objfbIsPortLike(q) && s.cats.includes('port')) {
+        window._objfbPickItem(id, { cat: 'port', name: q });
+        return;
+      }
       if (_objfbIsIpLike(q)) {
         window._objfbPickItem(id, { cat: 'ip', name: q });
       } else {
