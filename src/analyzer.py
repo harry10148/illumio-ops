@@ -691,26 +691,58 @@ class Analyzer:
         logger.error(f"Watchdog: {failures} consecutive PCE failures — self-alert dispatched")
 
     def _maybe_alert_overflow(self) -> None:
-        """Meta-alert when event polling hit max_results: oldest events were lost."""
-        overflow = self.state.get("event_overflow") or {}
+        """Meta-alert on any data-loss overflow signal: oldest events were lost
+        (event_overflow, legacy live event polling) or a minute of traffic
+        flows may be incomplete (traffic_overflow, cache-ingest bisection
+        floor — written by run_traffic_ingest, see scheduler/jobs.py).
+
+        Generalized (was event_overflow-only, and was only ever called from
+        the legacy no-cache-subscriber branch of _run_event_analysis) because
+        under pce_cache.enabled=true that legacy branch never runs — this is
+        now called unconditionally from run_analysis() every cycle so the
+        cache-ingest path's traffic_overflow actually gets checked. See
+        live-verification-report.md finding #7.
+
+        Each signal has its own state key and cooldown key so a persistent
+        one alerting doesn't suppress the other, and vice versa.
+        """
+        self._maybe_alert_single_overflow(
+            state_key="event_overflow",
+            cooldown_key="overflow_last_alert_at",
+            rule_key="alert_overflow_rule",
+            details_key="alert_overflow_details",
+            log_label="Event overflow",
+        )
+        self._maybe_alert_single_overflow(
+            state_key="traffic_overflow",
+            cooldown_key="traffic_overflow_last_alert_at",
+            rule_key="alert_traffic_overflow_rule",
+            details_key="alert_traffic_overflow_details",
+            log_label="Traffic ingest overflow",
+        )
+
+    def _maybe_alert_single_overflow(
+        self, *, state_key: str, cooldown_key: str, rule_key: str, details_key: str, log_label: str
+    ) -> None:
+        overflow = self.state.get(state_key) or {}
         if not overflow:
             return
         now_utc = datetime.datetime.now(datetime.timezone.utc)
-        last = parse_event_timestamp(self.state.get("overflow_last_alert_at"))
+        last = parse_event_timestamp(self.state.get(cooldown_key))
         if last and (now_utc - last).total_seconds() < OVERFLOW_ALERT_COOLDOWN_MINUTES * 60:
             return
-        self.state["overflow_last_alert_at"] = format_utc(now_utc)
+        self.state[cooldown_key] = format_utc(now_utc)
         self.reporter.add_health_alert({
             "time": now_utc.strftime('%Y-%m-%d %H:%M:%S'),
-            "rule": t('alert_overflow_rule'),
+            "rule": t(rule_key),
             "status": "warning",
-            "details": t('alert_overflow_details',
+            "details": t(details_key,
                          raw=overflow.get("raw_count", "?"),
                          cap=overflow.get("max_results", "?"),
                          since=overflow.get("query_since", "?"),
                          until=overflow.get("query_until", "?")),
         })
-        logger.warning("Event overflow meta-alert dispatched")
+        logger.warning(f"{log_label} meta-alert dispatched")
 
     def run_analysis(self) -> None:
         logger.info("Starting analysis cycle.")
@@ -728,6 +760,12 @@ class Analyzer:
 
         # 4. Dispatch alerts for traffic triggers
         self._dispatch_alerts(triggers, tr_rules)
+
+        # Overflow meta-alerts (event polling / traffic ingest) — must run
+        # unconditionally every cycle, not just on the legacy event-poll
+        # branch, so the pce_cache-ingest path's traffic_overflow is checked
+        # even when _run_event_analysis took the cache-subscriber branch.
+        self._maybe_alert_overflow()
 
         self._check_watchdog()
 
@@ -780,7 +818,6 @@ class Analyzer:
         else:
             try:
                 events, event_batch = self._legacy_event_pull()
-                self._maybe_alert_overflow()
             except Exception as e:
                 logger.error(f"Event polling failed; watermark preserved at {self.state.get('event_watermark')}: {e}")
                 logger.error(t('api_fetch_events_error', error=str(e)))

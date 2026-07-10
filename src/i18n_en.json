@@ -7,6 +7,8 @@
   "alert_cache_lag_warning": "Cache ingestor lag warning: source={source} lag={lag}s",
   "alert_overflow_rule": "Event polling overflow",
   "alert_overflow_details": "Event query returned {raw} rows (cap {cap}) between {since} and {until}. The PCE sync events API returns only the newest rows, so older events in this window were permanently missed. Consider narrowing the poll interval or reviewing burst sources.",
+  "alert_traffic_overflow_rule": "Traffic ingest overflow",
+  "alert_traffic_overflow_details": "Traffic ingest hit the {cap}-row cap ({raw} rows returned) in window {since} to {until} and could not bisect the window any further. Flow data for that window may be incomplete — some flows were permanently dropped from the cache. Consider raising traffic_sampling.max_rows_per_batch or reviewing burst sources.",
   "alert_siem_backlog": "SIEM dispatch backlog: {pending} pending rows (threshold {warn})",
   "alert_watchdog_rule": "PCE connectivity watchdog",
   "alert_watchdog_details": "PCE polling has failed {count} consecutive cycles; event and traffic alerting is blind. Last error: {error}",

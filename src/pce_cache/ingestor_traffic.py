@@ -35,6 +35,15 @@ class TrafficIngestor:
         self._sampler = TrafficSampler(ratio_allowed=sample_ratio_allowed)
         self._max_results = max_results
         self._siem_dests = list(siem_destinations or [])
+        # Set by run_once() when a window's bisection hit the 1-min floor
+        # (_MIN_BISECT_SPAN) or the max depth without resolving the
+        # max_results cap — that window's flow data may be incomplete. Shape
+        # mirrors Analyzer.state["event_overflow"] so the scheduler job can
+        # persist it under state["traffic_overflow"] and
+        # Analyzer._maybe_alert_overflow can check both with the same code
+        # path. None when the last run_once() had no unresolved cap hit.
+        self.last_run_overflow: Optional[dict] = None
+        self._overflow_windows: list[dict] = []
 
     # 二分抽乾參數：深度 6 → 最小窗 = 原窗/64；再配 _MIN_BISECT_SPAN 硬下限，
     # 保證遞迴有界。碰頂但無法再分時記 warning（該窗資料可能不完整）。
@@ -43,12 +52,24 @@ class TrafficIngestor:
 
     def run_once(self) -> int:
         since = self._since_cursor()
+        self._overflow_windows = []
+        self.last_run_overflow = None
         try:
             flows = self._fetch_all(since)
         except Exception as exc:
             logger.exception("Traffic ingest failed: {}", exc)
             self._wm.record_error(self.SOURCE, str(exc))
             return 0
+
+        if self._overflow_windows:
+            self.last_run_overflow = {
+                "detected_at": datetime.now(timezone.utc).isoformat(),
+                "query_since": min(w["since"] for w in self._overflow_windows),
+                "query_until": max(w["until"] for w in self._overflow_windows),
+                "raw_count": sum(w["count"] for w in self._overflow_windows),
+                "max_results": self._max_results,
+                "window_count": len(self._overflow_windows),
+            }
 
         inserted = 0
         watermark_advanced = False
@@ -96,6 +117,11 @@ class TrafficIngestor:
                 "cannot bisect further — data in this window may be incomplete",
                 self._max_results, since_dt, until_dt, depth,
             )
+            self._overflow_windows.append({
+                "since": since_dt.isoformat(),
+                "until": until_dt.isoformat(),
+                "count": len(flows),
+            })
             return flows
         mid = since_dt + span / 2
         logger.warning(
