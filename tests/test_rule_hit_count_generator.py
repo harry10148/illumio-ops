@@ -250,5 +250,25 @@ class TestGenerateFromNative(unittest.TestCase):
             gen.generate_from_native()
 
 
+class TestExport(unittest.TestCase):
+    def test_export_html_csv_and_metadata(self):
+        gen = RuleHitCountGenerator(MagicMock(), api_client=None)
+        with tempfile.TemporaryDirectory() as td:
+            result = gen.generate_from_csv(_write_native_csv(td), lang="en")
+            paths = gen.export(result, fmt="all", output_dir=td)
+            self.assertEqual(len(paths), 2)
+            html = [p for p in paths if p.endswith(".html")]
+            zips = [p for p in paths if p.endswith(".zip")]
+            self.assertEqual(len(html), 1)
+            self.assertEqual(len(zips), 1)
+            self.assertTrue(os.path.basename(html[0]).startswith("Illumio_Rule_Hit_Count_Report_"))
+            self.assertTrue(os.path.basename(zips[0]).startswith("Illumio_Rule_Hit_Count_Report_"))
+            import json as _json
+            meta = _json.load(open(html[0] + ".metadata.json", encoding="utf-8"))
+            self.assertEqual(meta["report_type"], "rule_hit_count")
+            self.assertEqual(meta["record_count"], 3)
+            self.assertEqual(meta["source"], "csv")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -14,6 +14,7 @@ existing Policy Usage report's job.
 from __future__ import annotations
 
 import datetime
+import json
 import os
 import re
 from dataclasses import dataclass, field
@@ -154,6 +155,59 @@ class RuleHitCountGenerator:
         enrich_failed = self._enrich_rows(rows)
         return self._finalize(rows, source='csv', date_range=date_range,
                               enrich_failed=enrich_failed)
+
+    def export(
+        self,
+        result: RuleHitCountResult,
+        fmt: str = 'html',
+        output_dir: str = 'reports',
+        lang: str | None = None,
+    ) -> list[str]:
+        from src.report.exporters.rule_hit_count_html_exporter import RuleHitCountHtmlExporter
+        from src.report.exporters.csv_exporter import CsvExporter
+
+        lang = lang or getattr(self, '_lang', 'en')
+        os.makedirs(output_dir, exist_ok=True)
+        paths = []
+
+        if fmt in ('html', 'all'):
+            path = RuleHitCountHtmlExporter(result, lang=lang).export(output_dir)
+            paths.append(path)
+            self._write_report_metadata(path, result, file_format='html')
+            print(t("rpt_rhc_html_saved", path=path, lang=lang))
+
+        if fmt in ('csv', 'all'):
+            mr = result.module_results or {}
+            export_data = {}
+            # CSV carries the FULL untruncated cell values (HTML truncates at
+            # _CELL_MAX with title= hover; this is the recovery path).
+            for key in ('hit_df', 'unused_df', 'cleanup_df'):
+                df = mr.get(key)
+                if df is not None and not df.empty:
+                    export_data[key.replace('_df', '_rules')] = df
+            if result.dataframe is not None and not result.dataframe.empty:
+                export_data['all_rules'] = result.dataframe
+            if export_data:
+                path = CsvExporter(export_data, report_label='Rule_Hit_Count').export(output_dir)
+                paths.append(path)
+                self._write_report_metadata(path, result, file_format='csv')
+                print(t("rpt_rhc_csv_saved", path=path, lang=lang))
+
+        return paths
+
+    def _write_report_metadata(self, report_path: str, result: RuleHitCountResult,
+                               file_format: str) -> None:
+        payload = {
+            "report_type": "rule_hit_count",
+            "file_format": file_format,
+            "generated_at": result.generated_at.isoformat(),
+            "record_count": int(result.record_count or 0),
+            "date_range": list(result.date_range or ("", "")),
+            "source": result.source,
+            "kpis": (result.module_results or {}).get('kpis', {}),
+        }
+        with open(report_path + ".metadata.json", "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, ensure_ascii=False)
 
     # ── Internal helpers ──────────────────────────────────────────────────
 
