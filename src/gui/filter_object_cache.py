@@ -104,6 +104,45 @@ def _match_named(objs, q, limit, summary_fn=None):
     return hits[:limit], len(hits) > limit
 
 
+_TYPE_FETCHERS = {
+    "label": ("labels", lambda a: a.get_all_labels()),
+    "iplist": ("ip_lists", lambda a: a.get_ip_lists()),
+    "label_group": ("label_groups", lambda a: a.get_label_groups()),
+    "service": ("services", lambda a: a.get_services()),
+}
+
+
+def cached_type_totals(api) -> dict[str, int]:
+    """各 cached 類別總數（chip 顯示用；快取長度，零 PCE 額外成本）。"""
+    return {t: len(_get_or_fill(api, key, fn)) for t, (key, fn) in _TYPE_FETCHERS.items()}
+
+
+def browse_cached_objects(api, btype: str, offset: int, limit: int) -> dict:
+    """單一類別全量瀏覽分頁。label 依 (key, value) 排序並附 groups 統計；
+    其他類別依 name 排序。item 形狀與 suggest 一致。"""
+    key, fn = _TYPE_FETCHERS[btype]
+    objs = _get_or_fill(api, key, fn)
+    if btype == "label":
+        objs = sorted(objs, key=lambda l: ((l.get("key") or ""), (l.get("value") or "")))
+        groups: dict[str, int] = {}
+        for l in objs:
+            groups[l.get("key") or ""] = groups.get(l.get("key") or "", 0) + 1
+        items = [{"name": f"{l.get('key', '')}={l.get('value', '')}",
+                  "key": l.get("key"), "value": l.get("value"), "href": l.get("href")}
+                 for l in objs[offset:offset + limit]]
+        return {"items": items, "total": len(objs), "truncated": offset + limit < len(objs),
+                "groups": [{"key": k, "count": n} for k, n in groups.items()]}
+    objs = sorted(objs, key=lambda o: o.get("name") or "")
+    summary_fn = _ip_list_summary if btype == "iplist" else (_service_summary if btype == "service" else None)
+    items = []
+    for o in objs[offset:offset + limit]:
+        item = {"name": o.get("name", ""), "href": o.get("href")}
+        if summary_fn:
+            item["summary"] = summary_fn(o)
+        items.append(item)
+    return {"items": items, "total": len(objs), "truncated": offset + limit < len(objs)}
+
+
 def search_cached_objects(api, q: str, types: list[str], limit: int) -> dict[str, Any]:
     """對 cached 四類（label/label_group/iplist/service）做子字串比對，回分類分組結果。
 
