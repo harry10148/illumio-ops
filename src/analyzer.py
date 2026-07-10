@@ -309,6 +309,14 @@ class Analyzer:
                 # value the ingest job wrote mid-cycle (C2).
                 if "traffic_overflow" in existing:
                     merged["traffic_overflow"] = existing["traffic_overflow"]
+                # alert_dlq: Analyzer never reads or writes this; it is
+                # written exclusively by the Reporter's DLQ push/pop (see
+                # Reporter._push_alert_dlq/_pop_alert_dlq in
+                # src/reporter.py, both via update_state_file). Always defer
+                # to disk so a stale in-memory snapshot never resurrects
+                # entries the Reporter already drained mid-cycle.
+                if "alert_dlq" in existing:
+                    merged["alert_dlq"] = existing["alert_dlq"]
                 # pce_stats: co-owned with the scheduler's ingest jobs, which
                 # maintain pce_stats.consecutive_failures (the watchdog
                 # counter) via the same StatsTracker shape on cache-ingest

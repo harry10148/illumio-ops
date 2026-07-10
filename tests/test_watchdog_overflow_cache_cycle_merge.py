@@ -181,3 +181,27 @@ def test_save_state_merge_defers_to_disk_traffic_overflow(state_file):
 
     on_disk = load_state_file(state_file)
     assert on_disk["traffic_overflow"] == fresher_overflow
+
+
+# ─── Task 2: alert_dlq must survive a cache-only cycle ────────────────────
+
+def test_save_state_merge_defers_to_disk_alert_dlq(state_file):
+    """Isolates the _merge fix: alert_dlq is written exclusively by the
+    Reporter's DLQ push/pop (via update_state_file, src/reporter.py), never
+    by Analyzer. Simulate the Reporter clearing the on-disk queue (a
+    successful retry-drain) in the gap between this Analyzer instance's
+    load_state() (at construction) and its save_state() call — the cleared
+    disk value must survive, not be resurrected by this cycle's stale
+    in-memory snapshot."""
+    entry = {"attempts": 1, "first_failed_at": "2026-07-10T00:00:00+00:00"}
+    update_state_file(state_file, lambda s: {**s, "alert_dlq": [entry]})
+    ana = _cache_analyzer()
+    assert ana.state["alert_dlq"] == [entry]  # stale snapshot taken at load
+
+    # Reporter drains the DLQ mid-cycle (successful retry).
+    update_state_file(state_file, lambda s: {**s, "alert_dlq": []})
+
+    ana.save_state()
+
+    on_disk = load_state_file(state_file)
+    assert on_disk["alert_dlq"] == []
