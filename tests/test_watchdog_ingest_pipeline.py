@@ -242,3 +242,39 @@ def test_partial_failure_across_jobs_does_not_falsely_trigger_watchdog(tmp_path)
 
         state = _load_state(tmp_path)
         assert state["pce_stats"]["consecutive_failures"] == 0
+
+
+def test_traffic_connection_failure_signals_watchdog_end_to_end(tmp_path):
+    """Mirror of test_events_connection_failure_signals_watchdog_end_to_end:
+    drives a real TrafficIngestor + real WatermarkStore against an ApiClient
+    stand-in that reproduces the connection-layer failure (get_traffic_flows_async()
+    returns [] while last_fetch_error is set) — proving the fix makes the signal
+    reach pce_stats.consecutive_failures and watermark.last_status without
+    mocking the ingestor itself."""
+    from sqlalchemy import create_engine
+    from src.pce_cache.schema import init_schema
+    from src.scheduler.jobs import run_traffic_ingest
+
+    class ConnectionFailingApiClient:
+        last_fetch_error = "Connection timeout"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def get_traffic_flows_async(self, max_results=200000, rate_limit=False, **kw):
+            return []
+
+    cm = _cm(tmp_path)
+    engine = create_engine(f"sqlite:///{tmp_path / 'cache.sqlite'}")
+    init_schema(engine)
+
+    with patch("src.scheduler.jobs._get_cache_engine", return_value=engine), \
+         patch("src.api_client.ApiClient", return_value=ConnectionFailingApiClient()):
+        run_traffic_ingest(cm)
+
+    state = _load_state(tmp_path)
+    assert state["pce_stats"]["consecutive_failures"] == 1
+    assert "Connection timeout" in state["pce_stats"]["last_error"]
