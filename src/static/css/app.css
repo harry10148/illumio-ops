@@ -2761,3 +2761,17 @@ select {
 }
 .objfb-pop-rm:hover { background: color-mix(in oklab, var(--danger) 12%, transparent); }
 /* ══ end Phase 3 — .objfb-* ══════════════════════════════════════════ */
+
+/* ══ Task 10 — Modal 物件庫（.ob-*） ══════════════════════════════════ */
+.ob-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border, #8884); margin-bottom: 8px; }
+.ob-tab { padding: 4px 12px; border: none; background: none; cursor: pointer; opacity: .6; }
+.ob-tab.on { opacity: 1; border-bottom: 2px solid var(--accent, #4a7dbd); }
+.ob-search { width: 100%; margin-bottom: 6px; }
+#ob-table { max-height: 320px; overflow-y: auto; }
+.ob-row { display: flex; gap: 8px; padding: 4px 6px; align-items: center; cursor: pointer; }
+.ob-row:hover { background: var(--hover, rgba(74,125,189,.08)); }
+.ob-row-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 12px; }
+.ob-dir-btn { padding: 2px 8px; }
+.ob-dir-btn.on { background: var(--accent, #4a7dbd); color: #fff; }
+/* ══ end Task 10 — .ob-* ══════════════════════════════════════════════ */

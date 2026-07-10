@@ -2465,6 +2465,19 @@
     </div>
   </div>
 
+  <!-- Object Browser Modal -->
+  <div class="modal-bg" role="dialog" aria-modal="true" id="modal-obj-browser">
+    <div class="modal" style="max-width:720px">
+      <h2 data-i18n="gui_ob_title">Select filter objects</h2>
+      <div id="ob-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" data-action="closeModal" data-args='["modal-obj-browser"]'
+          data-i18n="gui_cancel">Cancel</button>
+        <button class="btn" id="ob-add-btn" data-on-click="_obAddSelected" data-i18n="gui_ob_add">Add</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Quarantine Action Modal -->
   <div class="modal-bg" role="dialog" aria-modal="true" id="m-quarantine">
     <div class="modal" style="max-width:500px">
@@ -2988,6 +3001,7 @@
   <script defer src="/static/js/actions.js"></script>
   <script defer src="/static/js/quarantine.js"></script>
   <script defer src="/static/js/filter-bar.js"></script>
+  <script defer src="/static/js/object-browser.js"></script>
   <script defer src="/static/js/rule-scheduler.js"></script>
   <script defer src="/static/js/module-log.js"></script>
   </main>

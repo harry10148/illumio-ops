@@ -361,6 +361,14 @@ function _objfbRenderCatChips(state) {
   note.className = 'objfb-dd-note';
   note.setAttribute('data-i18n', 'gui_fb_scope_hint');
   dd.appendChild(note);
+  const browseAll = document.createElement('button');
+  browseAll.type = 'button';
+  browseAll.className = 'objfb-dd-more';
+  browseAll.setAttribute('data-i18n', 'gui_fb_browse_all');
+  browseAll.textContent = 'Browse all…';
+  browseAll.setAttribute('data-on-click', '_objfbOpenBrowser');
+  browseAll.dataset.args = JSON.stringify([state.id]);
+  dd.appendChild(browseAll);
   _objfbApplyI18n(dd);
   dd.classList.add('open');
   state.actIdx = -1;
@@ -446,6 +454,14 @@ function _objfbRenderBrowseList(state) {
     more.dataset.args = JSON.stringify([state.id]);
     dd.appendChild(more);
   }
+  const browseAll = document.createElement('button');
+  browseAll.type = 'button';
+  browseAll.className = 'objfb-dd-more';
+  browseAll.setAttribute('data-i18n', 'gui_fb_browse_all');
+  browseAll.textContent = 'Browse all…';
+  browseAll.setAttribute('data-on-click', '_objfbOpenBrowser');
+  browseAll.dataset.args = JSON.stringify([state.id]);
+  dd.appendChild(browseAll);
   _objfbApplyI18n(dd);
   state.actIdx = state.ddItems.length ? 0 : -1;
   _objfbMarkActive(state);
@@ -758,6 +774,15 @@ window._objfbClearScope = function (id) {
 window._objfbBrowseMore = function (id) {
   const s = _objfbInstances[id];
   if (s) _objfbRenderBrowse(s, true);
+};
+
+// 供 object-browser.js（Modal 物件庫）取回實例、代為加入 pill。
+window._objfbGetInstance = function (id) { return _objfbInstances[id] || null; };
+window._objfbAddPillPublic = function (state, obj) { _objfbAddPill(state, obj); };
+
+window._objfbOpenBrowser = function (id) {
+  const s = _objfbInstances[id];
+  if (s) { s.els.dd.classList.remove('open'); window.openObjectBrowser(id); }
 };
 
 // 點擊 bar/popover 以外區域時關閉下拉與 popover（沿用 codebase 既有的
