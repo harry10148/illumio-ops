@@ -4319,5 +4319,7 @@
   "cli_rhc_scope_pick_title": "選擇啟用範圍的 label",
   "cli_rhc_enable_done": "Rule Hit Count 已啟用（步驟：{steps}）。",
   "cli_rhc_enable_failed": "啟用失敗，已完成步驟 [{steps}]：{error}",
-  "cli_rhc_ven_delay_note": "VEN 需要時間開始回報——請稍後再產生報表。"
+  "cli_rhc_ven_delay_note": "VEN 需要時間開始回報——請稍後再產生報表。",
+  "cli_rhc_no_labels_selected": "未選擇任何 label，不會啟用。請重新執行並至少選一個 label，或改選「全部 VEN」。",
+  "cli_rhc_pull_timeout": "PCE 尚未完成準備 Rule Hit Count 報表，請稍後再試。"
 }

@@ -320,8 +320,12 @@ def _run_rhc_enablement_wizard(api, lang: str) -> bool:
         kv_to_href = {f"{l['key']}={l['value']}": l.get("href", "")
                       for l in api.get_all_labels()}
         hrefs = [kv_to_href[v] for v in picked.get("labels", []) if kv_to_href.get(v)]
-        if hrefs:
-            scopes = [[{"label": {"href": h}} for h in hrefs]]
+        if not hrefs:
+            # No labels selected (picker Done immediately) or href lookup missed —
+            # must NOT fall through with scopes=None, which means "all VENs".
+            click.echo(t("cli_rhc_no_labels_selected", lang=lang))
+            return False
+        scopes = [[{"label": {"href": h}} for h in hrefs]]
 
     try:
         steps = enable_rule_hit_count(api, scopes=scopes)
@@ -685,6 +689,7 @@ def report_rule_hit_count(
     output_dir,
 ) -> None:
     """Generate Rule Hit Count Report (native PCE data, enriched with rule details)."""
+    from src.api.reports import RuleHitCountPullTimeout
     from src.report.rule_hit_count_enablement import RuleHitCountNotEnabled
     try:
         paths = generate_rule_hit_count_report(
@@ -703,6 +708,13 @@ def report_rule_hit_count(
         from src.config import ConfigManager
         _run_rhc_enablement_wizard(ApiClient(ConfigManager()), lang)
         # Wizard never auto-generates (VENs need time to report) — exit either way.
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except RuleHitCountPullTimeout:
+        # TimeoutError is an OSError subclass — must be caught here, before the
+        # (ConnectionError, OSError) block below, or it re-raises as an
+        # uncaught traceback / EXIT_SOFTWARE instead of a clear i18n message.
+        echo_error(ctx, t("cli_rhc_pull_timeout", lang=_ctx_lang()))
         ctx.exit(EXIT_UNAVAILABLE)
         return
     except click.ClickException as exc:
