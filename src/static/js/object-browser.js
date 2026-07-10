@@ -196,10 +196,13 @@ window._obAddSelected = function () {
   if (fb) {
     const prevDir = fb.addDir;
     fb.addDir = _ob.dir;
-    for (const it of Object.values(_ob.selected)) {
-      window._objfbAddPillPublic(fb, Object.assign({ cat: _ob.cat }, it));
+    try {
+      for (const it of Object.values(_ob.selected)) {
+        window._objfbAddPillPublic(fb, Object.assign({ cat: _ob.cat }, it));
+      }
+    } finally {
+      fb.addDir = prevDir;
     }
-    fb.addDir = prevDir;
   }
   closeModal('modal-obj-browser');
 };
