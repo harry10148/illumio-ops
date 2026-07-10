@@ -13,7 +13,16 @@ class TrafficAggregator:
     # 增量視窗：agg 非空時只重算近 N 天的 bucket。更舊 bucket 的 raw 只會因
     # retention 減少，而 MAX 合併本就把它們凍結在歷史峰值——略過重算與 MAX
     # 守門結果等價，把每小時全表掃描縮成 O(近幾天)。3 天 > ingest grace(5m)
-    # 與跨午夜 bucket 移動的任何情境。
+    # 與跨午夜 bucket 移動的任何情境——但前提是 agg 沒有落後太多。
+    #
+    # cutoff 因此錨定 agg 表自身進度：min(now - _WINDOW_DAYS, max_agg_day - 1d)。
+    # 穩態下 agg 跟得上，max_agg_day - 1d 比 now - _WINDOW_DAYS 新，min 取
+    # now - _WINDOW_DAYS，行為與純牆鐘視窗完全相同。但 ingest 中斷超過
+    # _WINDOW_DAYS 天恢復後，ingestor 會用舊 watermark 補拉多天 backlog；這些
+    # raw 列的 last_detected 比純牆鐘 cutoff 舊，若不錨定 agg 進度就會被永遠
+    # 跳過（agg 非空不觸發 bootstrap full-scan），backlog 在 raw retention
+    # 到期後永久遺失。錨定後視窗自動加寬到 max_agg_day 前一天，backlog 全數
+    # 納入；重疊日重算由既有 MAX-merge upsert 保證安全（見下方 MAX 註解）。
     _WINDOW_DAYS = 3
 
     def __init__(self, session_factory: sessionmaker):
@@ -61,7 +70,8 @@ class TrafficAggregator:
             )
         )
         if not full and self._has_agg_rows():
-            cutoff = datetime.now(timezone.utc) - timedelta(days=self._WINDOW_DAYS)
+            window_cutoff = datetime.now(timezone.utc) - timedelta(days=self._WINDOW_DAYS)
+            cutoff = min(window_cutoff, self._max_agg_day() - timedelta(days=1))
             sel = sel.where(PceTrafficFlowRaw.last_detected >= cutoff)
         stmt = sqlite_insert(PceTrafficFlowAgg.__table__).from_select(
             ["bucket_day", "src_workload", "dst_workload", "port",
@@ -95,3 +105,11 @@ class TrafficAggregator:
         with self._sf() as s:
             return s.execute(
                 select(PceTrafficFlowAgg.id).limit(1)).first() is not None
+
+    def _max_agg_day(self) -> datetime:
+        with self._sf() as s:
+            max_day = s.execute(
+                select(func.max(PceTrafficFlowAgg.bucket_day))).scalar_one()
+        if max_day.tzinfo is None:
+            max_day = max_day.replace(tzinfo=timezone.utc)
+        return max_day
