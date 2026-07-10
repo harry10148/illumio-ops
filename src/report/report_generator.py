@@ -253,6 +253,7 @@ class ReportGenerator:
             "ex_src_workload", "ex_src_workloads", "ex_dst_workload", "ex_dst_workloads",
             "any_iplist", "any_workload",
             "ex_any_iplist", "ex_any_workload",
+            "services", "ex_services",
         )
         if filters and self.api is not None and any(filters.get(k) for k in _obj_filter_keys):
             filters = self.api.expand_object_filters_for_df(filters)

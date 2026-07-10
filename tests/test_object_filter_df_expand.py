@@ -108,3 +108,23 @@ class TestExpandObjectFiltersForDf(unittest.TestCase):
     def test_expand_services_to_port_entries(self):
         out = self.client.expand_object_filters_for_df({"services": ["/x/services/1"]})
         assert out["_svc_port_entries"] == [{"port": 443, "proto": 6}]
+
+    def test_report_generator_expands_services_before_df_filter(self):
+        """迴歸測試：filters 僅含 services（無任何 iplist/workload key）時，
+        _fetch_traffic_df 的 _obj_filter_keys gate 也必須觸發
+        expand_object_filters_for_df，否則 service/port 條件在 cache df
+        路徑會被靜默忽略（同類 bug 曾在 ex_any_iplist 修過一次）。"""
+        from src.report.report_generator import ReportGenerator
+        rg = ReportGenerator.__new__(ReportGenerator)
+        rg.api = self.client
+        rg._cache = None
+        captured = {}
+        def fake_fetch(start_time_str, end_time_str, filters=None, compute_draft=False):
+            captured.update(filters or {})
+            return []
+        self.client.fetch_traffic_for_report = fake_fetch
+        rg._parse_api = lambda flows: __import__("pandas").DataFrame()
+        import datetime as dt
+        rg._fetch_traffic_df(dt.datetime(2026, 7, 1), dt.datetime(2026, 7, 2),
+                             filters={"services": ["/x/services/1"]}, use_cache=False)
+        assert "_svc_port_entries" in captured
