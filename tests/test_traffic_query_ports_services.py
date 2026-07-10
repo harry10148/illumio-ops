@@ -5,6 +5,8 @@ import pytest
 
 from src.api_client import ApiClient
 
+SVC_HREF = "/orgs/1/sec_policy/active/services/10"
+
 
 @pytest.fixture
 def client():
@@ -97,3 +99,48 @@ def test_fallback_ex_ports_skips_unresolved_value():
     flow = _flow_with_service(443, 6)
     # 無法解析的排除值略過、其餘值仍須生效比對——此處只有無法解析值，應維持命中（不排除）
     assert _match(flow, {"ex_ports": ["notaport"]}) is True
+
+
+# ─── services/ex_services：href 查詢時展開（Task 4）───────────────────────────
+
+
+def test_services_expand_to_entries(client):
+    client.service_ports_cache[SVC_HREF] = [
+        {"port": 80, "proto": 6}, {"port": 443, "proto": 6},
+        {"windows_service_name": "wuauserv"},
+    ]
+    p = _payload(client, {"services": [SVC_HREF]})
+    assert {"port": 80, "proto": 6} in p["services"]["include"]
+    assert {"port": 443, "proto": 6} in p["services"]["include"]
+    assert {"windows_service_name": "wuauserv"} in p["services"]["include"]
+
+
+def test_ex_services_expand_to_exclude(client):
+    client.service_ports_cache[SVC_HREF] = [{"port": 22, "proto": 6}]
+    p = _payload(client, {"ex_services": [SVC_HREF]})
+    assert {"port": 22, "proto": 6} in p["services"]["exclude"]
+
+
+def test_services_unknown_href_unresolved(client):
+    p = _payload(client, {"services": ["/orgs/1/sec_policy/active/services/404"]})
+    assert p["services"]["include"] == []
+    assert "services" in client.last_traffic_query_diagnostics["unresolved_native_filters"]
+
+
+def test_services_expansion_cap(client):
+    client.service_ports_cache[SVC_HREF] = [{"port": i} for i in range(1, 302)]
+    p = _payload(client, {"services": [SVC_HREF]})
+    assert p["services"]["include"] == []
+    assert "services" in client.last_traffic_query_diagnostics["unresolved_native_filters"]
+
+
+def test_services_fallback_flow_match(client):
+    # 注意：_flow_matches_filters 是 @staticmethod（僅收 flow/filters，無 self/
+    # client 存取管道），href 展開需要 client 端的 service_ports_cache，故此處
+    # 額外傳入 resolve_service 這個第三參數（bound method）；呼叫慣例與
+    # Step 1 brief 原稿的 2-arg 形式不同，原因見 B-task-4-report.md。
+    client.service_ports_cache[SVC_HREF] = [{"port": 443, "proto": 6}]
+    flow = {"src": {}, "dst": {}, "service": {"port": 443, "proto": 6}}
+    resolve = client._labels.resolve_service_entries
+    assert client._traffic._flow_matches_filters(flow, {"services": [SVC_HREF]}, resolve)
+    assert not client._traffic._flow_matches_filters(flow, {"ex_services": [SVC_HREF]}, resolve)
