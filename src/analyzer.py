@@ -198,6 +198,16 @@ class Analyzer:
         # write, or whether it must defer to the on-disk value written by
         # the scheduler's ingest jobs. See watchdog-overflow-fix-report.md (C1).
         self._pce_stats_dirty = False
+        # Set True only when THIS instance actually wrote watchdog_last_alert_at
+        # this cycle (record_pce_success clearing it to None on recovery, or
+        # _check_watchdog setting a fresh cooldown timestamp). Deliberately a
+        # separate flag from _pce_stats_dirty: on a cache-only deployment with
+        # no health-check rule, _check_watchdog can fire (and write this key)
+        # in a cycle where _pce_stats_dirty stays False (no real PCE probe ran
+        # here) — sharing the flag would make save_state()'s _merge defer to
+        # disk and immediately erase the timestamp this cycle just wrote,
+        # causing a re-alert every cycle. See H-Task 3 scheduler-side finding.
+        self._watchdog_dirty = False
 
     def load_state(self) -> None:
         try:
@@ -331,6 +341,26 @@ class Analyzer:
                 # this cycle's load_state() and now (C1).
                 if not self._pce_stats_dirty and "pce_stats" in existing:
                     merged["pce_stats"] = existing["pce_stats"]
+                # watchdog_last_alert_at: co-owned with the scheduler's
+                # cache-ingest jobs, whose _record_ingest_pce_result ->
+                # StatsTracker.record_pce_success clears this key to None on
+                # disk directly when a real PCE probe recovers (d75170e).
+                # This cycle's in-memory value is only trustworthy when THIS
+                # instance actually wrote it this cycle (self._watchdog_dirty:
+                # a recovery via record_pce_success, or _check_watchdog
+                # setting a fresh cooldown timestamp) — never share
+                # _pce_stats_dirty here (see its init comment): a cache-only
+                # cycle with no health rule can have _check_watchdog fire
+                # while _pce_stats_dirty stays False, and deferring in that
+                # case would erase the alert this cycle just recorded. A
+                # cycle that didn't touch this key at all must defer to disk
+                # so a concurrent scheduler-side recovery isn't stomped by
+                # this cycle's stale load-time snapshot — otherwise a new
+                # incident's first alert can be suppressed for up to
+                # WATCHDOG_COOLDOWN_MINUTES by the previous incident's
+                # timestamp (H-Task 3 scheduler-side finding).
+                if not self._watchdog_dirty and "watchdog_last_alert_at" in existing:
+                    merged["watchdog_last_alert_at"] = existing["watchdog_last_alert_at"]
                 return merged
 
             self.state = update_state_file(STATE_FILE, _merge)
@@ -714,6 +744,7 @@ class Analyzer:
                 logger.info("PCE health check OK.")
                 self.stats.record_pce_success("health", status=h_status, message=h_msg[:120])
                 self._pce_stats_dirty = True
+                self._watchdog_dirty = True
         return True
 
     def _check_watchdog(self) -> None:
@@ -731,6 +762,7 @@ class Analyzer:
         if last and (now_utc - last).total_seconds() < WATCHDOG_COOLDOWN_MINUTES * 60:
             return
         self.state["watchdog_last_alert_at"] = format_utc(now_utc)
+        self._watchdog_dirty = True
         last_error = self.state.get("pce_stats", {}).get("last_error", "")
         self.reporter.add_health_alert({
             "time": now_utc.strftime('%Y-%m-%d %H:%M:%S'),
@@ -833,6 +865,7 @@ class Analyzer:
         events = event_batch.events
         self.stats.record_pce_success("events", status=200, message=f"fetched={len(events)}")
         self._pce_stats_dirty = True
+        self._watchdog_dirty = True
         if event_batch.overflow_risk:
             logger.warning(
                 "Event polling reached max_results=%s between %s and %s; additional events may exist.",
