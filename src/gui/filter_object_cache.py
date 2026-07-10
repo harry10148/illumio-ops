@@ -113,17 +113,17 @@ def search_cached_objects(api, q: str, types: list[str], limit: int) -> dict[str
     if "label" in types:
         objs = _get_or_fill(api, "labels", lambda a: a.get_all_labels())
         items, trunc = _match_labels(objs, q, limit)
-        out["label"] = {"items": items, "truncated": trunc, "error": None}
+        out["label"] = {"items": items, "truncated": trunc}
     if "iplist" in types:
         objs = _get_or_fill(api, "ip_lists", lambda a: a.get_ip_lists())
         items, trunc = _match_named(objs, q, limit, summary_fn=_ip_list_summary)
-        out["iplist"] = {"items": items, "truncated": trunc, "error": None}
+        out["iplist"] = {"items": items, "truncated": trunc}
     if "label_group" in types:
         objs = _get_or_fill(api, "label_groups", lambda a: a.get_label_groups())
         items, trunc = _match_named(objs, q, limit)
-        out["label_group"] = {"items": items, "truncated": trunc, "error": None}
+        out["label_group"] = {"items": items, "truncated": trunc}
     if "service" in types:
         objs = _get_or_fill(api, "services", lambda a: a.get_services())
         items, trunc = _match_named(objs, q, limit, summary_fn=_service_summary)
-        out["service"] = {"items": items, "truncated": trunc, "error": None}
+        out["service"] = {"items": items, "truncated": trunc}
     return out

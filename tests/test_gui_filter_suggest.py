@@ -117,6 +117,9 @@ def test_suggest_service_cached(app_persistent, monkeypatch):
 
 
 def test_suggest_service_offline_degrades(app_persistent, monkeypatch):
+    # cached 類離線降級的既有樣式：search_cached_objects 拋例外 → blanket except
+    # 把「該次 request 涉及的所有 cached types」標 pce_unreachable（與其他 cached
+    # 類別一致；service 不靠 check_health 探測）。
     client = app_persistent.test_client()
     _login(client)
     from src.gui.filter_object_cache import invalidate_object_cache
@@ -125,9 +128,10 @@ def test_suggest_service_offline_degrades(app_persistent, monkeypatch):
                         lambda self: [])
     monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self: [])
     monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.get_services",
-                        lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.check_health", lambda self: (0, "unreachable"))
+
+    def _boom(self):
+        raise RuntimeError("pce down")
+    monkeypatch.setattr("src.api_client.ApiClient.get_services", _boom)
 
     r = client.get('/api/filter-objects/suggest?q=web&types=service&limit=10',
                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
