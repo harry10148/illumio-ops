@@ -190,6 +190,14 @@ class Analyzer:
         ensure_monitoring_state(self.state)
         self.stats = StatsTracker(self.state)
         self.alert_throttler = AlertThrottler(self.state)
+        # Set True only when this cycle performed a real PCE probe
+        # (record_pce_success/record_pce_error from _run_health_check or
+        # _legacy_event_pull) — never by cache-local reads
+        # (StatsTracker.record_local_read). save_state()'s _merge uses this
+        # to decide whether self.state.pce_stats is trustworthy enough to
+        # write, or whether it must defer to the on-disk value written by
+        # the scheduler's ingest jobs. See watchdog-overflow-fix-report.md (C1).
+        self._pce_stats_dirty = False
 
     def load_state(self) -> None:
         try:
@@ -275,15 +283,46 @@ class Analyzer:
 
         try:
             def _merge(existing: dict[str, Any]) -> dict[str, Any]:
+                # externally co-owned keys: self.state is a snapshot loaded at
+                # cycle start (or, for pce_stats, only reliable when this
+                # cycle actually performed a real PCE probe — see
+                # self._pce_stats_dirty). Other processes/background jobs may
+                # write these same keys between this cycle's load_state() and
+                # this save_state() call, so blindly overlaying self.state
+                # would stomp their freshest on-disk values. Add new co-owned
+                # keys here (never to the merged.update(self.state) overlay
+                # below) whenever a key is written by code outside this
+                # Analyzer instance's own cycle. See
+                # .superpowers/sdd/watchdog-overflow-fix-report.md (C1/C2).
                 merged = dict(existing)
                 merged.update(self.state)
-                # The analyzer's self.state is a snapshot loaded at cycle start;
-                # blindly overlaying it would stomp dashboard summary keys written
-                # by other background jobs (ven_summary, posture_summary) since the
-                # last load. Preserve the freshest on-disk values for those keys.
+                # ven_summary/posture_summary: written by other background
+                # jobs (dashboard summary refreshers) — always defer to disk.
                 for _k in ("ven_summary", "posture_summary"):
                     if _k in existing:
                         merged[_k] = existing[_k]
+                # traffic_overflow: Analyzer only ever reads this (via
+                # _maybe_alert_overflow); it is written exclusively by the
+                # scheduler's run_traffic_ingest job
+                # (src/scheduler/jobs.py:_record_traffic_overflow). Always
+                # defer to disk so a stale in-memory snapshot never wipes a
+                # value the ingest job wrote mid-cycle (C2).
+                if "traffic_overflow" in existing:
+                    merged["traffic_overflow"] = existing["traffic_overflow"]
+                # pce_stats: co-owned with the scheduler's ingest jobs, which
+                # maintain pce_stats.consecutive_failures (the watchdog
+                # counter) via the same StatsTracker shape on cache-ingest
+                # deployments (jobs.py:_record_ingest_pce_result). This
+                # cycle's in-memory pce_stats is only trustworthy when this
+                # instance performed a real PCE probe this cycle
+                # (record_pce_success/record_pce_error — health check or
+                # legacy event pull, marked via self._pce_stats_dirty); a
+                # pure cache-read cycle never legitimately touches it (see
+                # StatsTracker.record_local_read) and must defer to disk,
+                # else it clobbers counts the ingest jobs accumulated between
+                # this cycle's load_state() and now (C1).
+                if not self._pce_stats_dirty and "pce_stats" in existing:
+                    merged["pce_stats"] = existing["pce_stats"]
                 return merged
 
             self.state = update_state_file(STATE_FILE, _merge)
@@ -638,6 +677,7 @@ class Analyzer:
             logger.error(t('status_error'))
             logger.warning(f"PCE health check failed: {h_status} - {h_msg[:200]}")
             self.stats.record_pce_error("health", h_msg[:200], status=h_status)
+            self._pce_stats_dirty = True
             for rule in pce_health_rules:
                 if self._check_cooldown(rule):
                     self.reporter.add_health_alert({
@@ -652,6 +692,7 @@ class Analyzer:
             if body_status in {"warning", "degraded", "error", "critical"}:
                 logger.warning(f"PCE health degraded: status={body_status}")
                 self.stats.record_pce_error("health", f"degraded: status={body_status}", status=h_status)
+                self._pce_stats_dirty = True
                 for rule in pce_health_rules:
                     if self._check_cooldown(rule):
                         self.reporter.add_health_alert({
@@ -664,6 +705,7 @@ class Analyzer:
                 logger.info(t('status_ok'))
                 logger.info("PCE health check OK.")
                 self.stats.record_pce_success("health", status=h_status, message=h_msg[:120])
+                self._pce_stats_dirty = True
         return True
 
     def _check_watchdog(self) -> None:
@@ -782,6 +824,7 @@ class Analyzer:
         event_batch = self._fetch_event_batch()
         events = event_batch.events
         self.stats.record_pce_success("events", status=200, message=f"fetched={len(events)}")
+        self._pce_stats_dirty = True
         if event_batch.overflow_risk:
             logger.warning(
                 "Event polling reached max_results=%s between %s and %s; additional events may exist.",
@@ -809,12 +852,18 @@ class Analyzer:
                 logger.info("Analyzer event path: cache ({} rows)", len(events))
                 # Record poll health like the legacy path does — the dashboard
                 # "Event Poll" card reads pce_stats.event_poll_status, which would
-                # otherwise stay 'unknown' forever on the cache path.
-                self.stats.record_pce_success("events", status=200, message=f"cache rows={len(events)}")
+                # otherwise stay 'unknown' forever on the cache path. Uses
+                # record_local_read (NOT record_pce_success): a local cache
+                # read says nothing about live PCE reachability, so it must
+                # never reset pce_stats.consecutive_failures — on this
+                # deployment shape that counter is owned exclusively by the
+                # scheduler's ingest jobs (see _check_watchdog docstring and
+                # .superpowers/sdd/watchdog-overflow-fix-report.md, C1).
+                self.stats.record_local_read("events", success=True, message=f"cache rows={len(events)}")
             except Exception as e:
                 logger.error(f"Cache event poll failed: {e}")
                 logger.error(t('api_fetch_events_error', error=str(e)))
-                self.stats.record_pce_error("events", str(e))
+                self.stats.record_local_read("events", success=False, error=str(e))
         else:
             try:
                 events, event_batch = self._legacy_event_pull()
@@ -822,6 +871,7 @@ class Analyzer:
                 logger.error(f"Event polling failed; watermark preserved at {self.state.get('event_watermark')}: {e}")
                 logger.error(t('api_fetch_events_error', error=str(e)))
                 self.stats.record_pce_error("events", str(e))
+                self._pce_stats_dirty = True
 
         if events:
             logger.info(t('found_events', count=len(events)))
