@@ -34,6 +34,7 @@ from urllib3.util.retry import Retry
 
 from src.api.async_jobs import AsyncJobManager
 from src.api.labels import LabelResolver
+from src.api.reports import ReportsApi
 from src.api.traffic_query import (
     MAX_TRAFFIC_RESULTS,
     TrafficQueryBuilder,
@@ -163,6 +164,7 @@ class ApiClient:
         self._labels = LabelResolver(self)
         self._jobs = AsyncJobManager(self)
         self._traffic = TrafficQueryBuilder(self)
+        self._reports = ReportsApi(self)
 
     # ═══════════════════════════════════════════════════════════════════════
     # Resource lifecycle
@@ -898,6 +900,10 @@ class ApiClient:
             return True
         logger.error(f"Provision failed for RuleSet {_extract_id(rs_href)}: status {prov_status}")
         return False
+
+    def pull_rule_hit_count_report(self, **kwargs) -> str:
+        """Delegates to ReportsApi — native Rule Hit Count report pull."""
+        return self._reports.pull_rule_hit_count_report(**kwargs)
 
     def has_draft_changes(self, href: str) -> bool:
         """Check if an item OR its parent RuleSet has pending draft changes."""
