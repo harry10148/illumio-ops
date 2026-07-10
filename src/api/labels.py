@@ -104,6 +104,34 @@ class LabelResolver:
         return parse_port_token(value, default_proto=default_proto)
 
     @staticmethod
+    def _service_entry_defs(svc):
+        """service 物件 → services.include 條目清單（查詢用完整形，含
+        windows_services 與純 proto 條目；空 service 回 []）。"""
+        defs = []
+        for sp in svc.get("service_ports") or []:
+            p = sp.get("port")
+            if p:
+                pd = {"port": p}
+                if sp.get("proto") is not None:
+                    pd["proto"] = sp["proto"]
+                if sp.get("to_port"):
+                    pd["to_port"] = sp["to_port"]
+                defs.append(pd)
+            elif sp.get("proto") is not None:
+                defs.append({"proto": sp["proto"]})
+        for w in svc.get("windows_services") or []:
+            if w.get("service_name"):
+                defs.append({"windows_service_name": w["service_name"]})
+            elif w.get("process_name"):
+                defs.append({"process_name": w["process_name"]})
+            elif w.get("port"):
+                pd = {"port": w["port"]}
+                if w.get("proto") is not None:
+                    pd["proto"] = w["proto"]
+                defs.append(pd)
+        return defs
+
+    @staticmethod
     def _dedupe_query_group(items):
         deduped = []
         seen = set()
@@ -218,25 +246,19 @@ class LabelResolver:
                     for i in d_services:
                         name = i.get('name')
                         ports = []
-                        port_defs = []  # raw port/proto dicts for query building
                         for svc in i.get('service_ports', []):
                             p = svc.get('port')
                             if p:
                                 proto = "UDP" if svc.get('proto') == 17 else "TCP"
                                 top = f"-{svc['to_port']}" if svc.get('to_port') else ""
                                 ports.append(f"{proto}/{p}{top}")
-                                # Build raw port definition for async queries
-                                pd = {"port": p}
-                                if svc.get('proto') is not None:
-                                    pd["proto"] = svc['proto']
-                                if svc.get('to_port'):
-                                    pd["to_port"] = svc['to_port']
-                                port_defs.append(pd)
                         port_str = f" ({','.join(ports)})" if ports else ""
                         val = f"{name}{port_str}"
                         c.label_cache[i['href']] = val
                         c.label_cache[i['href'].replace('/draft/', '/active/')] = val
-                        # Cache resolved port definitions for per-rule queries
+                        # 查詢用完整條目（含 windows_services、純 proto；filter
+                        # 的 service 展開與 per-rule query 共用）
+                        port_defs = LabelResolver._service_entry_defs(i)
                         if port_defs:
                             c.service_ports_cache[i['href']] = port_defs
                             c.service_ports_cache[i['href'].replace('/draft/', '/active/')] = port_defs
@@ -473,6 +495,13 @@ class LabelResolver:
             else:
                 svcs.append("RefObj")
         return ", ".join(svcs)
+
+    def resolve_service_entries(self, value):
+        """service href → services.include/exclude 條目清單（filter 的
+        services/ex_services key 查詢時展開用）。查無（物件被刪、快取未含）
+        回 None，由呼叫端走 unresolved 降級。"""
+        c = self._client
+        return c.service_ports_cache.get(str(value).strip())
 
     # ── Cache DataFrame object-filter expansion ─────────────────────────
 
