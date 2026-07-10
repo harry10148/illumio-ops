@@ -2710,6 +2710,8 @@ select {
 .objfb-dd-item.act { box-shadow: inset 2px 0 0 var(--accent); }
 .objfb-dd-empty,
 .objfb-dd-note { padding: var(--space-3); color: var(--dim); font-size: 12.5px; }
+.objfb-chip-cnt { opacity: .55; font-size: 11px; }
+.objfb-dd-more { display: block; width: 100%; text-align: center; padding: 6px; border: none; background: none; color: var(--accent, #4a7dbd); cursor: pointer; font-size: 12px; border-top: 1px dashed var(--border, #8884); }
 
 /* pill 編輯 popover：改方向 / 包含排除 / 移除 */
 .objfb-pop {

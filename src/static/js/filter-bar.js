@@ -296,9 +296,10 @@ function _objfbBuildPill(state, p, idx) {
 }
 
 /* ── 下拉局部更新（不重繪整個 bar，保留輸入框焦點/游標）──
- * 空輸入：顯示類別捷徑。非空輸入：委派 _objfbRenderDropdown 立即畫出同步
- * 可得的候選（IP/CIDR 置頂、手動 key=value），並觸發 debounce suggest 查詢
- * （250ms 後打後端、結果回來時再由 _objfbRenderDropdown 併入分類分組）。
+ * 空輸入且無 scope：顯示類別 chip 列（含 totals）。空輸入且有 scope：該類別
+ * 的全量瀏覽清單（載入更多）。非空輸入：委派 _objfbRenderDropdown 立即畫出
+ * 同步可得的候選（IP/CIDR 置頂、手動 key=value），並觸發 debounce suggest
+ * 查詢（250ms 後打後端、結果回來時再由 _objfbRenderDropdown 併入分類分組）。
  */
 function _objfbUpdateDropdown(state) {
   const dd = state.els.dd;
@@ -310,38 +311,145 @@ function _objfbUpdateDropdown(state) {
     if (state._abort) { state._abort.abort(); state._abort = null; }
     state._suggest = null;
     state._suggestQ = null;
-    const catsWrap = document.createElement('div');
-    catsWrap.className = 'objfb-dd-cats';
-    for (const c of state.cats.filter((c) => c !== 'ip')) {
-      const meta = _OBJFB_CATS[c];
-      if (!meta) continue;
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'objfb-cat-btn';
-      const dot = document.createElement('i');
-      dot.className = 'objfb-cat-dot ' + meta.dot;
-      b.appendChild(dot);
-      const label = document.createElement('span');
-      label.setAttribute('data-i18n', meta.i18n);
-      label.textContent = meta.fallback;
-      b.appendChild(label);
-      b.setAttribute('data-on-click', '_objfbSetScope');
-      b.dataset.args = JSON.stringify([state.id, c]);
-      catsWrap.appendChild(b);
+    if (state.scopeCat && state.scopeCat !== 'ip' && state.scopeCat !== 'port') {
+      _objfbRenderBrowse(state);   // 有 scope：空輸入即瀏覽該類別
+      return;
     }
-    dd.appendChild(catsWrap);
-    const note = document.createElement('div');
-    note.className = 'objfb-dd-note';
-    note.setAttribute('data-i18n', 'gui_fb_scope_hint');
-    dd.appendChild(note);
-    _objfbApplyI18n(dd);
-    dd.classList.add('open');
-    state.actIdx = -1;
+    _objfbRenderCatChips(state);   // 無 scope：類別 chip 列（含 totals）
     return;
   }
 
   _objfbRenderDropdown(state, q);
   state._debouncedSuggest(q);
+}
+
+/* ── 空輸入瀏覽（案 C）：無 scope 顯示類別 chip（含各類總數），點 chip 設
+ * scope 進入該類別的全量分頁清單；label 依 key 插入組頭。totals 每實例
+ * 快取一次（TTL 交給後端 module cache）。 ── */
+function _objfbRenderCatChips(state) {
+  const dd = state.els.dd;
+  dd.innerHTML = '';
+  state.ddItems = [];
+  const catsWrap = document.createElement('div');
+  catsWrap.className = 'objfb-dd-cats';
+  for (const c of state.cats.filter((c) => c !== 'ip' && c !== 'port')) {
+    const meta = _OBJFB_CATS[c];
+    if (!meta) continue;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'objfb-cat-btn';
+    const dot = document.createElement('i');
+    dot.className = 'objfb-cat-dot ' + meta.dot;
+    b.appendChild(dot);
+    const label = document.createElement('span');
+    if (meta.i18n) label.setAttribute('data-i18n', meta.i18n);
+    label.textContent = meta.fallback;
+    b.appendChild(label);
+    const n = state._totals && state._totals[c];
+    if (typeof n === 'number') {
+      const cnt = document.createElement('span');
+      cnt.className = 'objfb-chip-cnt';
+      cnt.textContent = ` (${n})`;
+      b.appendChild(cnt);
+    }
+    b.setAttribute('data-on-click', '_objfbSetScope');
+    b.dataset.args = JSON.stringify([state.id, c]);
+    catsWrap.appendChild(b);
+  }
+  dd.appendChild(catsWrap);
+  const note = document.createElement('div');
+  note.className = 'objfb-dd-note';
+  note.setAttribute('data-i18n', 'gui_fb_scope_hint');
+  dd.appendChild(note);
+  _objfbApplyI18n(dd);
+  dd.classList.add('open');
+  state.actIdx = -1;
+  if (!state._totals) {
+    fetch('/api/filter-objects/browse?type=_totals', { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(body => {
+        if (body.ok && body.totals) {
+          state._totals = body.totals;
+          if (state.els && !state.els.input.value.trim() && !state.scopeCat) _objfbRenderCatChips(state);
+        }
+      })
+      .catch(() => {});
+  }
+}
+
+function _objfbRenderBrowse(state, append) {
+  const cat = state.scopeCat;
+  const dd = state.els.dd;
+  if (cat === 'workload') {
+    dd.innerHTML = '';
+    state.ddItems = [];
+    _objfbAddDdNote(dd, 'gui_fb_type_to_search', 'Type to search');
+    _objfbApplyI18n(dd);
+    dd.classList.add('open');
+    return;
+  }
+  const offset = append && state._browse && state._browse.type === cat ? state._browse.items.length : 0;
+  fetch(`/api/filter-objects/browse?type=${cat}&offset=${offset}&limit=20`, { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(body => {
+      if (!state.els || state.els.input.value.trim() || state.scopeCat !== cat) return; // 已改變，放棄
+      if (!body.ok) throw new Error(body.error || 'browse');
+      const prev = (append && state._browse && state._browse.type === cat) ? state._browse.items : [];
+      state._browse = { type: cat, items: prev.concat(body.items), total: body.total, groups: body.groups || null };
+      _objfbRenderBrowseList(state);
+    })
+    .catch(() => {
+      if (!state.els) return;
+      dd.innerHTML = '';
+      state.ddItems = [];
+      _objfbAddDdNote(dd, 'gui_fb_browse_error', 'Browse unavailable');
+      _objfbApplyI18n(dd);
+      dd.classList.add('open');
+    });
+}
+
+function _objfbRenderBrowseList(state) {
+  const dd = state.els.dd;
+  const b = state._browse;
+  dd.innerHTML = '';
+  state.ddItems = [];
+  let prevKey = null;
+  let batch = [];
+  const flush = () => {
+    if (!batch.length) return;
+    const hdrText = b.type === 'label' ? prevKey : null;
+    if (hdrText !== null) {
+      const h = document.createElement('div');
+      h.className = 'objfb-dd-hdr';
+      h.textContent = hdrText;
+      dd.appendChild(h);
+    }
+    _objfbAddDdGroupItems(state, batch);
+    batch = [];
+  };
+  for (const it of b.items) {
+    const k = b.type === 'label' ? (it.key || '') : null;
+    if (b.type === 'label' && k !== prevKey) { flush(); prevKey = k; }
+    batch.push(Object.assign({ cat: b.type }, it));
+  }
+  flush();
+  if (b.items.length < b.total) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'objfb-dd-more';
+    more.setAttribute('data-i18n', 'gui_fb_load_more');
+    more.textContent = 'Load more';
+    const cnt = document.createElement('span');
+    cnt.textContent = ` (${b.items.length}/${b.total})`;
+    more.appendChild(cnt);
+    more.setAttribute('data-on-click', '_objfbBrowseMore');
+    more.dataset.args = JSON.stringify([state.id]);
+    dd.appendChild(more);
+  }
+  _objfbApplyI18n(dd);
+  state.actIdx = state.ddItems.length ? 0 : -1;
+  _objfbMarkActive(state);
+  dd.classList.add('open');
 }
 
 /* ── suggest 查詢：debounce 250ms 後由 state._debouncedSuggest 呼叫。
@@ -453,6 +561,12 @@ function _objfbAddDdGroup(state, items, headerI18nKey, headerFallback) {
   h.setAttribute('data-i18n', headerI18nKey);
   h.textContent = headerFallback;
   dd.appendChild(h);
+  _objfbAddDdGroupItems(state, items);
+}
+
+// 不帶組頭的 items 渲染（_objfbAddDdGroup 拆出共用；原函式改呼叫此函式）
+function _objfbAddDdGroupItems(state, items) {
+  const dd = state.els.dd;
   for (const o of items) {
     const el = document.createElement('div');
     el.className = 'objfb-dd-item';
@@ -462,7 +576,7 @@ function _objfbAddDdGroup(state, items, headerI18nKey, headerFallback) {
     dot.className = 'objfb-cat-dot ' + (meta ? meta.dot : 'objfb-dot-ip');
     el.appendChild(dot);
     const txt = document.createElement('span');
-    txt.textContent = o.name;
+    txt.textContent = o.summary ? `${o.name} — ${o.summary}` : o.name;
     el.appendChild(txt);
     el.setAttribute('data-on-click', '_objfbPickItem');
     el.dataset.args = JSON.stringify([state.id, o]);
@@ -639,6 +753,11 @@ window._objfbClearScope = function (id) {
   _objfbRender(s);
   s.els.input.focus();
   _objfbUpdateDropdown(s);
+};
+
+window._objfbBrowseMore = function (id) {
+  const s = _objfbInstances[id];
+  if (s) _objfbRenderBrowse(s, true);
 };
 
 // 點擊 bar/popover 以外區域時關閉下拉與 popover（沿用 codebase 既有的

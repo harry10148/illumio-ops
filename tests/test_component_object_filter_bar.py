@@ -352,3 +352,18 @@ def test_filter_bar_service_i18n_keys_bilingual():
     zh = json.loads(_ZH.read_text(encoding="utf-8"))
     for k in ("gui_fb_cat_service", "gui_fb_cat_port", "gui_fb_add_port"):
         assert k in en and k in zh
+
+
+def test_filter_bar_browse_wiring_present():
+    src = _JS.read_text(encoding="utf-8")
+    assert "/api/filter-objects/browse" in src
+    assert "window._objfbBrowseMore" in src
+    assert "gui_fb_load_more" in src and "gui_fb_type_to_search" in src
+
+
+def test_filter_bar_browse_i18n_bilingual():
+    import json
+    en = json.loads(_EN.read_text(encoding="utf-8"))
+    zh = json.loads(_ZH.read_text(encoding="utf-8"))
+    for k in ("gui_fb_load_more", "gui_fb_type_to_search", "gui_fb_browse_error"):
+        assert k in en and k in zh
