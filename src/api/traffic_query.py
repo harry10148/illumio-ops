@@ -833,6 +833,7 @@ class TrafficQueryBuilder:
             time.sleep(2 * attempt)
             rows = _download_rows() or []
         if attempt and rows:
+            c.last_fetch_error = None
             logger.info("Async query recovered {} rows after {} re-download(s).",
                         len(rows), attempt)
         for item in rows:
