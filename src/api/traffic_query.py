@@ -476,19 +476,35 @@ class TrafficQueryBuilder:
             hrefs = values if isinstance(values, (list, tuple)) else [values]
             expanded = []
             unresolved = False
+            has_wildcard = False
             for href in hrefs:
                 entries = labels.resolve_service_entries(href)
                 if not entries:
                     # 查無（被刪）或空 service：不送空條件，走 unresolved 降級
                     unresolved = True
                     break
-                expanded.extend(entries)
+                for e in entries:
+                    if e.get("wildcard"):
+                        has_wildcard = True
+                    else:
+                        expanded.append(e)
             if unresolved or len(expanded) > _SERVICE_EXPANSION_CAP:
                 if len(expanded) > _SERVICE_EXPANSION_CAP:
                     logger.warning(
                         "Service expansion exceeds cap ({} > {}); falling back to client-side",
                         len(expanded), _SERVICE_EXPANSION_CAP)
                 _record_unresolved(key, spec.native_filters.get(key))
+            elif has_wildcard and target == "exclude":
+                # 排除 All Services＝排除一切流量，語意荒謬（使用者操作
+                # 本身無意義）：整 key 降級 unresolved 走 fallback，而非送
+                # 出「排除所有服務」的荒謬 native 條件。
+                logger.warning(
+                    "ex_services includes an All-Services wildcard entry; "
+                    "excluding all traffic is meaningless, falling back to client-side")
+                _record_unresolved(key, spec.native_filters.get(key))
+            elif has_wildcard:
+                # All Services（include）＝不限制服務：不 append 任何條件。
+                _record_consumed(key, spec.native_filters.get(key))
             else:
                 payload["services"][target].extend(expanded)
                 _record_consumed(key, spec.native_filters.get(key))
@@ -849,6 +865,9 @@ class TrafficQueryBuilder:
 
         def _port_entry_hit(svc, flow, entry):
             """flow 的 service port/proto 是否命中一個 parse_port_token 條目。"""
+            if entry.get("wildcard"):
+                # All Services＝無服務限制，全命中。
+                return True
             try:
                 flow_port = svc.get('port') or flow.get('dst_port')
                 flow_proto = svc.get('proto') or flow.get('proto')
@@ -992,7 +1011,7 @@ class TrafficQueryBuilder:
                 # 名稱型條目（windows_service_name/process_name）在 fallback
                 # 端無法比對 flow——只用 port/proto 型條目比對；service 只有
                 # 名稱型條目時 port_entries 會是空、hit 維持 False。
-                port_entries = [e for e in entries if "port" in e or "proto" in e]
+                port_entries = [e for e in entries if "port" in e or "proto" in e or e.get("wildcard")]
                 if any(_port_entry_hit(svc, flow, e) for e in port_entries):
                     hit = True
                     break

@@ -48,3 +48,26 @@ def test_cache_build_includes_windows_and_protocol_only_entries():
 
 def test_service_entry_defs_empty_service():
     assert LabelResolver._service_entry_defs({"name": "Empty", "href": "/x", "service_ports": []}) == []
+
+
+def test_service_entry_defs_wildcard_for_negative_proto():
+    """PCE 特殊物件「All Services」的 service_ports 條目是 {"proto": -1}
+    （語意=所有協定、無服務限制），須正規化為 wildcard 標記條目，而非
+    把 -1 當成一個真實 proto 值送進 query。"""
+    svc = {
+        "name": "All Services",
+        "href": "/orgs/1/sec_policy/active/services/1",
+        "service_ports": [{"proto": -1}],
+    }
+    defs = LabelResolver._service_entry_defs(svc)
+    assert defs == [{"wildcard": True}]
+
+
+def test_service_entry_defs_wildcard_for_negative_port():
+    svc = {
+        "name": "Weird",
+        "href": "/orgs/1/sec_policy/active/services/2",
+        "service_ports": [{"port": -1, "proto": 6}],
+    }
+    defs = LabelResolver._service_entry_defs(svc)
+    assert defs == [{"wildcard": True}]

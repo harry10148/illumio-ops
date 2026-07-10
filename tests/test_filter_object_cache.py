@@ -125,3 +125,11 @@ def test_service_summary_truncates_with_ellipsis():
     svc = {"service_ports": [{"port": p, "proto": 6} for p in (1, 2, 3, 4, 5)]}
     s = _service_summary(svc)
     assert s.endswith(", …") and s.count(",") == 3  # 3 segments + ellipsis
+
+
+def test_service_summary_all_services_wildcard():
+    """PCE 特殊物件「All Services」的 service_ports 是 {"proto": -1}
+    （語意=所有協定、無服務限制），摘要須顯示 "all"，不可印出 "-1"。"""
+    from src.gui.filter_object_cache import _service_summary
+    svc = {"service_ports": [{"proto": -1}]}
+    assert _service_summary(svc) == "all"
