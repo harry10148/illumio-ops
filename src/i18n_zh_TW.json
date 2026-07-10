@@ -4321,5 +4321,17 @@
   "cli_rhc_enable_failed": "啟用失敗，已完成步驟 [{steps}]：{error}",
   "cli_rhc_ven_delay_note": "VEN 需要時間開始回報——請稍後再產生報表。",
   "cli_rhc_no_labels_selected": "未選擇任何 label，不會啟用。請重新執行並至少選一個 label，或改選「全部 VEN」。",
-  "cli_rhc_pull_timeout": "PCE 尚未完成準備 Rule Hit Count 報表，請稍後再試。"
+  "cli_rhc_pull_timeout": "PCE 尚未完成準備 Rule Hit Count 報表，請稍後再試。",
+  "gui_btn_rhc_report": "規則命中次數報表",
+  "gui_gen_rhc_title": "產生規則命中次數報表",
+  "gui_no_rhc_data": "原生報表未回傳任何規則。",
+  "gui_rcard_rhc_desc": "原生 VEN 實測規則命中次數，補完整規則明細",
+  "gui_rhc_enable_failed": "啟用失敗：{error}",
+  "gui_rhc_enabled_ok": "已啟用。VEN 需要時間開始回報——請稍後再產生報表。",
+  "gui_rhc_needs_enable_confirm": "原生 Rule Hit Count 未啟用（{state}）。要立即對「全部 VEN」啟用嗎？警告：這會寫入 draft firewall_settings 並 provision 到生產 policy。（指定 label 範圍請改用 CLI 精靈。）",
+  "gui_rhc_use_pu_hint": "未啟用——可改用 Policy Usage 報表（流量近似計數）。",
+  "gui_sched_rt_rhc": "規則命中次數報表",
+  "gui_toast_rhc_done": "規則命中次數報表已產生（{count} 條規則）",
+  "gui_toast_rhc_error": "規則命中次數報表錯誤：{error}",
+  "gui_toast_rhc_fail": "規則命中次數報表產生失敗"
 }

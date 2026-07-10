@@ -23,6 +23,12 @@ from src.gui._helpers import (
     _write_audit_dashboard_summary,
     _write_policy_usage_dashboard_summary,
 )
+from src.report.rule_hit_count_enablement import (
+    EnablementError,
+    RuleHitCountNotEnabled,
+    check_enablement,
+    enable_rule_hit_count,
+)
 
 # state.json key holding ad-hoc traffic-report job records (most recent 20 kept).
 _ADHOC_JOBS_KEY = "adhoc_report_jobs"
@@ -753,6 +759,118 @@ def make_reports_blueprint(
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
             return _err_with_log("report_policy_usage_generate", e, lang=lang)
+
+    # ── API: Rule Hit Count（原生數據增強器）────────────────────────────────
+    @bp.route('/api/rule_hit_count/enablement', methods=['GET'])
+    def api_rule_hit_count_enablement():
+        try:
+            from src.api_client import ApiClient
+            cm.load()
+            api = ApiClient(cm)
+            st = check_enablement(api)
+            return jsonify({"ok": True, "state": st.state,
+                            "pce_report_enabled": st.pce_report_enabled,
+                            "ven_scopes_enabled": st.ven_scopes_enabled,
+                            "detail": st.detail})
+        except Exception as e:
+            return _err_with_log("rule_hit_count_enablement", e, lang='en')
+
+    @bp.route('/api/rule_hit_count/enable', methods=['POST'])
+    @limiter.limit("5 per hour")
+    def api_rule_hit_count_enable():
+        d = request.get_json(silent=True) or {}
+        lang = d.get('lang', 'en')
+        if lang not in ('en', 'zh_TW'):
+            lang = 'en'
+        try:
+            from src.api_client import ApiClient
+            cm.load()
+            api = ApiClient(cm)
+            # GUI v1: ALL VENs only (scopes=None → [[]]); label scopes via CLI wizard.
+            steps = enable_rule_hit_count(api, scopes=None)
+            try:
+                from src.module_log import ModuleLog as _ML
+                _ML.get("reports").info(f"Rule hit count enabled via GUI: {steps}")
+            except Exception:
+                pass  # intentional fallback: ModuleLog write is best-effort
+            return jsonify({"ok": True, "steps_done": steps})
+        except EnablementError as e:
+            return jsonify({"ok": False, "error": str(e), "steps_done": e.steps_done})
+        except Exception as e:
+            return _err_with_log("rule_hit_count_enable", e, lang=lang)
+
+    @bp.route('/api/rule_hit_count_report/generate', methods=['POST'])
+    @limiter.limit("10 per hour")
+    def api_generate_rule_hit_count_report():
+        d = request.get_json(silent=True) or request.form.to_dict() or {}
+        _rhlog = None
+        lang = d.get('lang', 'en')
+        if lang not in ('en', 'zh_TW'):
+            lang = 'en'
+        try:
+            from src.report.rule_hit_count_generator import RuleHitCountGenerator
+            from src.api_client import ApiClient
+            try:
+                from src.module_log import ModuleLog as _ML
+                _rhlog = _ML.get("reports")
+                _rhlog.separator(f"Rule Hit Count Report {datetime.datetime.now(datetime.timezone.utc).strftime('%H:%M:%S')} UTC")
+            except Exception:
+                pass  # intentional fallback: ModuleLog is optional
+
+            cm.load()
+            api = ApiClient(cm)
+            config_dir = _resolve_config_dir()
+            gen = RuleHitCountGenerator(cm, api_client=api, config_dir=config_dir)
+
+            source = d.get('source', 'native')
+            if source == 'csv':
+                import tempfile
+                if 'file' not in request.files or request.files['file'].filename == '':
+                    return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
+                csv_file = request.files['file']
+                safe_name = secure_filename(csv_file.filename) or 'upload.csv'
+                temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}_{safe_name}")
+                csv_file.save(temp_path)
+                try:
+                    result = gen.generate_from_csv(temp_path, lang=lang)
+                finally:
+                    try:
+                        os.unlink(temp_path)
+                    except OSError:
+                        pass
+            else:
+                try:
+                    result = gen.generate_from_native(start_date=d.get('start_date'),
+                                                      end_date=d.get('end_date'), lang=lang)
+                except RuleHitCountNotEnabled as exc:
+                    return jsonify({"ok": False, "needs_enablement": True,
+                                    "state": exc.status.state,
+                                    "detail": exc.status.detail,
+                                    "error": t("gui_rhc_use_pu_hint", lang=lang)})
+
+            if result.record_count == 0:
+                return jsonify({"ok": False, "error": t("gui_no_rhc_data", lang=lang)})
+
+            output_dir = _resolve_reports_dir(cm)
+            fmt = d.get('format', 'html')
+            fmt = fmt if fmt in ('html', 'csv', 'all') else 'html'
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
+            filenames = [os.path.basename(p) for p in paths]
+            kpis = (result.module_results or {}).get('kpis', {})
+            try:
+                if _rhlog:
+                    _rhlog.info(f"Saved: {filenames}")
+            except Exception:
+                pass  # intentional fallback: ModuleLog write is best-effort
+            return jsonify({"ok": True, "files": filenames,
+                            "record_count": result.record_count, "kpis": kpis})
+        except Exception as e:
+            try:
+                if _rhlog:
+                    _rhlog.error(f"Rule hit count report generation failed: {e}")
+            except Exception:
+                pass  # intentional fallback: ModuleLog write is best-effort
+            return _err_with_log("report_rule_hit_count_generate", e, lang=lang)
 
     # ── API: Report Schedules ─────────────────────────────────────────────────
 
