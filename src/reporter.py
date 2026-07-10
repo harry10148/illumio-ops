@@ -15,7 +15,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from src.alerts import build_output_plugin, get_output_registry, render_alert_template
 from src.events import normalize_event, persist_dispatch_results
+from src.events.poller import format_utc
 from src.i18n import t
+from src.state_store import update_state_file
 
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(PKG_DIR)
@@ -184,6 +186,8 @@ class Reporter:
         "warn":     "alert_sev_warning",
         "warning":  "alert_sev_warning",
         "info":     "alert_sev_info",
+        "notice":   "alert_sev_notice",
+        "debug":    "alert_sev_debug",
     }
 
     _STATUS_I18N_KEYS: dict[str, str] = {
@@ -641,10 +645,10 @@ class Reporter:
     def _highest_severity(issues: list[dict]) -> str:
         """Pick highest severity from a list of issue dicts; returns 'critical', 'warning', or 'info'."""
         # Map raw severity values to canonical three-level labels used by mail_severity_* i18n keys
-        _rank = {'critical': 3, 'crit': 3, 'emerg': 3, 'alert': 2, 'err': 2, 'error': 2, 'warning': 2, 'warn': 2, 'info': 1}
+        _rank = {'critical': 3, 'crit': 3, 'emerg': 3, 'alert': 2, 'err': 2, 'error': 2, 'warning': 2, 'warn': 2, 'info': 1, 'notice': 1, 'debug': 1}
         _canonical = {'critical': 'critical', 'crit': 'critical', 'emerg': 'critical',
                       'alert': 'warning', 'err': 'warning', 'error': 'warning', 'warning': 'warning', 'warn': 'warning',
-                      'info': 'info'}
+                      'info': 'info', 'notice': 'info', 'debug': 'info'}
         cur = 0
         out = 'info'
         for issue in issues:
@@ -816,12 +820,56 @@ class Reporter:
             text = text[:max_chars - 1].rsplit(' ', 1)[0] + '…'
         return _html.escape(text)
 
+    ALERT_DLQ_MAX_ATTEMPTS = 3
+
+    def _pop_alert_dlq(self) -> list[dict[str, Any]]:
+        """Atomically take all pending DLQ entries from the state file."""
+        popped: list[dict[str, Any]] = []
+
+        def _take(existing: dict) -> dict:
+            nonlocal popped
+            popped = list(existing.get("alert_dlq", []))
+            out = dict(existing)
+            out["alert_dlq"] = []
+            return out
+
+        try:
+            update_state_file(STATE_FILE, _take)
+        except Exception as exc:
+            logger.warning("Failed to read alert DLQ: {}", exc)
+            return []
+        return popped
+
+    def _push_alert_dlq(self, buckets: dict[str, list], attempts: int, first_failed_at: str) -> None:
+        entry = {"buckets": buckets, "attempts": attempts, "first_failed_at": first_failed_at}
+
+        def _append(existing: dict) -> dict:
+            out = dict(existing)
+            out["alert_dlq"] = list(existing.get("alert_dlq", [])) + [entry]
+            return out
+
+        try:
+            update_state_file(STATE_FILE, _append)
+        except Exception as exc:
+            logger.error("Failed to persist alert DLQ (alerts lost): {}", exc)
+
     def send_alerts(self, force_test: bool = False, channels: list[str] | None = None, *, lang: str | None = None) -> list[dict[str, Any]]:
         _lang = lang or self._lang
         # Bind the subject's t() to the dispatch language; _dispatch_lang (set
         # around the plugin loop below) carries the same language into the
         # body builders the plugins invoke without a lang argument.
         t = self._lang_t(_lang)
+        replayed_attempts = 0
+        replayed_first_failed_at = ""
+        if not force_test:
+            for entry in self._pop_alert_dlq():
+                buckets = entry.get("buckets", {})
+                self.health_alerts.extend(buckets.get("health", []))
+                self.event_alerts.extend(buckets.get("event", []))
+                self.traffic_alerts.extend(buckets.get("traffic", []))
+                self.metric_alerts.extend(buckets.get("metric", []))
+                replayed_attempts = max(replayed_attempts, int(entry.get("attempts", 0)))
+                replayed_first_failed_at = replayed_first_failed_at or entry.get("first_failed_at", "")
         if (
             not any(
                 [
@@ -944,6 +992,31 @@ class Reporter:
             "traffic": len(self.traffic_alerts),
             "metrics": len(self.metric_alerts),
         }
+
+        attempted = [r for r in results if r.get("status") != "skipped"]
+        delivered = any(r.get("status") == "success" for r in results)
+        if attempted and not delivered and not force_test:
+            attempts = replayed_attempts + 1
+            first_failed_at = replayed_first_failed_at or format_utc(
+                datetime.datetime.now(datetime.timezone.utc)
+            )
+            buckets = {
+                "health": list(self.health_alerts),
+                "event": list(self.event_alerts),
+                "traffic": list(self.traffic_alerts),
+                "metric": list(self.metric_alerts),
+            }
+            if attempts >= self.ALERT_DLQ_MAX_ATTEMPTS:
+                logger.error(
+                    "Alert DLQ: dropping {} alert bucket(s) after {} failed dispatch attempts",
+                    sum(len(v) for v in buckets.values()), attempts,
+                )
+                results.append({"channel": "dlq", "status": "dropped", "target": "",
+                                "error": f"dropped after {attempts} attempts"})
+            else:
+                logger.warning("Alert DLQ: all channels failed, queuing for retry (attempt {})", attempts)
+                self._push_alert_dlq(buckets, attempts, first_failed_at)
+
         try:
             persist_dispatch_results(
                 STATE_FILE,
@@ -999,6 +1072,8 @@ class Reporter:
                 health_section_lines.append(f"{time_lbl}：{self._compact_text(alert.get('time', ''))}")
                 health_section_lines.append(f"{summary_lbl}：{self._compact_text(alert.get('details', ''))}")
                 health_section_lines.append("")
+            if len(self.health_alerts) > 2:
+                health_section_lines.append(t('line_section_more', more=len(self.health_alerts) - 2))
 
         event_section_lines = []
         if self.event_alerts:
@@ -1046,6 +1121,8 @@ class Reporter:
                 if alert.get("count") is not None:
                     traffic_section_lines.append(f"{count_lbl}：{self._compact_text(alert.get('count', ''))}")
                 traffic_section_lines.append("")
+            if len(self.traffic_alerts) > 2:
+                traffic_section_lines.append(t('line_section_more', more=len(self.traffic_alerts) - 2))
 
         metric_section_lines = []
         if self.metric_alerts:
@@ -1058,6 +1135,8 @@ class Reporter:
                 if alert.get("count") is not None:
                     metric_section_lines.append(f"{value_lbl}：{self._compact_text(alert.get('count', ''))}")
                 metric_section_lines.append("")
+            if len(self.metric_alerts) > 2:
+                metric_section_lines.append(t('line_section_more', more=len(self.metric_alerts) - 2))
 
         return render_alert_template(
             "line_digest.txt.tmpl",

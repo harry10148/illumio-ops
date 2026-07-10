@@ -1,0 +1,42 @@
+"""HTTP 200 from /api/v2/health does NOT mean healthy: parse body status."""
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+from src.api_client import health_status_from_body
+
+
+def test_parses_top_level_status_dict():
+    assert health_status_from_body('{"status": "normal"}') == "normal"
+    assert health_status_from_body('{"status": "WARNING"}') == "warning"
+
+
+def test_parses_node_list_and_picks_worst():
+    body = '[{"status": "normal"}, {"status": "critical"}, {"status": "warning"}]'
+    assert health_status_from_body(body) == "critical"
+
+
+def test_unparseable_body_returns_empty():
+    assert health_status_from_body("not json") == ""
+    assert health_status_from_body("") == ""
+    assert health_status_from_body("[1, 2]") == ""
+
+
+def test_degraded_200_fires_health_alert(tmp_path, monkeypatch):
+    import src.analyzer as analyzer_mod
+    monkeypatch.setattr(analyzer_mod, "STATE_FILE", str(tmp_path / "state.json"))
+    from src.analyzer import Analyzer
+    from src.config import ConfigManager
+    cm = ConfigManager()
+    cm.config["rules"] = [{
+        "id": 1, "name": "PCE Health", "type": "system",
+        "filter_value": "pce_health", "threshold_count": 1, "threshold_type": "count",
+    }]
+    api = MagicMock()
+    api.check_health.return_value = (200, '{"status": "warning"}')
+    rep = MagicMock()
+    ana = Analyzer(cm, api, rep)
+    ana._run_health_check()
+    rep.add_health_alert.assert_called_once()
+    alert = rep.add_health_alert.call_args[0][0]
+    assert "warning" in alert["details"].lower()

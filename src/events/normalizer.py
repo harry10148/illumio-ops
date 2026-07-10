@@ -232,6 +232,18 @@ def _extract_notification_user(event: dict[str, Any]) -> str:
             return username
     return ""
 
+def _extract_notification_types(event: dict[str, Any]) -> list[str]:
+    notifications = event.get("notifications")
+    if not isinstance(notifications, list):
+        return []
+    out: list[str] = []
+    for entry in notifications:
+        if isinstance(entry, dict):
+            nt = _string(entry.get("notification_type"))
+            if nt:
+                out.append(nt)
+    return out
+
 def _build_parser_notes(event: dict[str, Any], normalized: dict[str, Any]) -> list[str]:
     notes: list[str] = []
     event_type = normalized.get("event_type", "")
@@ -325,6 +337,7 @@ def normalize_event(event: dict[str, Any]) -> dict[str, Any]:
         "action": action_label,
         "resource_changes_count": len(event.get("resource_changes") or []) if isinstance(event.get("resource_changes"), list) else 0,
         "notifications_count": len(event.get("notifications") or []) if isinstance(event.get("notifications"), list) else 0,
+        "notification_types": _extract_notification_types(event),
         "workloads_affected": _extract_workloads_affected(event),
     }
     normalized["parser_notes"] = _build_parser_notes(event, normalized)

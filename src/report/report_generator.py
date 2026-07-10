@@ -31,6 +31,7 @@ from src.report.report_metadata import (
     extract_attack_summary,
 )
 from src.report.tz_utils import parse_tz as _parse_tz, fmt_tz_now as _fmt_tz_now
+from src.pce_cache.reader import CacheReadTooLarge
 
 
 def _fmt_iso(dt) -> str:
@@ -181,12 +182,16 @@ class ReportGenerator:
         if use_cache and self._cache is not None:
             state = self._cache.cover_state("traffic", start, end)
             if state == "full":
-                logger.info("Traffic report: flows from cache ({} → {})", start, end)
-                return {
-                    "raw": self._cache.read_flows_raw(start, end, workload_hrefs=cache_workload_hrefs),
-                    "agg": self._cache.read_flows_agg(start, end),
-                    "source": "cache",
-                }
+                try:
+                    raw = self._cache.read_flows_raw(
+                        start, end, workload_hrefs=cache_workload_hrefs)
+                except CacheReadTooLarge as exc:
+                    logger.warning("Traffic report: {} — falling back to live API", exc)
+                else:
+                    logger.info("Traffic report: flows from cache ({} → {})", start, end)
+                    return {"raw": raw,
+                            "agg": self._cache.read_flows_agg(start, end),
+                            "source": "cache"}
             if state == "partial":
                 cache_start = self._cache.earliest_data_timestamp("traffic")
                 if cache_start is not None and cache_start > start:
@@ -217,10 +222,16 @@ class ReportGenerator:
                     else:
                         # 次秒級 gap：回退 1 秒後已無有意義的窗口可查詢。
                         gap = []
-                    cached = self._cache.read_flows_raw(cache_start, end, workload_hrefs=cache_workload_hrefs)
-                    # agg data not available for hybrid results
-                    source = "mixed" if gap else "cache"
-                    return {"raw": gap + cached, "agg": None, "source": source}
+                    try:
+                        cached = self._cache.read_flows_raw(
+                            cache_start, end, workload_hrefs=cache_workload_hrefs)
+                    except CacheReadTooLarge as exc:
+                        logger.warning(
+                            "Traffic report hybrid: {} — falling back to full API path", exc)
+                    else:
+                        # agg data not available for hybrid results
+                        source = "mixed" if gap else "cache"
+                        return {"raw": gap + cached, "agg": None, "source": source}
         flows = self.api.fetch_traffic_for_report(
             start_time_str=_fmt_iso(start),
             end_time_str=_fmt_iso(end),
@@ -260,11 +271,15 @@ class ReportGenerator:
         if use_cache and self._cache is not None:
             state = self._cache.cover_state("traffic", start, end)
             if state == "full":
-                df = self._cache.read_flows_df(start, end, workload_hrefs=cache_workload_hrefs,
-                                               policy_decisions=pds)
-                df = apply_df_traffic_filters(df, filters)
-                logger.info("Traffic report: flows from cache ({} → {}) [vectorized]", start, end)
-                return df, "cache"
+                try:
+                    df = self._cache.read_flows_df(start, end, workload_hrefs=cache_workload_hrefs,
+                                                   policy_decisions=pds)
+                except CacheReadTooLarge as exc:
+                    logger.warning("Traffic report: {} — falling back to live API", exc)
+                else:
+                    df = apply_df_traffic_filters(df, filters)
+                    logger.info("Traffic report: flows from cache ({} → {}) [vectorized]", start, end)
+                    return df, "cache"
             if state == "partial":
                 cache_start = self._cache.earliest_data_timestamp("traffic")
                 if cache_start is not None and cache_start > start:
@@ -288,13 +303,18 @@ class ReportGenerator:
                         # 次秒級 gap：回退 1 秒後已無有意義的窗口可查詢。
                         gap = []
                     df_gap = self._parse_api(gap)
-                    df_cache = self._cache.read_flows_df(cache_start, end,
-                                                         workload_hrefs=cache_workload_hrefs,
-                                                         policy_decisions=pds)
-                    df_cache = apply_df_traffic_filters(df_cache, filters)
-                    parts = [d for d in (df_gap, df_cache) if not d.empty]
-                    df = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
-                    return df, ("mixed" if not df_gap.empty else "cache")
+                    try:
+                        df_cache = self._cache.read_flows_df(cache_start, end,
+                                                             workload_hrefs=cache_workload_hrefs,
+                                                             policy_decisions=pds)
+                    except CacheReadTooLarge as exc:
+                        logger.warning(
+                            "Traffic report hybrid: {} — falling back to full API path", exc)
+                    else:
+                        df_cache = apply_df_traffic_filters(df_cache, filters)
+                        parts = [d for d in (df_gap, df_cache) if not d.empty]
+                        df = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+                        return df, ("mixed" if not df_gap.empty else "cache")
         flows = self.api.fetch_traffic_for_report(
             start_time_str=_fmt_iso(start),
             end_time_str=_fmt_iso(end),

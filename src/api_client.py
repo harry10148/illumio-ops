@@ -303,11 +303,11 @@ class ApiClient:
         """Async bulk events pull via Prefer: respond-async (stub for Phase 13)."""
         return []
 
-    def get_traffic_flows_async(self, max_results: int = 200000, rate_limit: bool = False, since: str | None = None, **kwargs: Any) -> list[dict[str, Any]]:
+    def get_traffic_flows_async(self, max_results: int = 200000, rate_limit: bool = False, since: str | None = None, until: str | None = None, **kwargs: Any) -> list[dict[str, Any]]:
         """Pull traffic flows for cache ingestion via the async query endpoint."""
         import contextlib, io
         from datetime import datetime, timezone, timedelta
-        end_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        end_time = until or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
         if since is None:
             since = (datetime.now(timezone.utc) - timedelta(hours=24)).replace(microsecond=0).isoformat()
         with contextlib.redirect_stdout(io.StringIO()):
@@ -978,10 +978,41 @@ class ApiClient:
         return self.get_provision_state(href) == 'active'
 
 
+_HEALTH_BAD_ORDER = ("critical", "error", "degraded", "warning")
+
+
+def health_status_from_body(text: str) -> str:
+    """Extract the PCE health status string from a /api/v2/health body.
+
+    The endpoint returns HTTP 200 whenever it can report at all, so the body
+    status is the only truthful health signal. Returns '' when unparseable —
+    callers must treat '' as unknown, never as healthy.
+    """
+    import json as _json
+    try:
+        data = _json.loads(text)
+    except (ValueError, TypeError):
+        return ""
+    if isinstance(data, dict):
+        return str(data.get("status") or "").strip().lower()
+    if isinstance(data, list):
+        statuses = [
+            str(node.get("status") or "").strip().lower()
+            for node in data if isinstance(node, dict)
+        ]
+        statuses = [s for s in statuses if s]
+        for bad in _HEALTH_BAD_ORDER:
+            if bad in statuses:
+                return bad
+        return statuses[0] if statuses else ""
+    return ""
+
+
 __all__ = [
     "ApiClient",
     "EventFetchError",
     "TrafficQuerySpec",
     "MAX_TRAFFIC_RESULTS",
     "MAX_RETRIES",
+    "health_status_from_body",
 ]

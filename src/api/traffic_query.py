@@ -868,7 +868,16 @@ class TrafficQueryBuilder:
                 payload.get("sources_destinations_query_op"),
                 payload.get("policy_decisions"),
             )
-            yield from self._submit_and_stream_async_query(payload, compute_draft=compute_draft, rate_limit=rate_limit)
+            flow_count = 0
+            for flow in self._submit_and_stream_async_query(payload, compute_draft=compute_draft, rate_limit=rate_limit):
+                flow_count += 1
+                yield flow
+            if flow_count >= MAX_TRAFFIC_RESULTS:
+                logger.warning(
+                    f"execute_traffic_query_stream: PCE returned {flow_count} flows, "
+                    f"hit max_results={MAX_TRAFFIC_RESULTS} cap; more flows may exist "
+                    f"and were not returned"
+                )
         except Exception as e:
             logger.error(f"Query Exception: {e}")
             print(t("api_query_exception", error=str(e)))
@@ -1140,6 +1149,12 @@ class TrafficQueryBuilder:
             compute_draft=compute_draft, rate_limit=rate_limit
         )
         records = list(stream)
+        if len(records) >= MAX_TRAFFIC_RESULTS:
+            logger.warning(
+                f"fetch_traffic_for_report: PCE returned {len(records)} flows, "
+                f"hit max_results={MAX_TRAFFIC_RESULTS} cap; more flows may exist "
+                f"and were not returned"
+            )
 
         # execute_traffic_query_stream demotes any native filter that fails href
         # resolution into the *effective* fallback set, which it publishes on the

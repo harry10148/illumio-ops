@@ -29,6 +29,7 @@ from src.i18n import t
 from src.state_store import load_state_file, update_state_file
 from src.interfaces import IApiClient, IReporter
 from src.api.traffic_query import TrafficQueryBuilder
+from src.pce_cache.reader import CacheReadTooLarge
 
 # Refine Root Dir for State File
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -39,6 +40,19 @@ STATE_FILE = os.path.join(ROOT_DIR, "logs", "state.json")
 # `top_10 = res['top_matches'][:10]`）。_run_rule_engine 以同一個 N 對
 # 每條規則的累積量設上界，確保累積永遠不超過 dispatch 端實際使用的筆數。
 TOP_MATCHES_LIMIT = 10
+
+# Dead-man's switch: after this many consecutive PCE polling failures the
+# analyzer self-alerts (via _check_watchdog), because a dead poller otherwise
+# fails silent — no events polled, no alerts fired. Own cooldown keeps a
+# long outage to one alert per hour instead of one per cycle.
+WATCHDOG_FAILURE_THRESHOLD = 3
+WATCHDOG_COOLDOWN_MINUTES = 60
+
+# Meta-alert cooldown for event polling overflow: when the sync events API
+# hits max_results it returns only the newest rows, so older events in the
+# window are permanently lost. Own cooldown keeps a persistent burst source
+# to one alert per hour instead of one per cycle.
+OVERFLOW_ALERT_COOLDOWN_MINUTES = 60
 
 # query_flows 殘餘比對的委派範圍：check_flow_match 只認 legacy scalar key，
 # 下列物件/複數 key（Phase 3 FilterBar）委派給報表路徑同一套比對器
@@ -633,10 +647,70 @@ class Analyzer:
                         "details": h_msg[:200]
                     })
         else:
-            logger.info(t('status_ok'))
-            logger.info("PCE health check OK.")
-            self.stats.record_pce_success("health", status=h_status, message=h_msg[:120])
+            from src.api_client import health_status_from_body
+            body_status = health_status_from_body(h_msg)
+            if body_status in {"warning", "degraded", "error", "critical"}:
+                logger.warning(f"PCE health degraded: status={body_status}")
+                self.stats.record_pce_error("health", f"degraded: status={body_status}", status=h_status)
+                for rule in pce_health_rules:
+                    if self._check_cooldown(rule):
+                        self.reporter.add_health_alert({
+                            "time": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+                            "rule": rule["name"],
+                            "status": body_status,
+                            "details": t('health_degraded_details', status=body_status),
+                        })
+            else:
+                logger.info(t('status_ok'))
+                logger.info("PCE health check OK.")
+                self.stats.record_pce_success("health", status=h_status, message=h_msg[:120])
         return True
+
+    def _check_watchdog(self) -> None:
+        """Self-alert when the PCE has been unreachable for N consecutive cycles.
+
+        Without this, a dead poller fails silent: no events, no alerts, and the
+        operator assumes all is well. Uses its own cooldown so a long outage
+        produces one alert per hour instead of one per cycle.
+        """
+        failures = int(self.state.get("pce_stats", {}).get("consecutive_failures", 0))
+        if failures < WATCHDOG_FAILURE_THRESHOLD:
+            return
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        last = parse_event_timestamp(self.state.get("watchdog_last_alert_at"))
+        if last and (now_utc - last).total_seconds() < WATCHDOG_COOLDOWN_MINUTES * 60:
+            return
+        self.state["watchdog_last_alert_at"] = format_utc(now_utc)
+        last_error = self.state.get("pce_stats", {}).get("last_error", "")
+        self.reporter.add_health_alert({
+            "time": now_utc.strftime('%Y-%m-%d %H:%M:%S'),
+            "rule": t('alert_watchdog_rule'),
+            "status": "critical",
+            "details": t('alert_watchdog_details', count=failures, error=last_error[:120]),
+        })
+        logger.error(f"Watchdog: {failures} consecutive PCE failures — self-alert dispatched")
+
+    def _maybe_alert_overflow(self) -> None:
+        """Meta-alert when event polling hit max_results: oldest events were lost."""
+        overflow = self.state.get("event_overflow") or {}
+        if not overflow:
+            return
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        last = parse_event_timestamp(self.state.get("overflow_last_alert_at"))
+        if last and (now_utc - last).total_seconds() < OVERFLOW_ALERT_COOLDOWN_MINUTES * 60:
+            return
+        self.state["overflow_last_alert_at"] = format_utc(now_utc)
+        self.reporter.add_health_alert({
+            "time": now_utc.strftime('%Y-%m-%d %H:%M:%S'),
+            "rule": t('alert_overflow_rule'),
+            "status": "warning",
+            "details": t('alert_overflow_details',
+                         raw=overflow.get("raw_count", "?"),
+                         cap=overflow.get("max_results", "?"),
+                         since=overflow.get("query_since", "?"),
+                         until=overflow.get("query_until", "?")),
+        })
+        logger.warning("Event overflow meta-alert dispatched")
 
     def run_analysis(self) -> None:
         logger.info("Starting analysis cycle.")
@@ -654,6 +728,8 @@ class Analyzer:
 
         # 4. Dispatch alerts for traffic triggers
         self._dispatch_alerts(triggers, tr_rules)
+
+        self._check_watchdog()
 
         self.save_state()
         logger.info("Analysis cycle completed.")
@@ -704,6 +780,7 @@ class Analyzer:
         else:
             try:
                 events, event_batch = self._legacy_event_pull()
+                self._maybe_alert_overflow()
             except Exception as e:
                 logger.error(f"Event polling failed; watermark preserved at {self.state.get('event_watermark')}: {e}")
                 logger.error(t('api_fetch_events_error', error=str(e)))
@@ -1063,8 +1140,13 @@ class Analyzer:
             return stream, "api"
 
         if state == "full":
-            logger.info("query_flows: flows from cache ({} → {})", start_dt, end_dt)
-            return self._cache_reader.read_flows_raw(start_dt, end_dt), "cache"
+            try:
+                logger.info("query_flows: flows from cache ({} → {})", start_dt, end_dt)
+                return self._cache_reader.read_flows_raw(start_dt, end_dt), "cache"
+            except CacheReadTooLarge as exc:
+                logger.warning(
+                    "query_flows: {} — falling back to live API (bounded)", exc)
+                state = "cache_too_large"  # 落到函式底部的 API 路徑
 
         if state == "partial":
             cache_start = self._cache_reader.earliest_data_timestamp("traffic")
@@ -1107,9 +1189,14 @@ class Analyzer:
                     )
                     gap_list = None
                 if gap_list is not None:
-                    cached = self._cache_reader.read_flows_raw(cache_start, end_dt)
-                    source = "mixed" if gap_list else "cache"
-                    return gap_list + cached, source
+                    try:
+                        cached = self._cache_reader.read_flows_raw(cache_start, end_dt)
+                    except CacheReadTooLarge as exc:
+                        logger.warning(
+                            "query_flows hybrid: {} — falling back to full API path", exc)
+                    else:
+                        source = "mixed" if gap_list else "cache"
+                        return gap_list + cached, source
 
         # miss / partial-with-conflict / hybrid-failure: fall through to API
         stream = self.api.execute_traffic_query_stream(

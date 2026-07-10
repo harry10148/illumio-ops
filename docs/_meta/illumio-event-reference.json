@@ -69,6 +69,13 @@
     "remediation": "VEN lifecycle event. Activation/deactivation is normal during\ndeployment. Unexpected deactivation or unpair may indicate\nworkload decommissioning or administrative action. Check\nthe actor and verify against change management records.\n",
     "doc_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm"
   },
+  "agent.refresh_policy": {
+    "category": "Agent Health",
+    "description": "Success or failure to apply policy on VEN.",
+    "severity": "info",
+    "remediation": "If status is failure, check VEN connectivity and re-sync policy from the PCE.",
+    "doc_url": ""
+  },
   "agent.refresh_token": {
     "category": "Agent Operations",
     "description": "This event is triggered when an agent refreshes its token.",
@@ -716,6 +723,13 @@
   "login_proxy_orgs.update": {
     "category": "Auth & API",
     "description": "A login proxy organization is updated.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "logout_from_jwt": {
+    "category": "General",
+    "description": "User logged out (JWT session).",
     "severity": "info",
     "remediation": "",
     "doc_url": ""
@@ -1388,6 +1402,27 @@
   "support_report.upload": {
     "category": "Inventory & Identity",
     "description": "Support report uploaded.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "support_report_request.create": {
+    "category": "General",
+    "description": "Support report requested.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "support_report_request.delete": {
+    "category": "General",
+    "description": "Deleted a request for a support report.",
+    "severity": "info",
+    "remediation": "",
+    "doc_url": ""
+  },
+  "support_reports": {
+    "category": "General",
+    "description": "Support report added.",
     "severity": "info",
     "remediation": "",
     "doc_url": ""

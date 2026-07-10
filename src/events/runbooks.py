@@ -26,6 +26,7 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
             "user.create_session",
             "user.pce_session_terminated",
             "user.login_session_terminated",
+            "logout_from_jwt",
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/event-types.htm",
         "severity_hint": "info",
@@ -85,6 +86,9 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
             "agent.machine_identifier",
             "agents.unpair",
             "agents.clear_conditions",
+            "agent.refresh_policy",
+            "agent.service_not_available",
+            "lost_agent.found",
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/ven-administration/managing-vens.htm",
         "severity_hint": "info",
@@ -224,7 +228,16 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/pce-administration/system-tasks.htm",
         "severity_hint": "info",
-        "response": "Investigate workloads generating these events by viewing the PCE web console Troubleshooting > Events or Organization events export. A missed heartbeats check event indicates a VEN failed to communicate, and the PCE may take the workload offline after a sustained period, removing its IP address from policy. Verify the network connectivity of the affected workloads and ensure the VEN processes are running correctly.",
+        "response": "Investigate workloads generating these events by viewing the PCE web console Troubleshooting > Events or Organization events export. A missed heartbeats check event indicates a VEN failed to communicate, and the PCE may take the workload offline after a sustained period, removing its IP address from policy. Verify the network connectivity of the affected workloads and ensure the VEN processes are running correctly. If a prune_old_log_events event carries a soft_limit.exceeded notification it is informational cleanup, but hard_limit.exceeded means the PCE has reached its hard limit and stopped recording new events until space is reclaimed, and must be treated as critical.",
+    },
+    "pce-capacity": {
+        "patterns": [
+            "database.temp_table_autocleanup_started",
+            "database.temp_table_autocleanup_completed",
+        ],
+        "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/events-monitoring.htm",
+        "severity_hint": "critical",
+        "response": "Check PCE event database disk usage immediately. The PCE prunes events aggressively once event storage reaches 20 percent of disk (soft limit) and stops recording new events at 25 percent (hard limit), which silently breaks event-based alerting. Review Troubleshooting > Events for prune_old_log_events entries whose notifications carry soft_limit.exceeded or hard_limit.exceeded, reduce event retention, or expand disk. Confirm system_task.hard_limit_recovery_completed appears after cleanup.",
     },
     "server-errors": {
         "patterns": [

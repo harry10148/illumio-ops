@@ -71,6 +71,7 @@ def _make_cache_reader(cm, db_path: str | None = None):
             session_factory=sf,
             events_retention_days=int(getattr(cfg, "events_retention_days", 30)),
             traffic_raw_retention_days=int(getattr(cfg, "traffic_raw_retention_days", 30)),
+            read_max_rows=int(getattr(cfg, "cache_read_max_rows", 500000)),
         )
     except Exception as exc:
         logger.warning("Could not create cache reader: {}", exc)

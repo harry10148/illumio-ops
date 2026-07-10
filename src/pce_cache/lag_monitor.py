@@ -9,6 +9,37 @@ from sqlalchemy.orm import sessionmaker
 from src.pce_cache.models import IngestionWatermark
 from src.i18n import t
 
+# AL-Task 11: throttle repeated lag-monitor alerts. run_cache_lag_monitor ticks
+# every 60s; without throttling a sustained outage re-logs one error per
+# minute (capacity-case review flagged this as a systemic alerting-storm gap
+# and handed it to the Alert case). lag_monitor has no reporter/STATE_FILE
+# lifecycle like the analyzer watchdog (AL-Task 6), so a lightweight
+# module-level dict is enough — the scheduler runs as a single long-lived
+# process; a restart re-sending one alert is acceptable. Keyed by alert
+# identity (kind, source[, level]) so different sources/levels don't block
+# each other, and cleared once the triggering condition clears so the next
+# occurrence alerts immediately (unlike the watchdog's fixed-cooldown,
+# no-reset behavior — that precedent is out of scope here; this is a new
+# mechanism with no compatibility burden).
+LAG_ALERT_COOLDOWN_MINUTES = 60
+
+_last_alert_at: dict[tuple, datetime] = {}
+
+
+def _should_alert(key: tuple) -> bool:
+    """True (and records now()) if key is outside its cooldown window."""
+    now = datetime.now(timezone.utc)
+    last = _last_alert_at.get(key)
+    if last and (now - last).total_seconds() < LAG_ALERT_COOLDOWN_MINUTES * 60:
+        return False
+    _last_alert_at[key] = now
+    return True
+
+
+def _clear_alert(key: tuple) -> None:
+    """Drop a key's cooldown so recovery lets the next alert fire immediately."""
+    _last_alert_at.pop(key, None)
+
 
 def check_cache_lag(session_factory: sessionmaker, max_lag_seconds: int = 300) -> list[dict]:
     """Return lag info for all watermark sources.
@@ -47,6 +78,23 @@ def check_cache_lag(session_factory: sessionmaker, max_lag_seconds: int = 300) -
     return results
 
 
+def status_alerts(results: list[dict]) -> list[str]:
+    """last_status=='error' 的來源 → 告警訊息。
+
+    時間基準的 level 看不出「持續失敗」：失敗的 ingest 仍會 bump
+    last_sync_at（見 check_cache_lag docstring），所以 PCE 長期不可達時
+    lag 永遠正常。此函式補上以結果狀態為準的第二道判斷。"""
+    msgs = []
+    for r in results:
+        if r.get("last_status") == "error":
+            msgs.append(t(
+                "alert_cache_ingest_failing",
+                source=r.get("source", "?"),
+                err=(r.get("last_error") or "")[:200],
+            ))
+    return msgs
+
+
 def run_cache_lag_monitor(cm) -> None:
     """APScheduler job: check ingestor lag, log if stalled."""
     from sqlalchemy.orm import sessionmaker as _SM
@@ -66,11 +114,29 @@ def run_cache_lag_monitor(cm) -> None:
 
     results = check_cache_lag(sf, max_lag_seconds=max_lag)
     for r in results:
+        source = r["source"]
+        error_key = ("level", source, "error")
+        warning_key = ("level", source, "warning")
         if r["level"] == "error":
-            logger.error(
-                t("alert_cache_lag_error", source=r["source"], lag=int(r["lag_seconds"]))
-            )
+            _clear_alert(warning_key)
+            if _should_alert(error_key):
+                logger.error(
+                    t("alert_cache_lag_error", source=source, lag=int(r["lag_seconds"]))
+                )
         elif r["level"] == "warning":
-            logger.warning(
-                t("alert_cache_lag_warning", source=r["source"], lag=int(r["lag_seconds"]))
-            )
+            _clear_alert(error_key)
+            if _should_alert(warning_key):
+                logger.warning(
+                    t("alert_cache_lag_warning", source=source, lag=int(r["lag_seconds"]))
+                )
+        else:
+            _clear_alert(error_key)
+            _clear_alert(warning_key)
+
+        status_key = ("status", source)
+        if r.get("last_status") == "error":
+            if _should_alert(status_key):
+                for msg in status_alerts([r]):
+                    logger.error(msg)
+        else:
+            _clear_alert(status_key)

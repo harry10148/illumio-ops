@@ -1,15 +1,21 @@
 """Vendor-derived PCE event catalog.
 
-This list is based on alexgoller/illumio-pretty-cool-events and is used as a
-baseline to detect unknown or newly introduced event types.
+Split into two tiers to detect unknown or newly introduced event types:
 
-Some real PCE builds emit additional event types that are not present in the
-reference catalog. Those are tracked separately as local extensions so the
-viewer can distinguish vendor baseline from environment-observed additions.
+- VENDOR_DOCUMENTED_EVENT_TYPES: exactly the official "List of Event Types"
+  from the Events Administration Guide.
+- OBSERVED_EXTENSION_EVENT_TYPES: event types emitted by real PCE builds
+  (25.x field observations, upstream alexgoller/illumio-pretty-cool-events
+  entries, notification-derived types) but absent from the official list.
+  Kept known so they never regress into unknown_events noise.
+
+KNOWN_EVENT_TYPES is the union of both tiers.
 """
 from __future__ import annotations
 
-KNOWN_EVENT_TYPES = {
+# Tier 1: exactly the official "List of Event Types" (Events Administration
+# Guide; cross-checked against tests/fixtures/vendor_event_types.json).
+VENDOR_DOCUMENTED_EVENT_TYPES = frozenset({
     "access_restriction.create",
     "access_restriction.delete",
     "access_restriction.update",
@@ -17,12 +23,10 @@ KNOWN_EVENT_TYPES = {
     "agent.activate_clone",
     "agent.clone_detected",
     "agent.deactivate",
-    "agent.generate_maintenance_token",
     "agent.goodbye",
     "agent.machine_identifier",
+    "agent.refresh_policy",
     "agent.refresh_token",
-    "agent.reguest_policy",
-    "agent.request_policy",
     "agent.request_upgrade",
     "agent.service_not_available",
     "agent.suspend",
@@ -32,7 +36,6 @@ KNOWN_EVENT_TYPES = {
     "agent.update_interactive_users",
     "agent.update_iptables_href",
     "agent.update_running_containers",
-    "agent.upgrade_successful",
     "agent.upload_existing_ip_table_rules",
     "agent.upload_support_report",
     "agent_support_report_request.create",
@@ -49,22 +52,16 @@ KNOWN_EVENT_TYPES = {
     "cluster.create",
     "cluster.delete",
     "cluster.update",
-    "container_workload.update",
     "container_cluster.create",
     "container_cluster.delete",
-    "container_cluster.kubernetes_workloads_bulk_create",
-    "container_cluster.kubernetes_workloads_bulk_update",
     "container_cluster.update",
-    "container_cluster.update_label_map",
     "container_cluster.update_services",
+    "container_workload.update",
     "container_workload_profile.create",
     "container_workload_profile.delete",
     "container_workload_profile.update",
-    "database.temp_table_autocleanup_started",
     "database.temp_table_autocleanup_completed",
-    "deny_rule.create",
-    "deny_rule.delete",
-    "deny_rule.update",
+    "database.temp_table_autocleanup_started",
     "domain.create",
     "domain.delete",
     "domain.update",
@@ -86,15 +83,9 @@ KNOWN_EVENT_TYPES = {
     "label.create",
     "label.delete",
     "label.update",
-    "label_dimension.create",
-    "label_dimension.delete",
-    "label_dimension.update",
     "label_group.create",
     "label_group.delete",
     "label_group.update",
-    "label_mapping_rule.create",
-    "label_mapping_rule.delete",
-    "label_mapping_rule.update",
     "labels.delete",
     "ldap_config.create",
     "ldap_config.delete",
@@ -106,12 +97,7 @@ KNOWN_EVENT_TYPES = {
     "login_proxy_ldap_config.delete",
     "login_proxy_ldap_config.update",
     "login_proxy_ldap_config.verify_connection",
-    "login_proxy_msp_tenants.create",
-    "login_proxy_msp_tenants.delete",
-    "login_proxy_msp_tenants.update",
-    "login_proxy_orgs.create",
-    "login_proxy_orgs.delete",
-    "login_proxy_orgs.update",
+    "logout_from_jwt",
     "lost_agent.found",
     "network.create",
     "network.delete",
@@ -128,14 +114,10 @@ KNOWN_EVENT_TYPES = {
     "network_enforcement_node.activate",
     "network_enforcement_node.clear_conditions",
     "network_enforcement_node.deactivate",
-    "network_enforcement_node.degraded",
-    "network_enforcement_node.missed_heartbeats",
-    "network_enforcement_node.missed_heartbeats_check",
     "network_enforcement_node.network_devices_network_endpoints_workloads",
     "network_enforcement_node.policy_ack",
     "network_enforcement_node.request_policy",
     "network_enforcement_node.update_status",
-    "network_enforcement_nodes.clear_conditions",
     "nfc.activate",
     "nfc.delete",
     "nfc.update_discovered_virtual_servers",
@@ -147,8 +129,8 @@ KNOWN_EVENT_TYPES = {
     "pairing_profile.create",
     "pairing_profile.create_pairing_key",
     "pairing_profile.delete",
-    "pairing_profile.update",
     "pairing_profile.delete_all_pairing_keys",
+    "pairing_profile.update",
     "pairing_profiles.delete",
     "password_policy.create",
     "password_policy.delete",
@@ -156,10 +138,6 @@ KNOWN_EVENT_TYPES = {
     "permission.create",
     "permission.delete",
     "permission.update",
-    "radius_config.create",
-    "radius_config.delete",
-    "radius_config.update",
-    "radius_config.verify_shared_secret",
     "request.authentication_failed",
     "request.authorization_failed",
     "request.internal_server_error",
@@ -175,14 +153,13 @@ KNOWN_EVENT_TYPES = {
     "saml_acs.update",
     "saml_config.create",
     "saml_config.delete",
-    "saml_config.pce_signing_cert",
     "saml_config.update",
     "saml_sp_config.create",
     "saml_sp_config.delete",
     "saml_sp_config.update",
     "sec_policy.create",
-    "sec_policy_pending.delete",
     "sec_policy.restore",
+    "sec_policy_pending.delete",
     "sec_rule.create",
     "sec_rule.delete",
     "sec_rule.update",
@@ -196,37 +173,22 @@ KNOWN_EVENT_TYPES = {
     "service.create",
     "service.delete",
     "service.update",
-    "service_account.create",
-    "service_account.delete",
-    "service_account.update",
     "service_binding.create",
     "service_binding.delete",
     "service_bindings.delete",
     "services.delete",
-    "settings.update",
     "slb.create",
     "slb.delete",
     "slb.update",
-    "support_report.upload",
+    "support_report_request.create",
+    "support_report_request.delete",
+    "support_reports",
     "syslog_destination.create",
     "syslog_destination.delete",
     "syslog_destination.update",
     "system_task.agent_missed_heartbeats_check",
-    "system_task.agent_missing_heartbeats_after_upgrade",
     "system_task.agent_offline_check",
-    "system_task.agent_self_signed_certs_check",
-    "system_task.agent_settings_invalidation_error_state_check",
-    "system_task.agent_uninstall_timeout",
-    "system_task.clear_auth_recover_condition",
-    "system_task.compute_policy_for_unmanaged_workloads",
-    "system_task.delete_expired_service_account_api_keys",
-    "system_task.delete_old_cached_perspectives",
-    "system_task.endpoint_offline_check",
-    "system_task.provision_container_cluster_services",
     "system_task.prune_old_log_events",
-    "system_task.remove_stale_zone_subsets",
-    "system_task.set_server_sync_check",
-    "system_task.vacuum_deactivated_agent_and_deleted_workloads",
     "traffic_collector_setting.create",
     "traffic_collector_setting.delete",
     "traffic_collector_setting.update",
@@ -246,8 +208,6 @@ KNOWN_EVENT_TYPES = {
     "user.update",
     "user.update_password",
     "user.use_expired_password",
-    "user.verify_mfa",
-    "users.auth_token",
     "user_local_profile.create",
     "user_local_profile.delete",
     "user_local_profile.reinvite",
@@ -295,15 +255,75 @@ KNOWN_EVENT_TYPES = {
     "workloads.set_labels",
     "workloads.unpair",
     "workloads.update",
-}
+})
 
-LOCAL_EXTENSION_EVENT_TYPES = {
-    "container_cluster.security_policy_applied",
+# Tier 2: emitted by real PCE builds (25.x field observations, upstream
+# pretty-cool-events entries, notification-derived types) but absent from
+# the official List of Event Types. Kept known so they never regress into
+# unknown_events noise; excluded from any "vendor documented" claim.
+OBSERVED_EXTENSION_EVENT_TYPES = frozenset({
+    "agent.generate_maintenance_token",
+    "agent.reguest_policy",
+    "agent.request_policy",
+    "agent.upgrade_successful",
+    "container_cluster.kubernetes_workloads_bulk_create",
+    "container_cluster.kubernetes_workloads_bulk_update",
     "container_cluster.security_policy_acks",
+    "container_cluster.security_policy_applied",
+    "container_cluster.update_label_map",
+    "deny_rule.create",
+    "deny_rule.delete",
+    "deny_rule.update",
+    "label_dimension.create",
+    "label_dimension.delete",
+    "label_dimension.update",
+    "label_mapping_rule.create",
+    "label_mapping_rule.delete",
+    "label_mapping_rule.update",
+    "login_proxy_msp_tenants.create",
+    "login_proxy_msp_tenants.delete",
+    "login_proxy_msp_tenants.update",
+    "login_proxy_orgs.create",
+    "login_proxy_orgs.delete",
+    "login_proxy_orgs.update",
+    "network_enforcement_node.degraded",
+    "network_enforcement_node.missed_heartbeats",
+    "network_enforcement_node.missed_heartbeats_check",
+    "network_enforcement_nodes.clear_conditions",
+    "radius_config.create",
+    "radius_config.delete",
+    "radius_config.update",
+    "radius_config.verify_shared_secret",
+    "saml_config.pce_signing_cert",
+    "service_account.create",
+    "service_account.delete",
+    "service_account.update",
+    "settings.update",
+    "support_report.upload",
+    "system_task.agent_missing_heartbeats_after_upgrade",
+    "system_task.agent_self_signed_certs_check",
+    "system_task.agent_settings_invalidation_error_state_check",
+    "system_task.agent_uninstall_timeout",
+    "system_task.clear_auth_recover_condition",
+    "system_task.compute_policy_for_unmanaged_workloads",
+    "system_task.delete_expired_service_account_api_keys",
+    "system_task.delete_old_cached_perspectives",
+    "system_task.endpoint_offline_check",
+    "system_task.provision_container_cluster_services",
+    "system_task.remove_stale_zone_subsets",
+    "system_task.set_server_sync_check",
+    "system_task.vacuum_deactivated_agent_and_deleted_workloads",
     "user.create_session",
-}
+    "user.verify_mfa",
+    "users.auth_token",
+})
 
-KNOWN_EVENT_TYPES |= LOCAL_EXTENSION_EVENT_TYPES
+KNOWN_EVENT_TYPES = set(VENDOR_DOCUMENTED_EVENT_TYPES | OBSERVED_EXTENSION_EVENT_TYPES)
+
+
+def is_vendor_documented(event_type: str) -> bool:
+    """True if the event type appears verbatim in the official Event Guide list."""
+    return event_type in VENDOR_DOCUMENTED_EVENT_TYPES
 
 
 # Resource-prefix → category mapping for events whose exact event_type is

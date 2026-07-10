@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import threading
 from datetime import datetime, timezone, timedelta
 
 from flask import Blueprint, current_app, jsonify, request
@@ -12,9 +11,6 @@ from src.gui._helpers import _err_with_log
 
 bp = Blueprint("siem", __name__, url_prefix="/api/siem")
 
-_SF_KEY = "_siem_Session"
-_LOCK_KEY = "_siem_sf_lock"
-
 
 def _get_siem_cfg():
     from src.config import ConfigManager
@@ -22,25 +18,13 @@ def _get_siem_cfg():
 
 
 def _get_sf():
-    sf = current_app.config.get(_SF_KEY)
-    if sf is not None:
-        return sf
-    lock = current_app.config.setdefault(_LOCK_KEY, threading.Lock())
-    with lock:
-        sf = current_app.config.get(_SF_KEY)
-        if sf is not None:
-            return sf
-        import os
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-        from src.pce_cache.schema import init_schema
-        cm = current_app.config["CM"]
-        cfg = cm.models.pce_cache
-        os.makedirs(os.path.dirname(os.path.abspath(cfg.db_path)), exist_ok=True)
-        engine = create_engine(f"sqlite:///{cfg.db_path}")
-        init_schema(engine)
-        current_app.config[_SF_KEY] = sessionmaker(engine)
-    return current_app.config[_SF_KEY]
+    """siem 端沿用 pce_cache DB 的 sessionmaker。引擎走 _get_cache_engine：
+    per-db_path process 快取 + NullPool + schema 只 init 一次，避免 web
+    路徑用預設 QueuePool 長跑累積連線。"""
+    from sqlalchemy.orm import sessionmaker
+    from src.gui._helpers import _get_cache_engine
+    db_path = current_app.config["CM"].models.pce_cache.db_path
+    return sessionmaker(_get_cache_engine(db_path))
 
 
 @bp.route("/destinations", methods=["GET"])
@@ -313,19 +297,16 @@ def purge_dlq():
 def dlq_export():
     from flask import Response
     import csv, io
-    from sqlalchemy import create_engine, select
+    from sqlalchemy import select
     from sqlalchemy.orm import sessionmaker
     from src.pce_cache.models import DeadLetter
-    from src.pce_cache.schema import init_schema
+    from src.gui._helpers import _get_cache_engine
 
-    import os
     destination = request.args.get("dest", "").strip()
     reason = request.args.get("reason", "").strip()
     cm = current_app.config["CM"]
     cfg = cm.models.pce_cache
-    os.makedirs(os.path.dirname(os.path.abspath(cfg.db_path)), exist_ok=True)
-    engine = create_engine(f"sqlite:///{cfg.db_path}")
-    init_schema(engine)
+    engine = _get_cache_engine(cfg.db_path)
     Session = sessionmaker(engine)
     buf = io.StringIO()
     w = csv.writer(buf)

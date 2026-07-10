@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 
 from loguru import logger
-from sqlalchemy import delete
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.pce_cache.models import (
@@ -13,8 +13,27 @@ from src.pce_cache.models import (
 
 
 class RetentionWorker:
+    # 每批一個交易：避免單一大 DELETE 交易撐爆 WAL、長時間佔住
+    # cache_writer。以 PK id 選批（LIMIT 子查詢先取 id 再 IN 刪除），
+    # 與索引無關、總效果與一次性 DELETE 等價。
+    _DELETE_BATCH = 10000
+
     def __init__(self, session_factory: sessionmaker):
         self._sf = session_factory
+
+    def _batched_delete(self, model, *where_clauses) -> int:
+        total = 0
+        while True:
+            with self._sf.begin() as s:
+                ids = s.execute(
+                    select(model.id).where(*where_clauses).limit(self._DELETE_BATCH)
+                ).scalars().all()
+                if not ids:
+                    return total
+                r = s.execute(delete(model).where(model.id.in_(ids)))
+                total += r.rowcount
+            if len(ids) < self._DELETE_BATCH:
+                return total
 
     def run_once(
         self,
@@ -35,48 +54,38 @@ class RetentionWorker:
         now = datetime.now(timezone.utc)
         results: dict[str, int] = {}
 
-        with self._sf.begin() as s:
-            policy_cutoff = now - timedelta(days=events_days)
-            eff = self._effective_cutoff(s, "pce_events", policy_cutoff, archive_enabled)
-            if eff is None:
-                results["events"] = 0
-            else:
-                r = s.execute(delete(PceEvent).where(PceEvent.ingested_at < eff))
-                results["events"] = r.rowcount
+        with self._sf() as s:
+            eff_events = self._effective_cutoff(
+                s, "pce_events", now - timedelta(days=events_days), archive_enabled)
+        results["events"] = (
+            0 if eff_events is None
+            else self._batched_delete(PceEvent, PceEvent.ingested_at < eff_events))
 
-        with self._sf.begin() as s:
-            policy_cutoff = now - timedelta(days=traffic_raw_days)
-            eff = self._effective_cutoff(s, "pce_traffic_flows_raw", policy_cutoff, archive_enabled)
-            if eff is None:
-                results["traffic_raw"] = 0
-            else:
-                r = s.execute(delete(PceTrafficFlowRaw).where(PceTrafficFlowRaw.ingested_at < eff))
-                results["traffic_raw"] = r.rowcount
+        with self._sf() as s:
+            eff_raw = self._effective_cutoff(
+                s, "pce_traffic_flows_raw", now - timedelta(days=traffic_raw_days), archive_enabled)
+        results["traffic_raw"] = (
+            0 if eff_raw is None
+            else self._batched_delete(PceTrafficFlowRaw, PceTrafficFlowRaw.ingested_at < eff_raw))
 
-        with self._sf.begin() as s:
-            cutoff = now - timedelta(days=traffic_agg_days)
-            r = s.execute(delete(PceTrafficFlowAgg).where(PceTrafficFlowAgg.bucket_day < cutoff))
-            results["traffic_agg"] = r.rowcount
+        results["traffic_agg"] = self._batched_delete(
+            PceTrafficFlowAgg,
+            PceTrafficFlowAgg.bucket_day < now - timedelta(days=traffic_agg_days))
 
-        with self._sf.begin() as s:
-            cutoff = now - timedelta(days=dlq_days)
-            r = s.execute(delete(DeadLetter).where(DeadLetter.quarantined_at < cutoff))
-            results["dead_letter"] = r.rowcount
+        results["dead_letter"] = self._batched_delete(
+            DeadLetter, DeadLetter.quarantined_at < now - timedelta(days=dlq_days))
 
-        with self._sf.begin() as s:
-            # siem_dispatch grows one row per record per destination and is never
-            # otherwise pruned — the dispatcher only flips status pending→sent. So
-            # delivered rows accumulate forever, long after the underlying raw
-            # flows are deleted at 7 days, bloating the DB and the dispatch
-            # indexes/COUNT queries. Purge delivered ('sent') rows past the
-            # cutoff; leave pending/failed (retry/DLQ candidates) untouched. Their
-            # NULL sent_at is excluded by the `< cutoff` comparison anyway.
-            cutoff = now - timedelta(days=dispatch_days)
-            r = s.execute(delete(SiemDispatch).where(
-                SiemDispatch.status == "sent",
-                SiemDispatch.sent_at < cutoff,
-            ))
-            results["siem_dispatch"] = r.rowcount
+        # siem_dispatch grows one row per record per destination and is never
+        # otherwise pruned — the dispatcher only flips status pending→sent. So
+        # delivered rows accumulate forever, long after the underlying raw
+        # flows are deleted at 7 days, bloating the DB and the dispatch
+        # indexes/COUNT queries. Purge delivered ('sent') rows past the
+        # cutoff; leave pending/failed (retry/DLQ candidates) untouched. Their
+        # NULL sent_at is excluded by the `< cutoff` comparison anyway.
+        results["siem_dispatch"] = self._batched_delete(
+            SiemDispatch,
+            SiemDispatch.status == "sent",
+            SiemDispatch.sent_at < now - timedelta(days=dispatch_days))
 
         return results
 

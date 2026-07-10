@@ -1,40 +1,25 @@
 """Flask Blueprint for PCE cache management endpoints."""
 from __future__ import annotations
 
-import threading
-
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required
+from loguru import logger
 
 from src.i18n import t
 from src.gui._helpers import _err_with_log
 
 bp = Blueprint("pce_cache", __name__, url_prefix="/api/cache")
 
-_SF_KEY = "_cache_Session"
-_LOCK_KEY = "_cache_sf_lock"
-
 
 def _get_sf():
-    sf = current_app.config.get(_SF_KEY)
-    if sf is not None:
-        return sf
-    lock = current_app.config.setdefault(_LOCK_KEY, threading.Lock())
-    with lock:
-        sf = current_app.config.get(_SF_KEY)
-        if sf is not None:
-            return sf
-        import os
-        from sqlalchemy import create_engine
-        from sqlalchemy.orm import sessionmaker
-        from src.pce_cache.schema import init_schema
-        cm = current_app.config["CM"]
-        cfg = cm.models.pce_cache
-        os.makedirs(os.path.dirname(os.path.abspath(cfg.db_path)), exist_ok=True)
-        engine = create_engine(f"sqlite:///{cfg.db_path}")
-        init_schema(engine)
-        current_app.config[_SF_KEY] = sessionmaker(engine)
-    return current_app.config[_SF_KEY]
+    """cache DB 的 sessionmaker。引擎走 _get_cache_engine：per-db_path
+    process 快取 + NullPool + schema 只 init 一次——與 lag_monitor、
+    scheduler jobs 相同的取用模式，避免 web 路徑用預設 QueuePool 長跑
+    累積連線。"""
+    from sqlalchemy.orm import sessionmaker
+    from src.gui._helpers import _get_cache_engine
+    db_path = current_app.config["CM"].models.pce_cache.db_path
+    return sessionmaker(_get_cache_engine(db_path))
 
 
 def _get_api():
@@ -74,6 +59,10 @@ def api_cache_backfill():
             result = runner.run_events(since_dt, until_dt)
         else:
             result = runner.run_traffic(since_dt, until_dt)
+            # backfill 會灌入舊日期資料，落在 aggregator 增量視窗之外，
+            # 必須顯式全量重算一次，否則趨勢圖看不到 backfill 的 bucket。
+            from src.pce_cache.aggregator import TrafficAggregator
+            TrafficAggregator(sf).run_once(full=True)
         return jsonify({
             "total_rows": result.total_rows,
             "inserted": result.inserted,
@@ -205,12 +194,19 @@ def api_cache_health():
             denom=totals["denom"],
             dlq=totals["dlq"],
         )
+        try:
+            from src.pce_cache.capacity import capacity_snapshot
+            capacity = capacity_snapshot(sf, current_app.config["CM"].models.pce_cache)
+        except Exception as cap_exc:
+            logger.warning("capacity_snapshot failed in /api/cache/health: {}", cap_exc)
+            capacity = None
         return jsonify({
             "verdict": verdict,
             "lag_levels": levels,
             "cache_lag": cache_lag,
             "siem_success_1h": success_1h,
             "dlq": totals["dlq"],
+            "capacity": capacity,
         })
     except Exception as e:
         return _err_with_log("cache_health", e, lang=lang)
@@ -268,7 +264,7 @@ def put_cache_settings():
 @login_required
 def load_archive():
     from datetime import date
-    from src.pce_cache.archive_import import ArchiveLoadBusy, load_archive_review
+    from src.pce_cache.archive_import import ArchiveLoadBusy, start_archive_load
     cm = current_app.config['CM']
     cfg = cm.models.pce_cache
     lang = cm.config.get('settings', {}).get('language', 'en')
@@ -286,23 +282,25 @@ def load_archive():
         return jsonify({"ok": False,
                         "error": f"range {span}d exceeds max {cfg.archive_review_max_days}d"}), 422
     try:
-        meta = load_archive_review(cfg, start, end)
+        res = start_archive_load(cfg, start, end)
     except ArchiveLoadBusy:
         # 另一個 load 正在進行中（non-blocking lock 取得失敗）：立即回 409，不排隊。
         return jsonify({"ok": False,
                         "error": t("gui_traffic_archive_load_busy", lang=lang)}), 409
     except Exception as exc:  # noqa: BLE001
         return _err_with_log("cache_archive_load", exc, lang=lang)
-    return jsonify({"ok": True, **meta})
+    return jsonify({"ok": True, **res}), 202
 
 
 @bp.route("/archive/status", methods=["GET"])
 @login_required
 def archive_status():
-    from src.pce_cache.archive_import import review_status
+    from src.pce_cache.archive_import import review_status, load_progress
     cm = current_app.config['CM']
     lang = cm.config.get('settings', {}).get('language', 'en')
     try:
-        return jsonify(review_status(cm.models.pce_cache))
+        st = review_status(cm.models.pce_cache)
+        st["load"] = load_progress()
+        return jsonify(st)
     except Exception as exc:  # noqa: BLE001
         return _err_with_log("cache_archive_status", exc, lang=lang)
