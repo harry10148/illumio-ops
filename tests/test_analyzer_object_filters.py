@@ -322,5 +322,52 @@ class TestRuleEngineObjectFilters(unittest.TestCase):
         self.assertEqual(matched, {"erp-flow"})
 
 
+# ─── Task 11 gap fix：_OBJECT_FILTER_KEYS 缺 services/ex_services/ports/
+# ex_ports——規則的 Service/Port pill 對 _run_rule_engine 是 no-op（全部
+# flow 誤命中），因為 alert 規則永遠走 client-side _match_flow_filters，
+# 不會建構 native PCE query。ports/ex_ports 純本地解析；services/
+# ex_services 需要 resolve_service href→entries callable 才能展開。
+
+class TestRuleEnginePortServiceFilters(unittest.TestCase):
+    def setUp(self):
+        self.now_utc = datetime.datetime(2026, 6, 1, 0, 15, tzinfo=datetime.timezone.utc)
+        self.flows = [
+            _flow("p443", src_ip="10.0.2.1", port=443),
+            _flow("p80", src_ip="10.0.2.2", port=80),
+        ]
+
+    def _rule(self, **kw):
+        base = {"id": "r1", "type": "traffic", "name": "R", "pd": -1,
+                "threshold_type": "count", "threshold_count": 1, "threshold_window": 10}
+        base.update(kw)
+        return base
+
+    def _matched(self, az, rule):
+        results = az._run_rule_engine(self.flows, [rule], self.now_utc)
+        _, res = results[0]
+        return {m["id"] for m in res["top_matches"]}
+
+    def test_rule_ports_filters_by_port(self):
+        az = Analyzer(MagicMock(), MagicMock(), MagicMock())
+        matched = self._matched(az, self._rule(ports=["443"]))
+        self.assertEqual(matched, {"p443"})
+
+    def test_rule_ex_ports_excludes_by_port(self):
+        az = Analyzer(MagicMock(), MagicMock(), MagicMock())
+        matched = self._matched(az, self._rule(ex_ports=["443"]))
+        self.assertEqual(matched, {"p80"})
+
+    def test_rule_services_resolves_href_via_label_resolver(self):
+        mock_api = MagicMock()
+        mock_api._labels.resolve_service_entries.side_effect = (
+            lambda href: [{"port": 443}]
+            if href == "/orgs/1/sec_policy/active/services/svc-https" else None
+        )
+        az = Analyzer(MagicMock(), mock_api, MagicMock())
+        rule = self._rule(services=["/orgs/1/sec_policy/active/services/svc-https"])
+        matched = self._matched(az, rule)
+        self.assertEqual(matched, {"p443"})
+
+
 if __name__ == "__main__":
     unittest.main()

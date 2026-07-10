@@ -49,6 +49,7 @@ _OBJECT_FILTER_KEYS = (
     "src_workload", "src_workloads", "dst_workload", "dst_workloads",
     "ex_src_workload", "ex_src_workloads", "ex_dst_workload", "ex_dst_workloads",
     "any_iplist", "any_workload", "ex_any_iplist", "ex_any_workload",
+    "services", "ex_services", "ports", "ex_ports",
 )
 
 # 兩套 client-side 比對器（check_flow_match 與 _flow_matches_filters）都無法
@@ -397,7 +398,14 @@ class Analyzer:
             return False
         object_rule = {k: rule[k] for k in _OBJECT_FILTER_KEYS if rule.get(k)}
         if object_rule:
-            if not TrafficQueryBuilder._flow_matches_filters(f, object_rule):
+            # services/ex_services 的 href→entries 展開需要 client 端
+            # service_ports_cache（LabelResolver.resolve_service_entries）；
+            # 未傳時 _flow_matches_filters 會把 services fail-closed（include
+            # 全不命中）——比照 traffic_query.fetch_traffic_for_report 的接法，
+            # 用 getattr 防禦 self.api 可能是無 _labels 的測試 stub。
+            labels = getattr(self.api, "_labels", None)
+            resolve_service = getattr(labels, "resolve_service_entries", None)
+            if not TrafficQueryBuilder._flow_matches_filters(f, object_rule, resolve_service):
                 return False
         return True
 
