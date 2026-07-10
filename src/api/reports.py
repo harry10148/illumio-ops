@@ -38,6 +38,13 @@ class ReportsApi:
         """Generate + download the native report. Returns a local temp CSV path.
 
         Caller owns (and should unlink) the returned file.
+
+        PCE-side cleanup: the reports API has no DELETE endpoint; generated
+        report objects are purged automatically by the PCE once
+        report_retention_days (max 7 days) elapses (official API guide /
+        Visualization Guide). Repeated pulls therefore accumulate at most a
+        bounded, self-expiring set of report objects — no manual cleanup is
+        possible or required.
         """
         org = self._c.api_cfg['org_id']
         if start_date and end_date:
