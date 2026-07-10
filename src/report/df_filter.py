@@ -104,8 +104,8 @@ def _ip_mask(df: pd.DataFrame, col: str, value: str) -> pd.Series:
     if "-" in value:
         left, _, right = value.partition("-")
         try:
-            frm = ipaddress.ip_address(left.strip())
-            to = ipaddress.ip_address(right.strip())
+            frm = ipaddress.IPv4Address(left.strip())
+            to = ipaddress.IPv4Address(right.strip())
         except ValueError:
             return pd.Series(True, index=df.index)
         if frm > to:

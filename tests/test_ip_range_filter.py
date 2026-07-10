@@ -156,3 +156,22 @@ def test_flow_matches_filters_ex_src_ip_range_excludes():
     from src.api.traffic_query import TrafficQueryBuilder
     flow = {"src": {"ip": "10.0.0.25"}, "dst": {"ip": "2.2.2.2"}, "service": {}}
     assert TrafficQueryBuilder._flow_matches_filters(flow, {"ex_src_ip": "10.0.0.5-10.0.0.50"}) is False
+
+
+# ─── IPv6 range enforcement (fail-open in cache, fail-closed in live) ───
+
+def test_ip_mask_ipv6_range_matches_all():
+    """IPv6 ranges are not supported; treated as illegal and fail-open (cache convention)."""
+    import pandas as pd
+    from src.report.df_filter import _ip_mask
+    df = pd.DataFrame({"src_ip": ["a::1", "a::5", "b::1"]})
+    m = _ip_mask(df, "src_ip", "a::1-a::2")
+    assert list(m) == [True, True, True]
+
+
+def test_flow_matches_filters_ipv6_range_no_match():
+    """IPv6 ranges are not supported; treated as illegal and fail-closed (live convention)."""
+    from src.api.traffic_query import TrafficQueryBuilder
+    flow = {"src": {"ip": "a::5"}, "dst": {"ip": "2.2.2.2"}, "service": {}}
+    # IPv6 range should not match; fall through to False (fail-closed)
+    assert TrafficQueryBuilder._flow_matches_filters(flow, {"src_ip": "a::1-a::2"}) is False

@@ -909,9 +909,9 @@ class TrafficQueryBuilder:
             if '-' in ip_str:
                 left, _, right = ip_str.partition('-')
                 try:
-                    frm = ipaddress.ip_address(left.strip())
-                    to = ipaddress.ip_address(right.strip())
-                    flow_ip = ipaddress.ip_address(str(side.get('ip')))
+                    frm = ipaddress.IPv4Address(left.strip())
+                    to = ipaddress.IPv4Address(right.strip())
+                    flow_ip = ipaddress.IPv4Address(str(side.get('ip')))
                 except ValueError:
                     frm = to = flow_ip = None
                 if frm is not None:
