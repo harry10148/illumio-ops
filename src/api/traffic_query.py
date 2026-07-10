@@ -25,6 +25,7 @@ import orjson
 from loguru import logger
 
 from src.i18n import t
+from src.port_token import parse_port_token
 
 MAX_TRAFFIC_RESULTS = 200000
 
@@ -53,6 +54,8 @@ _TRAFFIC_FILTER_CAPABILITIES = {
     "port": {"execution": "native", "min_pce_version": "21.2", "notes": "Pushed to services.include."},
     "proto": {"execution": "native", "min_pce_version": "21.2", "notes": "Combined with port or port range in services.include."},
     "ex_port": {"execution": "native", "min_pce_version": "21.2", "notes": "Pushed to services.exclude."},
+    "ports": {"execution": "native", "min_pce_version": "21.2", "notes": "Port tokens (80, 443/tcp, 1000-2000/tcp) pushed to services.include."},
+    "ex_ports": {"execution": "native", "min_pce_version": "21.2", "notes": "Port tokens pushed to services.exclude."},
     "port_range": {"execution": "native", "min_pce_version": "21.2", "notes": "Single port range expression for services.include."},
     "port_ranges": {"execution": "native", "min_pce_version": "21.2", "notes": "Multiple port range expressions for services.include."},
     "ex_port_range": {"execution": "native", "min_pce_version": "21.2", "notes": "Single port range expression for services.exclude."},
@@ -61,6 +64,8 @@ _TRAFFIC_FILTER_CAPABILITIES = {
     "windows_service_name": {"execution": "native", "min_pce_version": "21.2", "notes": "Pushed to services.include windows_service_name."},
     "ex_process_name": {"execution": "native", "min_pce_version": "21.2", "notes": "Pushed to services.exclude process_name."},
     "ex_windows_service_name": {"execution": "native", "min_pce_version": "21.2", "notes": "Pushed to services.exclude windows_service_name."},
+    "services": {"execution": "native", "min_pce_version": "21.2", "notes": "Service hrefs expanded via service_ports_cache into services.include."},
+    "ex_services": {"execution": "native", "min_pce_version": "21.2", "notes": "Service hrefs expanded via service_ports_cache into services.exclude."},
     "query_operator": {"execution": "native", "min_pce_version": "21.2", "notes": "Mapped to sources_destinations_query_op."},
     "exclude_workloads_from_ip_list_query": {"execution": "native", "min_pce_version": "21.2", "notes": "Pushed directly into async query payload."},
     "src_ams": {"execution": "native", "min_pce_version": "21.2", "notes": "Adds actors:ams to sources.include."},
@@ -113,6 +118,7 @@ _TRAFFIC_FILTER_CAPABILITIES = {
 }
 
 _LABEL_OR_EXPANSION_CAP = 100  # 笛卡兒積組數上限，超過即整族降級 fallback
+_SERVICE_EXPANSION_CAP = 200  # service 展開條目數上限，超過整 key 降級 fallback
 
 
 def group_label_specs_by_key(values):
@@ -443,6 +449,51 @@ class TrafficQueryBuilder:
                 _record_unresolved("ex_port", spec.native_filters.get("ex_port"))
                 _consume_keys(("ex_port",))
 
+        for key, target in (("ports", "include"), ("ex_ports", "exclude")):
+            values = native_filters.get(key)
+            if not values:
+                continue
+            entries = values if isinstance(values, (list, tuple)) else [values]
+            parsed_entries = []
+            unresolved = False
+            for entry in entries:
+                parsed = parse_port_token(entry)
+                if not parsed:
+                    unresolved = True
+                    break
+                parsed_entries.append(parsed)
+            if unresolved:
+                _record_unresolved(key, spec.native_filters.get(key))
+            else:
+                payload["services"][target].extend(parsed_entries)
+                _record_consumed(key, spec.native_filters.get(key))
+            _consume_keys((key,))
+
+        for key, target in (("services", "include"), ("ex_services", "exclude")):
+            values = native_filters.get(key)
+            if not values:
+                continue
+            hrefs = values if isinstance(values, (list, tuple)) else [values]
+            expanded = []
+            unresolved = False
+            for href in hrefs:
+                entries = labels.resolve_service_entries(href)
+                if not entries:
+                    # 查無（被刪）或空 service：不送空條件，走 unresolved 降級
+                    unresolved = True
+                    break
+                expanded.extend(entries)
+            if unresolved or len(expanded) > _SERVICE_EXPANSION_CAP:
+                if len(expanded) > _SERVICE_EXPANSION_CAP:
+                    logger.warning(
+                        "Service expansion exceeds cap ({} > {}); falling back to client-side",
+                        len(expanded), _SERVICE_EXPANSION_CAP)
+                _record_unresolved(key, spec.native_filters.get(key))
+            else:
+                payload["services"][target].extend(expanded)
+                _record_consumed(key, spec.native_filters.get(key))
+            _consume_keys((key,))
+
         default_proto = native_filters.get("proto")
         for key, target in (("port_range", "include"), ("port_ranges", "include"),
                             ("ex_port_range", "exclude"), ("ex_port_ranges", "exclude")):
@@ -753,8 +804,17 @@ class TrafficQueryBuilder:
     # ── Python-side filter for report ───────────────────────────────────
 
     @staticmethod
-    def _flow_matches_filters(flow: dict, filters: dict) -> bool:
-        """Python-side filter applied after PCE download."""
+    def _flow_matches_filters(flow: dict, filters: dict, resolve_service=None) -> bool:
+        """Python-side filter applied after PCE download.
+
+        resolve_service: 選用的 href→entries 解析器（簽章同
+        ``LabelResolver.resolve_service_entries``），僅 services/ex_services
+        key 用得到。這個函式是 @staticmethod（只收 flow/filters，無 self/
+        client 存取管道），href 展開需要 client 端的 service_ports_cache，
+        故用這個第三參數把 client 端解析能力最小侵入地傳進來；未提供時
+        （沿用既有 2-arg 呼叫慣例）等同查無 href，services key 視為
+        unresolved（include fail-closed、ex_services 不誤排除）。
+        """
         src = flow.get('src', {})
         dst = flow.get('dst', {})
         svc = flow.get('service', {})
@@ -787,6 +847,24 @@ class TrafficQueryBuilder:
         def _workload_hit(side: dict, value: str) -> bool:
             return (side.get('workload') or {}).get('href') == value
 
+        def _port_entry_hit(svc, flow, entry):
+            """flow 的 service port/proto 是否命中一個 parse_port_token 條目。"""
+            try:
+                flow_port = svc.get('port') or flow.get('dst_port')
+                flow_proto = svc.get('proto') or flow.get('proto')
+                if "port" in entry:
+                    if flow_port is None:
+                        return False
+                    p = int(flow_port)
+                    if not (entry["port"] <= p <= entry.get("to_port", entry["port"])):
+                        return False
+                if entry.get("proto") is not None:
+                    if flow_proto is None or int(flow_proto) != int(entry["proto"]):
+                        return False
+                return True
+            except (TypeError, ValueError):
+                return False
+
         # 同 key any、跨 key all —— 與 native 路徑的 OR 展開語意一致（spec §2.2）
         for fkey, side_obj in (("src_labels", src), ("dst_labels", dst)):
             specs = [s for s in (filters.get(fkey) or []) if s]
@@ -808,6 +886,14 @@ class TrafficQueryBuilder:
                     return False
             except (ValueError, TypeError):
                 pass
+
+        ports_inc = filters.get('ports')
+        if ports_inc:
+            ports_inc = ports_inc if isinstance(ports_inc, list) else [ports_inc]
+            tokens = [t_ for t_ in (parse_port_token(v) for v in ports_inc) if t_]
+            # fail-closed：有條件但全數無法解析 → 不命中
+            if not any(_port_entry_hit(svc, flow, t_) for t_ in tokens):
+                return False
 
         proto_filter = filters.get('proto')
         if proto_filter:
@@ -888,6 +974,33 @@ class TrafficQueryBuilder:
             except (ValueError, TypeError):
                 pass
 
+        ports_exc = filters.get('ex_ports')
+        if ports_exc:
+            ports_exc = ports_exc if isinstance(ports_exc, list) else [ports_exc]
+            for t_ in (parse_port_token(v) for v in ports_exc):
+                if t_ and _port_entry_hit(svc, flow, t_):
+                    return False
+
+        for fkey, is_exclude in (("services", False), ("ex_services", True)):
+            vals = filters.get(fkey)
+            if not vals:
+                continue
+            vals = vals if isinstance(vals, list) else [vals]
+            hit = False
+            for href in vals:
+                entries = (resolve_service(href) if resolve_service else None) or []
+                # 名稱型條目（windows_service_name/process_name）在 fallback
+                # 端無法比對 flow——只用 port/proto 型條目比對；service 只有
+                # 名稱型條目時 port_entries 會是空、hit 維持 False。
+                port_entries = [e for e in entries if "port" in e or "proto" in e]
+                if any(_port_entry_hit(svc, flow, e) for e in port_entries):
+                    hit = True
+                    break
+            if is_exclude and hit:
+                return False
+            if not is_exclude and not hit:
+                return False
+
         ex_any_label = filters.get('ex_any_label')
         if ex_any_label:
             if _label_match(src, ex_any_label) or _label_match(dst, ex_any_label):
@@ -927,8 +1040,14 @@ class TrafficQueryBuilder:
         fallback_filters = diagnostics.get("fallback_filters", query_spec.fallback_filters)
 
         if fallback_filters:
+            # Some lightweight client stubs (tests) don't expose ._labels; degrade
+            # to no resolver rather than raising, matching the existing tolerant
+            # style of this facade wrapper.
+            labels = getattr(self._client, "_labels", None)
+            resolve_service = getattr(labels, "resolve_service_entries", None)
             before = len(records)
-            records = [r for r in records if self._flow_matches_filters(r, fallback_filters)]
+            records = [r for r in records if self._flow_matches_filters(
+                r, fallback_filters, resolve_service)]
             after = len(records)
             if before != after:
                 logger.info(f"[ReportFilter] {before} → {after} flows after applying filters")

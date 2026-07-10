@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 
-_CACHED_TYPES = ("label", "label_group", "iplist")
+_CACHED_TYPES = ("label", "label_group", "iplist", "service")
 _ALL_TYPES = _CACHED_TYPES + ("workload",)
 _MAX_LIMIT = 25
 
@@ -50,6 +50,39 @@ def make_filter_objects_blueprint(cm, csrf, limiter, login_required):
             results["workload"] = _search_workloads(api, q, limit)
 
         return jsonify({"ok": True, "results": results})
+
+    @bp.route('/api/filter-objects/browse', methods=['GET'])
+    @limiter.limit("240 per hour")
+    def api_filter_objects_browse():
+        btype = (request.args.get('type') or '').strip()
+        try:
+            offset = max(0, int(request.args.get('offset', 0)))
+        except (ValueError, TypeError):
+            offset = 0
+        try:
+            limit = max(1, min(100, int(request.args.get('limit', 20))))
+        except (ValueError, TypeError):
+            limit = 20
+
+        if btype == 'workload':
+            return jsonify({"ok": True, "browseable": False, "items": [], "total": None})
+
+        from src.api_client import ApiClient
+        from src.gui.filter_object_cache import browse_cached_objects, cached_type_totals
+        cm.load()
+        api = ApiClient(cm)
+
+        if btype == '_totals':
+            try:
+                return jsonify({"ok": True, "totals": cached_type_totals(api)})
+            except Exception:
+                return jsonify({"ok": False, "error": "pce_unreachable"}), 502
+        if btype not in _CACHED_TYPES:
+            return jsonify({"ok": False, "error": "unknown_type"}), 400
+        try:
+            return jsonify({"ok": True, **browse_cached_objects(api, btype, offset, limit)})
+        except Exception:
+            return jsonify({"ok": False, "error": "pce_unreachable"}), 502
 
     return bp
 

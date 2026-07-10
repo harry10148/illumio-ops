@@ -126,6 +126,12 @@ def make_actions_blueprint(
                 "dst_labels": d.get("dst_labels", []),
                 "ex_src_labels": d.get("ex_src_labels", []),
                 "ex_dst_labels": d.get("ex_dst_labels", []),
+                # Task 11：qt-port/qt-proto/qt-expt scalar 欄位移除，FilterBar 的
+                # service/port pill 序列化 key 需直通到 analyzer（同 query_flows whitelist）。
+                "services": d.get("services", []),
+                "ex_services": d.get("ex_services", []),
+                "ports": d.get("ports", []),
+                "ex_ports": d.get("ex_ports", []),
                 # FilterBar 的 label group pill 序列化 key，須與 analyzer.py query_flows
                 # whitelist（~1053-1064）及 _TRAFFIC_FILTER_CAPABILITIES（traffic_query.py ~90-96）保持一致
                 "src_label_groups": d.get("src_label_groups", []),

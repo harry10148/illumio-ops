@@ -2624,6 +2624,8 @@ select {
 .objfb-dot-workload  { background: var(--success, #35c58f); }
 .objfb-dot-iplist    { background: var(--accent2); }
 .objfb-dot-ip        { background: var(--dim); }
+.objfb-dot-service { background: var(--accent-purple, #8e6fc0); }
+.objfb-dot-port    { background: var(--accent-teal, #3fa7a0); }
 
 /* any 方向較慢提示 */
 .objfb-hint {
@@ -2708,6 +2710,8 @@ select {
 .objfb-dd-item.act { box-shadow: inset 2px 0 0 var(--accent); }
 .objfb-dd-empty,
 .objfb-dd-note { padding: var(--space-3); color: var(--dim); font-size: 12.5px; }
+.objfb-chip-cnt { opacity: .55; font-size: 11px; }
+.objfb-dd-more { display: block; width: 100%; text-align: center; padding: 6px; border: none; background: none; color: var(--accent, #4a7dbd); cursor: pointer; font-size: 12px; border-top: 1px dashed var(--border, #8884); }
 
 /* pill 編輯 popover：改方向 / 包含排除 / 移除 */
 .objfb-pop {
@@ -2757,3 +2761,17 @@ select {
 }
 .objfb-pop-rm:hover { background: color-mix(in oklab, var(--danger) 12%, transparent); }
 /* ══ end Phase 3 — .objfb-* ══════════════════════════════════════════ */
+
+/* ══ Task 10 — Modal 物件庫（.ob-*） ══════════════════════════════════ */
+.ob-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border, #8884); margin-bottom: 8px; }
+.ob-tab { padding: 4px 12px; border: none; background: none; cursor: pointer; opacity: .6; }
+.ob-tab.on { opacity: 1; border-bottom: 2px solid var(--accent, #4a7dbd); }
+.ob-search { width: 100%; margin-bottom: 6px; }
+#ob-table { max-height: 320px; overflow-y: auto; }
+.ob-row { display: flex; gap: 8px; padding: 4px 6px; align-items: center; cursor: pointer; }
+.ob-row:hover { background: var(--hover, rgba(74,125,189,.08)); }
+.ob-row-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 12px; }
+.ob-dir-btn { padding: 2px 8px; }
+.ob-dir-btn.on { background: var(--accent, #4a7dbd); color: #fff; }
+/* ══ end Task 10 — .ob-* ══════════════════════════════════════════════ */

@@ -38,6 +38,10 @@ def _prepare_wizard(monkeypatch, answers, raw_inputs=None):
 # object_picker._CAT_ORDER）在非 TTY 降級路徑下各自一個 input()；全空＝保留 preselected。
 _ALL_SLOTS_EMPTY = [""] * 16
 
+# svc/ex_svc 兩個 service/port 槽（cats=(service, port)，_CAT_ORDER 交集後為 port, service
+# 兩類別）在非 TTY 降級路徑下各自一個 input()；全空＝保留 preselected。
+_SVC_SLOTS_EMPTY = [""] * 4
+
 
 @pytest.fixture(autouse=True)
 def _english_ui():
@@ -76,11 +80,8 @@ def test_add_traffic_menu_enter_uses_numeric_defaults(monkeypatch):
             (None, "empty"),
             (None, "empty"),
             (None, "empty"),
-            (None, "empty"),
-            (None, "empty"),
-            (None, "empty"),
         ],
-        raw_inputs=_ALL_SLOTS_EMPTY + ["", ""],
+        raw_inputs=_SVC_SLOTS_EMPTY + _ALL_SLOTS_EMPTY + ["", ""],
     )
 
     settings_module.add_traffic_menu(cm, edit_rule=edit_rule)
@@ -89,12 +90,15 @@ def test_add_traffic_menu_enter_uses_numeric_defaults(monkeypatch):
     rule = saved[0]
     assert rule["name"] == "Traffic Default"
     assert rule["pd"] == 2
-    assert rule["port"] == 443
-    assert rule["proto"] == 6
     assert rule["threshold_window"] == 15
     assert rule["threshold_count"] == 8
     assert rule["cooldown_minutes"] == 20
-    assert rule["ex_port"] == 8443
+    # 空輸入=保留 preselected：舊純量 port/proto/ex_port 遷移為 service/port 類別的 list key
+    assert rule["ports"] == ["443/tcp"]
+    assert rule["ex_ports"] == ["8443"]
+    assert "port" not in rule
+    assert "proto" not in rule
+    assert "ex_port" not in rule
     # 空輸入=保留 preselected：舊純量 label 遷移為 flat list key
     assert rule["src_labels"] == ["role=app"]
     assert rule["dst_labels"] == ["role=db"]
@@ -129,11 +133,8 @@ def test_add_bandwidth_menu_enter_uses_numeric_defaults(monkeypatch):
             (None, "empty"),
             (None, "empty"),
             (None, "empty"),
-            (None, "empty"),
-            (None, "empty"),
-            (None, "empty"),
         ],
-        raw_inputs=_ALL_SLOTS_EMPTY + ["", ""],
+        raw_inputs=_SVC_SLOTS_EMPTY + _ALL_SLOTS_EMPTY + ["", ""],
     )
 
     settings_module.add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
@@ -142,12 +143,15 @@ def test_add_bandwidth_menu_enter_uses_numeric_defaults(monkeypatch):
     rule = saved[0]
     assert rule["name"] == "Bandwidth Default"
     assert rule["type"] == "bandwidth"
-    assert rule["port"] == 53
-    assert rule["proto"] == 17
     assert rule["threshold_count"] == 12.5
     assert rule["threshold_window"] == 30
     assert rule["cooldown_minutes"] == 45
-    assert rule["ex_port"] == 5353
+    # 空輸入=保留 preselected：舊純量 port/proto/ex_port 遷移為 service/port 類別的 list key
+    assert rule["ports"] == ["53/udp"]
+    assert rule["ex_ports"] == ["5353"]
+    assert "port" not in rule
+    assert "proto" not in rule
+    assert "ex_port" not in rule
     # 空輸入=保留 preselected：舊純量 label 遷移為 flat list key
     assert rule["src_labels"] == ["role=dns"]
     assert rule["dst_labels"] == ["role=client"]

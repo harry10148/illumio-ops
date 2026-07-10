@@ -29,6 +29,7 @@ _RULE_FB_KEYS = (
     "src_ip_in", "dst_ip_in", "ex_src_ip", "ex_dst_ip",
     "any_label", "any_ip", "any_iplist", "any_workload",
     "ex_any_label", "ex_any_ip", "ex_any_iplist", "ex_any_workload",
+    "services", "ex_services", "ports", "ex_ports",
 )
 _RULE_REJECTED_KEYS = (
     "src_label_groups", "dst_label_groups", "ex_src_label_groups", "ex_dst_label_groups",

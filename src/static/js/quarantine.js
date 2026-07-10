@@ -274,10 +274,6 @@ async function runTrafficAnalyzer() {
   const search = document.getElementById('qt-search').value;
   const mins = parseInt(document.getElementById('qt-mins').value);
 
-  const expStr = document.getElementById('qt-expt').value.trim();
-  const port = document.getElementById('qt-port').value.trim();
-  const proto = document.getElementById('qt-proto').value;
-
   const bd = document.getElementById('qt-body');
   bd.innerHTML = renderSkeletonRow(8);
   document.getElementById('qt-chkall').checked = false;
@@ -290,9 +286,6 @@ async function runTrafficAnalyzer() {
     payload.policy_decision = pd || '-1';
     if (draftPd) payload.draft_policy_decision = draftPd;
 
-    if (port) payload.port = port;
-    if (expStr) payload.ex_port = expStr;
-    if (proto) payload.proto = proto;
     Object.assign(payload, _ensureQtFilterBar().getFilters());
 
     const r = await post('/api/quarantine/search', payload);

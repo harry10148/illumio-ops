@@ -164,3 +164,71 @@ def test_tty_clear_category_option(monkeypatch):
         msel.return_value.unsafe_ask.side_effect = [f"{op._CLEAR_PREFIX}label", "__done__"]
         out = op.pick_objects(_api(), cats=("label",), title="src", preselected=preselected)
     assert out == {}
+
+
+# --- Task 12: service/port 類別 ---
+
+def test_cat_order_has_service_and_port():
+    from src.cli.object_picker import _CAT_ORDER
+    assert "service" in _CAT_ORDER and "port" in _CAT_ORDER
+
+
+def test_load_candidates_service():
+    from src.cli.object_picker import _load_candidates
+    api = MagicMock()
+    api.get_services.return_value = [
+        {"name": "Web", "href": "/s/1", "service_ports": [{"port": 80, "proto": 6}]}]
+    cands = _load_candidates(api, "service")
+    assert cands == [("Web (tcp/80)", "/s/1")]
+
+
+def test_picked_to_service_filters():
+    from src.cli.object_picker import picked_to_service_filters
+    picked = {"services": ["/s/1"], "ports": ["443/tcp"]}
+    assert picked_to_service_filters(picked) == {"services": ["/s/1"], "ports": ["443/tcp"]}
+    assert picked_to_service_filters(picked, exclude=True) == {
+        "ex_services": ["/s/1"], "ex_ports": ["443/tcp"]}
+
+
+def test_legacy_service_to_preselected_scalar_port():
+    from src.cli.object_picker import legacy_service_to_preselected
+    rule = {"port": 443, "proto": 6}
+    assert legacy_service_to_preselected(rule) == {"ports": ["443/tcp"]}
+    assert legacy_service_to_preselected({"ex_port": 22}, exclude=True) == {"ports": ["22"]}
+    assert legacy_service_to_preselected({"services": ["/s/1"], "ports": ["80"]}) == {
+        "services": ["/s/1"], "ports": ["80"]}
+
+
+def test_pick_service_via_questionary(monkeypatch):
+    # service 類別走 TTY autocomplete，值為 href
+    from src.cli import object_picker as op
+    monkeypatch.setattr(op, "_interactive_ok", lambda: True)
+    api = _api()
+    api.get_services.return_value = [
+        {"name": "Web", "href": "/s/1", "service_ports": [{"port": 80, "proto": 6}]}]
+    with patch("questionary.select") as msel, patch("questionary.autocomplete") as mauto:
+        msel.return_value.unsafe_ask.side_effect = ["service", "__done__"]
+        mauto.return_value.unsafe_ask.side_effect = ["Web (tcp/80)"]
+        out = op.pick_objects(api, cats=("service", "port"), title="t")
+    assert out == {"services": ["/s/1"]}
+
+
+def test_pick_port_manual_tty(monkeypatch):
+    # port 類別走手動輸入（同 ip 類別），非法 token 被過濾
+    from src.cli import object_picker as op
+    monkeypatch.setattr(op, "_interactive_ok", lambda: True)
+    with patch("questionary.select") as msel, patch("questionary.text") as mtext:
+        msel.return_value.unsafe_ask.side_effect = ["port", "__done__"]
+        mtext.return_value.unsafe_ask.side_effect = ["80, notaport, 443/tcp"]
+        out = op.pick_objects(_api(), cats=("service", "port"), title="t")
+    assert out == {"ports": ["80", "443/tcp"]}
+
+
+def test_non_tty_port_validation(monkeypatch):
+    # 非 TTY input() 降級路徑：非法 token 被過濾
+    import src.cli.object_picker as op
+    monkeypatch.setattr(op, "_interactive_ok", lambda: False)
+    inputs = iter(["80, notaport, 443/tcp", ""])
+    monkeypatch.setattr("builtins.input", lambda *_: next(inputs))
+    out = op.pick_objects(MagicMock(), cats=("port", "service"), title="t")
+    assert out == {"ports": ["80", "443/tcp"]}

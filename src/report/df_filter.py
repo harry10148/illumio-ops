@@ -16,8 +16,29 @@ import ipaddress
 
 import pandas as pd
 
+from src.port_token import parse_port_token
+
 _STD_LABEL_KEYS = ("app", "env", "loc", "role")
 _PROTO_ALIAS = {"6": "TCP", "17": "UDP", "1": "ICMP", "58": "ICMPV6"}
+
+
+def _port_entries_mask(df: pd.DataFrame, entries: list) -> pd.Series:
+    """parse_port_token/service 展開條目清單 → 條目間 OR 的命中 mask。"""
+    m = pd.Series(False, index=df.index)
+    if "port" not in df.columns:
+        return m
+    ports = pd.to_numeric(df["port"], errors="coerce")
+    for e in entries:
+        em = pd.Series(True, index=df.index)
+        if "port" in e:
+            em &= ports.ge(e["port"]) & ports.le(e.get("to_port", e["port"]))
+        if e.get("proto") is not None and "proto" in df.columns:
+            want = _PROTO_ALIAS.get(str(e["proto"]), str(e["proto"])).upper()
+            em &= df["proto"].astype(str).str.upper() == want
+        if "port" not in e and e.get("proto") is None:
+            continue  # 空條目不得全命中
+        m |= em
+    return m
 
 
 def _label_mask(df: pd.DataFrame, side: str, specs: list[str]) -> pd.Series:
@@ -167,6 +188,27 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
             mask &= df["port"] != int(ex_port)
         except (ValueError, TypeError):
             pass
+
+    ports_raw = filters.get("ports")
+    ports_list = ports_raw if isinstance(ports_raw, (list, tuple)) else [ports_raw]
+    ports_inc = [s for s in ports_list if s]
+    if ports_inc:
+        tokens = [t for t in (parse_port_token(v) for v in ports_inc) if t]
+        mask &= _port_entries_mask(df, tokens)  # 全數無法解析 → tokens 空 → mask False（fail-closed）
+    ex_ports_raw = filters.get("ex_ports")
+    ex_ports_list = ex_ports_raw if isinstance(ex_ports_raw, (list, tuple)) else [ex_ports_raw]
+    for v in ex_ports_list:
+        if v:
+            t = parse_port_token(v)
+            if t:
+                mask &= ~_port_entries_mask(df, [t])
+
+    svc_inc = filters.get("_svc_port_entries")
+    if svc_inc:
+        mask &= _port_entries_mask(df, svc_inc)
+    svc_exc = filters.get("_ex_svc_port_entries")
+    if svc_exc:
+        mask &= ~_port_entries_mask(df, svc_exc)
 
     # src_ip_in / dst_ip_in（FilterBar 送 list；多 IP/CIDR 取 OR）。既有 src_ip（scalar）保留相容。
     for side in ("src", "dst"):

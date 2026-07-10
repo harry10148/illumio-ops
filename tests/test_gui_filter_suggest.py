@@ -92,3 +92,48 @@ def test_suggest_workload_dedup_name_hostname(app_persistent, monkeypatch):
                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
     # name 查與 hostname 查回同一 workload → 去重成 1 筆
     assert len(r.json["results"]["workload"]["items"]) == 1
+
+
+def test_suggest_service_cached(app_persistent, monkeypatch):
+    client = app_persistent.test_client()
+    _login(client)
+    from src.gui.filter_object_cache import invalidate_object_cache
+    invalidate_object_cache()
+    monkeypatch.setattr("src.api_client.ApiClient.get_all_labels",
+                        lambda self: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_services",
+                        lambda self: [{"name": "Web-Ports", "href": "/s/1",
+                                       "service_ports": [{"port": 80, "proto": 6}, {"port": 443, "proto": 6}]}])
+
+    r = client.get('/api/filter-objects/suggest?q=web&types=service&limit=10',
+                   environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert r.status_code == 200
+    body = r.json["results"]
+    assert body["service"]["items"][0]["name"] == "Web-Ports"
+    assert "tcp/80" in body["service"]["items"][0]["summary"]
+    assert "tcp/443" in body["service"]["items"][0]["summary"]
+
+
+def test_suggest_service_offline_degrades(app_persistent, monkeypatch):
+    # cached 類離線降級的既有樣式：search_cached_objects 拋例外 → blanket except
+    # 把「該次 request 涉及的所有 cached types」標 pce_unreachable（與其他 cached
+    # 類別一致；service 不靠 check_health 探測）。
+    client = app_persistent.test_client()
+    _login(client)
+    from src.gui.filter_object_cache import invalidate_object_cache
+    invalidate_object_cache()
+    monkeypatch.setattr("src.api_client.ApiClient.get_all_labels",
+                        lambda self: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self: [])
+
+    def _boom(self):
+        raise RuntimeError("pce down")
+    monkeypatch.setattr("src.api_client.ApiClient.get_services", _boom)
+
+    r = client.get('/api/filter-objects/suggest?q=web&types=service&limit=10',
+                   environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert r.status_code == 200
+    assert r.json["results"]["service"]["error"] == "pce_unreachable"

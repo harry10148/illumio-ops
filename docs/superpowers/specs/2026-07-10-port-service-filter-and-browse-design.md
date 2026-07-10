@@ -74,6 +74,7 @@ traffic_query 查詢時展開：service href ─(service_ports_cache)→ port/pr
 - service href 在**進 df_filter 前**由查詢組裝層（有 ApiClient 處）展開成 port 條目清單；df_filter 維持離線純函式。
 - df_filter 新增：port range 比對、`port/proto` 成對比對、`ex_ports` 排除語意（目前只有單 port int）。
 - 名稱型條目（windows_service_name/process_name）在 cache 路徑**無法**以 port 比對：展開時僅取 port/proto 型條目進 df_filter，名稱型條目忽略並記 diagnostics（native 路徑不受影響，照常送 PCE）。
+- 角落不對稱（設計明定）：service **全部**條目皆為名稱型時，cache 路徑不套任何過濾（pass-through），而 live fallback 路徑為 fail-closed（include 全數不命中）；native 路徑照常由 PCE 過濾。三路對此角落的行為差異是接受的取捨，非缺陷。
 
 ## 5. 前端設計（FilterBar）
 

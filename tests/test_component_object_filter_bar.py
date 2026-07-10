@@ -101,9 +101,8 @@ def test_traffic_analyzer_modal_mounts_filter_bar():
         "qt-exsrc", "qt-exdst", "qt-ex-any-label", "qt-ex-any-ip",
     ):
         assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from modal-qt-filters"
-    # port/proto/PD radio 保留（不屬 FilterBar 範圍）
-    assert 'id="qt-port"' in html
-    assert 'id="qt-proto"' in html
+    # Task 11：qt-port/qt-proto scalar 欄位已收斂進 FilterBar 的 port pill；
+    # PD radio 不屬 FilterBar 範圍，保留。
     assert 'name="qt-pd-radio"' in html
 
 
@@ -287,7 +286,7 @@ def test_filter_bar_suggest_cats_order_locked():
     """suggest 支援類別的固定順序鎖定：未傳 cats 的既有實例（流量分析器/報表/排程/
     dashboard）預設 cats 含全類別，types 字串與下拉分類順序須與現行逐位相同。"""
     js = _JS.read_text(encoding="utf-8")
-    assert "const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload'];" in js
+    assert "const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload', 'service'];" in js
 
 
 def test_rules_js_uses_filter_bar_for_traffic_and_bw():
@@ -322,3 +321,63 @@ def test_save_traffic_and_bw_send_filters_dict():
     for removed_key in ("src:", "dst:", "ex_src:", "ex_dst:"):
         assert removed_key not in tr_src, f"{removed_key} should no longer be read directly in saveTraffic"
         assert removed_key not in bw_src, f"{removed_key} should no longer be read directly in saveBW"
+
+
+def test_filter_bar_service_port_categories_defined():
+    src = _JS.read_text(encoding="utf-8")
+    assert "gui_fb_cat_service" in src and "gui_fb_cat_port" in src
+    assert "objfb-dot-service" in src and "objfb-dot-port" in src
+
+
+def test_filter_bar_serializes_services_and_ports_keys():
+    src = _JS.read_text(encoding="utf-8")
+    for key in ("services", "ex_services", "ports", "ex_ports"):
+        assert f"'{key}'" in src or f"`${{ex}}{key.removeprefix('ex_')}`" in src, key
+
+
+def test_filter_bar_port_like_validator_present():
+    src = _JS.read_text(encoding="utf-8")
+    assert "_objfbIsPortLike" in src
+
+
+def test_filter_bar_dirless_cats():
+    src = _JS.read_text(encoding="utf-8")
+    assert "_OBJFB_DIRLESS" in src
+
+
+def test_filter_bar_service_i18n_keys_bilingual():
+    import json
+    en = json.loads(_EN.read_text(encoding="utf-8"))
+    zh = json.loads(_ZH.read_text(encoding="utf-8"))
+    for k in ("gui_fb_cat_service", "gui_fb_cat_port", "gui_fb_add_port"):
+        assert k in en and k in zh
+
+
+def test_filter_bar_browse_wiring_present():
+    src = _JS.read_text(encoding="utf-8")
+    assert "/api/filter-objects/browse" in src
+    assert "window._objfbBrowseMore" in src
+    assert "gui_fb_load_more" in src and "gui_fb_type_to_search" in src
+
+
+def test_filter_bar_browse_i18n_bilingual():
+    import json
+    en = json.loads(_EN.read_text(encoding="utf-8"))
+    zh = json.loads(_ZH.read_text(encoding="utf-8"))
+    for k in ("gui_fb_load_more", "gui_fb_type_to_search", "gui_fb_browse_error"):
+        assert k in en and k in zh
+
+
+def test_qt_port_fields_removed():
+    html = _INDEX.read_text(encoding="utf-8")
+    assert 'id="qt-port"' not in html and 'id="qt-expt"' not in html and 'id="qt-proto"' not in html
+
+
+def test_quarantine_js_no_qt_port_reads():
+    src = Path("src/static/js/quarantine.js").read_text(encoding="utf-8")
+    assert "qt-port" not in src and "qt-expt" not in src and "qt-proto" not in src
+
+
+def test_rules_filter_bars_allow_service_port():
+    src = Path("src/static/js/rules.js").read_text(encoding="utf-8")
+    assert src.count("'service', 'port'") >= 2

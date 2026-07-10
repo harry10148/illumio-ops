@@ -2416,17 +2416,8 @@
         </svg> Traffic Analyzer Filters</h2>
       <fieldset>
         <legend data-i18n="gui_col_filters">Filters</legend>
-        <div class="form-row">
-          <div class="form-group"><label data-i18n="gui_port">Port</label><input id="qt-port"
-              placeholder="e.g. 80, 443" data-i18n-placeholder="gui_ph_port"></div>
-          <div class="form-group"><label data-i18n="gui_protocol">Protocol</label><select id="qt-proto">
-              <option value="" data-i18n="gui_both">Both</option>
-              <option value="6" data-i18n="gui_tcp">TCP</option>
-              <option value="17" data-i18n="gui_udp">UDP</option>
-            </select></div>
-        </div>
         <div class="form-group">
-          <label data-i18n="gui_qt_object_filters">Source / Destination / Either Side (Labels, IPs, Workloads, IP Lists)</label>
+          <label data-i18n="gui_qt_object_filters">Source / Destination / Either Side (Label, IP, Workload, IP List, Service, Port)</label>
           <div id="qt-filter-bar"></div>
         </div>
       </fieldset>
@@ -2451,16 +2442,22 @@
           <label><input type="radio" name="qt-dpd-radio" value="" checked> <span data-i18n="gui_pd_all">All</span></label>
         </div>
       </fieldset>
-      <fieldset>
-        <legend data-i18n="gui_excludes">Excludes (Optional)</legend>
-        <div class="form-row">
-          <div class="form-group"><label data-i18n="gui_ex_port">Exclude Port</label><input id="qt-expt"
-              placeholder="e.g. 22" data-i18n-placeholder="gui_ph_ex_port"></div>
-        </div>
-      </fieldset>
       <div class="modal-actions">
         <button class="btn btn-secondary" data-action="closeModal" data-args='["modal-qt-filters"]' data-i18n="gui_cancel">Cancel</button>
         <button class="btn btn-success" data-action="applyQtFilters" data-i18n="gui_apply_query">Apply & Query</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Object Browser Modal -->
+  <div class="modal-bg" role="dialog" aria-modal="true" id="modal-obj-browser">
+    <div class="modal" style="max-width:720px">
+      <h2 data-i18n="gui_ob_title">Select filter objects</h2>
+      <div id="ob-body"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" data-action="closeModal" data-args='["modal-obj-browser"]'
+          data-i18n="gui_cancel">Cancel</button>
+        <button class="btn" id="ob-add-btn" data-on-click="_obAddSelected" data-i18n="gui_ob_add">Add</button>
       </div>
     </div>
   </div>
@@ -2988,6 +2985,7 @@
   <script defer src="/static/js/actions.js"></script>
   <script defer src="/static/js/quarantine.js"></script>
   <script defer src="/static/js/filter-bar.js"></script>
+  <script defer src="/static/js/object-browser.js"></script>
   <script defer src="/static/js/rule-scheduler.js"></script>
   <script defer src="/static/js/module-log.js"></script>
   </main>

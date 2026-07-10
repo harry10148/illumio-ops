@@ -16,10 +16,18 @@ function _objfbIsIpLike(s) {
     t.split('/')[0].split('.').every(o => +o <= 255);
 }
 
+// port token：80 / 443/tcp / 1000-2000 / 1000-2000/udp（proto 也收數字）
+function _objfbIsPortLike(s) {
+  const m = String(s).trim().toLowerCase().match(/^(\d{1,5})(?:-(\d{1,5}))?(?:\/(tcp|udp|icmp|icmpv6|\d{1,3}))?$/);
+  if (!m) return false;
+  const lo = +m[1], hi = m[2] ? +m[2] : +m[1];
+  return lo >= 1 && lo <= 65535 && hi >= 1 && hi <= 65535;
+}
+
 function createFilterBar(container, options) {
   const opts = options || {};
   const dirs = opts.dirs || ['src', 'dst', 'any'];
-  const cats = opts.cats || ['label', 'label_group', 'iplist', 'workload', 'ip'];
+  const cats = opts.cats || ['label', 'label_group', 'iplist', 'workload', 'ip', 'service', 'port'];
   const id = 'objfb-' + (++_objfbSeq);
   const state = {
     id, container, dirs, cats,
@@ -55,6 +63,8 @@ function _objfbSerialize(state) {
   const setScalar = (k, v) => { out[k] = v; };
   for (const p of state.pills) {
     const ex = p.neg ? 'ex_' : '';
+    if (p.cat === 'service') { push(`${ex}services`, p.href || p.name); continue; }
+    if (p.cat === 'port')    { push(`${ex}ports`, p.name); continue; }
     if (p.dir === 'any') {
       // any 方向：Phase 1 單值 key（多個同類取最後值）
       if (p.cat === 'label')         setScalar(`${ex}any_label`, p.name);
@@ -81,6 +91,16 @@ function _objfbDeserialize(state, dict) {
     state.pills.push(Object.assign({ cat, name, href: null, key: null, value: null, dir, neg }, extra || {}));
   const d = dict || {};
   const asList = (v) => Array.isArray(v) ? v : (v ? [v] : []);
+  for (const h of asList(d['services'])) add('service', h, null, false, { href: h });
+  for (const h of asList(d['ex_services'])) add('service', h, null, true, { href: h });
+  for (const tok of asList(d['ports'])) add('port', tok, null, false);
+  for (const tok of asList(d['ex_ports'])) add('port', tok, null, true);
+  // 舊 scalar port/proto/ex_port 回填成 port pill（讀取相容，零遷移）
+  if (d['port']) {
+    const protoName = { '6': 'tcp', '17': 'udp' }[String(d['proto'] || '')] || null;
+    add('port', protoName ? `${d['port']}/${protoName}` : String(d['port']), null, false);
+  }
+  if (d['ex_port']) add('port', String(d['ex_port']), null, true);
   for (const dir of ['src', 'dst']) {
     for (const spec of asList(d[`${dir}_labels`]).concat(asList(d[`${dir}_label`]))) add('label', spec, dir, false);
     for (const spec of asList(d[`ex_${dir}_labels`]).concat(asList(d[`ex_${dir}_label`]))) add('label', spec, dir, true);
@@ -105,7 +125,8 @@ function _objfbDeserialize(state, dict) {
 function _objfbAddPill(state, obj) {
   state.pills.push({
     cat: obj.cat, name: obj.name, href: obj.href || null,
-    key: obj.key || null, value: obj.value || null, dir: state.addDir, neg: false,
+    key: obj.key || null, value: obj.value || null,
+    dir: _OBJFB_DIRLESS.has(obj.cat) ? null : state.addDir, neg: false,
   });
   _objfbRender(state);
   if (state.changeCb) state.changeCb();
@@ -118,12 +139,17 @@ const _OBJFB_CATS = {
   iplist:      { i18n: 'gui_fb_cat_iplist',      dot: 'objfb-dot-iplist',  fallback: 'IP Lists' },
   workload:    { i18n: 'gui_fb_cat_workload',    dot: 'objfb-dot-workload', fallback: 'Workloads' },
   ip:          { i18n: null,                     dot: 'objfb-dot-ip',       fallback: 'IP/CIDR' },
+  service:     { i18n: 'gui_fb_cat_service',     dot: 'objfb-dot-service',  fallback: 'Services' },
+  port:        { i18n: 'gui_fb_cat_port',        dot: 'objfb-dot-port',     fallback: 'Port' },
 };
 const _OBJFB_DIR_TAG = { src: 'S', dst: 'D', any: 'S/D' };
 
+// 無方向類別：pill 不帶 src/dst/any、序列化不吃 dir、popover 不顯示方向列
+const _OBJFB_DIRLESS = new Set(['service', 'port']);
+
 // suggest 端支援的類別，固定順序（'ip' 不支援 suggest，不列入）；
 // _objfbQuerySuggest 與 _objfbRenderDropdown 皆以此清單交集 state.cats。
-const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload'];
+const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload', 'service'];
 
 function _objfbApplyI18n(root) {
   if (typeof window.i18nApply === 'function') window.i18nApply(root);
@@ -239,10 +265,12 @@ function _objfbBuildPill(state, p, idx) {
   el.dataset.args = JSON.stringify([state.id, idx]);
   el.setAttribute('data-pass-event', '1');
 
-  const dirTag = document.createElement('span');
-  dirTag.className = 'objfb-pill-dir';
-  dirTag.textContent = _OBJFB_DIR_TAG[p.dir] || p.dir;
-  el.appendChild(dirTag);
+  if (p.dir !== null) {
+    const dirTag = document.createElement('span');
+    dirTag.className = 'objfb-pill-dir';
+    dirTag.textContent = _OBJFB_DIR_TAG[p.dir] || p.dir;
+    el.appendChild(dirTag);
+  }
 
   const dot = document.createElement('i');
   const meta = _OBJFB_CATS[p.cat];
@@ -268,9 +296,10 @@ function _objfbBuildPill(state, p, idx) {
 }
 
 /* ── 下拉局部更新（不重繪整個 bar，保留輸入框焦點/游標）──
- * 空輸入：顯示類別捷徑。非空輸入：委派 _objfbRenderDropdown 立即畫出同步
- * 可得的候選（IP/CIDR 置頂、手動 key=value），並觸發 debounce suggest 查詢
- * （250ms 後打後端、結果回來時再由 _objfbRenderDropdown 併入分類分組）。
+ * 空輸入且無 scope：顯示類別 chip 列（含 totals）。空輸入且有 scope：該類別
+ * 的全量瀏覽清單（載入更多）。非空輸入：委派 _objfbRenderDropdown 立即畫出
+ * 同步可得的候選（IP/CIDR 置頂、手動 key=value），並觸發 debounce suggest
+ * 查詢（250ms 後打後端、結果回來時再由 _objfbRenderDropdown 併入分類分組）。
  */
 function _objfbUpdateDropdown(state) {
   const dd = state.els.dd;
@@ -282,38 +311,164 @@ function _objfbUpdateDropdown(state) {
     if (state._abort) { state._abort.abort(); state._abort = null; }
     state._suggest = null;
     state._suggestQ = null;
-    const catsWrap = document.createElement('div');
-    catsWrap.className = 'objfb-dd-cats';
-    for (const c of state.cats.filter((c) => c !== 'ip')) {
-      const meta = _OBJFB_CATS[c];
-      if (!meta) continue;
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'objfb-cat-btn';
-      const dot = document.createElement('i');
-      dot.className = 'objfb-cat-dot ' + meta.dot;
-      b.appendChild(dot);
-      const label = document.createElement('span');
-      label.setAttribute('data-i18n', meta.i18n);
-      label.textContent = meta.fallback;
-      b.appendChild(label);
-      b.setAttribute('data-on-click', '_objfbSetScope');
-      b.dataset.args = JSON.stringify([state.id, c]);
-      catsWrap.appendChild(b);
+    if (state.scopeCat && state.scopeCat !== 'ip' && state.scopeCat !== 'port') {
+      // 有 scope：空輸入即瀏覽該類別
+      _objfbRenderBrowse(state);
+      return;
     }
-    dd.appendChild(catsWrap);
-    const note = document.createElement('div');
-    note.className = 'objfb-dd-note';
-    note.setAttribute('data-i18n', 'gui_fb_scope_hint');
-    dd.appendChild(note);
-    _objfbApplyI18n(dd);
-    dd.classList.add('open');
-    state.actIdx = -1;
+    // 無 scope：類別 chip 列（含 totals）
+    _objfbRenderCatChips(state);
     return;
   }
 
   _objfbRenderDropdown(state, q);
   state._debouncedSuggest(q);
+}
+
+/* ── 空輸入瀏覽（案 C）：無 scope 顯示類別 chip（含各類總數），點 chip 設
+ * scope 進入該類別的全量分頁清單；label 依 key 插入組頭。totals 每實例
+ * 快取一次（TTL 交給後端 module cache）。 ── */
+function _objfbRenderCatChips(state) {
+  const dd = state.els.dd;
+  dd.innerHTML = '';
+  state.ddItems = [];
+  const catsWrap = document.createElement('div');
+  catsWrap.className = 'objfb-dd-cats';
+  for (const c of state.cats.filter((c) => c !== 'ip' && c !== 'port')) {
+    const meta = _OBJFB_CATS[c];
+    if (!meta) continue;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'objfb-cat-btn';
+    const dot = document.createElement('i');
+    dot.className = 'objfb-cat-dot ' + meta.dot;
+    b.appendChild(dot);
+    const label = document.createElement('span');
+    if (meta.i18n) label.setAttribute('data-i18n', meta.i18n);
+    label.textContent = meta.fallback;
+    b.appendChild(label);
+    const n = state._totals && state._totals[c];
+    if (typeof n === 'number') {
+      const cnt = document.createElement('span');
+      cnt.className = 'objfb-chip-cnt';
+      cnt.textContent = ` (${n})`;
+      b.appendChild(cnt);
+    }
+    b.setAttribute('data-on-click', '_objfbSetScope');
+    b.dataset.args = JSON.stringify([state.id, c]);
+    catsWrap.appendChild(b);
+  }
+  dd.appendChild(catsWrap);
+  const note = document.createElement('div');
+  note.className = 'objfb-dd-note';
+  note.setAttribute('data-i18n', 'gui_fb_scope_hint');
+  dd.appendChild(note);
+  const browseAll = document.createElement('button');
+  browseAll.type = 'button';
+  browseAll.className = 'objfb-dd-more';
+  browseAll.setAttribute('data-i18n', 'gui_fb_browse_all');
+  browseAll.textContent = 'Browse all…';
+  browseAll.setAttribute('data-on-click', '_objfbOpenBrowser');
+  browseAll.dataset.args = JSON.stringify([state.id]);
+  dd.appendChild(browseAll);
+  _objfbApplyI18n(dd);
+  dd.classList.add('open');
+  state.actIdx = -1;
+  if (!state._totals) {
+    fetch('/api/filter-objects/browse?type=_totals', { credentials: 'same-origin' })
+      .then(r => r.json())
+      .then(body => {
+        if (body.ok && body.totals) {
+          state._totals = body.totals;
+          if (state.els && !state.els.input.value.trim() && !state.scopeCat) _objfbRenderCatChips(state);
+        }
+      })
+      .catch(() => {});
+  }
+}
+
+function _objfbRenderBrowse(state, append) {
+  const cat = state.scopeCat;
+  const dd = state.els.dd;
+  if (cat === 'workload') {
+    dd.innerHTML = '';
+    state.ddItems = [];
+    _objfbAddDdNote(dd, 'gui_fb_type_to_search', 'Type to search');
+    _objfbApplyI18n(dd);
+    dd.classList.add('open');
+    return;
+  }
+  const offset = append && state._browse && state._browse.type === cat ? state._browse.items.length : 0;
+  fetch(`/api/filter-objects/browse?type=${cat}&offset=${offset}&limit=20`, { credentials: 'same-origin' })
+    .then(r => r.json())
+    .then(body => {
+      // 已改變，放棄
+      if (!state.els || state.els.input.value.trim() || state.scopeCat !== cat) return;
+      if (!body.ok) throw new Error(body.error || 'browse');
+      const prev = (append && state._browse && state._browse.type === cat) ? state._browse.items : [];
+      state._browse = { type: cat, items: prev.concat(body.items), total: body.total, groups: body.groups || null };
+      _objfbRenderBrowseList(state);
+    })
+    .catch(() => {
+      if (!state.els) return;
+      dd.innerHTML = '';
+      state.ddItems = [];
+      _objfbAddDdNote(dd, 'gui_fb_browse_error', 'Browse unavailable');
+      _objfbApplyI18n(dd);
+      dd.classList.add('open');
+    });
+}
+
+function _objfbRenderBrowseList(state) {
+  const dd = state.els.dd;
+  const b = state._browse;
+  dd.innerHTML = '';
+  state.ddItems = [];
+  let prevKey = null;
+  let batch = [];
+  const flush = () => {
+    if (!batch.length) return;
+    const hdrText = b.type === 'label' ? prevKey : null;
+    if (hdrText !== null) {
+      const h = document.createElement('div');
+      h.className = 'objfb-dd-hdr';
+      h.textContent = hdrText;
+      dd.appendChild(h);
+    }
+    _objfbAddDdGroupItems(state, batch);
+    batch = [];
+  };
+  for (const it of b.items) {
+    const k = b.type === 'label' ? (it.key || '') : null;
+    if (b.type === 'label' && k !== prevKey) { flush(); prevKey = k; }
+    batch.push(Object.assign({ cat: b.type }, it));
+  }
+  flush();
+  if (b.items.length < b.total) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'objfb-dd-more';
+    more.setAttribute('data-i18n', 'gui_fb_load_more');
+    more.textContent = 'Load more';
+    const cnt = document.createElement('span');
+    cnt.textContent = ` (${b.items.length}/${b.total})`;
+    more.appendChild(cnt);
+    more.setAttribute('data-on-click', '_objfbBrowseMore');
+    more.dataset.args = JSON.stringify([state.id]);
+    dd.appendChild(more);
+  }
+  const browseAll = document.createElement('button');
+  browseAll.type = 'button';
+  browseAll.className = 'objfb-dd-more';
+  browseAll.setAttribute('data-i18n', 'gui_fb_browse_all');
+  browseAll.textContent = 'Browse all…';
+  browseAll.setAttribute('data-on-click', '_objfbOpenBrowser');
+  browseAll.dataset.args = JSON.stringify([state.id]);
+  dd.appendChild(browseAll);
+  _objfbApplyI18n(dd);
+  state.actIdx = state.ddItems.length ? 0 : -1;
+  _objfbMarkActive(state);
+  dd.classList.add('open');
 }
 
 /* ── suggest 查詢：debounce 250ms 後由 state._debouncedSuggest 呼叫。
@@ -371,6 +526,9 @@ function _objfbRenderDropdown(state, q) {
       }
     }
   }
+  if (_objfbIsPortLike(q) && state.cats.includes('port') && (!state.scopeCat || state.scopeCat === 'service' || state.scopeCat === 'port')) {
+    _objfbAddDdGroup(state, [{ cat: 'port', name: q.trim() }], 'gui_fb_add_port', 'Add Port');
+  }
 
   const sug = (state._suggestQ === q) ? state._suggest : null;
   if (sug) {
@@ -422,6 +580,12 @@ function _objfbAddDdGroup(state, items, headerI18nKey, headerFallback) {
   h.setAttribute('data-i18n', headerI18nKey);
   h.textContent = headerFallback;
   dd.appendChild(h);
+  _objfbAddDdGroupItems(state, items);
+}
+
+// 不帶組頭的 items 渲染（_objfbAddDdGroup 拆出共用；原函式改呼叫此函式）
+function _objfbAddDdGroupItems(state, items) {
+  const dd = state.els.dd;
   for (const o of items) {
     const el = document.createElement('div');
     el.className = 'objfb-dd-item';
@@ -431,7 +595,7 @@ function _objfbAddDdGroup(state, items, headerI18nKey, headerFallback) {
     dot.className = 'objfb-cat-dot ' + (meta ? meta.dot : 'objfb-dot-ip');
     el.appendChild(dot);
     const txt = document.createElement('span');
-    txt.textContent = o.name;
+    txt.textContent = o.summary ? `${o.name} — ${o.summary}` : o.name;
     el.appendChild(txt);
     el.setAttribute('data-on-click', '_objfbPickItem');
     el.dataset.args = JSON.stringify([state.id, o]);
@@ -453,21 +617,23 @@ function _objfbOpenPop(state, idx, pillEl) {
   state.popIdx = idx;
   pop.innerHTML = '';
 
-  const dirRow = document.createElement('div');
-  dirRow.className = 'objfb-pop-row';
-  const dirSeg = document.createElement('div');
-  dirSeg.className = 'objfb-pop-seg';
-  for (const d of state.dirs) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'objfb-pop-btn' + (p.dir === d ? ' on' : '');
-    b.setAttribute('data-i18n', 'gui_fb_dir_' + d);
-    b.setAttribute('data-on-click', '_objfbPopAction');
-    b.dataset.args = JSON.stringify([state.id, idx, 'dir', d]);
-    dirSeg.appendChild(b);
+  if (!_OBJFB_DIRLESS.has(p.cat)) {
+    const dirRow = document.createElement('div');
+    dirRow.className = 'objfb-pop-row';
+    const dirSeg = document.createElement('div');
+    dirSeg.className = 'objfb-pop-seg';
+    for (const d of state.dirs) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'objfb-pop-btn' + (p.dir === d ? ' on' : '');
+      b.setAttribute('data-i18n', 'gui_fb_dir_' + d);
+      b.setAttribute('data-on-click', '_objfbPopAction');
+      b.dataset.args = JSON.stringify([state.id, idx, 'dir', d]);
+      dirSeg.appendChild(b);
+    }
+    dirRow.appendChild(dirSeg);
+    pop.appendChild(dirRow);
   }
-  dirRow.appendChild(dirSeg);
-  pop.appendChild(dirRow);
 
   const negRow = document.createElement('div');
   negRow.className = 'objfb-pop-row';
@@ -534,6 +700,10 @@ window._objfbKeydown = function (id, ev) {
       window._objfbPickItem(id, s.ddItems[s.actIdx].o);
     } else {
       const q = s.els.input.value.trim();
+      if (_objfbIsPortLike(q) && s.cats.includes('port')) {
+        window._objfbPickItem(id, { cat: 'port', name: q });
+        return;
+      }
       if (_objfbIsIpLike(q)) {
         window._objfbPickItem(id, { cat: 'ip', name: q });
       } else {
@@ -602,6 +772,20 @@ window._objfbClearScope = function (id) {
   _objfbRender(s);
   s.els.input.focus();
   _objfbUpdateDropdown(s);
+};
+
+window._objfbBrowseMore = function (id) {
+  const s = _objfbInstances[id];
+  if (s) _objfbRenderBrowse(s, true);
+};
+
+// 供 object-browser.js（Modal 物件庫）取回實例、代為加入 pill。
+window._objfbGetInstance = function (id) { return _objfbInstances[id] || null; };
+window._objfbAddPillPublic = function (state, obj) { _objfbAddPill(state, obj); };
+
+window._objfbOpenBrowser = function (id) {
+  const s = _objfbInstances[id];
+  if (s) { s.els.dd.classList.remove('open'); window.openObjectBrowser(id); }
 };
 
 // 點擊 bar/popover 以外區域時關閉下拉與 popover（沿用 codebase 既有的

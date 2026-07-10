@@ -100,38 +100,36 @@ class LabelResolver:
 
     @staticmethod
     def _parse_port_range_entry(value, default_proto=None):
-        proto = default_proto
-        if isinstance(value, (list, tuple)):
-            if len(value) == 2:
-                start, end = value
-            elif len(value) == 3:
-                start, end, proto = value
-            else:
-                return None
-        else:
-            text = str(value).strip()
-            if not text:
-                return None
-            range_part = text
-            if "/" in text:
-                range_part, proto_part = text.split("/", 1)
-                proto = proto_part
-            elif ":" in text and text.count(":") == 1 and "-" in text:
-                range_part, proto_part = text.split(":", 1)
-                proto = proto_part
-            if "-" not in range_part:
-                return None
-            start, end = [part.strip() for part in range_part.split("-", 1)]
-        try:
-            start = int(start)
-            end = int(end)
-            if start > end:
-                start, end = end, start
-            if proto in (None, ""):
-                return {"port": start, "to_port": end}
-            return {"port": start, "to_port": end, "proto": int(proto)}
-        except (TypeError, ValueError):
-            return None
+        from src.port_token import parse_port_token
+        return parse_port_token(value, default_proto=default_proto)
+
+    @staticmethod
+    def _service_entry_defs(svc):
+        """service 物件 → services.include 條目清單（查詢用完整形，含
+        windows_services 與純 proto 條目；空 service 回 []）。"""
+        defs = []
+        for sp in svc.get("service_ports") or []:
+            p = sp.get("port")
+            if p:
+                pd = {"port": p}
+                if sp.get("proto") is not None:
+                    pd["proto"] = sp["proto"]
+                if sp.get("to_port"):
+                    pd["to_port"] = sp["to_port"]
+                defs.append(pd)
+            elif sp.get("proto") is not None:
+                defs.append({"proto": sp["proto"]})
+        for w in svc.get("windows_services") or []:
+            if w.get("service_name"):
+                defs.append({"windows_service_name": w["service_name"]})
+            elif w.get("process_name"):
+                defs.append({"process_name": w["process_name"]})
+            elif w.get("port"):
+                pd = {"port": w["port"]}
+                if w.get("proto") is not None:
+                    pd["proto"] = w["proto"]
+                defs.append(pd)
+        return defs
 
     @staticmethod
     def _dedupe_query_group(items):
@@ -248,25 +246,19 @@ class LabelResolver:
                     for i in d_services:
                         name = i.get('name')
                         ports = []
-                        port_defs = []  # raw port/proto dicts for query building
                         for svc in i.get('service_ports', []):
                             p = svc.get('port')
                             if p:
                                 proto = "UDP" if svc.get('proto') == 17 else "TCP"
                                 top = f"-{svc['to_port']}" if svc.get('to_port') else ""
                                 ports.append(f"{proto}/{p}{top}")
-                                # Build raw port definition for async queries
-                                pd = {"port": p}
-                                if svc.get('proto') is not None:
-                                    pd["proto"] = svc['proto']
-                                if svc.get('to_port'):
-                                    pd["to_port"] = svc['to_port']
-                                port_defs.append(pd)
                         port_str = f" ({','.join(ports)})" if ports else ""
                         val = f"{name}{port_str}"
                         c.label_cache[i['href']] = val
                         c.label_cache[i['href'].replace('/draft/', '/active/')] = val
-                        # Cache resolved port definitions for per-rule queries
+                        # 查詢用完整條目（含 windows_services、純 proto；filter
+                        # 的 service 展開與 per-rule query 共用）
+                        port_defs = LabelResolver._service_entry_defs(i)
                         if port_defs:
                             c.service_ports_cache[i['href']] = port_defs
                             c.service_ports_cache[i['href'].replace('/draft/', '/active/')] = port_defs
@@ -504,6 +496,13 @@ class LabelResolver:
                 svcs.append("RefObj")
         return ", ".join(svcs)
 
+    def resolve_service_entries(self, value):
+        """service href → services.include/exclude 條目清單（filter 的
+        services/ex_services key 查詢時展開用）。查無（物件被刪、快取未含）
+        回 None，由呼叫端走 unresolved 降級。"""
+        c = self._client
+        return c.service_ports_cache.get(str(value).strip())
+
     # ── Cache DataFrame object-filter expansion ─────────────────────────
 
     def expand_object_filters_for_df(self, filters):
@@ -525,8 +524,10 @@ class LabelResolver:
             "_any_object_cidrs": ("any_iplist", "any_workload"),
             "_ex_any_object_cidrs": ("ex_any_iplist", "ex_any_workload"),
         }
-        if not filters or not any(
-                filters.get(k) for keys in obj_keys.values() for k in keys):
+        svc_keys = (("services", "_svc_port_entries"), ("ex_services", "_ex_svc_port_entries"))
+        has_svc = any(filters.get(k) for k, _ in svc_keys) if filters else False
+        if not filters or (not any(
+                filters.get(k) for keys in obj_keys.values() for k in keys) and not has_svc):
             return filters
 
         def _iplist_cidrs(value):
@@ -575,4 +576,20 @@ class LabelResolver:
                     cidrs.extend(_iplist_cidrs(v) if "iplist" in k else _workload_ips(v))
             if cidrs:
                 out[dest] = cidrs
+
+        for key, internal in svc_keys:
+            vals = filters.get(key)
+            if not vals:
+                continue
+            vals = vals if isinstance(vals, list) else [vals]
+            entries = []
+            for href in vals:
+                for e in (self.resolve_service_entries(href) or []):
+                    if "port" in e or "proto" in e:
+                        entries.append(e)
+                    else:
+                        logger.warning(
+                            "Cache path cannot match name-based service entry {}; skipped", e)
+            if entries:
+                out[internal] = entries
         return out

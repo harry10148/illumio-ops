@@ -49,6 +49,7 @@ _OBJECT_FILTER_KEYS = (
     "src_workload", "src_workloads", "dst_workload", "dst_workloads",
     "ex_src_workload", "ex_src_workloads", "ex_dst_workload", "ex_dst_workloads",
     "any_iplist", "any_workload", "ex_any_iplist", "ex_any_workload",
+    "services", "ex_services", "ports", "ex_ports",
 )
 
 # 兩套 client-side 比對器（check_flow_match 與 _flow_matches_filters）都無法
@@ -397,7 +398,14 @@ class Analyzer:
             return False
         object_rule = {k: rule[k] for k in _OBJECT_FILTER_KEYS if rule.get(k)}
         if object_rule:
-            if not TrafficQueryBuilder._flow_matches_filters(f, object_rule):
+            # services/ex_services 的 href→entries 展開需要 client 端
+            # service_ports_cache（LabelResolver.resolve_service_entries）；
+            # 未傳時 _flow_matches_filters 會把 services fail-closed（include
+            # 全不命中）——比照 traffic_query.fetch_traffic_for_report 的接法，
+            # 用 getattr 防禦 self.api 可能是無 _labels 的測試 stub。
+            labels = getattr(self.api, "_labels", None)
+            resolve_service = getattr(labels, "resolve_service_entries", None)
+            if not TrafficQueryBuilder._flow_matches_filters(f, object_rule, resolve_service):
                 return False
         return True
 
@@ -1113,6 +1121,13 @@ class Analyzer:
             "port_range": params.get("port_range"),
             "ex_port": params.get("ex_port"),
             "ex_port_range": params.get("ex_port_range"),
+            # Task 11：FilterBar 的 service/port pill 序列化 key（qt-port/qt-proto/
+            # qt-expt scalar 欄位移除後改走 pill）——與 actions.py 的 params dict
+            # 保持一致，否則會在這個 whitelist 被靜默丟棄。
+            "services": params.get("services", []),
+            "ex_services": params.get("ex_services", []),
+            "ports": params.get("ports", []),
+            "ex_ports": params.get("ex_ports", []),
             "src_label": params.get("src_label"),
             "src_label_group": params.get("src_label_group"),
             "src_label_groups": params.get("src_label_groups"),

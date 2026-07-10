@@ -25,18 +25,19 @@ function onBwMetricTypeChange() {
 
 // FilterBar 實例（Phase 4c）：延遲初始化，理由同 dashboard.js 的 _ensureRptFilterBar
 // （rules.js 在 filter-bar.js 之前解析，模組作用域頂層不能直接呼叫 createFilterBar）；
-// cats 排除 label_group——規則引擎後端只認 label/iplist/workload/ip，label_group 會 400。
+// cats 排除 label_group——規則引擎後端只認 label/iplist/workload/ip/service/port，
+// label_group 會 400。
 let _trFb = null;
 function _ensureTrFilterBar() {
   if (!_trFb) {
-    _trFb = createFilterBar(document.getElementById('tr-filter-bar'), { cats: ['label', 'iplist', 'workload', 'ip'] });
+    _trFb = createFilterBar(document.getElementById('tr-filter-bar'), { cats: ['label', 'iplist', 'workload', 'ip', 'service', 'port'] });
   }
   return _trFb;
 }
 let _bwFb = null;
 function _ensureBwFilterBar() {
   if (!_bwFb) {
-    _bwFb = createFilterBar(document.getElementById('bw-filter-bar'), { cats: ['label', 'iplist', 'workload', 'ip'] });
+    _bwFb = createFilterBar(document.getElementById('bw-filter-bar'), { cats: ['label', 'iplist', 'workload', 'ip', 'service', 'port'] });
   }
   return _bwFb;
 }
