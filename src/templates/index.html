@@ -1409,6 +1409,19 @@
             </div>
           </div>
         </div>
+        <div class="rcard" data-rtype="rule_hit_count">
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-body">
+            <h3 data-i18n="gui_btn_rhc_report">Rule Hit Count Report</h3>
+            <p data-i18n="gui_rcard_rhc_desc">Native VEN-measured rule hit counts, enriched with full rule details</p>
+            <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
+            <div style="display:flex;gap:6px;margin-top:10px;">
+              <button class="btn btn-primary btn-sm" id="btn-gen-rhc" data-action="openReportGenModal" data-args='["rule_hit_count"]'>
+                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+              </button>
+            </div>
+          </div>
+        </div>
         <div class="rcard" data-rtype="policy_diff">
           <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
           <div class="rcard-body">
@@ -1551,6 +1564,7 @@
             <option value="audit" data-i18n="gui_sched_rt_audit">Audit Report</option>
             <option value="ven_status" data-i18n="gui_sched_rt_ven">VEN Status Report</option>
             <option value="policy_usage" data-i18n="gui_sched_rt_pu">Policy Usage Report</option>
+            <option value="rule_hit_count" data-i18n="gui_sched_rt_rhc">Rule Hit Count Report</option>
             <option value="policy_diff" data-i18n="gui_sched_rt_policy_diff">Policy Diff Report</option>
             <option value="policy_resolver" data-i18n="gui_sched_rt_policy_resolver">Policy Resolver Report</option>
             <option value="app_summary" data-i18n="gui_sched_rt_app_summary">App Summary Report</option>
