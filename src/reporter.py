@@ -184,6 +184,8 @@ class Reporter:
         "warn":     "alert_sev_warning",
         "warning":  "alert_sev_warning",
         "info":     "alert_sev_info",
+        "notice":   "alert_sev_notice",
+        "debug":    "alert_sev_debug",
     }
 
     _STATUS_I18N_KEYS: dict[str, str] = {
@@ -641,10 +643,10 @@ class Reporter:
     def _highest_severity(issues: list[dict]) -> str:
         """Pick highest severity from a list of issue dicts; returns 'critical', 'warning', or 'info'."""
         # Map raw severity values to canonical three-level labels used by mail_severity_* i18n keys
-        _rank = {'critical': 3, 'crit': 3, 'emerg': 3, 'alert': 2, 'err': 2, 'error': 2, 'warning': 2, 'warn': 2, 'info': 1}
+        _rank = {'critical': 3, 'crit': 3, 'emerg': 3, 'alert': 2, 'err': 2, 'error': 2, 'warning': 2, 'warn': 2, 'info': 1, 'notice': 1, 'debug': 1}
         _canonical = {'critical': 'critical', 'crit': 'critical', 'emerg': 'critical',
                       'alert': 'warning', 'err': 'warning', 'error': 'warning', 'warning': 'warning', 'warn': 'warning',
-                      'info': 'info'}
+                      'info': 'info', 'notice': 'info', 'debug': 'info'}
         cur = 0
         out = 'info'
         for issue in issues:
