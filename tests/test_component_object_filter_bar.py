@@ -329,6 +329,16 @@ def test_filter_bar_service_port_categories_defined():
     assert "objfb-dot-service" in src and "objfb-dot-port" in src
 
 
+def test_objfb_dot_service_port_use_hardcoded_hex():
+    """比照 .objfb-dot-label 慣例（本 sweep）：.objfb-dot-service/-port 不再用
+    未定義的 --accent-purple/--accent-teal 假 var()+fallback，直接硬編 hex。"""
+    css = _CSS.read_text(encoding="utf-8")
+    assert "--accent-purple" not in css
+    assert "--accent-teal" not in css
+    assert ".objfb-dot-service { background: #8e6fc0; }" in css
+    assert ".objfb-dot-port    { background: #3fa7a0; }" in css
+
+
 def test_filter_bar_serializes_services_and_ports_keys():
     src = _JS.read_text(encoding="utf-8")
     for key in ("services", "ex_services", "ports", "ex_ports"):

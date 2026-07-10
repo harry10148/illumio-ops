@@ -825,6 +825,11 @@ async function refreshArchiveStatus() {
   } catch (_) { el.textContent = ''; }
 }
 
+// 輪詢上限：避免背景 load 卡住（例如伺服端程序異常退出、_PROGRESS 永遠停在
+// running）時前端無限輪詢下去。720 次 * 2s 間隔 = 上限時間，超過即停止輪詢、
+// 以既有錯誤樣式顯示逾時訊息（不再視為進行中）。
+const ARCHIVE_POLL_MAX = 720;
+
 // 載入指定日期範圍的 archive（背景執行）：POST 立即回 202，之後輪詢 status。
 async function loadArchiveRange() {
   const el = document.getElementById('archive-status');
@@ -838,7 +843,8 @@ async function loadArchiveRange() {
       return;
     }
     if (el) el.textContent = _t('gui_traffic_archive_loading');
-    for (;;) {
+    let timedOut = true;
+    for (let i = 0; i < ARCHIVE_POLL_MAX; i++) {
       await new Promise((r) => setTimeout(r, 2000));
       const st = await get('/api/cache/archive/status');
       const load = (st && st.load) || {};
@@ -852,7 +858,12 @@ async function loadArchiveRange() {
         return;
       }
       // done → 以既有 status 呈現邏輯刷新
+      timedOut = false;
       break;
+    }
+    if (timedOut) {
+      if (el) el.textContent = _t('gui_traffic_archive_poll_timeout');
+      return;
     }
   } catch (e) {
     if (el) el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', String(e));

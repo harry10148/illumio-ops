@@ -17,8 +17,10 @@ import pytest
 def _reset_alert_cooldown_state():
     from src.pce_cache import lag_monitor
     lag_monitor._last_alert_at.clear()
+    lag_monitor._suppression_logged.clear()
     yield
     lag_monitor._last_alert_at.clear()
+    lag_monitor._suppression_logged.clear()
 
 
 def _make_cm(tmp_path):
@@ -88,6 +90,28 @@ def test_different_sources_independent(tmp_path, caplog):
                return_value=[events_result, traffic_result]):
         lag_monitor.run_cache_lag_monitor(cm)
     assert len(_errors(caplog)) == 2
+
+
+def test_suppression_logs_debug_once_at_start(tmp_path, caplog):
+    """壓制起點記一條 debug（身份 + 起訖），壓制期間後續 tick 不重複記
+    （避免洗版；本 sweep 新增，不改既有節流語意）。"""
+    import logging
+    caplog.set_level(logging.DEBUG)
+    cm = _make_cm(tmp_path)
+    result = {"source": "events", "level": "error", "lag_seconds": 900,
+              "last_status": "ok", "last_error": None}
+    _run_with_result(cm, result)  # first tick: alert fires, no suppression yet
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert len(debug_records) == 0
+    caplog.clear()
+    _run_with_result(cm, result)  # second tick within cooldown: suppressed
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert len(debug_records) == 1
+    assert "events" in debug_records[0].message
+    caplog.clear()
+    _run_with_result(cm, result)  # third tick still suppressed: no repeat debug log
+    debug_records = [r for r in caplog.records if r.levelname == "DEBUG"]
+    assert len(debug_records) == 0
 
 
 def test_status_alert_throttled_independently_of_level(tmp_path, caplog):

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import functools
 import heapq
 import ipaddress
 import json
@@ -540,28 +541,43 @@ class Analyzer:
         return False
 
     @staticmethod
+    @functools.lru_cache(maxsize=2048)
+    def _parse_ip_filter_value(text: str) -> tuple | None:
+        """把 CIDR/range 的解析結果快取起來——同一個 filter 值在 per-flow
+        熱迴圈裡會被重複呼叫上千次（每個 flow × 每個 side 都重跑一次
+        ip_network/_parse_ip_range），但值本身只有規則設定裡那幾個，快取後
+        對同一 val 只解析一次。回傳 ("cidr", network) / ("range", frm, to) /
+        None（bare IP 或非法格式，呼叫端各自處理）。純函式、無 flow_ip 參與，
+        快取安全。"""
+        if "/" in text:
+            try:
+                return ("cidr", ipaddress.ip_network(text, strict=False))
+            except ValueError:
+                return None
+        if "-" in text:
+            ip_range = LabelResolver._parse_ip_range(text)
+            if ip_range is None:
+                return None
+            return ("range", ip_range[0], ip_range[1])
+        return None
+
+    @staticmethod
     def _ip_value_contains(flow_ip: Any, val: str) -> bool:
         """CIDR ('/') 或 IPv4 range ('-') containment：flow_ip 是否落在
         filter 值 val 所描述的範圍內。非法 CIDR/range → 不命中（fail-closed；
         此函式把關 live 查詢/告警結果，不套用 df_filter._ip_mask 的 cache
-        顯示 fail-open 慣例）。"""
-        text = str(val)
-        if "/" in text:
-            try:
-                net = ipaddress.ip_network(text, strict=False)
-                return ipaddress.ip_address(str(flow_ip)) in net
-            except ValueError:
-                return False
-        if "-" in text:
-            ip_range = LabelResolver._parse_ip_range(text)
-            if ip_range is None:
-                return False
-            frm, to = ip_range
-            try:
-                return frm <= ipaddress.IPv4Address(str(flow_ip)) <= to
-            except ValueError:
-                return False
-        return False
+        顯示 fail-open 慣例）。值本身的解析交給 _parse_ip_filter_value（有
+        lru_cache），這裡只做逐 flow 不同的 containment 判斷。"""
+        parsed = Analyzer._parse_ip_filter_value(str(val))
+        if parsed is None:
+            return False
+        try:
+            if parsed[0] == "cidr":
+                return ipaddress.ip_address(str(flow_ip)) in parsed[1]
+            _, frm, to = parsed
+            return frm <= ipaddress.IPv4Address(str(flow_ip)) <= to
+        except ValueError:
+            return False
 
     def get_traffic_details_key(self, flow: dict[str, Any]) -> str:
         src = flow.get('src', {})

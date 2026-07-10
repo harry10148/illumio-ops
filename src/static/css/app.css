@@ -2624,8 +2624,8 @@ select {
 .objfb-dot-workload  { background: var(--success, #35c58f); }
 .objfb-dot-iplist    { background: var(--accent2); }
 .objfb-dot-ip        { background: var(--dim); }
-.objfb-dot-service { background: var(--accent-purple, #8e6fc0); }
-.objfb-dot-port    { background: var(--accent-teal, #3fa7a0); }
+.objfb-dot-service { background: #8e6fc0; }
+.objfb-dot-port    { background: #3fa7a0; }
 
 /* any 方向較慢提示 */
 .objfb-hint {
