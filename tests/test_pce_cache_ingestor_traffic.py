@@ -269,3 +269,67 @@ def test_traffic_run_once_records_error_status_on_insert_failure(session_factory
     assert row is not None                        # record_error 必須在 re-raise 前寫入 watermark
     assert row.last_status == "error"
     assert "database is locked" in (row.last_error or "")
+
+
+class BisectFakeApi:
+    """第一次（全窗）回滿 max_results 觸發二分；之後每個半窗回 1 筆。"""
+    def __init__(self):
+        self.windows = []  # (since, until) 呼叫紀錄
+
+    def get_traffic_flows_async(self, max_results=200000, rate_limit=False,
+                                since=None, until=None, **kw):
+        self.windows.append((since, until))
+        if len(self.windows) == 1:
+            return [_mk_flow(i) for i in range(max_results)]
+        return [_mk_flow(1000 + len(self.windows))]
+
+
+def test_ingest_bisects_window_on_cap_hit(session_factory):
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    fake = BisectFakeApi()
+    ing = TrafficIngestor(api=fake, session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory), max_results=5)
+    ing.run_once()
+    # 1 次全窗（滿載）+ 2 次半窗
+    assert len(fake.windows) == 3
+    s0, u0 = fake.windows[0]
+    s1, u1 = fake.windows[1]
+    s2, u2 = fake.windows[2]
+    assert s1 == s0 and u2 == u0 and u1 == s2  # 兩個半窗恰好拼回全窗
+
+
+def test_ingest_single_call_below_cap(session_factory):
+    # 回歸：未碰頂時維持單次呼叫
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    flows = [_mk_flow(i) for i in range(3)]
+    fake = FakeApiClient(flows)
+    ing = TrafficIngestor(api=fake, session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory), max_results=5)
+    assert ing.run_once() == 3
+    assert fake.calls == 1
+
+
+class AlwaysFullApi:
+    """每個窗口都回滿載：驗證遞迴深度有界，不會無限二分。"""
+    def __init__(self):
+        self.calls = 0
+
+    def get_traffic_flows_async(self, max_results=200000, **kw):
+        self.calls += 1
+        return [_mk_flow(i) for i in range(max_results)]
+
+
+def test_ingest_bisect_depth_bounded(session_factory):
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    fake = AlwaysFullApi()
+    ing = TrafficIngestor(api=fake, session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory), max_results=2)
+    ing.run_once()  # 不應 RecursionError / 無限迴圈
+    # 深度 6 的完整二元樹：1 + 2 + ... + 64 = 127 次呼叫為上限
+    assert fake.calls <= 127

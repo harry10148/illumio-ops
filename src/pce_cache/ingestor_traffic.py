@@ -36,14 +36,15 @@ class TrafficIngestor:
         self._max_results = max_results
         self._siem_dests = list(siem_destinations or [])
 
+    # 二分抽乾參數：深度 6 → 最小窗 = 原窗/64；再配 _MIN_BISECT_SPAN 硬下限，
+    # 保證遞迴有界。碰頂但無法再分時記 warning（該窗資料可能不完整）。
+    _MAX_BISECT_DEPTH = 6
+    _MIN_BISECT_SPAN = timedelta(minutes=1)
+
     def run_once(self) -> int:
         since = self._since_cursor()
         try:
-            flows = self._api.get_traffic_flows_async(
-                max_results=self._max_results,
-                rate_limit=True,
-                since=since,
-            )
+            flows = self._fetch_all(since)
         except Exception as exc:
             logger.exception("Traffic ingest failed: {}", exc)
             self._wm.record_error(self.SOURCE, str(exc))
@@ -69,6 +70,40 @@ class TrafficIngestor:
                 "Traffic ingest poll: fetched={} inserted={} watermark_advanced={} since={}",
                 len(flows), inserted, watermark_advanced, since,
             )
+
+    def _fetch_all(self, since: Optional[str]) -> list[dict]:
+        until_dt = datetime.now(timezone.utc).replace(microsecond=0)
+        if since is not None:
+            since_dt = datetime.fromisoformat(since)
+        else:
+            # 鏡射 api_client 的預設：無 watermark 時往回抓 24 小時
+            since_dt = until_dt - timedelta(hours=24)
+        return self._fetch_window(since_dt, until_dt, depth=0)
+
+    def _fetch_window(self, since_dt: datetime, until_dt: datetime, depth: int) -> list[dict]:
+        flows = self._api.get_traffic_flows_async(
+            max_results=self._max_results,
+            rate_limit=True,
+            since=since_dt.isoformat(),
+            until=until_dt.isoformat(),
+        )
+        if len(flows) < self._max_results:
+            return flows
+        span = until_dt - since_dt
+        if depth >= self._MAX_BISECT_DEPTH or span <= self._MIN_BISECT_SPAN:
+            logger.warning(
+                "Traffic ingest hit max_results cap ({}) in window {} → {} at depth {}; "
+                "cannot bisect further — data in this window may be incomplete",
+                self._max_results, since_dt, until_dt, depth,
+            )
+            return flows
+        mid = since_dt + span / 2
+        logger.warning(
+            "Traffic ingest hit max_results cap ({}); bisecting {} → {} at {}",
+            self._max_results, since_dt, until_dt, mid,
+        )
+        return (self._fetch_window(since_dt, mid, depth + 1)
+                + self._fetch_window(mid, until_dt, depth + 1))
 
     def _since_cursor(self) -> Optional[str]:
         wm = self._wm.get(self.SOURCE)

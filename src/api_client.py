@@ -303,11 +303,11 @@ class ApiClient:
         """Async bulk events pull via Prefer: respond-async (stub for Phase 13)."""
         return []
 
-    def get_traffic_flows_async(self, max_results: int = 200000, rate_limit: bool = False, since: str | None = None, **kwargs: Any) -> list[dict[str, Any]]:
+    def get_traffic_flows_async(self, max_results: int = 200000, rate_limit: bool = False, since: str | None = None, until: str | None = None, **kwargs: Any) -> list[dict[str, Any]]:
         """Pull traffic flows for cache ingestion via the async query endpoint."""
         import contextlib, io
         from datetime import datetime, timezone, timedelta
-        end_time = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+        end_time = until or datetime.now(timezone.utc).replace(microsecond=0).isoformat()
         if since is None:
             since = (datetime.now(timezone.utc) - timedelta(hours=24)).replace(microsecond=0).isoformat()
         with contextlib.redirect_stdout(io.StringIO()):
