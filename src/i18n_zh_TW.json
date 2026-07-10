@@ -4139,6 +4139,8 @@
   "wgs_tls_valid_until": "有效期至",
   "wgs_user_input": "帳號",
   "wgs_username": "帳號",
+  "wiz_svc_exclude": "Service / Port 條件（排除）",
+  "wiz_svc_include": "Service / Port 條件（包含）",
   "would_trigger": "會觸發",
   "rpt_raw_csv_saved": "已儲存原始 Explorer CSV：{path}",
   "rpt_email_col_id": "ID",

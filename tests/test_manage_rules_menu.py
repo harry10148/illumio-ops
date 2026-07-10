@@ -154,14 +154,13 @@ def test_traffic_wizard_saves_flat_object_keys(monkeypatch):
         [
             "Flat Rule",             # name
             "3",                     # pd_sel -> Allowed
-            "443",                   # port_in
-            "",                      # proto_in -> default (both)
+            "443/tcp", "",           # svc_picked: port, service
+            "8080", "",              # ex_svc_picked: port, service
             "app=erp, app=web", "", "", "10.0.0.1",  # src: label/iplist/workload/ip
             "", "", "", "",          # dst: all empty
             "10",                    # win_in
             "5",                     # cnt_in
             "10",                    # cd_in
-            "8080",                  # ex_port_in
             "", "", "", "",          # ex_src: all empty
             "", "", "", "",          # ex_dst: all empty
             "",                      # confirm
@@ -175,6 +174,11 @@ def test_traffic_wizard_saves_flat_object_keys(monkeypatch):
     rule = cm.config["rules"][-1]
     assert rule["src_labels"] == ["app=erp", "app=web"]
     assert rule["src_ip_in"] == ["10.0.0.1"]
+    assert rule["ports"] == ["443/tcp"]
+    assert rule["ex_ports"] == ["8080"]
+    assert "port" not in rule
+    assert "proto" not in rule
+    assert "ex_port" not in rule
     assert "src_label" not in rule
     assert "dst_label" not in rule
     assert "dst_labels" not in rule
@@ -200,13 +204,13 @@ def test_traffic_wizard_edit_legacy_rule_migrates_keys(monkeypatch):
         [
             "",                      # name -> keep
             "",                      # pd_sel -> default
-            "",                      # port_in -> default (0, falsy -> no proto prompt)
+            "", "",                  # svc_picked: port, service -> keep (none preselected, port=0 is falsy)
+            "", "",                  # ex_svc_picked: port, service -> keep (none preselected)
             "", "", "", "",          # src: all empty -> keep preselected
             "", "", "", "",          # dst: all empty
             "",                      # win_in -> default
             "",                      # cnt_in -> default
             "",                      # cd_in -> default
-            "",                      # ex_port_in -> default
             "", "", "", "",          # ex_src: all empty
             "", "", "", "",          # ex_dst: all empty
             "",                      # confirm
@@ -221,6 +225,8 @@ def test_traffic_wizard_edit_legacy_rule_migrates_keys(monkeypatch):
     assert rule["src_labels"] == ["app=old"]
     assert rule["src_ip_in"] == ["1.2.3.4"]
     assert "src_label" not in rule
+    assert "ports" not in rule
+    assert "port" not in rule
 
 
 def test_bandwidth_wizard_saves_flat_object_keys(monkeypatch):
@@ -230,14 +236,13 @@ def test_bandwidth_wizard_saves_flat_object_keys(monkeypatch):
         [
             "BW Flat Rule",          # name
             "1",                     # m_sel -> bandwidth
-            "443",                   # port_in
-            "",                      # proto_in -> default (both)
+            "443/tcp", "",           # svc_picked: port, service
+            "8080", "",              # ex_svc_picked: port, service
             "app=erp, app=web", "", "", "10.0.0.1",  # src: label/iplist/workload/ip
             "", "", "", "",          # dst: all empty
             "100",                   # th_in
             "10",                    # win_in
             "10",                    # cd_in
-            "8080",                  # ex_port_in
             "", "", "", "",          # ex_src: all empty
             "", "", "", "",          # ex_dst: all empty
             "",                      # confirm
@@ -251,6 +256,11 @@ def test_bandwidth_wizard_saves_flat_object_keys(monkeypatch):
     rule = cm.config["rules"][-1]
     assert rule["src_labels"] == ["app=erp", "app=web"]
     assert rule["src_ip_in"] == ["10.0.0.1"]
+    assert rule["ports"] == ["443/tcp"]
+    assert rule["ex_ports"] == ["8080"]
+    assert "port" not in rule
+    assert "proto" not in rule
+    assert "ex_port" not in rule
     assert "src_label" not in rule
     assert "dst_label" not in rule
     assert "dst_labels" not in rule
@@ -275,13 +285,13 @@ def test_bandwidth_wizard_edit_legacy_rule_migrates_keys(monkeypatch):
         [
             "",                      # name -> keep
             "",                      # m_sel -> default (bandwidth)
-            "",                      # port_in -> default (0, falsy -> no proto prompt)
+            "", "",                  # svc_picked: port, service -> keep (none preselected, port=0 is falsy)
+            "", "",                  # ex_svc_picked: port, service -> keep (none preselected)
             "", "", "", "",          # src: all empty -> keep preselected
             "", "", "", "",          # dst: all empty
             "",                      # th_in -> default
             "",                      # win_in -> default
             "",                      # cd_in -> default
-            "",                      # ex_port_in -> default
             "", "", "", "",          # ex_src: all empty
             "", "", "", "",          # ex_dst: all empty
             "",                      # confirm
@@ -296,6 +306,8 @@ def test_bandwidth_wizard_edit_legacy_rule_migrates_keys(monkeypatch):
     assert rule["src_labels"] == ["app=old"]
     assert rule["src_ip_in"] == ["1.2.3.4"]
     assert "src_label" not in rule
+    assert "ports" not in rule
+    assert "port" not in rule
 
 
 # ─── Phase 5 final-review 修補：CLI 精靈編輯不得靜默丟棄 GUI 產的 any_*/ex_any_* ──
@@ -327,13 +339,13 @@ def test_traffic_wizard_preserves_any_filters_on_edit(monkeypatch):
         [
             "",                      # name -> keep
             "",                      # pd_sel -> default
-            "",                      # port_in -> default (0, falsy -> no proto prompt)
+            "", "",                  # svc_picked: port, service -> keep (none preselected, port=0 is falsy)
+            "", "",                  # ex_svc_picked: port, service -> keep (none preselected)
             "", "", "", "",          # src: all empty -> keep preselected
             "", "", "", "",          # dst: all empty
             "",                      # win_in -> default
             "",                      # cnt_in -> default
             "",                      # cd_in -> default
-            "",                      # ex_port_in -> default
             "", "", "", "",          # ex_src: all empty
             "", "", "", "",          # ex_dst: all empty
             "",                      # confirm
@@ -368,13 +380,13 @@ def test_bandwidth_wizard_preserves_any_filters_on_edit(monkeypatch):
         [
             "",                      # name -> keep
             "",                      # m_sel -> default (bandwidth)
-            "",                      # port_in -> default (0, falsy -> no proto prompt)
+            "", "",                  # svc_picked: port, service -> keep (none preselected, port=0 is falsy)
+            "", "",                  # ex_svc_picked: port, service -> keep (none preselected)
             "", "", "", "",          # src: all empty -> keep preselected
             "", "", "", "",          # dst: all empty
             "",                      # th_in -> default
             "",                      # win_in -> default
             "",                      # cd_in -> default
-            "",                      # ex_port_in -> default
             "", "", "", "",          # ex_src: all empty
             "", "", "", "",          # ex_dst: all empty
             "",                      # confirm

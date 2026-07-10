@@ -12,7 +12,7 @@ try:
 except ImportError:  # pragma: no cover - 極端情況下 _render 不可用時的保底
     _STYLE = None
 
-_CAT_ORDER = ("label", "label_group", "iplist", "workload", "ip")
+_CAT_ORDER = ("label", "label_group", "iplist", "workload", "ip", "port", "service")
 
 # 類別選單顯示名稱：與現有技術詞彙一致（中英文皆保留原文，同 gui_fb_cat_* 慣例）
 _CAT_TITLES = {
@@ -21,6 +21,8 @@ _CAT_TITLES = {
     "iplist": "IP List",
     "workload": "Workload",
     "ip": "IP/CIDR (manual)",
+    "service": "Service",
+    "port": "Port (manual)",
 }
 
 _DONE = "__done__"
@@ -59,11 +61,20 @@ def _load_candidates(api, cat, label_key_filter=None):
     if cat == "workload":
         return [(f"{w.get('name') or w.get('hostname')} ({w.get('hostname', '')})", w["href"])
                 for w in api.search_workloads({"max_results": 200})]
+    if cat == "service":
+        from src.gui.filter_object_cache import _service_summary
+        out = []
+        for s in api.get_services():
+            summary = _service_summary(s)
+            display = f"{s['name']} ({summary})" if summary else s["name"]
+            out.append((display, s["href"]))
+        return out
     return []
 
 
 _CAT_RESULT_KEY = {"label": "labels", "label_group": "label_groups",
-                   "iplist": "iplists", "workload": "workloads", "ip": "ips"}
+                   "iplist": "iplists", "workload": "workloads", "ip": "ips",
+                   "service": "services", "port": "ports"}
 
 
 def _append_unique(result, key, value):
@@ -91,6 +102,9 @@ def _pick_non_tty(api, cats, result, lang):
         values = _split_values(raw)
         if cat == "ip":
             values = [v for v in values if _valid_ip_or_cidr(v)]
+        if cat == "port":
+            from src.port_token import parse_port_token
+            values = [v for v in values if parse_port_token(v)]
         if values:
             result[key] = values
         else:
@@ -109,6 +123,9 @@ def _manual_text_entry(cat, key, result, lang):
     values = _split_values(raw)
     if cat == "ip":
         values = [v for v in values if _valid_ip_or_cidr(v)]
+    if cat == "port":
+        from src.port_token import parse_port_token
+        values = [v for v in values if parse_port_token(v)]
     for v in values:
         _append_unique(result, key, v)
 
@@ -144,7 +161,7 @@ def _pick_tty(api, cats, result, title, lang, label_key_filter=None):
         cat = selection
         key = _CAT_RESULT_KEY[cat]
 
-        if cat == "ip":
+        if cat in ("ip", "port"):
             _manual_text_entry(cat, key, result, lang)
         else:
             try:
@@ -258,3 +275,40 @@ def picked_to_flat_filters(picked, dir_prefix, exclude=False):
         ip_key = f"{dir_prefix}_ip_in" if not exclude else f"ex_{dir_prefix}_ip"
         out[ip_key] = picked["ips"]
     return out
+
+
+def picked_to_service_filters(picked, exclude=False):
+    """pick_objects 回傳 dict → 無方向的 service/port filter key（只含非空）。"""
+    prefix = "ex_" if exclude else ""
+    out = {}
+    if picked.get("services"):
+        out[f"{prefix}services"] = picked["services"]
+    if picked.get("ports"):
+        out[f"{prefix}ports"] = picked["ports"]
+    return out
+
+
+def legacy_service_to_preselected(rule, exclude=False):
+    """規則 dict → service/port 類別的 preselected（新 list key 優先，
+    舊 scalar port/proto/ex_port 轉 token；零遷移讀取相容）。"""
+    if not rule:
+        return None
+    result = {}
+    if exclude:
+        if rule.get("ex_services"):
+            result["services"] = _as_list(rule["ex_services"])
+        ports = _as_list(rule.get("ex_ports"))
+        if not ports and rule.get("ex_port"):
+            ports = [str(rule["ex_port"])]
+        if ports:
+            result["ports"] = ports
+        return result or None
+    if rule.get("services"):
+        result["services"] = _as_list(rule["services"])
+    ports = _as_list(rule.get("ports"))
+    if not ports and rule.get("port"):
+        proto_name = {6: "tcp", 17: "udp"}.get(rule.get("proto"))
+        ports = [f"{rule['port']}/{proto_name}" if proto_name else str(rule["port"])]
+    if ports:
+        result["ports"] = ports
+    return result or None

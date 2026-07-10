@@ -18,6 +18,8 @@ from src.cli.object_picker import (
     legacy_rule_to_preselected,
     picked_to_flat_filters,
     preserve_any_filters,
+    legacy_service_to_preselected,
+    picked_to_service_filters,
 )
 
 _PICK_CATS = ("label", "iplist", "workload", "ip")  # 4c 規則不支援 label_group，故不含
@@ -38,7 +40,8 @@ def _pick_or_cancel(api, cats, title, preselected=None, lang=None):
 
 def _fmt_picked(picked):
     # 精靈回顧摘要用：把 pick_objects 回傳 dict 攤平成一行文字
-    parts = [f"{k}={','.join(v)}" for k in ("labels", "iplists", "workloads", "ips") for v in [picked.get(k, [])] if v]
+    parts = [f"{k}={','.join(v)}" for k in ("labels", "iplists", "workloads", "ips", "services", "ports")
+             for v in [picked.get(k, [])] if v]
     return "; ".join(parts) if parts else "-"
 
 
@@ -101,45 +104,22 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
     print(f"\n{Colors.CYAN}{t('step_2_filters')}{Colors.ENDC}")
     print(f"{Colors.DARK_GRAY}{t('hint_return')}{Colors.ENDC}")
 
-    def_port = edit_rule.get("port", "") if edit_rule else ""
-    port_in = safe_input(
-        t("port_input"), int, allow_cancel=True, hint=str(def_port) if def_port else ""
-    )
-    if port_in is None:
-        if _empty_uses_default(def_port):
-            port_in = int(def_port)
-        else:
-            if should_restart_flow():
-                add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
-            return
-
-    proto_in = None
-    if port_in:
-        def_proto = 0
-        if edit_rule and edit_rule.get("proto") == 6:
-            def_proto = 1
-        elif edit_rule and edit_rule.get("proto") == 17:
-            def_proto = 2
-        p_sel = safe_input(
-            t("proto_select"), int, range(0, 3), allow_cancel=True, hint=str(def_proto)
-        )
-        if p_sel is None:
-            if _empty_uses_default(def_proto):
-                p_sel = def_proto
-            else:
-                if should_restart_flow():
-                    add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
-                return
-        if p_sel == 1:
-            proto_in = 6
-        elif p_sel == 2:
-            proto_in = 17
-        elif p_sel == 0:
-            proto_in = None
-
     from src.api_client import ApiClient
 
     api = ApiClient(cm)
+    svc_picked = _pick_or_cancel(
+        api, cats=("service", "port"), title=t("wiz_svc_include"),
+        preselected=legacy_service_to_preselected(edit_rule) if edit_rule else None,
+    )
+    if svc_picked is None:
+        return
+    ex_svc_picked = _pick_or_cancel(
+        api, cats=("service", "port"), title=t("wiz_svc_exclude"),
+        preselected=legacy_service_to_preselected(edit_rule, exclude=True) if edit_rule else None,
+    )
+    if ex_svc_picked is None:
+        return
+
     src_picked = _pick_or_cancel(
         api, cats=_PICK_CATS, title=t("src_input"),
         preselected=legacy_rule_to_preselected(edit_rule, "src", exclude=False) if edit_rule else None,
@@ -211,17 +191,6 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
     cd = cd_in
 
     print(f"\n{Colors.CYAN}{t('excludes_optional')}{Colors.ENDC}")
-    def_ex_port = edit_rule.get("ex_port", "") if edit_rule else ""
-    ex_port_in = safe_input(
-        t("ex_port_input"), int, allow_cancel=True, hint=str(def_ex_port)
-    )
-    if ex_port_in is None:
-        if _empty_uses_default(def_ex_port):
-            ex_port_in = int(def_ex_port)
-        else:
-            if should_restart_flow():
-                add_bandwidth_volume_menu(cm, edit_rule=edit_rule)
-            return
 
     ex_src_picked = _pick_or_cancel(
         api, cats=_PICK_CATS, title=t("ex_src_input"),
@@ -244,10 +213,10 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
         f"{t('sum_type')}: {rtype}",
         f"{t('sum_name')}: {name}",
         f"{t('sum_unit_threshold')}: {unit_prompt} / {th}",
-        f"{t('sum_port_proto')}: {port_in or '-'} / {proto_in or 'both'}",
+        f"{t('sum_port_proto')}: {_fmt_picked(svc_picked)}",
         f"{t('sum_src_dst')}: {_fmt_picked(src_picked)} -> {_fmt_picked(dst_picked)}",
         f"{t('sum_window_cooldown')}: {win}m / {cd}m",
-        f"{t('sum_exclude')}: port={ex_port_in or '-'}, src={_fmt_picked(ex_src_picked)}, dst={_fmt_picked(ex_dst_picked)}",
+        f"{t('sum_exclude')}: svc={_fmt_picked(ex_svc_picked)}, src={_fmt_picked(ex_src_picked)}, dst={_fmt_picked(ex_dst_picked)}",
     ]
     if preserved_any:
         summary.append(t("cli_pick_any_preserved", keys=", ".join(preserved_any.keys())))
@@ -259,9 +228,6 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
         "type": rtype,
         "name": name,
         "pd": edit_rule.get("pd", -1) if edit_rule else -1,
-        "port": port_in,
-        "proto": proto_in,
-        "ex_port": ex_port_in,
         "threshold_type": "immediate",
         "threshold_count": th,
         "threshold_window": win,
@@ -273,6 +239,8 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
     new_rule.update(picked_to_flat_filters(dst_picked, "dst", exclude=False))
     new_rule.update(picked_to_flat_filters(ex_src_picked, "src", exclude=True))
     new_rule.update(picked_to_flat_filters(ex_dst_picked, "dst", exclude=True))
+    new_rule.update(picked_to_service_filters(svc_picked, exclude=False))
+    new_rule.update(picked_to_service_filters(ex_svc_picked, exclude=True))
     new_rule.update(preserved_any)
     cm.add_or_update_rule(new_rule)
     input(
