@@ -110,15 +110,22 @@ class LabelResolver:
         defs = []
         for sp in svc.get("service_ports") or []:
             p = sp.get("port")
+            proto = sp.get("proto")
+            # PCE 特殊物件「All Services」用 {"proto": -1} 表示所有協定、
+            # 無服務限制；負值 port/proto 一律正規化為 wildcard 標記條目，
+            # 不可把 -1 當成真實 proto/port 值送進 query（語意錯誤）。
+            if (p is not None and p < 0) or (proto is not None and proto < 0):
+                defs.append({"wildcard": True})
+                continue
             if p:
                 pd = {"port": p}
-                if sp.get("proto") is not None:
-                    pd["proto"] = sp["proto"]
+                if proto is not None:
+                    pd["proto"] = proto
                 if sp.get("to_port"):
                     pd["to_port"] = sp["to_port"]
                 defs.append(pd)
-            elif sp.get("proto") is not None:
-                defs.append({"proto": sp["proto"]})
+            elif proto is not None:
+                defs.append({"proto": proto})
         for w in svc.get("windows_services") or []:
             if w.get("service_name"):
                 defs.append({"windows_service_name": w["service_name"]})
@@ -585,7 +592,7 @@ class LabelResolver:
             entries = []
             for href in vals:
                 for e in (self.resolve_service_entries(href) or []):
-                    if "port" in e or "proto" in e:
+                    if "port" in e or "proto" in e or e.get("wildcard"):
                         entries.append(e)
                     else:
                         logger.warning(

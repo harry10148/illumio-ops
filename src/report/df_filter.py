@@ -29,6 +29,9 @@ def _port_entries_mask(df: pd.DataFrame, entries: list) -> pd.Series:
         return m
     ports = pd.to_numeric(df["port"], errors="coerce")
     for e in entries:
+        if e.get("wildcard"):
+            m |= pd.Series(True, index=df.index)  # All Services：無服務限制，全命中
+            continue
         em = pd.Series(True, index=df.index)
         if "port" in e:
             em &= ports.ge(e["port"]) & ports.le(e.get("to_port", e["port"]))

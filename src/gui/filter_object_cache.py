@@ -67,11 +67,17 @@ def _service_summary(svc: dict) -> str:
     parts = []
     for sp in svc.get("service_ports") or []:
         p = sp.get("port")
-        proto = _PROTO_NUM_TO_NAME.get(sp.get("proto"), str(sp.get("proto") or ""))
+        raw_proto = sp.get("proto")
+        # PCE 特殊物件「All Services」用 {"proto": -1} 表示所有協定、無服務
+        # 限制；負值 port/proto 顯示為 "all"，不可把 -1 印成一個協定號。
+        if (p is not None and p < 0) or (raw_proto is not None and raw_proto < 0):
+            parts.append("all")
+            continue
+        proto = _PROTO_NUM_TO_NAME.get(raw_proto, str(raw_proto or ""))
         if p:
             top = f"-{sp['to_port']}" if sp.get("to_port") else ""
             parts.append(f"{proto}/{p}{top}" if proto else f"{p}{top}")
-        elif sp.get("proto") is not None:
+        elif raw_proto is not None:
             parts.append(proto)
     for w in svc.get("windows_services") or []:
         n = w.get("service_name") or w.get("process_name")

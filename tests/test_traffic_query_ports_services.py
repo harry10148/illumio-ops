@@ -134,6 +134,36 @@ def test_services_expansion_cap(client):
     assert "services" in client.last_traffic_query_diagnostics["unresolved_native_filters"]
 
 
+def test_services_wildcard_include_consumed_no_constraint(client):
+    """All Services（{"wildcard": True}）語意=不限制服務：services.include
+    不得 append 任何條目，且 key 須記 consumed（非 unresolved）——代表已
+    正確處理而非查詢失敗降級。"""
+    client.service_ports_cache[SVC_HREF] = [{"wildcard": True}]
+    p = _payload(client, {"services": [SVC_HREF]})
+    assert p["services"]["include"] == []
+    diag = client.last_traffic_query_diagnostics
+    assert "services" in diag["native_filters"]
+    assert "services" not in diag["unresolved_native_filters"]
+
+
+def test_ex_services_wildcard_falls_back_unresolved(client):
+    """排除 All Services＝排除一切流量，語意荒謬：整 key 降級 unresolved
+    而非送出「排除所有服務」的荒謬 native 條件。"""
+    client.service_ports_cache[SVC_HREF] = [{"wildcard": True}]
+    p = _payload(client, {"ex_services": [SVC_HREF]})
+    assert p["services"]["exclude"] == []
+    diag = client.last_traffic_query_diagnostics
+    assert "ex_services" in diag["unresolved_native_filters"]
+
+
+def test_services_fallback_wildcard_hit(client):
+    client.service_ports_cache[SVC_HREF] = [{"wildcard": True}]
+    flow = {"src": {}, "dst": {}, "service": {"port": 12345, "proto": 132}}
+    resolve = client._labels.resolve_service_entries
+    # wildcard 條目全命中——即使 flow 的 port/proto 是任意值
+    assert client._traffic._flow_matches_filters(flow, {"services": [SVC_HREF]}, resolve)
+
+
 def test_services_fallback_flow_match(client):
     # 注意：_flow_matches_filters 是 @staticmethod（僅收 flow/filters，無 self/
     # client 存取管道），href 展開需要 client 端的 service_ports_cache，故此處

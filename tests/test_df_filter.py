@@ -240,6 +240,13 @@ def test_svc_port_entries_internal_keys():
     assert 443 not in out2["port"].tolist()
 
 
+def test_svc_port_entries_wildcard_matches_all():
+    """All Services 展開後的 {"wildcard": True} 條目在 fallback df 比對層
+    須全命中，不可因無 port/proto key 被當成「空條目」而全不命中。"""
+    out = apply_df_traffic_filters(_ports_df(), {"_svc_port_entries": [{"wildcard": True}]})
+    assert sorted(out["port"].tolist()) == [80, 443, 1500]
+
+
 def test_ports_include_all_invalid_fail_closed():
     out = apply_df_traffic_filters(_ports_df(), {"ports": ["nonsense"]})
     assert out.empty
