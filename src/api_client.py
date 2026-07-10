@@ -118,6 +118,13 @@ class ApiClient:
         # Diagnostics (read via getter / written by domain classes)
         self.last_traffic_query_diagnostics: dict[str, Any] = {}
         self.last_rule_usage_batch_stats: dict[str, Any] = {}
+        # Set (and cleared on success) by fetch_events() / the traffic async
+        # query submit path whenever a connection-layer failure (DNS/refused/
+        # timeout) is swallowed into an empty result — report/GUI consumers
+        # keep degrading gracefully to [], but pce_cache ingestors read this to
+        # tell "PCE unreachable" apart from "PCE says genuinely 0 rows" (see
+        # .superpowers/sdd/watchdog-live-reverify-report.md step 2).
+        self.last_fetch_error: str | None = None
 
         # State-store paths + async job cache TTL parameters
         self._root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -276,17 +283,21 @@ class ApiClient:
     def fetch_events(self, start_time_str: str, end_time_str: str | None = None, max_results: int = 5000,
                      rate_limit: bool = False) -> list[dict[str, Any]]:
         try:
-            return self.fetch_events_strict(
+            events = self.fetch_events_strict(
                 start_time_str,
                 end_time_str=end_time_str,
                 max_results=max_results,
                 rate_limit=rate_limit,
             )
+            self.last_fetch_error = None
+            return events
         except EventFetchError as e:
+            self.last_fetch_error = f"{e.status}: {e.message}"
             logger.error(f"Get Events Failed: {e.status} - {e.message}")
             print(f"{Colors.FAIL}{t('api_get_events_failed', status=e.status, error=e.message[:500])}{Colors.ENDC}")
             return []
         except Exception as e:
+            self.last_fetch_error = str(e)
             logger.error(f"Fetch Events Error: {e}")
             print(f"{Colors.FAIL}{t('api_fetch_events_error', error=str(e))}{Colors.ENDC}")
             return []

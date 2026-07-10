@@ -91,6 +91,72 @@ def test_async_query_retry_gives_up_after_bound():
     assert calls["dl"] == 4, "1 initial + 3 bounded retries"
 
 
+# ── ingest-error-signal: submit-layer connection failure must not look like
+# a genuinely-empty query (watchdog-live-reverify-report.md step 2 — traffic
+# 鏈 "同構" bug: status=0 from a connection-layer failure was swallowed here
+# exactly like fetch_events(), so TrafficIngestor never saw an error).
+
+
+def test_async_query_connection_failure_sets_last_fetch_error():
+    c = _client()
+    c.last_fetch_error = None
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        return 0, b"Connection refused"  # mirrors ApiClient._request's connection-failure return
+
+    c._request.side_effect = fake_request
+    b = TrafficQueryBuilder(c)
+    rows = list(b._submit_and_stream_async_query({}))
+
+    assert rows == []  # graceful degrade for existing (report) consumers, unchanged
+    assert c.last_fetch_error, \
+        "connection failure must be recorded so TrafficIngestor can distinguish it from a genuinely empty query"
+
+
+def test_async_query_success_clears_last_fetch_error():
+    c = _client()
+    c.last_fetch_error = "stale error from a previous failed poll"
+    full_dl = _gzip_rows([{"src": {"ip": "a"}}])
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        if url.endswith("/async_queries"):
+            return 202, json.dumps({"href": "/orgs/1/traffic_flows/async_queries/q1"}).encode()
+        if url.endswith("/download"):
+            return 200, full_dl
+        return 200, json.dumps({"status": "completed", "matches_count": 1}).encode()
+
+    c._request.side_effect = fake_request
+    b = TrafficQueryBuilder(c)
+    with patch("src.api.traffic_query.time.sleep", lambda *a, **k: None):
+        rows = list(b._submit_and_stream_async_query({}))
+
+    assert len(rows) == 1
+    assert c.last_fetch_error is None
+
+
+def test_async_query_genuinely_empty_does_not_set_last_fetch_error():
+    """Reverse pin: a real PCE response reporting 0 matches must not be
+    mistaken for a connection failure."""
+    c = _client()
+    c.last_fetch_error = None
+    empty_dl = _gzip_rows([])
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        if url.endswith("/async_queries"):
+            return 202, json.dumps({"href": "/orgs/1/traffic_flows/async_queries/q1"}).encode()
+        if url.endswith("/download"):
+            return 200, empty_dl
+        return 200, json.dumps({"status": "completed", "matches_count": 0}).encode()
+
+    c._request.side_effect = fake_request
+    b = TrafficQueryBuilder(c)
+    with patch("src.api.traffic_query.time.sleep", lambda *a, **k: None):
+        rows = list(b._submit_and_stream_async_query({}))
+
+    assert rows == []
+    assert c.last_fetch_error is None
+
+
 # ── Task F4: rate_limit wiring through submit/poll/download ────────────────
 
 

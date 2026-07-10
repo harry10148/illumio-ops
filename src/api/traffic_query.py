@@ -671,12 +671,19 @@ class TrafficQueryBuilder:
         呼叫次數」，不是「查詢次數」，每個 HTTP request 都該計數。
         """
         c = self._client
+        # Cleared at the start of every submit so a stale error from a previous
+        # poll never leaks into this call's result; set below only on an actual
+        # submit failure (status 0 = connection-layer failure per c._request,
+        # or a real non-2xx from the PCE) — see last_fetch_error docstring in
+        # ApiClient.__init__ and watchdog-live-reverify-report.md step 2.
+        c.last_fetch_error = None
         url = f"{c.base_url}/traffic_flows/async_queries"
         status, body = c._request(url, method="POST", data=payload, timeout=10, rate_limit=rate_limit)
         if status not in (200, 201, 202):
             text = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
             logger.error(f"API Error {status}: {text}")
             print(t("api_error_status", status=status, text=text))
+            c.last_fetch_error = f"submit failed: {status} - {text}"
             return
 
         result = orjson.loads(body)
