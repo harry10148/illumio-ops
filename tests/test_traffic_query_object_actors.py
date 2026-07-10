@@ -57,3 +57,57 @@ class TestObjectActorKeys(unittest.TestCase):
         payload, spec = self._build({"src_iplist": "10.0.0.1"})
         self.assertEqual(payload["sources"]["include"], [])
         self.assertIn("src_iplist", spec.fallback_filters)
+
+    # ─── 同 key 多值 = OR（每值一組），非內層 AND ───────────────────────────
+    # 依據：Security Policy Guide「labels use an OR between the same label
+    # type and an AND between different label types」；SIEM Integration Guide
+    # 「If all the labels selected have the same type, the OR operator is
+    # applied」。iplist/workload/label_group 皆為物件類 key，same-type-OR 依據
+    # 相同，比照 IP 系列（0ea0e94）修法：每個 resolved actor 各自一個 include 組。
+
+    def test_src_iplists_multi_value_is_outer_or_not_inner_and(self):
+        self.client._iplist_href_cache["staging-subnets"] = \
+            "/orgs/1/sec_policy/draft/ip_lists/8"
+        payload, _ = self._build(
+            {"src_iplists": ["prod-subnets", "staging-subnets"]})
+        include = payload["sources"]["include"]
+        self.assertIn([{"ip_list": {"href": "/orgs/1/sec_policy/draft/ip_lists/7"}}], include)
+        self.assertIn([{"ip_list": {"href": "/orgs/1/sec_policy/draft/ip_lists/8"}}], include)
+        self.assertNotIn(
+            [{"ip_list": {"href": "/orgs/1/sec_policy/draft/ip_lists/7"}},
+             {"ip_list": {"href": "/orgs/1/sec_policy/draft/ip_lists/8"}}],
+            include)
+
+    def test_dst_workloads_multi_value_is_outer_or(self):
+        payload, _ = self._build({"dst_workloads": [
+            "/orgs/1/workloads/abc-123", "/orgs/1/workloads/def-456"]})
+        include = payload["destinations"]["include"]
+        self.assertIn([{"workload": {"href": "/orgs/1/workloads/abc-123"}}], include)
+        self.assertIn([{"workload": {"href": "/orgs/1/workloads/def-456"}}], include)
+        self.assertNotIn(
+            [{"workload": {"href": "/orgs/1/workloads/abc-123"}},
+             {"workload": {"href": "/orgs/1/workloads/def-456"}}],
+            include)
+
+    def test_src_label_groups_multi_value_is_outer_or(self):
+        self.client._label_group_href_cache["group-a"] = \
+            "/orgs/1/sec_policy/active/label_groups/1"
+        self.client._label_group_href_cache["group-b"] = \
+            "/orgs/1/sec_policy/active/label_groups/2"
+        payload, _ = self._build(
+            {"src_label_groups": ["group-a", "group-b"]})
+        include = payload["sources"]["include"]
+        self.assertIn(
+            [{"label_group": {"href": "/orgs/1/sec_policy/active/label_groups/1"}}], include)
+        self.assertIn(
+            [{"label_group": {"href": "/orgs/1/sec_policy/active/label_groups/2"}}], include)
+        self.assertNotIn(
+            [{"label_group": {"href": "/orgs/1/sec_policy/active/label_groups/1"}},
+             {"label_group": {"href": "/orgs/1/sec_policy/active/label_groups/2"}}],
+            include)
+
+    def test_src_iplist_single_value_unchanged(self):
+        # 單值行為零變更釘：仍是單一 include 組
+        payload, _ = self._build({"src_iplist": "prod-subnets"})
+        self.assertEqual(payload["sources"]["include"], [
+            [{"ip_list": {"href": "/orgs/1/sec_policy/draft/ip_lists/7"}}]])

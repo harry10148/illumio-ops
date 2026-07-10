@@ -357,6 +357,11 @@ class TrafficQueryBuilder:
                 _record_consumed(key, spec.native_filters.get(key))
             _consume_keys(used_keys)
 
+        # label_group/iplist/workload：同 key 多值須外層 OR，非內層 AND——依據與
+        # src_label(s) 相同（Security Policy Guide「labels use an OR between
+        # the same label type」；SIEM Integration Guide「same type → OR」），
+        # 這些皆為物件類 key，同 key 多值等同「同型別多選」。比照 IP 系列
+        # （0ea0e94）修法：每個 resolved actor 各自一個 include 組。
         for keys, side, resolver in include_specs:
             values, used_keys = _pop_many(keys)
             if not values:
@@ -374,7 +379,8 @@ class TrafficQueryBuilder:
                     _record_unresolved(key, spec.native_filters.get(key))
                 _consume_keys(used_keys)
                 continue
-            payload[side]["include"].append(labels._dedupe_query_group(resolved_items))
+            for item in labels._dedupe_query_group(resolved_items):
+                payload[side]["include"].append([item])
             for key in used_keys:
                 _record_consumed(key, spec.native_filters.get(key))
             _consume_keys(used_keys)
