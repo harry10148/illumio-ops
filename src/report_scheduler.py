@@ -411,6 +411,22 @@ class ReportScheduler:
             result = SimpleNamespace(record_count=1)
             return result, [path]
 
+        elif report_type == "rule_hit_count":
+            from src.report.rule_hit_count_generator import RuleHitCountGenerator
+            from src.report.rule_hit_count_enablement import RuleHitCountNotEnabled
+            gen = RuleHitCountGenerator(self.cm, api_client=api, config_dir=self._config_dir)
+            try:
+                result = gen.generate_from_native(start_date=start_date, end_date=end_date, lang=lang)
+            except RuleHitCountNotEnabled as exc:
+                # Scheduler NEVER prompts or auto-enables — skip with a warning.
+                logger.warning(f"[Scheduler] '{name}': native rule hit count not enabled ({exc}) — skipping")
+                return None, []
+            if result.record_count == 0:
+                logger.warning(f"[Scheduler] '{name}': native report returned no rules — skipping export")
+                return None, []
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir)
+            return result, paths
+
         else:
             logger.error(f"[Scheduler] Unknown report_type: {report_type}")
             return None, []
@@ -598,6 +614,7 @@ class ReportScheduler:
         "policy_diff":       "Illumio_Policy_Diff_Report_",
         "policy_resolver":   "Illumio_Policy_Resolver_",
         "app_summary":       "Illumio_App_Summary_",
+        "rule_hit_count":    "Illumio_Rule_Hit_Count_Report_",
     }
 
     @staticmethod

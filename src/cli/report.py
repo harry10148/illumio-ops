@@ -247,6 +247,97 @@ def generate_policy_usage_report(
     return gen.export(result, fmt=fmt, output_dir=out, lang=lang)
 
 
+def generate_rule_hit_count_report(
+    *,
+    source: str = "native",
+    file_path: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    fmt: str = "html",
+    output_dir: str | None = None,
+) -> list[str]:
+    """Raises RuleHitCountNotEnabled (native source) for the command layer to handle."""
+    from src.api_client import ApiClient
+    from src.config import ConfigManager
+    from src.report.rule_hit_count_generator import RuleHitCountGenerator
+
+    cm = ConfigManager()
+    api = ApiClient(cm)
+    _root_dir, config_dir = _resolve_paths(output_dir)
+    out = _resolve_output_dir(cm, output_dir)
+    lang = _resolve_lang(cm)
+
+    gen = RuleHitCountGenerator(cm, api_client=api, config_dir=config_dir)
+    if source == "csv":
+        if not file_path:
+            raise click.ClickException(t("cli_report_file_required_csv", lang=lang))
+        result = gen.generate_from_csv(file_path, lang=lang)
+    else:
+        result = gen.generate_from_native(
+            start_date=_iso_date(start_date, end_of_day=False),
+            end_date=_iso_date(end_date, end_of_day=True),
+            lang=lang,
+        )
+
+    if result.record_count == 0:
+        raise click.ClickException(t("cli_report_no_data", lang=lang))
+    return gen.export(result, fmt=fmt, output_dir=out, lang=lang)
+
+
+def _run_rhc_enablement_wizard(api, lang: str) -> bool:
+    """Interactive enablement wizard (TTY only). Returns True if enable ran.
+
+    WARNING shown to the operator: the VEN side writes draft firewall_settings
+    and provisions — a production policy write.
+    """
+    import sys
+
+    import questionary
+
+    from src.cli.object_picker import pick_objects
+    from src.report.rule_hit_count_enablement import EnablementError, enable_rule_hit_count
+
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        return False
+
+    click.echo(t("cli_rhc_not_enabled_intro", lang=lang))
+    click.echo(t("cli_rhc_provision_warning", lang=lang))
+    if not questionary.confirm(t("cli_rhc_confirm_enable", lang=lang), default=False).unsafe_ask():
+        click.echo(t("cli_rhc_enable_declined", lang=lang))
+        return False
+
+    scope_choice = questionary.select(
+        t("cli_rhc_scope_question", lang=lang),
+        choices=[
+            questionary.Choice(t("cli_rhc_scope_all", lang=lang), value="all"),
+            questionary.Choice(t("cli_rhc_scope_labels", lang=lang), value="labels"),
+        ],
+    ).unsafe_ask()
+
+    scopes = None   # None → all VENs ([[]])
+    if scope_choice == "labels":
+        picked = pick_objects(api, ["label"], t("cli_rhc_scope_pick_title", lang=lang), lang=lang)
+        kv_to_href = {f"{l['key']}={l['value']}": l.get("href", "")
+                      for l in api.get_all_labels()}
+        hrefs = [kv_to_href[v] for v in picked.get("labels", []) if kv_to_href.get(v)]
+        if not hrefs:
+            # No labels selected (picker Done immediately) or href lookup missed —
+            # must NOT fall through with scopes=None, which means "all VENs".
+            click.echo(t("cli_rhc_no_labels_selected", lang=lang))
+            return False
+        scopes = [[{"label": {"href": h}} for h in hrefs]]
+
+    try:
+        steps = enable_rule_hit_count(api, scopes=scopes)
+    except EnablementError as exc:
+        click.echo(t("cli_rhc_enable_failed", steps=", ".join(exc.steps_done) or "-",
+                     error=str(exc), lang=lang), err=True)
+        return False
+    click.echo(t("cli_rhc_enable_done", steps=", ".join(steps), lang=lang))
+    click.echo(t("cli_rhc_ven_delay_note", lang=lang))
+    return True
+
+
 def _emit_paths(ctx: click.Context, paths: list[str], fmt: str) -> None:
     """Emit report paths — JSON array when --json, else one path per line."""
     if is_json(ctx):
@@ -574,6 +665,74 @@ def report_policy_usage(
         return
     except Exception as exc:
         log.exception("policy-usage report failed")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
+        ctx.exit(EXIT_SOFTWARE)
+        return
+    _emit_paths(ctx, paths, fmt)
+
+
+@report_group.command("rule-hit-count")
+@click.option("--source", type=click.Choice(["native", "csv"]), default="native")
+@click.option("--file", "file_path", type=click.Path(exists=True), default=None)
+@click.option("--start-date", type=str, default=None, help="Start date in YYYY-MM-DD")
+@click.option("--end-date", type=str, default=None, help="End date in YYYY-MM-DD")
+@click.option("--format", "fmt", type=click.Choice(["html", "csv", "all"]), default="html")
+@click.option("--output-dir", type=click.Path(), default=None)
+@click.pass_context
+def report_rule_hit_count(
+    ctx: click.Context,
+    source: str,
+    file_path,
+    start_date: str | None,
+    end_date: str | None,
+    fmt: str,
+    output_dir,
+) -> None:
+    """Generate Rule Hit Count Report (native PCE data, enriched with rule details)."""
+    from src.api.reports import RuleHitCountPullTimeout
+    from src.report.rule_hit_count_enablement import RuleHitCountNotEnabled
+    try:
+        paths = generate_rule_hit_count_report(
+            source=source,
+            file_path=file_path,
+            start_date=start_date,
+            end_date=end_date,
+            fmt=fmt,
+            output_dir=output_dir,
+        )
+    except RuleHitCountNotEnabled as exc:
+        lang = _ctx_lang()
+        echo_error(ctx, t("cli_rhc_not_enabled", state=exc.status.state,
+                          detail=exc.status.detail, lang=lang))
+        from src.api_client import ApiClient
+        from src.config import ConfigManager
+        _run_rhc_enablement_wizard(ApiClient(ConfigManager()), lang)
+        # Wizard never auto-generates (VENs need time to report) — exit either way.
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except RuleHitCountPullTimeout:
+        # TimeoutError is an OSError subclass — must be caught here, before the
+        # (ConnectionError, OSError) block below, or it re-raises as an
+        # uncaught traceback / EXIT_SOFTWARE instead of a clear i18n message.
+        echo_error(ctx, t("cli_rhc_pull_timeout", lang=_ctx_lang()))
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except FileNotFoundError as exc:
+        echo_error(ctx, t("cli_report_input_not_found", error=exc, lang=_ctx_lang()))
+        ctx.exit(EXIT_NOINPUT)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except Exception as exc:
+        log.exception("rule-hit-count report failed")
         echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
         ctx.exit(EXIT_SOFTWARE)
         return

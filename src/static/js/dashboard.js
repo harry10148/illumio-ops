@@ -321,6 +321,7 @@ function renderSchedules() {
     audit: _t('gui_sched_rt_audit'),
     ven_status: _t('gui_sched_rt_ven'),
     policy_usage: _t('gui_sched_rt_pu'),
+    rule_hit_count: _t('gui_sched_rt_rhc'),
     policy_diff: _t('gui_sched_rt_policy_diff'),
     policy_resolver: _t('gui_sched_rt_policy_resolver'),
     app_summary: _t('gui_sched_rt_app_summary'),
@@ -650,6 +651,7 @@ function openReportGenModal(type) {
     audit:        { titleKey: 'gui_gen_audit_title',   icon: '#icon-shield', dates: true  },
     ven:          { titleKey: 'gui_gen_ven_title',     icon: '#icon-cpu',    dates: false },
     policy_usage: { titleKey: 'gui_gen_pu_title',      icon: '#icon-shield', dates: true  },
+    rule_hit_count: { titleKey: 'gui_gen_rhc_title',   icon: '#icon-shield', dates: true  },
     policy_diff:  { titleKey: 'gui_gen_policy_diff_title', icon: '#icon-shield', dates: false },
     policy_resolver: { titleKey: 'gui_gen_policy_resolver_title', icon: '#icon-shield', dates: false },
     app_summary:  { titleKey: 'gui_gen_app_title', icon: '#icon-shield', dates: true, appField: true },
@@ -670,8 +672,8 @@ function openReportGenModal(type) {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     _ensureRptFilterBar().setFilters({});
-  } else if (type === 'policy_usage') {
-    // Policy-usage supports api/csv source (no traffic filters/profile).
+  } else if (type === 'policy_usage' || type === 'rule_hit_count') {
+    // Both support source selection (no traffic filters/profile).
     $('m-gen-source-row').style.display = '';
     $('m-gen-filters').style.display = 'none';
     toggleTrafficSource();  // sets dates/csv-upload per the current source radio
@@ -749,6 +751,7 @@ async function confirmReportGen() {
     audit:        _t('gui_gen_audit_title'),
     ven:          _t('gui_gen_ven_title'),
     policy_usage: _t('gui_gen_pu_title'),
+    rule_hit_count: _t('gui_gen_rhc_title'),
     policy_diff:  _t('gui_gen_policy_diff_title'),
     policy_resolver: _t('gui_gen_policy_resolver_title'),
     app_summary:  _t('gui_gen_app_title'),
@@ -759,6 +762,7 @@ async function confirmReportGen() {
   else if (_genReportType === 'audit')        await _doGenerateAudit();
   else if (_genReportType === 'ven')          await _doGenerateVen();
   else if (_genReportType === 'policy_usage') await _doGeneratePolicyUsageClean();
+  else if (_genReportType === 'rule_hit_count') await _doGenerateRuleHitCount();
   else if (_genReportType === 'policy_diff')  await _doGeneratePolicyDiff();
   else if (_genReportType === 'policy_resolver') await _doGeneratePolicyResolver();
   else if (_genReportType === 'app_summary')  await _doGenerateAppSummary();
@@ -1222,6 +1226,72 @@ async function _doGeneratePolicyUsageClean() {
   } catch (e) {
     _hideGenProgress(false, e.message);
     toast((_t('gui_toast_pu_error')).replace('{error}', e.message), 'err');
+  }
+}
+
+async function _doGenerateRuleHitCount() {
+  const fmtEl = document.getElementById('m-gen-format');
+  const fmt = fmtEl ? fmtEl.value : 'html';
+  _updateGenStep(_t('gui_gen_step_fetching'));
+  try {
+    const start = $('m-gen-start') ? $('m-gen-start').value : null;
+    const end   = $('m-gen-end')   ? $('m-gen-end').value   : null;
+    const langEl = document.getElementById('m-gen-lang');
+    const lang = langEl ? langEl.value : 'en';
+    const src = document.querySelector('input[name="traffic-source"]:checked')?.value || 'api';
+    let r;
+    if (src === 'csv') {
+      const fileInput = $('m-gen-csv-file');
+      if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        _hideGenProgress(false, _t('gui_csv_required'));
+        toast(_t('gui_err_no_csv'), 'err');
+        return;
+      }
+      const fd = new FormData();
+      fd.append('source', 'csv');
+      fd.append('format', fmt);
+      fd.append('lang', lang);
+      fd.append('file', fileInput.files[0]);
+      r = await fetch('/api/rule_hit_count_report/generate', {
+        method: 'POST', headers: { 'X-CSRF-Token': _csrfToken() }, body: fd
+      }).then(res => res.json());
+    } else {
+      r = await post('/api/rule_hit_count_report/generate',
+                     { source: 'native', start_date: start, end_date: end, format: fmt, lang: lang });
+    }
+    if (r.ok) {
+      const k = r.kpis || {};
+      const kpiText = Object.entries(k).map(([key, val]) => `${key}: ${val}`).join(' | ');
+      _hideGenProgress(true, kpiText || _t('gui_gen_done'));
+      toast((_t('gui_toast_rhc_done')).replace('{count}', r.record_count));
+      loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
+    } else if (r.needs_enablement) {
+      _hideGenProgress(false, r.error || _t('gui_toast_rhc_fail'));
+      const msg = (_t('gui_rhc_needs_enable_confirm')).replace('{state}', r.state || '');
+      if (window.confirm(msg)) {
+        const en = await post('/api/rule_hit_count/enable', { lang: lang });
+        if (en.ok) {
+          toast(_t('gui_rhc_enabled_ok'));
+        } else {
+          toast((_t('gui_rhc_enable_failed')).replace('{error}', en.error || ''), 'err');
+        }
+      } else {
+        toast(r.error || _t('gui_toast_rhc_fail'), 'err');
+      }
+    } else if (r.pull_timeout) {
+      // PCE hasn't finished preparing the native report yet — this is not a
+      // hard failure, so use the 'warn' toast/framing and point at retry
+      // instead of the generic failure path (mirrors needs_enablement above).
+      _hideGenProgress(false, r.error || _t('gui_rhc_pull_timeout'));
+      toast(r.error || _t('gui_rhc_pull_timeout'), 'warn');
+    } else {
+      _hideGenProgress(false, r.error || _t('gui_toast_rhc_fail'));
+      toast(r.error || _t('gui_toast_rhc_fail'), 'err');
+    }
+  } catch (e) {
+    _hideGenProgress(false, e.message);
+    toast((_t('gui_toast_rhc_error')).replace('{error}', e.message), 'err');
   }
 }
 

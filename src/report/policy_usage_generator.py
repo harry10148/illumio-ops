@@ -41,6 +41,54 @@ class PolicyUsageResult:
     dataframe: object = None       # flat rules DataFrame for CSV export
     execution_stats: dict = field(default_factory=dict)
 
+
+def build_rule_baseline(rulesets: list) -> tuple:
+    """Flatten all rulesets into a list of rules; build a ruleset_map.
+
+    Each rule dict is augmented with:
+    - _ruleset_name, _ruleset_href: for display
+    - _ruleset_scopes: first scope array from the parent ruleset (for query building)
+
+    Shared by the Policy Usage and Rule Hit Count reports.
+    Returns (flat_rules, ruleset_map).
+    """
+    flat_rules = []
+    ruleset_map = {}
+
+    for rs in rulesets:
+        rs_href = rs.get('href', '')
+        rs_name = rs.get('name', rs_href)
+        ruleset_map[rs_href] = rs_name
+
+        # Extract the first scope (most rulesets have exactly one scope)
+        scopes = rs.get('scopes', [])
+        first_scope = scopes[0] if scopes else []
+
+        rs_id = rs_href.split('/')[-1] if rs_href else ''
+
+        # Collect rules by type; annotate each with _rule_type
+        typed_rules = []
+        for r in rs.get('sec_rules', []) + rs.get('rules', []):
+            typed_rules.append((r, 'Allow'))
+        for r in rs.get('deny_rules', []):
+            rule_type = 'Override Deny' if r.get('override') else 'Deny'
+            typed_rules.append((r, rule_type))
+
+        for rule_no, (rule, rule_type) in enumerate(typed_rules, 1):
+            rule_href = rule.get('href', '')
+            rule_copy = dict(rule)
+            rule_copy['_ruleset_href'] = rs_href
+            rule_copy['_ruleset_name'] = rs_name
+            rule_copy['_ruleset_scopes'] = first_scope
+            rule_copy['_ruleset_id'] = rs_id
+            rule_copy['_rule_id'] = rule_href.split('/')[-1] if rule_href else ''
+            rule_copy['_rule_no'] = rule_no
+            rule_copy['_rule_type'] = rule_type
+            flat_rules.append(rule_copy)
+
+    return flat_rules, ruleset_map
+
+
 class PolicyUsageGenerator:
     def __init__(self, config_manager, api_client=None, config_dir: str = 'config'):
         self.cm = config_manager
@@ -376,49 +424,8 @@ class PolicyUsageGenerator:
     # ── Internal helpers ───────────────────────────────────────────────────────
 
     def _build_baseline(self, rulesets: list) -> tuple:
-        """Flatten all rulesets into a list of rules; build a ruleset_map.
-
-        Each rule dict is augmented with:
-        - _ruleset_name, _ruleset_href: for display
-        - _ruleset_scopes: first scope array from the parent ruleset (for query building)
-
-        Returns (flat_rules, ruleset_map).
-        """
-        flat_rules = []
-        ruleset_map = {}
-
-        for rs in rulesets:
-            rs_href = rs.get('href', '')
-            rs_name = rs.get('name', rs_href)
-            ruleset_map[rs_href] = rs_name
-
-            # Extract the first scope (most rulesets have exactly one scope)
-            scopes = rs.get('scopes', [])
-            first_scope = scopes[0] if scopes else []
-
-            rs_id = rs_href.split('/')[-1] if rs_href else ''
-
-            # Collect rules by type; annotate each with _rule_type
-            typed_rules = []
-            for r in rs.get('sec_rules', []) + rs.get('rules', []):
-                typed_rules.append((r, 'Allow'))
-            for r in rs.get('deny_rules', []):
-                rule_type = 'Override Deny' if r.get('override') else 'Deny'
-                typed_rules.append((r, rule_type))
-
-            for rule_no, (rule, rule_type) in enumerate(typed_rules, 1):
-                rule_href = rule.get('href', '')
-                rule_copy = dict(rule)
-                rule_copy['_ruleset_href'] = rs_href
-                rule_copy['_ruleset_name'] = rs_name
-                rule_copy['_ruleset_scopes'] = first_scope
-                rule_copy['_ruleset_id'] = rs_id
-                rule_copy['_rule_id'] = rule_href.split('/')[-1] if rule_href else ''
-                rule_copy['_rule_no'] = rule_no
-                rule_copy['_rule_type'] = rule_type
-                flat_rules.append(rule_copy)
-
-        return flat_rules, ruleset_map
+        """Delegates to the module-level build_rule_baseline (shared helper)."""
+        return build_rule_baseline(rulesets)
 
     def _extract_hit_data(self, flat_rules: list, start_date: str, end_date: str) -> tuple:
         """Run per-rule async traffic queries using a parallel 3-phase strategy.
