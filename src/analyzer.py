@@ -600,9 +600,23 @@ class Analyzer:
                         "details": h_msg[:200]
                     })
         else:
-            logger.info(t('status_ok'))
-            logger.info("PCE health check OK.")
-            self.stats.record_pce_success("health", status=h_status, message=h_msg[:120])
+            from src.api_client import health_status_from_body
+            body_status = health_status_from_body(h_msg)
+            if body_status in {"warning", "degraded", "error", "critical"}:
+                logger.warning(f"PCE health degraded: status={body_status}")
+                self.stats.record_pce_error("health", f"degraded: status={body_status}", status=h_status)
+                for rule in pce_health_rules:
+                    if self._check_cooldown(rule):
+                        self.reporter.add_health_alert({
+                            "time": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+                            "rule": rule["name"],
+                            "status": body_status,
+                            "details": t('health_degraded_details', status=body_status),
+                        })
+            else:
+                logger.info(t('status_ok'))
+                logger.info("PCE health check OK.")
+                self.stats.record_pce_success("health", status=h_status, message=h_msg[:120])
         return True
 
     def _check_watchdog(self) -> None:

@@ -2460,6 +2460,7 @@
   "gui_ws_ip_placeholder": "e.g. 10.0.0.5",
   "gui_ws_name_placeholder": "Exact or partial name",
   "gui_ws_search": "Workload Search",
+  "health_degraded_details": "PCE /health returned HTTP 200 but reports status={status}. Check node health, database replication lag, and service status in the PCE web console.",
   "health_details": "Details",
   "health_status": "Status",
   "health_time": "Time",

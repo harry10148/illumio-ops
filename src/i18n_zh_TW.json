@@ -2460,6 +2460,7 @@
   "gui_ws_ip_placeholder": "例如 10.0.0.5",
   "gui_ws_name_placeholder": "完整或部分名稱",
   "gui_ws_search": "Workload 搜尋",
+  "health_degraded_details": "PCE /health 回傳 HTTP 200，但 body status={status}。請檢查 PCE 主控台的節點健康、資料庫複寫延遲與服務狀態。",
   "health_details": "詳細資訊",
   "health_status": "狀態",
   "health_time": "時間",
