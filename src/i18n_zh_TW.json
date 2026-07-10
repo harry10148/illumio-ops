@@ -4243,7 +4243,7 @@
   "gui_fb_load_more": "載入更多",
   "gui_fb_type_to_search": "請輸入關鍵字搜尋",
   "gui_fb_browse_error": "瀏覽暫時無法使用，請直接輸入搜尋",
-  "gui_qt_object_filters": "來源／目的／任一側（Labels、IP、Workloads、IP Lists）",
+  "gui_qt_object_filters": "來源 / 目的 / 任一（Label、IP、Workload、IP List、Service、Port）",
   "gui_fb_browse_all": "在視窗中瀏覽全部…",
   "gui_ob_title": "選取 filter 物件",
   "gui_ob_add": "加入",

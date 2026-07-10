@@ -101,9 +101,8 @@ def test_traffic_analyzer_modal_mounts_filter_bar():
         "qt-exsrc", "qt-exdst", "qt-ex-any-label", "qt-ex-any-ip",
     ):
         assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from modal-qt-filters"
-    # port/proto/PD radio 保留（不屬 FilterBar 範圍）
-    assert 'id="qt-port"' in html
-    assert 'id="qt-proto"' in html
+    # Task 11：qt-port/qt-proto scalar 欄位已收斂進 FilterBar 的 port pill；
+    # PD radio 不屬 FilterBar 範圍，保留。
     assert 'name="qt-pd-radio"' in html
 
 
@@ -367,3 +366,18 @@ def test_filter_bar_browse_i18n_bilingual():
     zh = json.loads(_ZH.read_text(encoding="utf-8"))
     for k in ("gui_fb_load_more", "gui_fb_type_to_search", "gui_fb_browse_error"):
         assert k in en and k in zh
+
+
+def test_qt_port_fields_removed():
+    html = _INDEX.read_text(encoding="utf-8")
+    assert 'id="qt-port"' not in html and 'id="qt-expt"' not in html and 'id="qt-proto"' not in html
+
+
+def test_quarantine_js_no_qt_port_reads():
+    src = Path("src/static/js/quarantine.js").read_text(encoding="utf-8")
+    assert "qt-port" not in src and "qt-expt" not in src and "qt-proto" not in src
+
+
+def test_rules_filter_bars_allow_service_port():
+    src = Path("src/static/js/rules.js").read_text(encoding="utf-8")
+    assert src.count("'service', 'port'") >= 2

@@ -1113,6 +1113,13 @@ class Analyzer:
             "port_range": params.get("port_range"),
             "ex_port": params.get("ex_port"),
             "ex_port_range": params.get("ex_port_range"),
+            # Task 11：FilterBar 的 service/port pill 序列化 key（qt-port/qt-proto/
+            # qt-expt scalar 欄位移除後改走 pill）——與 actions.py 的 params dict
+            # 保持一致，否則會在這個 whitelist 被靜默丟棄。
+            "services": params.get("services", []),
+            "ex_services": params.get("ex_services", []),
+            "ports": params.get("ports", []),
+            "ex_ports": params.get("ex_ports", []),
             "src_label": params.get("src_label"),
             "src_label_group": params.get("src_label_group"),
             "src_label_groups": params.get("src_label_groups"),
