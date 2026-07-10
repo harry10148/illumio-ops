@@ -224,3 +224,37 @@ def test_guard_off_matches_current_behaviour(session_factory):
     worker = RetentionWorker(session_factory)
     deleted = worker.run_once(traffic_raw_days=7)  # 不帶 archive_enabled
     assert deleted["traffic_raw"] == 5
+
+
+def _mk_raw(i, ingested_at):
+    from src.pce_cache.models import PceTrafficFlowRaw
+    return PceTrafficFlowRaw(
+        flow_hash=f"batch-h{i}", src_ip="10.9.0.1", dst_ip="10.9.0.2",
+        port=443, protocol="tcp", action="allowed", flow_count=1,
+        bytes_in=0, bytes_out=0,
+        first_detected=ingested_at, last_detected=ingested_at,
+        ingested_at=ingested_at, raw_json="{}",
+    )
+
+
+def test_retention_deletes_across_multiple_batches(session_factory, monkeypatch):
+    from datetime import datetime, timezone, timedelta
+    from src.pce_cache.retention import RetentionWorker
+
+    old = datetime.now(timezone.utc) - timedelta(days=30)
+    fresh = datetime.now(timezone.utc)
+    with session_factory.begin() as s:
+        for i in range(25):
+            s.add(_mk_raw(i, old))
+        s.add(_mk_raw(999, fresh))  # 未到期，不可被刪
+
+    monkeypatch.setattr(RetentionWorker, "_DELETE_BATCH", 10)  # 強迫跨 3 批
+    result = RetentionWorker(session_factory).run_once(traffic_raw_days=7)
+    assert result["traffic_raw"] == 25
+
+    from sqlalchemy import select, func
+    from src.pce_cache.models import PceTrafficFlowRaw
+    with session_factory() as s:
+        remaining = s.execute(
+            select(func.count()).select_from(PceTrafficFlowRaw)).scalar()
+    assert remaining == 1
