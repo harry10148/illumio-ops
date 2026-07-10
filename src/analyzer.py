@@ -46,6 +46,12 @@ TOP_MATCHES_LIMIT = 10
 WATCHDOG_FAILURE_THRESHOLD = 3
 WATCHDOG_COOLDOWN_MINUTES = 60
 
+# Meta-alert cooldown for event polling overflow: when the sync events API
+# hits max_results it returns only the newest rows, so older events in the
+# window are permanently lost. Own cooldown keeps a persistent burst source
+# to one alert per hour instead of one per cycle.
+OVERFLOW_ALERT_COOLDOWN_MINUTES = 60
+
 # query_flows 殘餘比對的委派範圍：check_flow_match 只認 legacy scalar key，
 # 下列物件/複數 key（Phase 3 FilterBar）委派給報表路徑同一套比對器
 # TrafficQueryBuilder._flow_matches_filters 評估——cache 命中時 client 端
@@ -643,6 +649,28 @@ class Analyzer:
         })
         logger.error(f"Watchdog: {failures} consecutive PCE failures — self-alert dispatched")
 
+    def _maybe_alert_overflow(self) -> None:
+        """Meta-alert when event polling hit max_results: oldest events were lost."""
+        overflow = self.state.get("event_overflow") or {}
+        if not overflow:
+            return
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        last = parse_event_timestamp(self.state.get("overflow_last_alert_at"))
+        if last and (now_utc - last).total_seconds() < OVERFLOW_ALERT_COOLDOWN_MINUTES * 60:
+            return
+        self.state["overflow_last_alert_at"] = format_utc(now_utc)
+        self.reporter.add_health_alert({
+            "time": now_utc.strftime('%Y-%m-%d %H:%M:%S'),
+            "rule": t('alert_overflow_rule'),
+            "status": "warning",
+            "details": t('alert_overflow_details',
+                         raw=overflow.get("raw_count", "?"),
+                         cap=overflow.get("max_results", "?"),
+                         since=overflow.get("query_since", "?"),
+                         until=overflow.get("query_until", "?")),
+        })
+        logger.warning("Event overflow meta-alert dispatched")
+
     def run_analysis(self) -> None:
         logger.info("Starting analysis cycle.")
         # 1. Health Check (only runs when a system rule with filter_value=pce_health is configured)
@@ -711,6 +739,7 @@ class Analyzer:
         else:
             try:
                 events, event_batch = self._legacy_event_pull()
+                self._maybe_alert_overflow()
             except Exception as e:
                 logger.error(f"Event polling failed; watermark preserved at {self.state.get('event_watermark')}: {e}")
                 logger.error(t('api_fetch_events_error', error=str(e)))

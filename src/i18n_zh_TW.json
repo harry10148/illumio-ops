@@ -5,6 +5,8 @@
   "alert_cache_ingest_failing": "Cache 擷取持續失敗：來源={source} 最近錯誤={err}",
   "alert_cache_lag_error": "快取擷取器停止響應：來源={source} 延遲={lag}秒",
   "alert_cache_lag_warning": "快取擷取器延遲警告：來源={source} 延遲={lag}秒",
+  "alert_overflow_rule": "事件輪詢溢出",
+  "alert_overflow_details": "事件查詢於 {since} 至 {until} 間回傳 {raw} 筆（上限 {cap}）。PCE 同步事件 API 只回傳最新的事件，此視窗中較舊的事件已永久漏失。請縮短輪詢間隔或調查事件暴增來源。",
   "alert_siem_backlog": "SIEM 派送積壓：{pending} 筆待送（門檻 {warn}）",
   "alert_watchdog_rule": "PCE 連線看門狗",
   "alert_watchdog_details": "PCE 輪詢已連續失敗 {count} 個週期，事件與流量告警目前處於盲區。最近錯誤：{error}",

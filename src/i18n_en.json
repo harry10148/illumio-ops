@@ -5,6 +5,8 @@
   "alert_cache_ingest_failing": "Cache ingest keeps failing: source={source} last_error={err}",
   "alert_cache_lag_error": "Cache ingestor stalled: source={source} lag={lag}s",
   "alert_cache_lag_warning": "Cache ingestor lag warning: source={source} lag={lag}s",
+  "alert_overflow_rule": "Event polling overflow",
+  "alert_overflow_details": "Event query returned {raw} rows (cap {cap}) between {since} and {until}. The PCE sync events API returns only the newest rows, so older events in this window were permanently missed. Consider narrowing the poll interval or reviewing burst sources.",
   "alert_siem_backlog": "SIEM dispatch backlog: {pending} pending rows (threshold {warn})",
   "alert_watchdog_rule": "PCE connectivity watchdog",
   "alert_watchdog_details": "PCE polling has failed {count} consecutive cycles; event and traffic alerting is blind. Last error: {error}",
