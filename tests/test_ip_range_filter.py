@@ -83,6 +83,21 @@ def test_src_ip_in_cidr_native_payload_consumed(client):
     assert "src_ip_in" not in diag.get("unresolved_native_filters", {})
 
 
+def test_cidr_literal_precedence_over_same_named_ip_list(client):
+    """CIDR-shaped literal (e.g. '10.0.0.0/24') takes precedence over IP List name lookup.
+
+    Even if an IP List is named '10.0.0.0/24', the filter value '10.0.0.0/24'
+    resolves to a literal ip_address actor, not an ip_list actor.
+    """
+    # Mock an IP List with name "10.0.0.0/24"
+    client._iplist_href_cache["10.0.0.0/24"] = "/orgs/1/sec_policy/draft/ip_lists/abc123"
+
+    result = client._labels._resolve_ip_filter_to_actor("10.0.0.0/24")
+
+    # Should resolve to literal CIDR, not IP List
+    assert result == {"ip_address": "10.0.0.0/24"}
+
+
 def test_resolve_ip_filter_to_actors_range_expands_to_cidrs(client):
     items = client._labels._resolve_ip_filter_to_actors("10.0.0.5-10.0.0.6")
     assert items == [{"ip_address": "10.0.0.5/32"}, {"ip_address": "10.0.0.6/32"}]

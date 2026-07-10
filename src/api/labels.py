@@ -415,6 +415,9 @@ class LabelResolver:
             if "/workloads/" in candidate:
                 return {"workload": {"href": candidate}}
             return None
+        # CIDR literal (e.g. "10.0.0.0/24") takes precedence over same-named IP List.
+        # This is intentional: CIDR-shaped strings are parsed as ip_address actors,
+        # per PCE API guide; literal interpretation is more correct than name lookup.
         if self._is_ip_literal(candidate):
             # PCE (21.5+) 對 traffic_flows include/exclude 的 ip_address
             # native actor 只接受 plain string；nested {"value": ...} 會
