@@ -65,7 +65,8 @@ def test_pull_timeout_exits_unavailable_with_i18n_message():
     it needs its own i18n message + EXIT_UNAVAILABLE."""
     runner = CliRunner()
     exc = RuleHitCountPullTimeout("/orgs/1/reports/abc123")
-    with patch("src.cli.report.generate_rule_hit_count_report", side_effect=exc):
+    with patch("src.cli.report.generate_rule_hit_count_report", side_effect=exc), \
+         patch("src.cli.report._ctx_lang", return_value="en"):
         result = runner.invoke(report_group, ["rule-hit-count"])
     assert result.exit_code == EXIT_UNAVAILABLE, result.output
     assert "Traceback" not in result.output
