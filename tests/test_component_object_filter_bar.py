@@ -381,3 +381,16 @@ def test_quarantine_js_no_qt_port_reads():
 def test_rules_filter_bars_allow_service_port():
     src = Path("src/static/js/rules.js").read_text(encoding="utf-8")
     assert src.count("'service', 'port'") >= 2
+
+
+def test_filter_bar_ip_like_regex_supports_range():
+    """手動輸入 IP range（a.b.c.d-a.b.c.d）：_objfbIsIpLike 正規表達式須含右側 IP
+    alternation，且左右兩側都要過八位組合法性檢查（不可只驗左側，否則
+    "1.1.1.1-999.999.999.999" 會誤判為合法 range）。"""
+    src = _JS.read_text(encoding="utf-8")
+    assert "function _objfbIsIpLike" in src
+    start = src.index("function _objfbIsIpLike")
+    end = src.index("\n}", start)
+    body = src[start:end]
+    assert "-(\\d{1,3}" in body  # range 右側 IP 的正規表達式片段
+    assert "m[3]" in body and "octetsOk(m[3])" in body  # 右側也要過八位組檢查

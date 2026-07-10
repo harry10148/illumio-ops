@@ -13,6 +13,7 @@ Delegates to:
 from __future__ import annotations
 
 import gzip
+import ipaddress
 import itertools
 import json
 import os
@@ -301,8 +302,6 @@ class TrafficQueryBuilder:
         include_specs = [
             (("src_label_group", "src_label_groups"), "sources", labels._resolve_label_group_filter_to_actor),
             (("dst_label_group", "dst_label_groups"), "destinations", labels._resolve_label_group_filter_to_actor),
-            (("src_ip_in", "src_ip"), "sources", labels._resolve_ip_filter_to_actor),
-            (("dst_ip_in", "dst_ip"), "destinations", labels._resolve_ip_filter_to_actor),
             (("src_iplist", "src_iplists"), "sources", labels._resolve_iplist_filter_to_actor),
             (("dst_iplist", "dst_iplists"), "destinations", labels._resolve_iplist_filter_to_actor),
             (("src_workload", "src_workloads"), "sources", labels._resolve_workload_filter_to_actor),
@@ -313,8 +312,6 @@ class TrafficQueryBuilder:
             (("ex_src_label_group", "ex_src_label_groups"), "sources", labels._resolve_label_group_filter_to_actor),
             (("ex_dst_label", "ex_dst_labels"), "destinations", labels._resolve_label_filter_to_actor),
             (("ex_dst_label_group", "ex_dst_label_groups"), "destinations", labels._resolve_label_group_filter_to_actor),
-            (("ex_src_ip",), "sources", labels._resolve_ip_filter_to_actor),
-            (("ex_dst_ip",), "destinations", labels._resolve_ip_filter_to_actor),
             (("ex_src_iplist", "ex_src_iplists"), "sources", labels._resolve_iplist_filter_to_actor),
             (("ex_dst_iplist", "ex_dst_iplists"), "destinations", labels._resolve_iplist_filter_to_actor),
             (("ex_src_workload", "ex_src_workloads"), "sources", labels._resolve_workload_filter_to_actor),
@@ -382,6 +379,38 @@ class TrafficQueryBuilder:
                 _record_consumed(key, spec.native_filters.get(key))
             _consume_keys(used_keys)
 
+        # src_ip_in/dst_ip_in（含 src_ip/dst_ip 相容別名）：同 key 多值須外層 OR
+        # ——同一 flow 的 src 不可能同時等於兩個 IP（Step 0 查驗證實舊碼把多值塞
+        # 進單一 inner group = AND，實測 0 筆；修正為每個 resolved actor 各自
+        # 一個 include 組）。range 值經 `_resolve_ip_filter_to_actors` 展開成多個
+        # CIDR actor，同樣各自成組（CIDR 之間亦為 OR，涵蓋整個 range）。
+        ip_include_specs = [
+            (("src_ip_in", "src_ip"), "sources"),
+            (("dst_ip_in", "dst_ip"), "destinations"),
+        ]
+        for keys, side in ip_include_specs:
+            values, used_keys = _pop_many(keys)
+            if not values:
+                continue
+            resolved_items = []
+            unresolved = False
+            for value in values:
+                items = labels._resolve_ip_filter_to_actors(value)
+                if not items:
+                    unresolved = True
+                    break
+                resolved_items.extend(items)
+            if unresolved:
+                for key in used_keys:
+                    _record_unresolved(key, spec.native_filters.get(key))
+                _consume_keys(used_keys)
+                continue
+            for item in labels._dedupe_query_group(resolved_items):
+                payload[side]["include"].append([item])
+            for key in used_keys:
+                _record_consumed(key, spec.native_filters.get(key))
+            _consume_keys(used_keys)
+
         _append_actor_groups("sources", "src_include_groups")
         _append_actor_groups("destinations", "dst_include_groups")
         _append_ams("sources", "src_ams")
@@ -399,6 +428,34 @@ class TrafficQueryBuilder:
                     unresolved = True
                     break
                 resolved_items.append(item)
+            if unresolved:
+                for key in used_keys:
+                    _record_unresolved(key, spec.native_filters.get(key))
+                _consume_keys(used_keys)
+                continue
+            payload[side]["exclude"].extend(labels._dedupe_query_group(resolved_items))
+            for key in used_keys:
+                _record_consumed(key, spec.native_filters.get(key))
+            _consume_keys(used_keys)
+
+        # ex_src_ip/ex_dst_ip：exclude 陣列本就是扁平清單（命中任一即排除＝OR），
+        # range 值展開的多個 CIDR actor 直接 extend 進去即可，語意已正確。
+        ip_exclude_specs = [
+            (("ex_src_ip",), "sources"),
+            (("ex_dst_ip",), "destinations"),
+        ]
+        for keys, side in ip_exclude_specs:
+            values, used_keys = _pop_many(keys)
+            if not values:
+                continue
+            resolved_items = []
+            unresolved = False
+            for value in values:
+                items = labels._resolve_ip_filter_to_actors(value)
+                if not items:
+                    unresolved = True
+                    break
+                resolved_items.extend(items)
             if unresolved:
                 for key in used_keys:
                     _record_unresolved(key, spec.native_filters.get(key))
@@ -849,6 +906,19 @@ class TrafficQueryBuilder:
         def _ip_match(side: dict, ip_str: str) -> bool:
             if side.get('ip') == ip_str:
                 return True
+            if '-' in ip_str:
+                left, _, right = ip_str.partition('-')
+                try:
+                    frm = ipaddress.IPv4Address(left.strip())
+                    to = ipaddress.IPv4Address(right.strip())
+                    flow_ip = ipaddress.IPv4Address(str(side.get('ip')))
+                except ValueError:
+                    frm = to = flow_ip = None
+                if frm is not None:
+                    if frm > to:
+                        frm, to = to, frm
+                    if frm <= flow_ip <= to:
+                        return True
             for ipl in side.get('ip_lists', []):
                 if ipl.get('name') == ip_str:
                     return True
