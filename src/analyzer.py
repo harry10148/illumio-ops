@@ -27,6 +27,7 @@ from src.i18n import t
 from src.state_store import load_state_file, update_state_file
 from src.interfaces import IApiClient, IReporter
 from src.api.traffic_query import TrafficQueryBuilder
+from src.pce_cache.reader import CacheReadTooLarge
 
 # Refine Root Dir for State File
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1022,8 +1023,13 @@ class Analyzer:
             return stream, "api"
 
         if state == "full":
-            logger.info("query_flows: flows from cache ({} → {})", start_dt, end_dt)
-            return self._cache_reader.read_flows_raw(start_dt, end_dt), "cache"
+            try:
+                logger.info("query_flows: flows from cache ({} → {})", start_dt, end_dt)
+                return self._cache_reader.read_flows_raw(start_dt, end_dt), "cache"
+            except CacheReadTooLarge as exc:
+                logger.warning(
+                    "query_flows: {} — falling back to live API (bounded)", exc)
+                state = "cache_too_large"  # 落到函式底部的 API 路徑
 
         if state == "partial":
             cache_start = self._cache_reader.earliest_data_timestamp("traffic")
@@ -1066,9 +1072,14 @@ class Analyzer:
                     )
                     gap_list = None
                 if gap_list is not None:
-                    cached = self._cache_reader.read_flows_raw(cache_start, end_dt)
-                    source = "mixed" if gap_list else "cache"
-                    return gap_list + cached, source
+                    try:
+                        cached = self._cache_reader.read_flows_raw(cache_start, end_dt)
+                    except CacheReadTooLarge as exc:
+                        logger.warning(
+                            "query_flows hybrid: {} — falling back to full API path", exc)
+                    else:
+                        source = "mixed" if gap_list else "cache"
+                        return gap_list + cached, source
 
         # miss / partial-with-conflict / hybrid-failure: fall through to API
         stream = self.api.execute_traffic_query_stream(

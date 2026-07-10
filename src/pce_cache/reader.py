@@ -12,16 +12,30 @@ from src.pce_cache.models import PceEvent, PceTrafficFlowAgg, PceTrafficFlowRaw
 CoverState = Literal["full", "partial", "miss"]
 
 
+class CacheReadTooLarge(RuntimeError):
+    """查詢窗列數超過 read_max_rows 護欄。
+
+    呼叫端應接住並改走 live API 路徑（該路徑由 MAX_TRAFFIC_RESULTS=200k
+    硬上限保護），而不是把整個視窗載入記憶體撐爆常駐 process。"""
+
+    def __init__(self, count: int, cap: int):
+        super().__init__(f"cache window has {count} rows > cap {cap}")
+        self.count = count
+        self.cap = cap
+
+
 class CacheReader:
     def __init__(
         self,
         session_factory: sessionmaker,
         events_retention_days: int,
         traffic_raw_retention_days: int,
+        read_max_rows: int | None = None,
     ):
         self._sf = session_factory
         self._events_days = events_retention_days
         self._traffic_days = traffic_raw_retention_days
+        self._read_max_rows = read_max_rows
 
     def cover_state(self, source: str, start: datetime, end: datetime) -> CoverState:
         earliest = self.earliest_data_timestamp(source)
@@ -74,6 +88,26 @@ class CacheReader:
                 result = result.replace(tzinfo=timezone.utc)
             return result
 
+    def count_flows(self, start: datetime, end: datetime,
+                    workload_hrefs: list[str] | None = None) -> int:
+        with self._sf() as s:
+            q = (select(func.count()).select_from(PceTrafficFlowRaw)
+                 .where(PceTrafficFlowRaw.last_detected >= start,
+                        PceTrafficFlowRaw.last_detected <= end))
+            if workload_hrefs:
+                hrefs = list(workload_hrefs)
+                q = q.where(or_(PceTrafficFlowRaw.src_workload.in_(hrefs),
+                                PceTrafficFlowRaw.dst_workload.in_(hrefs)))
+            return s.execute(q).scalar() or 0
+
+    def _guard_window(self, start: datetime, end: datetime,
+                      workload_hrefs: list[str] | None = None) -> None:
+        if self._read_max_rows is None:
+            return
+        n = self.count_flows(start, end, workload_hrefs)
+        if n > self._read_max_rows:
+            raise CacheReadTooLarge(n, self._read_max_rows)
+
     def read_events(self, start: datetime, end: datetime) -> list[dict]:
         # Column-only select: only raw_json is used, so avoid materializing
         # the full ORM entity (and its other columns) per row — same fast-path
@@ -95,6 +129,7 @@ class CacheReader:
         app's flows instead of the whole estate. The src/dst columns are
         indexed, so this is a fast index scan, not a full-table read.
         """
+        self._guard_window(start, end, workload_hrefs)
         # Column-only select: only raw_json is used, so skip both ORM entity
         # materialization and transferring the unused report_json blob per row
         # (same fast-path pattern as read_flows_df below).
@@ -129,6 +164,7 @@ class CacheReader:
         values in SQL — both correctness (cache must honour the report's decision
         filter like the live API does) and perf (read only matching rows).
         """
+        self._guard_window(start, end, workload_hrefs)
         from src.report.parsers.api_parser import flatten_flow_record, build_unified_df
 
         def _window(col):

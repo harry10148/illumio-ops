@@ -262,6 +262,7 @@ class PceCacheSettings(_Base):
     archive_review_max_days: int = Field(default=31, ge=1)  # archive 查閱單次載入的日期範圍上限
     disk_free_warn_gb: int = Field(default=10, ge=1)        # 磁碟剩餘低於此 GB 數告警
     siem_pending_warn_rows: int = Field(default=50000, ge=1000)  # SIEM 佇列積壓告警門檻
+    cache_read_max_rows: int = Field(default=500000, ge=10000)  # cache 讀取單次視窗列數護欄
 
 
 class SiemDestinationSettings(_Base):
