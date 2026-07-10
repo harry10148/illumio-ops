@@ -357,6 +357,11 @@ class TrafficQueryBuilder:
                 _record_consumed(key, spec.native_filters.get(key))
             _consume_keys(used_keys)
 
+        # label_group/iplist/workload：同 key 多值須外層 OR，非內層 AND——依據與
+        # src_label(s) 相同（Security Policy Guide「labels use an OR between
+        # the same label type」；SIEM Integration Guide「same type → OR」），
+        # 這些皆為物件類 key，同 key 多值等同「同型別多選」。比照 IP 系列
+        # （0ea0e94）修法：每個 resolved actor 各自一個 include 組。
         for keys, side, resolver in include_specs:
             values, used_keys = _pop_many(keys)
             if not values:
@@ -374,7 +379,8 @@ class TrafficQueryBuilder:
                     _record_unresolved(key, spec.native_filters.get(key))
                 _consume_keys(used_keys)
                 continue
-            payload[side]["include"].append(labels._dedupe_query_group(resolved_items))
+            for item in labels._dedupe_query_group(resolved_items):
+                payload[side]["include"].append([item])
             for key in used_keys:
                 _record_consumed(key, spec.native_filters.get(key))
             _consume_keys(used_keys)
@@ -689,6 +695,7 @@ class TrafficQueryBuilder:
         result = orjson.loads(body)
         if result.get("status") in ("queued", "pending") and not result.get("href"):
             logger.error(f"Async query accepted but no href returned: {result}")
+            c.last_fetch_error = f"async query submit returned no href (status={result.get('status')})"
             return
         job_url = result.get("href")
         print(t('waiting_traffic', default='Waiting for traffic calculation...'), end="", flush=True)
@@ -734,6 +741,7 @@ class TrafficQueryBuilder:
             if state == "failed":
                 print(f" {t('query_failed', default='Failed.')}")
                 logger.error("Traffic query failed.")
+                c.last_fetch_error = f"async query state failed: {state}"
                 return
             print(".", end="", flush=True)
             interval = min(interval + 1, 10)
@@ -743,6 +751,7 @@ class TrafficQueryBuilder:
                 "Traffic query timed out after {}s (PCE still computing).",
                 _ASYNC_QUERY_MAX_WAIT_SECONDS,
             )
+            c.last_fetch_error = f"async query poll timeout after {_ASYNC_QUERY_MAX_WAIT_SECONDS}s"
             return
 
         if compute_draft:
@@ -785,6 +794,7 @@ class TrafficQueryBuilder:
             dl_status, dl_body = c._request(dl_url, timeout=60, rate_limit=rate_limit)
             if dl_status != 200:
                 logger.error(f"Download failed: {dl_status}")
+                c.last_fetch_error = f"async query download failed: HTTP {dl_status}"
                 return None
             rows = []
             buffer = BytesIO(dl_body)
@@ -830,6 +840,7 @@ class TrafficQueryBuilder:
             time.sleep(2 * attempt)
             rows = _download_rows() or []
         if attempt and rows:
+            c.last_fetch_error = None
             logger.info("Async query recovered {} rows after {} re-download(s).",
                         len(rows), attempt)
         for item in rows:

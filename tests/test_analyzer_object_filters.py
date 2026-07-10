@@ -170,6 +170,30 @@ class TestCheckFlowMatchListIp(unittest.TestCase):
         rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.0.1/nope"]}
         self.assertFalse(self.az.check_flow_match(rule, self.flow, None))
 
+    def test_ip_value_parse_is_cached_and_behaviour_unchanged(self):
+        """本 sweep：CIDR/range 值清單改用 lru_cache 預解析——行為不變釘。
+        同一個值跨多個 flow 重複比對，結果逐位一致，且底層解析只發生一次
+        （cache hit 遞增），非法值不進命中路徑但仍 fail-closed。"""
+        from src.analyzer import Analyzer
+        Analyzer._parse_ip_filter_value.cache_clear()
+        rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.0.0/24"]}
+        flow_in = _flow("in", src_ip="10.0.0.5")
+        flow_out = _flow("out", src_ip="10.0.1.5")
+        # 重複呼叫多次，逐位行為不變
+        for _ in range(3):
+            self.assertTrue(self.az.check_flow_match(rule, flow_in, None))
+            self.assertFalse(self.az.check_flow_match(rule, flow_out, None))
+        info = Analyzer._parse_ip_filter_value.cache_info()
+        self.assertEqual(info.misses, 1)  # 只解析一次
+        self.assertGreaterEqual(info.hits, 5)  # 其餘全命中快取
+
+        # range 值與非法值也維持原行為（各自快取一次、行為不變）
+        range_rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.0.0-10.0.0.10"]}
+        illegal_rule = {"type": "connections", "pd": -1, "src_ip_in": ["10.0.0.1/nope"]}
+        for _ in range(3):
+            self.assertTrue(self.az.check_flow_match(range_rule, self.flow, None))
+            self.assertFalse(self.az.check_flow_match(illegal_rule, self.flow, None))
+
 
 # ─── Part B：query_flows 物件 key 委派 _flow_matches_filters（C2 主體）────────
 

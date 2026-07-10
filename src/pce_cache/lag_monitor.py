@@ -1,7 +1,7 @@
 """Cache lag monitor — detects stalled PCE ingestor and emits alerts."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from loguru import logger
 from sqlalchemy.orm import sessionmaker
@@ -24,6 +24,9 @@ from src.i18n import t
 LAG_ALERT_COOLDOWN_MINUTES = 60
 
 _last_alert_at: dict[tuple, datetime] = {}
+# 值班可觀測性（本 sweep）：壓制起點記一條 debug——只在「進入壓制的第一個 tick」
+# 記一次，避免壓制期間每 60s 一條把 debug log 洗版。不改節流語意（AL-11 沿用）。
+_suppression_logged: set[tuple] = set()
 
 
 def _should_alert(key: tuple) -> bool:
@@ -31,14 +34,23 @@ def _should_alert(key: tuple) -> bool:
     now = datetime.now(timezone.utc)
     last = _last_alert_at.get(key)
     if last and (now - last).total_seconds() < LAG_ALERT_COOLDOWN_MINUTES * 60:
+        if key not in _suppression_logged:
+            _suppression_logged.add(key)
+            cooldown_until = last + timedelta(minutes=LAG_ALERT_COOLDOWN_MINUTES)
+            logger.debug(
+                "lag_monitor: alert suppressed for key={} (cooldown {} -> {})",
+                key, last.isoformat(), cooldown_until.isoformat(),
+            )
         return False
     _last_alert_at[key] = now
+    _suppression_logged.discard(key)
     return True
 
 
 def _clear_alert(key: tuple) -> None:
     """Drop a key's cooldown so recovery lets the next alert fire immediately."""
     _last_alert_at.pop(key, None)
+    _suppression_logged.discard(key)
 
 
 def check_cache_lag(session_factory: sessionmaker, max_lag_seconds: int = 300) -> list[dict]:

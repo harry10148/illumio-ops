@@ -228,6 +228,118 @@ def test_execute_traffic_query_stream_threads_rate_limit(monkeypatch):
     assert captured.get("rate_limit") is True
 
 
+# ── Task 1 (Hardening follow-ups): remaining three swallowed-error branches
+# in _submit_and_stream_async_query (poll timeout, state=="failed", download
+# failure) must also surface into last_fetch_error, same convention as the
+# submit-failure / connection-failure fix above.
+
+
+def test_poll_timeout_sets_last_fetch_error(monkeypatch):
+    c = _client()
+    c.last_fetch_error = None
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        if url.endswith("/async_queries"):
+            return 202, json.dumps({"href": "/orgs/1/traffic_flows/async_queries/q1"}).encode()
+        return 200, json.dumps({"status": "running"}).encode()
+
+    c._request.side_effect = fake_request
+    monkeypatch.setattr("src.api.traffic_query._ASYNC_QUERY_MAX_WAIT_SECONDS", 0)
+    b = TrafficQueryBuilder(c)
+    with patch("src.api.traffic_query.time.sleep", lambda *a, **k: None):
+        rows = list(b._submit_and_stream_async_query({}))
+
+    assert rows == []
+    assert c.last_fetch_error is not None and "timeout" in c.last_fetch_error.lower()
+
+
+def test_query_state_failed_sets_last_fetch_error():
+    c = _client()
+    c.last_fetch_error = None
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        if url.endswith("/async_queries"):
+            return 202, json.dumps({"href": "/orgs/1/traffic_flows/async_queries/q1"}).encode()
+        return 200, json.dumps({"status": "failed"}).encode()
+
+    c._request.side_effect = fake_request
+    b = TrafficQueryBuilder(c)
+    with patch("src.api.traffic_query.time.sleep", lambda *a, **k: None):
+        rows = list(b._submit_and_stream_async_query({}))
+
+    assert rows == []
+    assert c.last_fetch_error is not None and "failed" in c.last_fetch_error.lower()
+
+
+def test_submit_accepted_but_no_href_sets_last_fetch_error():
+    c = _client()
+    c.last_fetch_error = None
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        if url.endswith("/async_queries"):
+            return 202, json.dumps({"status": "queued"}).encode()
+        return 200, json.dumps({"status": "completed", "matches_count": 1}).encode()
+
+    c._request.side_effect = fake_request
+    b = TrafficQueryBuilder(c)
+    rows = list(b._submit_and_stream_async_query({}))
+
+    assert rows == []
+    assert c.last_fetch_error is not None and "href" in c.last_fetch_error.lower()
+
+
+def test_download_failure_sets_last_fetch_error():
+    c = _client()
+    c.last_fetch_error = None
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        if url.endswith("/async_queries"):
+            return 202, json.dumps({"href": "/orgs/1/traffic_flows/async_queries/q1"}).encode()
+        if url.endswith("/download"):
+            return 500, None
+        return 200, json.dumps({"status": "completed", "matches_count": 1}).encode()
+
+    c._request.side_effect = fake_request
+    b = TrafficQueryBuilder(c)
+    with patch("src.api.traffic_query.time.sleep", lambda *a, **k: None):
+        rows = list(b._submit_and_stream_async_query({}))
+
+    assert rows == []
+    assert c.last_fetch_error is not None and "download" in c.last_fetch_error.lower()
+
+
+def test_download_retry_failure_then_success_clears_error():
+    """Critical: first download succeeds with 0 rows → retry 1 fails (HTTP 500,
+    sets last_fetch_error) → retry 2 succeeds with real rows → error must be
+    cleared so downstream ingestor doesn't discard the recovered rows."""
+    c = _client()
+    c.last_fetch_error = None
+    full_dl = _gzip_rows([{"src": {"ip": "a"}}, {"src": {"ip": "b"}}])
+    state = {"dl": 0}
+
+    def fake_request(url, method="GET", data=None, timeout=None, rate_limit=False):
+        if url.endswith("/async_queries"):
+            return 202, json.dumps({"href": "/orgs/1/traffic_flows/async_queries/q1"}).encode()
+        if url.endswith("/download"):
+            state["dl"] += 1
+            if state["dl"] == 1:
+                return 200, _gzip_rows([])  # first: 0 rows, triggers retry
+            elif state["dl"] == 2:
+                return 500, None  # retry 1: HTTP 500 failure, sets error
+            else:
+                return 200, full_dl  # retry 2: succeeds with 2 rows
+        return 200, json.dumps({"status": "completed", "matches_count": 2}).encode()
+
+    c._request.side_effect = fake_request
+    b = TrafficQueryBuilder(c)
+    with patch("src.api.traffic_query.time.sleep", lambda *a, **k: None):
+        rows = list(b._submit_and_stream_async_query({}))
+
+    assert len(rows) == 2, f"retry should recover 2 rows, got {len(rows)}"
+    assert c.last_fetch_error is None, \
+        "error must be cleared when retry succeeds, else ingestor discards recovered rows"
+
+
 def test_fetch_traffic_for_report_threads_rate_limit(monkeypatch):
     """fetch_traffic_for_report must forward rate_limit down to
     execute_traffic_query_stream."""

@@ -1029,6 +1029,8 @@ class Reporter:
             logger.warning("Failed to persist dispatch history: {}", exc)
         return results
 
+    _LINE_MESSAGE_CAP = 4500  # LINE push API 實際上限 ~5000，留 buffer（spec §C）
+
     def _build_line_message(self, subj: str, *, lang: str | None = None) -> str:
         """Build a LINE-friendly alert digest aligned to the vendor event content baseline."""
         _lang = lang or self._dispatch_lang or self._lang
@@ -1138,7 +1140,7 @@ class Reporter:
             if len(self.metric_alerts) > 2:
                 metric_section_lines.append(t('line_section_more', more=len(self.metric_alerts) - 2))
 
-        return render_alert_template(
+        message = render_alert_template(
             "line_digest.txt.tmpl",
             subject=self._compact_text(subj),
             generated_at=self._now_str(),
@@ -1152,6 +1154,11 @@ class Reporter:
             traffic_section="\n".join(traffic_section_lines),
             metric_section="\n".join(metric_section_lines),
         ).strip()
+
+        if len(message) > self._LINE_MESSAGE_CAP:
+            footer = t("line_message_truncated")
+            message = message[: self._LINE_MESSAGE_CAP - len(footer) - 1].rstrip() + "\n" + footer
+        return message
 
     def _build_telegram_message(self, subj: str, *, lang: str | None = None) -> str:
         """Build an HTML-formatted alert digest for Telegram (parse_mode=HTML).

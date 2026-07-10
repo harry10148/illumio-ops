@@ -41,6 +41,7 @@ import pytest
 
 from src.analyzer import Analyzer, WATCHDOG_FAILURE_THRESHOLD
 from src.config import ConfigManager
+from src.events.poller import format_utc
 from src.state_store import load_state_file, update_state_file
 
 
@@ -181,3 +182,78 @@ def test_save_state_merge_defers_to_disk_traffic_overflow(state_file):
 
     on_disk = load_state_file(state_file)
     assert on_disk["traffic_overflow"] == fresher_overflow
+
+
+# ─── Task 2: alert_dlq must survive a cache-only cycle ────────────────────
+
+def test_save_state_merge_defers_to_disk_alert_dlq(state_file):
+    """Isolates the _merge fix: alert_dlq is written exclusively by the
+    Reporter's DLQ push/pop (via update_state_file, src/reporter.py), never
+    by Analyzer. Simulate the Reporter clearing the on-disk queue (a
+    successful retry-drain) in the gap between this Analyzer instance's
+    load_state() (at construction) and its save_state() call — the cleared
+    disk value must survive, not be resurrected by this cycle's stale
+    in-memory snapshot."""
+    entry = {"attempts": 1, "first_failed_at": "2026-07-10T00:00:00+00:00"}
+    update_state_file(state_file, lambda s: {**s, "alert_dlq": [entry]})
+    ana = _cache_analyzer()
+    assert ana.state["alert_dlq"] == [entry]  # stale snapshot taken at load
+
+    # Reporter drains the DLQ mid-cycle (successful retry).
+    update_state_file(state_file, lambda s: {**s, "alert_dlq": []})
+
+    ana.save_state()
+
+    on_disk = load_state_file(state_file)
+    assert on_disk["alert_dlq"] == []
+
+
+# ─── H-Task 3 (scheduler side): watchdog_last_alert_at must survive a
+# cache-only cycle ──────────────────────────────────────────────────────────
+
+def test_save_state_merge_defers_to_disk_watchdog_last_alert_at_when_not_dirty(state_file):
+    """Isolates the _merge fix: watchdog_last_alert_at is co-owned with the
+    scheduler's cache-ingest jobs — _record_ingest_pce_result's
+    record_pce_success clears it to None on disk directly when a real PCE
+    probe recovers (see d75170e). Simulate that recovery landing on disk in
+    the gap between this Analyzer instance's load_state() (at construction,
+    snapshotting the still-stale timestamp left by a prior incident) and its
+    save_state() call. The cleared (None) disk value must survive — not be
+    resurrected by this cycle's stale in-memory snapshot — otherwise a fresh
+    incident within the 60-minute cooldown window of the old one is silently
+    suppressed (the exact bug H-Task 3 was meant to eliminate, reborn on the
+    scheduler side)."""
+    stale_ts = format_utc(datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10))
+    update_state_file(state_file, lambda s: {**s, "watchdog_last_alert_at": stale_ts})
+    ana = _cache_analyzer()
+    assert ana.state["watchdog_last_alert_at"] == stale_ts  # stale snapshot taken at load
+
+    # Scheduler's ingest job recovers mid-cycle: record_pce_success clears
+    # watchdog_last_alert_at to None on disk directly (never through this
+    # Analyzer instance).
+    update_state_file(state_file, lambda s: {**s, "watchdog_last_alert_at": None})
+
+    ana.save_state()
+
+    on_disk = load_state_file(state_file)
+    assert on_disk["watchdog_last_alert_at"] is None
+
+
+def test_check_watchdog_alert_timestamp_survives_save_when_pce_stats_not_dirty(state_file):
+    """Reverse pin: a cache-only cycle where _check_watchdog itself fires an
+    alert (no health-check rule deployed, so self._pce_stats_dirty stays
+    False all cycle) must still persist the timestamp _check_watchdog just
+    wrote into self.state. watchdog_last_alert_at needs its own dirty flag,
+    separate from _pce_stats_dirty — sharing it would make save_state() defer
+    to disk (stale/absent) instead of writing this cycle's own cooldown
+    timestamp, so the watchdog would re-alert every cycle instead of
+    respecting WATCHDOG_COOLDOWN_MINUTES."""
+    update_state_file(state_file, lambda s: {
+        **s, "pce_stats": {"consecutive_failures": WATCHDOG_FAILURE_THRESHOLD}
+    })
+    ana = _cache_analyzer()
+    _run_cache_cycle(ana)  # no health rule -> _pce_stats_dirty stays False; _check_watchdog still fires
+
+    ana.reporter.add_health_alert.assert_called_once()
+    on_disk = load_state_file(state_file)
+    assert on_disk["watchdog_last_alert_at"]

@@ -73,3 +73,30 @@ def test_load_error_reported_in_progress(tmp_path):
     st = _wait_terminal()
     assert st["state"] == "error"
     assert st["error"]
+
+
+def test_progress_resets_on_new_round_after_prior_error(tmp_path):
+    """本 sweep：上一輪以 error 結束後，_PROGRESS 的 'error' 欄位不得殘留到
+    下一輪的 done 狀態——start_archive_load 開始新輪時整個 dict 是重置
+    （_set_progress 先 clear() 再 update()），不是與舊欄位 merge。"""
+    from src.pce_cache.archive_import import start_archive_load, load_progress
+    (tmp_path / "arch").mkdir()
+
+    # Round 1：逼出錯誤（bad db_path）
+    (tmp_path / "arch" / "traffic-2026-07-01.jsonl").write_bytes(b"")
+    bad_cfg = _cfg(tmp_path)
+    bad_cfg.db_path = str(tmp_path / "no-such-dir" / "x" / "cache.sqlite")
+    start_archive_load(bad_cfg, date(2026, 7, 1), date(2026, 7, 1))
+    st1 = _wait_terminal()
+    assert st1["state"] == "error"
+    assert "error" in st1
+
+    # Round 2：合法設定，應成功且不帶前一輪殘留的 error 欄位
+    _write_archive(tmp_path / "arch", "2026-07-02", 3)
+    cfg = _cfg(tmp_path)
+    start_archive_load(cfg, date(2026, 7, 2), date(2026, 7, 2))
+    st2 = _wait_terminal()
+    assert st2["state"] == "done"
+    assert "error" not in st2
+    assert st2["rows"] == 3
+    assert load_progress() == st2
