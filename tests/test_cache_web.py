@@ -237,6 +237,25 @@ def test_cache_health_500_does_not_leak_exception_detail(client, monkeypatch):
     assert "secret-db-path-leak" not in body["error"]
 
 
+def test_cache_health_capacity_failure_isolated(client, monkeypatch):
+    """capacity_snapshot 例外不可讓整個 /api/cache/health 變成錯誤回應——
+    verdict/lag/siem/dlq 等既有欄位須照常回傳，capacity 降級為 None。"""
+    def _boom(*args, **kwargs):
+        raise RuntimeError("capacity blew up")
+
+    monkeypatch.setattr("src.pce_cache.capacity.capacity_snapshot", _boom)
+    resp = client.get("/api/cache/health",
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["capacity"] is None
+    assert "verdict" in body
+    assert "lag_levels" in body
+    assert "cache_lag" in body
+    assert "siem_success_1h" in body
+    assert "dlq" in body
+
+
 def test_cache_lag_empty(client):
     resp = client.get("/api/cache/lag",
                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})

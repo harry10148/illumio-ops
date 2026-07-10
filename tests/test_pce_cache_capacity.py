@@ -1,11 +1,11 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from src.pce_cache.models import PceTrafficFlowRaw
+from src.pce_cache.models import IngestionCursor, PceTrafficFlowRaw
 
 
 @pytest.fixture
@@ -33,6 +33,33 @@ def test_capacity_snapshot_shape_and_lag(cache_db):
     assert snap["siem_pending"] == 0
     # 有資料但 archiver 從未推進 cursor → None（全部未封存）
     assert snap["archiver_lag_seconds"]["traffic"] is None
+
+
+def test_capacity_snapshot_computes_real_lag_from_db(cache_db):
+    """archiver 已推進過 cursor 時，lag 走真正的 (newest - archived) 減法分支
+    （非合成 int），須用真 DB 一筆 raw row + 一筆 IngestionCursor 覆蓋，驗證
+    SQLite 讀回的 naive UTC datetime 相減能得到已知偏移秒數。"""
+    from src.pce_cache.capacity import capacity_snapshot
+    db_path, sf = cache_db
+    newest = datetime.now(timezone.utc)
+    offset_seconds = 900
+    archived = newest - timedelta(seconds=offset_seconds)
+    with sf.begin() as s:
+        s.add(PceTrafficFlowRaw(
+            flow_hash="cap-h2", src_ip="1.1.1.1", dst_ip="2.2.2.2",
+            port=80, protocol="tcp", action="allowed", flow_count=1,
+            bytes_in=0, bytes_out=0, first_detected=newest, last_detected=newest,
+            ingested_at=newest, raw_json="{}"))
+        s.add(IngestionCursor(
+            consumer="archiver", source_table="pce_traffic_flows_raw",
+            last_ingested_at=archived, last_row_id=1,
+            updated_at=newest,
+        ))
+    cfg = SimpleNamespace(db_path=db_path, archive_enabled=True)
+    snap = capacity_snapshot(sf, cfg)
+    lag = snap["archiver_lag_seconds"]["traffic"]
+    assert lag is not None
+    assert abs(lag - offset_seconds) <= 1
 
 
 def test_capacity_warnings_thresholds():

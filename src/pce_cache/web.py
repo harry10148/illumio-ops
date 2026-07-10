@@ -5,6 +5,7 @@ import threading
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required
+from loguru import logger
 
 from src.i18n import t
 from src.gui._helpers import _err_with_log
@@ -209,8 +210,12 @@ def api_cache_health():
             denom=totals["denom"],
             dlq=totals["dlq"],
         )
-        from src.pce_cache.capacity import capacity_snapshot
-        capacity = capacity_snapshot(sf, current_app.config["CM"].models.pce_cache)
+        try:
+            from src.pce_cache.capacity import capacity_snapshot
+            capacity = capacity_snapshot(sf, current_app.config["CM"].models.pce_cache)
+        except Exception as cap_exc:
+            logger.warning("capacity_snapshot failed in /api/cache/health: {}", cap_exc)
+            capacity = None
         return jsonify({
             "verdict": verdict,
             "lag_levels": levels,
