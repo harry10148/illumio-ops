@@ -25,6 +25,9 @@ class TestExpandObjectFiltersForDf(unittest.TestCase):
             "public_ip": "203.0.113.5",
             "interfaces": [{"address": "10.1.2.3"}, {"address": "fe80::1"}],
         })
+        self.client.service_ports_cache = {
+            "/x/services/1": [{"port": 443, "proto": 6}, {"windows_service_name": "w"}],
+        }
 
     def tearDown(self):
         self._td.cleanup()
@@ -101,3 +104,7 @@ class TestExpandObjectFiltersForDf(unittest.TestCase):
         rg._fetch_traffic_df(dt.datetime(2026, 7, 1), dt.datetime(2026, 7, 2),
                              filters={"ex_any_iplist": "prod-subnets"}, use_cache=False)
         assert "_ex_any_object_cidrs" in captured
+
+    def test_expand_services_to_port_entries(self):
+        out = self.client.expand_object_filters_for_df({"services": ["/x/services/1"]})
+        assert out["_svc_port_entries"] == [{"port": 443, "proto": 6}]

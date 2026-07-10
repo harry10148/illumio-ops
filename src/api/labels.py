@@ -524,8 +524,10 @@ class LabelResolver:
             "_any_object_cidrs": ("any_iplist", "any_workload"),
             "_ex_any_object_cidrs": ("ex_any_iplist", "ex_any_workload"),
         }
-        if not filters or not any(
-                filters.get(k) for keys in obj_keys.values() for k in keys):
+        svc_keys = (("services", "_svc_port_entries"), ("ex_services", "_ex_svc_port_entries"))
+        has_svc = any(filters.get(k) for k, _ in svc_keys) if filters else False
+        if not filters or (not any(
+                filters.get(k) for keys in obj_keys.values() for k in keys) and not has_svc):
             return filters
 
         def _iplist_cidrs(value):
@@ -574,4 +576,20 @@ class LabelResolver:
                     cidrs.extend(_iplist_cidrs(v) if "iplist" in k else _workload_ips(v))
             if cidrs:
                 out[dest] = cidrs
+
+        for key, internal in svc_keys:
+            vals = filters.get(key)
+            if not vals:
+                continue
+            vals = vals if isinstance(vals, list) else [vals]
+            entries = []
+            for href in vals:
+                for e in (self.resolve_service_entries(href) or []):
+                    if "port" in e or "proto" in e:
+                        entries.append(e)
+                    else:
+                        logger.warning(
+                            "Cache path cannot match name-based service entry {}; skipped", e)
+            if entries:
+                out[internal] = entries
         return out

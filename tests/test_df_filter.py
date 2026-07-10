@@ -213,3 +213,33 @@ def test_ex_any_ip_excludes_either_side():
     # ex_any_ip=10.0.0.1 命中 row0 的 src 側 → 該列被剔除，其餘保留
     out = apply_df_traffic_filters(_df_two_apps(), {"ex_any_ip": "10.0.0.1"})
     assert sorted(out["src_ip"]) == ["10.0.0.2", "10.0.0.3"]
+
+
+def _ports_df():
+    return pd.DataFrame([
+        {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 80, "proto": "TCP"},
+        {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 443, "proto": "TCP"},
+        {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "port": 1500, "proto": "UDP"},
+    ])
+
+
+def test_ports_tokens_include_or():
+    out = apply_df_traffic_filters(_ports_df(), {"ports": ["80", "1000-2000/udp"]})
+    assert sorted(out["port"].tolist()) == [80, 1500]
+
+
+def test_ex_ports_exclude():
+    out = apply_df_traffic_filters(_ports_df(), {"ex_ports": ["443/tcp"]})
+    assert 443 not in out["port"].tolist()
+
+
+def test_svc_port_entries_internal_keys():
+    out = apply_df_traffic_filters(_ports_df(), {"_svc_port_entries": [{"port": 443, "proto": 6}]})
+    assert out["port"].tolist() == [443]
+    out2 = apply_df_traffic_filters(_ports_df(), {"_ex_svc_port_entries": [{"port": 443, "proto": 6}]})
+    assert 443 not in out2["port"].tolist()
+
+
+def test_ports_include_all_invalid_fail_closed():
+    out = apply_df_traffic_filters(_ports_df(), {"ports": ["nonsense"]})
+    assert out.empty
