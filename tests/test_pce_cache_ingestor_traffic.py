@@ -246,6 +246,58 @@ def test_since_cursor_attaches_utc_offset_to_naive_watermark(session_factory):
     assert parsed == datetime(2026, 5, 1, 11, 55, 0, tzinfo=timezone.utc)
 
 
+class _ConnectionFailingApiClient:
+    """Mirrors real ApiClient: get_traffic_flows_async() swallows a connection-
+    layer PCE failure (submit status 0) into [] but reports it via
+    last_fetch_error (see src/api/traffic_query.py _submit_and_stream_async_query
+    / watchdog-live-reverify-report.md step 2 — traffic 鏈同構 bug)."""
+    last_fetch_error = "Connection refused"
+
+    def get_traffic_flows_async(self, max_results=200000, rate_limit=False, **kw):
+        return []
+
+
+def test_run_once_records_error_on_silently_swallowed_connection_failure(session_factory):
+    """RED (pre-fix): a connection-layer failure was swallowed to [] inside
+    the async query submit path, so run_once() never saw an exception and the
+    watermark stayed 'ok'. Fix: _fetch_window checks ApiClient.last_fetch_error
+    and raises, reaching run_once()'s except → watermark.record_error()."""
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+    from src.pce_cache.models import IngestionWatermark
+
+    fake = _ConnectionFailingApiClient()
+    ing = TrafficIngestor(api=fake, session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory))
+
+    count = ing.run_once()
+
+    assert count == 0
+    with session_factory() as s:
+        row = s.get(IngestionWatermark, "traffic")
+    assert row is not None and row.last_status == "error"
+    assert "Connection refused" in (row.last_error or "")
+
+
+def test_run_once_does_not_record_error_on_genuinely_empty_response(session_factory):
+    """Reverse pin: PCE reachable, genuinely 0 new flows (no last_fetch_error)
+    must NOT be recorded as an error."""
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+    from src.pce_cache.models import IngestionWatermark
+
+    fake = FakeApiClient([])  # no last_fetch_error attribute at all
+    ing = TrafficIngestor(api=fake, session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory))
+
+    count = ing.run_once()
+
+    assert count == 0
+    with session_factory() as s:
+        row = s.get(IngestionWatermark, "traffic")
+    assert row is None or row.last_status != "error"
+
+
 def test_traffic_run_once_records_error_status_on_insert_failure(session_factory):
     import pytest
     from sqlalchemy.exc import OperationalError

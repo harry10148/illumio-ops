@@ -236,6 +236,61 @@ def test_async_threshold_uses_async_result_when_non_empty(session_factory):
     assert ids == {f"uuid-{100 + i}" for i in range(5)}
 
 
+class _ConnectionFailingApiClient:
+    """Mirrors real ApiClient: get_events() swallows a connection-layer PCE
+    failure into [] but reports it via last_fetch_error (see
+    src/api_client.py fetch_events / watchdog-live-reverify-report.md step 2)."""
+    last_fetch_error = "Connection refused"
+
+    def get_events(self, max_results=500, since=None, rate_limit=False, **kw):
+        return []
+
+    def get_events_async(self, since=None, rate_limit=False, **kw):
+        return []
+
+
+def test_run_once_records_error_on_silently_swallowed_connection_failure(session_factory):
+    """RED (pre-fix): a connection-layer failure inside get_events() was
+    swallowed to [] by fetch_events(), so run_once() never saw an exception and
+    the watermark stayed 'ok' — the watchdog got no signal on a real PCE
+    outage. Fix: check ApiClient.last_fetch_error and record it the same as
+    any other fetch failure."""
+    from src.pce_cache.ingestor_events import EventsIngestor
+    from src.pce_cache.watermark import WatermarkStore
+    from src.pce_cache.models import IngestionWatermark
+
+    fake = _ConnectionFailingApiClient()
+    ing = EventsIngestor(api=fake, session_factory=session_factory,
+                         watermark=WatermarkStore(session_factory), async_threshold=10000)
+
+    count = ing.run_once()
+
+    assert count == 0
+    with session_factory() as s:
+        row = s.get(IngestionWatermark, "events")
+    assert row is not None and row.last_status == "error"
+    assert "Connection refused" in (row.last_error or "")
+
+
+def test_run_once_does_not_record_error_on_genuinely_empty_response(session_factory):
+    """Reverse pin: PCE reachable, genuinely 0 new events (no last_fetch_error)
+    must NOT be recorded as an error — a false alarm is as bad as a missed one."""
+    from src.pce_cache.ingestor_events import EventsIngestor
+    from src.pce_cache.watermark import WatermarkStore
+    from src.pce_cache.models import IngestionWatermark
+
+    fake = FakeApiClient(events=[])  # no last_fetch_error attribute at all
+    ing = EventsIngestor(api=fake, session_factory=session_factory,
+                         watermark=WatermarkStore(session_factory), async_threshold=10000)
+
+    count = ing.run_once()
+
+    assert count == 0
+    with session_factory() as s:
+        row = s.get(IngestionWatermark, "events")
+    assert row is None or row.last_status != "error"
+
+
 def test_events_run_once_records_error_status_on_insert_failure(session_factory):
     import pytest
     from sqlalchemy.exc import OperationalError

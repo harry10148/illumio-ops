@@ -60,6 +60,22 @@ class EventsIngestor:
             self._wm.record_error(self.SOURCE, str(exc))
             return 0
 
+        # get_events()/get_events_async() route through ApiClient.fetch_events(),
+        # which swallows connection-layer PCE failures (DNS/refused/timeout)
+        # into an empty list instead of raising — so `events == []` alone can't
+        # tell "PCE unreachable" apart from "genuinely no new events". ApiClient
+        # surfaces the swallowed failure on last_fetch_error; treat it the same
+        # as the except-branch above (see watchdog-live-reverify-report.md step 2).
+        fetch_error = getattr(self._api, "last_fetch_error", None)
+        # isinstance guard: many tests pass a bare MagicMock() as `api`, whose
+        # unconfigured attributes auto-vivify into truthy child Mocks rather
+        # than None — without this guard every such test would spuriously
+        # trip the error path. The real ApiClient contract is always str|None.
+        if isinstance(fetch_error, str) and fetch_error:
+            logger.error("Events ingest: PCE fetch reported an error — {}", fetch_error)
+            self._wm.record_error(self.SOURCE, fetch_error)
+            return 0
+
         try:
             inserted = self._insert_batch(events)
             if events:

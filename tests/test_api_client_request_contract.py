@@ -185,6 +185,53 @@ def test_get_traffic_flows_async_threads_rate_limit_to_fetch_traffic_for_report(
     assert captured.get("rate_limit") is True
 
 
+# ── ingest-error-signal: fetch_events() must surface swallowed connection
+# failures on last_fetch_error so pce_cache ingestors can tell "PCE
+# unreachable" apart from "genuinely 0 events" (watchdog-live-reverify-
+# report.md step 2). Report/GUI consumers are untouched: they never read
+# last_fetch_error and fetch_events() still returns [] on failure exactly as
+# before.
+
+
+@responses.activate
+def test_fetch_events_connection_failure_sets_last_fetch_error(api_client):
+    url = "https://pce.example.com:8443/api/v2/orgs/1/events"
+    responses.add(responses.GET, url, body=ConnectionError("no route to host"))
+
+    result = api_client.fetch_events("2026-01-01T00:00:00Z")
+
+    assert result == []  # graceful degrade for existing consumers, unchanged
+    assert api_client.last_fetch_error, \
+        "connection failure must be recorded so ingest callers can distinguish it from a genuinely empty response"
+
+
+@responses.activate
+def test_fetch_events_success_clears_last_fetch_error(api_client):
+    """A later successful fetch must clear a stale error from a prior failed poll."""
+    url = "https://pce.example.com:8443/api/v2/orgs/1/events"
+    api_client.last_fetch_error = "stale error from a previous failed poll"
+    responses.add(responses.GET, url, status=200,
+                  body=b'[{"href": "/orgs/1/events/1", "timestamp": "2026-01-01T00:00:00Z"}]')
+
+    result = api_client.fetch_events("2026-01-01T00:00:00Z")
+
+    assert len(result) == 1
+    assert api_client.last_fetch_error is None
+
+
+@responses.activate
+def test_fetch_events_genuinely_empty_does_not_set_last_fetch_error(api_client):
+    """Reverse pin: PCE reachable and genuinely reports 0 events — must NOT be
+    mistaken for a connection failure (false-alarm risk)."""
+    url = "https://pce.example.com:8443/api/v2/orgs/1/events"
+    responses.add(responses.GET, url, status=200, body=b'[]')
+
+    result = api_client.fetch_events("2026-01-01T00:00:00Z")
+
+    assert result == []
+    assert api_client.last_fetch_error is None
+
+
 def test_api_client_fetch_traffic_for_report_threads_rate_limit(api_client, monkeypatch):
     """The facade's fetch_traffic_for_report wrapper must forward rate_limit
     to the TrafficQueryBuilder implementation."""

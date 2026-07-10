@@ -108,6 +108,20 @@ class TrafficIngestor:
             since=since_dt.isoformat(),
             until=until_dt.isoformat(),
         )
+        # get_traffic_flows_async() routes through the async query submit path
+        # (src/api/traffic_query.py _submit_and_stream_async_query), which
+        # swallows a connection-layer PCE failure into an empty result instead
+        # of raising — so `flows == []` alone can't tell "PCE unreachable" apart
+        # from "genuinely no new flows". Raise here so run_once()'s except
+        # branch records it via watermark.record_error(), same as any other
+        # fetch failure (see watchdog-live-reverify-report.md step 2).
+        fetch_error = getattr(self._api, "last_fetch_error", None)
+        # isinstance guard: many tests pass a bare MagicMock() as `api`, whose
+        # unconfigured attributes auto-vivify into truthy child Mocks rather
+        # than None — without this guard every such test would spuriously
+        # trip the error path. The real ApiClient contract is always str|None.
+        if isinstance(fetch_error, str) and fetch_error:
+            raise RuntimeError(f"PCE traffic fetch failed: {fetch_error}")
         if len(flows) < self._max_results:
             return flows
         span = until_dt - since_dt

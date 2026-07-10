@@ -165,6 +165,48 @@ def test_three_consecutive_ingest_failures_trigger_watchdog_via_analyzer(tmp_pat
         ana.reporter.add_health_alert.assert_called_once()
 
 
+def test_events_connection_failure_signals_watchdog_end_to_end(tmp_path):
+    """Closes the gap one layer below this module's other tests: those mock
+    EventsIngestor entirely and only verify _record_ingest_pce_result's own
+    bookkeeping (already correct per 756e078). This test drives a REAL
+    EventsIngestor + real WatermarkStore against an ApiClient stand-in that
+    reproduces the actual swallow bug (fetch_events() returns [] on a
+    connection-layer failure, see src/api_client.py and
+    watchdog-live-reverify-report.md step 2) — proving the fix makes the
+    signal reach pce_stats.consecutive_failures without any mocking of the
+    ingestor itself."""
+    from sqlalchemy import create_engine
+    from src.pce_cache.schema import init_schema
+    from src.scheduler.jobs import run_events_ingest
+
+    class ConnectionFailingApiClient:
+        last_fetch_error = "Connection refused"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def get_events(self, max_results=500, since=None, rate_limit=False, **kw):
+            return []
+
+        def get_events_async(self, since=None, rate_limit=False, **kw):
+            return []
+
+    cm = _cm(tmp_path)
+    engine = create_engine(f"sqlite:///{tmp_path / 'cache.sqlite'}")
+    init_schema(engine)
+
+    with patch("src.scheduler.jobs._get_cache_engine", return_value=engine), \
+         patch("src.api_client.ApiClient", return_value=ConnectionFailingApiClient()):
+        run_events_ingest(cm)
+
+    state = _load_state(tmp_path)
+    assert state["pce_stats"]["consecutive_failures"] == 1
+    assert "Connection refused" in state["pce_stats"]["last_error"]
+
+
 def test_partial_failure_across_jobs_does_not_falsely_trigger_watchdog(tmp_path):
     """One ingestor (traffic) chronically fails while the other (events)
     keeps succeeding: since PCE is demonstrably reachable, the shared counter
