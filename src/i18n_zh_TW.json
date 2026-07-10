@@ -4333,5 +4333,6 @@
   "gui_sched_rt_rhc": "規則命中次數報表",
   "gui_toast_rhc_done": "規則命中次數報表已產生（{count} 條規則）",
   "gui_toast_rhc_error": "規則命中次數報表錯誤：{error}",
-  "gui_toast_rhc_fail": "規則命中次數報表產生失敗"
+  "gui_toast_rhc_fail": "規則命中次數報表產生失敗",
+  "gui_rhc_pull_timeout": "PCE 尚未完成準備 Rule Hit Count 報表，請稍後再試。"
 }

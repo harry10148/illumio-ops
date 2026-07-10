@@ -23,6 +23,7 @@ from src.gui._helpers import (
     _write_audit_dashboard_summary,
     _write_policy_usage_dashboard_summary,
 )
+from src.api.reports import RuleHitCountPullTimeout
 from src.report.rule_hit_count_enablement import (
     EnablementError,
     RuleHitCountNotEnabled,
@@ -88,6 +89,20 @@ def make_reports_blueprint(
     login_required,  # flask_login.login_required decorator (unused here, kept for consistent signature)
 ) -> Blueprint:
     bp = Blueprint("reports", __name__)
+
+    def _audit_rhc_action(action, result, **fields):
+        """Rule hit count 啟用審計——best-effort，絕不阻斷主操作（比照 actions.py 的 _audit_action 慣例）。"""
+        try:
+            from src.module_log import ModuleLog as _ML
+            try:
+                from flask_login import current_user
+                user = current_user.get_id() if getattr(current_user, "is_authenticated", False) else "?"
+            except Exception:
+                user = "?"
+            parts = " ".join(f"{k}={v}" for k, v in fields.items())
+            _ML.get("actions").info(f"{action}: user={user} result={result} {parts}")
+        except Exception:
+            pass
 
     # ── API: Reports ──────────────────────────────────────────────────────────
 
@@ -793,10 +808,13 @@ def make_reports_blueprint(
                 _ML.get("reports").info(f"Rule hit count enabled via GUI: {steps}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
+            _audit_rhc_action("rule_hit_count_enable", "success", steps_done=steps)
             return jsonify({"ok": True, "steps_done": steps})
         except EnablementError as e:
+            _audit_rhc_action("rule_hit_count_enable", "failed", error=str(e), steps_done=e.steps_done)
             return jsonify({"ok": False, "error": str(e), "steps_done": e.steps_done})
         except Exception as e:
+            _audit_rhc_action("rule_hit_count_enable", "failed", error=str(e))
             return _err_with_log("rule_hit_count_enable", e, lang=lang)
 
     @bp.route('/api/rule_hit_count_report/generate', methods=['POST'])
@@ -847,6 +865,14 @@ def make_reports_blueprint(
                                     "state": exc.status.state,
                                     "detail": exc.status.detail,
                                     "error": t("gui_rhc_use_pu_hint", lang=lang)})
+                except RuleHitCountPullTimeout:
+                    # TimeoutError is an OSError subclass — must be caught here,
+                    # before the generic `except Exception` below, or it falls
+                    # through to a plain 500 "Internal server error" and the
+                    # frontend can't tell "PCE still preparing" from a hard
+                    # failure (mirrors src/cli/report.py's ordering).
+                    return jsonify({"ok": False, "pull_timeout": True,
+                                    "error": t("gui_rhc_pull_timeout", lang=lang)})
 
             if result.record_count == 0:
                 return jsonify({"ok": False, "error": t("gui_no_rhc_data", lang=lang)})

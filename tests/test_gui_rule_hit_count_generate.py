@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 
 from tests._helpers import _csrf
 
+from src.api.reports import RuleHitCountPullTimeout
 from src.report.rule_hit_count_enablement import EnablementStatus, RuleHitCountNotEnabled
 
 
@@ -81,3 +82,52 @@ def test_generate_not_enabled_returns_needs_enablement(client):
     assert body["ok"] is False
     assert body["needs_enablement"] is True
     assert body["state"] == "disabled"
+
+
+def test_generate_native_pull_timeout_returns_pull_timeout_flag(client):
+    """Finding 1: RuleHitCountPullTimeout must not fall into the generic 500
+    handler — the GUI needs to tell the caller the PCE is still preparing the
+    report, distinct from a hard failure."""
+    csrf_token = _login(client)
+    exc = RuleHitCountPullTimeout("/orgs/1/reports/abc123")
+    with patch("src.report.rule_hit_count_generator.RuleHitCountGenerator") as MockGen:
+        MockGen.return_value.generate_from_native.side_effect = exc
+        r = client.post(
+            "/api/rule_hit_count_report/generate",
+            json={"source": "native", "lang": "en"},
+            headers={"X-CSRF-Token": csrf_token},
+            environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+        )
+    body = r.get_json()
+    assert body["ok"] is False
+    assert body["pull_timeout"] is True
+    assert body["error"]
+    assert "Internal server error" not in body.get("error", "")
+    assert r.status_code != 500
+
+
+def test_enable_endpoint_writes_audit_log(client, monkeypatch):
+    """Finding 2: enable success must be recorded in the actions audit log
+    (operator + result), mirroring actions.py's _audit_action convention."""
+    csrf_token = _login(client)
+
+    records = []
+
+    class _Rec:
+        def info(self, msg):
+            records.append(msg)
+
+    from src.module_log import ModuleLog
+    monkeypatch.setattr(ModuleLog, "get", classmethod(
+        lambda cls, name: _Rec() if name == "actions" else MagicMock()))
+
+    with patch("src.gui.routes.reports.enable_rule_hit_count",
+               return_value=["pce_report_template", "ven_firewall_settings_draft",
+                             "provisioned"]):
+        r = client.post("/api/rule_hit_count/enable", json={},
+                        headers={"X-CSRF-Token": csrf_token},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert r.get_json()["ok"] is True
+    audit = [m for m in records if "rule_hit_count_enable" in m]
+    assert len(audit) == 1
+    assert "user=admin" in audit[0]

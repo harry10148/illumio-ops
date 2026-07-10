@@ -1945,6 +1945,7 @@
   "gui_rhc_enable_failed": "Enable failed: {error}",
   "gui_rhc_enabled_ok": "Enabled. VENs need time to start reporting — generate the report again later.",
   "gui_rhc_needs_enable_confirm": "Native Rule Hit Count is not enabled ({state}). Enable it now for ALL VENs? WARNING: this writes draft firewall_settings and PROVISIONS to production policy. (For label-scoped enablement use the CLI wizard.)",
+  "gui_rhc_pull_timeout": "The PCE has not finished preparing the Rule Hit Count report yet. Please retry later.",
   "gui_rhc_use_pu_hint": "Not enabled — you can use the Policy Usage report (traffic-approximated counts) instead.",
   "gui_rows": "Rows",
   "gui_rs_action_label": "Action",

@@ -633,6 +633,7 @@
   "gui_rhc_enable_failed": "啟用失敗：{error}",
   "gui_rhc_enabled_ok": "已啟用。VEN 需要時間開始回報——請稍後再產生報表。",
   "gui_rhc_needs_enable_confirm": "原生 Rule Hit Count 未啟用（{state}）。要立即對「全部 VEN」啟用嗎？警告：這會寫入 draft firewall_settings 並 provision 到生產 policy。（指定 label 範圍請改用 CLI 精靈。）",
+  "gui_rhc_pull_timeout": "PCE 尚未完成準備 Rule Hit Count 報表，請稍後再試。",
   "gui_rhc_use_pu_hint": "未啟用——可改用 Policy Usage 報表（流量近似計數）。",
   "gui_rows": "筆數",
   "gui_rs_action_label": "動作",
