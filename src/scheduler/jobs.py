@@ -77,6 +77,104 @@ def tick_rule_schedules(cm) -> None:
         mlog.error(f"Rule schedule tick failed: {exc}")
 
 
+def _record_ingest_pce_result(source: str, wm=None, fallback_error: str | None = None) -> None:
+    """Mirror Analyzer's pce_stats.consecutive_failures bookkeeping for the
+    cache-ingest scheduler path.
+
+    Background: when pce_cache.enabled=true, Analyzer.run_analysis() reads
+    events/traffic from the local cache and never calls the live PCE itself,
+    so record_pce_error()/record_pce_success() (src/events/stats.py) were
+    never invoked from that deployment shape and AL-6's watchdog
+    (Analyzer._check_watchdog) was dead code — see
+    .superpowers/sdd/live-verification-report.md finding #5.
+    run_events_ingest/run_traffic_ingest are the only code that actually
+    talks to the live PCE under pce_cache, so they now write into the SAME
+    state.json pce_stats field (via StatsTracker, unchanged shape) that
+    Analyzer reads back on its next load_state() call.
+
+    Counting semantic: ONE shared counter across both ingest jobs, matching
+    the legacy Analyzer path where health-check and event-poll failures
+    already share the same consecutive_failures field. Any successful PCE
+    pull resets it to 0; a failed pull increments it by 1 — evaluated
+    per-invocation, not batched into an artificial "tick" across the two
+    independently-scheduled jobs (events_poll_interval_seconds and
+    traffic_poll_interval_seconds need not match). Effect: a full PCE outage
+    (both jobs failing every invocation) climbs the counter monotonically
+    and crosses WATCHDOG_FAILURE_THRESHOLD within a few cycles; a single
+    chronically-broken ingestor with the other still healthy self-heals on
+    every success from its sibling, so it never falsely trips the "PCE is
+    unreachable" watchdog (that job's own log line / lag_monitor bookkeeping
+    covers its own failures separately).
+
+    wm: the WatermarkStore used by the ingestor this cycle. Its
+    last_status/last_error (set by TrafficIngestor/EventsIngestor even when
+    they swallow the underlying exception and return 0) is the ground truth
+    for whether this ingest actually reached the PCE. When wm is None or has
+    no row yet (e.g. the failure happened before the ingestor ran at all),
+    fallback_error forces a failure record instead.
+    """
+    from src.events import StatsTracker
+    from src.state_store import update_state_file
+
+    success = True
+    error = ""
+    if wm is not None:
+        row = wm.get(source)
+        if row is not None:
+            success = row.last_status != "error"
+            if not success:
+                error = row.last_error or ""
+    if fallback_error is not None:
+        success = False
+        error = fallback_error
+
+    def _update(existing: dict) -> dict:
+        tracker = StatsTracker(existing)
+        if success:
+            tracker.record_pce_success(source, message="cache ingest ok")
+        else:
+            tracker.record_pce_error(source, error or "ingest failed")
+        return tracker.state
+
+    try:
+        update_state_file(_resolve_state_file(), _update)
+    except Exception as exc:
+        logger.exception("Failed to persist ingest PCE stats for {}: {}", source, exc)
+
+
+def _record_traffic_overflow(overflow: dict | None) -> None:
+    """Mirror Analyzer's event_overflow bookkeeping for the traffic cache-
+    ingest path.
+
+    Background: TrafficIngestor's 1-min bisection floor (capacity-hardening
+    Task 1, ingestor_traffic._fetch_window) can still hit max_results with no
+    further bisection possible — that minute's flow data may be incomplete —
+    but it only ever logged a WARNING; no reporter alert existed for it (see
+    live-verification-report.md finding #7). Written into state.json under
+    traffic_overflow (same shape as the legacy event_overflow key) so
+    Analyzer._maybe_alert_overflow, now generalized to check both keys, can
+    fire a distinct meta-alert for it.
+
+    Always overwrites traffic_overflow with `overflow or {}` — mirrors
+    Analyzer._fetch_event_batch, which clears event_overflow to {} on every
+    poll that did NOT hit the cap, so a resolved overflow episode stops
+    alerting on the next cycle. Callers must only invoke this after a
+    successful fetch (see run_traffic_ingest) — a fetch failure tells us
+    nothing about overflow and must not clobber a real unresolved episode.
+    """
+    from src.state_store import update_state_file
+
+    def _update(existing: dict) -> dict:
+        existing = dict(existing)
+        existing["traffic_overflow"] = overflow or {}
+        return existing
+
+    try:
+        update_state_file(_resolve_state_file(), _update)
+    except Exception as exc:
+        logger.exception("Failed to persist traffic_overflow state: {}", exc)
+
+
 def _enabled_siem_destinations(cm, source_type: str) -> list[str]:
     """Return enabled destination names that subscribe to the given source_type."""
     siem_cfg = cm.models.siem
@@ -89,6 +187,7 @@ def _enabled_siem_destinations(cm, source_type: str) -> list[str]:
 
 
 def run_events_ingest(cm) -> None:
+    wm = None
     try:
         from sqlalchemy.orm import sessionmaker
         from src.pce_cache.watermark import WatermarkStore
@@ -96,18 +195,22 @@ def run_events_ingest(cm) -> None:
         from src.api_client import ApiClient
         cfg = cm.models.pce_cache
         sf = sessionmaker(_get_cache_engine(cfg.db_path))
+        wm = WatermarkStore(sf)
         with ApiClient(cm) as api:
             ing = EventsIngestor(api=api, session_factory=sf,
-                                  watermark=WatermarkStore(sf),
+                                  watermark=wm,
                                   async_threshold=cfg.async_threshold_events,
                                   siem_destinations=_enabled_siem_destinations(cm, "audit"))
             count = ing.run_once()
         logger.info("Events ingest: {} rows inserted", count)
+        _record_ingest_pce_result("events", wm)
     except Exception as exc:
         logger.exception("run_events_ingest failed: {}", exc)
+        _record_ingest_pce_result("events", wm, fallback_error=str(exc))
 
 
 def run_traffic_ingest(cm) -> None:
+    wm = None
     try:
         from sqlalchemy.orm import sessionmaker
         from src.pce_cache.watermark import WatermarkStore
@@ -115,15 +218,21 @@ def run_traffic_ingest(cm) -> None:
         from src.api_client import ApiClient
         cfg = cm.models.pce_cache
         sf = sessionmaker(_get_cache_engine(cfg.db_path))
+        wm = WatermarkStore(sf)
         with ApiClient(cm) as api:
             ing = TrafficIngestor(api=api, session_factory=sf,
-                                   watermark=WatermarkStore(sf),
+                                   watermark=wm,
                                    max_results=cfg.traffic_sampling.max_rows_per_batch,
                                    siem_destinations=_enabled_siem_destinations(cm, "traffic"))
             count = ing.run_once()
         logger.info("Traffic ingest: {} rows inserted", count)
+        _record_ingest_pce_result("traffic", wm)
+        row = wm.get(TrafficIngestor.SOURCE)
+        if row is None or row.last_status != "error":
+            _record_traffic_overflow(ing.last_run_overflow)
     except Exception as exc:
         logger.exception("run_traffic_ingest failed: {}", exc)
+        _record_ingest_pce_result("traffic", wm, fallback_error=str(exc))
 
 
 def run_traffic_aggregate(cm) -> None:

@@ -75,6 +75,31 @@ class StatsTracker:
             pce_stats["last_event_poll"] = now_str
         self.record_timeline("pce_ok", f"{stage} ok", status=status, message=message)
 
+    def record_local_read(self, stage: str, *, success: bool, message: str = "", error: str = "") -> None:
+        """Record a LOCAL cache-read outcome for dashboard display only.
+
+        Used by the pce_cache-ingest deployment shape's monitor cycle, which
+        reads events from the local on-disk cache already populated by the
+        scheduler's ingest jobs (run_events_ingest/run_traffic_ingest) — the
+        code that actually talks to the live PCE on that deployment shape.
+        A local cache read succeeding or failing says nothing about live PCE
+        reachability, so unlike record_pce_success/record_pce_error this
+        never touches pce_stats.consecutive_failures (the watchdog counter);
+        it only updates the dashboard-facing event_poll_status/
+        last_event_poll/last_error* fields. See
+        .superpowers/sdd/watchdog-overflow-fix-report.md (C1).
+        """
+        now_str = format_utc(datetime.datetime.now(datetime.timezone.utc))
+        pce_stats = self.state.setdefault("pce_stats", {})
+        pce_stats["event_poll_status"] = "ok" if success else "error"
+        pce_stats["last_event_poll"] = now_str
+        if success:
+            self.record_timeline("pce_ok", f"{stage} ok", status=200, message=message)
+        else:
+            pce_stats["last_error"] = error[:300]
+            pce_stats["last_error_stage"] = stage
+            self.record_timeline("pce_error", f"{stage} failed", status=None, error=error[:300])
+
     def record_pce_error(self, stage: str, error: str, *, status=None) -> None:
         now_str = format_utc(datetime.datetime.now(datetime.timezone.utc))
         pce_stats = self.state.setdefault("pce_stats", {})
