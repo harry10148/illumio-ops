@@ -128,3 +128,61 @@ def test_ex_dst_ip_list_excludes_on_dst_hit():
     flow = _flow_with_ips(dst_ip="10.0.0.5")
     assert _match(flow, {"ex_dst_ip": ["10.0.0.5", "10.0.0.9"]}) is False
     assert _match(flow, {"ex_src_ip": ["10.0.0.5"]}) is True
+
+
+# ─── src_ip_in/dst_ip_in list 形殘餘比對（native 解析失敗降級時，不得靜默不過濾）───
+
+def test_src_ip_in_list_matches_or():
+    flow = _flow_with_ips(src_ip="10.0.0.1")
+    assert _match(flow, {"src_ip_in": ["10.0.0.1", "10.0.0.9"]}) is True
+    assert _match(flow, {"src_ip_in": ["10.0.0.2", "10.0.0.9"]}) is False
+
+
+def test_dst_ip_in_list_matches_or():
+    flow = _flow_with_ips(dst_ip="10.0.0.5")
+    assert _match(flow, {"dst_ip_in": ["10.0.0.5", "10.0.0.9"]}) is True
+    assert _match(flow, {"dst_ip_in": ["10.0.0.2", "10.0.0.9"]}) is False
+
+
+def test_src_ip_in_scalar_still_supported():
+    # native 解析失敗仍可能只降級單一 scalar 值（非 list）——沿用既有 scalar 慣例
+    flow = _flow_with_ips(src_ip="10.0.0.1")
+    assert _match(flow, {"src_ip_in": "10.0.0.1"}) is True
+    assert _match(flow, {"src_ip_in": "10.0.0.2"}) is False
+
+
+# ─── _ip_match CIDR containment（IPv4 強制；語意對齊 df_filter._ip_mask）───
+
+def test_ip_match_cidr_containment_hit():
+    flow = _flow_with_ips(src_ip="10.0.0.5")
+    assert _match(flow, {"src_ip": "10.0.0.0/24"}) is True
+
+
+def test_ip_match_cidr_containment_miss():
+    flow = _flow_with_ips(src_ip="10.0.1.5")
+    assert _match(flow, {"src_ip": "10.0.0.0/24"}) is False
+
+
+def test_ip_match_cidr_containment_in_list_or():
+    flow = _flow_with_ips(src_ip="10.0.0.5")
+    assert _match(flow, {"src_ip_in": ["10.0.0.0/24", "192.168.0.0/24"]}) is True
+    assert _match(flow, {"src_ip_in": ["172.16.0.0/24", "192.168.0.0/24"]}) is False
+
+
+def test_ip_match_cidr_illegal_fails_closed():
+    flow = _flow_with_ips(src_ip="10.0.0.5")
+    assert _match(flow, {"src_ip": "10.0.0.0/not-a-mask"}) is False
+
+
+def test_ip_match_cidr_ipv6_fails_closed():
+    # IPv4 強制：IPv6 CIDR 沿用既有 IPv6 range fail-closed 慣例
+    flow = {"src": {"ip": "a::5", "ip_lists": [], "workload": {"labels": []}},
+            "dst": {"ip": "", "ip_lists": [], "workload": {"labels": []}},
+            "service": {}}
+    assert _match(flow, {"src_ip": "a::/64"}) is False
+
+
+def test_ex_src_ip_cidr_excludes_on_containment():
+    flow = _flow_with_ips(src_ip="10.0.0.5")
+    assert _match(flow, {"ex_src_ip": "10.0.0.0/24"}) is False
+    assert _match(flow, {"ex_src_ip": "192.168.0.0/24"}) is True

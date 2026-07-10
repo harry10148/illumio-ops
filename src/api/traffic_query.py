@@ -906,6 +906,18 @@ class TrafficQueryBuilder:
         def _ip_match(side: dict, ip_str: str) -> bool:
             if side.get('ip') == ip_str:
                 return True
+            if '/' in ip_str:
+                # CIDR containment，語意對齊 src/report/df_filter.py::_ip_mask。
+                # IPv4 強制：非法 CIDR／IPv6 CIDR 皆 fail-closed（沿用本函式既有
+                # IPv6 range fail-closed 慣例，這條路徑把關 live 查詢真實筆數，
+                # 非 cache 顯示層的容錯展示）。
+                try:
+                    net = ipaddress.IPv4Network(ip_str.strip(), strict=False)
+                    flow_ip = ipaddress.IPv4Address(str(side.get('ip')))
+                except ValueError:
+                    net = flow_ip = None
+                if net is not None and flow_ip in net:
+                    return True
             if '-' in ip_str:
                 left, _, right = ip_str.partition('-')
                 try:
@@ -966,6 +978,15 @@ class TrafficQueryBuilder:
             return False
         if filters.get('dst_ip') and not _ip_match(dst, filters['dst_ip']):
             return False
+        # src_ip_in/dst_ip_in：native 解析失敗（如非法 CIDR）降級到殘餘比對時的
+        # 同 key OR——修正前這裡完全沒有處理，list 形值 unresolved 降級後靜默不過濾。
+        for fkey, side_obj in (("src_ip_in", src), ("dst_ip_in", dst)):
+            vals = filters.get(fkey)
+            if not vals:
+                continue
+            vals = vals if isinstance(vals, list) else [vals]
+            if not any(_ip_match(side_obj, v) for v in vals if v):
+                return False
 
         port_filter = filters.get('port', '')
         if port_filter:

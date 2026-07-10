@@ -50,11 +50,23 @@ class LabelResolver:
 
     @staticmethod
     def _is_ip_literal(value):
+        text = str(value).strip()
         try:
-            ipaddress.ip_address(str(value).strip())
+            ipaddress.ip_address(text)
             return True
         except ValueError:
-            return False
+            pass
+        if "/" in text:
+            # CIDR block（如 "10.0.0.0/24"）：PCE ip_address native actor 對 Explorer
+            # 「IP Address/CIDR Block」類別接受 CIDR 字串，見官方 API guide（
+            # analyzer-ip-containment-report.md native 觀察段）。strict=False 允許
+            # host bits 已設的寫法（如 "10.0.0.5/24"）。
+            try:
+                ipaddress.ip_network(text, strict=False)
+                return True
+            except ValueError:
+                return False
+        return False
 
     @staticmethod
     def _is_href(value):
@@ -403,6 +415,9 @@ class LabelResolver:
             if "/workloads/" in candidate:
                 return {"workload": {"href": candidate}}
             return None
+        # CIDR literal (e.g. "10.0.0.0/24") takes precedence over same-named IP List.
+        # This is intentional: CIDR-shaped strings are parsed as ip_address actors,
+        # per PCE API guide; literal interpretation is more correct than name lookup.
         if self._is_ip_literal(candidate):
             # PCE (21.5+) 對 traffic_flows include/exclude 的 ip_address
             # native actor 只接受 plain string；nested {"value": ...} 會
