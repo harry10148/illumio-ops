@@ -464,6 +464,7 @@ class ReportScheduler:
                       "policy_diff": t("rpt_policy_diff_report_title", lang=lang),
                       "policy_resolver": t("rpt_policy_resolver_title", lang=lang),
                       "app_summary": t("rpt_app_title", lang=lang),
+                      "rule_hit_count": t("rpt_rhc_report_title", lang=lang),
                       "readiness": t("rpt_readiness_report_title", lang=lang)}.get(report_type, "Report")
         start_disp = start_date[:10] if start_date else "N/A"
         end_disp = end_date[:10] if end_date else "N/A"
