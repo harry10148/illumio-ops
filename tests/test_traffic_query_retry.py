@@ -340,6 +340,33 @@ def test_download_retry_failure_then_success_clears_error():
         "error must be cleared when retry succeeds, else ingestor discards recovered rows"
 
 
+# ── Task 2 (deferred minors hardening): execute_traffic_query_stream's
+# outer `except Exception` (payload build / submit_and_stream unexpected
+# errors) previously logged+printed then returned bare, leaving
+# last_fetch_error untouched — an interactive query failure looked
+# identical to a genuinely-empty result. Must set the signal (same
+# convention as the submit/poll/download branches above) without raising,
+# so the ingest empty-yield contract is unchanged.
+
+
+def test_stream_exception_sets_last_fetch_error(monkeypatch):
+    c = _client()
+    c.last_fetch_error = None
+    b = TrafficQueryBuilder(c)
+
+    def boom(*a, **kw):
+        raise ValueError("bad native filter payload")
+
+    monkeypatch.setattr(b, "_build_native_traffic_payload", boom)
+    flows = list(b.execute_traffic_query_stream(
+        "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z", ["blocked"]
+    ))
+
+    assert flows == []
+    assert c.last_fetch_error is not None
+    assert "exception" in c.last_fetch_error.lower()
+
+
 def test_fetch_traffic_for_report_threads_rate_limit(monkeypatch):
     """fetch_traffic_for_report must forward rate_limit down to
     execute_traffic_query_stream."""

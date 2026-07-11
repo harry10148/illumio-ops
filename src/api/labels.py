@@ -590,26 +590,63 @@ class LabelResolver:
                 filters.get(k) for keys in obj_keys.values() for k in keys) and not has_svc):
             return filters
 
+        def _range_to_cidrs(r, list_name):
+            frm = r.get("from_ip")
+            to = r.get("to_ip")
+            if not frm:
+                return []
+            if not to or "/" in frm:
+                return [frm]
+            try:
+                return [str(n) for n in ipaddress.summarize_address_range(
+                    ipaddress.ip_address(frm), ipaddress.ip_address(to))]
+            except ValueError:
+                logger.warning("Bad ip_range in {}: {}-{}", list_name, frm, to)
+                return []
+
+        def _subtract_cidrs(include, exclude):
+            """per-IP List 的 CIDR 集合差（PCE 語意：exclusion 從 inclusion
+            扣除）。range 已先化為 CIDR，兩 CIDR 非相離即巢狀，逐一
+            address_exclude 即為精確差集。無法解析的 inclusion 字串原樣
+            保留（fail-open 保守：寧可 over-include 也不無聲丟 inclusion）。"""
+            if not exclude:
+                return include
+            passthrough, inc_nets, exc_nets = [], [], []
+            for s in include:
+                try:
+                    inc_nets.append(ipaddress.ip_network(str(s).strip(), strict=False))
+                except ValueError:
+                    passthrough.append(s)
+            for s in exclude:
+                try:
+                    exc_nets.append(ipaddress.ip_network(str(s).strip(), strict=False))
+                except ValueError:
+                    pass  # 解析不了的 exclusion 忽略（無從扣除）
+            for exc in exc_nets:
+                remaining = []
+                for n in inc_nets:
+                    if n.version != exc.version or not n.overlaps(exc):
+                        remaining.append(n)
+                    elif exc.supernet_of(n):
+                        continue  # 整塊被排除
+                    else:  # n 真包含 exc → 切分
+                        remaining.extend(n.address_exclude(exc))
+                inc_nets = remaining
+            return passthrough + [str(n) for n in inc_nets]
+
         def _iplist_cidrs(value):
+            """IP List → 有效 CIDR 清單（inclusion 聯集 − exclusion；PCE 語意）。
+            修正前 exclusion:true 條目被一併展開成 inclusion，cache df 路徑
+            over-include；native（PCE 端自套 exclusion）與 fallback
+            （_iplist_hit 比 PCE 標注 membership）本已正確——修這裡即三路一致。"""
             value = str(value).strip()
             for ipl in (c.get_ip_lists() or []):
                 if ipl.get("name") == value or ipl.get("href") == value:
-                    out = []
+                    include, exclude = [], []
                     for r in ipl.get("ip_ranges", []) or []:
-                        frm = r.get("from_ip")
-                        to = r.get("to_ip")
-                        if not frm:
-                            continue
-                        if not to or "/" in frm:
-                            out.append(frm)
-                            continue
-                        try:
-                            nets = ipaddress.summarize_address_range(
-                                ipaddress.ip_address(frm), ipaddress.ip_address(to))
-                            out.extend(str(n) for n in nets)
-                        except ValueError:
-                            logger.warning("Bad ip_range in {}: {}-{}", value, frm, to)
-                    return out
+                        bucket = exclude if r.get("exclusion") else include
+                        bucket.extend(_range_to_cidrs(r, value))
+                    return _subtract_cidrs(include, exclude)
             return []
 
         def _workload_ips(value):

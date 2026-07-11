@@ -1,7 +1,9 @@
 """Quarantine endpoint tests (split from test_gui_security.py for M9)."""
+from unittest.mock import patch
+
 from src.i18n import get_messages, set_language
 
-
+from src.exceptions import TrafficQueryError
 from tests._helpers import _csrf
 
 
@@ -135,6 +137,29 @@ def test_quarantine_search_forwards_object_filter_keys(app_persistent, monkeypat
     assert captured.get("ex_any_workload") == "/orgs/1/workloads/q"
     assert captured.get("src_label_groups") == ["app_group"]
     assert captured.get("ex_dst_label_groups") == ["dmz_group"]
+
+
+# ── Task 2 (deferred minors hardening): a PCE-side query failure (e.g.
+# submit 406) must surface as a distinguishable error, not as ok:true with
+# an empty result indistinguishable from a genuine 0-flow match.
+
+
+def test_quarantine_search_surfaces_query_failure(app_persistent, monkeypatch):
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    with patch("src.analyzer.Analyzer.query_flows",
+               side_effect=TrafficQueryError("submit failed: 406 - bad payload")):
+        r = client.post('/api/quarantine/search', json={"mins": 60},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                        headers={'X-CSRF-Token': csrf_token})
+
+    assert r.status_code == 502
+    body = r.get_json()
+    assert body["ok"] is False
+    assert "406" in body["error"]
 
 
 def test_quarantine_apply_writes_audit_log(app_persistent, monkeypatch):

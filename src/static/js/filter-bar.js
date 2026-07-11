@@ -76,7 +76,12 @@ function _objfbSerialize(state) {
       else if (p.cat === 'iplist')   setScalar(`${ex}any_iplist`, p.href || p.name);
       else if (p.cat === 'workload') setScalar(`${ex}any_workload`, p.href);
       else if (p.cat === 'ip')       setScalar(`${ex}any_ip`, p.name);
-      else if (p.cat === 'label_group') setScalar(`${ex}any_label`, p.name);
+      else if (p.cat === 'label_group') {
+        // any 方向不支援 label_group（design §C）：不得降格成 any_label
+        // （group 名被當 label spec，fallback 比對 fail-closed 0 筆）。
+        // 正常流程在 _objfbAddPill 已擋，這裡是序列化邊界的防禦性拒絕。
+        console.warn('objfb: label_group pill is not supported for the any direction; skipped:', p.name);
+      }
       continue;
     }
     const d = p.dir; // src | dst
@@ -128,6 +133,13 @@ function _objfbDeserialize(state, dict) {
 
 /* ── 加 pill / 移除 / 方向 / 排除（handler 掛 window，供 dispatcher 委派）── */
 function _objfbAddPill(state, obj) {
+  if (obj.cat === 'label_group' && state.addDir === 'any') {
+    // any 方向不支援 label_group：不建 pill，顯示提示（design §C）
+    state.anyLabelGroupHint = true;
+    _objfbRender(state);
+    return;
+  }
+  state.anyLabelGroupHint = false;
   state.pills.push({
     cat: obj.cat, name: obj.name, href: obj.href || null,
     key: obj.key || null, value: obj.value || null,
@@ -250,6 +262,13 @@ function _objfbRender(state) {
   hint.hidden = !state.pills.some(p => p.dir === 'any');
   c.appendChild(hint);
 
+  // any 方向不支援 label_group 的提示（嘗試建立時顯示，換方向清除）
+  const lgHint = document.createElement('div');
+  lgHint.className = 'objfb-hint';
+  lgHint.setAttribute('data-i18n', 'gui_fb_any_label_group_unsupported');
+  lgHint.hidden = !state.anyLabelGroupHint;
+  c.appendChild(lgHint);
+
   // pill 編輯 popover（隱藏，點 pill 時填內容並開啟）
   const pop = document.createElement('div');
   pop.className = 'objfb-pop';
@@ -339,7 +358,8 @@ function _objfbRenderCatChips(state) {
   state.ddItems = [];
   const catsWrap = document.createElement('div');
   catsWrap.className = 'objfb-dd-cats';
-  for (const c of state.cats.filter((c) => c !== 'ip' && c !== 'port')) {
+  for (const c of state.cats.filter((c) => c !== 'ip' && c !== 'port' &&
+      !(state.addDir === 'any' && c === 'label_group'))) {
     const meta = _OBJFB_CATS[c];
     if (!meta) continue;
     const b = document.createElement('button');
@@ -489,7 +509,8 @@ function _objfbQuerySuggest(state, q) {
   // 無 scope（自由輸入）時 types 須由 state.cats 導出，交集 suggest 端支援的類別
   // （'ip' 不是 suggest 類別，不列入）；有 scope 時 scope 本身已受
   // _objfbUpdateDropdown 的分類快選鈕過濾，天然是 state.cats 的子集。
-  const types = scope ? scope : _OBJFB_SUGGEST_CATS.filter((c) => state.cats.includes(c)).join(',');
+  const types = scope ? scope : _OBJFB_SUGGEST_CATS.filter((c) =>
+    state.cats.includes(c) && !(state.addDir === 'any' && c === 'label_group')).join(',');
   const url = `/api/filter-objects/suggest?q=${encodeURIComponent(q)}&types=${types}&limit=10`;
   fetch(url, { signal: ctrl.signal, credentials: 'same-origin' })
     .then(r => r.json())
@@ -542,7 +563,8 @@ function _objfbRenderDropdown(state, q) {
     } else {
       // 迭代清單須照 state.cats 過濾，否則被排除的分類（如規則 modal 排除的
       // label_group）仍會出現在下拉，選取後儲存會被後端拒絕。
-      for (const cat of _OBJFB_SUGGEST_CATS.filter((c) => state.cats.includes(c))) {
+      for (const cat of _OBJFB_SUGGEST_CATS.filter((c) =>
+          state.cats.includes(c) && !(state.addDir === 'any' && c === 'label_group'))) {
         const r = sug[cat];
         if (!r) continue;
         if (cat === 'workload' && r.error === 'pce_unreachable') {
@@ -680,7 +702,14 @@ function _objfbOpenPop(state, idx, pillEl) {
 
 // 掛載 window（CSP dispatcher 查找 window[fnName]）
 window.createFilterBar = createFilterBar;
-window._objfbAddDir = function (id, dir) { const s = _objfbInstances[id]; if (s) { s.addDir = dir; _objfbRender(s); } };
+window._objfbAddDir = function (id, dir) {
+  const s = _objfbInstances[id];
+  if (!s) return;
+  s.addDir = dir;
+  s.anyLabelGroupHint = false;
+  if (dir === 'any' && s.scopeCat === 'label_group') { window._objfbClearScope(id); return; }
+  _objfbRender(s);
+};
 
 window._objfbInput = function (id) {
   const s = _objfbInstances[id];

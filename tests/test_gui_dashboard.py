@@ -1,8 +1,9 @@
 """Dashboards/reports/schedule tests (split from test_gui_security.py for M9)."""
 import json
 import threading
+from unittest.mock import patch
 
-
+from src.exceptions import TrafficQueryError
 from tests._helpers import _csrf
 
 
@@ -335,3 +336,25 @@ def test_top10_forwards_object_and_plural_filters(app_persistent, monkeypatch):
     assert captured.get("any_iplist") == "corp-vpn"
     assert captured.get("ex_any_workload") == "/orgs/1/workloads/xyz"
     assert captured.get("src_label") == "role=db"    # 舊 scalar key 不回歸
+
+
+# ── Task 2 (deferred minors hardening): PCE-side query failure must
+# surface as 502, matching the quarantine search endpoint's behaviour.
+
+
+def test_top10_surfaces_query_failure(app_persistent, monkeypatch):
+    client = app_persistent.test_client()
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    csrf_token = _csrf(login)
+
+    with patch("src.analyzer.Analyzer.query_flows",
+               side_effect=TrafficQueryError("poll timed out after 300s")):
+        r = client.post('/api/dashboard/top10', json={"mins": 30},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                        headers={'X-CSRF-Token': csrf_token})
+
+    assert r.status_code == 502
+    body = r.get_json()
+    assert body["ok"] is False
+    assert "timed out" in body["error"]
