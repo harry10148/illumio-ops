@@ -43,6 +43,16 @@ _ALLOWED_CSV_UPLOAD_MIMETYPES = {
 }
 
 
+def _csv_upload_rejected(csv_file) -> bool:
+    """Reject an upload unless the filename ends in .csv (case-insensitive)
+    AND the client mimetype is whitelisted. The mimetype alone is client-
+    controlled and trivially forged; the extension check is the primary gate,
+    the whitelist absorbs browser mimetype variance for real .csv files."""
+    if not (csv_file.filename or '').lower().endswith('.csv'):
+        return True
+    return csv_file.mimetype not in _ALLOWED_CSV_UPLOAD_MIMETYPES
+
+
 from src.report.cache_support import resolve_data_source, cache_available
 
 
@@ -355,7 +365,7 @@ def make_reports_blueprint(
             csv_file = request.files['file']
             if csv_file.filename == '':
                 return jsonify({"ok": False, "error": t("gui_err_empty_csv", lang=lang)})
-            if csv_file.mimetype not in _ALLOWED_CSV_UPLOAD_MIMETYPES:
+            if _csv_upload_rejected(csv_file):
                 return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
             # Persist the upload now (request-scoped) so the worker thread can read it.
             safe_filename = secure_filename(csv_file.filename) or 'upload.csv'
@@ -733,7 +743,7 @@ def make_reports_blueprint(
                 if 'file' not in request.files or request.files['file'].filename == '':
                     return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
                 csv_file = request.files['file']
-                if csv_file.mimetype not in _ALLOWED_CSV_UPLOAD_MIMETYPES:
+                if _csv_upload_rejected(csv_file):
                     return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
                 safe_name = secure_filename(csv_file.filename) or 'upload.csv'
                 temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}_{safe_name}")
@@ -794,7 +804,8 @@ def make_reports_blueprint(
                             "ven_scopes_enabled": st.ven_scopes_enabled,
                             "detail": st.detail})
         except Exception as e:
-            return _err_with_log("rule_hit_count_enablement", e, lang='en')
+            lang = request.args.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            return _err_with_log("rule_hit_count_enablement", e, lang=lang)
 
     @bp.route('/api/rule_hit_count/enable', methods=['POST'])
     @limiter.limit("5 per hour")
@@ -852,7 +863,7 @@ def make_reports_blueprint(
                 if 'file' not in request.files or request.files['file'].filename == '':
                     return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
                 csv_file = request.files['file']
-                if csv_file.mimetype not in _ALLOWED_CSV_UPLOAD_MIMETYPES:
+                if _csv_upload_rejected(csv_file):
                     return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
                 safe_name = secure_filename(csv_file.filename) or 'upload.csv'
                 temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}_{safe_name}")
