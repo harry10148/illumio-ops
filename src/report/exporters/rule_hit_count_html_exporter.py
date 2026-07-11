@@ -25,7 +25,8 @@ _CELL_MAX = 160
 _TRUNC_COLS = {"consumers", "providers", "services", "description"}
 
 _COLS = ["ruleset", "rule_no", "rule_type", "description", "consumers",
-         "providers", "services", "enabled", "hit_count", "days_since_last_hit"]
+         "providers", "services", "enabled", "hit_count", "days_since_last_hit",
+         "last_hit_at"]
 
 _COL_I18N = {
     "ruleset": "rpt_rhc_col_ruleset",
@@ -39,6 +40,7 @@ _COL_I18N = {
     "enabled": "rpt_rhc_col_enabled",
     "hit_count": "rpt_rhc_col_hit_count",
     "days_since_last_hit": "rpt_rhc_col_days_since",
+    "last_hit_at": "rpt_rhc_col_last_hit_at",
 }
 
 

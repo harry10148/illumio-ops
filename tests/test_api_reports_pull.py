@@ -91,6 +91,18 @@ class TestPull(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             ReportsApi(c).pull_rule_hit_count_report(last_num_days=7)
 
+    def test_submit_2xx_without_href_raises_immediately(self):
+        """2xx but body missing href: current behavior polls with empty string until
+        timeout (misleading RuleHitCountPullTimeout). Must raise immediately with
+        body summary in message."""
+        c = _client()
+        c._api_post.return_value = (201, {"status": "queued"})
+        with self.assertRaises(RuntimeError) as ctx:
+            ReportsApi(c).pull_rule_hit_count_report(last_num_days=7)
+        self.assertIn("no href", str(ctx.exception))
+        self.assertIn("queued", str(ctx.exception))
+        c._api_get.assert_not_called()   # must not enter polling
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -781,8 +781,17 @@ class ApiClient:
             logger.error(f"API POST {endpoint}: {e}")
             return 0, None
 
-    def get_all_rulesets(self, force_refresh: bool = False) -> list[dict[str, Any]]:
-        """Get all rulesets from PCE (cached unless force_refresh)."""
+    def get_all_rulesets(self, force_refresh: bool = False,
+                         raise_on_error: bool = False) -> list[dict[str, Any]]:
+        """Get all rulesets from PCE (cached unless force_refresh).
+
+        raise_on_error=True: any non-200 (incl. status 0 = connection-layer
+        failure per _request) raises RuntimeError instead of silently
+        returning [] — opt-in for callers that must distinguish fetch failure
+        from a legitimately empty org (rule hit count enrich_failed signal,
+        real-PCE verified 2026-07-11). Default False keeps the legacy
+        empty-list contract for all existing callers.
+        """
         if self.ruleset_cache and not force_refresh:
             return self.ruleset_cache
         org = self.api_cfg['org_id']
@@ -790,6 +799,8 @@ class ApiClient:
         if status == 200 and data:
             self.ruleset_cache = data
             return self.ruleset_cache
+        if raise_on_error and status != 200:
+            raise RuntimeError(f"get_all_rulesets failed: HTTP {status}")
         return []
 
     def get_active_rulesets(self) -> list[dict[str, Any]]:

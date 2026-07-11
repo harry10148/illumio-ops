@@ -16,18 +16,25 @@ from src.report.rule_hit_count_generator import (
 
 
 def _write_native_csv(dirpath: str) -> str:
-    """Write a CSV shaped like the PCE-native Rule Hit Count export."""
+    """Write a CSV shaped like the PCE-native Rule Hit Count export
+    (full 11-column header, real-PCE verified 2026-07-11)."""
     path = os.path.join(dirpath, "rule-hit-count.csv")
     with open(path, "w", encoding="utf-8-sig") as fh:
         fh.write(
-            "Rule HREF,Rule Name,Rule Set HREF,Rule Set Name,Rule Hit Count,"
-            "Days Since Last Hit,Start Date,End Date\n"
-            "/orgs/1/sec_policy/active/rule_sets/10/sec_rules/100,allow web,"
-            "/orgs/1/sec_policy/active/rule_sets/10,RS-A,42,3,2026-06-01,2026-07-01\n"
-            "/orgs/1/sec_policy/active/rule_sets/10/sec_rules/101,stale allow,"
-            "/orgs/1/sec_policy/active/rule_sets/10,RS-A,5,120,2026-06-01,2026-07-01\n"
-            "/orgs/1/sec_policy/active/rule_sets/11/deny_rules/200,deny legacy,"
-            "/orgs/1/sec_policy/active/rule_sets/11,RS-Legacy,0,,2026-06-01,2026-07-01\n"
+            "Rule Name,Rule HREF,Ruleset Name,Ruleset HREF,Rule Hit Count,"
+            "Days Since Last Hit,Timestamp of Last Hit,Last Updated By,"
+            "Timestamp Last Updated,Start Date,End Date\n"
+            "allow web,/orgs/1/sec_policy/active/rule_sets/10/sec_rules/100,"
+            "RS-A,/orgs/1/sec_policy/active/rule_sets/10,42,3,"
+            "2026-06-28T09:14:23Z,admin@lab.local,2026-05-01T00:00:00Z,"
+            "2026-06-01,2026-07-01\n"
+            "stale allow,/orgs/1/sec_policy/active/rule_sets/10/sec_rules/101,"
+            "RS-A,/orgs/1/sec_policy/active/rule_sets/10,5,120,"
+            "2026-03-03T00:00:00Z,admin@lab.local,2026-05-01T00:00:00Z,"
+            "2026-06-01,2026-07-01\n"
+            "deny legacy,/orgs/1/sec_policy/active/rule_sets/11/deny_rules/200,"
+            "RS-Legacy,/orgs/1/sec_policy/active/rule_sets/11,0,,,,,"
+            "2026-06-01,2026-07-01\n"
         )
     return path
 
@@ -157,6 +164,18 @@ class TestCsvEnrichment(unittest.TestCase):
         self.assertEqual(result.record_count, 3)
         self.assertTrue(result.module_results.get("enrich_failed"))
 
+    def test_enrichment_opts_into_raise_on_error(self):
+        """真 PCE 驗證 v1 項 6：HTTP 40x 時 get_all_rulesets 預設回 [] 不拋例外，
+        enrich_failed 永不為 True、HTML 無注記、欄位靜默全空。generator 必須以
+        raise_on_error=True 呼叫，讓 HTTP 失敗走既有 except 路徑設旗標。"""
+        api = MagicMock()
+        api.get_all_rulesets.side_effect = RuntimeError("get_all_rulesets failed: HTTP 403")
+        gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+        with tempfile.TemporaryDirectory() as td:
+            result = gen.generate_from_csv(_write_native_csv(td))
+        self.assertTrue(result.module_results.get("enrich_failed"))
+        api.get_all_rulesets.assert_called_once_with(force_refresh=True, raise_on_error=True)
+
     def test_enriches_when_ruleset_hrefs_are_draft_and_csv_hrefs_are_active(self):
         """Production shape: get_all_rulesets() always returns DRAFT-form hrefs
         (api_client.py hits /sec_policy/draft/...), but the native Rule Hit Count
@@ -184,6 +203,46 @@ class TestCsvEnrichment(unittest.TestCase):
         self.assertEqual(row["ruleset"], "RS-A")
         self.assertEqual(row["rule_type"], "Allow")
         self.assertEqual(row["enabled"], True)
+
+
+class TestNativeExtraColumns(unittest.TestCase):
+    def test_extra_native_columns_parsed(self):
+        gen = RuleHitCountGenerator(MagicMock(), api_client=None)
+        with tempfile.TemporaryDirectory() as td:
+            result = gen.generate_from_csv(_write_native_csv(td), lang="en")
+        row = result.dataframe[result.dataframe["rule_id"] == "100"].iloc[0]
+        self.assertEqual(row["last_hit_at"], "2026-06-28T09:14:23Z")
+        self.assertEqual(row["last_updated_by"], "admin@lab.local")
+        self.assertEqual(row["last_updated_at"], "2026-05-01T00:00:00Z")
+        # 未命中列：Timestamp of Last Hit 為空 → ''（不得為 'nan'）
+        row0 = result.dataframe[result.dataframe["rule_id"] == "200"].iloc[0]
+        self.assertEqual(row0["last_hit_at"], "")
+
+    def test_missing_extra_columns_default_empty(self):
+        # 舊版/精簡 CSV（無這 3 欄）不得失敗
+        gen = RuleHitCountGenerator(MagicMock(), api_client=None)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "minimal.csv")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("Rule HREF,Rule Hit Count\n/r/1,3\n")
+            result = gen.generate_from_csv(path)
+        row = result.dataframe.iloc[0]
+        self.assertEqual(row["last_hit_at"], "")
+        self.assertEqual(row["last_updated_by"], "")
+        self.assertEqual(row["last_updated_at"], "")
+
+    def test_csv_export_carries_extra_columns(self):
+        import zipfile
+        gen = RuleHitCountGenerator(MagicMock(), api_client=None)
+        with tempfile.TemporaryDirectory() as td:
+            result = gen.generate_from_csv(_write_native_csv(td))
+            paths = gen.export(result, fmt="csv", output_dir=td)
+            with zipfile.ZipFile([p for p in paths if p.endswith(".zip")][0]) as zf:
+                name = next(n for n in zf.namelist() if n.endswith("all_rules.csv"))
+                content = zf.read(name).decode("utf-8")
+        self.assertIn("last_hit_at", content)
+        self.assertIn("last_updated_by", content)
+        self.assertIn("admin@lab.local", content)
 
 
 class TestGenerateFromCsvEmptyFile(unittest.TestCase):
@@ -231,6 +290,57 @@ class TestGenerateFromNative(unittest.TestCase):
                    return_value=EnablementStatus("disabled", False, False, "off")):
             with self.assertRaises(RuleHitCountNotEnabled):
                 gen.generate_from_native()
+
+    def test_raises_for_partial_and_unsupported_states(self):
+        """GUI route 靠 exc.status.state 轉述前端（needs_enablement 分支）——
+        partial/unsupported 必須與 disabled 同路 raise，且 state 原樣攜帶、
+        不觸發 pull。"""
+        from unittest.mock import patch
+        from src.report.rule_hit_count_enablement import (
+            EnablementStatus, RuleHitCountNotEnabled)
+        for state, detail in (("partial", "missing: PCE report template"),
+                              ("unsupported", "report template not found")):
+            with self.subTest(state=state):
+                api = MagicMock()
+                gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+                with patch("src.report.rule_hit_count_generator.check_enablement",
+                           return_value=EnablementStatus(state, False, False, detail)):
+                    with self.assertRaises(RuleHitCountNotEnabled) as ctx:
+                        gen.generate_from_native()
+                self.assertEqual(ctx.exception.status.state, state)
+                api.pull_rule_hit_count_report.assert_not_called()
+
+    def test_pull_runtime_error_propagates_unwrapped(self):
+        """pull 的 RuntimeError（如 submit 406/no-href）必須原型別、原訊息上拋
+        （GUI _err_with_log / CLI 泛型處理依賴），不得被吞或包裝。"""
+        from unittest.mock import patch
+        from src.report.rule_hit_count_enablement import EnablementStatus
+        api = MagicMock()
+        api.pull_rule_hit_count_report.side_effect = RuntimeError(
+            "rule hit count report submit failed: HTTP 406")
+        gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+        with patch("src.report.rule_hit_count_generator.check_enablement",
+                   return_value=EnablementStatus("enabled", True, True, "")):
+            with self.assertRaises(RuntimeError) as ctx:
+                gen.generate_from_native()
+        self.assertIn("406", str(ctx.exception))
+
+    def test_pull_timeout_propagates_with_report_href(self):
+        """RuleHitCountPullTimeout 必須原型別上拋且 report_href 保留——route 層
+        的型別分流（TimeoutError 是 OSError 子類，須先於泛型 except 捕捉）與
+        後續重試/CSV 路徑都依賴它。"""
+        from unittest.mock import patch
+        from src.api.reports import RuleHitCountPullTimeout
+        from src.report.rule_hit_count_enablement import EnablementStatus
+        api = MagicMock()
+        api.pull_rule_hit_count_report.side_effect = RuleHitCountPullTimeout(
+            "/orgs/1/reports/xyz")
+        gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+        with patch("src.report.rule_hit_count_generator.check_enablement",
+                   return_value=EnablementStatus("enabled", True, True, "")):
+            with self.assertRaises(RuleHitCountPullTimeout) as ctx:
+                gen.generate_from_native()
+        self.assertEqual(ctx.exception.report_href, "/orgs/1/reports/xyz")
 
     def test_temp_csv_is_cleaned_up(self):
         from unittest.mock import patch

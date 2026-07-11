@@ -15,7 +15,10 @@ def _row(**over):
     base = {"rule_href": "/r/1", "ruleset": "RS-A", "rule_no": 1, "rule_id": "1",
             "rule_type": "Allow", "description": "d", "consumers": "c",
             "providers": "p", "services": "s", "enabled": True,
-            "hit_count": 5, "days_since_last_hit": "3"}
+            "hit_count": 5, "days_since_last_hit": "3",
+            "last_hit_at": "2026-06-28T09:14:23Z",
+            "last_updated_by": "admin@lab.local",
+            "last_updated_at": "2026-05-01T00:00:00Z"}
     base.update(over)
     return base
 
@@ -80,6 +83,17 @@ class TestExporter(unittest.TestCase):
             path = RuleHitCountHtmlExporter(_result([]), lang="en").export(td)
             html = open(path, encoding="utf-8").read()
         self.assertIn("No rules in this section.", html)
+
+    def test_last_hit_at_rendered_in_full_and_governance_columns_hidden(self):
+        # last_hit_at：固定長度時戳，比照 days_since_last_hit 整值呈現（不進
+        # _TRUNC_COLS 截斷路徑；CLAUDE.md：截斷必須明確，此欄無截斷需要）。
+        # last_updated_by/last_updated_at：CSV pass-through only，HTML 不顯示。
+        with tempfile.TemporaryDirectory() as td:
+            path = RuleHitCountHtmlExporter(_result([_row()]), lang="en").export(td)
+            html = open(path, encoding="utf-8").read()
+        self.assertIn("Timestamp of Last Hit", html)            # 表頭 i18n
+        self.assertIn(">2026-06-28T09:14:23Z</td>", html)        # 整值、無截斷
+        self.assertNotIn("admin@lab.local", html)                # 治理欄不進 HTML
 
 
 if __name__ == "__main__":

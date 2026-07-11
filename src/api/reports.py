@@ -76,6 +76,9 @@ class ReportsApi:
             detail = f": {body}" if body else ""
             raise RuntimeError(f"rule hit count report submit failed: HTTP {status}{detail}")
         href = body.get("href", "")
+        if not href:
+            raise RuntimeError(
+                f"rule hit count report submit returned no href: {str(body)[:200]}")
         logger.info(f"Rule hit count report submitted: {href}")
 
         deadline = time.monotonic() + timeout_seconds

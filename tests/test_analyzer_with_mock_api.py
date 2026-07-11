@@ -149,9 +149,15 @@ def test_query_flows_forwards_object_filter_keys_to_query_spec_builder():
         )
 
 
-def test_analyzer_run_analysis_uses_stub_api(monkeypatch):
+def test_analyzer_run_analysis_uses_stub_api(monkeypatch, tmp_path):
     """run_analysis() completes with stub doubles — no real network."""
     import datetime
+    # Isolate persistent state BEFORE construction — Analyzer loads
+    # src.analyzer.STATE_FILE (the repo's logs/state.json, which other tests
+    # in a full-suite run write to) into self.state in __init__. A leaked
+    # state with pce_stats.consecutive_failures >= 3 fires the watchdog,
+    # whose reporter call _StubReporter does not implement.
+    monkeypatch.setattr("src.analyzer.STATE_FILE", str(tmp_path / "state.json"))
     analyzer, api, rep = _make_analyzer()
     # Patch time-related side effects — signatures must match actual call sites in run_analysis()
     # _fetch_traffic() → (traffic_stream, tr_rules, now_utc)

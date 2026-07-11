@@ -35,6 +35,13 @@ from src.report.rule_hit_count_enablement import (
 _ADHOC_JOBS_KEY = "adhoc_report_jobs"
 _ADHOC_JOBS_MAX = 20
 
+# CSV upload mimetype whitelist — single source for the traffic, policy_usage
+# and rule_hit_count upload routes (traffic route established the set).
+_ALLOWED_CSV_UPLOAD_MIMETYPES = {
+    'text/csv', 'application/vnd.ms-excel',
+    'text/plain', 'application/octet-stream',
+}
+
 
 from src.report.cache_support import resolve_data_source, cache_available
 
@@ -348,10 +355,7 @@ def make_reports_blueprint(
             csv_file = request.files['file']
             if csv_file.filename == '':
                 return jsonify({"ok": False, "error": t("gui_err_empty_csv", lang=lang)})
-            if csv_file.mimetype not in {
-                'text/csv', 'application/vnd.ms-excel',
-                'text/plain', 'application/octet-stream',
-            }:
+            if csv_file.mimetype not in _ALLOWED_CSV_UPLOAD_MIMETYPES:
                 return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
             # Persist the upload now (request-scoped) so the worker thread can read it.
             safe_filename = secure_filename(csv_file.filename) or 'upload.csv'
@@ -729,6 +733,8 @@ def make_reports_blueprint(
                 if 'file' not in request.files or request.files['file'].filename == '':
                     return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
                 csv_file = request.files['file']
+                if csv_file.mimetype not in _ALLOWED_CSV_UPLOAD_MIMETYPES:
+                    return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
                 safe_name = secure_filename(csv_file.filename) or 'upload.csv'
                 temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}_{safe_name}")
                 csv_file.save(temp_path)
@@ -846,6 +852,8 @@ def make_reports_blueprint(
                 if 'file' not in request.files or request.files['file'].filename == '':
                     return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
                 csv_file = request.files['file']
+                if csv_file.mimetype not in _ALLOWED_CSV_UPLOAD_MIMETYPES:
+                    return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
                 safe_name = secure_filename(csv_file.filename) or 'upload.csv'
                 temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}_{safe_name}")
                 csv_file.save(temp_path)

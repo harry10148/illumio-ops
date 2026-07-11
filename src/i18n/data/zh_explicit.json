@@ -1228,6 +1228,7 @@
   "rpt_rhc_col_enabled": "啟用",
   "rpt_rhc_col_hit_count": "命中次數",
   "rpt_rhc_col_days_since": "距上次命中天數",
+  "rpt_rhc_col_last_hit_at": "最後命中時間",
   "cli_rhc_not_enabled": "原生 Rule Hit Count 不可用（狀態：{state}；{detail}）。可改用 Policy Usage 報表（流量近似計數），或啟用原生功能。",
   "cli_rhc_not_enabled_intro": "此 PCE 的原生 Rule Hit Count 功能尚未完整啟用。",
   "cli_rhc_provision_warning": "警告：啟用會寫入 draft firewall_settings 並「provision 到生產 policy」。VEN 版本低於 23.2.30 不會回報。",
