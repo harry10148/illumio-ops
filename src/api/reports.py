@@ -22,6 +22,14 @@ class RuleHitCountPullTimeout(TimeoutError):
         super().__init__(f"rule hit count report not ready in time: {report_href}")
 
 
+def _to_iso_timestamp(date_str: str, end_of_day: bool) -> str:
+    """Expand a bare YYYY-MM-DD to a full ISO-8601 UTC timestamp; pass through
+    values that already carry a time component."""
+    if "T" in date_str:
+        return date_str
+    return f"{date_str}T23:59:59Z" if end_of_day else f"{date_str}T00:00:00Z"
+
+
 class ReportsApi:
     def __init__(self, client):
         self._c = client   # ApiClient (facade) — uses its _api_post/_api_get/_request
@@ -48,7 +56,9 @@ class ReportsApi:
         """
         org = self._c.api_cfg['org_id']
         if start_date and end_date:
-            time_range = {"start_date": start_date, "end_date": end_date}
+            # PCE 對純 YYYY-MM-DD 回 406，須為完整 ISO 時戳（真 PCE 25.2.40 實測）。
+            time_range = {"start_date": _to_iso_timestamp(start_date, end_of_day=False),
+                          "end_date": _to_iso_timestamp(end_date, end_of_day=True)}
         else:
             time_range = {"last_num_days": int(last_num_days or 30)}
 
@@ -63,7 +73,8 @@ class ReportsApi:
         }
         status, body = self._c._api_post(f"/orgs/{org}/reports", payload)
         if status not in (200, 201) or not body:
-            raise RuntimeError(f"rule hit count report submit failed: HTTP {status}")
+            detail = f": {body}" if body else ""
+            raise RuntimeError(f"rule hit count report submit failed: HTTP {status}{detail}")
         href = body.get("href", "")
         logger.info(f"Rule hit count report submitted: {href}")
 

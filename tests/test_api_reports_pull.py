@@ -49,6 +49,28 @@ class TestPull(unittest.TestCase):
                          {"start_date": "2026-06-01T00:00:00Z",
                           "end_date": "2026-07-01T00:00:00Z"})
 
+    def test_bare_dates_normalized_to_iso_timestamps(self):
+        """PCE rejects bare YYYY-MM-DD with HTTP 406 (real-PCE verified 2026-07-11);
+        the CLI/GUI pass bare dates, so the API layer must normalize them."""
+        c = _client()
+        with patch("src.api.reports.time.sleep"):
+            path = ReportsApi(c).pull_rule_hit_count_report(
+                start_date="2026-06-01", end_date="2026-07-01")
+        os.unlink(path)
+        payload = c._api_post.call_args.args[1]
+        self.assertEqual(payload["report_parameters"]["report_time_range"],
+                         {"start_date": "2026-06-01T00:00:00Z",
+                          "end_date": "2026-07-01T23:59:59Z"})
+
+    def test_submit_failure_message_includes_body(self):
+        c = _client()
+        c._api_post.return_value = (406, {"error": "invalid time range"})
+        with self.assertRaises(RuntimeError) as ctx:
+            ReportsApi(c).pull_rule_hit_count_report(
+                start_date="2026-06-01", end_date="2026-07-01")
+        self.assertIn("406", str(ctx.exception))
+        self.assertIn("invalid time range", str(ctx.exception))
+
     def test_report_failed_status_raises(self):
         c = _client(poll_statuses=("pending", "failed"))
         with patch("src.api.reports.time.sleep"):
