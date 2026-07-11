@@ -427,6 +427,18 @@ class ReportScheduler:
             paths = gen.export(result, fmt=fmt, output_dir=output_dir)
             return result, paths
 
+        elif report_type == "readiness":
+            from src.report.readiness_report import ReadinessReportGenerator
+            gen = ReadinessReportGenerator(self.cm, api_client=api, config_dir=self._config_dir,
+                                           cache_reader=_make_cache_reader(self.cm))
+            result = gen.generate_from_api(start_date=start_date, end_date=end_date,
+                                           lang=lang, output_dir=output_dir)
+            if result.record_count == 0:
+                logger.warning(f"[Scheduler] '{name}': no traffic data — skipping export")
+                return None, []
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir)
+            return result, paths
+
         else:
             logger.error(f"[Scheduler] Unknown report_type: {report_type}")
             return None, []
@@ -451,7 +463,8 @@ class ReportScheduler:
                       "policy_usage": t("rpt_email_pu_subject", lang=lang),
                       "policy_diff": t("rpt_policy_diff_report_title", lang=lang),
                       "policy_resolver": t("rpt_policy_resolver_title", lang=lang),
-                      "app_summary": t("rpt_app_title", lang=lang)}.get(report_type, "Report")
+                      "app_summary": t("rpt_app_title", lang=lang),
+                      "readiness": t("rpt_readiness_report_title", lang=lang)}.get(report_type, "Report")
         start_disp = start_date[:10] if start_date else "N/A"
         end_disp = end_date[:10] if end_date else "N/A"
 
@@ -615,6 +628,7 @@ class ReportScheduler:
         "policy_resolver":   "Illumio_Policy_Resolver_",
         "app_summary":       "Illumio_App_Summary_",
         "rule_hit_count":    "Illumio_Rule_Hit_Count_Report_",
+        "readiness":         "Illumio_Readiness_Report_",
     }
 
     @staticmethod
