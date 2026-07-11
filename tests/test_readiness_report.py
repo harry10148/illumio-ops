@@ -88,3 +88,25 @@ def test_trend_snapshot_saved_and_deltas_on_second_run(monkeypatch, tmp_path):
     r2 = gen.generate_from_api(output_dir=str(tmp_path))
     metrics = {d["metric"] for d in r2.module_results["_trend_deltas"]}
     assert "rpt_readiness_kpi_score" in metrics
+
+
+def test_export_html_writes_sidecar_with_report_type(monkeypatch, tmp_path):
+    gen = _gen(monkeypatch, _flows_df(), _workloads())
+    result = gen.generate_from_api(output_dir=str(tmp_path))
+    paths = gen.export(result, fmt="html", output_dir=str(tmp_path))
+    assert len(paths) == 1 and paths[0].endswith(".html")
+    import json
+    with open(paths[0] + ".metadata.json", encoding="utf-8") as fh:
+        meta = json.load(fh)
+    assert meta["report_type"] == "readiness"
+    assert meta["record_count"] == result.record_count
+
+
+def test_export_all_writes_html_and_csv_zip(monkeypatch, tmp_path):
+    gen = _gen(monkeypatch, _flows_df(), _workloads())
+    result = gen.generate_from_api(output_dir=str(tmp_path))
+    paths = gen.export(result, fmt="all", output_dir=str(tmp_path))
+    exts = sorted(p.rsplit(".", 1)[-1] for p in paths)
+    assert exts == ["html", "zip"]
+    import os
+    assert all(os.path.basename(p).startswith("Illumio_Readiness_Report_") for p in paths)

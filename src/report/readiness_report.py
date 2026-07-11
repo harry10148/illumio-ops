@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import dataclasses
 import datetime
+import json
+import os
 
 import pandas as pd
 from loguru import logger
@@ -210,3 +212,48 @@ class ReadinessReportGenerator:
         except Exception as e:  # noqa: BLE001
             logger.warning("Readiness trend delta skipped: {}", e)
             result.module_results["_trend_deltas"] = []
+
+    # ── Export ───────────────────────────────────────────────────────────
+    def export(self, result: ReadinessResult, fmt: str = 'html',
+               output_dir: str = 'reports', lang: str | None = None) -> list[str]:
+        from src.report.exporters.readiness_html_exporter import ReadinessHtmlExporter
+        from src.report.exporters.csv_exporter import CsvExporter
+        lang = lang or self._lang
+        os.makedirs(output_dir, exist_ok=True)
+        paths: list[str] = []
+        mr = result.module_results or {}
+        if fmt in ('html', 'all'):
+            path = ReadinessHtmlExporter(result, lang=lang).export(output_dir)
+            paths.append(path)
+            self._write_report_metadata(path, result, file_format='html')
+            print(t("rpt_readiness_html_saved", path=path, lang=lang))
+        if fmt in ('csv', 'all'):
+            readiness = mr.get("readiness", {})
+            # CSV carries FULL untruncated values (recovery path for the
+            # HTML _CELL_MAX truncation).
+            export_data = {}
+            if mr.get("queue_df") is not None:
+                export_data["queue"] = mr["queue_df"]
+            for key in ("factor_table", "recommendations"):
+                df = readiness.get(key)
+                if df is not None and not getattr(df, "empty", True):
+                    export_data[key] = df
+            if export_data:
+                path = CsvExporter(export_data, report_label='Readiness').export(output_dir)
+                paths.append(path)
+                self._write_report_metadata(path, result, file_format='csv')
+                print(t("rpt_readiness_csv_saved", path=path, lang=lang))
+        return paths
+
+    def _write_report_metadata(self, report_path: str, result: ReadinessResult,
+                               file_format: str) -> None:
+        payload = {
+            "report_type": "readiness",
+            "file_format": file_format,
+            "generated_at": result.generated_at.isoformat(),
+            "record_count": int(result.record_count or 0),
+            "date_range": list(result.date_range or ("", "")),
+            "kpis": (result.module_results or {}).get("kpis", []),
+        }
+        with open(report_path + ".metadata.json", "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, indent=2, ensure_ascii=False)
