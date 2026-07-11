@@ -917,6 +917,40 @@ def make_reports_blueprint(
                 pass  # intentional fallback: ModuleLog write is best-effort
             return _err_with_log("report_rule_hit_count_generate", e, lang=lang)
 
+    # ── API: Enforcement Readiness Report ─────────────────────────────────────
+    @bp.route('/api/readiness_report/generate', methods=['POST'])
+    @limiter.limit("10 per hour")
+    def api_generate_readiness_report():
+        d = request.json or {}
+        lang = d.get('lang', 'en')
+        if lang not in ('en', 'zh_TW'):
+            lang = 'en'
+        try:
+            from src.api_client import ApiClient
+            from src.main import _make_cache_reader
+            from src.report.readiness_report import ReadinessReportGenerator
+            cm.load()
+            api = ApiClient(cm)
+            use_cache, _clip, _ds_warn = _data_source_from_payload(d, cache_available(cm))
+            gen = ReadinessReportGenerator(cm, api_client=api,
+                                           cache_reader=_make_cache_reader(cm))
+            output_dir = _resolve_reports_dir(cm)
+            result = gen.generate_from_api(start_date=d.get('start_date'),
+                                           end_date=d.get('end_date'),
+                                           lang=lang, use_cache=use_cache,
+                                           output_dir=output_dir)
+            if result.record_count == 0:
+                return jsonify({"ok": False, "error": t("gui_no_traffic_data", lang=lang)})
+            fmt = d.get('format', 'html')
+            fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
+            paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
+            return jsonify({"ok": True,
+                            "files": [os.path.basename(p) for p in paths],
+                            "record_count": result.record_count,
+                            "kpis": result.module_results.get('kpis', [])})
+        except Exception as e:
+            return _err_with_log("report_readiness_generate", e, lang=lang)
+
     # ── API: Report Schedules ─────────────────────────────────────────────────
 
     @bp.route('/api/report-schedules', methods=['GET'])

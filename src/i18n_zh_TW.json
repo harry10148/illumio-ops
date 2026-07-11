@@ -4368,5 +4368,13 @@
   "rpt_readiness_kpi_ready": "已就緒 Apps（A/B）",
   "rpt_readiness_kpi_blocked": "Blocked Apps（D/F）",
   "rpt_readiness_col_blocking": "Blocking 因素",
-  "rpt_readiness_rollup_apps": "受影響 Apps"
+  "rpt_readiness_rollup_apps": "受影響 Apps",
+  "gui_gen_readiness_title": "產生 Enforcement 就緒度報表",
+  "gui_rcard_readiness_desc": "哪個 App（Env）可以安全推進到下一階段 Enforcement——就緒分數、卡關因素與改善佇列。",
+  "gui_rcard_readiness_title": "Enforcement 就緒度報表",
+  "gui_sched_rt_readiness": "Enforcement 就緒度",
+  "gui_toast_readiness_done": "Enforcement 就緒度報表已產生。",
+  "gui_toast_readiness_done_kpi": "Enforcement 就緒度報表已產生：{kpi}",
+  "gui_toast_readiness_error": "產生 Enforcement 就緒度報表時發生錯誤：{error}",
+  "gui_toast_readiness_fail": "Enforcement 就緒度報表產生失敗"
 }

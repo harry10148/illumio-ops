@@ -488,8 +488,9 @@ illumio-ops 從即時 PCE 資料或本地 cache 產生多種報表，輸出於 `
 | App Summary | `report app-summary --app <APP> [--env --days]` | 單一 App label 的進出向視圖 |
 | Policy Resolve | `report resolve` | 把 ACTIVE label-based policy 解析成 IP 層防火牆規則 |
 | Policy Diff | `report policy-diff` | DRAFT vs ACTIVE 差異（含 operator 歸因） |
+| Enforcement 就緒度 | `report readiness` | 獨立報表，回答「哪個 App（Env）可以安全推進到下一階段 Enforcement」——就緒分數／等級、以就緒優先排序的推進佇列（含每個 App 的卡關因素與建議動作）、評估因素分解、改善建議、趨勢章；與 Security 報表 Enforcement 就緒度章共用同一套評分引擎，兩者對同一 App 的分數不會不一致；提供 `html`／`csv` |
 
-> 早期文件僅列出 traffic／audit/ven-status/policy-usage 四種——v4.1.0 已擴充為上表九種。`report traffic --profile security_risk|network_inventory` 旗標已**棄用**，請改用 `report security`／`report inventory` 子命令。所有報表子命令亦有 `generate-*` 別名（向後相容）。
+> 早期文件僅列出 traffic／audit/ven-status/policy-usage 四種——v4.1.0 已擴充為上表十種。`report traffic --profile security_risk|network_inventory` 旗標已**棄用**，請改用 `report security`／`report inventory` 子命令。所有報表子命令亦有 `generate-*` 別名（向後相容）。
 
 **輸出格式**：`--format html|csv|pdf|xlsx|all`（預設 `html`）。
 
