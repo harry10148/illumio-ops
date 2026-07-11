@@ -4318,6 +4318,7 @@
   "gui_fb_exclude": "Exclude",
   "gui_fb_remove": "Remove",
   "gui_fb_or": "or",
+  "gui_fb_any_label_group_unsupported": "Label groups are not supported for the S/D (any) direction. Add separate source and destination Label Group conditions instead.",
   "gui_fb_any_slow": "includes either-side condition — query is slower",
   "gui_fb_offline": "PCE unreachable — object search unavailable (manual input still works)",
   "gui_fb_no_match": "No matching objects",

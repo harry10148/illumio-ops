@@ -404,3 +404,26 @@ def test_filter_bar_ip_like_regex_supports_range():
     body = src[start:end]
     assert "-(\\d{1,3}" in body  # range 右側 IP 的正規表達式片段
     assert "m[3]" in body and "octetsOk(m[3])" in body  # 右側也要過八位組檢查
+
+
+def test_any_direction_label_group_not_serialized_as_any_label():
+    src = _JS.read_text(encoding="utf-8")
+    # 舊映射（語意靜默錯誤：group 名被當 label 查）必須消失
+    assert "setScalar(`${ex}any_label`, p.name);" in src  # label 分支仍在
+    assert src.count("setScalar(`${ex}any_label`") == 1   # label_group 分支不再共用
+    # 序列化端防禦性 skip 必須存在
+    assert "label_group pill is not supported for the any direction" in src
+
+
+def test_any_direction_label_group_pill_guard_present():
+    src = _JS.read_text(encoding="utf-8")
+    assert "obj.cat === 'label_group' && state.addDir === 'any'" in src
+
+
+def test_any_label_group_i18n_hint_present():
+    import json
+    en = json.loads(_EN.read_text(encoding="utf-8"))
+    zh = json.loads(_ZH.read_text(encoding="utf-8"))
+    assert "gui_fb_any_label_group_unsupported" in en
+    assert "gui_fb_any_label_group_unsupported" in zh
+    assert "gui_fb_any_label_group_unsupported" in _JS.read_text(encoding="utf-8")
