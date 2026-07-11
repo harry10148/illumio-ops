@@ -291,6 +291,57 @@ class TestGenerateFromNative(unittest.TestCase):
             with self.assertRaises(RuleHitCountNotEnabled):
                 gen.generate_from_native()
 
+    def test_raises_for_partial_and_unsupported_states(self):
+        """GUI route 靠 exc.status.state 轉述前端（needs_enablement 分支）——
+        partial/unsupported 必須與 disabled 同路 raise，且 state 原樣攜帶、
+        不觸發 pull。"""
+        from unittest.mock import patch
+        from src.report.rule_hit_count_enablement import (
+            EnablementStatus, RuleHitCountNotEnabled)
+        for state, detail in (("partial", "missing: PCE report template"),
+                              ("unsupported", "report template not found")):
+            with self.subTest(state=state):
+                api = MagicMock()
+                gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+                with patch("src.report.rule_hit_count_generator.check_enablement",
+                           return_value=EnablementStatus(state, False, False, detail)):
+                    with self.assertRaises(RuleHitCountNotEnabled) as ctx:
+                        gen.generate_from_native()
+                self.assertEqual(ctx.exception.status.state, state)
+                api.pull_rule_hit_count_report.assert_not_called()
+
+    def test_pull_runtime_error_propagates_unwrapped(self):
+        """pull 的 RuntimeError（如 submit 406/no-href）必須原型別、原訊息上拋
+        （GUI _err_with_log / CLI 泛型處理依賴），不得被吞或包裝。"""
+        from unittest.mock import patch
+        from src.report.rule_hit_count_enablement import EnablementStatus
+        api = MagicMock()
+        api.pull_rule_hit_count_report.side_effect = RuntimeError(
+            "rule hit count report submit failed: HTTP 406")
+        gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+        with patch("src.report.rule_hit_count_generator.check_enablement",
+                   return_value=EnablementStatus("enabled", True, True, "")):
+            with self.assertRaises(RuntimeError) as ctx:
+                gen.generate_from_native()
+        self.assertIn("406", str(ctx.exception))
+
+    def test_pull_timeout_propagates_with_report_href(self):
+        """RuleHitCountPullTimeout 必須原型別上拋且 report_href 保留——route 層
+        的型別分流（TimeoutError 是 OSError 子類，須先於泛型 except 捕捉）與
+        後續重試/CSV 路徑都依賴它。"""
+        from unittest.mock import patch
+        from src.api.reports import RuleHitCountPullTimeout
+        from src.report.rule_hit_count_enablement import EnablementStatus
+        api = MagicMock()
+        api.pull_rule_hit_count_report.side_effect = RuleHitCountPullTimeout(
+            "/orgs/1/reports/xyz")
+        gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+        with patch("src.report.rule_hit_count_generator.check_enablement",
+                   return_value=EnablementStatus("enabled", True, True, "")):
+            with self.assertRaises(RuleHitCountPullTimeout) as ctx:
+                gen.generate_from_native()
+        self.assertEqual(ctx.exception.report_href, "/orgs/1/reports/xyz")
+
     def test_temp_csv_is_cleaned_up(self):
         from unittest.mock import patch
         from src.report.rule_hit_count_enablement import EnablementStatus
