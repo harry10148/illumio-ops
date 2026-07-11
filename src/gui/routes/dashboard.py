@@ -493,6 +493,7 @@ def make_dashboard_blueprint(
         try:
             from src.api_client import ApiClient
             from src.analyzer import Analyzer, QUERY_RESULT_CAP
+            from src.exceptions import TrafficQueryError
             from src.reporter import Reporter
             import datetime
 
@@ -634,6 +635,10 @@ def make_dashboard_blueprint(
                 "truncated": bool(stats.get("truncated")),
                 "cap": int(stats.get("cap", QUERY_RESULT_CAP)),
             })
+        except TrafficQueryError as e:
+            lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+            return jsonify({"ok": False, "error": t(
+                "gui_err_traffic_query_failed", detail=str(e), lang=lang)}), 502
         except Exception as e:
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
             return _err_with_log("dashboard_top10", e, lang=lang)

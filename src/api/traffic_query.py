@@ -899,6 +899,8 @@ class TrafficQueryBuilder:
         except Exception as e:
             logger.error(f"Query Exception: {e}")
             print(t("api_query_exception", error=str(e)))
+            if not c.last_fetch_error:
+                c.last_fetch_error = f"traffic query exception: {e}"
             return
 
     # ── Python-side filter for report ───────────────────────────────────

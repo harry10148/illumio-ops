@@ -419,6 +419,7 @@
   "gui_err_pce_profile_not_found": "PCE profile not found.",
   "gui_err_report_output_dir_forbidden": "Report output directory cannot be a system path or the filesystem root.",
   "gui_err_rule_not_found": "Rule not found.",
+  "gui_err_traffic_query_failed": "Traffic query failed on the PCE side: {detail}",
   "gui_err_unknown_action": "Unknown action.",
   "gui_err_unknown_job": "Unknown job.",
   "gui_err_unsupported_system_rule_type": "Unsupported system rule type.",

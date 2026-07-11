@@ -58,6 +58,11 @@ def _make_analyzer(cache_flows=None, api_flows=None):
     mock_cm = MagicMock()
     mock_cm.config = {"rules": []}
     mock_api = MagicMock()
+    # Task 2 (deferred minors hardening): query_flows now raises TrafficQueryError
+    # when last_fetch_error is set after an api/mixed fetch. A bare MagicMock()
+    # attribute is truthy by default, which would spuriously trigger that raise —
+    # pin it to the real ApiClient's default (src/api_client.py:128).
+    mock_api.last_fetch_error = None
     builder = TrafficQueryBuilder(MagicMock())
     mock_api.build_traffic_query_spec.side_effect = builder.build_traffic_query_spec
     mock_api.execute_traffic_query_stream.side_effect = (

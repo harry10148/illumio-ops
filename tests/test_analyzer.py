@@ -9,6 +9,10 @@ class TestAnalyzer(unittest.TestCase):
     def setUp(self):
         self.mock_cm = MagicMock()
         self.mock_api = MagicMock()
+        # Task 2 (deferred minors hardening): query_flows raises TrafficQueryError
+        # when last_fetch_error is truthy after an api/mixed fetch; a bare
+        # MagicMock attribute is truthy, so pin the real default (None).
+        self.mock_api.last_fetch_error = None
         self.mock_rep = MagicMock()
         self.analyzer = Analyzer(self.mock_cm, self.mock_api, self.mock_rep)
 

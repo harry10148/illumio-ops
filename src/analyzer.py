@@ -25,6 +25,7 @@ from src.events import (
     parse_event_timestamp,
 )
 from src.events.catalog import classify_unknown_event_type
+from src.exceptions import TrafficQueryError
 from src.utils import Colors, format_unit, safe_input
 from src.i18n import t
 from src.state_store import load_state_file, update_state_file
@@ -1349,6 +1350,16 @@ class Analyzer:
         )
         return stream, "api"
 
+    def _raise_if_query_fetch_failed(self) -> None:
+        """互動查詢失敗須可分辨（spec §B）：API/混合來源在串流耗盡後，
+        last_fetch_error 非空即代表本次查詢在 PCE 側失敗（submit 406、
+        poll failed/timeout、download 失敗、stream 例外），不得與 0 筆
+        同形回傳。cache/archive 來源不打 PCE，不檢查。"""
+        if self.last_query_source in ("api", "mixed"):
+            err = getattr(self.api, "last_fetch_error", None)
+            if err:
+                raise TrafficQueryError(str(err))
+
     def query_flows(self, params: dict) -> list[dict[str, Any]]:
         """
         Generic traffic flow query utilizing identical metrics logic to run_debug_mode.
@@ -1465,6 +1476,7 @@ class Analyzer:
             cache_bypass_keys=cache_bypass_keys,
         )
         if not traffic_stream:
+            self._raise_if_query_fetch_failed()
             return []
 
         search_query = str(query_spec.report_only_filters.get("search", "") or "").lower()
@@ -1607,6 +1619,8 @@ class Analyzer:
             f_copy["policy_decision"] = f.get("policy_decision")
 
             matches.append(f_copy)
+
+        self._raise_if_query_fetch_failed()
 
         matches.sort(key=lambda x: x.get('_metric_val', 0), reverse=True)
         total = len(matches)

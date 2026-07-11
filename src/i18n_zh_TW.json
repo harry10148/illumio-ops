@@ -4337,5 +4337,6 @@
   "gui_toast_rhc_error": "規則命中次數報表錯誤：{error}",
   "gui_toast_rhc_fail": "規則命中次數報表產生失敗",
   "gui_rhc_pull_timeout": "PCE 尚未完成準備 Rule Hit Count 報表，請稍後再試。",
-  "rpt_rhc_col_last_hit_at": "最後命中時間"
+  "rpt_rhc_col_last_hit_at": "最後命中時間",
+  "gui_err_traffic_query_failed": "PCE 流量查詢失敗：{detail}"
 }

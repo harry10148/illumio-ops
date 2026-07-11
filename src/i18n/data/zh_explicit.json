@@ -384,6 +384,7 @@
   "gui_err_network": "網路錯誤，請稍後再試。",
   "gui_err_no_csv": "未上傳 CSV 檔案。",
   "gui_err_too_many_attempts": "嘗試次數過多，請稍候再試。",
+  "gui_err_traffic_query_failed": "PCE 流量查詢失敗：{detail}",
   "gui_err_unauthorized": "未授權。",
   "gui_ev_advanced_filters": "進階條件（選填）",
   "gui_ev_all_categories": "全部分類",
