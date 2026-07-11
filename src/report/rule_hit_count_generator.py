@@ -51,6 +51,12 @@ _CSV_ALIASES = {
     'rule_set_href': 'ruleset_href',
     'ruleset_href': 'ruleset_href',
     'days_since_last_hit': 'days_since_last_hit',
+    'timestamp_of_last_hit': 'last_hit_at',
+    # last_updated_by / last_updated_at：治理欄位，僅 CSV 匯出 pass-through
+    # （CsvExporter dump 全欄；rule_href/rule_id 同先例）。HTML 刻意不顯示——
+    # 值班判讀價值低，exporter _COLS 白名單濾掉（spec §B, 2026-07-11）。
+    'last_updated_by': 'last_updated_by',
+    'timestamp_last_updated': 'last_updated_at',
     'start_date': 'start_date',
     'end_date': 'end_date',
 }
@@ -132,6 +138,11 @@ class RuleHitCountGenerator:
             except (TypeError, ValueError):
                 hits = 0
             days = row.get('days_since_last_hit', '')
+
+            def _s(col: str) -> str:
+                v = row.get(col, '')
+                return '' if pd.isna(v) else str(v)
+
             rows.append({
                 'rule_href': href,
                 'ruleset': str(row.get('ruleset_name', '') or ''),
@@ -145,6 +156,9 @@ class RuleHitCountGenerator:
                 'enabled': '',
                 'hit_count': hits,
                 'days_since_last_hit': '' if pd.isna(days) else str(days),
+                'last_hit_at': _s('last_hit_at'),
+                'last_updated_by': _s('last_updated_by'),
+                'last_updated_at': _s('last_updated_at'),
             })
 
         # Native export carries the report window as Start/End Date columns.

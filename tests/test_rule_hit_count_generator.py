@@ -16,18 +16,25 @@ from src.report.rule_hit_count_generator import (
 
 
 def _write_native_csv(dirpath: str) -> str:
-    """Write a CSV shaped like the PCE-native Rule Hit Count export."""
+    """Write a CSV shaped like the PCE-native Rule Hit Count export
+    (full 11-column header, real-PCE verified 2026-07-11)."""
     path = os.path.join(dirpath, "rule-hit-count.csv")
     with open(path, "w", encoding="utf-8-sig") as fh:
         fh.write(
-            "Rule HREF,Rule Name,Rule Set HREF,Rule Set Name,Rule Hit Count,"
-            "Days Since Last Hit,Start Date,End Date\n"
-            "/orgs/1/sec_policy/active/rule_sets/10/sec_rules/100,allow web,"
-            "/orgs/1/sec_policy/active/rule_sets/10,RS-A,42,3,2026-06-01,2026-07-01\n"
-            "/orgs/1/sec_policy/active/rule_sets/10/sec_rules/101,stale allow,"
-            "/orgs/1/sec_policy/active/rule_sets/10,RS-A,5,120,2026-06-01,2026-07-01\n"
-            "/orgs/1/sec_policy/active/rule_sets/11/deny_rules/200,deny legacy,"
-            "/orgs/1/sec_policy/active/rule_sets/11,RS-Legacy,0,,2026-06-01,2026-07-01\n"
+            "Rule Name,Rule HREF,Ruleset Name,Ruleset HREF,Rule Hit Count,"
+            "Days Since Last Hit,Timestamp of Last Hit,Last Updated By,"
+            "Timestamp Last Updated,Start Date,End Date\n"
+            "allow web,/orgs/1/sec_policy/active/rule_sets/10/sec_rules/100,"
+            "RS-A,/orgs/1/sec_policy/active/rule_sets/10,42,3,"
+            "2026-06-28T09:14:23Z,admin@lab.local,2026-05-01T00:00:00Z,"
+            "2026-06-01,2026-07-01\n"
+            "stale allow,/orgs/1/sec_policy/active/rule_sets/10/sec_rules/101,"
+            "RS-A,/orgs/1/sec_policy/active/rule_sets/10,5,120,"
+            "2026-03-03T00:00:00Z,admin@lab.local,2026-05-01T00:00:00Z,"
+            "2026-06-01,2026-07-01\n"
+            "deny legacy,/orgs/1/sec_policy/active/rule_sets/11/deny_rules/200,"
+            "RS-Legacy,/orgs/1/sec_policy/active/rule_sets/11,0,,,,,"
+            "2026-06-01,2026-07-01\n"
         )
     return path
 
@@ -196,6 +203,46 @@ class TestCsvEnrichment(unittest.TestCase):
         self.assertEqual(row["ruleset"], "RS-A")
         self.assertEqual(row["rule_type"], "Allow")
         self.assertEqual(row["enabled"], True)
+
+
+class TestNativeExtraColumns(unittest.TestCase):
+    def test_extra_native_columns_parsed(self):
+        gen = RuleHitCountGenerator(MagicMock(), api_client=None)
+        with tempfile.TemporaryDirectory() as td:
+            result = gen.generate_from_csv(_write_native_csv(td), lang="en")
+        row = result.dataframe[result.dataframe["rule_id"] == "100"].iloc[0]
+        self.assertEqual(row["last_hit_at"], "2026-06-28T09:14:23Z")
+        self.assertEqual(row["last_updated_by"], "admin@lab.local")
+        self.assertEqual(row["last_updated_at"], "2026-05-01T00:00:00Z")
+        # 未命中列：Timestamp of Last Hit 為空 → ''（不得為 'nan'）
+        row0 = result.dataframe[result.dataframe["rule_id"] == "200"].iloc[0]
+        self.assertEqual(row0["last_hit_at"], "")
+
+    def test_missing_extra_columns_default_empty(self):
+        # 舊版/精簡 CSV（無這 3 欄）不得失敗
+        gen = RuleHitCountGenerator(MagicMock(), api_client=None)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "minimal.csv")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("Rule HREF,Rule Hit Count\n/r/1,3\n")
+            result = gen.generate_from_csv(path)
+        row = result.dataframe.iloc[0]
+        self.assertEqual(row["last_hit_at"], "")
+        self.assertEqual(row["last_updated_by"], "")
+        self.assertEqual(row["last_updated_at"], "")
+
+    def test_csv_export_carries_extra_columns(self):
+        import zipfile
+        gen = RuleHitCountGenerator(MagicMock(), api_client=None)
+        with tempfile.TemporaryDirectory() as td:
+            result = gen.generate_from_csv(_write_native_csv(td))
+            paths = gen.export(result, fmt="csv", output_dir=td)
+            with zipfile.ZipFile([p for p in paths if p.endswith(".zip")][0]) as zf:
+                name = next(n for n in zf.namelist() if n.endswith("all_rules.csv"))
+                content = zf.read(name).decode("utf-8")
+        self.assertIn("last_hit_at", content)
+        self.assertIn("last_updated_by", content)
+        self.assertIn("admin@lab.local", content)
 
 
 class TestGenerateFromCsvEmptyFile(unittest.TestCase):

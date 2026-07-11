@@ -3504,6 +3504,7 @@
   "rpt_rhc_col_enabled": "Enabled",
   "rpt_rhc_col_hit_count": "Hit Count",
   "rpt_rhc_col_days_since": "Days Since Last Hit",
+  "rpt_rhc_col_last_hit_at": "Timestamp of Last Hit",
   "cli_rhc_not_enabled": "Native Rule Hit Count is not available (state: {state}; {detail}). Use the Policy Usage report for traffic-approximated counts, or enable the native feature.",
   "cli_rhc_not_enabled_intro": "The native Rule Hit Count feature is not fully enabled on this PCE.",
   "cli_rhc_provision_warning": "WARNING: enabling writes draft firewall_settings and PROVISIONS the change to production policy. VENs older than 23.2.30 will not report.",
