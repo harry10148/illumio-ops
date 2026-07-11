@@ -116,6 +116,59 @@ class TestExpandObjectFiltersForDf(unittest.TestCase):
         out = self.client.expand_object_filters_for_df({"services": ["/x/services/all"]})
         assert out["_svc_port_entries"] == [{"wildcard": True}]
 
+    def test_iplist_exclusion_subtracted_from_inclusion(self):
+        """PCE 語意：exclusion:true 條目須從 inclusion 扣除，而非併入。"""
+        self.client.get_ip_lists = MagicMock(return_value=[
+            {"name": "corp", "href": "/orgs/1/sec_policy/active/ip_lists/1",
+             "ip_ranges": [{"from_ip": "10.0.0.0/24"},
+                           {"from_ip": "10.0.0.128/25", "exclusion": True}]},
+        ])
+        out = self.client.expand_object_filters_for_df({"src_iplists": ["corp"]})
+        assert sorted(out["_src_object_cidrs"]) == ["10.0.0.0/25"]
+
+    def test_iplist_exclusion_only_yields_empty(self):
+        """ip_ranges 只有 exclusion 條目 → 展開為空，key 不產生。"""
+        self.client.get_ip_lists = MagicMock(return_value=[
+            {"name": "excl-only", "href": "/orgs/1/sec_policy/active/ip_lists/2",
+             "ip_ranges": [{"from_ip": "10.0.0.0/24", "exclusion": True}]},
+        ])
+        out = self.client.expand_object_filters_for_df({"src_iplists": ["excl-only"]})
+        assert "_src_object_cidrs" not in out
+
+    def test_iplist_exclusion_range_form(self):
+        """exclusion 用 from-to range 形也須正確扣除。"""
+        self.client.get_ip_lists = MagicMock(return_value=[
+            {"name": "range-excl", "href": "/orgs/1/sec_policy/active/ip_lists/3",
+             "ip_ranges": [{"from_ip": "10.0.0.0/24"},
+                           {"from_ip": "10.0.0.128", "to_ip": "10.0.0.255",
+                            "exclusion": True}]},
+        ])
+        out = self.client.expand_object_filters_for_df({"src_iplists": ["range-excl"]})
+        assert sorted(out["_src_object_cidrs"]) == ["10.0.0.0/25"]
+
+    def test_iplist_exclusion_disjoint_is_noop(self):
+        """exclusion 與 inclusion 相離時原樣保留。"""
+        self.client.get_ip_lists = MagicMock(return_value=[
+            {"name": "disjoint", "href": "/orgs/1/sec_policy/active/ip_lists/4",
+             "ip_ranges": [{"from_ip": "10.0.0.0/24"},
+                           {"from_ip": "192.168.0.0/24", "exclusion": True}]},
+        ])
+        out = self.client.expand_object_filters_for_df({"src_iplists": ["disjoint"]})
+        assert sorted(out["_src_object_cidrs"]) == ["10.0.0.0/24"]
+
+    def test_multi_iplist_union_not_cross_subtracted(self):
+        """per-list 扣除：A 的 exclusion 不得吃掉 B 的 inclusion（OR 聯集語意）。"""
+        self.client.get_ip_lists = MagicMock(return_value=[
+            {"name": "A", "href": "/orgs/1/sec_policy/active/ip_lists/5",
+             "ip_ranges": [{"from_ip": "10.0.0.0/24"},
+                           {"from_ip": "10.1.0.0/16", "exclusion": True}]},
+            {"name": "B", "href": "/orgs/1/sec_policy/active/ip_lists/6",
+             "ip_ranges": [{"from_ip": "10.1.0.0/16"}]},
+        ])
+        out = self.client.expand_object_filters_for_df({"src_iplists": ["A", "B"]})
+        assert "10.1.0.0/16" in out["_src_object_cidrs"]
+        assert "10.0.0.0/24" in out["_src_object_cidrs"]
+
     def test_report_generator_expands_services_before_df_filter(self):
         """迴歸測試：filters 僅含 services（無任何 iplist/workload key）時，
         _fetch_traffic_df 的 _obj_filter_keys gate 也必須觸發
