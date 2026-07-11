@@ -236,7 +236,7 @@ class RuleHitCountGenerator:
             return False
         try:
             from src.report.policy_usage_generator import build_rule_baseline
-            rulesets = self.api.get_all_rulesets(force_refresh=True)
+            rulesets = self.api.get_all_rulesets(force_refresh=True, raise_on_error=True)
             flat_rules, _ = build_rule_baseline(rulesets or [])
         except Exception as exc:
             logger.warning("Rule detail enrichment skipped: {}", exc)

@@ -157,6 +157,18 @@ class TestCsvEnrichment(unittest.TestCase):
         self.assertEqual(result.record_count, 3)
         self.assertTrue(result.module_results.get("enrich_failed"))
 
+    def test_enrichment_opts_into_raise_on_error(self):
+        """真 PCE 驗證 v1 項 6：HTTP 40x 時 get_all_rulesets 預設回 [] 不拋例外，
+        enrich_failed 永不為 True、HTML 無注記、欄位靜默全空。generator 必須以
+        raise_on_error=True 呼叫，讓 HTTP 失敗走既有 except 路徑設旗標。"""
+        api = MagicMock()
+        api.get_all_rulesets.side_effect = RuntimeError("get_all_rulesets failed: HTTP 403")
+        gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+        with tempfile.TemporaryDirectory() as td:
+            result = gen.generate_from_csv(_write_native_csv(td))
+        self.assertTrue(result.module_results.get("enrich_failed"))
+        api.get_all_rulesets.assert_called_once_with(force_refresh=True, raise_on_error=True)
+
     def test_enriches_when_ruleset_hrefs_are_draft_and_csv_hrefs_are_active(self):
         """Production shape: get_all_rulesets() always returns DRAFT-form hrefs
         (api_client.py hits /sec_policy/draft/...), but the native Rule Hit Count
