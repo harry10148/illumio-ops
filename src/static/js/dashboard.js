@@ -322,6 +322,7 @@ function renderSchedules() {
     ven_status: _t('gui_sched_rt_ven'),
     policy_usage: _t('gui_sched_rt_pu'),
     rule_hit_count: _t('gui_sched_rt_rhc'),
+    readiness: _t('gui_sched_rt_readiness'),
     policy_diff: _t('gui_sched_rt_policy_diff'),
     policy_resolver: _t('gui_sched_rt_policy_resolver'),
     app_summary: _t('gui_sched_rt_app_summary'),
@@ -652,6 +653,7 @@ function openReportGenModal(type) {
     ven:          { titleKey: 'gui_gen_ven_title',     icon: '#icon-cpu',    dates: false },
     policy_usage: { titleKey: 'gui_gen_pu_title',      icon: '#icon-shield', dates: true  },
     rule_hit_count: { titleKey: 'gui_gen_rhc_title',   icon: '#icon-shield', dates: true  },
+    readiness:    { titleKey: 'gui_gen_readiness_title', icon: '#icon-shield', dates: true },
     policy_diff:  { titleKey: 'gui_gen_policy_diff_title', icon: '#icon-shield', dates: false },
     policy_resolver: { titleKey: 'gui_gen_policy_resolver_title', icon: '#icon-shield', dates: false },
     app_summary:  { titleKey: 'gui_gen_app_title', icon: '#icon-shield', dates: true, appField: true },
@@ -694,7 +696,7 @@ function openReportGenModal(type) {
   // and only when the PCE cache is actually available.
   const dsRow = $('m-gen-data-source-row');
   if (dsRow) {
-    const supportsCache = (TRAFFIC_PROFILE_TYPES.includes(type) || type === 'app_summary');
+    const supportsCache = (TRAFFIC_PROFILE_TYPES.includes(type) || type === 'app_summary' || type === 'readiness');
     dsRow.style.display = (supportsCache && window._CACHE_AVAILABLE) ? '' : 'none';
     const dsSel = $('m-gen-data-source');
     if (dsSel) dsSel.value = 'hybrid';  // default each open
@@ -752,6 +754,7 @@ async function confirmReportGen() {
     ven:          _t('gui_gen_ven_title'),
     policy_usage: _t('gui_gen_pu_title'),
     rule_hit_count: _t('gui_gen_rhc_title'),
+    readiness:    _t('gui_gen_readiness_title'),
     policy_diff:  _t('gui_gen_policy_diff_title'),
     policy_resolver: _t('gui_gen_policy_resolver_title'),
     app_summary:  _t('gui_gen_app_title'),
@@ -763,6 +766,7 @@ async function confirmReportGen() {
   else if (_genReportType === 'ven')          await _doGenerateVen();
   else if (_genReportType === 'policy_usage') await _doGeneratePolicyUsageClean();
   else if (_genReportType === 'rule_hit_count') await _doGenerateRuleHitCount();
+  else if (_genReportType === 'readiness')    await _doGenerateReadiness();
   else if (_genReportType === 'policy_diff')  await _doGeneratePolicyDiff();
   else if (_genReportType === 'policy_resolver') await _doGeneratePolicyResolver();
   else if (_genReportType === 'app_summary')  await _doGenerateAppSummary();
@@ -1054,6 +1058,41 @@ async function _doGenerateVen() {
   } catch(e) {
     _hideGenProgress(false, e.message);
     toast((_t('gui_toast_ven_error')).replace('{error}', e.message), 'err');
+  }
+}
+
+async function _doGenerateReadiness() {
+  const fmtEl = document.getElementById('m-gen-format');
+  const langEl = document.getElementById('m-gen-lang');
+  const payload = {
+    format: fmtEl ? fmtEl.value : 'html',
+    lang: langEl ? langEl.value : 'en',
+    start_date: $('m-gen-start').value,
+    end_date: $('m-gen-end').value,
+  };
+  const dsRow = $('m-gen-data-source-row');
+  const dsSel = $('m-gen-data-source');
+  if (dsSel && dsRow && dsRow.style.display !== 'none') payload.data_source = dsSel.value;
+  _updateGenStep(_t('gui_gen_step_fetching'));
+  try {
+    const r = await post('/api/readiness_report/generate', payload);
+    if (r.ok) {
+      const kpiText = (r.kpis || []).map(k => `${k.label}: ${k.value}`).join(' | ');
+      _hideGenProgress(true, kpiText || (_t('gui_gen_done')));
+      const doneMsg = kpiText
+        ? (_t('gui_toast_readiness_done_kpi')).replace('{kpi}', kpiText)
+        : (_t('gui_toast_readiness_done'));
+      toast(doneMsg);
+      loadReports();
+      if (typeof loadRcardMeta === 'function') loadRcardMeta();
+    } else {
+      const fail = _t('gui_toast_readiness_fail');
+      _hideGenProgress(false, r.error || fail);
+      toast(r.error || fail, 'err');
+    }
+  } catch(e) {
+    _hideGenProgress(false, e.message);
+    toast((_t('gui_toast_readiness_error')).replace('{error}', e.message), 'err');
   }
 }
 

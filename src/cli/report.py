@@ -284,6 +284,42 @@ def generate_rule_hit_count_report(
     return gen.export(result, fmt=fmt, output_dir=out, lang=lang)
 
 
+def generate_readiness_report(
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    fmt: str = "html",
+    output_dir: str | None = None,
+    data_source: str | None = None,
+    use_cache: bool = True,
+) -> list[str]:
+    from src.api_client import ApiClient
+    from src.config import ConfigManager
+    from src.main import _make_cache_reader
+    from src.report.cache_support import cache_available, resolve_data_source
+    from src.report.readiness_report import ReadinessReportGenerator
+
+    cm = ConfigManager()
+    api = ApiClient(cm)
+    lang = _resolve_lang(cm)
+    eff_ds = data_source if data_source is not None else ("cache" if use_cache else "no-cache")
+    # fetch_traffic_df has no clip_to_cache knob — only use_cache applies here.
+    use_cache, _clip, _ds_warn = resolve_data_source(eff_ds, cache_available(cm))
+    if _ds_warn:
+        click.echo(t("cli_report_data_source_warning", msg=_ds_warn, lang=lang), err=True)
+    _root_dir, config_dir = _resolve_paths(output_dir)
+    out = _resolve_output_dir(cm, output_dir)
+    gen = ReadinessReportGenerator(cm, api_client=api, config_dir=config_dir,
+                                   cache_reader=_make_cache_reader(cm))
+    result = gen.generate_from_api(
+        start_date=_iso_date(start_date, end_of_day=False),
+        end_date=_iso_date(end_date, end_of_day=True),
+        lang=lang, use_cache=use_cache, output_dir=out)
+    if result.record_count == 0:
+        raise click.ClickException(t("cli_report_no_data", lang=lang))
+    return gen.export(result, fmt=fmt, output_dir=out, lang=lang)
+
+
 def _run_rhc_enablement_wizard(api, lang: str) -> bool:
     """Interactive enablement wizard (TTY only). Returns True if enable ran.
 
@@ -926,6 +962,39 @@ def report_resolve(ctx: click.Context, fmt: str, output_dir) -> None:
         from src.i18n import t as _t
         click.echo(_t("gui_toast_policy_resolver_empty",
                       lang=_resolve_lang(ConfigManager())), err=True)
+    _emit_paths(ctx, paths, fmt)
+
+
+@report_group.command("readiness")
+@click.option("--start-date", default=None, help="Start date (YYYY-MM-DD).")
+@click.option("--end-date", default=None, help="End date (YYYY-MM-DD).")
+@click.option("--format", "fmt", type=click.Choice(["html", "csv", "all"]), default="html")
+@click.option("--output-dir", type=click.Path(), default=None)
+@_data_source_options
+@click.pass_context
+def report_readiness(ctx: click.Context, start_date: str | None, end_date: str | None,
+                     fmt: str, output_dir, data_source, legacy_cache) -> None:
+    """Generate the Enforcement Readiness report (which app to enforce next)."""
+    data_source, use_cache = _resolve_cli_data_source(data_source, legacy_cache)
+    try:
+        paths = generate_readiness_report(start_date=start_date, end_date=end_date,
+                                          fmt=fmt, output_dir=output_dir,
+                                          data_source=data_source, use_cache=use_cache)
+    except click.ClickException as exc:
+        echo_error(ctx, exc.format_message())
+        ctx.exit(EXIT_DATAERR)
+        return
+    except (ConnectionError, OSError) as exc:
+        if isinstance(exc, OSError) and 'connection' not in str(exc).lower():
+            raise
+        echo_error(ctx, t("cli_report_connection_failed", error=exc, lang=_ctx_lang()))
+        ctx.exit(EXIT_UNAVAILABLE)
+        return
+    except Exception as exc:
+        log.exception("readiness report failed")
+        echo_error(ctx, t("cli_report_unexpected_error", error=exc, lang=_ctx_lang()))
+        ctx.exit(EXIT_SOFTWARE)
+        return
     _emit_paths(ctx, paths, fmt)
 
 

@@ -187,3 +187,27 @@ def test_report_audit_connection_error_exits_unavailable():
 
     assert result.exit_code == EXIT_UNAVAILABLE, result.output
     assert "connection refused" in result.output  # error detail surfaces (message is now i18n'd)
+
+
+def test_report_readiness_subcommand_dispatches_helper():
+    from src.cli.root import cli
+
+    runner = CliRunner()
+    with patch("src.cli.report.generate_readiness_report",
+               return_value=["/tmp/readiness.html"]) as mock_gen:
+        result = runner.invoke(
+            cli,
+            ["report", "readiness", "--start-date", "2026-07-01",
+             "--end-date", "2026-07-08", "--format", "csv"],
+        )
+
+    assert result.exit_code == 0
+    assert "/tmp/readiness.html" in result.output
+    mock_gen.assert_called_once_with(
+        start_date="2026-07-01",
+        end_date="2026-07-08",
+        fmt="csv",
+        output_dir=None,
+        data_source=None,
+        use_cache=True,
+    )

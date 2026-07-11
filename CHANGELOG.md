@@ -93,6 +93,14 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Added
 
+- Enforcement Readiness Report (`report readiness`, CLI + GUI + scheduler): a
+  standalone report answering "which app (env) can safely move to enforcement
+  next" — readiness score/grade, an advancement queue ranked ready-first with
+  per-app blocking factor and recommended action, factor breakdown, remediation
+  recommendations, and a trend chapter. Shares its scoring engine with the
+  Security report's Enforcement Readiness chapter (same `enforcement_readiness`
+  analysis, so the two reports never disagree on a given app's score). Available
+  in HTML/CSV, in both English and Traditional Chinese.
 - Plain Traffic Flow Report profile (`traffic`): overview, policy decision summary,
   app/env distribution, bandwidth, unmanaged overview. Runs only lightweight modules.
 - Trend/drift credibility hardening (phase 6): the Baseline Drift chapter now excludes

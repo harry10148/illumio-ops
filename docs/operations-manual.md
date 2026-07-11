@@ -488,8 +488,9 @@ illumio-ops generates several report types from live PCE data or the local cache
 | App Summary | `report app-summary --app <APP> [--env --days]` | Inbound/outbound view of a single App label |
 | Policy Resolve | `report resolve` | Resolves ACTIVE label-based policy into IP-level firewall rules |
 | Policy Diff | `report policy-diff` | DRAFT vs ACTIVE differences (with operator attribution) |
+| Enforcement Readiness | `report readiness` | Standalone report answering "which app (env) can safely move to enforcement next" — readiness score/grade, an advancement queue ranked ready-first with per-app blocking factor and recommended action, factor breakdown, remediation recommendations, and a trend chapter; shares its scoring engine with the Security report's Enforcement Readiness chapter, so the two never disagree on a given app's score; available in `html`/`csv` |
 
-> Earlier docs listed only four (traffic/audit/ven-status/policy-usage) — v4.1.0 has expanded to the nine in the table above. The `report traffic --profile security_risk|network_inventory` flag is **deprecated**; use the `report security` / `report inventory` subcommands instead. All report subcommands also have `generate-*` aliases (for backward compatibility).
+> Earlier docs listed only four (traffic/audit/ven-status/policy-usage) — v4.1.0 has expanded to the ten in the table above. The `report traffic --profile security_risk|network_inventory` flag is **deprecated**; use the `report security` / `report inventory` subcommands instead. All report subcommands also have `generate-*` aliases (for backward compatibility).
 
 **Output formats**: `--format html|csv|pdf|xlsx|all` (default `html`).
 
