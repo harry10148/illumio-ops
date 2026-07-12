@@ -72,7 +72,7 @@ for dir in python wheels app deploy; do
     else fail "Bundle dir missing: $dir/ — bundle may be corrupt"; fi
 done
 
-WHEEL_COUNT=$(find "$BUNDLE_DIR/wheels" -name "*.whl" 2>/dev/null | wc -l)
+WHEEL_COUNT=$(find "$BUNDLE_DIR/wheels" -name "*.whl" 2>/dev/null | wc -l || true)
 if [ "$WHEEL_COUNT" -ge 20 ]; then pass "Wheels: $WHEEL_COUNT .whl files (>= 20 required)"
 else fail "Wheels: only $WHEEL_COUNT .whl files — expected >= 20"; fi
 
@@ -80,12 +80,37 @@ BUNDLED_PY="$BUNDLE_DIR/python/bin/python3"
 if [ -x "$BUNDLED_PY" ]; then pass "Bundled Python: $("$BUNDLED_PY" --version 2>&1)"
 else fail "Bundled Python not executable: $BUNDLED_PY"; fi
 
+# 6b. Bundled Python SQLite floor — INSERT ... RETURNING needs >= 3.35.0.
+# Mirror of MIN_SQLITE_VERSION in src/runtime_checks.py; keep in sync.
+if [ -x "$BUNDLED_PY" ]; then
+    SQLITE_VER=$("$BUNDLED_PY" -c 'import sqlite3; print(sqlite3.sqlite_version)' 2>/dev/null || echo "unknown")
+    SQLITE_OK=$("$BUNDLED_PY" -c 'import sqlite3; print(1 if sqlite3.sqlite_version_info >= (3, 35, 0) else 0)' 2>/dev/null || echo 0)
+    if [ "$SQLITE_OK" = "1" ]; then pass "Bundled SQLite: $SQLITE_VER (>= 3.35.0 required)"
+    else fail "Bundled SQLite: $SQLITE_VER — requires >= 3.35.0"; fi
+fi
+
 # 7. Upgrade detection (informational)
 if [ -f "$INSTALL_ROOT/config/config.json" ]; then
     warn "Existing installation at $INSTALL_ROOT — this is an UPGRADE"
     warn "config.json, alerts.json (rules), and rule_schedules.json will be preserved"
 else
     pass "No existing installation at $INSTALL_ROOT — fresh install"
+fi
+
+# 7b. Existing cache DB (upgrade only, informational). Requires read access —
+# run preflight with sudo on upgrades for an accurate result.
+DB_FILE="$INSTALL_ROOT/data/pce_cache.sqlite"
+if [ -f "$DB_FILE" ] && [ -x "$BUNDLED_PY" ]; then
+    DB_USER_VERSION=$("$BUNDLED_PY" -c "
+import sqlite3, sys
+conn = sqlite3.connect(f'file:{sys.argv[1]}?mode=ro', uri=True)
+print(conn.execute('PRAGMA user_version').fetchone()[0])
+" "$DB_FILE" 2>/dev/null || echo "unreadable")
+    if [ "$DB_USER_VERSION" = "unreadable" ]; then
+        warn "Existing cache DB at $DB_FILE could not be opened read-only — check permissions (re-run with sudo) or corruption before upgrading"
+    else
+        pass "Existing cache DB: user_version=$DB_USER_VERSION (schema migrates automatically on next service start)"
+    fi
 fi
 
 # 8. Port 5001
