@@ -114,6 +114,12 @@ sudo systemctl enable --now illumio-ops
 sudo systemctl status illumio-ops     # should show: Active: active (running)
 ```
 
+After installation a CLI wrapper is available as `illumio-ops` (installed to
+`/usr/local/bin/illumio-ops`). Always use the wrapper (or the bundled
+interpreter at `/opt/illumio-ops/python/bin/python3`) for manual CLI
+operations — the system `python3` on older distros links a SQLite that is too
+old for this application (>= 3.35.0 required) and the app will refuse to start.
+
 **Windows Server / Windows 11 — first-time install** (PowerShell as Administrator):
 
 ```powershell

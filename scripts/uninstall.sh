@@ -35,6 +35,7 @@ echo "==> Stopping and disabling service"
 systemctl stop    "$SERVICE_NAME" 2>/dev/null || true
 systemctl disable "$SERVICE_NAME" 2>/dev/null || true
 rm -f "$SERVICE_FILE"
+rm -f /usr/local/bin/illumio-ops
 systemctl daemon-reload
 
 if [ "$PURGE" = true ]; then

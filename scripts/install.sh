@@ -187,14 +187,26 @@ sed "s|/opt/illumio-ops|$INSTALL_ROOT|g" "$SRC/deploy/illumio-ops.service" > "$S
 chmod 0644 "$SERVICE_FILE"
 systemctl daemon-reload
 
+# CLI wrapper: give operators a stable `illumio-ops` command that always uses
+# the bundled Python. Running the app with the system python3 breaks on old
+# distros (system SQLite < 3.35 lacks INSERT ... RETURNING).
+WRAPPER=/usr/local/bin/illumio-ops
+cat > "$WRAPPER" <<EOF
+#!/usr/bin/env bash
+exec "$INSTALL_ROOT/python/bin/python3" "$INSTALL_ROOT/illumio-ops.py" "\$@"
+EOF
+chmod 0755 "$WRAPPER"
+
 if [ "$IS_UPGRADE" = true ]; then
     echo "==> Upgrade complete."
     echo "    Check for new config keys: diff $INSTALL_ROOT/config/config.json.example $INSTALL_ROOT/config/config.json"
     echo "    Restart service          : sudo systemctl restart $SERVICE_NAME"
+    echo "    CLI usage    : illumio-ops --help   (wrapper installed at /usr/local/bin/illumio-ops)"
 else
     echo "==> Installation complete."
     echo "    Edit config : nano $INSTALL_ROOT/config/config.json"
     echo "    Start service: sudo systemctl enable --now $SERVICE_NAME"
+    echo "    CLI usage    : illumio-ops --help   (wrapper installed at /usr/local/bin/illumio-ops)"
     echo "    Uninstall    : sudo $INSTALL_ROOT/uninstall.sh"
     echo "    Purge all    : sudo $INSTALL_ROOT/uninstall.sh --purge"
 fi
