@@ -428,6 +428,8 @@ def make_reports_blueprint(
                     'ex_process_name': raw_filters.get('ex_process_name', []),
                     'windows_service_name': raw_filters.get('windows_service_name', []),
                     'ex_windows_service_name': raw_filters.get('ex_windows_service_name', []),
+                    'transmission': raw_filters.get('transmission', []),
+                    'ex_transmission': raw_filters.get('ex_transmission', []),
                 }
                 if not any(v for v in report_filters.values() if v):
                     report_filters = None

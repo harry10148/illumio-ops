@@ -84,6 +84,7 @@ _TRAFFIC_FILTER_CAPABILITIES = {
     "ex_dst_ams": {"execution": "native", "min_pce_version": "21.2", "notes": "Adds actors:ams to destinations.exclude."},
     "transmission_excludes": {"execution": "native", "min_pce_version": "21.2", "notes": "Mapped to destinations.exclude transmission entries."},
     "ex_transmission": {"execution": "native", "min_pce_version": "21.2", "notes": "Mapped to destinations.exclude transmission entries."},
+    "transmission": {"execution": "native", "min_pce_version": "21.2", "notes": "Destination-side transmission include (unicast/broadcast/multicast)."},
     "src_include_groups": {"execution": "native", "min_pce_version": "21.2", "notes": "Supports OR-of-AND actor groups on source side."},
     "dst_include_groups": {"execution": "native", "min_pce_version": "21.2", "notes": "Supports OR-of-AND actor groups on destination side."},
     "any_label": {"execution": "fallback", "notes": "Either-side semantics require client-side filtering."},
@@ -621,6 +622,18 @@ class TrafficQueryBuilder:
                 _record_consumed(key, spec.native_filters.get(key))
                 _consume_keys((key,))
 
+        transmission_include = labels._normalize_transmission_values(
+            native_filters.get("transmission")
+        )
+        if transmission_include:
+            for value in transmission_include:
+                payload["destinations"]["include"].append([{"transmission": value}])
+            _record_consumed("transmission", spec.native_filters.get("transmission"))
+            _consume_keys(("transmission",))
+        elif "transmission" in native_filters:
+            _record_unresolved("transmission", spec.native_filters.get("transmission"))
+            _consume_keys(("transmission",))
+
         transmission_values = labels._normalize_transmission_values(
             native_filters.get("transmission_excludes") or native_filters.get("ex_transmission")
         )
@@ -1149,6 +1162,17 @@ class TrafficQueryBuilder:
                 flow_val = str(svc.get(svc_field) or "").casefold()
                 if flow_val and flow_val in exc:
                     return False
+
+        tx_inc = _name_values(filters, "transmission")
+        if tx_inc:
+            flow_tx = str(flow.get("transmission") or "").casefold()
+            if not flow_tx or flow_tx not in tx_inc:
+                return False
+        tx_exc = _name_values(filters, "ex_transmission") or _name_values(filters, "transmission_excludes")
+        if tx_exc:
+            flow_tx = str(flow.get("transmission") or "").casefold()
+            if flow_tx and flow_tx in tx_exc:
+                return False
 
         for fkey, is_exclude in (("services", False), ("ex_services", True)):
             vals = filters.get(fkey)

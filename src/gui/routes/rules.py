@@ -32,6 +32,7 @@ _RULE_FB_KEYS = (
     "services", "ex_services", "ports", "ex_ports",
     "process_name", "ex_process_name",
     "windows_service_name", "ex_windows_service_name",
+    "transmission", "ex_transmission",
 )
 _RULE_REJECTED_KEYS = (
     "src_label_groups", "dst_label_groups", "ex_src_label_groups", "ex_dst_label_groups",

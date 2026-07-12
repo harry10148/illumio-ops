@@ -70,6 +70,7 @@ _OBJECT_FILTER_KEYS = (
     "services", "ex_services", "ports", "ex_ports",
     "process_name", "ex_process_name",
     "windows_service_name", "ex_windows_service_name",
+    "transmission", "ex_transmission", "transmission_excludes",
 )
 
 # 兩套 client-side 比對器（check_flow_match 與 _flow_matches_filters）都無法
@@ -1434,6 +1435,7 @@ class Analyzer:
             "ex_src_ams": params.get("ex_src_ams"),
             "ex_dst_ams": params.get("ex_dst_ams"),
             "transmission_excludes": params.get("transmission_excludes") or params.get("ex_transmission"),
+            "transmission": params.get("transmission"),
             "src_include_groups": params.get("src_include_groups"),
             "dst_include_groups": params.get("dst_include_groups"),
             "search": params.get("search"),

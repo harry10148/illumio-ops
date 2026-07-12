@@ -20,6 +20,8 @@ PILL_KEYS = ("ports", "ex_ports", "services", "ex_services")
 NAME_KEYS = ("process_name", "ex_process_name",
              "windows_service_name", "ex_windows_service_name")
 
+TRANSMISSION_KEYS = ("transmission", "ex_transmission")
+
 FORWARD_SURFACES_ALL = FORWARD_SURFACES + (
     ("rules.whitelist", "src/gui/routes/rules.py", "src_labels"),
     ("actions.quarantine", "src/gui/routes/actions.py", "src_labels"),
@@ -44,4 +46,11 @@ def test_name_keys_forwarded_everywhere():
     for label, path, anchor in FORWARD_SURFACES_ALL:
         seg = _surface_text(path, anchor)
         missing = [k for k in NAME_KEYS if f"'{k}'" not in seg and f'"{k}"' not in seg]
+        assert not missing, f"{label} missing keys: {missing}"
+
+
+def test_transmission_keys_forwarded_everywhere():
+    for label, path, anchor in FORWARD_SURFACES_ALL:
+        seg = _surface_text(path, anchor)
+        missing = [k for k in TRANSMISSION_KEYS if f"'{k}'" not in seg and f'"{k}"' not in seg]
         assert not missing, f"{label} missing keys: {missing}"

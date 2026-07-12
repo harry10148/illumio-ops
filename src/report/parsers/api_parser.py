@@ -89,6 +89,7 @@ def flatten_flow_record(r: dict) -> dict:
         'user_name':        svc.get('user_name', '') or '',
         'num_connections':  int(r.get('num_connections', 1) or 1),
         'state':            r.get('state', '') or '',
+        'transmission':     r.get('transmission', '') or '',
         'policy_decision':  r.get('policy_decision', 'unknown') or 'unknown',
         'first_detected':   r.get('first_detected'),
         'last_detected':    r.get('last_detected'),
