@@ -84,7 +84,7 @@ _TRAFFIC_FILTER_CAPABILITIES = {
     "ex_dst_ams": {"execution": "native", "min_pce_version": "21.2", "notes": "Adds actors:ams to destinations.exclude."},
     "transmission_excludes": {"execution": "native", "min_pce_version": "21.2", "notes": "Mapped to destinations.exclude transmission entries."},
     "ex_transmission": {"execution": "native", "min_pce_version": "21.2", "notes": "Mapped to destinations.exclude transmission entries."},
-    "transmission": {"execution": "native", "min_pce_version": "21.2", "notes": "Destination-side transmission include (unicast/broadcast/multicast)."},
+    "transmission": {"execution": "fallback", "notes": "Destination-side transmission include (unicast/broadcast/multicast) matched client-side; PCE's destinations.include actor schema does not accept a transmission entry (live PCE returns HTTP 406)."},
     "src_include_groups": {"execution": "native", "min_pce_version": "21.2", "notes": "Supports OR-of-AND actor groups on source side."},
     "dst_include_groups": {"execution": "native", "min_pce_version": "21.2", "notes": "Supports OR-of-AND actor groups on destination side."},
     "any_label": {"execution": "fallback", "notes": "Either-side semantics require client-side filtering."},
@@ -621,18 +621,6 @@ class TrafficQueryBuilder:
                         payload["services"][target].append({field_: v})
                 _record_consumed(key, spec.native_filters.get(key))
                 _consume_keys((key,))
-
-        transmission_include = labels._normalize_transmission_values(
-            native_filters.get("transmission")
-        )
-        if transmission_include:
-            for value in transmission_include:
-                payload["destinations"]["include"].append({"transmission": value})
-            _record_consumed("transmission", spec.native_filters.get("transmission"))
-            _consume_keys(("transmission",))
-        elif "transmission" in native_filters:
-            _record_unresolved("transmission", spec.native_filters.get("transmission"))
-            _consume_keys(("transmission",))
 
         transmission_values = labels._normalize_transmission_values(
             native_filters.get("transmission_excludes") or native_filters.get("ex_transmission")

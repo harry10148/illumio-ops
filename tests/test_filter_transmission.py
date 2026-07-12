@@ -68,6 +68,12 @@ def test_blank_only_transmission_include_matches_nothing_filtered_both_paths():
 
 
 def test_native_payload_include_side():
+    # 真 PCE 驗證（第二次修正）：destinations.include 的 actor schema
+    # 根本不接受 transmission 條目（list-of-lists 得到 406；flat dict
+    # 也被拒絕，parse 端丟 'str' object has no attribute 'get'）。
+    # 因此 transmission include 必須整個走 client-side fallback，
+    # 不可出現在 native_filters 或 native payload 的 destinations.include 裡。
+    #
     # NOTE: _build_native_traffic_payload(self, start_time_str, end_time_str,
     # policy_decisions, filters=None) takes `filters=`, not `spec=`, and builds
     # the spec internally; it also returns (payload, effective_spec), not just
@@ -80,9 +86,13 @@ def test_native_payload_include_side():
 
     b = B.__new__(B)
     b._client = types.SimpleNamespace(_labels=LabelResolver)
+
+    spec = b.build_traffic_query_spec({"transmission": ["broadcast"]})
+    assert "transmission" in spec.fallback_filters
+    assert "transmission" not in spec.native_filters
+
     payload, _spec = b._build_native_traffic_payload(
         "2026-07-01T00:00:00Z", "2026-07-02T00:00:00Z", ["allowed"],
         filters={"transmission": ["broadcast"]})
-    # 真 PCE 驗證：list-of-lists 會被 406 拒絕，正確形狀是 flat dict
-    assert {"transmission": "broadcast"} in payload["destinations"]["include"]
-    assert [{"transmission": "broadcast"}] not in payload["destinations"]["include"]
+    for entry in payload["destinations"]["include"]:
+        assert not (isinstance(entry, dict) and "transmission" in entry)
