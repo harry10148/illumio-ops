@@ -135,6 +135,11 @@ notepad C:\illumio-ops\config\config.json       # fill in PCE credentials
 Get-Service IllumioOps                # should show: Running
 ```
 
+`install.ps1` verifies the installation before registering the service —
+every production dependency must import (`scripts\verify_deps.py
+--offline-bundle`); a pip or verification failure aborts the install with a
+non-zero exit code.
+
 ### systemd / NSSM service
 
 The service definitions live in `deploy/`:

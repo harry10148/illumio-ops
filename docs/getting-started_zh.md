@@ -133,6 +133,10 @@ notepad C:\illumio-ops\config\config.json       # 填入 PCE 憑證
 Get-Service IllumioOps                # 應顯示：Running
 ```
 
+`install.ps1` 會在註冊服務前先驗證安裝——所有正式相依必須可 import
+（`scripts\verify_deps.py --offline-bundle`）；pip 或驗證失敗即中止並回傳
+非零 exit code。
+
 ### systemd / NSSM 服務
 
 服務定義檔位於 `deploy/`：

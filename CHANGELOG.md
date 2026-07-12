@@ -25,7 +25,12 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   itself, so the documented steps now say so explicitly. The downgrade guard also
   falls back to the cache DB's `PRAGMA user_version` when the installed version
   string is unreadable (the uninstall-then-reinstall-older path), and the wrapper
-  docs note that real operations need `sudo`.
+  docs note that real operations need `sudo`. Windows: shipped PowerShell scripts
+  now carry a UTF-8 BOM (PowerShell 5.1 misparsed the BOM-less files on CJK ANSI
+  code pages), the bundle includes the Windows-only wheels (`colorama`,
+  `win32-setctime`) that the Linux-side `pip download` silently skipped via
+  environment markers, and `install.ps1` aborts on pip failure and runs the same
+  `verify_deps.py --offline-bundle` post-install verification as Linux.
 - `report traffic` now generates the new plain Traffic Flow Report (traffic facts only,
   no security scoring). Use `report security` / `report inventory` for the previous
   outputs; `--profile` on `report traffic` is deprecated.
