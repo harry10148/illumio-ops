@@ -123,7 +123,10 @@ preservation details) see [Getting Started — Upgrade section](../getting-start
 
 **Offline-bundle installer (`scripts/install.sh`)**: detects an existing install
 by checking for `<INSTALL_ROOT>/config/config.json` and sets `IS_UPGRADE=true`.
-The internal pip invocation it runs is:
+On upgrade it first `rsync`s the bundle's pristine `python/` runtime over the
+installed one, which resets `site-packages` to empty of anything not shipped
+in the bundle; the internal pip invocation it then runs reinstalls the exact
+wheel set on top of that clean runtime:
 
 ```bash
 "$INSTALL_ROOT/python/bin/python3" -m pip install \
@@ -131,9 +134,14 @@ The internal pip invocation it runs is:
     -r requirements-offline.txt
 ```
 
-After the dependency refresh, the installer restarts `illumio-ops.service` only
-when `IS_UPGRADE=true` — fresh installs leave the service stopped so the
-operator can review settings first.
+The installer never starts the service itself. On upgrade it stops a running
+service before touching files (torn-state guard) and reminds the operator to
+restart afterwards; fresh installs leave the service stopped so the operator
+can review settings first. Upgrades additionally refuse a version downgrade
+unless `--allow-downgrade` is passed, restore a pristine bundled runtime
+before reinstalling wheels (deterministic dependency refresh), and abort on a
+failed post-install verification (`scripts/verify_deps.py --offline-bundle`
+plus an `illumio-ops.py --help` smoke check).
 
 ---
 
