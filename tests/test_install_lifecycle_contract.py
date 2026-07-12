@@ -25,6 +25,8 @@ def test_upgrade_app_rsync_deletes_stale_files_with_guards():
     src = _install_sh()
     # upgrade 分支必須帶 --delete，且逐一排除 operator/runtime 目錄
     assert "rsync -a --delete \\" in src
-    for excl in ("config/", "data/", "logs/", "reports/", "python/",
-                 "MIGRATED_FROM", "uninstall.sh"):
-        assert f"--exclude='{excl}'" in src, f"missing --exclude for {excl}"
+    # Excludes must be anchored (leading /) to the transfer root; unanchored
+    # patterns match at any depth and would freeze app-tree dirs like src/i18n/data/
+    for excl in ("/config/", "/data/", "/logs/", "/reports/", "/python/",
+                 "/MIGRATED_FROM", "/uninstall.sh"):
+        assert f"--exclude='{excl}'" in src, f"missing anchored --exclude for {excl}"

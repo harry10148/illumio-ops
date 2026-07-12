@@ -142,10 +142,13 @@ if [ "$IS_UPGRADE" = true ]; then
     # --delete removes app files that no longer exist in the new release:
     # renamed/deleted src modules would otherwise linger as importable zombie
     # .py files. Operator/runtime dirs are excluded from deletion.
+    # Excludes are anchored (leading /) to the transfer root: unanchored
+    # patterns match at any depth and would freeze app-tree dirs like
+    # src/i18n/data/ out of the upgrade sync.
     rsync -a --delete \
-        --exclude='config/' --exclude='data/' --exclude='logs/' \
-        --exclude='reports/' --exclude='python/' \
-        --exclude='MIGRATED_FROM' --exclude='uninstall.sh' \
+        --exclude='/config/' --exclude='/data/' --exclude='/logs/' \
+        --exclude='/reports/' --exclude='/python/' \
+        --exclude='/MIGRATED_FROM' --exclude='/uninstall.sh' \
         "$SRC/app/" "$INSTALL_ROOT/"
     # Only update *.example templates so operators can diff for new config keys
     rsync -a --include='*.example' --exclude='*' \

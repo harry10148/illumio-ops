@@ -897,11 +897,13 @@ def test_python_runtime_rsync_restores_pristine():
 
 def test_upgrade_app_rsync_deletes_stale_files_with_guards():
     src = _install_sh()
-    # upgrade 分支必須帶 --delete，且逐一排除 operator/runtime 目錄
+    # upgrade 分支必須帶 --delete，且逐一排除 operator/runtime 目錄。
+    # 排除樣式必須以 / 錨定 transfer root——未錨定會在任意深度命中，
+    # 凍結 app 樹內的同名目錄（例如 src/i18n/data/）。
     assert "rsync -a --delete \\" in src
-    for excl in ("config/", "data/", "logs/", "reports/", "python/",
-                 "MIGRATED_FROM", "uninstall.sh"):
-        assert f"--exclude='{excl}'" in src, f"missing --exclude for {excl}"
+    for excl in ("/config/", "/data/", "/logs/", "/reports/", "/python/",
+                 "/MIGRATED_FROM", "/uninstall.sh"):
+        assert f"--exclude='{excl}'" in src, f"missing anchored --exclude for {excl}"
 ```
 
 - [ ] **Step 2: 執行測試，確認失敗**
@@ -945,11 +947,13 @@ if [ "$IS_UPGRADE" = true ]; then
     # renamed/deleted src modules would otherwise linger as importable zombie
     # .py files. Operator/runtime dirs are excluded from deletion.
     rsync -a --delete \
-        --exclude='config/' --exclude='data/' --exclude='logs/' \
-        --exclude='reports/' --exclude='python/' \
-        --exclude='MIGRATED_FROM' --exclude='uninstall.sh' \
+        --exclude='/config/' --exclude='/data/' --exclude='/logs/' \
+        --exclude='/reports/' --exclude='/python/' \
+        --exclude='/MIGRATED_FROM' --exclude='/uninstall.sh' \
         "$SRC/app/" "$INSTALL_ROOT/"
 ```
+
+（審查修正 2026-07-12：exclude 以 `/` 錨定 transfer root。原版未錨定的 `data/` 會在任意深度命中，把 app 樹內的 `src/i18n/data/`（glossary/token map）從升級同步中永久凍結——新版修正到不了升級機、刪除也不生效。錨定後僅保護 INSTALL_ROOT 頂層的 operator/runtime 目錄。）
 
 `scripts/install.sh:146-148` 的 pip 呼叫前加註解（指令本身不變——runtime 已 pristine，無需 `--upgrade`）：
 
