@@ -43,12 +43,14 @@ def _ensure_schema_once(engine: Engine, db_path: str) -> None:
         _schema_ensured_paths.add(db_path)
 
 
-# Columns added to pce_traffic_flows_raw after it first shipped (Tier-2a
-# report-ready flatten cache). create_all() never ALTERs an existing table, so
-# add missing columns explicitly (idempotently). SQLite ADD COLUMN is a cheap
-# metadata-only op.
+# Columns added to a table after it first shipped. create_all() never ALTERs
+# an existing table, so add missing columns explicitly (idempotently). SQLite
+# ADD COLUMN is a cheap metadata-only op. Entries are (table, column, sqltype)
+# so future additions to ANY table only need a new tuple here — forgetting to
+# register a new model column is caught by tests/test_schema_drift_guard.py.
 _ADDED_COLUMNS = (
-    ("report_json", "TEXT"),
+    # Tier-2a report-ready flatten cache.
+    ("pce_traffic_flows_raw", "report_json", "TEXT"),
 )
 
 
@@ -56,25 +58,26 @@ def _ensure_added_columns(engine: Engine) -> None:
     from sqlalchemy.exc import OperationalError
 
     with engine.begin() as conn:
-        existing = {
-            r[1] for r in conn.execute(
-                text("PRAGMA table_info(pce_traffic_flows_raw)")
-            )
-        }
-        for name, sqltype in _ADDED_COLUMNS:
-            if name not in existing:
-                try:
-                    conn.execute(text(
-                        f"ALTER TABLE pce_traffic_flows_raw ADD COLUMN {name} {sqltype}"
-                    ))
-                except OperationalError as exc:
-                    # SQLite has no "ADD COLUMN IF NOT EXISTS". When init_schema runs
-                    # concurrently from two threads (daemon ingestion + a web request
-                    # under monitor-gui), both can pass the PRAGMA check above before
-                    # either ALTERs, so the loser hits "duplicate column name". The
-                    # column exists either way — swallow only that race, re-raise else.
-                    if "duplicate column name" not in str(exc).lower():
-                        raise
+        for table, name, sqltype in _ADDED_COLUMNS:
+            existing = {
+                r[1] for r in conn.execute(
+                    text(f"PRAGMA table_info({table})")
+                )
+            }
+            if name in existing:
+                continue
+            try:
+                conn.execute(text(
+                    f"ALTER TABLE {table} ADD COLUMN {name} {sqltype}"
+                ))
+            except OperationalError as exc:
+                # SQLite has no "ADD COLUMN IF NOT EXISTS". When init_schema runs
+                # concurrently from two threads (daemon ingestion + a web request
+                # under monitor-gui), both can pass the PRAGMA check above before
+                # either ALTERs, so the loser hits "duplicate column name". The
+                # column exists either way — swallow only that race, re-raise else.
+                if "duplicate column name" not in str(exc).lower():
+                    raise
 
 
 # Indexes added after a table first shipped. metadata.create_all() only creates
