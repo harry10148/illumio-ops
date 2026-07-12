@@ -263,8 +263,20 @@ Files preserved across upgrades: `config/config.json`, `config/alerts.json`,
    answer `illumio-ops.py --help`. A failed check aborts the install with a
    non-zero exit code.
 
-**Uninstall** keeps `config/` and `data/` (the cache DB) unless you pass
-`--purge`; a later reinstall picks both up automatically.
+**Uninstall** keeps `config/` and `data/` (the cache DB) unless you ask for
+a full wipe; a later reinstall picks both up automatically.
+
+```bash
+# Linux
+sudo /opt/illumio-ops/uninstall.sh            # preserves config/ and data/
+sudo /opt/illumio-ops/uninstall.sh --purge    # removes everything
+```
+
+```powershell
+# Windows
+.\install.ps1 -Action uninstall               # preserves config\ and data\
+.\install.ps1 -Action uninstall -Purge        # removes everything
+```
 
 **Per-version migration scripts** — some releases ship a one-shot script under
 `scripts/migrate_*.py` that rewrites operator-owned state (e.g. alerts.json

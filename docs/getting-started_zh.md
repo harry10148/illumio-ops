@@ -254,8 +254,20 @@ Get-Service IllumioOps
    （`scripts/verify_deps.py --offline-bundle`），且 app 能回應
    `illumio-ops.py --help`。任一檢查失敗即中止並回傳非零 exit code。
 
-**移除**：未加 `--purge` 時保留 `config/` 與 `data/`（快取 DB），之後重新
-安裝會自動沿用。
+**移除**：預設保留 `config/` 與 `data/`（快取 DB），之後重新安裝會自動
+沿用；要全部刪除需明確指定。
+
+```bash
+# Linux
+sudo /opt/illumio-ops/uninstall.sh            # 保留 config/ 與 data/
+sudo /opt/illumio-ops/uninstall.sh --purge    # 全部移除
+```
+
+```powershell
+# Windows
+.\install.ps1 -Action uninstall               # 保留 config\ 與 data\
+.\install.ps1 -Action uninstall -Purge        # 全部移除
+```
 
 **各版本遷移腳本** — 部分版本會附帶 `scripts/migrate_*.py` 一次性腳本，
 用來改寫操作人員擁有的狀態檔（例如 v3.26.0 將 alerts.json 鍵值化）。

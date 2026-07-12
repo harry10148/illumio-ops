@@ -39,6 +39,27 @@ def test_build_script_guards_windows_wheel_closure():
     )
 
 
+def test_install_ps1_has_upgrade_guards():
+    src = (ROOT / "scripts" / "install.ps1").read_text(encoding="utf-8-sig")
+    # Parity with install.sh: version-string downgrade guard with an
+    # -AllowDowngrade override, DB user_version fallback (reads the bundle's
+    # schema.py migration ceiling), and a stop-running-service guard so
+    # robocopy never copies over a live python.exe.
+    assert "$AllowDowngrade" in src
+    assert "_MIGRATION_AGG_BUCKET_DAY" in src
+    assert "PRAGMA user_version" in src
+    assert "Stopping running service for upgrade" in src
+
+
+def test_install_ps1_uninstall_preserves_config_and_data():
+    src = (ROOT / "scripts" / "install.ps1").read_text(encoding="utf-8-sig")
+    # Parity with uninstall.sh: non-purge keeps config\ and data\ (cache DB);
+    # only -Purge removes everything.
+    assert "$Purge" in src
+    assert '@("config", "data")' in src
+    assert "Data preserved" in src
+
+
 def test_install_ps1_fails_on_pip_error_and_verifies_deps():
     src = (ROOT / "scripts" / "install.ps1").read_text(encoding="utf-8-sig")
     assert "pip install failed" in src, (

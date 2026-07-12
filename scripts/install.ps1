@@ -10,6 +10,12 @@
     install (default) | uninstall
 .PARAMETER InstallRoot
     Installation directory. Default: C:\illumio-ops
+.PARAMETER AllowDowngrade
+    Proceed even when the bundle is older than the installed version
+    (db schema migrations are forward-only; downgrade is unsupported).
+.PARAMETER Purge
+    With -Action uninstall: also delete config\ and data\ (cache DB).
+    Without it, both are preserved and a later reinstall picks them up.
 .EXAMPLE
     .\install.ps1
     .\install.ps1 -Action uninstall
@@ -19,7 +25,9 @@
 param(
     [ValidateSet("install", "uninstall")]
     [string]$Action = "install",
-    [string]$InstallRoot = "C:\illumio-ops"
+    [string]$InstallRoot = "C:\illumio-ops",
+    [switch]$AllowDowngrade,
+    [switch]$Purge
 )
 
 # Require elevation
@@ -168,8 +176,18 @@ function Invoke-MigrateFromUnderscoreRoot {
 if ($Action -eq "uninstall") {
     Write-Host "==> Removing NSSM service" -ForegroundColor Yellow
     & "$SRC\deploy\install_service.ps1" -Action uninstall -InstallRoot $InstallRoot
-    Write-Host "==> Removing $InstallRoot" -ForegroundColor Yellow
-    Remove-Item -Recurse -Force $InstallRoot -ErrorAction SilentlyContinue
+    if ($Purge) {
+        Write-Host "==> Removing $InstallRoot (-Purge: config and data (cache DB) will be deleted)" -ForegroundColor Yellow
+        Remove-Item -Recurse -Force $InstallRoot -ErrorAction SilentlyContinue
+    } else {
+        Write-Host "==> Removing $InstallRoot (preserving config\ and data\)" -ForegroundColor Yellow
+        Get-ChildItem $InstallRoot -Force -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notin @("config", "data") } |
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "    Config preserved at: $InstallRoot\config\" -ForegroundColor Gray
+        Write-Host "    Data preserved at:   $InstallRoot\data\  (cache DB; reinstall picks it up)" -ForegroundColor Gray
+        Write-Host "    To fully remove:     .\install.ps1 -Action uninstall -Purge" -ForegroundColor Gray
+    }
     Write-Host "==> Uninstall complete." -ForegroundColor Green
     exit 0
 }
@@ -180,6 +198,77 @@ if ($InstallRoot -eq "C:\illumio-ops") {
 }
 
 $IsUpgrade = Test-Path (Join-Path $InstallRoot "config\config.json")
+
+# ── Upgrade guards (parity with install.sh) ───────────────────────────────────
+if ($IsUpgrade) {
+    # Downgrade guard: db schema migrations are forward-only (PRAGMA
+    # user_version); installing an older bundle over a newer install is
+    # unsupported. Compare base versions (strip +hash dev suffix).
+    $BundleBase = $null
+    $versionFile = Join-Path $SRC "VERSION"
+    if (Test-Path $versionFile) {
+        $BundleBase = (Get-Content $versionFile -Raw).Trim().Split("+")[0]
+    }
+    $InstalledVersion = $null
+    $initPy = Join-Path $InstallRoot "src\__init__.py"
+    if (Test-Path $initPy) {
+        $m = Select-String -Path $initPy -Pattern '^__version__\s*=\s*["'']([^"'']+)["'']'
+        if ($m) { $InstalledVersion = $m.Matches[0].Groups[1].Value }
+    }
+    if ($InstalledVersion -and $BundleBase) {
+        try {
+            if ([version]$BundleBase -lt [version]$InstalledVersion) {
+                if (-not $AllowDowngrade) {
+                    Write-Host "ERROR: bundle version $BundleBase is older than installed $InstalledVersion." -ForegroundColor Red
+                    Write-Host "       Downgrade is unsupported (db schema migrations are forward-only)." -ForegroundColor Red
+                    Write-Host "       Re-run with -AllowDowngrade to proceed anyway." -ForegroundColor Red
+                    exit 1
+                }
+                Write-Host "WARNING: downgrading $InstalledVersion -> $BundleBase (-AllowDowngrade given)." -ForegroundColor Yellow
+            }
+        } catch {
+            # Unparseable version strings: skip the string comparison
+            # (fails open, mirroring install.sh when sed finds no match).
+        }
+    }
+    # Fallback downgrade guard: an uninstall (non-purge) deletes src\ but
+    # keeps config\ + data\, so InstalledVersion above is unreadable on
+    # reinstall. Detect a newer-than-bundle DB directly via PRAGMA
+    # user_version vs the bundle schema.py migration ceiling.
+    $DbFile = Join-Path $InstallRoot "data\pce_cache.sqlite"
+    $BundlePy = Join-Path $SRC "python\python.exe"
+    if (-not $InstalledVersion -and (Test-Path $DbFile) -and (Test-Path $BundlePy)) {
+        $BundleMaxUv = $null
+        $m2 = Select-String -Path (Join-Path $SRC "app\src\pce_cache\schema.py") -Pattern '^_MIGRATION_AGG_BUCKET_DAY = (\d+)' -ErrorAction SilentlyContinue
+        if ($m2) { $BundleMaxUv = [int]$m2.Matches[0].Groups[1].Value }
+        $DbUv = $null
+        $out = & $BundlePy -c "import sqlite3,sys; print(sqlite3.connect(f'file:{sys.argv[1]}?mode=ro', uri=True).execute('PRAGMA user_version').fetchone()[0])" $DbFile 2>$null
+        if ($LASTEXITCODE -eq 0 -and $out -match '^\d+$') { $DbUv = [int]$out }
+        if ($null -ne $BundleMaxUv -and $null -ne $DbUv -and $DbUv -gt $BundleMaxUv) {
+            if (-not $AllowDowngrade) {
+                Write-Host "ERROR: existing cache DB user_version=$DbUv is newer than this bundle understands (max $BundleMaxUv)." -ForegroundColor Red
+                Write-Host "       The DB was migrated by newer code; installing an older bundle over it is unsupported." -ForegroundColor Red
+                Write-Host "       Re-run with -AllowDowngrade to proceed anyway." -ForegroundColor Red
+                exit 1
+            }
+            Write-Host "WARNING: proceeding over newer cache DB (user_version=$DbUv > max $BundleMaxUv) (-AllowDowngrade given)." -ForegroundColor Yellow
+        }
+    }
+    # Service guard: robocopy over a running service risks copying onto a
+    # locked python.exe / torn state. Stop it; install_service.ps1 starts
+    # the service again at the end of the install.
+    $svcGuard = Get-Service IllumioOps -ErrorAction SilentlyContinue
+    if ($svcGuard -and $svcGuard.Status -eq "Running") {
+        Write-Host "==> Stopping running service for upgrade (re-registered and started at the end)" -ForegroundColor Yellow
+        try {
+            Stop-Service IllumioOps -ErrorAction Stop
+            $svcGuard.WaitForStatus("Stopped", [TimeSpan]::FromSeconds(30))
+        } catch {
+            Write-Host "ERROR: failed to stop IllumioOps; stop it manually and re-run." -ForegroundColor Red
+            exit 1
+        }
+    }
+}
 
 Write-Host "==> Installing to $InstallRoot  (upgrade=$IsUpgrade)" -ForegroundColor Cyan
 New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null

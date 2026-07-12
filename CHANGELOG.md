@@ -31,6 +31,14 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   `win32-setctime`) that the Linux-side `pip download` silently skipped via
   environment markers, and `install.ps1` aborts on pip failure and runs the same
   `verify_deps.py --offline-bundle` post-install verification as Linux.
+  `install.ps1` now also carries the same upgrade guards as `install.sh` —
+  refuses downgrades unless `-AllowDowngrade` (version string with a cache-DB
+  `PRAGMA user_version` fallback) and stops a running service before copying
+  files — and its uninstall preserves `config\` and `data\` unless `-Purge`.
+  `scripts/check_doc_coverage.sh` works again: retargeted to the split docs
+  (`docs/reference/cli.md` for subcommands, `docs/getting-started.md` for
+  deployment scripts); the analysis-module filename family was dropped as no
+  longer operator-facing.
 - `report traffic` now generates the new plain Traffic Flow Report (traffic facts only,
   no security scoring). Use `report security` / `report inventory` for the previous
   outputs; `--profile` on `report traffic` is deprecated.
