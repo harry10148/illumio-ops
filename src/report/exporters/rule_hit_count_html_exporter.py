@@ -125,10 +125,15 @@ class RuleHitCountHtmlExporter:
         body_sections = "".join(
             f'<section id="{sid}" class="card"><h2>{_esc(title)}</h2>{self._table(df)}</section>'
             for sid, title, df in sections)
+        nav_html = (
+            '<aside class="report-toc screen-only">'
+            f'<button class="print-btn" onclick="window.print()">{t("rpt_nav_print_pdf", lang=lang)}</button>'
+            '</aside>'
+        )
         return (
             "<!DOCTYPE html><html><head><meta charset='utf-8'>"
             f"<title>{_esc(t('rpt_rhc_report_title', lang=lang))}</title>{_CSS}</head>"
-            f"<body>{cover}<div class='report-shell'><main class='report-main'>"
+            f"<body>{cover}<div class='report-shell'>{nav_html}<main class='report-main'>"
             f"{kpi_row}{self._notes()}{body_sections}</main></div>{TABLE_JS}</body></html>"
         )
 
