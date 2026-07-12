@@ -72,9 +72,11 @@ OR 模式：
 
 | key | 形式 | 語意 |
 |---|---|---|
-| `processes` / `ex_processes` | list[str] | service.process_name 比對（不分大小寫、完整字串） |
-| `win_services` / `ex_win_services` | list[str] | service.windows_service_name 比對 |
-| `dst_transmission` / `ex_dst_transmission` | list[str]（值域 unicast/broadcast/multicast） | 流向型態；僅 destination 側 |
+| `process_name` / `ex_process_name` | str \| list[str] | service.process_name 比對（不分大小寫、完整字串）——沿用查詢層既有 key，擴充為可收 list |
+| `windows_service_name` / `ex_windows_service_name` | str \| list[str] | service.windows_service_name 比對——沿用既有 key，擴充為可收 list |
+| `transmission`（新）/ `ex_transmission`（既有） | str \| list[str]（值域 unicast/broadcast/multicast） | 流向型態；僅 destination 側。include 為本案新增；exclude 沿用既有 key（`transmission_excludes` 別名續留） |
+
+（修訂 2026-07-12：七層落差矩陣盤點後改沿用查詢層既有 key 命名，取代原草案的 `processes`/`win_services`/`dst_transmission`。另盤點發現 `ports` token 文法已含範圍與 proto 且四層皆通——**`port_range*` 四 key 維持現狀不擴充**，範圍一律走 `ports` token。）
 
 ## 5. Vendor-verified API 形狀（NotebookLM／官方 REST API guide，2026-07-12）
 
