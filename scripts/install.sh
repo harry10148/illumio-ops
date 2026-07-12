@@ -7,9 +7,11 @@
 set -euo pipefail
 
 INSTALL_ROOT="/opt/illumio-ops"
+ALLOW_DOWNGRADE=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --install-root) INSTALL_ROOT="$2"; shift 2 ;;
+        --allow-downgrade) ALLOW_DOWNGRADE=true; shift ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
@@ -124,6 +126,39 @@ fi
 IS_UPGRADE=false
 [ -f "$INSTALL_ROOT/config/config.json" ] && IS_UPGRADE=true
 
+# --- Upgrade guards ---------------------------------------------------------
+if [ "$IS_UPGRADE" = true ]; then
+    # Downgrade guard: db schema migrations are forward-only (PRAGMA
+    # user_version); installing an older bundle over a newer install is
+    # unsupported. Compare base versions (strip +hash dev suffix).
+    BUNDLE_BASE="$(cat "$SRC/VERSION" 2>/dev/null || echo unknown)"
+    BUNDLE_BASE="${BUNDLE_BASE%%+*}"
+    INSTALLED_VERSION=$(sed -n 's/^__version__ *= *["'"'"']\([^"'"'"']*\)["'"'"'].*/\1/p' \
+        "$INSTALL_ROOT/src/__init__.py" 2>/dev/null || true)
+    if [ -n "$INSTALLED_VERSION" ] && [ "$BUNDLE_BASE" != "unknown" ] \
+       && [ "$BUNDLE_BASE" != "$INSTALLED_VERSION" ] \
+       && [ "$(printf '%s\n%s\n' "$BUNDLE_BASE" "$INSTALLED_VERSION" | sort -V | tail -1)" = "$INSTALLED_VERSION" ]; then
+        if [ "$ALLOW_DOWNGRADE" != true ]; then
+            echo "ERROR: bundle version $BUNDLE_BASE is older than installed $INSTALLED_VERSION." >&2
+            echo "       Downgrade is unsupported (db schema migrations are forward-only)." >&2
+            echo "       Re-run with --allow-downgrade to proceed anyway." >&2
+            exit 1
+        fi
+        echo "WARNING: downgrading $INSTALLED_VERSION -> $BUNDLE_BASE (--allow-downgrade given)."
+    fi
+    # Service guard: upgrading files under a running service risks a torn
+    # state (old process, new site-packages). Stop it; operator restarts
+    # after reviewing the install output (docs already instruct this).
+    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        echo "==> Stopping running service for upgrade"
+        systemctl stop "$SERVICE_NAME" || {
+            echo "ERROR: failed to stop $SERVICE_NAME; stop it manually and re-run." >&2
+            exit 1
+        }
+        echo "    NOTE: restart after install: sudo systemctl restart $SERVICE_NAME"
+    fi
+fi
+
 echo "==> Installing to $INSTALL_ROOT (upgrade=$IS_UPGRADE)"
 mkdir -p "$INSTALL_ROOT"
 # Ensure all runtime dirs exist — ProtectSystem=strict requires them before service startup
@@ -183,6 +218,18 @@ except Exception as e:
     print('    Config migration warning:', e, file=sys.stderr)
 " "$INSTALL_ROOT/config/config.json" || true
 fi
+
+# --- Post-install verification -----------------------------------------------
+echo "==> Verifying installed dependencies"
+"$INSTALL_ROOT/python/bin/python3" "$INSTALL_ROOT/scripts/verify_deps.py" --offline-bundle || {
+    echo "ERROR: dependency verification failed — installation is incomplete." >&2
+    exit 1
+}
+(cd "$INSTALL_ROOT" && ./python/bin/python3 illumio-ops.py --help >/dev/null) || {
+    echo "ERROR: app smoke check failed (illumio-ops.py --help)." >&2
+    exit 1
+}
+echo "    Dependency and smoke checks passed."
 
 if ! id illumio-ops &>/dev/null; then
     useradd --system --no-create-home --shell /sbin/nologin illumio-ops

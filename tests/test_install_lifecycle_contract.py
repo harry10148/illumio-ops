@@ -30,3 +30,22 @@ def test_upgrade_app_rsync_deletes_stale_files_with_guards():
     for excl in ("/config/", "/data/", "/logs/", "/reports/", "/python/",
                  "/MIGRATED_FROM", "/uninstall.sh"):
         assert f"--exclude='{excl}'" in src, f"missing anchored --exclude for {excl}"
+
+
+def test_upgrade_has_downgrade_guard():
+    src = _install_sh()
+    assert "--allow-downgrade" in src
+    assert "sort -V" in src  # 版本比較
+    assert "__version__" in src  # 讀取已安裝版本
+
+
+def test_upgrade_stops_running_service():
+    src = _install_sh()
+    assert 'systemctl is-active --quiet "$SERVICE_NAME"' in src
+
+
+def test_post_install_verification_runs():
+    src = _install_sh()
+    assert "verify_deps.py" in src
+    assert "--offline-bundle" in src
+    assert "illumio-ops.py --help" in src  # app 煙霧測試
