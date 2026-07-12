@@ -36,7 +36,7 @@ def _surface_text(path: str, anchor: str, span: int = 4000) -> str:
 
 
 def test_pill_port_service_keys_forwarded_everywhere():
-    for label, path, anchor in FORWARD_SURFACES:
+    for label, path, anchor in FORWARD_SURFACES_ALL:
         seg = _surface_text(path, anchor)
         missing = [k for k in PILL_KEYS if f"'{k}'" not in seg and f'"{k}"' not in seg]
         assert not missing, f"{label} missing keys: {missing}"

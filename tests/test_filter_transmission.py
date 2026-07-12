@@ -52,6 +52,21 @@ def test_df_filter_transmission():
     assert len(df_filter(df, {"ex_transmission": ["broadcast"]})) == 1
 
 
+def test_blank_only_transmission_include_matches_nothing_filtered_both_paths():
+    # 全空白 include 清單：matcher 的 _name_values 先去空、清單變空即跳過該
+    # key（不限制）；df 路徑須對齊，不可在去空「之前」就判斷 truthy。
+    f = TrafficQueryBuilder._flow_matches_filters
+    assert f(_flow("broadcast"), {"transmission": [""]})
+    assert f(_flow("unicast"), {"transmission": [""]})
+
+    df = pd.DataFrame([
+        {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 137, "transmission": "broadcast"},
+        {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 53, "transmission": "unicast"},
+    ])
+    out = df_filter(df, {"transmission": [""]})
+    assert len(out) == len(df)
+
+
 def test_native_payload_include_side():
     # NOTE: _build_native_traffic_payload(self, start_time_str, end_time_str,
     # policy_decisions, filters=None) takes `filters=`, not `spec=`, and builds

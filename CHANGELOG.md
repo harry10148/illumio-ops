@@ -124,7 +124,11 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 - Filter backend chain: the unified flow DataFrame (cache and report path) now
   carries `windows_service_name` and `transmission` flattened columns (empty
   string when the underlying flow has no value), enabling DataFrame-path
-  filtering on cached/report data for the new filter keys below.
+  filtering on cached/report data for the new filter keys below. This
+  DataFrame-path filtering only applies to flows ingested at or after this
+  release — rows cached before the upgrade were flattened by the old
+  flattener and lack these columns, so an include filter on either key
+  fails closed (matches nothing) until the flow is re-ingested.
 
 ### Added
 

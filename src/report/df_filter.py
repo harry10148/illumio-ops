@@ -246,21 +246,21 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
         ("windows_service_name", "ex_windows_service_name", "windows_service_name"),
     ):
         raw = filters.get(inc_key)
-        if raw:
-            vals = raw if isinstance(raw, (list, tuple)) else [raw]
+        vals = [v for v in (raw if isinstance(raw, (list, tuple)) else [raw]) if v and str(v).strip()]
+        if vals:
             mask &= _name_mask(df, col, vals)      # 缺欄 → 全 False（fail-closed）
         raw = filters.get(ex_key)
-        if raw:
-            vals = raw if isinstance(raw, (list, tuple)) else [raw]
+        vals = [v for v in (raw if isinstance(raw, (list, tuple)) else [raw]) if v and str(v).strip()]
+        if vals:
             mask &= ~_name_mask(df, col, vals)     # 缺欄 → 不排除
 
     raw = filters.get("transmission")
-    if raw:
-        vals = raw if isinstance(raw, (list, tuple)) else [raw]
+    vals = [v for v in (raw if isinstance(raw, (list, tuple)) else [raw]) if v and str(v).strip()]
+    if vals:
         mask &= _name_mask(df, "transmission", vals)
     raw = filters.get("ex_transmission") or filters.get("transmission_excludes")
-    if raw:
-        vals = raw if isinstance(raw, (list, tuple)) else [raw]
+    vals = [v for v in (raw if isinstance(raw, (list, tuple)) else [raw]) if v and str(v).strip()]
+    if vals:
         mask &= ~_name_mask(df, "transmission", vals)
 
     # src_ip_in / dst_ip_in（FilterBar 送 list；多 IP/CIDR 取 OR）。既有 src_ip（scalar）保留相容。

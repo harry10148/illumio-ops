@@ -93,3 +93,19 @@ def test_df_filter_winservice_null_tolerant_old_rows():
     df = pd.DataFrame([{"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 53}])
     assert len(df_filter(df, {"windows_service_name": "Dnscache"})) == 0
     assert len(df_filter(df, {"ex_windows_service_name": "Dnscache"})) == 1
+
+
+def test_blank_only_process_name_include_matches_nothing_filtered_both_paths():
+    # 全空白 include 清單（如 {"process_name": [""]}）：matcher 的 _name_values
+    # 先去空、清單變空即跳過該 key（等同「不限制」）；df 路徑須對齊，
+    # 不可在去空「之前」就判斷 truthy 導致誤判為「有條件」而全部濾掉。
+    f = TrafficQueryBuilder._flow_matches_filters
+    assert f(_flow("httpd"), {"process_name": [""]})
+    assert f(_flow("nginx"), {"process_name": [""]})
+
+    df = _df([
+        {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 443, "proto": "TCP", "process_name": "httpd"},
+        {"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 80, "proto": "TCP", "process_name": "nginx"},
+    ])
+    out = df_filter(df, {"process_name": [""]})
+    assert len(out) == len(df)
