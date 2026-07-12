@@ -83,5 +83,6 @@ def test_native_payload_include_side():
     payload, _spec = b._build_native_traffic_payload(
         "2026-07-01T00:00:00Z", "2026-07-02T00:00:00Z", ["allowed"],
         filters={"transmission": ["broadcast"]})
-    flat = str(payload["destinations"]["include"])
-    assert "broadcast" in flat  # 形狀細節由 Task 6 真 PCE 定案，此處鎖「有進 include」
+    # 真 PCE 驗證：list-of-lists 會被 406 拒絕，正確形狀是 flat dict
+    assert {"transmission": "broadcast"} in payload["destinations"]["include"]
+    assert [{"transmission": "broadcast"}] not in payload["destinations"]["include"]

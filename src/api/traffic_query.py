@@ -627,7 +627,7 @@ class TrafficQueryBuilder:
         )
         if transmission_include:
             for value in transmission_include:
-                payload["destinations"]["include"].append([{"transmission": value}])
+                payload["destinations"]["include"].append({"transmission": value})
             _record_consumed("transmission", spec.native_filters.get("transmission"))
             _consume_keys(("transmission",))
         elif "transmission" in native_filters:
