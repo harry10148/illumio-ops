@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 
+from loguru import logger
 from sqlalchemy import event, text
 from sqlalchemy.engine import Engine
 
@@ -157,6 +158,16 @@ def _normalize_agg_bucket_day(engine: Engine) -> None:
     """
     with engine.begin() as conn:
         version = conn.execute(text("PRAGMA user_version")).scalar()
+        if version > _MIGRATION_AGG_BUCKET_DAY:
+            # DB 曾被更新版程式碼遷移過（downgrade 情境）。repo 不支援
+            # downgrade——不動資料、只警示，讓 operator 有跡可循。
+            logger.warning(
+                "pce_cache db user_version={} is newer than this build "
+                "understands (max {}); the DB was migrated by newer code and "
+                "downgrade is unsupported — upgrade this installation",
+                version, _MIGRATION_AGG_BUCKET_DAY,
+            )
+            return
         if version >= _MIGRATION_AGG_BUCKET_DAY:
             return
         old_rows = conn.execute(text(
