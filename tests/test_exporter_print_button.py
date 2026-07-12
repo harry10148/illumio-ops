@@ -10,7 +10,7 @@ EXPORTER_DIR = ROOT / "src" / "report" / "exporters"
 
 
 def test_every_html_exporter_has_print_button():
-    exporters = sorted(EXPORTER_DIR.glob("*_html_exporter.py"))
-    assert len(exporters) >= 7  # audit/ven/pu/readiness/policy_diff/app_summary/rhc
+    exporters = sorted(EXPORTER_DIR.glob("*html_exporter.py"))
+    assert len(exporters) >= 8  # audit/ven/pu/readiness/policy_diff/app_summary/rhc/traffic
     missing = [p.name for p in exporters if "print-btn" not in p.read_text()]
     assert not missing, f"exporters without print button: {missing}"
