@@ -281,6 +281,9 @@ systemctl daemon-reload
 WRAPPER=/usr/local/bin/illumio-ops
 cat > "$WRAPPER" <<EOF
 #!/usr/bin/env bash
+# cd first: relative paths from config (data/, logs/, reports/) resolve
+# against the process cwd, not the app root.
+cd "$INSTALL_ROOT" || exit 1
 exec "$INSTALL_ROOT/python/bin/python3" "$INSTALL_ROOT/illumio-ops.py" "\$@"
 EOF
 chmod 0755 "$WRAPPER"
