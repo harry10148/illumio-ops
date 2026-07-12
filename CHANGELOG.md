@@ -14,7 +14,7 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 - Offline bundle / DB hardening: `_ADDED_COLUMNS` schema registry entries are now
   table-qualified (`("table", "column", "ddl")`) instead of column-name-only, closing
   a drift risk where two tables could share a column name. `install.sh`'s dependency
-  refresh is now deterministic — the runtime venv is rebuilt from a pristine base and
+  refresh is now deterministic — the bundled Python runtime is restored to a pristine base and
   wheels are fully reinstalled (not merged/patched) on upgrade, with stale files left
   behind by the previous version cleaned up; the upgrade `rsync --delete` excludes
   (`config/`, `data/`, `logs/`, `reports/`, `python/`, `MIGRATED_FROM`, `uninstall.sh`)

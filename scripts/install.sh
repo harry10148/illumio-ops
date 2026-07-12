@@ -135,7 +135,7 @@ if [ "$IS_UPGRADE" = true ]; then
     BUNDLE_BASE="${BUNDLE_BASE%%+*}"
     INSTALLED_VERSION=$(sed -n 's/^__version__ *= *["'"'"']\([^"'"'"']*\)["'"'"'].*/\1/p' \
         "$INSTALL_ROOT/src/__init__.py" 2>/dev/null || true)
-    if [ -n "$INSTALLED_VERSION" ] && [ "$BUNDLE_BASE" != "unknown" ] \
+    if [ -n "$INSTALLED_VERSION" ] && [ -n "$BUNDLE_BASE" ] && [ "$BUNDLE_BASE" != "unknown" ] \
        && [ "$BUNDLE_BASE" != "$INSTALLED_VERSION" ] \
        && [ "$(printf '%s\n%s\n' "$BUNDLE_BASE" "$INSTALLED_VERSION" | sort -V | tail -1)" = "$INSTALLED_VERSION" ]; then
         if [ "$ALLOW_DOWNGRADE" != true ]; then

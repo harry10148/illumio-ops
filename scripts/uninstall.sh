@@ -39,7 +39,7 @@ rm -f /usr/local/bin/illumio-ops
 systemctl daemon-reload
 
 if [ "$PURGE" = true ]; then
-    echo "==> Removing $INSTALL_ROOT (--purge: config will be deleted)"
+    echo "==> Removing $INSTALL_ROOT (--purge: config and data (cache DB) will be deleted)"
     rm -rf "$INSTALL_ROOT"
 else
     echo "==> Removing $INSTALL_ROOT (preserving config/ and data/)"
