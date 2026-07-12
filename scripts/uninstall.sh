@@ -42,9 +42,10 @@ if [ "$PURGE" = true ]; then
     echo "==> Removing $INSTALL_ROOT (--purge: config will be deleted)"
     rm -rf "$INSTALL_ROOT"
 else
-    echo "==> Removing $INSTALL_ROOT (preserving config/)"
-    find "$INSTALL_ROOT" -mindepth 1 -maxdepth 1 ! -name 'config' -exec rm -rf {} +
+    echo "==> Removing $INSTALL_ROOT (preserving config/ and data/)"
+    find "$INSTALL_ROOT" -mindepth 1 -maxdepth 1 ! -name 'config' ! -name 'data' -exec rm -rf {} +
     echo "    Config preserved at: $INSTALL_ROOT/config/"
+    echo "    Data preserved at:   $INSTALL_ROOT/data/  (cache DB; reinstall picks it up)"
     echo "    To fully remove:     sudo rm -rf $INSTALL_ROOT"
 fi
 

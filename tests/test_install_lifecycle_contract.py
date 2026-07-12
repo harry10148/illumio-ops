@@ -49,3 +49,9 @@ def test_post_install_verification_runs():
     assert "verify_deps.py" in src
     assert "--offline-bundle" in src
     assert "illumio-ops.py --help" in src  # app 煙霧測試
+
+
+def test_uninstall_preserves_data_by_default():
+    src = (ROOT / "scripts" / "uninstall.sh").read_text()
+    assert "! -name 'config' ! -name 'data'" in src
+    assert "Data preserved" in src
