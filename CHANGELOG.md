@@ -121,8 +121,22 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   shows a count plus a version-distribution summary instead of a per-host table;
   per-host online detail moved to the XLSX/CSV export only (the Offline / Lost
   Today / Lost Yesterday chapters, and the XLSX/CSV exports, are unaffected).
+- Filter backend chain: the unified flow DataFrame (cache and report path) now
+  carries `windows_service_name` and `transmission` flattened columns (empty
+  string when the underlying flow has no value), enabling DataFrame-path
+  filtering on cached/report data for the new filter keys below.
 
 ### Added
+
+- New filter keys, wired end-to-end across the full seven-layer chain (PCE-native
+  query payload where the PCE API supports it, the async-query client-side
+  matcher, and the cache/report DataFrame matcher): `process_name` /
+  `ex_process_name`, `windows_service_name` / `ex_windows_service_name`, and a new
+  `transmission` include key (`transmission` / `ex_transmission`;
+  `transmission_excludes` remains a supported alias for the exclude side). All
+  three match case-insensitively on the full string, accept a scalar or a list of
+  values, and are null-tolerant: a flow row missing the underlying field fails
+  closed for an include filter and is never excluded by an exclude filter.
 
 - Fail-fast SQLite runtime check: entry points now refuse to start with a clear error
   when the linked SQLite is older than `3.35.0` (`src/runtime_checks.py`), instead of
@@ -194,6 +208,15 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 - Long unbreakable strings (e.g. a 100+ character hostname) in report tables now wrap
   inside the cell on screen instead of forcing horizontal scroll; print layout was
   already unaffected and remains untouched.
+- The GUI reports and dashboard endpoints were silently dropping the `ports` /
+  `ex_ports` / `services` / `ex_services` FilterBar keys before forwarding to the
+  analyzer — the filter pills appeared active in the UI but had no effect on the
+  results. These keys are now forwarded like the rest of the filter set; a static
+  source-contract test now checks every endpoint's forward-whitelist against the
+  full filter key set so this class of silent-drop regression can't recur.
+- Rule Hit Count HTML report: was missing the "print to PDF" sidebar button that
+  every other report family has; it now renders it. The print-button guard test
+  now scans all HTML exporter sources, so no report family can ship without it.
 
 ## [4.1.0] — 2026-06-21
 
