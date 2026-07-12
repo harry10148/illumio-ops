@@ -22,7 +22,10 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   paths nested deeper in the tree. `uninstall.sh` now preserves `data/` alongside
   `config/` by default; both are only removed with `--purge`. Docs: the upgrade SOP is
   aligned with actual installer behavior — the installer never restarts the service
-  itself, so the documented steps now say so explicitly.
+  itself, so the documented steps now say so explicitly. The downgrade guard also
+  falls back to the cache DB's `PRAGMA user_version` when the installed version
+  string is unreadable (the uninstall-then-reinstall-older path), and the wrapper
+  docs note that real operations need `sudo`.
 - `report traffic` now generates the new plain Traffic Flow Report (traffic facts only,
   no security scoring). Use `report security` / `report inventory` for the previous
   outputs; `--profile` on `report traffic` is deprecated.

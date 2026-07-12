@@ -146,6 +146,30 @@ if [ "$IS_UPGRADE" = true ]; then
         fi
         echo "WARNING: downgrading $INSTALLED_VERSION -> $BUNDLE_BASE (--allow-downgrade given)."
     fi
+    # Fallback downgrade guard: a non-purge uninstall deletes src/ but keeps
+    # config/ + data/, so on reinstall INSTALLED_VERSION above is unreadable
+    # and the version-string comparison is skipped. Detect a newer-than-bundle
+    # DB directly: compare the DB's PRAGMA user_version against the highest
+    # migration this bundle's schema.py knows (_MIGRATION_AGG_BUCKET_DAY).
+    DB_FILE="$INSTALL_ROOT/data/pce_cache.sqlite"
+    if [ -z "$INSTALLED_VERSION" ] && [ -f "$DB_FILE" ] && [ -x "$SRC/python/bin/python3" ]; then
+        BUNDLE_MAX_UV=$(sed -n 's/^_MIGRATION_AGG_BUCKET_DAY = \([0-9][0-9]*\).*/\1/p' \
+            "$SRC/app/src/pce_cache/schema.py" 2>/dev/null || true)
+        DB_UV=$("$SRC/python/bin/python3" -c "
+import sqlite3, sys
+conn = sqlite3.connect(f'file:{sys.argv[1]}?mode=ro', uri=True)
+print(conn.execute('PRAGMA user_version').fetchone()[0])
+" "$DB_FILE" 2>/dev/null || true)
+        if [ -n "$BUNDLE_MAX_UV" ] && [ -n "$DB_UV" ] && [ "$DB_UV" -gt "$BUNDLE_MAX_UV" ] 2>/dev/null; then
+            if [ "$ALLOW_DOWNGRADE" != true ]; then
+                echo "ERROR: existing cache DB user_version=$DB_UV is newer than this bundle understands (max $BUNDLE_MAX_UV)." >&2
+                echo "       The DB was migrated by newer code; installing an older bundle over it is unsupported." >&2
+                echo "       Re-run with --allow-downgrade to proceed anyway." >&2
+                exit 1
+            fi
+            echo "WARNING: proceeding over newer cache DB (user_version=$DB_UV > max $BUNDLE_MAX_UV) (--allow-downgrade given)."
+        fi
+    fi
     # Service guard: upgrading files under a running service risks a torn
     # state (old process, new site-packages). Stop it; operator restarts
     # after reviewing the install output (docs already instruct this).

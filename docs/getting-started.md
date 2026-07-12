@@ -119,6 +119,8 @@ After installation a CLI wrapper is available as `illumio-ops` (installed to
 interpreter at `/opt/illumio-ops/python/bin/python3`) for manual CLI
 operations — the system `python3` on older distros links a SQLite that is too
 old for this application (>= 3.35.0 required) and the app will refuse to start.
+Run real operations with `sudo` — config files are readable only by the
+service user, so an unprivileged wrapper call can do little beyond `--help`.
 
 **Windows Server / Windows 11 — first-time install** (PowerShell as Administrator):
 

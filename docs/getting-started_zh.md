@@ -117,6 +117,8 @@ sudo systemctl status illumio-ops     # 應顯示：Active: active (running)
 `/usr/local/bin/illumio-ops`）。手動執行 CLI 操作時一律使用 wrapper（或
 bundle 內建直譯器 `/opt/illumio-ops/python/bin/python3`）——舊發行版的系統
 `python3` 連結的 SQLite 版本過舊（本應用需要 >= 3.35.0），應用程式會拒絕啟動。
+實際操作請以 `sudo` 執行——設定檔僅服務使用者可讀，非特權下的 wrapper
+幾乎只有 `--help` 可用。
 
 **Windows Server / Windows 11 — 首次安裝**（以系統管理員身分執行 PowerShell）：
 

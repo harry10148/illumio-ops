@@ -51,6 +51,17 @@ def test_post_install_verification_runs():
     assert "illumio-ops.py --help" in src  # app 煙霧測試
 
 
+def test_downgrade_guard_db_user_version_fallback():
+    src = _install_sh()
+    # A non-purge uninstall deletes src/ but keeps config/ + data/, so on
+    # reinstall of an OLDER bundle INSTALLED_VERSION is unreadable and the
+    # version-string guard is skipped. The guard must fall back to comparing
+    # the DB's PRAGMA user_version against the bundle's highest known
+    # migration instead of silently proceeding.
+    assert "_MIGRATION_AGG_BUCKET_DAY" in src
+    assert "PRAGMA user_version" in src
+
+
 def test_uninstall_preserves_data_by_default():
     src = (ROOT / "scripts" / "uninstall.sh").read_text()
     assert "! -name 'config' ! -name 'data'" in src
