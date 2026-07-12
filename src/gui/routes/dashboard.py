@@ -380,6 +380,7 @@ def make_dashboard_blueprint(
                 "src_ip_in", "dst_ip_in", "ex_src_ip", "ex_dst_ip",
                 "any_label", "any_ip", "any_iplist", "any_workload",
                 "ex_any_label", "ex_any_ip", "ex_any_iplist", "ex_any_workload",
+                "ports", "ex_ports", "services", "ex_services",
             )
             query_def = {
                 "name": name, "rank_by": rank_by, "pd": pd_sel,
@@ -552,6 +553,10 @@ def make_dashboard_blueprint(
                 "any_workload": d.get("any_workload", ""),
                 "ex_any_iplist": d.get("ex_any_iplist", ""),
                 "ex_any_workload": d.get("ex_any_workload", ""),
+                "ports": d.get("ports", []),
+                "ex_ports": d.get("ex_ports", []),
+                "services": d.get("services", []),
+                "ex_services": d.get("ex_services", []),
             }
             results = base_ana.query_flows(params)
 

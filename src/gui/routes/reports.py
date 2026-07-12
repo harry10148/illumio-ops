@@ -419,6 +419,11 @@ def make_reports_blueprint(
                     'ex_any_ip': raw_filters.get('ex_any_ip', ''),
                     'ex_any_iplist': raw_filters.get('ex_any_iplist', ''),
                     'ex_any_workload': raw_filters.get('ex_any_workload', ''),
+                    # 2026-07-12 七層對帳：port/service pill key 原漏收（silent drop）。
+                    'ports': raw_filters.get('ports', []),
+                    'ex_ports': raw_filters.get('ex_ports', []),
+                    'services': raw_filters.get('services', []),
+                    'ex_services': raw_filters.get('ex_services', []),
                 }
                 if not any(v for v in report_filters.values() if v):
                     report_filters = None
