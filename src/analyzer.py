@@ -68,6 +68,8 @@ _OBJECT_FILTER_KEYS = (
     "ex_src_workload", "ex_src_workloads", "ex_dst_workload", "ex_dst_workloads",
     "any_iplist", "any_workload", "ex_any_iplist", "ex_any_workload",
     "services", "ex_services", "ports", "ex_ports",
+    "process_name", "ex_process_name",
+    "windows_service_name", "ex_windows_service_name",
 )
 
 # 兩套 client-side 比對器（check_flow_match 與 _flow_matches_filters）都無法
@@ -1403,6 +1405,10 @@ class Analyzer:
             "ex_services": params.get("ex_services", []),
             "ports": params.get("ports", []),
             "ex_ports": params.get("ex_ports", []),
+            "process_name": params.get("process_name"),
+            "ex_process_name": params.get("ex_process_name"),
+            "windows_service_name": params.get("windows_service_name"),
+            "ex_windows_service_name": params.get("ex_windows_service_name"),
             "src_label": params.get("src_label"),
             "src_label_group": params.get("src_label_group"),
             "src_label_groups": params.get("src_label_groups"),

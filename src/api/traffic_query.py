@@ -28,6 +28,15 @@ from loguru import logger
 from src.i18n import t
 from src.port_token import parse_port_token
 
+
+def _name_values(filters, key):
+    """Scalar-or-list 字串值正規化：去空、casefold。"""
+    raw = filters.get(key)
+    if not raw:
+        return []
+    vals = raw if isinstance(raw, list) else [raw]
+    return [str(v).strip().casefold() for v in vals if v and str(v).strip()]
+
 MAX_TRAFFIC_RESULTS = 200000
 
 # Max wall-clock seconds to wait for the PCE to finish computing an async traffic
@@ -604,7 +613,11 @@ class TrafficQueryBuilder:
         ):
             value = native_filters.get(key)
             if value:
-                payload["services"][target].append({field_: str(value).strip()})
+                values = value if isinstance(value, list) else [value]
+                for v in values:
+                    v = str(v).strip()
+                    if v:
+                        payload["services"][target].append({field_: v})
                 _record_consumed(key, spec.native_filters.get(key))
                 _consume_keys((key,))
 
@@ -1118,6 +1131,23 @@ class TrafficQueryBuilder:
             ports_exc = ports_exc if isinstance(ports_exc, list) else [ports_exc]
             for t_ in (parse_port_token(v) for v in ports_exc):
                 if t_ and _port_entry_hit(svc, flow, t_):
+                    return False
+
+        # process / windows service 名稱比對（不分大小寫完整相等；include 缺值
+        # fail-closed、exclude 缺值不排除——與 cache df 的 null-tolerant 規則一致）
+        for inc_key, ex_key, svc_field in (
+            ("process_name", "ex_process_name", "process_name"),
+            ("windows_service_name", "ex_windows_service_name", "windows_service_name"),
+        ):
+            inc = _name_values(filters, inc_key)
+            if inc:
+                flow_val = str(svc.get(svc_field) or "").casefold()
+                if not flow_val or flow_val not in inc:
+                    return False
+            exc = _name_values(filters, ex_key)
+            if exc:
+                flow_val = str(svc.get(svc_field) or "").casefold()
+                if flow_val and flow_val in exc:
                     return False
 
         for fkey, is_exclude in (("services", False), ("ex_services", True)):

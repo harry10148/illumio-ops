@@ -133,6 +133,10 @@ def make_actions_blueprint(
                 "ex_services": d.get("ex_services", []),
                 "ports": d.get("ports", []),
                 "ex_ports": d.get("ex_ports", []),
+                "process_name": d.get("process_name", []),
+                "ex_process_name": d.get("ex_process_name", []),
+                "windows_service_name": d.get("windows_service_name", []),
+                "ex_windows_service_name": d.get("ex_windows_service_name", []),
                 # FilterBar 的 label group pill 序列化 key，須與 analyzer.py query_flows
                 # whitelist（~1053-1064）及 _TRAFFIC_FILTER_CAPABILITIES（traffic_query.py ~90-96）保持一致
                 "src_label_groups": d.get("src_label_groups", []),

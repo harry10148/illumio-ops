@@ -17,6 +17,14 @@ FORWARD_SURFACES = (
 
 PILL_KEYS = ("ports", "ex_ports", "services", "ex_services")
 
+NAME_KEYS = ("process_name", "ex_process_name",
+             "windows_service_name", "ex_windows_service_name")
+
+FORWARD_SURFACES_ALL = FORWARD_SURFACES + (
+    ("rules.whitelist", "src/gui/routes/rules.py", "src_labels"),
+    ("actions.quarantine", "src/gui/routes/actions.py", "src_labels"),
+)
+
 
 def _surface_text(path: str, anchor: str, span: int = 4000) -> str:
     text = (ROOT / path).read_text()
@@ -29,4 +37,11 @@ def test_pill_port_service_keys_forwarded_everywhere():
     for label, path, anchor in FORWARD_SURFACES:
         seg = _surface_text(path, anchor)
         missing = [k for k in PILL_KEYS if f"'{k}'" not in seg and f'"{k}"' not in seg]
+        assert not missing, f"{label} missing keys: {missing}"
+
+
+def test_name_keys_forwarded_everywhere():
+    for label, path, anchor in FORWARD_SURFACES_ALL:
+        seg = _surface_text(path, anchor)
+        missing = [k for k in NAME_KEYS if f"'{k}'" not in seg and f'"{k}"' not in seg]
         assert not missing, f"{label} missing keys: {missing}"

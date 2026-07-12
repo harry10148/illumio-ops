@@ -30,6 +30,8 @@ _RULE_FB_KEYS = (
     "any_label", "any_ip", "any_iplist", "any_workload",
     "ex_any_label", "ex_any_ip", "ex_any_iplist", "ex_any_workload",
     "services", "ex_services", "ports", "ex_ports",
+    "process_name", "ex_process_name",
+    "windows_service_name", "ex_windows_service_name",
 )
 _RULE_REJECTED_KEYS = (
     "src_label_groups", "dst_label_groups", "ex_src_label_groups", "ex_dst_label_groups",

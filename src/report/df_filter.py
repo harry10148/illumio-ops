@@ -22,6 +22,14 @@ _STD_LABEL_KEYS = ("app", "env", "loc", "role")
 _PROTO_ALIAS = {"6": "TCP", "17": "UDP", "1": "ICMP", "58": "ICMPV6"}
 
 
+def _name_mask(df: pd.DataFrame, column: str, values: list) -> pd.Series:
+    """不分大小寫完整相等；缺欄回全 False（呼叫端決定 include/exclude 語意）。"""
+    if column not in df.columns:
+        return pd.Series(False, index=df.index)
+    vals = {str(v).strip().casefold() for v in values if v and str(v).strip()}
+    return df[column].fillna("").astype(str).str.strip().str.casefold().isin(vals)
+
+
 def _port_entries_mask(df: pd.DataFrame, entries: list) -> pd.Series:
     """parse_port_token/service 展開條目清單 → 條目間 OR 的命中 mask。"""
     m = pd.Series(False, index=df.index)
@@ -232,6 +240,19 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
     svc_exc = filters.get("_ex_svc_port_entries")
     if svc_exc:
         mask &= ~_port_entries_mask(df, svc_exc)
+
+    for inc_key, ex_key, col in (
+        ("process_name", "ex_process_name", "process_name"),
+        ("windows_service_name", "ex_windows_service_name", "windows_service_name"),
+    ):
+        raw = filters.get(inc_key)
+        if raw:
+            vals = raw if isinstance(raw, (list, tuple)) else [raw]
+            mask &= _name_mask(df, col, vals)      # 缺欄 → 全 False（fail-closed）
+        raw = filters.get(ex_key)
+        if raw:
+            vals = raw if isinstance(raw, (list, tuple)) else [raw]
+            mask &= ~_name_mask(df, col, vals)     # 缺欄 → 不排除
 
     # src_ip_in / dst_ip_in（FilterBar 送 list；多 IP/CIDR 取 OR）。既有 src_ip（scalar）保留相容。
     for side in ("src", "dst"):
