@@ -60,6 +60,14 @@ def test_install_ps1_uninstall_preserves_config_and_data():
     assert "Data preserved" in src
 
 
+def test_install_ps1_creates_runtime_dirs():
+    src = (ROOT / "scripts" / "install.ps1").read_text(encoding="utf-8-sig")
+    # Parity with install.sh's mkdir of runtime dirs: sqlite creates the DB
+    # file but not its parent directory, so a missing data\ breaks the cache
+    # the moment it is enabled.
+    assert '@("logs", "data", "reports")' in src
+
+
 def test_install_ps1_fails_on_pip_error_and_verifies_deps():
     src = (ROOT / "scripts" / "install.ps1").read_text(encoding="utf-8-sig")
     assert "pip install failed" in src, (

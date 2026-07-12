@@ -84,6 +84,10 @@ function Invoke-MigrateFromUnderscoreRoot {
     # This means the script was killed after Move-Item but before nssm/marker.
     if (-not (Test-Path $OldRoot)) {
         if ((Test-Path $NewRoot) -and -not (Test-Path "$NewRoot\MIGRATED_FROM")) {
+            # No service and no OldRoot means this is NOT a torn migration —
+            # e.g. a reinstall over a preserved config\/data\ after uninstall.
+            # Writing MIGRATED_FROM here would fabricate a migration record.
+            if (-not (Get-Service IllumioOps -ErrorAction SilentlyContinue)) { return }
             $script:NSSM = Resolve-Nssm
             # Fix I1: trim \r that nssm includes in its stdout on Windows
             $currentAppDir = ((& $script:NSSM get IllumioOps AppDirectory 2>$null) -join "").Trim()
@@ -272,6 +276,11 @@ if ($IsUpgrade) {
 
 Write-Host "==> Installing to $InstallRoot  (upgrade=$IsUpgrade)" -ForegroundColor Cyan
 New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
+# Runtime dirs (parity with install.sh): sqlite creates the cache DB file
+# but not its parent directory, so data\ must exist before first use.
+foreach ($d in @("logs", "data", "reports")) {
+    New-Item -ItemType Directory -Path (Join-Path $InstallRoot $d) -Force | Out-Null
+}
 
 Write-Host "==> Copying Python runtime"
 Robocopy "$SRC\python" "$InstallRoot\python" /E /NP /NFL /NDL | Out-Null

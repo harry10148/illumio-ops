@@ -35,6 +35,9 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   refuses downgrades unless `-AllowDowngrade` (version string with a cache-DB
   `PRAGMA user_version` fallback) and stops a running service before copying
   files — and its uninstall preserves `config\` and `data\` unless `-Purge`.
+  `install.ps1` also creates the runtime dirs (`logs\`, `data\`, `reports\`)
+  like `install.sh` does, and no longer fabricates a `MIGRATED_FROM` marker
+  when reinstalling over a preserved `config\`/`data\` with no service present.
   `scripts/check_doc_coverage.sh` works again: retargeted to the split docs
   (`docs/reference/cli.md` for subcommands, `docs/getting-started.md` for
   deployment scripts); the analysis-module filename family was dropped as no
