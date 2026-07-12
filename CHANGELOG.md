@@ -11,6 +11,18 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Changed
 
+- Offline bundle / DB hardening: `_ADDED_COLUMNS` schema registry entries are now
+  table-qualified (`("table", "column", "ddl")`) instead of column-name-only, closing
+  a drift risk where two tables could share a column name. `install.sh`'s dependency
+  refresh is now deterministic — the bundled Python runtime is restored to a pristine base and
+  wheels are fully reinstalled (not merged/patched) on upgrade, with stale files left
+  behind by the previous version cleaned up; the upgrade `rsync --delete` excludes
+  (`config/`, `data/`, `logs/`, `reports/`, `python/`, `MIGRATED_FROM`, `uninstall.sh`)
+  are now anchored to the transfer root so they can't accidentally match same-named
+  paths nested deeper in the tree. `uninstall.sh` now preserves `data/` alongside
+  `config/` by default; both are only removed with `--purge`. Docs: the upgrade SOP is
+  aligned with actual installer behavior — the installer never restarts the service
+  itself, so the documented steps now say so explicitly.
 - `report traffic` now generates the new plain Traffic Flow Report (traffic facts only,
   no security scoring). Use `report security` / `report inventory` for the previous
   outputs; `--profile` on `report traffic` is deprecated.
@@ -93,6 +105,22 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Added
 
+- Fail-fast SQLite runtime check: entry points now refuse to start with a clear error
+  when the linked SQLite is older than `3.35.0` (`src/runtime_checks.py`), instead of
+  failing later with cryptic ALTER TABLE / window-function errors.
+- `/usr/local/bin/illumio-ops` CLI wrapper installed by `install.sh` so the CLI is on
+  `PATH` without manually activating the bundled venv.
+- `preflight.sh` now checks the bundled SQLite version against the `3.35.0` floor and
+  reports the existing cache DB's `user_version` before install/upgrade.
+- Schema registry hardening: a frozen-baseline drift guard test now fails if a future
+  column-migration entry silently rewrites `_ADDED_COLUMNS` history, and opening a
+  cache DB with a newer `user_version` than the running code knows now emits a
+  downgrade warning instead of proceeding silently.
+- `install.sh` gained a downgrade guard (blocks installing an older bundle version
+  unless `--allow-downgrade` is passed), a running-service guard (stops the service
+  before overwriting files and prompts to restart it after), and post-install
+  verification (`verify_deps` + a smoke check) that fails the install if the new
+  environment is broken.
 - Enforcement Readiness Report (`report readiness`, CLI + GUI + scheduler): a
   standalone report answering "which app (env) can safely move to enforcement
   next" — readiness score/grade, an advancement queue ranked ready-first with
@@ -121,6 +149,10 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- `siem status` / `siem replay`: a schema mismatch or DB corruption (`OperationalError`)
+  is no longer masked by the first-run zero-count fallback — only a genuinely missing
+  cache DB (`no such table` / `unable to open database file`) takes the zero-count
+  path; anything else now surfaces the real error and exits non-zero.
 - Display-layer fixes (phase 4): actor names resolve to readable text instead of a raw
   Python dict literal across the report layer and the Rule Scheduler CLI — `ams` now
   renders as "All Workloads" (CLI live-view truncation width widened from 12 to 15 so

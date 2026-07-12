@@ -114,6 +114,12 @@ sudo systemctl enable --now illumio-ops
 sudo systemctl status illumio-ops     # should show: Active: active (running)
 ```
 
+After installation a CLI wrapper is available as `illumio-ops` (installed to
+`/usr/local/bin/illumio-ops`). Always use the wrapper (or the bundled
+interpreter at `/opt/illumio-ops/python/bin/python3`) for manual CLI
+operations — the system `python3` on older distros links a SQLite that is too
+old for this application (>= 3.35.0 required) and the app will refuse to start.
+
 **Windows Server / Windows 11 — first-time install** (PowerShell as Administrator):
 
 ```powershell
@@ -233,6 +239,25 @@ Get-Service IllumioOps
 
 Files preserved across upgrades: `config/config.json`, `config/alerts.json`,
 `config/rule_schedules.json`, `logs/`, `data/pce_cache.sqlite`.
+
+**What the installer does on upgrade** (`install.sh` built-in guards):
+
+1. Refuses to install a bundle older than the installed version
+   (db schema migrations are forward-only). Override with
+   `sudo ./install.sh --allow-downgrade` only if you know what you are doing.
+2. Stops the service automatically if it is running (you restart it after
+   reviewing the output).
+3. Restores a pristine bundled Python runtime and reinstalls the exact wheel
+   set shipped in the bundle — dependency versions on the box always match
+   the bundle after an upgrade, and files removed in the new release are
+   cleaned up.
+4. Verifies the installation before finishing: every production dependency
+   must import (`scripts/verify_deps.py --offline-bundle`) and the app must
+   answer `illumio-ops.py --help`. A failed check aborts the install with a
+   non-zero exit code.
+
+**Uninstall** keeps `config/` and `data/` (the cache DB) unless you pass
+`--purge`; a later reinstall picks both up automatically.
 
 **Per-version migration scripts** — some releases ship a one-shot script under
 `scripts/migrate_*.py` that rewrites operator-owned state (e.g. alerts.json

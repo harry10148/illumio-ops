@@ -138,7 +138,11 @@ def siem_status(ctx: click.Context):
                 console.print(f"[dim]{t('cli_siem_no_records')}[/dim]")
             return
         _render_status_table(rows)
-    except OperationalError:
+    except OperationalError as exc:
+        if not _is_first_run_db_error(exc):
+            # Schema mismatch / corruption — surface it; zeros would lie.
+            echo_error(ctx, str(exc))
+            ctx.exit(EXIT_SOFTWARE)
         # SIEM cache db not initialized — first-run / pre-collect path.
         # Still surface configured destinations with zero counts so the CLI
         # agrees with the WebUI's configured-destinations view.
@@ -163,6 +167,15 @@ def siem_status(ctx: click.Context):
     except Exception as exc:
         echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
+
+
+def _is_first_run_db_error(exc: OperationalError) -> bool:
+    """True only when the OperationalError means the cache DB doesn't exist
+    yet (first run before any collection) — the sole case where a zero-count
+    fallback is honest. Schema mismatches ("no such column") and corruption
+    must surface as errors instead of silently rendering zeros."""
+    msg = str(exc).lower()
+    return "no such table" in msg or "unable to open database file" in msg
 
 
 def _render_status_table(rows: list[dict]) -> None:
@@ -207,7 +220,10 @@ def siem_replay(ctx: click.Context, dest: str, limit: int):
             echo_json(ctx, {"ok": True, "destination": dest, "requeued": count})
         elif not is_quiet(ctx):
             console.print(f"[green]{t('cli_siem_replayed', count=count, dest=dest)}[/green]")
-    except OperationalError:
+    except OperationalError as exc:
+        if not _is_first_run_db_error(exc):
+            echo_error(ctx, str(exc))
+            ctx.exit(EXIT_SOFTWARE)
         # SIEM cache db not initialized — replay needs existing dispatch records.
         echo_error(ctx, t("cli_siem_err_no_replay_data", dest=dest))
         ctx.exit(1)

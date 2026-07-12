@@ -52,6 +52,11 @@ def _looks_like_click_invocation(argv: list[str]) -> bool:
 
 
 if __name__ == "__main__":
+    from src.runtime_checks import sqlite_version_error
+    _sqlite_err = sqlite_version_error()
+    if _sqlite_err:
+        print(_sqlite_err, file=sys.stderr)
+        sys.exit(1)
     from src.cli._errors import install_top_level_handler
     install_top_level_handler()
     try:

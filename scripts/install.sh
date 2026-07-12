@@ -7,9 +7,11 @@
 set -euo pipefail
 
 INSTALL_ROOT="/opt/illumio-ops"
+ALLOW_DOWNGRADE=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --install-root) INSTALL_ROOT="$2"; shift 2 ;;
+        --allow-downgrade) ALLOW_DOWNGRADE=true; shift ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac
 done
@@ -124,17 +126,65 @@ fi
 IS_UPGRADE=false
 [ -f "$INSTALL_ROOT/config/config.json" ] && IS_UPGRADE=true
 
+# --- Upgrade guards ---------------------------------------------------------
+if [ "$IS_UPGRADE" = true ]; then
+    # Downgrade guard: db schema migrations are forward-only (PRAGMA
+    # user_version); installing an older bundle over a newer install is
+    # unsupported. Compare base versions (strip +hash dev suffix).
+    BUNDLE_BASE="$(cat "$SRC/VERSION" 2>/dev/null || echo unknown)"
+    BUNDLE_BASE="${BUNDLE_BASE%%+*}"
+    INSTALLED_VERSION=$(sed -n 's/^__version__ *= *["'"'"']\([^"'"'"']*\)["'"'"'].*/\1/p' \
+        "$INSTALL_ROOT/src/__init__.py" 2>/dev/null || true)
+    if [ -n "$INSTALLED_VERSION" ] && [ -n "$BUNDLE_BASE" ] && [ "$BUNDLE_BASE" != "unknown" ] \
+       && [ "$BUNDLE_BASE" != "$INSTALLED_VERSION" ] \
+       && [ "$(printf '%s\n%s\n' "$BUNDLE_BASE" "$INSTALLED_VERSION" | sort -V | tail -1)" = "$INSTALLED_VERSION" ]; then
+        if [ "$ALLOW_DOWNGRADE" != true ]; then
+            echo "ERROR: bundle version $BUNDLE_BASE is older than installed $INSTALLED_VERSION." >&2
+            echo "       Downgrade is unsupported (db schema migrations are forward-only)." >&2
+            echo "       Re-run with --allow-downgrade to proceed anyway." >&2
+            exit 1
+        fi
+        echo "WARNING: downgrading $INSTALLED_VERSION -> $BUNDLE_BASE (--allow-downgrade given)."
+    fi
+    # Service guard: upgrading files under a running service risks a torn
+    # state (old process, new site-packages). Stop it; operator restarts
+    # after reviewing the install output (docs already instruct this).
+    if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        echo "==> Stopping running service for upgrade"
+        systemctl stop "$SERVICE_NAME" || {
+            echo "ERROR: failed to stop $SERVICE_NAME; stop it manually and re-run." >&2
+            exit 1
+        }
+        echo "    NOTE: restart after install: sudo systemctl restart $SERVICE_NAME"
+    fi
+fi
+
 echo "==> Installing to $INSTALL_ROOT (upgrade=$IS_UPGRADE)"
 mkdir -p "$INSTALL_ROOT"
 # Ensure all runtime dirs exist — ProtectSystem=strict requires them before service startup
 mkdir -p "$INSTALL_ROOT/logs" "$INSTALL_ROOT/data" "$INSTALL_ROOT/reports" \
          "$INSTALL_ROOT/config" "$INSTALL_ROOT/config/tls"
 
-rsync -a "$SRC/python/" "$INSTALL_ROOT/python/"
+# --delete restores a pristine bundled runtime each install/upgrade. This is
+# what makes the dependency refresh deterministic: site-packages is reset to
+# the bundle's baseline, then pip below installs exactly the bundled wheels.
+# Without it, range specs in requirements-offline.txt let pip keep stale
+# already-satisfied versions, and removed dependencies linger forever.
+rsync -a --delete "$SRC/python/" "$INSTALL_ROOT/python/"
 
 if [ "$IS_UPGRADE" = true ]; then
-    # Preserve all of config/ on upgrade — never overwrite operator-owned files
-    rsync -a --exclude='config/' "$SRC/app/" "$INSTALL_ROOT/"
+    # Preserve all of config/ on upgrade — never overwrite operator-owned files.
+    # --delete removes app files that no longer exist in the new release:
+    # renamed/deleted src modules would otherwise linger as importable zombie
+    # .py files. Operator/runtime dirs are excluded from deletion.
+    # Excludes are anchored (leading /) to the transfer root: unanchored
+    # patterns match at any depth and would freeze app-tree dirs like
+    # src/i18n/data/ out of the upgrade sync.
+    rsync -a --delete \
+        --exclude='/config/' --exclude='/data/' --exclude='/logs/' \
+        --exclude='/reports/' --exclude='/python/' \
+        --exclude='/MIGRATED_FROM' --exclude='/uninstall.sh' \
+        "$SRC/app/" "$INSTALL_ROOT/"
     # Only update *.example templates so operators can diff for new config keys
     rsync -a --include='*.example' --exclude='*' \
         "$SRC/app/config/" "$INSTALL_ROOT/config/" 2>/dev/null || true
@@ -143,6 +193,8 @@ else
     cp "$INSTALL_ROOT/config/config.json.example" "$INSTALL_ROOT/config/config.json"
 fi
 
+# site-packages was reset by the python/ rsync above, so this installs the
+# bundle's exact wheel set (deterministic; no --upgrade needed).
 "$INSTALL_ROOT/python/bin/python3" -m pip install \
     --no-index --find-links "$SRC/wheels" \
     -r "$INSTALL_ROOT/requirements-offline.txt" --quiet
@@ -167,6 +219,18 @@ except Exception as e:
 " "$INSTALL_ROOT/config/config.json" || true
 fi
 
+# --- Post-install verification -----------------------------------------------
+echo "==> Verifying installed dependencies"
+"$INSTALL_ROOT/python/bin/python3" "$INSTALL_ROOT/scripts/verify_deps.py" --offline-bundle || {
+    echo "ERROR: dependency verification failed — installation is incomplete." >&2
+    exit 1
+}
+(cd "$INSTALL_ROOT" && ./python/bin/python3 illumio-ops.py --help >/dev/null) || {
+    echo "ERROR: app smoke check failed (illumio-ops.py --help)." >&2
+    exit 1
+}
+echo "    Dependency and smoke checks passed."
+
 if ! id illumio-ops &>/dev/null; then
     useradd --system --no-create-home --shell /sbin/nologin illumio-ops
 fi
@@ -187,14 +251,26 @@ sed "s|/opt/illumio-ops|$INSTALL_ROOT|g" "$SRC/deploy/illumio-ops.service" > "$S
 chmod 0644 "$SERVICE_FILE"
 systemctl daemon-reload
 
+# CLI wrapper: give operators a stable `illumio-ops` command that always uses
+# the bundled Python. Running the app with the system python3 breaks on old
+# distros (system SQLite < 3.35 lacks INSERT ... RETURNING).
+WRAPPER=/usr/local/bin/illumio-ops
+cat > "$WRAPPER" <<EOF
+#!/usr/bin/env bash
+exec "$INSTALL_ROOT/python/bin/python3" "$INSTALL_ROOT/illumio-ops.py" "\$@"
+EOF
+chmod 0755 "$WRAPPER"
+
 if [ "$IS_UPGRADE" = true ]; then
     echo "==> Upgrade complete."
     echo "    Check for new config keys: diff $INSTALL_ROOT/config/config.json.example $INSTALL_ROOT/config/config.json"
     echo "    Restart service          : sudo systemctl restart $SERVICE_NAME"
+    echo "    CLI usage    : illumio-ops --help   (wrapper installed at /usr/local/bin/illumio-ops)"
 else
     echo "==> Installation complete."
     echo "    Edit config : nano $INSTALL_ROOT/config/config.json"
     echo "    Start service: sudo systemctl enable --now $SERVICE_NAME"
+    echo "    CLI usage    : illumio-ops --help   (wrapper installed at /usr/local/bin/illumio-ops)"
     echo "    Uninstall    : sudo $INSTALL_ROOT/uninstall.sh"
     echo "    Purge all    : sudo $INSTALL_ROOT/uninstall.sh --purge"
 fi

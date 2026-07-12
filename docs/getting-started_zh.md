@@ -113,6 +113,11 @@ sudo systemctl enable --now illumio-ops
 sudo systemctl status illumio-ops     # 應顯示：Active: active (running)
 ```
 
+安裝完成後會提供 `illumio-ops` CLI wrapper（位於
+`/usr/local/bin/illumio-ops`）。手動執行 CLI 操作時一律使用 wrapper（或
+bundle 內建直譯器 `/opt/illumio-ops/python/bin/python3`）——舊發行版的系統
+`python3` 連結的 SQLite 版本過舊（本應用需要 >= 3.35.0），應用程式會拒絕啟動。
+
 **Windows Server / Windows 11 — 首次安裝**（以系統管理員身分執行 PowerShell）：
 
 ```powershell
@@ -230,6 +235,21 @@ Get-Service IllumioOps
 
 升級後保留的檔案：`config/config.json`、`config/alerts.json`、
 `config/rule_schedules.json`、`logs/`、`data/pce_cache.sqlite`。
+
+**升級時 installer 的內建行為**（`install.sh` 防呆與檢測）：
+
+1. 拒絕安裝比已裝版本更舊的 bundle（DB schema 遷移只能前進）。確有需要時
+   以 `sudo ./install.sh --allow-downgrade` 覆寫。
+2. 服務運行中會自動停止（安裝完成、檢視輸出後由你重啟）。
+3. 還原 pristine 的 bundle 內建 Python runtime 並全量重裝 bundle 內的
+   wheel——升級後機器上的相依版本必定與 bundle 一致，新版已移除的檔案
+   也會被清掉。
+4. 完成前自動驗證：所有正式相依必須可 import
+   （`scripts/verify_deps.py --offline-bundle`），且 app 能回應
+   `illumio-ops.py --help`。任一檢查失敗即中止並回傳非零 exit code。
+
+**移除**：未加 `--purge` 時保留 `config/` 與 `data/`（快取 DB），之後重新
+安裝會自動沿用。
 
 **各版本遷移腳本** — 部分版本會附帶 `scripts/migrate_*.py` 一次性腳本，
 用來改寫操作人員擁有的狀態檔（例如 v3.26.0 將 alerts.json 鍵值化）。
