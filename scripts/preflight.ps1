@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Pre-install environment check for illumio_ops offline bundle (Windows).
 .DESCRIPTION

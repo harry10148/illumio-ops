@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Install/Uninstall Illumio PCE Ops as a Windows Service using NSSM.
 

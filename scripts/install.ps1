@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Install or uninstall the illumio_ops offline bundle on Windows.
 .DESCRIPTION
