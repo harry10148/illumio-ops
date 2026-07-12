@@ -130,11 +130,23 @@ mkdir -p "$INSTALL_ROOT"
 mkdir -p "$INSTALL_ROOT/logs" "$INSTALL_ROOT/data" "$INSTALL_ROOT/reports" \
          "$INSTALL_ROOT/config" "$INSTALL_ROOT/config/tls"
 
-rsync -a "$SRC/python/" "$INSTALL_ROOT/python/"
+# --delete restores a pristine bundled runtime each install/upgrade. This is
+# what makes the dependency refresh deterministic: site-packages is reset to
+# the bundle's baseline, then pip below installs exactly the bundled wheels.
+# Without it, range specs in requirements-offline.txt let pip keep stale
+# already-satisfied versions, and removed dependencies linger forever.
+rsync -a --delete "$SRC/python/" "$INSTALL_ROOT/python/"
 
 if [ "$IS_UPGRADE" = true ]; then
-    # Preserve all of config/ on upgrade — never overwrite operator-owned files
-    rsync -a --exclude='config/' "$SRC/app/" "$INSTALL_ROOT/"
+    # Preserve all of config/ on upgrade — never overwrite operator-owned files.
+    # --delete removes app files that no longer exist in the new release:
+    # renamed/deleted src modules would otherwise linger as importable zombie
+    # .py files. Operator/runtime dirs are excluded from deletion.
+    rsync -a --delete \
+        --exclude='config/' --exclude='data/' --exclude='logs/' \
+        --exclude='reports/' --exclude='python/' \
+        --exclude='MIGRATED_FROM' --exclude='uninstall.sh' \
+        "$SRC/app/" "$INSTALL_ROOT/"
     # Only update *.example templates so operators can diff for new config keys
     rsync -a --include='*.example' --exclude='*' \
         "$SRC/app/config/" "$INSTALL_ROOT/config/" 2>/dev/null || true
@@ -143,6 +155,8 @@ else
     cp "$INSTALL_ROOT/config/config.json.example" "$INSTALL_ROOT/config/config.json"
 fi
 
+# site-packages was reset by the python/ rsync above, so this installs the
+# bundle's exact wheel set (deterministic; no --upgrade needed).
 "$INSTALL_ROOT/python/bin/python3" -m pip install \
     --no-index --find-links "$SRC/wheels" \
     -r "$INSTALL_ROOT/requirements-offline.txt" --quiet
