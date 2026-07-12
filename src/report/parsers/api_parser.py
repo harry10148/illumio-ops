@@ -85,6 +85,7 @@ def flatten_flow_record(r: dict) -> dict:
         'port':             svc.get('port', 0) or 0,
         'proto':            _PROTO_MAP.get(int(svc.get('proto', 0) or 0), str(svc.get('proto', ''))),
         'process_name':     svc.get('process_name', '') or '',
+        'windows_service_name': svc.get('windows_service_name', '') or '',
         'user_name':        svc.get('user_name', '') or '',
         'num_connections':  int(r.get('num_connections', 1) or 1),
         'state':            r.get('state', '') or '',

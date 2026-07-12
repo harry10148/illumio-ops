@@ -75,3 +75,21 @@ def test_native_payload_accepts_list():
         filters={"process_name": ["httpd", "nginx"]})
     entries = [e for e in payload["services"]["include"] if "process_name" in e]
     assert {e["process_name"] for e in entries} == {"httpd", "nginx"}
+
+
+def test_flatten_carries_windows_service_name():
+    from src.report.parsers.api_parser import flatten_flow_record
+    rec = {
+        "src": {"ip": "10.0.0.1"}, "dst": {"ip": "10.0.0.2"},
+        "service": {"port": 53, "proto": 17, "windows_service_name": "Dnscache"},
+        "num_connections": 1, "policy_decision": "allowed",
+    }
+    row = flatten_flow_record(rec)
+    assert row["windows_service_name"] == "Dnscache"
+
+
+def test_df_filter_winservice_null_tolerant_old_rows():
+    # 舊 report_json 列沒有此欄——include fail-closed、exclude 不排除
+    df = pd.DataFrame([{"src_ip": "1.1.1.1", "dst_ip": "2.2.2.2", "port": 53}])
+    assert len(df_filter(df, {"windows_service_name": "Dnscache"})) == 0
+    assert len(df_filter(df, {"ex_windows_service_name": "Dnscache"})) == 1
