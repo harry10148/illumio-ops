@@ -217,6 +217,18 @@ Write-Host "==> Installing Python packages (offline)"
     -r "$InstallRoot\requirements-offline.txt" `
     --quiet
 
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: pip install failed (exit $LASTEXITCODE) - installation is incomplete." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "==> Verifying installed dependencies"
+& "$InstallRoot\python\python.exe" "$InstallRoot\scripts\verify_deps.py" --offline-bundle
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: dependency verification failed - installation is incomplete." -ForegroundColor Red
+    exit 1
+}
+
 Write-Host "==> Registering Windows service"
 & "$SRC\deploy\install_service.ps1" -Action install -InstallRoot $InstallRoot
 

@@ -53,3 +53,12 @@ SQLAlchemy>=2.0,<3.0
 
 # ── Phase 7: Logging ─────────────────────────────────────────────────────────
 loguru>=0.7,<0.8
+
+# ── Windows-only transitive deps (explicit) ──────────────────────────────────
+# pip download evaluates environment markers on the BUILD host (Linux), so
+# wheels guarded by platform_system == "Windows" / sys_platform == "win32"
+# markers (click/loguru -> colorama, loguru -> win32-setctime) are silently
+# skipped unless pinned unconditionally here. Both are tiny pure-python
+# wheels; harmless no-ops on Linux installs.
+colorama>=0.4,<1.0
+win32-setctime>=1.0,<2.0

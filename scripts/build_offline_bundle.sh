@@ -178,6 +178,16 @@ build_windows() {
         -d "$BUILD/wheels" \
         -r "$REPO_ROOT/requirements-offline.txt"
 
+    # Cross-platform marker guard: pip download evaluates environment markers
+    # on this (Linux) host, so Windows-only wheels vanish silently if they
+    # ever drop out of requirements-offline.txt. Fail the build instead.
+    for w in colorama win32_setctime; do
+        ls "$BUILD/wheels/${w}"-*.whl >/dev/null 2>&1 || {
+            echo "ERROR: missing Windows-only wheel: $w (see requirements-offline.txt)" >&2
+            exit 1
+        }
+    done
+
     stage_app "$BUILD"
 
     mkdir -p "$BUILD/deploy"
