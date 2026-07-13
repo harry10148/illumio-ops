@@ -926,7 +926,7 @@ window._objfbInput = function (id, col, neg) {
 window._objfbKeydown = function (id, col, neg, ev) {
   const s = _objfbInstances[id];
   if (!s || !ev) return;
-  if (!s.zone || s.zone.col !== col || s.zone.neg !== neg) _objfbFocusZone(s, col, neg);
+  if (!s.els || !s.zone || s.zone.col !== col || s.zone.neg !== neg) _objfbFocusZone(s, col, neg);
   const key = ev.key;
   if (key === 'ArrowDown') {
     ev.preventDefault();
