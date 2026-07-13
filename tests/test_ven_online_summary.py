@@ -58,8 +58,9 @@ def _render(tmp_path):
 def test_online_chapter_shows_version_counts_not_hostnames(tmp_path):
     page = _render(tmp_path)
     online_start = page.index('id="online"')
-    offline_start = page.index('id="offline"')
-    online_section = page[online_start:offline_start]
+    # Policy Sync 異常章（2026-07-13）插在 online 與 offline 之間
+    sync_start = page.index('id="sync-issues"')
+    online_section = page[online_start:sync_start]
 
     # 計數摘要：兩個版本各自的計數都要出現
     assert "21.5.35" in online_section

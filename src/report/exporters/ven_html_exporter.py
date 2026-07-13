@@ -29,10 +29,12 @@ _HIGHLIGHT_CSS = f'<style>\n{get_highlight_css()}\n</style>'
 _REPORT_DETAIL_LEVEL = "full"
 
 def _policy_sync_badge(val: str) -> str:
+    # PCE 實際值域是 applied/syncing/staged（vendor 查證）；applied＝健康（綠），
+    # syncing/staged＝未收斂（黃），其他未知值才視為異常（紅）。
     v = str(val).lower().strip()
-    if v == "synced":
+    if v in ("applied", "synced"):
         return f'<span class="badge-synced">{val}</span>'
-    if v == "staged":
+    if v in ("syncing", "staged"):
         return f'<span class="badge-staged">{val}</span>'
     if v and v not in ("none", "nan"):
         return f'<span class="badge-unsynced">{val}</span>'
@@ -100,6 +102,7 @@ class VenHtmlExporter:
             '<ol>'
             f'<li><a href="#summary">{_s("rpt_ven_nav_summary")}</a></li>'
             f'<li><a href="#online">{_s("rpt_ven_nav_online")}</a></li>'
+            f'<li><a href="#sync-issues">{_s("rpt_ven_nav_sync")}</a></li>'
             f'<li><a href="#offline">{_s("rpt_ven_nav_offline")}</a></li>'
             f'<li><a href="#lost-today">{_s("rpt_ven_nav_lost_today")}</a></li>'
             f'<li><a href="#lost-yest">{_s("rpt_ven_nav_lost_yest")}</a></li>'
@@ -124,6 +127,8 @@ class VenHtmlExporter:
         df_offline = self._r.get("offline")
         df_today = self._r.get("lost_today")
         df_yest = self._r.get("lost_yesterday")
+        df_sync = self._r.get("sync_issues")
+        sync_count = len(df_sync) if df_sync is not None and not df_sync.empty else 0
         online_count = len(df_online) if df_online is not None and not df_online.empty else 0
         offline_count = len(df_offline) if df_offline is not None and not df_offline.empty else 0
         today_count = len(df_today) if df_today is not None and not df_today.empty else 0
@@ -207,6 +212,8 @@ class VenHtmlExporter:
             + status_chart_html
             + "</section>\n"
             + self._section("online", "rpt_ven_sec_online_title", online_count, _online_summary_html(df_online), "rpt_ven_sec_online_intro", "online", "ven_online_inventory")
+            + "\n"
+            + self._section("sync-issues", "rpt_ven_sec_sync_title", sync_count, _df_to_html(df_sync), "rpt_ven_sec_sync_intro", "warn", "ven_policy_sync_issues")
             + "\n"
             + (self._section("offline", "rpt_ven_sec_offline_title", offline_count, _df_to_html(df_offline), "rpt_ven_sec_offline_intro", "offline", "ven_offline")
                + "\n"

@@ -81,6 +81,25 @@ def _fmt_date_local(ts, tz: datetime.timezone) -> str:
         dt = dt.replace(tzinfo=datetime.timezone.utc)
     return dt.astimezone(tz).strftime("%Y-%m-%d")
 
+def _health_summary(st: dict) -> tuple:
+    """agent_health / agent_health_errors → (errors_str, warnings_str)。
+
+    兩欄位皆為 VEN 健康訊號（無錯誤時為空陣列/空 dict）；條目可能是字串或
+    物件（type/severity/audit_event），一律摘要成分號串接的短字串。"""
+    errs, warns = [], []
+    ahe = st.get('agent_health_errors') or {}
+    if isinstance(ahe, dict):
+        errs.extend(str(x) for x in (ahe.get('errors') or []))
+        warns.extend(str(x) for x in (ahe.get('warnings') or []))
+    for item in st.get('agent_health') or []:
+        if not isinstance(item, dict):
+            continue
+        label = str(item.get('type') or item.get('msg') or 'health')
+        sev = str(item.get('severity') or '').lower()
+        (errs if sev in ('err', 'error', 'critical') else warns).append(label)
+    return '; '.join(dict.fromkeys(errs)), '; '.join(dict.fromkeys(warns))
+
+
 @dataclass
 class VenStatusResult:
     generated_at: datetime.datetime = field(default_factory=datetime.datetime.now)
@@ -218,6 +237,7 @@ class VenStatusGenerator:
                 else:
                     other_pairs.append(f"{k}:{v}")
 
+            health_errors, health_warnings = _health_summary(st)
             rows.append({
                 'hostname':                   w.get('hostname', w.get('name', '')),
                 'ip':                         ip_str,
@@ -232,16 +252,27 @@ class VenStatusGenerator:
                 # Display fields
                 'policy_sync':               st.get('security_policy_sync_state', ''),
                 'last_heartbeat':             st.get('last_heartbeat_on', ''),
-                'policy_received':            st.get('security_policy_refresh_at', ''),
+                # security_policy_refresh_at 已被官方棄用（DEPRECATED AND REPLACED），
+                # 優先取 security_policy_received_at，缺值 fallback 舊欄位（舊 PCE 相容）
+                'policy_received':            st.get('security_policy_received_at', '')
+                                              or st.get('security_policy_refresh_at', ''),
+                'policy_applied':             st.get('security_policy_applied_at', ''),
                 'paired_at':                  st.get('managed_since', ''),
                 'ven_version':                st.get('agent_version', ''),
+                # Policy sync 健康訊號（vendor：sync 錯誤不在 sync_state 值域，
+                # 而在 agent_health/agent_health_errors；fw_config_current=False
+                # 代表防火牆組態未收斂）
+                'fw_config_current':          st.get('fw_config_current', None),
+                'health_errors':              health_errors,
+                'health_warnings':            health_warnings,
             })
 
         return pd.DataFrame(rows) if rows else pd.DataFrame(
             columns=['hostname', 'ip', 'role', 'app', 'env', 'loc', 'labels_other',
                      'ven_status', 'hours_since_last_heartbeat',
                      'policy_sync', 'last_heartbeat', 'policy_received',
-                     'paired_at', 'ven_version']
+                     'policy_applied', 'paired_at', 'ven_version',
+                     'fw_config_current', 'health_errors', 'health_warnings']
         )
 
     def _parse_tz(self) -> datetime.tzinfo:
@@ -267,12 +298,17 @@ class VenStatusGenerator:
         # Env/Loc remain in the underlying dataframe for CSV/XLSX exports.
         _DISPLAY_COLS = ['hostname', 'ip', 'policy_sync', 'last_heartbeat',
                          'policy_received', 'paired_at', 'ven_version']
+        # Policy sync 異常表：以 sync 訊號欄位取代 paired_at/version（保表窄）。
+        _SYNC_DISPLAY_COLS = ['hostname', 'ip', 'policy_sync', 'sync_issue',
+                              'last_heartbeat', 'policy_received', 'policy_applied']
         _COL_RENAME = {
             'hostname':        'Hostname',
             'ip':              'IP',
             'policy_sync':     'Policy Sync',
+            'sync_issue':      'Sync Issue',
             'last_heartbeat':  'Last Heartbeat',
             'policy_received': 'Policy Received',
+            'policy_applied':  'Policy Applied',
             'paired_at':       'Paired At',
             'ven_version':     'VEN Version',
         }
@@ -291,14 +327,15 @@ class VenStatusGenerator:
                 return pd.Series([], dtype=bool)
             return series.apply(predicate).astype(bool)
 
-        def _clean(d):
+        def _clean(d, display_cols=None):
+            display_cols = display_cols or _DISPLAY_COLS
             if d.empty:
-                return pd.DataFrame(columns=list(_COL_RENAME.values()))
-            cols = [c for c in _DISPLAY_COLS if c in d.columns]
+                return pd.DataFrame(columns=[_COL_RENAME.get(c, c) for c in display_cols])
+            cols = [c for c in display_cols if c in d.columns]
             out = d[cols].copy().sort_values('last_heartbeat', ascending=False, na_position='last')
             # Freshness columns → compact relative age (narrow for print); paired_at → date-only.
             tz = now.tzinfo
-            for ts_col in ('last_heartbeat', 'policy_received'):
+            for ts_col in ('last_heartbeat', 'policy_received', 'policy_applied'):
                 if ts_col in out.columns:
                     out[ts_col] = out[ts_col].apply(lambda v: _rel_time(v, now))
             if 'paired_at' in out.columns:
@@ -338,6 +375,36 @@ class VenStatusGenerator:
         df_online  = df[is_online].copy()
         df_offline = df[~is_online].copy()
 
+        # --- Policy sync 異常（回報正常）---
+        # 只看 online：VEN 心跳正常回報、行政狀態 active，但 policy 同步未收斂
+        # 或帶健康錯誤——offline 已有專章，不重複收。判定訊號（vendor 查證）：
+        #   1. agent_health / agent_health_errors 有 err 或 warning；
+        #   2. security_policy_sync_state 不是 applied（syncing 卡住、staged 未套用）；
+        #   3. fw_config_current 明確為 False（防火牆組態未收斂）；
+        #   4. security_policy_received_at 晚於 security_policy_applied_at
+        #      （收到 policy 但未套用）。
+        def _sync_issue_reason(row) -> str:
+            reasons = []
+            if row.get('health_errors'):
+                reasons.append(f"health err: {row['health_errors']}")
+            if row.get('health_warnings'):
+                reasons.append(f"health warn: {row['health_warnings']}")
+            state = str(row.get('policy_sync', '') or '').lower()
+            if state and state not in ('applied', 'synced'):
+                reasons.append(f"state: {state}")
+            if row.get('fw_config_current') is False:
+                reasons.append('fw config stale')
+            rcv = _parse(row.get('policy_received') or '')
+            app = _parse(row.get('policy_applied') or '')
+            if rcv is not None and app is not None and rcv > app:
+                reasons.append('received > applied')
+            elif rcv is not None and app is None:
+                reasons.append('never applied')
+            return '; '.join(reasons)
+
+        df['sync_issue'] = df.apply(_sync_issue_reason, axis=1)
+        df_sync_issues = df[is_online & df['sync_issue'].ne('')].copy()
+
         # Offline VENs bucketed by last-heartbeat time
         mask_today = _bool_mask(df_offline['_hb_dt'],
                                 lambda t: t is not None and t >= cutoff_24h)
@@ -355,6 +422,7 @@ class VenStatusGenerator:
             {'i18n_key': 'rpt_ven_kpi_offline', 'value': str(len(df_offline))},
             {'i18n_key': 'rpt_ven_kpi_lost_24h', 'value': str(len(df_lost_today))},
             {'i18n_key': 'rpt_ven_kpi_lost_48h', 'value': str(len(df_lost_yest))},
+            {'i18n_key': 'rpt_ven_kpi_sync_issues', 'value': str(len(df_sync_issues))},
         ]
 
         # Chart 1: VEN status pie (online vs offline)
@@ -396,6 +464,7 @@ class VenStatusGenerator:
             'offline':        _clean(df_offline),
             'lost_today':     _clean(df_lost_today),
             'lost_yesterday': _clean(df_lost_yest),
+            'sync_issues':    _clean(df_sync_issues, _SYNC_DISPLAY_COLS),
             'status_chart_spec': status_chart_spec,
             'os_chart_spec': os_chart_spec,
             'by_version': self._by_version(df),
@@ -423,6 +492,7 @@ def generate_ven_xlsx(analysis: dict, out_path: str, *, lang: str = "en") -> str
     add_df_sheet(wb, t("rpt_xlsx_sheet_ven_offline", lang=lang), analysis.get("offline"), lang=lang)
     add_df_sheet(wb, t("rpt_xlsx_sheet_ven_lost_today", lang=lang), analysis.get("lost_today"), lang=lang)
     add_df_sheet(wb, t("rpt_xlsx_sheet_ven_lost_yesterday", lang=lang), analysis.get("lost_yesterday"), lang=lang)
+    add_df_sheet(wb, t("rpt_xlsx_sheet_ven_sync_issues", lang=lang), analysis.get("sync_issues"), lang=lang)
 
     by_version = analysis.get("by_version") or {}
     versions_df = pd.DataFrame(

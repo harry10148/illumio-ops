@@ -168,6 +168,8 @@ for suffix, entry in {
     "policy_sync": ("Policy Sync", "Policy 同步"),
     "last_heartbeat": ("Last Heartbeat", "最後 Heartbeat"),
     "policy_received": ("Policy Received", "收到 Policy"),
+    "policy_applied": ("Policy Applied", "套用 Policy"),
+    "sync_issue": ("Sync Issue", "Sync 異常原因"),
     "paired_at": ("Paired At", "配對時間"),
     "ven_version": ("VEN Version", "VEN 版本"),
     "rule_no": ("No", "序號"),
