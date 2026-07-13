@@ -20,8 +20,11 @@ def test_filter_bar_js_exists_and_exports_factory():
 
 def test_filter_bar_handlers_on_window():
     src = _JS.read_text(encoding="utf-8")
-    for fn in ("_objfbInput", "_objfbKeydown", "_objfbPillClick", "_objfbAddDir"):
+    for fn in ("_objfbInput", "_objfbKeydown", "_objfbPillClick",
+               "_objfbZoneClick", "_objfbToggleMode", "_objfbSwapCols", "_objfbToggleExcl"):
         assert f"window.{fn}" in src, f"{fn} must be on window for CSP dispatcher"
+    # v1 方向分段鈕已由 zone 模型取代
+    assert "window._objfbAddDir" not in src
 
 
 def test_filter_bar_no_inline_onclick():
@@ -417,7 +420,7 @@ def test_any_direction_label_group_not_serialized_as_any_label():
 
 def test_any_direction_label_group_pill_guard_present():
     src = _JS.read_text(encoding="utf-8")
-    assert "obj.cat === 'label_group' && state.addDir === 'any'" in src
+    assert "obj.cat === 'label_group' && z.col === 'any'" in src
 
 
 def test_any_label_group_i18n_hint_present():
@@ -507,3 +510,71 @@ def test_filter_bar_svc_guidance_i18n_bilingual():
               "gui_fb_svc_range_hint", "gui_fb_fmt_hint", "gui_fb_kbd_hint",
               "gui_fb_grp_portproto", "gui_fb_grp_freetext"):
         assert k in en and k in zh, k
+
+
+def test_filter_bar_v2_zone_model():
+    """Plan B Task 3：zone 模型（col×neg）。transmission 歸 Destination 欄；
+    svc 欄容納四個無方向 service 家族類別。"""
+    src = _JS.read_text(encoding="utf-8")
+    for fn in ("function _objfbCols(state)", "function _objfbZoneCats(state, col)",
+               "function _objfbPillCol(state, p)", "function _objfbFocusZone(state, col, neg)"):
+        assert fn in src, fn
+    zc = src.split("function _objfbZoneCats(state, col)", 1)[1].split("\nfunction ", 1)[0]
+    assert "'service', 'port', 'process', 'winservice'" in zc
+    assert "col === 'dst' || col === 'any'" in zc  # transmission 僅 Destination（含 OR 合併欄）
+    pc = src.split("function _objfbPillCol(state, p)", 1)[1].split("\nfunction ", 1)[0]
+    assert "p.cat === 'transmission'" in pc
+
+
+def test_filter_bar_v2_mode_and_swap():
+    src = _JS.read_text(encoding="utf-8")
+    tm = src.split("window._objfbToggleMode = function (id)", 1)[1].split("\nwindow.", 1)[0]
+    # AND→OR：src/dst 併入 any；label_group 擋下切換（不得靜默丟 pill）
+    assert "p.dir = 'any'" in tm
+    assert "lgroupOrBlockHint" in tm
+    # OR→AND：any 拆回 Source 欄並提示（spec §2 決策）
+    assert "p.dir = 'src'" in tm and "movedAnyHint" in tm
+    sw = src.split("window._objfbSwapCols = function (id)", 1)[1].split("\nwindow.", 1)[0]
+    assert "p.dir = 'dst'" in sw and "p.dir = 'src'" in sw
+
+
+def test_filter_bar_v2_deserialize_mode_detection():
+    src = _JS.read_text(encoding="utf-8")
+    de = src.split("function _objfbDeserialize(state, dict)", 1)[1].split("\nfunction ", 1)[0]
+    assert "state.mode = 'or'" in de and "state.mode = 'and'" in de
+    assert "state.exclOpen" in de
+
+
+def test_filter_bar_v2_css_classes():
+    css = _CSS.read_text(encoding="utf-8")
+    for cls in (".objfb-grid", ".objfb-row", ".objfb-col", ".objfb-col-label",
+                ".objfb-mid", ".objfb-mode", ".objfb-swap", ".objfb-excl-toggle",
+                ".objfb-fbar-excl"):
+        assert cls in css, cls
+    # v1 方向分段鈕與 pill 方向徽章樣式已移除
+    assert ".objfb-dir-seg" not in css and ".objfb-dir-btn" not in css
+    assert ".objfb-pill-dir" not in css
+
+
+def test_filter_bar_v2_zone_dom_contract():
+    """e2e 依賴的 DOM 契約：zone 容器帶 data-zone=col:neg。"""
+    src = _JS.read_text(encoding="utf-8")
+    assert "zone.dataset.zone = zoneKey" in src
+
+
+def test_filter_bar_v2_i18n_bilingual():
+    import json
+    en = json.loads(_EN.read_text(encoding="utf-8"))
+    zh = json.loads(_ZH.read_text(encoding="utf-8"))
+    for k in ("gui_fb_col_svc", "gui_fb_col_any", "gui_fb_col_src_not", "gui_fb_col_dst_not",
+              "gui_fb_col_svc_not", "gui_fb_col_any_not", "gui_fb_mode_title",
+              "gui_fb_swap_title", "gui_fb_excl_toggle", "gui_fb_moved_any_src",
+              "gui_fb_lgroup_or_blocked", "gui_fb_svc_placeholder"):
+        assert k in en and k in zh, k
+
+
+def test_filter_bar_object_browser_compat_shim():
+    """object-browser.js 以 fb.addDir/fb.dirs 加 pill；shim 把 addDir 映射回 zone。"""
+    src = _JS.read_text(encoding="utf-8")
+    shim = src.split("window._objfbAddPillPublic", 1)[1].split("\nwindow.", 1)[0]
+    assert "state.addDir" in shim and "neg: false" in shim

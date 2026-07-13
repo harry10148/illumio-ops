@@ -4389,5 +4389,17 @@
   "gui_fb_fmt_hint": "443＝兩者 · 443/tcp · 443/udp · 1000-2000 · 1000-2000/udp · 文字＝Process / Win Service / Service 名稱",
   "gui_fb_kbd_hint": "↑↓ 選擇 · Enter 加入 · Esc 關閉",
   "gui_fb_grp_portproto": "Port 與通訊協定",
-  "gui_fb_grp_freetext": "程序 / Windows 服務"
+  "gui_fb_grp_freetext": "程序 / Windows 服務",
+  "gui_fb_col_svc": "服務",
+  "gui_fb_col_any": "來源或目的",
+  "gui_fb_col_src_not": "來源排除",
+  "gui_fb_col_dst_not": "目的排除",
+  "gui_fb_col_svc_not": "服務排除",
+  "gui_fb_col_any_not": "來源或目的排除",
+  "gui_fb_mode_title": "切換 AND（來源／目的分欄）／ OR（任一側）",
+  "gui_fb_swap_title": "對調來源與目的",
+  "gui_fb_excl_toggle": "排除條件（is not）",
+  "gui_fb_moved_any_src": "「任一側」條件已移入來源欄；如需調整請於儲存前處理",
+  "gui_fb_lgroup_or_blocked": "OR 模式不支援標籤群組條件；請先移除再切換",
+  "gui_fb_svc_placeholder": "443 · 1000-2000 · 程序／服務名稱…"
 }

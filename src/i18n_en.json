@@ -4389,5 +4389,17 @@
   "gui_fb_fmt_hint": "443 = both · 443/tcp · 443/udp · 1000-2000 · 1000-2000/udp · text = Process / Win Service / Service name",
   "gui_fb_kbd_hint": "↑↓ select · Enter add · Esc close",
   "gui_fb_grp_portproto": "Port and/or Protocol",
-  "gui_fb_grp_freetext": "Process / Windows Service"
+  "gui_fb_grp_freetext": "Process / Windows Service",
+  "gui_fb_col_svc": "Service",
+  "gui_fb_col_any": "Source OR Destination",
+  "gui_fb_col_src_not": "Source is not",
+  "gui_fb_col_dst_not": "Destination is not",
+  "gui_fb_col_svc_not": "Service is not",
+  "gui_fb_col_any_not": "Source OR Destination is not",
+  "gui_fb_mode_title": "Toggle AND (separate Source/Destination) / OR (either side)",
+  "gui_fb_swap_title": "Swap Source and Destination",
+  "gui_fb_excl_toggle": "Exclusions (is not)",
+  "gui_fb_moved_any_src": "Either-side conditions were moved to the Source column; adjust before saving if needed",
+  "gui_fb_lgroup_or_blocked": "Label Group conditions are not supported in OR mode; remove them before switching",
+  "gui_fb_svc_placeholder": "443 · 1000-2000 · process / service name…"
 }

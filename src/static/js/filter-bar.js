@@ -79,20 +79,22 @@ function _objfbTxCandidates(q) {
 
 function createFilterBar(container, options) {
   const opts = options || {};
-  const dirs = opts.dirs || ['src', 'dst', 'any'];
-  const cats = opts.cats || ['label', 'label_group', 'iplist', 'workload', 'ip', 'service', 'port'];
+  const cats = opts.cats || ['label', 'label_group', 'iplist', 'workload', 'ip',
+    'service', 'port', 'process', 'winservice', 'transmission'];
   const id = 'objfb-' + (++_objfbSeq);
   const state = {
-    id, container, dirs, cats,
+    id, container, cats,
     pills: [],          // {cat, name, href, key, value, dir, neg}
-    addDir: dirs[0],
+    mode: 'and',        // 'and'＝Source/Destination 分欄；'or'＝合併 Source OR Destination 欄
+    dirs: ['src', 'dst'],  // object-browser.js 相容（依 mode 派生，_objfbRender 維護）
+    addDir: 'src',         // object-browser.js 相容：外部加 pill 的方向
+    zone: null,         // 作用中欄位 {col, neg}；col ∈ src|dst|any|svc
+    zoneEls: {},        // `${col}:${neg}` → {fbar, input, dd}
+    exclOpen: false,    // is-not 排除列展開狀態（modal 預設收合，spec §3.1）
     scopeCat: null,
     changeCb: null,
-    // 進行中 suggest fetch 的 AbortController
     _abort: null,
-    // 最近一次 suggest 回應（依分類分組），或 {_error:true}
     _suggest: null,
-    // _suggest 對應的查詢字串（供比對是否過期）
     _suggestQ: null,
   };
   state._debouncedSuggest = window.debounce((q) => _objfbQuerySuggest(state, q), 250);
@@ -187,12 +189,28 @@ function _objfbDeserialize(state, dict) {
     if (d[k]) add(cat, d[k], 'any', false, cat === 'iplist' || cat === 'workload' ? { href: d[k] } : {});
     if (d['ex_' + k]) add(cat, d['ex_' + k], 'any', true, cat === 'iplist' || cat === 'workload' ? { href: d['ex_' + k] } : {});
   }
+  // v2 模式判定：純 any_* → OR 模式；混雜（v1 歷史資料）→ AND，any pill 放
+  // Source 欄並提示（spec §2「any 拆回時放 Source 欄並提示」）。重存後 key 隨之正規化。
+  const hasAny = state.pills.some((p) => p.dir === 'any');
+  const hasSided = state.pills.some((p) => p.dir === 'src' || p.dir === 'dst');
+  if (hasAny && !hasSided) {
+    state.mode = 'or';
+    state.movedAnyHint = false;
+  } else {
+    state.mode = 'and';
+    let moved = 0;
+    for (const p of state.pills) if (p.dir === 'any') { p.dir = 'src'; moved++; }
+    state.movedAnyHint = moved > 0;
+  }
+  state.exclOpen = state.pills.some((p) => p.neg);
+  state.zone = null;
 }
 
 /* ── 加 pill / 移除 / 方向 / 排除（handler 掛 window，供 dispatcher 委派）── */
 function _objfbAddPill(state, obj) {
-  if (obj.cat === 'label_group' && state.addDir === 'any') {
-    // any 方向不支援 label_group：不建 pill，顯示提示（design §C）
+  const z = state.zone || { col: state.addDir, neg: false };
+  if (obj.cat === 'label_group' && z.col === 'any') {
+    // any（OR）方向不支援 label_group：不建 pill，顯示提示（design §C）
     state.anyLabelGroupHint = true;
     _objfbRender(state);
     return;
@@ -201,7 +219,8 @@ function _objfbAddPill(state, obj) {
   state.pills.push({
     cat: obj.cat, name: obj.name, href: obj.href || null,
     key: obj.key || null, value: obj.value || null,
-    dir: _OBJFB_DIRLESS.has(obj.cat) ? null : state.addDir, neg: false,
+    dir: _OBJFB_DIRLESS.has(obj.cat) || z.col === 'svc' ? null : z.col,
+    neg: z.neg,
   });
   _objfbRender(state);
   if (state.changeCb) state.changeCb();
@@ -220,7 +239,33 @@ const _OBJFB_CATS = {
   winservice:   { i18n: 'gui_fb_cat_winservice',   dot: 'objfb-dot-winsvc',  fallback: 'Windows Service' },
   transmission: { i18n: 'gui_fb_cat_transmission', dot: 'objfb-dot-tx',      fallback: 'Transmission' },
 };
-const _OBJFB_DIR_TAG = { src: 'S', dst: 'D', any: 'S/D' };
+/* ── v2 zone 模型（Plan B）：col ∈ src|dst|any|svc × neg ∈ include|exclude。
+ * [include i18n, exclude i18n, include fallback, exclude fallback] ── */
+const _OBJFB_ZONE_LABELS = {
+  src: ['gui_fb_dir_src', 'gui_fb_col_src_not', 'Source', 'Source is not'],
+  dst: ['gui_fb_dir_dst', 'gui_fb_col_dst_not', 'Destination', 'Destination is not'],
+  any: ['gui_fb_col_any', 'gui_fb_col_any_not', 'Source OR Destination', 'Source OR Destination is not'],
+  svc: ['gui_fb_col_svc', 'gui_fb_col_svc_not', 'Service', 'Service is not'],
+};
+
+function _objfbCols(state) { return state.mode === 'or' ? ['any', 'svc'] : ['src', 'dst', 'svc']; }
+
+function _objfbZoneCats(state, col) {
+  if (col === 'svc') {
+    return ['service', 'port', 'process', 'winservice'].filter((c) => state.cats.includes(c));
+  }
+  const out = ['label', 'label_group', 'iplist', 'workload', 'ip'].filter((c) =>
+    state.cats.includes(c) && !(col === 'any' && c === 'label_group'));
+  // Transmission 僅 Destination 側（OR 模式合併欄包含 Destination，一併提供）——spec §3.1
+  if ((col === 'dst' || col === 'any') && state.cats.includes('transmission')) out.push('transmission');
+  return out;
+}
+
+function _objfbPillCol(state, p) {
+  if (p.cat === 'transmission') return state.mode === 'or' ? 'any' : 'dst';
+  if (p.dir === null) return 'svc';
+  return p.dir;
+}
 
 // 無方向類別：pill 不帶 src/dst/any、序列化不吃 dir、popover 不顯示方向列
 // 無方向類別：pill 不帶 src/dst/any、序列化不吃 dir。transmission 序列化亦無方向
@@ -243,41 +288,115 @@ function _objfbApplyI18n(root) {
   if (typeof window.i18nApply === 'function') window.i18nApply(root);
 }
 
-/* ── 完整重繪：方向分段 + pill 搜尋列（pill + scope chip + input + 下拉）+ any 提示 + 編輯 popover ──
- * 呼叫時機：初始化、setFilters、加入/移除/編輯 pill 之後。下拉候選（輸入中）改由
- * _objfbUpdateDropdown 局部更新，避免每個按鍵都整段重建導致輸入框失焦。
- */
+/* ── 完整重繪（v2）：兩列（include / is-not）× 三欄（OR 模式兩欄）zone，
+ * 中央 AND/OR 徽章 + ⇄ 鈕，排除列預設收合。下拉候選仍由 _objfbUpdateDropdown
+ * 局部更新（作用中 zone 的 dd），避免每鍵重建失焦。 ── */
 function _objfbRender(state) {
   const c = state.container;
   c.innerHTML = '';
+  state.dirs = state.mode === 'or' ? ['any'] : ['src', 'dst'];
+  if (!state.dirs.includes(state.addDir)) state.addDir = state.dirs[0];
+  state.zoneEls = {};
 
-  // 方向分段按鈕
-  const dirSeg = document.createElement('div');
-  dirSeg.className = 'objfb-dir-seg';
-  dirSeg.setAttribute('role', 'group');
-  for (const d of state.dirs) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'objfb-dir-btn' + (state.addDir === d ? ' on' : '');
-    b.setAttribute('data-i18n', 'gui_fb_dir_' + d);
-    b.textContent = d;
-    b.setAttribute('data-on-click', '_objfbAddDir');
-    b.dataset.args = JSON.stringify([state.id, d]);
-    dirSeg.appendChild(b);
+  const grid = document.createElement('div');
+  grid.className = 'objfb-grid';
+  for (const neg of [false, true]) {
+    const row = document.createElement('div');
+    row.className = 'objfb-row' + (neg ? ' objfb-row-excl' : '');
+    if (neg && !state.exclOpen) row.hidden = true;
+    _objfbCols(state).forEach((col, ci) => {
+      if (ci === 1) row.appendChild(_objfbBuildMid(state, neg));
+      row.appendChild(_objfbBuildZone(state, col, neg));
+    });
+    grid.appendChild(row);
   }
-  c.appendChild(dirSeg);
+  c.appendChild(grid);
 
-  // 搜尋列：pill 容器 + 輸入框 + 下拉
+  const exclBtn = document.createElement('button');
+  exclBtn.type = 'button';
+  exclBtn.className = 'objfb-excl-toggle';
+  exclBtn.setAttribute('aria-expanded', state.exclOpen ? 'true' : 'false');
+  exclBtn.setAttribute('data-i18n', 'gui_fb_excl_toggle');
+  exclBtn.textContent = 'Exclusions (is not)';
+  exclBtn.setAttribute('data-on-click', '_objfbToggleExcl');
+  exclBtn.dataset.args = JSON.stringify([state.id]);
+  c.appendChild(exclBtn);
+
+  // 提示列：OR/any 較慢、any×label_group 不支援、label_group 擋 OR、OR→AND 搬移
+  const mkHint = (i18nKey, hidden) => {
+    const el = document.createElement('div');
+    el.className = 'objfb-hint';
+    el.setAttribute('data-i18n', i18nKey);
+    el.hidden = hidden;
+    c.appendChild(el);
+  };
+  mkHint('gui_fb_any_slow', !(state.mode === 'or' && state.pills.length > 0));
+  mkHint('gui_fb_any_label_group_unsupported', !state.anyLabelGroupHint);
+  mkHint('gui_fb_lgroup_or_blocked', !state.lgroupOrBlockHint);
+  mkHint('gui_fb_moved_any_src', !state.movedAnyHint);
+
+  const pop = document.createElement('div');
+  pop.className = 'objfb-pop';
+  c.appendChild(pop);
+
+  state.els = null;   // 作用中 zone 的 {fbar, input, dd}；_objfbFocusZone 指定
+  state.pop = pop;
+  state.ddItems = [];
+  state.actIdx = -1;
+  state.popIdx = -1;
+
+  _objfbApplyI18n(c);
+}
+
+function _objfbBuildMid(state, neg) {
+  const mid = document.createElement('div');
+  // 排除列的中央控制只佔位對齊（比照 mockup visibility:hidden）
+  mid.className = 'objfb-mid' + (neg ? ' objfb-mid-ghost' : '');
+  const mode = document.createElement('button');
+  mode.type = 'button';
+  mode.className = 'objfb-mode' + (state.mode === 'or' ? ' or' : '');
+  mode.textContent = state.mode === 'or' ? 'OR' : 'AND';
+  mode.setAttribute('data-i18n-title', 'gui_fb_mode_title');
+  mode.setAttribute('data-on-click', '_objfbToggleMode');
+  mode.dataset.args = JSON.stringify([state.id]);
+  mid.appendChild(mode);
+  if (state.mode === 'and') {
+    const swap = document.createElement('button');
+    swap.type = 'button';
+    swap.className = 'objfb-swap';
+    swap.textContent = '⇄';
+    swap.setAttribute('data-i18n-title', 'gui_fb_swap_title');
+    swap.setAttribute('data-on-click', '_objfbSwapCols');
+    swap.dataset.args = JSON.stringify([state.id]);
+    mid.appendChild(swap);
+  }
+  return mid;
+}
+
+function _objfbBuildZone(state, col, neg) {
+  const zoneKey = col + ':' + neg;
+  const zone = document.createElement('div');
+  zone.className = 'objfb-col' + (col === 'svc' ? ' objfb-col-svc' : '');
+  zone.dataset.zone = zoneKey;
+
+  const lbl = document.createElement('div');
+  lbl.className = 'objfb-col-label';
+  const zmeta = _OBJFB_ZONE_LABELS[col];
+  lbl.setAttribute('data-i18n', zmeta[neg ? 1 : 0]);
+  lbl.textContent = zmeta[neg ? 3 : 2];
+  zone.appendChild(lbl);
+
   const fbar = document.createElement('div');
-  fbar.className = 'objfb-fbar';
-  fbar.setAttribute('data-on-click', '_objfbInput');
-  fbar.dataset.args = JSON.stringify([state.id]);
+  fbar.className = 'objfb-fbar' + (neg ? ' objfb-fbar-excl' : '');
+  fbar.setAttribute('data-on-click', '_objfbZoneClick');
+  fbar.dataset.args = JSON.stringify([state.id, col, neg]);
 
-  // 追蹤同側同 key label pill，插入 or 分隔
-  let prevKeyDir = null;
+  // 同 key label pill 之間插入 or 分隔（zone 內比對即可——同欄已隱含同方向）
+  let prevKey = null;
   state.pills.forEach((p, i) => {
+    if (_objfbPillCol(state, p) !== col || p.neg !== neg) return;
     const derivedKey = p.key || (p.cat === 'label' && String(p.name).includes('=') ? String(p.name).split('=')[0] : null);
-    if (prevKeyDir && p.cat === 'label' && derivedKey && prevKeyDir.dir === p.dir && prevKeyDir.key === derivedKey) {
+    if (prevKey && p.cat === 'label' && derivedKey && prevKey === derivedKey) {
       const orEl = document.createElement('span');
       orEl.className = 'objfb-or';
       orEl.setAttribute('data-i18n', 'gui_fb_or');
@@ -285,15 +404,16 @@ function _objfbRender(state) {
       fbar.appendChild(orEl);
     }
     fbar.appendChild(_objfbBuildPill(state, p, i));
-    prevKeyDir = derivedKey ? { dir: p.dir, key: derivedKey } : null;
+    prevKey = (p.cat === 'label' && derivedKey) ? derivedKey : null;
   });
 
-  if (state.scopeCat) {
+  const isActive = state.zone && state.zone.col === col && state.zone.neg === neg;
+  if (isActive && state.scopeCat) {
     const chip = document.createElement('span');
     chip.className = 'objfb-scope-chip';
     const label = document.createElement('span');
     const meta = _OBJFB_CATS[state.scopeCat];
-    if (meta) label.setAttribute('data-i18n', meta.i18n);
+    if (meta && meta.i18n) label.setAttribute('data-i18n', meta.i18n);
     label.textContent = meta ? meta.fallback : state.scopeCat;
     chip.appendChild(label);
     const x = document.createElement('button');
@@ -310,11 +430,11 @@ function _objfbRender(state) {
   input.type = 'text';
   input.className = 'objfb-input';
   input.autocomplete = 'off';
-  input.setAttribute('data-i18n-placeholder', 'gui_fb_placeholder');
+  input.setAttribute('data-i18n-placeholder', col === 'svc' ? 'gui_fb_svc_placeholder' : 'gui_fb_placeholder');
   input.placeholder = 'Search…';
   input.setAttribute('aria-label', 'Filter search');
   input.setAttribute('data-on-input', '_objfbInput');
-  input.dataset.args = JSON.stringify([state.id]);
+  input.dataset.args = JSON.stringify([state.id, col, neg]);
   input.setAttribute('data-on-keydown', '_objfbKeydown');
   input.setAttribute('data-pass-event', '1');
   fbar.appendChild(input);
@@ -324,33 +444,9 @@ function _objfbRender(state) {
   dd.setAttribute('role', 'listbox');
   fbar.appendChild(dd);
 
-  c.appendChild(fbar);
-
-  // any 方向較慢提示（有任一 pill 時顯示）
-  const hint = document.createElement('div');
-  hint.className = 'objfb-hint';
-  hint.setAttribute('data-i18n', 'gui_fb_any_slow');
-  hint.hidden = !state.pills.some(p => p.dir === 'any');
-  c.appendChild(hint);
-
-  // any 方向不支援 label_group 的提示（嘗試建立時顯示，換方向清除）
-  const lgHint = document.createElement('div');
-  lgHint.className = 'objfb-hint';
-  lgHint.setAttribute('data-i18n', 'gui_fb_any_label_group_unsupported');
-  lgHint.hidden = !state.anyLabelGroupHint;
-  c.appendChild(lgHint);
-
-  // pill 編輯 popover（隱藏，點 pill 時填內容並開啟）
-  const pop = document.createElement('div');
-  pop.className = 'objfb-pop';
-  c.appendChild(pop);
-
-  state.els = { dirSeg, fbar, input, dd, hint, pop };
-  state.ddItems = [];
-  state.actIdx = -1;
-  state.popIdx = -1;
-
-  _objfbApplyI18n(c);
+  zone.appendChild(fbar);
+  state.zoneEls[zoneKey] = { fbar, input, dd };
+  return zone;
 }
 
 function _objfbBuildPill(state, p, idx) {
@@ -359,13 +455,7 @@ function _objfbBuildPill(state, p, idx) {
   el.setAttribute('data-on-click', '_objfbPillClick');
   el.dataset.args = JSON.stringify([state.id, idx]);
   el.setAttribute('data-pass-event', '1');
-
-  if (p.dir !== null) {
-    const dirTag = document.createElement('span');
-    dirTag.className = 'objfb-pill-dir';
-    dirTag.textContent = _OBJFB_DIR_TAG[p.dir] || p.dir;
-    el.appendChild(dirTag);
-  }
+  el.dataset.pillIdx = String(idx);
 
   const dot = document.createElement('i');
   const meta = _OBJFB_CATS[p.cat];
@@ -406,8 +496,13 @@ function _objfbUpdateDropdown(state) {
     if (state._abort) { state._abort.abort(); state._abort = null; }
     state._suggest = null;
     state._suggestQ = null;
+    if (state.scopeCat === 'transmission') {
+      // 值域固定、無後端查詢：直接列出三個候選
+      _objfbRenderTxList(state);
+      return;
+    }
     if (state.scopeCat && state.scopeCat !== 'ip' && state.scopeCat !== 'port') {
-      // 有 scope：空輸入即瀏覽該類別
+      // 有 scope：空輸入即瀏覽該類別（process/winservice 同 workload：無瀏覽端點，顯示輸入提示）
       _objfbRenderBrowse(state);
       return;
     }
@@ -429,8 +524,8 @@ function _objfbRenderCatChips(state) {
   state.ddItems = [];
   const catsWrap = document.createElement('div');
   catsWrap.className = 'objfb-dd-cats';
-  for (const c of state.cats.filter((c) => c !== 'ip' && c !== 'port' &&
-      !(state.addDir === 'any' && c === 'label_group'))) {
+  const zoneCol = state.zone ? state.zone.col : _objfbCols(state)[0];
+  for (const c of _objfbZoneCats(state, zoneCol).filter((c) => c !== 'ip' && c !== 'port' && state.cats.includes(c))) {
     const meta = _OBJFB_CATS[c];
     if (!meta) continue;
     const b = document.createElement('button');
@@ -486,7 +581,7 @@ function _objfbRenderCatChips(state) {
 function _objfbRenderBrowse(state, append) {
   const cat = state.scopeCat;
   const dd = state.els.dd;
-  if (cat === 'workload') {
+  if (cat === 'workload' || cat === 'process' || cat === 'winservice') {
     dd.innerHTML = '';
     state.ddItems = [];
     _objfbAddDdNote(dd, 'gui_fb_type_to_search', 'Type to search');
@@ -513,6 +608,18 @@ function _objfbRenderBrowse(state, append) {
       _objfbApplyI18n(dd);
       dd.classList.add('open');
     });
+}
+
+function _objfbRenderTxList(state) {
+  const dd = state.els.dd;
+  dd.innerHTML = '';
+  state.ddItems = [];
+  _objfbAddDdGroup(state, _objfbTxCandidates(state.els.input.value.trim()),
+    'gui_fb_cat_transmission', 'Transmission');
+  _objfbApplyI18n(dd);
+  state.actIdx = state.ddItems.length ? 0 : -1;
+  _objfbMarkActive(state);
+  dd.classList.add('open');
 }
 
 function _objfbRenderBrowseList(state) {
@@ -578,10 +685,14 @@ function _objfbQuerySuggest(state, q) {
   state._abort = ctrl;
   const scope = state.scopeCat;
   // 無 scope（自由輸入）時 types 須由 state.cats 導出，交集 suggest 端支援的類別
-  // （'ip' 不是 suggest 類別，不列入）；有 scope 時 scope 本身已受
-  // _objfbUpdateDropdown 的分類快選鈕過濾，天然是 state.cats 的子集。
+  // （'ip' 不是 suggest 類別，不列入）與作用中 zone 的可用類別（zoneCats）；
+  // 有 scope 時 scope 本身若非 suggest 類別（process/winservice/transmission）
+  // 直接放棄查詢——後端無對應端點。
+  if (scope && !_OBJFB_SUGGEST_CATS.includes(scope)) return; // process/winservice/transmission 無後端 suggest
+  const zoneCats = state.zone ? _objfbZoneCats(state, state.zone.col) : state.cats;
   const types = scope ? scope : _OBJFB_SUGGEST_CATS.filter((c) =>
-    state.cats.includes(c) && !(state.addDir === 'any' && c === 'label_group')).join(',');
+    state.cats.includes(c) && zoneCats.includes(c)).join(',');
+  if (!types) return;
   const url = `/api/filter-objects/suggest?q=${encodeURIComponent(q)}&types=${types}&limit=10`;
   fetch(url, { signal: ctrl.signal, credentials: 'same-origin' })
     .then(r => r.json())
@@ -610,8 +721,9 @@ function _objfbRenderDropdown(state, q) {
   const dd = state.els.dd;
   dd.innerHTML = '';
   state.ddItems = [];
+  const zoneCats = state.zone ? _objfbZoneCats(state, state.zone.col) : state.cats;
 
-  if (_objfbIsIpLike(q) && !state.scopeCat) {
+  if (_objfbIsIpLike(q) && !state.scopeCat && state.zone && state.zone.col !== 'svc') {
     _objfbAddDdGroup(state, [{ cat: 'ip', name: q }], 'gui_fb_add_ipcidr', 'Add IP/CIDR');
   } else if (!state.scopeCat || state.scopeCat === 'label') {
     const eq = q.indexOf('=');
@@ -622,9 +734,18 @@ function _objfbRenderDropdown(state, q) {
         _objfbAddDdGroup(state, [{ cat: 'label', name: q, key: k, value: v }], 'gui_fb_cat_label', 'Labels');
       }
     }
+  } else if (state.scopeCat === 'process' || state.scopeCat === 'winservice') {
+    // process/winservice 無後端瀏覽/suggest：手動輸入即為候選
+    const meta = _OBJFB_CATS[state.scopeCat];
+    _objfbAddDdGroup(state, [{ cat: state.scopeCat, name: q.trim() }], meta.i18n, meta.fallback);
   }
-  if (_objfbIsPortLike(q) && state.cats.includes('port') && (!state.scopeCat || state.scopeCat === 'service' || state.scopeCat === 'port')) {
+  if (_objfbIsPortLike(q) && state.cats.includes('port') && (!state.scopeCat || state.scopeCat === 'service' || state.scopeCat === 'port') &&
+      state.zone && state.zone.col === 'svc') {
     _objfbAddDdGroup(state, [{ cat: 'port', name: q.trim() }], 'gui_fb_add_port', 'Add Port');
+  }
+  if (state.zone && (state.zone.col === 'dst' || state.zone.col === 'any') && state.cats.includes('transmission')) {
+    const txItems = _objfbTxCandidates(q);
+    if (txItems.length) _objfbAddDdGroup(state, txItems, 'gui_fb_cat_transmission', 'Transmission');
   }
 
   const sug = (state._suggestQ === q) ? state._suggest : null;
@@ -633,9 +754,10 @@ function _objfbRenderDropdown(state, q) {
       _objfbAddDdNote(dd, 'gui_fb_offline', 'PCE unreachable');
     } else {
       // 迭代清單須照 state.cats 過濾，否則被排除的分類（如規則 modal 排除的
-      // label_group）仍會出現在下拉，選取後儲存會被後端拒絕。
+      // label_group）仍會出現在下拉，選取後儲存會被後端拒絕；另交集作用中 zone
+      // 的可用類別（zoneCats），避免例如 Service 欄出現 label 建議。
       for (const cat of _OBJFB_SUGGEST_CATS.filter((c) =>
-          state.cats.includes(c) && !(state.addDir === 'any' && c === 'label_group'))) {
+          state.cats.includes(c) && zoneCats.includes(c))) {
         const r = sug[cat];
         if (!r) continue;
         if (cat === 'workload' && r.error === 'pce_unreachable') {
@@ -709,18 +831,18 @@ function _objfbMarkActive(state) {
 
 /* ── pill 編輯 popover：改方向 / 包含(gui_fb_include)排除(gui_fb_exclude) / 移除 ── */
 function _objfbOpenPop(state, idx, pillEl) {
-  const pop = state.els.pop;
+  const pop = state.pop;
   const p = state.pills[idx];
   if (!p || !pillEl) return;
   state.popIdx = idx;
   pop.innerHTML = '';
 
-  if (!_OBJFB_DIRLESS.has(p.cat)) {
+  if (state.mode === 'and' && !_OBJFB_DIRLESS.has(p.cat)) {
     const dirRow = document.createElement('div');
     dirRow.className = 'objfb-pop-row';
     const dirSeg = document.createElement('div');
     dirSeg.className = 'objfb-pop-seg';
-    for (const d of state.dirs) {
+    for (const d of ['src', 'dst']) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'objfb-pop-btn' + (p.dir === d ? ' on' : '');
@@ -771,27 +893,40 @@ function _objfbOpenPop(state, idx, pillEl) {
   _objfbApplyI18n(pop);
 }
 
+/* ── 焦點/輸入（取代 v1 的方向分段鈕）：點/輸入任一 zone 即成為作用中 zone ── */
+function _objfbFocusZone(state, col, neg) {
+  const z = state.zoneEls[col + ':' + neg];
+  if (!z) return;
+  const changed = !state.zone || state.zone.col !== col || state.zone.neg !== neg;
+  if (changed) {
+    state.scopeCat = null;
+    for (const k in state.zoneEls) state.zoneEls[k].dd.classList.remove('open');
+  }
+  state.zone = { col, neg };
+  if (col !== 'svc' && col !== 'any') state.addDir = col;      // object-browser.js 相容
+  else if (col === 'any') state.addDir = 'any';
+  state.els = z;
+  z.input.focus();
+  _objfbUpdateDropdown(state);
+}
+
 // 掛載 window（CSP dispatcher 查找 window[fnName]）
 window.createFilterBar = createFilterBar;
-window._objfbAddDir = function (id, dir) {
+
+window._objfbZoneClick = function (id, col, neg) {
   const s = _objfbInstances[id];
-  if (!s) return;
-  s.addDir = dir;
-  s.anyLabelGroupHint = false;
-  if (dir === 'any' && s.scopeCat === 'label_group') { window._objfbClearScope(id); return; }
-  _objfbRender(s);
+  if (s) _objfbFocusZone(s, col, neg);
 };
 
-window._objfbInput = function (id) {
+window._objfbInput = function (id, col, neg) {
   const s = _objfbInstances[id];
-  if (!s || !s.els) return;
-  s.els.input.focus();
-  _objfbUpdateDropdown(s);
+  if (s) _objfbFocusZone(s, col, neg);
 };
 
-window._objfbKeydown = function (id, ev) {
+window._objfbKeydown = function (id, col, neg, ev) {
   const s = _objfbInstances[id];
-  if (!s || !s.els || !ev) return;
+  if (!s || !ev) return;
+  if (!s.zone || s.zone.col !== col || s.zone.neg !== neg) _objfbFocusZone(s, col, neg);
   const key = ev.key;
   if (key === 'ArrowDown') {
     ev.preventDefault();
@@ -805,13 +940,11 @@ window._objfbKeydown = function (id, ev) {
       window._objfbPickItem(id, s.ddItems[s.actIdx].o);
     } else {
       const q = s.els.input.value.trim();
-      if (_objfbIsPortLike(q) && s.cats.includes('port')) {
+      if (col === 'svc' && _objfbIsPortLike(q) && s.cats.includes('port')) {
         window._objfbPickItem(id, { cat: 'port', name: q });
-        return;
-      }
-      if (_objfbIsIpLike(q)) {
+      } else if (col !== 'svc' && _objfbIsIpLike(q)) {
         window._objfbPickItem(id, { cat: 'ip', name: q });
-      } else {
+      } else if (col !== 'svc') {
         const eq = q.indexOf('=');
         if (eq > 0 && eq < q.length - 1) {
           const k = q.slice(0, eq).trim();
@@ -824,22 +957,80 @@ window._objfbKeydown = function (id, ev) {
     s.els.dd.classList.remove('open');
     s.actIdx = -1;
   } else if (key === 'Backspace' && !s.els.input.value) {
-    if (s.scopeCat) window._objfbClearScope(id);
-    else if (s.pills.length) window._objfbRemovePill(id, s.pills.length - 1);
+    if (s.scopeCat) { window._objfbClearScope(id); return; }
+    for (let i = s.pills.length - 1; i >= 0; i--) {
+      const p = s.pills[i];
+      if (_objfbPillCol(s, p) === col && p.neg === neg) { window._objfbRemovePill(id, i); return; }
+    }
   }
+};
+
+window._objfbToggleMode = function (id) {
+  const s = _objfbInstances[id];
+  if (!s) return;
+  s.anyLabelGroupHint = false;
+  s.movedAnyHint = false;
+  if (s.mode === 'and') {
+    // label_group 不能進 any（序列化 fail-closed 會丟棄）：擋切換並提示，不動資料
+    if (s.pills.some((p) => p.cat === 'label_group')) {
+      s.lgroupOrBlockHint = true;
+      _objfbRender(s);
+      return;
+    }
+    s.lgroupOrBlockHint = false;
+    for (const p of s.pills) if (p.dir === 'src' || p.dir === 'dst') p.dir = 'any';
+    s.mode = 'or';
+  } else {
+    s.lgroupOrBlockHint = false;
+    let moved = 0;
+    for (const p of s.pills) if (p.dir === 'any') { p.dir = 'src'; moved++; }
+    s.mode = 'and';
+    s.movedAnyHint = moved > 0;  // any 拆回 AND：pill 放 Source 欄並提示（spec §2）
+  }
+  s.zone = null;
+  _objfbRender(s);
+  if (s.changeCb) s.changeCb();
+};
+
+window._objfbSwapCols = function (id) {
+  const s = _objfbInstances[id];
+  if (!s || s.mode !== 'and') return;
+  // transmission pill dir=null，天然不受對調影響（僅 Destination 側，spec §3.1）
+  for (const p of s.pills) {
+    if (p.dir === 'src') p.dir = 'dst';
+    else if (p.dir === 'dst') p.dir = 'src';
+  }
+  s.zone = null;
+  _objfbRender(s);
+  if (s.changeCb) s.changeCb();
+};
+
+window._objfbToggleExcl = function (id) {
+  const s = _objfbInstances[id];
+  if (!s) return;
+  s.exclOpen = !s.exclOpen;
+  _objfbRender(s);
 };
 
 window._objfbPillClick = function (id, idx, ev, pillEl) {
   const s = _objfbInstances[id];
-  if (!s || !s.els) return;
+  // 注意：不可比照 v1 guard 檢查 s.els——v2 下 state.els 只在某 zone 被 focus 過才非
+  // null，使用者可能直接點擊既有 pill（未先聚焦任何 zone），此時仍須能開 popover。
+  if (!s) return;
   _objfbOpenPop(s, idx, pillEl);
 };
 
 window._objfbPickItem = function (id, payload) {
   const s = _objfbInstances[id];
   if (!s) return;
+  const z = s.zone;
   _objfbAddPill(s, payload);
-  if (s.els) { s.els.input.value = ''; s.els.input.focus(); _objfbUpdateDropdown(s); }
+  // _objfbAddPill 觸發 _objfbRender，重繪後 zone DOM 換新、state.els 被清空
+  // （見 _objfbRender），須以 z（加入前的作用中 zone）重新 focus 才能保留輸入焦點。
+  if (z && s.zoneEls[z.col + ':' + z.neg]) {
+    s.zoneEls[z.col + ':' + z.neg].input.value = '';
+    _objfbFocusZone(s, z.col, z.neg);
+  }
 };
 
 window._objfbRemovePill = function (id, idx) { const s = _objfbInstances[id]; if (s) { s.pills.splice(idx, 1); _objfbRender(s); if (s.changeCb) s.changeCb(); } };
@@ -850,33 +1041,35 @@ window._objfbPopAction = function (id, idx, action, val) {
   const p = s.pills[idx];
   if (!p) return;
   if (action === 'dir') p.dir = val;
-  else if (action === 'neg') p.neg = !!val;
+  else if (action === 'neg') { p.neg = !!val; if (p.neg) s.exclOpen = true; }
   else if (action === 'remove') s.pills.splice(idx, 1);
 
   _objfbRender(s);
   if (s.changeCb) s.changeCb();
   if (action !== 'remove') {
-    const pillEls = s.els.fbar.querySelectorAll('.objfb-pill');
-    if (pillEls[idx]) _objfbOpenPop(s, idx, pillEls[idx]);
+    const pillEl = s.container.querySelector('.objfb-pill[data-pill-idx="' + idx + '"]');
+    if (pillEl) _objfbOpenPop(s, idx, pillEl);
   }
 };
 
 window._objfbSetScope = function (id, cat) {
   const s = _objfbInstances[id];
-  if (!s) return;
+  if (!s || !s.zone) return;
   s.scopeCat = cat;
+  const z = s.zone;
   _objfbRender(s);
-  s.els.input.focus();
-  _objfbUpdateDropdown(s);
+  // _objfbFocusZone 重新指向重繪後的 zone DOM（見 _objfbPickItem 註解），
+  // 同 col/neg 故不會清 scopeCat（_objfbFocusZone 的 changed 判斷為 false）。
+  _objfbFocusZone(s, z.col, z.neg);
 };
 
 window._objfbClearScope = function (id) {
   const s = _objfbInstances[id];
-  if (!s) return;
+  if (!s || !s.zone) return;
   s.scopeCat = null;
+  const z = s.zone;
   _objfbRender(s);
-  s.els.input.focus();
-  _objfbUpdateDropdown(s);
+  _objfbFocusZone(s, z.col, z.neg);
 };
 
 window._objfbBrowseMore = function (id) {
@@ -886,11 +1079,17 @@ window._objfbBrowseMore = function (id) {
 
 // 供 object-browser.js（Modal 物件庫）取回實例、代為加入 pill。
 window._objfbGetInstance = function (id) { return _objfbInstances[id] || null; };
-window._objfbAddPillPublic = function (state, obj) { _objfbAddPill(state, obj); };
+window._objfbAddPillPublic = function (state, obj) {
+  // object-browser.js 以 fb.addDir 指定方向；映射回 zone 模型（include 列）
+  const saved = state.zone;
+  state.zone = { col: state.addDir || _objfbCols(state)[0], neg: false };
+  _objfbAddPill(state, obj);
+  state.zone = saved;
+};
 
 window._objfbOpenBrowser = function (id) {
   const s = _objfbInstances[id];
-  if (s) { s.els.dd.classList.remove('open'); window.openObjectBrowser(id); }
+  if (s && s.els) { s.els.dd.classList.remove('open'); window.openObjectBrowser(id); }
 };
 
 // 點擊 bar/popover 以外區域時關閉下拉與 popover（沿用 codebase 既有的
@@ -898,8 +1097,9 @@ window._objfbOpenBrowser = function (id) {
 document.addEventListener('click', function (e) {
   for (const id in _objfbInstances) {
     const s = _objfbInstances[id];
-    if (!s.els) continue;
-    if (!s.els.fbar.contains(e.target)) s.els.dd.classList.remove('open');
-    if (!s.els.pop.contains(e.target) && !e.target.closest('.objfb-pill')) s.els.pop.classList.remove('open');
+    for (const k in s.zoneEls) {
+      if (!s.zoneEls[k].fbar.contains(e.target)) s.zoneEls[k].dd.classList.remove('open');
+    }
+    if (s.pop && !s.pop.contains(e.target) && !e.target.closest('.objfb-pill')) s.pop.classList.remove('open');
   }
 });
