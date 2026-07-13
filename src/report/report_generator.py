@@ -32,6 +32,7 @@ from src.report.report_metadata import (
 )
 from src.report.tz_utils import parse_tz as _parse_tz, fmt_tz_now as _fmt_tz_now
 from src.pce_cache.reader import CacheReadTooLarge
+from src.exceptions import TrafficQueryError
 
 
 def _fmt_iso(dt) -> str:
@@ -167,6 +168,22 @@ class ReportGenerator:
 
     # ── cache-aware traffic fetch ────────────────────────────────────────────
 
+    def _raise_if_traffic_fetch_failed(self) -> None:
+        """報表路徑須與 analyzer 互動查詢同契約（見 analyzer._raise_if_query_fetch_failed）：
+        PCE traffic 查詢在 execute_traffic_query_stream 內把失敗（submit 406、
+        poll timeout、download 失敗、stream 例外）吞成空 yield 並記到
+        api.last_fetch_error。每個實際呼叫 PCE 的取數點後立即檢查，非空即代表
+        本次查詢在 PCE 側失敗，須 raise 而非與真 0 筆同形回傳（否則產出無聲
+        空/部分報表）。last_fetch_error 於每次 submit 起始清空（_submit_and_stream_
+        async_query），故僅反映本次；cache-only 路徑不呼叫本檢查（該值可能為前次殘留）。
+
+        last_fetch_error 的契約型別是 Optional[str]（見 api_client.py）：僅非空字串
+        代表真失敗。以 isinstance 精確比對契約型別，順帶對不完整測試替身穩健
+        （bare MagicMock 的自動屬性為 truthy 但非 str，不應誤判為查詢失敗）。"""
+        err = getattr(self.api, "last_fetch_error", None)
+        if isinstance(err, str) and err.strip():
+            raise TrafficQueryError(err)
+
     def _fetch_traffic(self, start: datetime.datetime, end: datetime.datetime,
                        filters: Optional[dict] = None,
                        use_cache: bool = True,
@@ -219,6 +236,8 @@ class ReportGenerator:
                             end_time_str=_fmt_iso(gap_end_dt),
                             filters=filters,
                         ) or []
+                        # 失敗的 gap 查詢不得無聲降級為 cache-only。
+                        self._raise_if_traffic_fetch_failed()
                     else:
                         # 次秒級 gap：回退 1 秒後已無有意義的窗口可查詢。
                         gap = []
@@ -237,6 +256,7 @@ class ReportGenerator:
             end_time_str=_fmt_iso(end),
             filters=filters,
         )
+        self._raise_if_traffic_fetch_failed()
         return {"raw": flows or [], "agg": None, "source": "api"}
 
     def _fetch_traffic_df(self, start: datetime.datetime, end: datetime.datetime,
@@ -299,6 +319,8 @@ class ReportGenerator:
                             filters=filters,
                             compute_draft=compute_draft,
                         ) or []
+                        # 失敗的 gap 查詢不得無聲降級為 cache-only。
+                        self._raise_if_traffic_fetch_failed()
                     else:
                         # 次秒級 gap：回退 1 秒後已無有意義的窗口可查詢。
                         gap = []
@@ -321,6 +343,7 @@ class ReportGenerator:
             filters=filters,
             compute_draft=compute_draft,
         )
+        self._raise_if_traffic_fetch_failed()
         return self._parse_api(flows or []), "api"
 
     def fetch_traffic_df(self, start_date: Optional[str] = None,

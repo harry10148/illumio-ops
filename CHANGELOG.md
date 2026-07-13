@@ -186,6 +186,15 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Report generation no longer produces a silent empty/partial report when the PCE
+  traffic query fails. `execute_traffic_query_stream` swallows a PCE failure (submit
+  406, poll timeout, download error) into an empty yield and records it on
+  `api.last_fetch_error` — the ingest and analyzer paths already surface this, but the
+  report generator's traffic fetch did not, so a failed query looked identical to a
+  genuine 0-row result. The report path now checks `last_fetch_error` after every PCE
+  call (full and hybrid-gap fetches) and raises `TrafficQueryError`, matching
+  `analyzer._raise_if_query_fetch_failed`; a failed hybrid gap fetch can no longer
+  silently degrade to cache-only. Cache-only reads never call the PCE and are unaffected.
 - `siem status` / `siem replay`: a schema mismatch or DB corruption (`OperationalError`)
   is no longer masked by the first-run zero-count fallback — only a genuinely missing
   cache DB (`no such table` / `unable to open database file`) takes the zero-count
