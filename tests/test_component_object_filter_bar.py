@@ -578,3 +578,38 @@ def test_filter_bar_object_browser_compat_shim():
     src = _JS.read_text(encoding="utf-8")
     shim = src.split("window._objfbAddPillPublic", 1)[1].split("\nwindow.", 1)[0]
     assert "state.addDir" in shim and "neg: false" in shim
+
+
+def test_filter_bar_two_pane_dropdown():
+    """Plan B Task 4：下拉面板＝左候選 + 右類別清單 + 底部提示列（mockup .cat-panel）。"""
+    src = _JS.read_text(encoding="utf-8")
+    css = _CSS.read_text(encoding="utf-8")
+    for frag in ("objfb-dd-body", "objfb-dd-main", "objfb-dd-catlist", "objfb-dd-foot",
+                 "gui_fb_kbd_hint", "gui_fb_cat_all"):
+        assert frag in src, frag
+    for cls in (".objfb-dd-body", ".objfb-dd-main", ".objfb-dd-catlist",
+                ".objfb-dd-foot", ".objfb-cat-item", ".objfb-dd-tag"):
+        assert cls in css, cls
+
+
+def test_filter_bar_svc_zone_uses_candidate_generator():
+    src = _JS.read_text(encoding="utf-8")
+    fn = src.split("function _objfbRenderDropdown(state, q)", 1)[1].split("\nfunction ", 1)[0]
+    assert "_objfbSvcCandidates(q)" in fn
+    assert "gui_fb_svc_range_hint" in fn
+    # 既有守門契約續留：候選分類迭代仍照 state.cats 過濾
+    assert "state.cats.includes(c)" in fn
+
+
+def test_filter_bar_svc_zone_format_hint_persistent():
+    """Service 欄面板底部常駐格式提示列（spec §3.2）。"""
+    src = _JS.read_text(encoding="utf-8")
+    fn = src.split("function _objfbBuildZone(state, col, neg)", 1)[1].split("\nfunction ", 1)[0]
+    assert "gui_fb_fmt_hint" in fn and "col === 'svc'" in fn
+
+
+def test_filter_bar_cat_all_i18n_bilingual():
+    import json
+    en = json.loads(_EN.read_text(encoding="utf-8"))
+    zh = json.loads(_ZH.read_text(encoding="utf-8"))
+    assert "gui_fb_cat_all" in en and "gui_fb_cat_all" in zh
