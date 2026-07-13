@@ -613,3 +613,26 @@ def test_filter_bar_cat_all_i18n_bilingual():
     en = json.loads(_EN.read_text(encoding="utf-8"))
     zh = json.loads(_ZH.read_text(encoding="utf-8"))
     assert "gui_fb_cat_all" in en and "gui_fb_cat_all" in zh
+
+
+def test_filter_bar_ip_port_scopes_functional():
+    """Plan B Task 4 fix：右欄 IP/CIDR 與 Port 類別（spec §3.1）點選後必須可用，
+    不得是死路——ip scope 下 ip-like 輸入仍出 Add IP/CIDR 候選。"""
+    src = _JS.read_text(encoding="utf-8")
+    fn = src.split("function _objfbRenderDropdown(state, q)", 1)[1].split("\nfunction ", 1)[0]
+    assert "state.scopeCat === 'ip'" in fn
+    assert "state.scopeCat === 'port'" in fn
+
+
+def test_filter_bar_svc_manual_port_dedup():
+    """裸數字/裸範圍已由 _objfbSvcCandidates 出三選一時，手動 Add Port 不得重複渲染。"""
+    src = _JS.read_text(encoding="utf-8")
+    fn = src.split("function _objfbRenderDropdown(state, q)", 1)[1].split("\nfunction ", 1)[0]
+    assert "'portproto'" in fn and ".some(" in fn
+
+
+def test_filter_bar_cat_ip_i18n_bilingual():
+    import json
+    en = json.loads(_EN.read_text(encoding="utf-8"))
+    zh = json.loads(_ZH.read_text(encoding="utf-8"))
+    assert "gui_fb_cat_ip" in en and "gui_fb_cat_ip" in zh

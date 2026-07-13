@@ -232,7 +232,7 @@ const _OBJFB_CATS = {
   label_group: { i18n: 'gui_fb_cat_label_group', dot: 'objfb-dot-lgroup',   fallback: 'Label Groups' },
   iplist:      { i18n: 'gui_fb_cat_iplist',      dot: 'objfb-dot-iplist',  fallback: 'IP Lists' },
   workload:    { i18n: 'gui_fb_cat_workload',    dot: 'objfb-dot-workload', fallback: 'Workloads' },
-  ip:          { i18n: null,                     dot: 'objfb-dot-ip',       fallback: 'IP/CIDR' },
+  ip:          { i18n: 'gui_fb_cat_ip',           dot: 'objfb-dot-ip',       fallback: 'IP/CIDR' },
   service:     { i18n: 'gui_fb_cat_service',     dot: 'objfb-dot-service',  fallback: 'Services' },
   port:        { i18n: 'gui_fb_cat_port',        dot: 'objfb-dot-port',     fallback: 'Port' },
   process:      { i18n: 'gui_fb_cat_process',      dot: 'objfb-dot-process', fallback: 'Process Name' },
@@ -549,6 +549,13 @@ function _objfbUpdateDropdown(state) {
       _objfbRenderBrowse(state);
       return;
     }
+    if (state.scopeCat === 'ip' || state.scopeCat === 'port') {
+      // ip/port scope 無瀏覽端點：比照 process/winservice，顯示輸入提示而非通用選類別 hint
+      _objfbAddDdNote(main, 'gui_fb_type_to_search', 'Type to search');
+      _objfbApplyI18n(main);
+      state.actIdx = -1;
+      return;
+    }
     // 無 scope：主欄提示文字，改用右欄類別清單挑選範圍
     _objfbAddDdNote(main, 'gui_fb_scope_hint', 'Type to search all categories, or pick a category to narrow');
     _objfbApplyI18n(main);
@@ -755,8 +762,10 @@ function _objfbRenderDropdown(state, q) {
   main.innerHTML = '';
   state.ddItems = [];
   const zoneCats = state.zone ? _objfbZoneCats(state, state.zone.col) : state.cats;
+  // svc 欄裸數字/裸範圍已由 _objfbSvcCandidates 出三選一時，手動 Add Port 不得重複渲染
+  const svcGroups = (state.zone && state.zone.col === 'svc' && !state.scopeCat) ? _objfbSvcCandidates(q) : [];
 
-  if (_objfbIsIpLike(q) && !state.scopeCat && state.zone && state.zone.col !== 'svc') {
+  if (_objfbIsIpLike(q) && (!state.scopeCat || state.scopeCat === 'ip') && state.zone && state.zone.col !== 'svc') {
     _objfbAddDdGroup(state, [{ cat: 'ip', name: q }], 'gui_fb_add_ipcidr', 'Add IP/CIDR');
   } else if (!state.scopeCat || state.scopeCat === 'label') {
     const eq = q.indexOf('=');
@@ -773,7 +782,7 @@ function _objfbRenderDropdown(state, q) {
     _objfbAddDdGroup(state, [{ cat: state.scopeCat, name: q.trim() }], meta.i18n, meta.fallback);
   }
   if (_objfbIsPortLike(q) && state.cats.includes('port') && (!state.scopeCat || state.scopeCat === 'service' || state.scopeCat === 'port') &&
-      state.zone && state.zone.col === 'svc') {
+      state.zone && state.zone.col === 'svc' && !svcGroups.some((g) => g.grp === 'portproto')) {
     _objfbAddDdGroup(state, [{ cat: 'port', name: q.trim() }], 'gui_fb_add_port', 'Add Port');
   }
   if (state.zone && (state.zone.col === 'dst' || state.zone.col === 'any') && state.cats.includes('transmission')) {
@@ -782,7 +791,7 @@ function _objfbRenderDropdown(state, q) {
   }
   // Service 欄輸入引導（spec §3.2）：數字/範圍三選一、文字 process/winservice 自由值
   if (state.zone && state.zone.col === 'svc' && !state.scopeCat) {
-    for (const grp of _objfbSvcCandidates(q)) {
+    for (const grp of svcGroups) {
       if (grp.grp === 'rangehint') {
         _objfbAddDdNote(main, 'gui_fb_svc_range_hint', 'Add "-" and an end port for a range');
         continue;
