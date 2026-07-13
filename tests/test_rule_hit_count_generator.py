@@ -382,3 +382,52 @@ class TestExport(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEnrichNameResolution(unittest.TestCase):
+    def test_enrich_warms_label_cache_before_actor_resolution(self):
+        """真機回饋（2026-07-13）：label_cache 冷時 resolve_actor_str 只回型別字樣
+        （Label/IPList/Service(id)），報表 Consumers/Providers 看不到實際物件名稱。
+        enrich 前必須先 update_label_cache 預熱 href→名稱快取（silent、不動
+        query-lookup 快取）。"""
+        api = MagicMock()
+        api.get_all_rulesets.return_value = _sample_rulesets()
+        api.resolve_actor_str.return_value = "app=Web"
+        api.resolve_service_str.return_value = "443/tcp"
+        gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+        with tempfile.TemporaryDirectory() as td:
+            gen.generate_from_csv(_write_native_csv(td))
+        api.update_label_cache.assert_called_once_with(silent=True, force_refresh=False)
+
+    def test_enrich_label_cache_warm_failure_is_non_fatal(self):
+        """預熱失敗只讓名稱降級為型別字樣（既有行為），不得標 enrich_failed、
+        不得殺報表。"""
+        api = MagicMock()
+        api.get_all_rulesets.return_value = _sample_rulesets()
+        api.update_label_cache.side_effect = ConnectionError("PCE down")
+        api.resolve_actor_str.return_value = "Label"
+        api.resolve_service_str.return_value = "All Services"
+        gen = RuleHitCountGenerator(MagicMock(), api_client=api)
+        with tempfile.TemporaryDirectory() as td:
+            result = gen.generate_from_csv(_write_native_csv(td))
+        self.assertFalse(result.module_results.get("enrich_failed"))
+        self.assertEqual(result.record_count, 3)
+
+
+class TestCsvNanFields(unittest.TestCase):
+    def test_missing_description_renders_empty_not_nan(self):
+        """pandas 缺值是 float NaN：str(NaN)='nan' 且 NaN 為 truthy，`or ''`
+        擋不住 → 說明欄印出字面 nan（真機回饋 2026-07-13）。須比照 _s helper
+        的 pd.isna 防護。ruleset_name 同型缺口一併鎖定。"""
+        gen = RuleHitCountGenerator(MagicMock(), api_client=None)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "rhc.csv")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(
+                    "Rule Name,Ruleset Name,Rule HREF,Rule Hit Count\n"
+                    ",,/orgs/1/sec_policy/active/rule_sets/10/sec_rules/100,7\n"
+                )
+            result = gen.generate_from_csv(path)
+        row = result.dataframe.iloc[0]
+        self.assertEqual(row["description"], "")
+        self.assertEqual(row["ruleset"], "")

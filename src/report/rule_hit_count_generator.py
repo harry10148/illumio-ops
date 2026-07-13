@@ -145,11 +145,13 @@ class RuleHitCountGenerator:
 
             rows.append({
                 'rule_href': href,
-                'ruleset': str(row.get('ruleset_name', '') or ''),
+                # ruleset/description 走 _s：pandas 缺值是 float NaN（truthy），
+                # str(NaN)='nan' 會把字面 nan 印進報表
+                'ruleset': _s('ruleset_name'),
                 'rule_no': '',
                 'rule_id': href.rstrip('/').rsplit('/', 1)[-1],
                 'rule_type': '',
-                'description': str(row.get('description', '') or ''),
+                'description': _s('description'),
                 'consumers': '',
                 'providers': '',
                 'services': '',
@@ -248,6 +250,14 @@ class RuleHitCountGenerator:
         (so the exporter can flag it); enrichment failure never kills the report."""
         if not self.api or not rows:
             return False
+        # 先預熱 href→名稱快取（labels/label_groups/ip_lists/services），否則
+        # resolve_actor_str/_service_str 冷快取時只回型別字樣（Label/IPList/
+        # Service(id)）。best-effort：預熱失敗名稱降級即可，不擋報表、不標
+        # enrich_failed。force_refresh=False＝只補快取、不失效 query-lookup 快取。
+        try:
+            self.api.update_label_cache(silent=True, force_refresh=False)
+        except Exception:
+            logger.opt(exception=True).debug("label cache warm failed; actor names degrade to types")
         try:
             from src.report.policy_usage_generator import build_rule_baseline
             rulesets = self.api.get_all_rulesets(force_refresh=True, raise_on_error=True)
