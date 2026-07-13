@@ -129,6 +129,19 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   release — rows cached before the upgrade were flattened by the old
   flattener and lack these columns, so an include filter on either key
   fails closed (matches nothing) until the flow is re-ingested.
+- FilterBar v2: PCE-native three-column layout (Source / Destination / Service with
+  is-not exclusion rows), AND/OR mode toggle with pill migration, source/destination
+  swap, per-column category panels (Transmission is destination-only), and service
+  input guidance (numeric input offers both/TCP/UDP with both as default; `-` extends
+  to a range; text matches Process Name / Windows Service / Policy Services).
+- The five GUI modals (instant report, scheduled report, saved query, traffic rule,
+  bandwidth rule) no longer render bare Port / Protocol / Exclude Port fields; port
+  and protocol filters are entered as FilterBar service pills. Saved configs with
+  legacy scalar `port`/`proto`/`ex_port` are still read back as port pills and are
+  normalized to `ports`/`ex_ports` tokens on next save.
+- Known limitation (pre-existing): in OR mode the `any_*` filter keys remain
+  single-valued on the backend, so multiple pills of the same category in the merged
+  column still resolve to the last value.
 
 ### Added
 
