@@ -27,6 +27,48 @@
       <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"
         d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
     </symbol>
+        <symbol id="icon-segment" viewBox="0 0 24 24">
+      <polygon points="12 2 20.66 7 20.66 17 12 22 3.34 17 3.34 7" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" fill="none" />
+      <circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="2" fill="none" />
+    </symbol>
+<symbol id="icon-clipboard" viewBox="0 0 24 24">
+      <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"
+        d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    </symbol>
+    <symbol id="icon-bar-chart" viewBox="0 0 24 24">
+      <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"
+        d="M18 20V10M12 20V4M6 20v-6" />
+    </symbol>
+    <symbol id="icon-target" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" />
+      <circle cx="12" cy="12" r="6" stroke="currentColor" stroke-width="2" fill="none" />
+      <circle cx="12" cy="12" r="2" stroke="currentColor" stroke-width="2" fill="none" />
+    </symbol>
+    <symbol id="icon-check-circle" viewBox="0 0 24 24">
+      <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"
+        d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+      <polyline stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"
+        points="22 4 12 14.01 9 11.01" />
+    </symbol>
+    <symbol id="icon-diff" viewBox="0 0 24 24">
+      <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"
+        d="M12 3v10M7 8h10M7 21h10" />
+    </symbol>
+    <symbol id="icon-layers" viewBox="0 0 24 24">
+      <polygon points="12 2 2 7 12 12 22 7 12 2" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" fill="none" />
+      <polyline points="2 17 12 22 22 17" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" fill="none" />
+      <polyline points="2 12 12 17 22 12" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    </symbol>
+    <symbol id="icon-grid" viewBox="0 0 24 24">
+      <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"
+        d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z" />
+    </symbol>
     <symbol id="icon-activity" viewBox="0 0 24 24">
       <polyline stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"
         points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -106,7 +148,7 @@
   <div class="header">
     <h1 data-i18n="gui_title">
       <svg class="icon" style="width:24px;height:24px;margin-right:8px;color:var(--accent2);">
-        <use href="#icon-shield"></use>
+        <use href="#icon-segment"></use>
       </svg>
       Illumio PCE Ops
     </h1>
@@ -1371,14 +1413,14 @@
           </div>
         </div>
         <div class="rcard" data-rtype="audit">
-          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-clipboard"></use></svg></div>
           <div class="rcard-body">
             <h3 data-i18n="gui_btn_audit_report">Audit Report</h3>
             <p data-i18n="gui_rcard_audit_desc">Policy / rule-set / user operation audit trail</p>
             <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-audit" data-action="openReportGenModal" data-args='["audit"]'>
-                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+                <svg class="icon"><use href="#icon-clipboard"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
               </button>
             </div>
           </div>
@@ -1397,79 +1439,79 @@
           </div>
         </div>
         <div class="rcard" data-rtype="policy_usage">
-          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-bar-chart"></use></svg></div>
           <div class="rcard-body">
             <h3 data-i18n="gui_btn_pu_report">Policy Usage Report</h3>
             <p data-i18n="gui_rcard_pu_desc">Rule hit rate / leniency / dormant rule detection</p>
             <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-pu" data-action="openReportGenModal" data-args='["policy_usage"]'>
-                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+                <svg class="icon"><use href="#icon-bar-chart"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
               </button>
             </div>
           </div>
         </div>
         <div class="rcard" data-rtype="rule_hit_count">
-          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-target"></use></svg></div>
           <div class="rcard-body">
             <h3 data-i18n="gui_btn_rhc_report">Rule Hit Count Report</h3>
             <p data-i18n="gui_rcard_rhc_desc">Native VEN-measured rule hit counts, enriched with full rule details</p>
             <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-rhc" data-action="openReportGenModal" data-args='["rule_hit_count"]'>
-                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+                <svg class="icon"><use href="#icon-target"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
               </button>
             </div>
           </div>
         </div>
         <div class="rcard" data-rtype="readiness">
-          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-check-circle"></use></svg></div>
           <div class="rcard-body">
             <h3 data-i18n="gui_rcard_readiness_title">Enforcement Readiness Report</h3>
             <p data-i18n="gui_rcard_readiness_desc">Which app (env) can safely move to enforcement next — readiness score, blocking factors, and remediation queue.</p>
             <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-readiness" data-action="openReportGenModal" data-args='["readiness"]'>
-                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+                <svg class="icon"><use href="#icon-check-circle"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
               </button>
             </div>
           </div>
         </div>
         <div class="rcard" data-rtype="policy_diff">
-          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-diff"></use></svg></div>
           <div class="rcard-body">
             <h3 data-i18n="gui_rcard_policy_diff_title">Policy Diff Report</h3>
             <p data-i18n="gui_rcard_policy_diff_desc">DRAFT vs ACTIVE ruleset drift, with operator attribution and risk grading</p>
             <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-pd" data-action="openReportGenModal" data-args='["policy_diff"]'>
-                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+                <svg class="icon"><use href="#icon-diff"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
               </button>
             </div>
           </div>
         </div>
         <div class="rcard" data-rtype="policy_resolver">
-          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-layers"></use></svg></div>
           <div class="rcard-body">
             <h3 data-i18n="gui_rcard_policy_resolver_title">Policy Resolver Report</h3>
             <p data-i18n="gui_rcard_policy_resolver_desc">Expand ACTIVE label-based Policy into IP-level rows (JSON + CSV)</p>
             <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-pr" data-action="openReportGenModal" data-args='["policy_resolver"]'>
-                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+                <svg class="icon"><use href="#icon-layers"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
               </button>
             </div>
           </div>
         </div>
         <div class="rcard" data-rtype="app_summary">
-          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-shield"></use></svg></div>
+          <div class="rcard-icon"><svg class="icon" aria-hidden="true"><use href="#icon-grid"></use></svg></div>
           <div class="rcard-body">
             <h3 data-i18n="gui_rcard_app_title">App Summary Report</h3>
             <p data-i18n="gui_rcard_app_desc">Single-App connection baseline + Policy coverage for app owners and audits</p>
             <div class="rcard-meta"><span class="rcard-meta-last"></span><span class="rcard-meta-sched" style="display:none;"></span></div>
             <div style="display:flex;gap:6px;margin-top:10px;">
               <button class="btn btn-primary btn-sm" id="btn-gen-app" data-action="openReportGenModal" data-args='["app_summary"]'>
-                <svg class="icon"><use href="#icon-shield"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
+                <svg class="icon"><use href="#icon-grid"></use></svg> <span data-i18n="gui_gen_generate">Generate</span>
               </button>
             </div>
           </div>

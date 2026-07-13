@@ -649,14 +649,14 @@ function openReportGenModal(type) {
     traffic:      { titleKey: 'gui_gen_traffic_title', icon: '#icon-play',   dates: true  },
     security_risk: { titleKey: 'gui_gen_security_title',   icon: '#icon-shield', dates: true },
     network_inventory: { titleKey: 'gui_gen_inventory_title',  icon: '#icon-search', dates: true },
-    audit:        { titleKey: 'gui_gen_audit_title',   icon: '#icon-shield', dates: true  },
+    audit:        { titleKey: 'gui_gen_audit_title',   icon: '#icon-clipboard', dates: true  },
     ven:          { titleKey: 'gui_gen_ven_title',     icon: '#icon-cpu',    dates: false },
-    policy_usage: { titleKey: 'gui_gen_pu_title',      icon: '#icon-shield', dates: true  },
-    rule_hit_count: { titleKey: 'gui_gen_rhc_title',   icon: '#icon-shield', dates: true  },
-    readiness:    { titleKey: 'gui_gen_readiness_title', icon: '#icon-shield', dates: true },
-    policy_diff:  { titleKey: 'gui_gen_policy_diff_title', icon: '#icon-shield', dates: false },
-    policy_resolver: { titleKey: 'gui_gen_policy_resolver_title', icon: '#icon-shield', dates: false },
-    app_summary:  { titleKey: 'gui_gen_app_title', icon: '#icon-shield', dates: true, appField: true },
+    policy_usage: { titleKey: 'gui_gen_pu_title',      icon: '#icon-bar-chart', dates: true  },
+    rule_hit_count: { titleKey: 'gui_gen_rhc_title',   icon: '#icon-target', dates: true  },
+    readiness:    { titleKey: 'gui_gen_readiness_title', icon: '#icon-check-circle', dates: true },
+    policy_diff:  { titleKey: 'gui_gen_policy_diff_title', icon: '#icon-diff', dates: false },
+    policy_resolver: { titleKey: 'gui_gen_policy_resolver_title', icon: '#icon-layers', dates: false },
+    app_summary:  { titleKey: 'gui_gen_app_title', icon: '#icon-grid', dates: true, appField: true },
   };
   const m = meta[type] || meta.traffic;
   $('m-gen-title').innerHTML =
