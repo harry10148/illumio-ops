@@ -481,3 +481,29 @@ def test_filter_bar_new_cats_are_dirless():
     dirless = src.split("const _OBJFB_DIRLESS = new Set(", 1)[1].split(")", 1)[0]
     for cat in ("'service'", "'port'", "'process'", "'winservice'", "'transmission'"):
         assert cat in dirless, cat
+
+
+def test_filter_bar_service_candidate_generator_present():
+    """spec §3.2：數字→三選一（兩者預設）；範圍→三選一；文字→process/winservice 自由值。"""
+    src = _JS.read_text(encoding="utf-8")
+    fn = src.split("function _objfbSvcCandidates(q)", 1)[1].split("\nfunction ", 1)[0]
+    assert "/tcp" in fn and "/udp" in fn
+    assert "gui_fb_svc_both" in fn and "dflt: true" in fn
+    assert "'process'" in fn and "'winservice'" in fn
+    assert "rangehint" in fn
+
+
+def test_filter_bar_transmission_candidate_generator_present():
+    src = _JS.read_text(encoding="utf-8")
+    assert "const _OBJFB_TX_VALUES = ['unicast', 'broadcast', 'multicast'];" in src
+    assert "function _objfbTxCandidates(q)" in src
+
+
+def test_filter_bar_svc_guidance_i18n_bilingual():
+    import json
+    en = json.loads(_EN.read_text(encoding="utf-8"))
+    zh = json.loads(_ZH.read_text(encoding="utf-8"))
+    for k in ("gui_fb_svc_both", "gui_fb_svc_tcp_only", "gui_fb_svc_udp_only",
+              "gui_fb_svc_range_hint", "gui_fb_fmt_hint", "gui_fb_kbd_hint",
+              "gui_fb_grp_portproto", "gui_fb_grp_freetext"):
+        assert k in en and k in zh, k

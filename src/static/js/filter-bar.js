@@ -29,6 +29,54 @@ function _objfbIsPortLike(s) {
   return lo >= 1 && lo <= 65535 && hi >= 1 && hi <= 65535;
 }
 
+/* ── Service 欄輸入引導（spec §3.2）：純函式，回傳分組候選供下拉渲染。
+ * 數字 → 三選一（無尾碼＝兩者 TCP+UDP，預設）+ 範圍起點提示；
+ * 範圍 → 三選一（已帶 /proto 則單一候選）；
+ * 文字 → Process Name / Windows Service 自由值（Policy Services 走既有 suggest 流程，不在此函式）。
+ */
+function _objfbSvcCandidates(q) {
+  const t = String(q).trim().toLowerCase();
+  const inRange = (n) => n >= 1 && n <= 65535;
+  let m = t.match(/^(\d{1,5})$/);
+  if (m && inRange(+m[1])) {
+    return [
+      { grp: 'portproto', items: [
+        { cat: 'port', name: m[1], tagI18n: 'gui_fb_svc_both', dflt: true },
+        { cat: 'port', name: `${m[1]}/tcp`, tagI18n: 'gui_fb_svc_tcp_only' },
+        { cat: 'port', name: `${m[1]}/udp`, tagI18n: 'gui_fb_svc_udp_only' },
+      ] },
+      { grp: 'rangehint' },
+    ];
+  }
+  m = t.match(/^(\d{1,5})-(\d{1,5})(?:\/(tcp|udp))?$/);
+  if (m && inRange(+m[1]) && inRange(+m[2])) {
+    const base = `${m[1]}-${m[2]}`;
+    return [{ grp: 'portproto', items: m[3]
+      ? [{ cat: 'port', name: `${base}/${m[3]}` }]
+      : [
+        { cat: 'port', name: base, tagI18n: 'gui_fb_svc_both', dflt: true },
+        { cat: 'port', name: `${base}/tcp`, tagI18n: 'gui_fb_svc_tcp_only' },
+        { cat: 'port', name: `${base}/udp`, tagI18n: 'gui_fb_svc_udp_only' },
+      ] }];
+  }
+  // 明確帶 proto 的單埠（443/tcp）交給 _objfbIsPortLike 的手動加入路徑，不出三選一
+  if (t && !/^\d/.test(t) && !_objfbIsPortLike(t)) {
+    return [{ grp: 'freetext', items: [
+      { cat: 'process', name: String(q).trim() },
+      { cat: 'winservice', name: String(q).trim() },
+    ] }];
+  }
+  return [];
+}
+
+/* ── Transmission 候選（僅 Destination 側面板；值域固定，無後端查詢）── */
+const _OBJFB_TX_VALUES = ['unicast', 'broadcast', 'multicast'];
+function _objfbTxCandidates(q) {
+  const t = String(q).trim().toLowerCase();
+  const vals = t ? _OBJFB_TX_VALUES.filter((v) => v.startsWith(t)) : _OBJFB_TX_VALUES;
+  return vals.map((v) => ({ cat: 'transmission', name: v }));
+}
+
 function createFilterBar(container, options) {
   const opts = options || {};
   const dirs = opts.dirs || ['src', 'dst', 'any'];

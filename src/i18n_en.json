@@ -4381,5 +4381,13 @@
   "gui_ob_dir_hint": "Service conditions are direction-less",
   "gui_fb_cat_process": "Process Name",
   "gui_fb_cat_winservice": "Windows Service",
-  "gui_fb_cat_transmission": "Transmission"
+  "gui_fb_cat_transmission": "Transmission",
+  "gui_fb_svc_both": "Both (TCP + UDP)",
+  "gui_fb_svc_tcp_only": "TCP only",
+  "gui_fb_svc_udp_only": "UDP only",
+  "gui_fb_svc_range_hint": "Add \"-\" and an end port for a range, e.g. 1000-2000 (both ends inclusive)",
+  "gui_fb_fmt_hint": "443 = both · 443/tcp · 443/udp · 1000-2000 · 1000-2000/udp · text = Process / Win Service / Service name",
+  "gui_fb_kbd_hint": "↑↓ select · Enter add · Esc close",
+  "gui_fb_grp_portproto": "Port and/or Protocol",
+  "gui_fb_grp_freetext": "Process / Windows Service"
 }

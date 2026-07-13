@@ -4381,5 +4381,13 @@
   "rpt_readiness_csv_saved": "就緒度 CSV 已儲存：{path}",
   "gui_fb_cat_process": "程序名稱",
   "gui_fb_cat_winservice": "Windows 服務",
-  "gui_fb_cat_transmission": "傳輸型態"
+  "gui_fb_cat_transmission": "傳輸型態",
+  "gui_fb_svc_both": "兩者（TCP + UDP）",
+  "gui_fb_svc_tcp_only": "僅 TCP",
+  "gui_fb_svc_udp_only": "僅 UDP",
+  "gui_fb_svc_range_hint": "輸入「-」接結束埠成為範圍，例 1000-2000（起訖皆含）",
+  "gui_fb_fmt_hint": "443＝兩者 · 443/tcp · 443/udp · 1000-2000 · 1000-2000/udp · 文字＝Process / Win Service / Service 名稱",
+  "gui_fb_kbd_hint": "↑↓ 選擇 · Enter 加入 · Esc 關閉",
+  "gui_fb_grp_portproto": "Port 與通訊協定",
+  "gui_fb_grp_freetext": "程序 / Windows 服務"
 }
