@@ -343,3 +343,56 @@ def test_scope_unknown_label_fails_closed():
         "ingress_services": [{"port": 443, "proto": 6}],
     }], scopes=[[{"label": {"href": "/labels/ghost"}}]])
     assert resolve_ruleset(rs, **_scoped_lookups()) == []
+
+
+def test_actor_level_exclusion_subtracts_ips():
+    """真 PCE 形狀（2026-07-13）：consumers/providers 的 entry 可帶
+    exclusion: true（如「PrivateIP ip_list 排除 Jumpdesk label」）。
+    被排除 actor 的 IP 必須從同側 include 集合中扣除，不得聯集進來。"""
+    rs = _scoped_rs([{
+        "href": "/sec_rules/x1",
+        "consumers": [
+            {"label": {"href": "/labels/prod"}, "exclusion": False},
+            {"label": {"href": "/labels/db"}, "exclusion": True},
+        ],
+        "providers": [{"ip_list": {"href": "/ip_lists/dc"}}],
+        "ingress_services": [{"port": 443, "proto": 6}],
+    }], scopes=[])
+    rows = resolve_ruleset(rs, **_scoped_lookups())
+    # prod={10.0.1.5,10.0.2.7} − db={10.0.2.7} = {10.0.1.5}
+    assert {r["src_ip"] for r in rows} == {"10.0.1.5"}
+
+
+def test_ams_with_exclusion_expands_to_workload_universe():
+    """無 scope 的 ams + exclusion：ANY 無法表達「全部除了 X」，
+    改以 workload_to_ips 全集展開後扣除（fail-closed，寧窄勿寬）。"""
+    lk = _scoped_lookups()
+    lk["workload_to_ips"] = {"/wl/a": ["10.0.1.5"], "/wl/b": ["10.0.2.7"],
+                             "/wl/c": ["10.0.3.9"]}
+    rs = _scoped_rs([{
+        "href": "/sec_rules/x2",
+        "consumers": [{"ip_list": {"href": "/ip_lists/dc"}}],
+        "providers": [
+            {"actors": "ams"},
+            {"label": {"href": "/labels/db"}, "exclusion": True},
+        ],
+        "ingress_services": [{"port": 22, "proto": 6}],
+    }], scopes=[])
+    rows = resolve_ruleset(rs, **lk)
+    assert {r["dst_ip"] for r in rows} == {"10.0.1.5", "10.0.3.9"}
+
+
+def test_scoped_ams_with_exclusion():
+    """有 scope 的 ams + exclusion：scope 集扣除被排除 label 的 IP。"""
+    rs = _scoped_rs([{
+        "href": "/sec_rules/x3",
+        "consumers": [{"ip_list": {"href": "/ip_lists/dc"}}],
+        "providers": [
+            {"actors": "ams"},
+            {"label": {"href": "/labels/web"}, "exclusion": True},
+        ],
+        "ingress_services": [{"port": 443, "proto": 6}],
+    }], scopes=[[{"label": {"href": "/labels/prod"}}]])
+    rows = resolve_ruleset(rs, **_scoped_lookups())
+    # scope prod={10.0.1.5,10.0.2.7} − web={10.0.1.5,10.0.1.6} = {10.0.2.7}
+    assert {r["dst_ip"] for r in rows} == {"10.0.2.7"}

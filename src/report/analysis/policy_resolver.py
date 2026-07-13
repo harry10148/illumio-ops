@@ -122,19 +122,41 @@ def _side_ips(
     if not actors:
         return [_ANY], "any"
 
+    # 真 PCE 形狀：entry 可帶 exclusion: true（「A 排除 B」）。先收集排除集，
+    # include 結果最後扣除；排除 actor 不受 scope 交集影響（先取全集再扣）。
+    excludes: set[str] = set()
+    has_exclusion = False
+    for actor in actors:
+        if actor.get("exclusion"):
+            has_exclusion = True
+            ips, _k = _actor_ips(actor, **lookups)
+            excludes.update(ips)
+
     out: list[str] = []
     kind = "any"
     seen: set[str] = set()
     for actor in actors:
-        if actor.get("actors") == "ams" and scope_ips is not None:
-            ips, k = sorted(scope_ips), "any"
+        if actor.get("exclusion"):
+            continue
+        if actor.get("actors") == "ams":
+            if scope_ips is not None:
+                ips, k = sorted(scope_ips), "any"
+            elif has_exclusion:
+                # ANY 無法表達「全部除了 X」：以 managed workload 全集展開
+                # 後扣除（寧窄勿寬；fail-closed）。
+                universe: set[str] = set()
+                for wl_ips in lookups["workload_to_ips"].values():
+                    universe.update(wl_ips)
+                ips, k = sorted(universe), "any"
+            else:
+                ips, k = [_ANY], "any"
         else:
             ips, k = _actor_ips(actor, **lookups)
             if scope_ips is not None and ("label" in actor or "label_group" in actor):
                 ips = [ip for ip in ips if ip in scope_ips]
         kind = k
         for ip in ips:
-            if ip not in seen:
+            if ip not in seen and ip not in excludes:
                 seen.add(ip)
                 out.append(ip)
     return out, kind
