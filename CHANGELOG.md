@@ -9,6 +9,34 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ## [Unreleased]
 
+### Added
+
+- VEN report: policy sync tracking for VENs that report normally — a KPI, a
+  dedicated section, and an XLSX sheet flag online VENs with agent health
+  errors/warnings, a sync state stuck off `applied`, stale firewall config, or
+  policy received but not applied (vendor-verified signals; the deprecated
+  `security_policy_refresh_at` column was replaced by
+  `security_policy_received_at` with a fallback for old PCEs).
+
+### Fixed
+
+- Policy Resolver report always produced "no resolvable ACTIVE policy": scope
+  filtering compared actor label hrefs against scope label hrefs (role-type
+  actors never match), deny rules were never expanded (rows now carry an
+  `action` column: allow / deny / override_deny), and actor-level
+  `exclusion: true` entries were unioned instead of subtracted.
+- Rule Hit Count report rendered bare actor type names (Label/IPList) instead
+  of object names — the enrichment now warms the label cache before resolving;
+  missing CSV descriptions no longer render a literal `nan`.
+- VEN report policy-sync badge treated the real-world `applied` state as
+  unsynced (red) because it only recognized `synced`.
+
+### Changed
+
+- Report cards, generation modals, and the app header now use
+  content-specific icons instead of a shared shield (shield stays with
+  Security & Risk); the header carries an original micro-segmentation mark.
+
 ### Changed
 
 - Offline bundle / DB hardening: `_ADDED_COLUMNS` schema registry entries are now
