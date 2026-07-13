@@ -26,11 +26,19 @@ class ArchiveLoadBusy(Exception):
     """另一個 load_archive_review 正在進行中（lock 非阻塞取得失敗）。"""
 
 
+# 任意位數小數秒（如 .5、.7771234567）：py3.10 的 fromisoformat 只收 3/6 位
+# （3.11 起才任意位數），正規化為 6 位以免整列被當解析失敗跳過。
+_DT_FRAC_RE = re.compile(r"^(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2})\.(\d+)(.*)$")
+
+
 def _parse_dt(s: str) -> datetime:
     """archive ISO 時間戳 → aware UTC datetime。處理結尾 Z、明確 offset、
     以及 naive（早期未帶 offset 的 archive）→ 視為 UTC。"""
     if s.endswith("Z"):
         s = s[:-1] + "+00:00"
+    m = _DT_FRAC_RE.match(s)
+    if m:
+        s = f"{m.group(1)}.{m.group(2)[:6].ljust(6, '0')}{m.group(3)}"
     dt = datetime.fromisoformat(s)
     dt = dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
     # Floor 到整秒：archive 查閱把查詢窗設為 MIN(last_detected) 的整秒字串
