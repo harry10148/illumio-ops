@@ -241,8 +241,9 @@ def test_filter_modal_service_browse_to_pill(page):
     pill = page.locator(f"{_zone('svc')} .objfb-pill").first
     pill.wait_for(state="visible", timeout=10000)
     assert item_name in pill.inner_text()
-    assert pill.locator(".objfb-pill-dir").count() == 0, \
-        "service pill must not carry a src/dst direction tag"
+    # v2 has no `.objfb-pill-dir` class — direction-less pills are proven by
+    # zone placement instead: the pill locator above is already scoped to
+    # `_zone('svc')`, which only exists for direction-less categories.
 
 
 # ---------------------------------------------------------------------------
@@ -266,8 +267,9 @@ def test_manual_port_token_pill_and_popover(page):
     pill = page.locator(f"{_zone('svc')} .objfb-pill").first
     pill.wait_for(state="visible", timeout=10000)
     assert "443/tcp" in pill.inner_text()
-    assert pill.locator(".objfb-pill-dir").count() == 0, \
-        "port pill must not carry a src/dst direction tag"
+    # v2 has no `.objfb-pill-dir` class — direction-less pills are proven by
+    # zone placement instead: the pill locator above is already scoped to
+    # `_zone('svc')`, which only exists for direction-less categories.
 
     # Open the edit popover by clicking the pill body.
     pill.locator(".objfb-pill-txt").click()
@@ -279,8 +281,8 @@ def test_manual_port_token_pill_and_popover(page):
     # …but the include/exclude toggle is present and functional.
     page.locator(f"{FB} .objfb-pop .objfb-pop-btn-danger").click()
     page.wait_for_selector(
-        f"{_zone('svc')} .objfb-pill.objfb-excl", state="visible", timeout=10000)
-    txt = page.locator(f"{_zone('svc')} .objfb-pill .objfb-pill-txt").first.inner_text()
+        f"{_zone('svc', 'true')} .objfb-pill.objfb-excl", state="visible", timeout=10000)
+    txt = page.locator(f"{_zone('svc', 'true')} .objfb-pill .objfb-pill-txt").first.inner_text()
     assert txt.startswith("!"), f"excluded pill text should start with '!': {txt!r}"
 
 

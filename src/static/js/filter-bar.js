@@ -150,6 +150,9 @@ function _objfbSerialize(state) {
 /* ── 反序列化：filter dict → pill（供 setFilters 回填既有查詢定義）── */
 function _objfbDeserialize(state, dict) {
   state.pills = [];
+  state.anyLabelGroupHint = false;
+  state.lgroupOrBlockHint = false;
+  state.scopeCat = null;
   const add = (cat, name, dir, neg, extra) =>
     state.pills.push(Object.assign({ cat, name, href: null, key: null, value: null, dir, neg }, extra || {}));
   const d = dict || {};
@@ -162,6 +165,12 @@ function _objfbDeserialize(state, dict) {
   if (d['port']) {
     const protoName = { '6': 'tcp', '17': 'udp' }[String(d['proto'] || '')] || null;
     add('port', protoName ? `${d['port']}/${protoName}` : String(d['port']), null, false);
+  }
+  // proto-only 舊設定（v1 裸 Protocol select 可單獨存在）：回填為該 proto 全 port 範圍
+  // pill（1-65535/tcp|udp，語意等價），否則編輯重存會無聲遺失過濾條件。
+  else if (d['proto']) {
+    const protoName = { '6': 'tcp', '17': 'udp' }[String(d['proto'])] || null;
+    if (protoName) add('port', `1-65535/${protoName}`, null, false);
   }
   if (d['ex_port']) add('port', String(d['ex_port']), null, true);
   // Plan B：service 家族新類別（str | list[str] 皆容忍；transmission_excludes 為續留別名）
@@ -267,9 +276,8 @@ function _objfbPillCol(state, p) {
   return p.dir;
 }
 
-// 無方向類別：pill 不帶 src/dst/any、序列化不吃 dir、popover 不顯示方向列
-// 無方向類別：pill 不帶 src/dst/any、序列化不吃 dir。transmission 序列化亦無方向
-// （flat key），但版面歸 Destination 欄（_objfbPillCol，Task 3）。
+// 無方向類別：pill 不帶 src/dst/any、序列化不吃 dir、popover 不顯示方向列。
+// transmission 序列化亦無方向（flat key），但版面歸 Destination 欄（_objfbPillCol，Task 3）。
 const _OBJFB_DIRLESS = new Set(['service', 'port', 'process', 'winservice', 'transmission']);
 
 // suggest 端支援的類別，固定順序（'ip' 不支援 suggest，不列入）；
@@ -785,7 +793,8 @@ function _objfbRenderDropdown(state, q) {
       state.zone && state.zone.col === 'svc' && !svcGroups.some((g) => g.grp === 'portproto')) {
     _objfbAddDdGroup(state, [{ cat: 'port', name: q.trim() }], 'gui_fb_add_port', 'Add Port');
   }
-  if (state.zone && (state.zone.col === 'dst' || state.zone.col === 'any') && state.cats.includes('transmission')) {
+  if (state.zone && (state.zone.col === 'dst' || state.zone.col === 'any') && state.cats.includes('transmission') &&
+      (!state.scopeCat || state.scopeCat === 'transmission')) {
     const txItems = _objfbTxCandidates(q);
     if (txItems.length) _objfbAddDdGroup(state, txItems, 'gui_fb_cat_transmission', 'Transmission');
   }
@@ -1155,6 +1164,9 @@ window._objfbOpenBrowser = function (id) {
 // 點擊 bar/popover 以外區域時關閉下拉與 popover（沿用 codebase 既有的
 // document-level outside-click 慣例，見 utils.js/dashboard.js/events.js）。
 document.addEventListener('click', function (e) {
+  // 重繪型 handler（setScope/pick/popover）先跑會 detach e.target；
+  // detach 必然代表點擊發生在剛重繪的 bar 內部，不得誤判為 outside-click。
+  if (!e.target.isConnected) return;
   for (const id in _objfbInstances) {
     const s = _objfbInstances[id];
     for (const k in s.zoneEls) {

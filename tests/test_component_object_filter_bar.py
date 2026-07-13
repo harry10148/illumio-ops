@@ -681,3 +681,11 @@ def test_filter_bar_legacy_scalar_backfill_retained():
     assert "if (d['port'])" in js
     assert "if (d['ex_port'])" in js
     assert "{ '6': 'tcp', '17': 'udp' }" in js
+
+
+def test_filter_bar_deserialize_proto_only_backfill():
+    """v1 允許 proto-only（只選 Protocol 不填 Port）；deserialize 須回填
+    1-65535/proto 範圍 pill，否則編輯重存無聲放寬過濾（final review Critical）。"""
+    src = _JS.read_text(encoding="utf-8")
+    assert "else if (d['proto'])" in src
+    assert "`1-65535/${protoName}`" in src
