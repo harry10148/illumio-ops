@@ -689,3 +689,11 @@ def test_filter_bar_deserialize_proto_only_backfill():
     src = _JS.read_text(encoding="utf-8")
     assert "else if (d['proto'])" in src
     assert "`1-65535/${protoName}`" in src
+
+
+def test_filter_bar_excl_row_hidden_overrides_flex():
+    """真機 e2e 抓到：.objfb-row 的 display:flex（author 樣式）會蓋掉 UA 的
+    [hidden]{display:none}，排除列預設收合失效。須比照 .objfb-hint[hidden]
+    慣例明寫 [hidden] 規則。"""
+    css = _CSS.read_text(encoding="utf-8")
+    assert ".objfb-row[hidden] { display: none; }" in css
