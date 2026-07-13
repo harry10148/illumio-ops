@@ -152,7 +152,9 @@ def test_empty_consumers_resolves_to_any():
 
 
 def test_scope_narrows_providers():
-    # provider label /labels/web; scope restricts to /labels/db only -> no rows.
+    # Illumio scope 語意＝交集：provider(web) 的 IP 與 scope(db) 的 IP 不相交
+    # → providers 解析為空 → 無列。（2026-07-13 修正前的舊實作是「provider label
+    # 不在 scope label 清單就跳過」——語意寫反，造成所有帶 scope 的 ruleset 歸零。）
     rs = _ruleset(
         [{
             "href": "/sec_rules/9",
@@ -206,3 +208,138 @@ def test_service_name_uses_friendly_name():
     )
     assert rows[0]["service_name"] == "HTTPS"
     assert rows[0]["port"] == 443
+
+
+# ── Scope 交集語意與 deny rules（2026-07-13：報表恆空 bug 修復）────────────────
+# 測資佈局：/labels/prod 的 IP 與 /labels/web 部分重疊（10.0.1.5），與 /labels/db
+# 完全重疊（10.0.2.7）。
+LABEL_TO_IPS_SCOPED = {
+    "/labels/web": ["10.0.1.5", "10.0.1.6"],
+    "/labels/db": ["10.0.2.7"],
+    "/labels/prod": ["10.0.1.5", "10.0.2.7"],
+}
+
+
+def _scoped_lookups():
+    lk = _lookups()
+    lk["label_to_ips"] = LABEL_TO_IPS_SCOPED
+    return lk
+
+
+def _scoped_rs(rules, scopes, **kw):
+    rs = _ruleset(rules, scopes=scopes)
+    rs.update(kw)
+    return rs
+
+
+def test_scope_intersects_provider_label_ips():
+    """scope(prod) ∩ provider(web) ＝ {10.0.1.5}：role label 幾乎不會是 scope
+    label，正確語意是 IP 交集而非 href 比對。"""
+    rs = _scoped_rs([{
+        "href": "/sec_rules/s1",
+        "consumers": [{"ip_list": {"href": "/ip_lists/dc"}}],
+        "providers": [{"label": {"href": "/labels/web"}}],
+        "ingress_services": [{"port": 443, "proto": 6}],
+    }], scopes=[[{"label": {"href": "/labels/prod"}}]])
+    rows = resolve_ruleset(rs, **_scoped_lookups())
+    assert {r["dst_ip"] for r in rows} == {"10.0.1.5"}
+
+
+def test_scope_constrains_ams_provider_to_scope_ips():
+    """provider 為 All Workloads（ams）時，有 scope 的 ruleset 應展開為
+    scope 內全部 workload IP，而非全域 ANY。"""
+    rs = _scoped_rs([{
+        "href": "/sec_rules/s2",
+        "consumers": [{"ip_list": {"href": "/ip_lists/dc"}}],
+        "providers": [{"actors": "ams"}],
+        "ingress_services": [{"port": 22, "proto": 6}],
+    }], scopes=[[{"label": {"href": "/labels/prod"}}]])
+    rows = resolve_ruleset(rs, **_scoped_lookups())
+    assert {r["dst_ip"] for r in rows} == {"10.0.1.5", "10.0.2.7"}
+
+
+def test_scope_applies_to_consumers_unless_unscoped():
+    """intra-scope ruleset 的 consumers 也受 scope 約束；
+    unscoped_consumers=True 時 consumers 恢復全域。"""
+    rule = {
+        "href": "/sec_rules/s3",
+        "consumers": [{"label": {"href": "/labels/web"}}],
+        "providers": [{"label": {"href": "/labels/db"}}],
+        "ingress_services": [{"port": 5432, "proto": 6}],
+    }
+    scopes = [[{"label": {"href": "/labels/prod"}}]]
+    rows = resolve_ruleset(_scoped_rs([dict(rule)], scopes), **_scoped_lookups())
+    assert {r["src_ip"] for r in rows} == {"10.0.1.5"}
+    rows = resolve_ruleset(
+        _scoped_rs([dict(rule, unscoped_consumers=True)], scopes), **_scoped_lookups())
+    assert {r["src_ip"] for r in rows} == {"10.0.1.5", "10.0.1.6"}
+
+
+def test_scope_passes_explicit_ip_actors_through():
+    """ip_list / ip_address 是明確 IP 來源，不受 scope 過濾。"""
+    rs = _scoped_rs([{
+        "href": "/sec_rules/s4",
+        "consumers": [{"ip_address": {"value": "203.0.113.9"}}],
+        "providers": [{"ip_list": {"href": "/ip_lists/dc"}}],
+        "ingress_services": [{"port": 80, "proto": 6}],
+    }], scopes=[[{"label": {"href": "/labels/prod"}}]])
+    rows = resolve_ruleset(rs, **_scoped_lookups())
+    assert {r["src_ip"] for r in rows} == {"203.0.113.9"}
+    assert {r["dst_ip"] for r in rows} == {"10.9.0.0/16"}
+
+
+def test_scope_and_within_one_scope_or_across_scopes():
+    """同一 scope 內多 entry 取 AND（交集）；多個 scope 取 OR（聯集）。"""
+    rs = _scoped_rs([{
+        "href": "/sec_rules/s5",
+        "consumers": [{"ip_list": {"href": "/ip_lists/dc"}}],
+        "providers": [{"actors": "ams"}],
+        "ingress_services": [{"port": 443, "proto": 6}],
+    }], scopes=[
+        [{"label": {"href": "/labels/prod"}}, {"label": {"href": "/labels/web"}}],
+        [{"label": {"href": "/labels/db"}}],
+    ])
+    rows = resolve_ruleset(rs, **_scoped_lookups())
+    # scope1: prod ∩ web = {10.0.1.5}; scope2: db = {10.0.2.7}; 聯集
+    assert {r["dst_ip"] for r in rows} == {"10.0.1.5", "10.0.2.7"}
+
+
+def test_deny_rules_expand_with_action_column():
+    """deny_rules 也要展開（第三方防火牆實作需要 deny 列）；
+    override=True → override_deny。allow 列 action='allow'。"""
+    rs = _scoped_rs(
+        [{
+            "href": "/sec_rules/a1",
+            "consumers": [{"ip_list": {"href": "/ip_lists/dc"}}],
+            "providers": [{"label": {"href": "/labels/db"}}],
+            "ingress_services": [{"port": 5432, "proto": 6}],
+        }],
+        scopes=[],
+    )
+    rs["deny_rules"] = [
+        {"href": "/deny_rules/d1", "enabled": True, "override": True,
+         "consumers": [{"actors": "ams"}],
+         "providers": [{"label": {"href": "/labels/web"}}],
+         "ingress_services": [{"port": 23, "proto": 6}]},
+        {"href": "/deny_rules/d2", "enabled": True,
+         "consumers": [{"actors": "ams"}],
+         "providers": [{"label": {"href": "/labels/db"}}],
+         "ingress_services": [{"port": 21, "proto": 6}]},
+    ]
+    rows = resolve_ruleset(rs, **_scoped_lookups())
+    by_action = {}
+    for r in rows:
+        by_action.setdefault(r["action"], set()).add(r["port"])
+    assert by_action == {"allow": {5432}, "override_deny": {23}, "deny": {21}}
+
+
+def test_scope_unknown_label_fails_closed():
+    """scope label 解析不到任何 IP → scope 集為空 → 受 scope 約束的側歸零、
+    規則被丟棄（fail-closed，與未知 actor 一致）。"""
+    rs = _scoped_rs([{
+        "href": "/sec_rules/s6",
+        "consumers": [{"ip_list": {"href": "/ip_lists/dc"}}],
+        "providers": [{"actors": "ams"}],
+        "ingress_services": [{"port": 443, "proto": 6}],
+    }], scopes=[[{"label": {"href": "/labels/ghost"}}]])
+    assert resolve_ruleset(rs, **_scoped_lookups()) == []
