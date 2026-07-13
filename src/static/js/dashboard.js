@@ -425,7 +425,7 @@ function openSchedModal(sched) {
   if ($('sched-app'))     $('sched-app').value = sched ? (sched.app || '') : '';
   if ($('sched-env'))     $('sched-env').value = sched ? (sched.env || '') : '';
   if ($('sched-app-row')) $('sched-app-row').style.display = rt === 'app_summary' ? '' : 'none';
-  // pd/proto/port/ex-port 與 FilterBar 皆由 _populateSchedFilters 統一重置與回填
+  // pd 與 FilterBar 皆由 _populateSchedFilters 統一重置與回填
   // （排程編輯有回填需求：呼叫時已確保 FilterBar 建立，見 _ensureSchedFilterBar）
   _populateSchedFilters(isTraffic && sched ? sched.filters : null);
 
@@ -670,9 +670,6 @@ function openReportGenModal(type) {
     ['rpt-pd-blocked','rpt-pd-potential','rpt-pd-allowed'].forEach(id => {
       const el = document.getElementById(id); if (el) el.checked = false;
     });
-    ['rpt-proto','rpt-port','rpt-ex-port'].forEach(id => {
-      const el = document.getElementById(id); if (el) el.value = '';
-    });
     _ensureRptFilterBar().setFilters({});
   } else if (type === 'policy_usage' || type === 'rule_hit_count') {
     // Both support source selection (no traffic filters/profile).
@@ -784,10 +781,6 @@ function _ensureRptFilterBar() {
 }
 
 function _collectReportFilters() {
-  const get = id => {
-    const el = document.getElementById(id);
-    return el ? el.value.trim() : '';
-  };
   const pdBlocked  = document.getElementById('rpt-pd-blocked');
   const pdPotential = document.getElementById('rpt-pd-potential');
   const pdAllowed  = document.getElementById('rpt-pd-allowed');
@@ -798,20 +791,11 @@ function _collectReportFilters() {
   if (pdAllowed  && pdAllowed.checked)   pds.push('allowed');
   if (!pds.length) pds = null; // null means all
 
-  const port       = get('rpt-port');
-  const proto      = get('rpt-proto');
-  const exPort     = get('rpt-ex-port');
   const objFilters = _ensureRptFilterBar().getFilters();
-
-  const hasFilter = pds || port || proto || exPort || Object.keys(objFilters).length > 0;
+  const hasFilter = pds || Object.keys(objFilters).length > 0;
   if (!hasFilter) return null;
 
-  const filters = {
-    policy_decisions: pds,
-    port:             port,
-    proto:            proto ? parseInt(proto) : null,
-    ex_port:          exPort,
-  };
+  const filters = { policy_decisions: pds };
   Object.assign(filters, objFilters);
   return filters;
 }
@@ -827,10 +811,6 @@ function _ensureSchedFilterBar() {
 }
 
 function _collectSchedFilters() {
-  const get = id => {
-    const el = document.getElementById(id);
-    return el ? el.value.trim() : '';
-  };
   const pdBlocked  = document.getElementById('sched-pd-blocked');
   const pdPotential = document.getElementById('sched-pd-potential');
   const pdAllowed  = document.getElementById('sched-pd-allowed');
@@ -841,27 +821,18 @@ function _collectSchedFilters() {
   if (pdAllowed  && pdAllowed.checked)   pds.push('allowed');
   if (!pds.length) pds = null;
 
-  const port       = get('sched-port');
-  const proto      = get('sched-proto');
-  const exPort     = get('sched-ex-port');
   const objFilters = _ensureSchedFilterBar().getFilters();
-
-  const hasFilter = pds || port || proto || exPort || Object.keys(objFilters).length > 0;
+  const hasFilter = pds || Object.keys(objFilters).length > 0;
   if (!hasFilter) return null;
 
-  const filters = {
-    policy_decisions: pds,
-    port:             port,
-    proto:            proto ? parseInt(proto) : null,
-    ex_port:          exPort,
-  };
+  const filters = { policy_decisions: pds };
   Object.assign(filters, objFilters);
   return filters;
 }
 
-// 排程編輯回填：filters 可能是舊格式（src_labels 單元素 list、src_ip/dst_ip
-// scalar、any_label 純量）或新格式（FilterBar getFilters() 輸出）；FilterBar
-// setFilters（_objfbDeserialize）兩種皆認，此處不需分流。
+// 排程編輯回填：filters 可能是舊格式（scalar port/proto/ex_port、src_ip scalar）或
+// 新格式（FilterBar getFilters() 輸出）；FilterBar setFilters（_objfbDeserialize）
+// 兩種皆認（舊 scalar 回填成 port pill），此處不需分流。
 function _populateSchedFilters(filters) {
   const setChk = (id, arr, val) => {
     const el = document.getElementById(id);
@@ -870,10 +841,6 @@ function _populateSchedFilters(filters) {
   setChk('sched-pd-blocked',  filters && filters.policy_decisions, 'blocked');
   setChk('sched-pd-potential', filters && filters.policy_decisions, 'potentially_blocked');
   setChk('sched-pd-allowed',  filters && filters.policy_decisions, 'allowed');
-  const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
-  setVal('sched-port',   filters && filters.port || '');
-  setVal('sched-proto',  filters && filters.proto != null ? String(filters.proto) : '');
-  setVal('sched-ex-port', filters && filters.ex_port || '');
   _ensureSchedFilterBar().setFilters(filters || {});
 }
 
@@ -1813,8 +1780,6 @@ function openQueryModal(idx = -1) {
     $('dq-name').value = '';
     $('dq-rank').value = 'count';
     document.querySelector('input[name="dq-pd"][value="3"]').checked = true;
-    $('dq-port').value = ''; $('dq-proto').value = '';
-    $('dq-expt').value = '';
     _ensureDqFilterBar().setFilters({});
   } else {
     $('mq-title').textContent = _t('gui_edit_query_widget');
@@ -1823,9 +1788,6 @@ function openQueryModal(idx = -1) {
     $('dq-rank').value = q.rank_by || 'count';
     const pdRad = document.querySelector(`input[name="dq-pd"][value="${q.pd}"]`);
     if (pdRad) pdRad.checked = true;
-    $('dq-port').value = q.port || '';
-    $('dq-proto').value = q.proto || '';
-    $('dq-expt').value = q.ex_port || '';
     // flat query_def 直接餵：deserialize 只讀已知 key，name/rank_by 等頂層
     // 欄位自然忽略；舊格式 src_label/src_ip_in scalar 原生相容。
     _ensureDqFilterBar().setFilters(q);
@@ -1856,9 +1818,6 @@ async function saveDashboardQuery() {
     name: $('dq-name').value,
     rank_by: $('dq-rank').value,
     pd: pdMatch ? parseInt(pdMatch.value) : 3,
-    port: parseInt($('dq-port').value) || null,
-    proto: parseInt($('dq-proto').value) || null,
-    ex_port: parseInt($('dq-expt').value) || null,
     filters: _ensureDqFilterBar().getFilters(),
   };
 

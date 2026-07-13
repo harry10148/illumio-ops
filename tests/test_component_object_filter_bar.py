@@ -126,11 +126,10 @@ def test_instant_report_modal_mounts_filter_bar():
         "rpt-any-label", "rpt-any-ip", "rpt-ex-any-label", "rpt-ex-any-ip",
     ):
         assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from m-gen-filters"
-    # pd checkbox/proto/port/ex-port 保留（不屬 FilterBar 範圍）
+    # Plan B：pd checkbox 保留；proto/port/ex-port 裸欄位收斂進 FilterBar Service 欄
     assert 'id="rpt-pd-blocked"' in html
-    assert 'id="rpt-proto"' in html
-    assert 'id="rpt-port"' in html
-    assert 'id="rpt-ex-port"' in html
+    for removed_id in ("rpt-proto", "rpt-port", "rpt-ex-port"):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed (Plan B)"
 
 
 def test_dashboard_js_uses_filter_bar_for_instant_report():
@@ -155,11 +154,9 @@ def test_scheduled_report_modal_mounts_filter_bar():
         "sched-any-label", "sched-any-ip", "sched-ex-any-label", "sched-ex-any-ip",
     ):
         assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from sched-filter-section"
-    # pd checkbox/proto/port/ex-port 保留（不屬 FilterBar 範圍）
     assert 'id="sched-pd-blocked"' in html
-    assert 'id="sched-proto"' in html
-    assert 'id="sched-port"' in html
-    assert 'id="sched-ex-port"' in html
+    for removed_id in ("sched-proto", "sched-port", "sched-ex-port"):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed (Plan B)"
 
 
 def test_dashboard_js_uses_filter_bar_for_scheduled_report():
@@ -192,14 +189,12 @@ def test_dashboard_query_modal_mounts_filter_bar():
         "dq-any-label", "dq-any-ip", "dq-ex-any-label", "dq-ex-any-ip",
     ):
         assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from m-query"
-    # name/rank/pd radio/port/proto/ex-port/idx 保留（不屬 FilterBar 範圍）
     assert 'id="dq-name"' in html
     assert 'id="dq-rank"' in html
     assert 'name="dq-pd"' in html
-    assert 'id="dq-port"' in html
-    assert 'id="dq-proto"' in html
-    assert 'id="dq-expt"' in html
     assert 'id="dq-idx"' in html
+    for removed_id in ("dq-port", "dq-proto", "dq-expt"):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed (Plan B)"
 
 
 def test_dashboard_js_uses_filter_bar_for_saved_query():
@@ -240,15 +235,13 @@ def test_traffic_rule_modal_mounts_filter_bar():
     assert 'id="tr-filter-bar"' in html
     for removed_id in ("tr-src", "tr-dst", "tr-exsrc", "tr-exdst"):
         assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed from m-traffic"
-    # name/pd/port/proto/ex-port/threshold/window/cooldown 保留（不屬 FilterBar 範圍）
     assert 'id="tr-name"' in html
     assert 'name="tr-pd"' in html
-    assert 'id="tr-port"' in html
-    assert 'id="tr-proto"' in html
-    assert 'id="tr-expt"' in html
     assert 'id="tr-cnt"' in html
     assert 'id="tr-win"' in html
     assert 'id="tr-cd"' in html
+    for removed_id in ("tr-port", "tr-proto", "tr-expt"):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed (Plan B)"
 
 
 def test_bw_rule_modal_mounts_filter_bar():
@@ -260,11 +253,11 @@ def test_bw_rule_modal_mounts_filter_bar():
     assert 'id="bw-name"' in html
     assert 'name="bw-mt"' in html
     assert 'name="bw-pd"' in html
-    assert 'id="bw-port"' in html
-    assert 'id="bw-expt"' in html
     assert 'id="bw-val"' in html
     assert 'id="bw-win"' in html
     assert 'id="bw-cd"' in html
+    for removed_id in ("bw-port", "bw-expt"):
+        assert f'id="{removed_id}"' not in html, f"{removed_id} should be removed (Plan B)"
 
 
 def test_filter_bar_suggest_types_derived_from_cats():
@@ -636,3 +629,55 @@ def test_filter_bar_cat_ip_i18n_bilingual():
     en = json.loads(_EN.read_text(encoding="utf-8"))
     zh = json.loads(_ZH.read_text(encoding="utf-8"))
     assert "gui_fb_cat_ip" in en and "gui_fb_cat_ip" in zh
+
+
+def test_report_and_sched_collect_no_scalar_port_keys():
+    """Plan B spec §7：儲存時不再產生 scalar port/proto/ex_port。"""
+    js = Path("src/static/js/dashboard.js").read_text(encoding="utf-8")
+    for fn_name in ("_collectReportFilters", "_collectSchedFilters"):
+        fn_src = js.split(f"function {fn_name}()", 1)[1].split("\nfunction ", 1)[0]
+        for removed in ("port:", "proto:", "rpt-port", "rpt-proto", "rpt-ex-port",
+                        "sched-port", "sched-proto", "sched-ex-port"):
+            assert removed not in fn_src, f"{removed} still in {fn_name}"
+
+
+def test_save_dashboard_query_no_scalar_port_keys():
+    js = Path("src/static/js/dashboard.js").read_text(encoding="utf-8")
+    fn_src = js.split("async function saveDashboardQuery()", 1)[1].split("\nasync function ", 1)[0]
+    for removed in ("port:", "proto:", "dq-port", "dq-proto", "dq-expt"):
+        assert removed not in fn_src, removed
+
+
+def test_save_rules_no_scalar_port_keys():
+    js = Path("src/static/js/rules.js").read_text(encoding="utf-8")
+    for fn_name in ("saveTraffic", "saveBW"):
+        fn_src = js.split(f"async function {fn_name}()", 1)[1].split("\nasync function ", 1)[0]
+        for removed in ("port:", "proto:", "tr-port", "tr-proto", "tr-expt", "bw-port", "bw-expt"):
+            assert removed not in fn_src, f"{removed} still in {fn_name}"
+
+
+def test_dashboard_rules_js_no_scalar_field_ids_anywhere():
+    """裸欄位 id 必須從 JS 徹底消失（含重置/回填路徑），比照 qt-port 前例。"""
+    dj = Path("src/static/js/dashboard.js").read_text(encoding="utf-8")
+    rj = Path("src/static/js/rules.js").read_text(encoding="utf-8")
+    for fid in ("rpt-port", "rpt-proto", "rpt-ex-port", "sched-port", "sched-proto",
+                "sched-ex-port", "dq-port", "dq-proto", "dq-expt"):
+        assert fid not in dj, fid
+    for fid in ("tr-port", "tr-proto", "tr-expt", "bw-port", "bw-expt"):
+        assert fid not in rj, fid
+
+
+def test_rules_filter_bars_include_service_family_cats():
+    """rules 後端白名單（_RULE_FB_KEYS）已收 process/winservice/transmission；
+    前端 cats 同步開放（label_group 仍排除）。"""
+    js = Path("src/static/js/rules.js").read_text(encoding="utf-8")
+    assert js.count("'service', 'port', 'process', 'winservice', 'transmission'") >= 2
+
+
+def test_filter_bar_legacy_scalar_backfill_retained():
+    """讀取相容不可移除：舊 rule/query/schedule 的 scalar port/proto/ex_port
+    仍須回填成 port pill（filter-bar.js deserialize 分支）。"""
+    js = _JS.read_text(encoding="utf-8")
+    assert "if (d['port'])" in js
+    assert "if (d['ex_port'])" in js
+    assert "{ '6': 'tcp', '17': 'udp' }" in js

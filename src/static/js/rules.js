@@ -27,17 +27,18 @@ function onBwMetricTypeChange() {
 // （rules.js 在 filter-bar.js 之前解析，模組作用域頂層不能直接呼叫 createFilterBar）；
 // cats 排除 label_group——規則引擎後端只認 label/iplist/workload/ip/service/port，
 // label_group 會 400。
+// Plan B：service 家族三類（process/winservice/transmission）已入 _RULE_FB_KEYS，一併開放。
 let _trFb = null;
 function _ensureTrFilterBar() {
   if (!_trFb) {
-    _trFb = createFilterBar(document.getElementById('tr-filter-bar'), { cats: ['label', 'iplist', 'workload', 'ip', 'service', 'port'] });
+    _trFb = createFilterBar(document.getElementById('tr-filter-bar'), { cats: ['label', 'iplist', 'workload', 'ip', 'service', 'port', 'process', 'winservice', 'transmission'] });
   }
   return _trFb;
 }
 let _bwFb = null;
 function _ensureBwFilterBar() {
   if (!_bwFb) {
-    _bwFb = createFilterBar(document.getElementById('bw-filter-bar'), { cats: ['label', 'iplist', 'workload', 'ip', 'service', 'port'] });
+    _bwFb = createFilterBar(document.getElementById('bw-filter-bar'), { cats: ['label', 'iplist', 'workload', 'ip', 'service', 'port', 'process', 'winservice', 'transmission'] });
   }
   return _bwFb;
 }
@@ -470,9 +471,6 @@ async function editRule(idx, type) {
     } else if (type === 'traffic') {
       $('tr-name').value = r.name || '';
       setRv('tr-pd', String(r.pd ?? 2));
-      $('tr-port').value = r.port || '';
-      $('tr-proto').value = r.proto ? String(r.proto) : '';
-      $('tr-expt').value = r.ex_port || '';
       _ensureTrFilterBar().setFilters(r);
       $('tr-cnt').value = r.threshold_count || 10;
       $('tr-win').value = r.threshold_window || 10;
@@ -483,8 +481,6 @@ async function editRule(idx, type) {
       setRv('bw-mt', r.type || 'bandwidth');
       onBwMetricTypeChange();
       setRv('bw-pd', String(r.pd ?? -1));
-      $('bw-port').value = r.port || '';
-      $('bw-expt').value = r.ex_port || '';
       _ensureBwFilterBar().setFilters(r);
       $('bw-val').value = r.threshold_count || 100;
       $('bw-win').value = r.threshold_window || 10;
@@ -539,7 +535,7 @@ async function saveSystemRule() {
 }
 async function saveTraffic() {
   const name = $('tr-name').value.trim(); if (!name) { toast(_t('gui_msg_name_required'), 'err'); return }
-  const data = { name, pd: rv('tr-pd'), port: $('tr-port').value, proto: $('tr-proto').value, ex_port: $('tr-expt').value, threshold_count: $('tr-cnt').value, threshold_window: $('tr-win').value, cooldown_minutes: $('tr-cd').value, filters: _ensureTrFilterBar().getFilters() };
+  const data = { name, pd: rv('tr-pd'), threshold_count: $('tr-cnt').value, threshold_window: $('tr-win').value, cooldown_minutes: $('tr-cd').value, filters: _ensureTrFilterBar().getFilters() };
   if (_editIdx !== null) await put('/api/rules/' + _editIdx, data); else await post('/api/rules/traffic', data);
   closeModal('m-traffic'); toast(_t('gui_msg_traffic_rule_saved')); loadRules(); loadDashboard();
 }
@@ -547,8 +543,6 @@ async function saveBW() {
   const name = $('bw-name').value.trim(); if (!name) { toast(_t('gui_msg_name_required'), 'err'); return }
   const data = {
     name, rule_type: rv('bw-mt'), pd: rv('bw-pd'),
-    port: $('bw-port').value,
-    ex_port: $('bw-expt').value,
     threshold_count: $('bw-val').value, threshold_window: $('bw-win').value, cooldown_minutes: $('bw-cd').value,
     filters: _ensureBwFilterBar().getFilters()
   };
