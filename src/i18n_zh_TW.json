@@ -4279,6 +4279,7 @@
   "gui_ob_title": "選取 filter 物件",
   "gui_ob_add": "加入",
   "gui_ob_selected": "已選",
+  "gui_ob_target": "加入至：",
   "gui_ob_search_ph": "搜尋此類別…",
   "gui_ob_page": "頁",
   "gui_ob_dir_hint": "Service 條件不分來源/目的",

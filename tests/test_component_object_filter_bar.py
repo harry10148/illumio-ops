@@ -697,3 +697,21 @@ def test_filter_bar_excl_row_hidden_overrides_flex():
     慣例明寫 [hidden] 規則。"""
     css = _CSS.read_text(encoding="utf-8")
     assert ".objfb-row[hidden] { display: none; }" in css
+
+
+def test_filter_bar_dropdown_anchors_to_bar_not_column():
+    """真機回饋（2026-07-13）：兩欄面板被限制在單欄寬度會擠爆——.objfb-dd 須
+    錨定外層 .objfb-bar 全寬（mockup .cat-panel 橫跨整個 bar），故 .objfb-fbar
+    不得建立 positioning context。"""
+    css = _CSS.read_text(encoding="utf-8")
+    fbar = css.split(".objfb-fbar {", 1)[1].split("}", 1)[0]
+    assert "position:" not in fbar
+    bar = css.split(".objfb-bar {", 1)[1].split("}", 1)[0]
+    assert "position: relative" in bar
+
+
+def test_filter_bar_add_zone_tracked_for_browser():
+    """object-browser 的 pill 目標欄位（含排除列）由 focus 時的 addZone 決定。"""
+    src = _JS.read_text(encoding="utf-8")
+    assert "state.addZone = { col, neg };" in src
+    assert "state.addZone ||" in src

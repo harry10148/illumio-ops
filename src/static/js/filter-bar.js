@@ -304,6 +304,8 @@ function _objfbRender(state) {
   c.innerHTML = '';
   state.dirs = state.mode === 'or' ? ['any'] : ['src', 'dst'];
   if (!state.dirs.includes(state.addDir)) state.addDir = state.dirs[0];
+  // 模式切換後 addZone 可能指向不存在的欄（如 OR 下的 src）：失效即清空
+  if (state.addZone && state.addZone.col !== 'svc' && !_objfbCols(state).includes(state.addZone.col)) state.addZone = null;
   state.zoneEls = {};
 
   const grid = document.createElement('div');
@@ -972,6 +974,7 @@ function _objfbFocusZone(state, col, neg) {
     for (const k in state.zoneEls) state.zoneEls[k].dd.classList.remove('open');
   }
   state.zone = { col, neg };
+  state.addZone = { col, neg };   // object-browser.js 用：pill 加入目標欄位（含排除列）
   if (col !== 'svc' && col !== 'any') state.addDir = col;      // object-browser.js 相容
   else if (col === 'any') state.addDir = 'any';
   state.els = z;
@@ -1149,9 +1152,10 @@ window._objfbBrowseMore = function (id) {
 // 供 object-browser.js（Modal 物件庫）取回實例、代為加入 pill。
 window._objfbGetInstance = function (id) { return _objfbInstances[id] || null; };
 window._objfbAddPillPublic = function (state, obj) {
-  // object-browser.js 以 fb.addDir 指定方向；映射回 zone 模型（include 列）
+  // object-browser.js 代加 pill：目標欄位取開啟瀏覽器時的 addZone（含排除列）；
+  // 無 addZone（理論上不會，防禦）退回 addDir + include 列（neg: false）
   const saved = state.zone;
-  state.zone = { col: state.addDir || _objfbCols(state)[0], neg: false };
+  state.zone = state.addZone || { col: state.addDir || _objfbCols(state)[0], neg: false };
   _objfbAddPill(state, obj);
   state.zone = saved;
 };

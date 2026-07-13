@@ -6,19 +6,28 @@
  */
 const _ob = {
   fbId: null, cat: null, q: '', offset: 0, limit: 20,
-  items: [], total: 0, selected: {}, dir: 'src',
+  items: [], total: 0, selected: {}, zone: null,
 };
 
 const _OB_PAGE_TYPES = ['label', 'label_group', 'iplist', 'workload', 'service'];
+
+// 目標欄位顯示 key（v2 zone 模型：方向/排除由開啟瀏覽器的欄位決定，視窗內不再二次選擇）
+const _OB_ZONE_I18N = {
+  'src:false': 'gui_fb_dir_src', 'dst:false': 'gui_fb_dir_dst',
+  'any:false': 'gui_fb_col_any', 'svc:false': 'gui_fb_col_svc',
+  'src:true': 'gui_fb_col_src_not', 'dst:true': 'gui_fb_col_dst_not',
+  'any:true': 'gui_fb_col_any_not', 'svc:true': 'gui_fb_col_svc_not',
+};
 
 window.openObjectBrowser = function (fbId) {
   const fb = window._objfbGetInstance ? window._objfbGetInstance(fbId) : null;
   if (!fb) return;
   _ob.fbId = fbId;
-  _ob.cats = _OB_PAGE_TYPES.filter(c => fb.cats.includes(c));
+  _ob.zone = fb.addZone || { col: fb.addDir || 'src', neg: false };
+  // any（OR 合併欄）不支援 label_group（序列化 fail-closed 丟棄），分頁一併隱藏
+  _ob.cats = _OB_PAGE_TYPES.filter(c => fb.cats.includes(c) &&
+    !(c === 'label_group' && _ob.zone.col === 'any'));
   _ob.cat = fb.scopeCat && _ob.cats.includes(fb.scopeCat) ? fb.scopeCat : _ob.cats[0];
-  _ob.dirs = fb.dirs;
-  _ob.dir = fb.addDir && fb.dirs.includes(fb.addDir) ? fb.addDir : fb.dirs[0];
   _ob.q = '';
   _ob.offset = 0;
   _ob.selected = {};
@@ -143,7 +152,8 @@ function _obRenderFoot() {
     pager.appendChild(prev); pager.appendChild(info); pager.appendChild(nums); pager.appendChild(next);
     foot.appendChild(pager);
   }
-  // 已選數 + 方向段（service 分頁隱藏方向）
+  // 已選數 + 目標欄位（方向/排除由開啟瀏覽器的欄位決定，不再於視窗內選擇；
+  // service 家族 pill 無方向，一律歸 Service 欄）
   const right = document.createElement('span');
   right.className = 'ob-foot-right';
   const selCnt = document.createElement('span');
@@ -152,32 +162,23 @@ function _obRenderFoot() {
   const selNum = document.createElement('span');
   selNum.textContent = ` ${Object.keys(_ob.selected).length}`;
   right.appendChild(selCnt); right.appendChild(selNum);
-  if (_ob.cat !== 'service') {
-    const seg = document.createElement('span');
-    seg.className = 'ob-dir-seg';
-    for (const d of _ob.dirs) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'ob-dir-btn' + (_ob.dir === d ? ' on' : '');
-      b.setAttribute('data-i18n', 'gui_fb_dir_' + d);
-      b.textContent = d;
-      b.setAttribute('data-on-click', '_obSetDir');
-      b.dataset.args = JSON.stringify([d]);
-      seg.appendChild(b);
-    }
-    right.appendChild(seg);
-  } else {
-    const hint = document.createElement('span');
-    hint.className = 'ob-dir-hint';
-    hint.setAttribute('data-i18n', 'gui_ob_dir_hint');
-    right.appendChild(hint);
-  }
+  const tgt = document.createElement('span');
+  tgt.className = 'ob-dir-hint';
+  const tgtPfx = document.createElement('span');
+  tgtPfx.setAttribute('data-i18n', 'gui_ob_target');
+  tgtPfx.textContent = 'Add to:';
+  tgt.appendChild(tgtPfx);
+  tgt.appendChild(document.createTextNode(' '));
+  const zoneCol = _ob.cat === 'service' ? 'svc' : _ob.zone.col;
+  const tgtZone = document.createElement('span');
+  tgtZone.setAttribute('data-i18n', _OB_ZONE_I18N[`${zoneCol}:${_ob.zone.neg}`] || 'gui_fb_dir_src');
+  tgt.appendChild(tgtZone);
+  right.appendChild(tgt);
   foot.appendChild(right);
   if (typeof window.i18nApply === 'function') window.i18nApply(foot);
 }
 
 window._obSetCat = function (c) { _ob.cat = c; _ob.q = ''; _ob.offset = 0; _ob.selected = {}; _obRender(); _obFetch(); };
-window._obSetDir = function (d) { _ob.dir = d; _obRenderFoot(); };
 window._obPage = function (delta) { _ob.offset = Math.max(0, _ob.offset + delta * _ob.limit); _obFetch(); };
 window._obToggle = function (key, it) {
   if (_ob.selected[key]) delete _ob.selected[key];
@@ -194,14 +195,9 @@ window._obSearchInput = function () {
 window._obAddSelected = function () {
   const fb = window._objfbGetInstance ? window._objfbGetInstance(_ob.fbId) : null;
   if (fb) {
-    const prevDir = fb.addDir;
-    fb.addDir = _ob.dir;
-    try {
-      for (const it of Object.values(_ob.selected)) {
-        window._objfbAddPillPublic(fb, Object.assign({ cat: _ob.cat }, it));
-      }
-    } finally {
-      fb.addDir = prevDir;
+    // 目標欄位由 fb.addZone（開啟瀏覽器時的欄位）決定，_objfbAddPillPublic 直接讀取
+    for (const it of Object.values(_ob.selected)) {
+      window._objfbAddPillPublic(fb, Object.assign({ cat: _ob.cat }, it));
     }
   }
   closeModal('modal-obj-browser');

@@ -2574,7 +2574,8 @@ select {
 .objfb-excl-toggle[aria-expanded="true"] { color: var(--danger); }
 
 .objfb-fbar {
-  position: relative;
+  /* 不建立 positioning context：.objfb-dd 錨定外層 .objfb-bar 全寬
+     （mockup .cat-panel 橫跨整個 bar；限單欄寬會把兩欄面板擠爆） */
   flex: 1;
   min-height: 40px;
   min-width: 0;
