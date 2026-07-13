@@ -912,7 +912,7 @@ class ApiClient:
         logger.error(f"Provision failed for RuleSet {_extract_id(rs_href)}: status {prov_status}")
         return False
 
-    def pull_rule_hit_count_report(self, **kwargs) -> str:
+    def pull_rule_hit_count_report(self, **kwargs: Any) -> str:
         """Delegates to ReportsApi — native Rule Hit Count report pull."""
         return self._reports.pull_rule_hit_count_report(**kwargs)
 

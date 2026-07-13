@@ -54,7 +54,7 @@ class Reporter:
         self.last_dispatch_results: list[dict[str, Any]] = []
 
     @staticmethod
-    def _lang_t(lang: str):
+    def _lang_t(lang: str) -> Callable[..., str]:
         """Return ``t()`` pre-bound to ``lang``.
 
         A content builder binds the module-level ``t`` to its dispatch language
