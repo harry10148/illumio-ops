@@ -85,12 +85,16 @@ function createFilterBar(container, options) {
   const state = {
     id, container, cats,
     pills: [],          // {cat, name, href, key, value, dir, neg}
-    mode: 'and',        // 'and'＝Source/Destination 分欄；'or'＝合併 Source OR Destination 欄
-    dirs: ['src', 'dst'],  // object-browser.js 相容（依 mode 派生，_objfbRender 維護）
-    addDir: 'src',         // object-browser.js 相容：外部加 pill 的方向
-    zone: null,         // 作用中欄位 {col, neg}；col ∈ src|dst|any|svc
+    // mode：'and'＝Source/Destination 分欄；'or'＝合併 Source OR Destination 欄。
+    // dirs/addDir 為 object-browser.js 相容欄位（依 mode 派生，_objfbRender 維護；
+    // addDir＝外部加 pill 的方向）。zone＝作用中欄位 {col, neg}（col ∈ src|dst|any|svc）。
+    // exclOpen＝is-not 排除列展開狀態（modal 預設收合，spec §3.1）。
+    mode: 'and',
+    dirs: ['src', 'dst'],
+    addDir: 'src',
+    zone: null,
     zoneEls: {},        // `${col}:${neg}` → {fbar, input, dd, ddMain, ddCats}
-    exclOpen: false,    // is-not 排除列展開狀態（modal 預設收合，spec §3.1）
+    exclOpen: false,
     scopeCat: null,
     changeCb: null,
     _abort: null,
@@ -349,7 +353,8 @@ function _objfbRender(state) {
   pop.className = 'objfb-pop';
   c.appendChild(pop);
 
-  state.els = null;   // 作用中 zone 的 {fbar, input, dd, ddMain, ddCats}；_objfbFocusZone 指定
+  // 作用中 zone 的 {fbar, input, dd, ddMain, ddCats}；_objfbFocusZone 指定
+  state.els = null;
   state.pop = pop;
   state.ddItems = [];
   state.actIdx = -1;
@@ -737,7 +742,8 @@ function _objfbQuerySuggest(state, q) {
   // （'ip' 不是 suggest 類別，不列入）與作用中 zone 的可用類別（zoneCats）；
   // 有 scope 時 scope 本身若非 suggest 類別（process/winservice/transmission）
   // 直接放棄查詢——後端無對應端點。
-  if (scope && !_OBJFB_SUGGEST_CATS.includes(scope)) return; // process/winservice/transmission 無後端 suggest
+  // process/winservice/transmission 無後端 suggest
+  if (scope && !_OBJFB_SUGGEST_CATS.includes(scope)) return;
   const zoneCats = state.zone ? _objfbZoneCats(state, state.zone.col) : state.cats;
   const types = scope ? scope : _OBJFB_SUGGEST_CATS.filter((c) =>
     state.cats.includes(c) && zoneCats.includes(c)).join(',');
@@ -974,8 +980,9 @@ function _objfbFocusZone(state, col, neg) {
     for (const k in state.zoneEls) state.zoneEls[k].dd.classList.remove('open');
   }
   state.zone = { col, neg };
-  state.addZone = { col, neg };   // object-browser.js 用：pill 加入目標欄位（含排除列）
-  if (col !== 'svc' && col !== 'any') state.addDir = col;      // object-browser.js 相容
+  // addZone：object-browser.js 用的 pill 加入目標欄位（含排除列）；addDir 為其舊相容欄位
+  state.addZone = { col, neg };
+  if (col !== 'svc' && col !== 'any') state.addDir = col;
   else if (col === 'any') state.addDir = 'any';
   state.els = z;
   z.input.focus();
@@ -1057,7 +1064,8 @@ window._objfbToggleMode = function (id) {
     let moved = 0;
     for (const p of s.pills) if (p.dir === 'any') { p.dir = 'src'; moved++; }
     s.mode = 'and';
-    s.movedAnyHint = moved > 0;  // any 拆回 AND：pill 放 Source 欄並提示（spec §2）
+    // any 拆回 AND：pill 放 Source 欄並提示（spec §2）
+    s.movedAnyHint = moved > 0;
   }
   s.zone = null;
   _objfbRender(s);
