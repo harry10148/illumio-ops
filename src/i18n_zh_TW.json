@@ -4378,5 +4378,8 @@
   "rpt_readiness_trend_col_previous": "上次",
   "rpt_readiness_trend_col_delta": "變化",
   "rpt_readiness_html_saved": "就緒度報表已儲存：{path}",
-  "rpt_readiness_csv_saved": "就緒度 CSV 已儲存：{path}"
+  "rpt_readiness_csv_saved": "就緒度 CSV 已儲存：{path}",
+  "gui_fb_cat_process": "程序名稱",
+  "gui_fb_cat_winservice": "Windows 服務",
+  "gui_fb_cat_transmission": "傳輸型態"
 }

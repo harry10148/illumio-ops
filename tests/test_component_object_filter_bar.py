@@ -427,3 +427,57 @@ def test_any_label_group_i18n_hint_present():
     assert "gui_fb_any_label_group_unsupported" in en
     assert "gui_fb_any_label_group_unsupported" in zh
     assert "gui_fb_any_label_group_unsupported" in _JS.read_text(encoding="utf-8")
+
+
+def test_filter_bar_serializes_new_service_family_keys():
+    """Plan B Task 1：process/winservice/transmission pill 序列化成 Plan A 後端白名單 key。"""
+    src = _JS.read_text(encoding="utf-8")
+    for frag in (
+        "push(`${ex}process_name`, p.name)",
+        "push(`${ex}windows_service_name`, p.name)",
+        "push(`${ex}transmission`, p.name)",
+    ):
+        assert frag in src, frag
+
+
+def test_filter_bar_deserializes_new_service_family_keys():
+    """回填缺 key 會使編輯時 pill 靜默消失、再存檔即永久遺失（label_group 前例）。
+    transmission_excludes 為 spec §4.3 明列的續留別名。"""
+    src = _JS.read_text(encoding="utf-8")
+    for key in ("process_name", "ex_process_name", "windows_service_name",
+                "ex_windows_service_name", "transmission", "ex_transmission",
+                "transmission_excludes"):
+        assert f"asList(d['{key}'])" in src, key
+
+
+def test_filter_bar_new_cat_metadata_and_dots():
+    src = _JS.read_text(encoding="utf-8")
+    css = _CSS.read_text(encoding="utf-8")
+    for cat_i18n in ("gui_fb_cat_process", "gui_fb_cat_winservice", "gui_fb_cat_transmission"):
+        assert cat_i18n in src, cat_i18n
+    # 比照 .objfb-dot-service/-port 慣例：色點直接硬編 hex
+    for dot in ("objfb-dot-process", "objfb-dot-winsvc", "objfb-dot-tx"):
+        assert dot in src and f".{dot}" in css, dot
+
+
+def test_filter_bar_new_cats_i18n_bilingual():
+    import json
+    en = json.loads(_EN.read_text(encoding="utf-8"))
+    zh = json.loads(_ZH.read_text(encoding="utf-8"))
+    for k in ("gui_fb_cat_process", "gui_fb_cat_winservice", "gui_fb_cat_transmission"):
+        assert k in en and k in zh, k
+
+
+def test_filter_bar_pill_label_prefixes():
+    """spec §3.2 pill 顯示：443 (TCP+UDP)、proc: httpd、winsvc: Dnscache、TX: broadcast。"""
+    src = _JS.read_text(encoding="utf-8")
+    fn = src.split("function _objfbPillLabel(p)", 1)[1].split("\nfunction ", 1)[0]
+    assert "(TCP+UDP)" in fn
+    assert "proc: " in fn and "winsvc: " in fn and "TX: " in fn
+
+
+def test_filter_bar_new_cats_are_dirless():
+    src = _JS.read_text(encoding="utf-8")
+    dirless = src.split("const _OBJFB_DIRLESS = new Set(", 1)[1].split(")", 1)[0]
+    for cat in ("'service'", "'port'", "'process'", "'winservice'", "'transmission'"):
+        assert cat in dirless, cat

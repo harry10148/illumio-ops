@@ -2626,6 +2626,9 @@ select {
 .objfb-dot-ip        { background: var(--dim); }
 .objfb-dot-service { background: #8e6fc0; }
 .objfb-dot-port    { background: #3fa7a0; }
+.objfb-dot-process { background: #d98c3f; }
+.objfb-dot-winsvc  { background: #5a9bd5; }
+.objfb-dot-tx      { background: #c05c8e; }
 
 /* any 方向較慢提示 */
 .objfb-hint {

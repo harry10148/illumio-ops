@@ -4378,5 +4378,8 @@
   "gui_ob_selected": "Selected",
   "gui_ob_search_ph": "Search this category…",
   "gui_ob_page": "Page",
-  "gui_ob_dir_hint": "Service conditions are direction-less"
+  "gui_ob_dir_hint": "Service conditions are direction-less",
+  "gui_fb_cat_process": "Process Name",
+  "gui_fb_cat_winservice": "Windows Service",
+  "gui_fb_cat_transmission": "Transmission"
 }

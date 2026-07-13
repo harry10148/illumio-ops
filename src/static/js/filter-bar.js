@@ -70,6 +70,9 @@ function _objfbSerialize(state) {
     const ex = p.neg ? 'ex_' : '';
     if (p.cat === 'service') { push(`${ex}services`, p.href || p.name); continue; }
     if (p.cat === 'port')    { push(`${ex}ports`, p.name); continue; }
+    if (p.cat === 'process')      { push(`${ex}process_name`, p.name); continue; }
+    if (p.cat === 'winservice')   { push(`${ex}windows_service_name`, p.name); continue; }
+    if (p.cat === 'transmission') { push(`${ex}transmission`, p.name); continue; }
     if (p.dir === 'any') {
       // any 方向：Phase 1 單值 key（多個同類取最後值）
       if (p.cat === 'label')         setScalar(`${ex}any_label`, p.name);
@@ -111,6 +114,13 @@ function _objfbDeserialize(state, dict) {
     add('port', protoName ? `${d['port']}/${protoName}` : String(d['port']), null, false);
   }
   if (d['ex_port']) add('port', String(d['ex_port']), null, true);
+  // Plan B：service 家族新類別（str | list[str] 皆容忍；transmission_excludes 為續留別名）
+  for (const v of asList(d['process_name'])) add('process', v, null, false);
+  for (const v of asList(d['ex_process_name'])) add('process', v, null, true);
+  for (const v of asList(d['windows_service_name'])) add('winservice', v, null, false);
+  for (const v of asList(d['ex_windows_service_name'])) add('winservice', v, null, true);
+  for (const v of asList(d['transmission'])) add('transmission', v, null, false);
+  for (const v of asList(d['ex_transmission']).concat(asList(d['transmission_excludes']))) add('transmission', v, null, true);
   for (const dir of ['src', 'dst']) {
     for (const spec of asList(d[`${dir}_labels`]).concat(asList(d[`${dir}_label`]))) add('label', spec, dir, false);
     for (const spec of asList(d[`ex_${dir}_labels`]).concat(asList(d[`ex_${dir}_label`]))) add('label', spec, dir, true);
@@ -158,15 +168,28 @@ const _OBJFB_CATS = {
   ip:          { i18n: null,                     dot: 'objfb-dot-ip',       fallback: 'IP/CIDR' },
   service:     { i18n: 'gui_fb_cat_service',     dot: 'objfb-dot-service',  fallback: 'Services' },
   port:        { i18n: 'gui_fb_cat_port',        dot: 'objfb-dot-port',     fallback: 'Port' },
+  process:      { i18n: 'gui_fb_cat_process',      dot: 'objfb-dot-process', fallback: 'Process Name' },
+  winservice:   { i18n: 'gui_fb_cat_winservice',   dot: 'objfb-dot-winsvc',  fallback: 'Windows Service' },
+  transmission: { i18n: 'gui_fb_cat_transmission', dot: 'objfb-dot-tx',      fallback: 'Transmission' },
 };
 const _OBJFB_DIR_TAG = { src: 'S', dst: 'D', any: 'S/D' };
 
 // 無方向類別：pill 不帶 src/dst/any、序列化不吃 dir、popover 不顯示方向列
-const _OBJFB_DIRLESS = new Set(['service', 'port']);
+// 無方向類別：pill 不帶 src/dst/any、序列化不吃 dir。transmission 序列化亦無方向
+// （flat key），但版面歸 Destination 欄（_objfbPillCol，Task 3）。
+const _OBJFB_DIRLESS = new Set(['service', 'port', 'process', 'winservice', 'transmission']);
 
 // suggest 端支援的類別，固定順序（'ip' 不支援 suggest，不列入）；
 // _objfbQuerySuggest 與 _objfbRenderDropdown 皆以此清單交集 state.cats。
 const _OBJFB_SUGGEST_CATS = ['label', 'label_group', 'iplist', 'workload', 'service'];
+/* ── pill 顯示文字（spec §3.2）：port 無 proto 尾碼＝兩者；新類別帶語意前綴 ── */
+function _objfbPillLabel(p) {
+  if (p.cat === 'port' && !String(p.name).includes('/')) return `${p.name} (TCP+UDP)`;
+  if (p.cat === 'process') return `proc: ${p.name}`;
+  if (p.cat === 'winservice') return `winsvc: ${p.name}`;
+  if (p.cat === 'transmission') return `TX: ${p.name}`;
+  return p.name;
+}
 
 function _objfbApplyI18n(root) {
   if (typeof window.i18nApply === 'function') window.i18nApply(root);
@@ -303,7 +326,7 @@ function _objfbBuildPill(state, p, idx) {
 
   const txt = document.createElement('span');
   txt.className = 'objfb-pill-txt';
-  txt.textContent = (p.neg ? '! ' : '') + p.name;
+  txt.textContent = (p.neg ? '! ' : '') + _objfbPillLabel(p);
   el.appendChild(txt);
 
   const x = document.createElement('button');
