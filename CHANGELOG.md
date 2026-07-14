@@ -20,6 +20,11 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Periodic cache jobs (traffic aggregate, retention, archive) never fired on
+  frequently-restarted deployments: IntervalTrigger schedules the first run a
+  full interval after startup, so the 24h archive/retention jobs kept being
+  pushed out and `data/archive` stayed empty while the DB grew unbounded. All
+  three now get a staggered near-term first run like the ingest jobs.
 - Policy Resolver report always produced "no resolvable ACTIVE policy": scope
   filtering compared actor label hrefs against scope label hrefs (role-type
   actors never match), deny rules were never expanded (rows now carry an
