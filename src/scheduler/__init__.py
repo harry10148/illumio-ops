@@ -134,11 +134,18 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             sched.add_job(run_traffic_ingest, _IT(seconds=cache_cfg.traffic_poll_interval_seconds),
                           args=[cm], id="pce_cache_ingest_traffic", replace_existing=True,
                           next_run_time=_kick, executor="cache_writer")
+            # aggregate/retention/archive 同樣需要首跑 kick（2026-07-14 真機事故：
+            # 未帶 next_run_time 時 IntervalTrigger 首跑排在啟動後一整個間隔，
+            # 部署頻繁重啟下 24h 間隔的 archive/retention 一次都沒跑過——
+            # data/archive 恆空、retention 停刪、DB 無上限成長）。
+            # kick 時間錯開，避免同刻搶 cache_writer 單 worker。
             sched.add_job(run_traffic_aggregate, _IT(hours=1),
                           args=[cm], id="pce_cache_aggregate", replace_existing=True,
+                          next_run_time=_kick + _dt.timedelta(seconds=60),
                           executor="cache_writer")
             sched.add_job(run_cache_retention, _IT(hours=24),
                           args=[cm], id="pce_cache_retention", replace_existing=True,
+                          next_run_time=_kick + _dt.timedelta(seconds=180),
                           executor="cache_writer")
             sched.add_job(run_cache_lag_monitor, _IT(seconds=60),
                           args=[cm], id="cache_lag_monitor", replace_existing=True)
@@ -149,6 +156,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             if cache_cfg.archive_enabled:
                 sched.add_job(run_cache_archive, _IT(hours=cache_cfg.archive_interval_hours),
                               args=[cm], id="pce_cache_archive", replace_existing=True,
+                              next_run_time=_kick + _dt.timedelta(seconds=120),
                               executor="cache_writer")
     except Exception as exc:
         logger.exception("Failed to register pce_cache scheduler jobs: {}", exc)

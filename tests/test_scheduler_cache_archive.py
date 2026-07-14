@@ -86,3 +86,37 @@ def test_archive_job_uses_cache_writer_executor(tmp_path):
     finally:
         for j in list(sched.get_jobs()):
             sched.remove_job(j.id)
+
+
+def test_periodic_cache_jobs_get_startup_kick(tmp_path):
+    """真機事故（2026-07-14）：aggregate/retention/archive 未帶 next_run_time，
+    IntervalTrigger 首跑排在啟動後一整個間隔；部署頻繁重啟下 24h 間隔的
+    archive/retention 永遠跑不到（data/archive 恆空、DB 無上限成長）。
+    比照 ingest job 的 _kick 慣例：三者都要有近期的首跑時間（錯開避免同時搶
+    cache_writer）。"""
+    import datetime
+    from src.scheduler import build_scheduler
+    cm = _cm(tmp_path, archive_enabled=True)
+    cm.models.pce_cache.enabled = True
+    cm.models.pce_cache.archive_interval_hours = 24
+    cm.models.pce_cache.events_poll_interval_seconds = 300
+    cm.models.pce_cache.traffic_poll_interval_seconds = 3600
+    cm.models.siem.enabled = False
+    cm.config = {}
+    sched = build_scheduler(cm)
+    try:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        kicks = {}
+        for job_id in ("pce_cache_aggregate", "pce_cache_retention", "pce_cache_archive"):
+            job = sched.get_job(job_id)
+            assert job is not None, job_id
+            nrt = job.next_run_time
+            assert nrt is not None, f"{job_id} 缺 next_run_time 首跑 kick"
+            delta = (nrt - now).total_seconds()
+            assert 0 <= delta <= 900, f"{job_id} 首跑須在啟動後 15 分鐘內（實際 {delta:.0f}s）"
+            kicks[job_id] = nrt
+        # 錯開：三個 kick 不得同時（避免同刻搶 cache_writer 單 worker）
+        assert len(set(kicks.values())) == 3, f"kick 時間須錯開: {kicks}"
+    finally:
+        for j in list(sched.get_jobs()):
+            sched.remove_job(j.id)
