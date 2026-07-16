@@ -135,3 +135,66 @@ def test_no_truncation_flag_on_error_status(api_client):
     status, data, total = api_client._get_collection("/orgs/1/labels")
     assert status == 503
     assert api_client.last_truncated_collections == []
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Task 2: 截斷時 async GET fallback（官方 async GET 流程：
+# Prefer: respond-async → 202+Location+Retry-After → 輪詢 job 直到 done
+# → 從 result.href 下載完整 datafile）
+# ═══════════════════════════════════════════════════════════════════════════
+
+def test_async_fallback_returns_full_collection(api_client, monkeypatch):
+    """截斷觸發 fallback，最終回完整 700 筆，且不留截斷紀錄。"""
+    monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)
+    truncated = [{"href": f"/orgs/1/workloads/{i}"} for i in range(500)]
+    full = [{"href": f"/orgs/1/workloads/{i}"} for i in range(700)]
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),  # 原本的截斷集合 GET
+        (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),  # async GET 觸發
+        (200, {"status": "running"}, {}),  # 輪詢中
+        (200, {"status": "done", "result": {"href": "/orgs/1/workloads_datafile_xyz"}}, {}),  # 完成
+        (200, full, {}),  # 下載 datafile
+    ])
+    status, data, total = api_client._get_collection("/orgs/1/workloads")
+    assert status == 200
+    assert data == full
+    assert total == 700
+    assert api_client.last_truncated_collections == []
+    assert api_client._api_get_with_headers.call_count == 5
+
+
+def test_async_fallback_failure_keeps_truncated_data(api_client, monkeypatch):
+    """輪詢回 failed → 回 500 筆截斷資料、error log 仍在（last_truncated_collections 有記錄）。"""
+    monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)
+    truncated = [{"href": f"/orgs/1/workloads/{i}"} for i in range(500)]
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),
+        (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),
+        (200, {"status": "failed"}, {}),
+    ])
+    status, data, total = api_client._get_collection("/orgs/1/workloads")
+    assert status == 200
+    assert data == truncated
+    assert len(data) == 500
+    assert total == 700
+    assert api_client.last_truncated_collections == ["/orgs/1/workloads"]
+
+
+@responses.activate
+def test_no_fallback_when_not_truncated(api_client):
+    """未截斷（X-Total-Count == 實收筆數）不應發 Prefer: respond-async 請求。"""
+    body = [{"href": "/orgs/1/labels/1"}]
+    responses.add(
+        responses.GET,
+        "https://pce.example.com:8443/api/v2/orgs/1/labels",
+        json=body,
+        status=200,
+        headers={"X-Total-Count": "1"},
+    )
+    status, data, total = api_client._get_collection("/orgs/1/labels")
+    assert status == 200
+    assert total == 1
+    assert api_client.last_truncated_collections == []
+    # 只有一次真實 HTTP 呼叫（原本的集合 GET），沒有額外的 async GET 觸發請求
+    assert len(responses.calls) == 1
+    assert "Prefer" not in responses.calls[0].request.headers

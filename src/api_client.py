@@ -764,17 +764,20 @@ class ApiClient:
             logger.error(f"API GET {endpoint}: {e}")
             return 0, None
 
-    def _api_get_with_headers(self, endpoint: str, timeout: int = 15) -> tuple[int, Any, dict]:
+    def _api_get_with_headers(self, endpoint: str, timeout: int = 15, headers: dict[str, str] | None = None) -> tuple[int, Any, dict]:
         """GET a PCE API endpoint，回傳連 headers 一起（供 _get_collection 讀 X-Total-Count）。
 
         不透過 _request（其簽名回 (status, body) 丟棄 headers、呼叫點太多不便改），
         直接用 self._session；錯誤處理比照 _request：連線例外回 (0, err_bytes, {})。
+
+        headers：額外請求 headers（Task 2 用來帶 Prefer: respond-async 觸發
+        async GET fallback）；預設 None，行為與 Task 1 完全相同。
         """
         if self._session is None:
             raise RuntimeError("ApiClient is closed; create a new instance")
         url = f"{self.api_cfg['url']}/api/v2{endpoint}"
         try:
-            resp = self._session.request(method="GET", url=url, timeout=timeout)
+            resp = self._session.request(method="GET", url=url, timeout=timeout, headers=headers)
         except Exception as e:
             logger.error(f"API GET {endpoint}: {e}")
             return 0, str(e).encode('utf-8'), {}
@@ -817,9 +820,107 @@ class ApiClient:
                 "collection GET truncated: {} returned {}/{} objects",
                 path, actual_count, total_count,
             )
-            self.last_truncated_collections.append(path)
+            # Task 2：截斷時自動改走官方 async GET 流程取回完整集合。成功且筆數
+            # 達到 total_count 九成以上（容忍輪詢期間物件增減）就當作修復完成，
+            # 回傳完整資料且不留截斷紀錄；失敗則維持 Task 1 的截斷資料與 error
+            # log 語意（永不比 Task 1 差）。
+            fallback_data = self._async_collection_get(path, total_count=total_count, timeout=timeout)
+            if fallback_data is not None and len(fallback_data) >= total_count * 0.9:
+                logger.info(
+                    "async GET fallback recovered collection: {} returned {}/{} objects",
+                    path, len(fallback_data), total_count,
+                )
+                return status, fallback_data, total_count
+            # 去重：同一 path 因排程重複呼叫且反覆截斷失敗時，避免
+            # last_truncated_collections 無上限纍積（Task 1 遺留的 append-only 問題）。
+            if path not in self.last_truncated_collections:
+                self.last_truncated_collections.append(path)
 
         return status, data, total_count
+
+    def _async_collection_get(self, path: str, *, total_count: int | None = None, timeout: int = 15) -> list[Any] | None:
+        """集合 GET 截斷時的官方 async GET fallback（vendor 已驗證流程）。
+
+        1. 對同一 path 發 GET，headers 帶 ``Prefer: respond-async``，預期
+           202 且回應 headers 含 Location（job href）與 Retry-After。
+        2. 輪詢 ``GET /api/v2{job_href}``（複用 _api_get_with_headers）直到
+           body ``status == "done"``（Jobs API 用 done，不是 completed——
+           本專案既有 vendor 事實）；failed 或超過 300s 回 None。輪詢間隔
+           從 Retry-After 或 2s 起，夾在 [2, 10] 秒之間。
+        3. done 後從 body ``result.href`` 取得 datafile href，下載完整
+           JSON 陣列並回傳。
+
+        任何一步失敗都回 None；呼叫端（_get_collection）自行決定 fallback
+        失敗時要不要維持截斷資料。
+        """
+        status, _data, headers = self._api_get_with_headers(
+            path, timeout=timeout, headers={"Prefer": "respond-async"}
+        )
+        if status != 202:
+            logger.error(
+                "async collection GET fallback: expected 202 (respond-async), got {} for {}",
+                status, path,
+            )
+            return None
+
+        job_href = (headers or {}).get("Location")
+        if not job_href:
+            logger.error(
+                "async collection GET fallback: 202 response missing Location header for {}",
+                path,
+            )
+            return None
+
+        retry_after_raw = (headers or {}).get("Retry-After")
+        try:
+            poll_interval = float(retry_after_raw) if retry_after_raw else 2.0
+        except (TypeError, ValueError):
+            poll_interval = 2.0
+        poll_interval = min(max(poll_interval, 2.0), 10.0)
+
+        deadline = time.time() + 300
+        job_body: dict[str, Any] | None = None
+        while time.time() < deadline:
+            time.sleep(poll_interval)
+            poll_status, poll_data, _poll_headers = self._api_get_with_headers(job_href, timeout=timeout)
+            if poll_status != 200 or not isinstance(poll_data, dict):
+                continue
+            state = poll_data.get("status")
+            if state == "done":
+                job_body = poll_data
+                break
+            if state == "failed":
+                logger.error(
+                    "async collection GET fallback: job {} reported failed for {}",
+                    job_href, path,
+                )
+                return None
+            # running/queued 等其他狀態繼續輪詢
+
+        if job_body is None:
+            logger.error(
+                "async collection GET fallback: job {} did not complete within 300s for {}",
+                job_href, path,
+            )
+            return None
+
+        result_href = (job_body.get("result") or {}).get("href")
+        if not result_href:
+            logger.error(
+                "async collection GET fallback: done job {} missing result.href for {}",
+                job_href, path,
+            )
+            return None
+
+        dl_status, dl_data, _dl_headers = self._api_get_with_headers(result_href, timeout=timeout)
+        if dl_status != 200 or not isinstance(dl_data, list):
+            logger.error(
+                "async collection GET fallback: datafile download failed status={} for {}",
+                dl_status, path,
+            )
+            return None
+
+        return dl_data
 
     def _api_put(self, endpoint: str, payload: dict[str, Any], timeout: int = 15) -> int:
         """PUT a PCE API endpoint. Returns status_code."""
