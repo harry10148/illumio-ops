@@ -144,6 +144,23 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     )
 
     try:
+        _tls_cfg = (cm.config.get("web_gui") or {}).get("tls") or {}
+        if (_tls_cfg.get("enabled", True) and _tls_cfg.get("self_signed", True)
+                and _tls_cfg.get("auto_renew", True)):
+            from src.scheduler.jobs import run_tls_renew_check
+            sched.add_job(
+                _instrument("tls_renew_check", run_tls_renew_check, 86400),
+                trigger=IntervalTrigger(hours=24),
+                args=[cm],
+                id="tls_renew_check",
+                name="TLS self-signed renew check",
+                replace_existing=True,
+                next_run_time=_kick0 + _dt0.timedelta(seconds=100),
+            )
+    except Exception as exc:
+        logger.exception("Failed to register tls renew job: {}", exc)
+
+    try:
         cache_cfg = cm.models.pce_cache
         if cache_cfg.enabled:
             import datetime as _dt

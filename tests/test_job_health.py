@@ -92,3 +92,30 @@ def test_scheduler_jobs_are_instrumented(tmp_path, monkeypatch):
     finally:
         for j in list(sched.get_jobs()):
             sched.remove_job(j.id)
+
+
+def test_run_tls_renew_check_invokes_helper(tmp_path, monkeypatch):
+    from unittest.mock import MagicMock, patch
+    from src.scheduler.jobs import run_tls_renew_check
+    cm = MagicMock()
+    cm.config = {"web_gui": {"tls": {"enabled": True, "self_signed": True,
+                                      "auto_renew": True, "auto_renew_days": 30}}}
+    with patch("src.gui._helpers._maybe_auto_renew_self_signed",
+               return_value=(True, 396)) as mock_renew:
+        run_tls_renew_check(cm)
+    mock_renew.assert_called_once()
+    _args, kwargs = mock_renew.call_args
+    assert kwargs.get("threshold_days") == 30
+
+
+def test_run_tls_renew_check_swallows_exceptions():
+    from unittest.mock import MagicMock, patch
+    from src.scheduler.jobs import run_tls_renew_check
+    cm = MagicMock()
+    cm.config = {"web_gui": {"tls": {"enabled": True, "self_signed": True,
+                                      "auto_renew": True}}}
+    with patch("src.gui._helpers._maybe_auto_renew_self_signed",
+               side_effect=RuntimeError("boom")), \
+         patch("src.scheduler.jobs.logger") as mock_logger:
+        run_tls_renew_check(cm)
+    assert mock_logger.exception.called

@@ -449,3 +449,29 @@ def run_siem_dispatch(cm) -> None:
                 logger.exception("run_siem_dispatch destination {!r} failed: {}", dest_cfg.name, exc)
     except Exception as exc:
         logger.exception("run_siem_dispatch failed: {}", exc)
+
+
+def run_tls_renew_check(cm) -> None:
+    """每日檢查 self-signed 憑證天數，低於門檻時就地重簽。
+
+    限制：只落地憑證檔，執行中的 GUI listener 不會熱換——續期後記
+    warning 提示重啟套用。到期天數的常態可視性由 overview 的 tls 卡涵蓋。
+    """
+    try:
+        from src.gui._helpers import _maybe_auto_renew_self_signed, _ROOT_DIR
+        tls_cfg = (cm.config.get("web_gui") or {}).get("tls") or {}
+        if not (tls_cfg.get("enabled", True) and tls_cfg.get("self_signed", True)
+                and tls_cfg.get("auto_renew", True)):
+            return
+        cert_dir = os.path.join(_ROOT_DIR, "config", "tls")
+        threshold = int(tls_cfg.get("auto_renew_days", 30))
+        renewed, days = _maybe_auto_renew_self_signed(cert_dir,
+                                                      threshold_days=threshold)
+        if renewed:
+            logger.warning(
+                "TLS self-signed cert renewed on disk ({} days remaining); "
+                "restart the service to apply", days)
+        else:
+            logger.info("TLS cert check: {} days remaining", days)
+    except Exception as exc:
+        logger.exception("run_tls_renew_check failed: {}", exc)

@@ -176,3 +176,35 @@ def test_every_long_interval_job_has_startup_kick(tmp_path):
     finally:
         for j in list(sched.get_jobs()):
             sched.remove_job(j.id)
+
+
+def test_tls_renew_job_registered_when_self_signed_auto_renew(tmp_path):
+    from src.scheduler import build_scheduler
+    cm = _cm(tmp_path, archive_enabled=False)
+    cm.models.pce_cache.enabled = False
+    cm.models.siem.enabled = False
+    cm.config = {"web_gui": {"tls": {"enabled": True, "self_signed": True,
+                                      "auto_renew": True}}}
+    sched = build_scheduler(cm)
+    try:
+        job = sched.get_job("tls_renew_check")
+        assert job is not None
+        assert job.next_run_time is not None
+    finally:
+        for j in list(sched.get_jobs()):
+            sched.remove_job(j.id)
+
+
+def test_tls_renew_job_absent_when_disabled(tmp_path):
+    from src.scheduler import build_scheduler
+    cm = _cm(tmp_path, archive_enabled=False)
+    cm.models.pce_cache.enabled = False
+    cm.models.siem.enabled = False
+    cm.config = {"web_gui": {"tls": {"enabled": True, "self_signed": True,
+                                      "auto_renew": False}}}
+    sched = build_scheduler(cm)
+    try:
+        assert sched.get_job("tls_renew_check") is None
+    finally:
+        for j in list(sched.get_jobs()):
+            sched.remove_job(j.id)
