@@ -95,6 +95,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         id="tick_rule_schedules",
         name="Rule schedule tick",
         replace_existing=True,
+        next_run_time=_kick0 + _dt0.timedelta(seconds=40),
     )
     ven_summary_interval = int(
         cm.config.get("dashboard", {}).get("ven_summary_interval_seconds", 300)
@@ -106,6 +107,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         id="ven_summary",
         name="VEN status summary",
         replace_existing=True,
+        next_run_time=_kick0 + _dt0.timedelta(seconds=60),
     )
     posture_summary_interval = int(
         cm.config.get("dashboard", {}).get("posture_summary_interval_seconds", 600)

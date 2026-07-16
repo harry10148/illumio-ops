@@ -145,3 +145,34 @@ def test_top_level_periodic_jobs_get_startup_kick(tmp_path):
     finally:
         for j in list(sched.get_jobs()):
             sched.remove_job(j.id)
+
+
+def test_every_long_interval_job_has_startup_kick(tmp_path):
+    """通用守門（防同類回歸）：scheduler 內任何間隔 >= 5 分鐘的 interval job
+    一律必須帶近期首跑 kick。逐一補洞已漏掉兩次（2026-07-14 archive 事故後
+    通則化時又漏 tick_rule_schedules / ven_summary），改為掃描全部 job 的不變量。
+    未來新增長間隔 job 忘記 kick 會直接紅在這裡。"""
+    import datetime
+    from src.scheduler import build_scheduler
+    cm = _cm(tmp_path, archive_enabled=True)
+    cm.models.pce_cache.enabled = True
+    cm.models.pce_cache.archive_interval_hours = 24
+    cm.models.pce_cache.events_poll_interval_seconds = 300
+    cm.models.pce_cache.traffic_poll_interval_seconds = 3600
+    cm.models.siem.enabled = False
+    cm.config = {}
+    sched = build_scheduler(cm)
+    try:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        offenders = []
+        for job in sched.get_jobs():
+            interval = getattr(job.trigger, "interval", None)
+            if interval is None or interval.total_seconds() < 300:
+                continue
+            nrt = job.next_run_time
+            if nrt is None or (nrt - now).total_seconds() > 900:
+                offenders.append(f"{job.id} (interval={interval}, next={nrt})")
+        assert not offenders, f"長間隔 job 缺首跑 kick: {offenders}"
+    finally:
+        for j in list(sched.get_jobs()):
+            sched.remove_job(j.id)
