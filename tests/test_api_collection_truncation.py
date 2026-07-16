@@ -102,3 +102,36 @@ def test_get_all_rulesets_routes_through_get_collection(api_client):
     out = api_client.get_all_rulesets()
     api_client._get_collection.assert_called_once()
     assert out == [{"href": "/rs/1"}]
+
+
+@responses.activate
+def test_get_with_headers_non_json_200_returns_error_tuple(api_client):
+    """200 但 body 非 JSON：_api_get_with_headers 須回 (0, None, {})，
+    不可讓 JSONDecodeError 炸穿到 getter 呼叫端（打破「Returns [] on error」契約）。"""
+    responses.add(
+        responses.GET,
+        "https://pce.example.com:8443/api/v2/orgs/1/sec_policy/active/services",
+        body=b"<html>oops",
+        status=200,
+    )
+    status, data, headers = api_client._api_get_with_headers(
+        "/orgs/1/sec_policy/active/services"
+    )
+    assert (status, data, headers) == (0, None, {})
+    # 經由 getter 呼叫也不應拋例外，且維持「錯誤回 []」的契約
+    assert api_client.get_services() == []
+
+
+@responses.activate
+def test_no_truncation_flag_on_error_status(api_client):
+    """非 200（如 503）即使意外帶 X-Total-Count 也不可誤判為截斷。"""
+    responses.add(
+        responses.GET,
+        "https://pce.example.com:8443/api/v2/orgs/1/labels",
+        json={"error": "unavailable"},
+        status=503,
+        headers={"X-Total-Count": "700"},
+    )
+    status, data, total = api_client._get_collection("/orgs/1/labels")
+    assert status == 503
+    assert api_client.last_truncated_collections == []

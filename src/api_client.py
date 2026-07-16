@@ -692,7 +692,7 @@ class ApiClient:
         """
         try:
             org = self.api_cfg['org_id']
-            status, data, _total = self._get_collection(f"/orgs/{org}/workloads?managed=true")
+            status, data, _total = self._get_collection(f"/orgs/{org}/workloads?managed=true", timeout=30)
             if status == 200:
                 return data
             logger.error(f"Fetch Managed Workloads Failed: {status}")
@@ -779,7 +779,13 @@ class ApiClient:
             logger.error(f"API GET {endpoint}: {e}")
             return 0, str(e).encode('utf-8'), {}
         if resp.status_code == 200:
-            return resp.status_code, orjson.loads(resp.content), resp.headers
+            try:
+                return resp.status_code, orjson.loads(resp.content), resp.headers
+            except Exception as e:
+                # body 非合法 JSON：比照 _api_get 的錯誤契約回 (0, None, {})，
+                # 避免例外炸穿到沒有 try/except 的 getter 呼叫端
+                logger.error(f"API GET {endpoint}: {e}")
+                return 0, None, {}
         if resp.status_code == 204:
             return resp.status_code, {}, resp.headers
         return resp.status_code, None, resp.headers
@@ -806,7 +812,7 @@ class ApiClient:
                     break
 
         actual_count = len(data) if isinstance(data, list) else 0
-        if total_count is not None and total_count > actual_count:
+        if status == 200 and total_count is not None and total_count > actual_count:
             logger.error(
                 "collection GET truncated: {} returned {}/{} objects",
                 path, actual_count, total_count,
