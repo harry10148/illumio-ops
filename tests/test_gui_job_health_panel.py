@@ -6,6 +6,7 @@ _EN = Path("src/i18n_en.json")
 _ZH = Path("src/i18n_zh_TW.json")
 _RS_JS = Path("src/static/js/rule-scheduler.js")
 _HTML = Path("src/templates/index.html")
+_DASH_JS = Path("src/static/js/dashboard.js")
 
 
 def test_overview_pane_fetches_dashboard_overview():
@@ -38,6 +39,14 @@ def test_job_health_i18n_bilingual():
               "gui_jh_never_ran", "gui_jh_overdue", "gui_ov_tls_cert",
               "gui_ov_tls_days", "gui_ov_tls_expiring"):
         assert k in en and k in zh, k
+
+
+def test_dashboard_tiles_show_staleness():
+    """2026-07-13 觀測性 backlog task 6：ven/posture tile 需以 computed_at/
+    generated_at 判斷 stale，凍結資料不能看起來像新鮮的。"""
+    js = _DASH_JS.read_text(encoding="utf-8")
+    assert "computed_at" in js
+    assert "_ovStale" in js
 
 
 def test_rule_scheduler_list_shows_last_run():

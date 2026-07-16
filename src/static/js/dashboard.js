@@ -1463,6 +1463,13 @@ function _ovSeverityClass(val, hiThresh, mdThresh) {
   if (val >= mdThresh) return 'v-md';
   return 'v-ok';
 }
+// 資料新鮮度：computed/generated 時戳距今超過門檻（毫秒）視為 stale。
+function _ovStale(ts, thresholdMs) {
+  if (!ts) return true;
+  var t = Date.parse(ts);
+  if (isNaN(t)) return true;
+  return (Date.now() - t) > thresholdMs;
+}
 
 function _renderPostureHero(posture, T) {
   var hero   = document.getElementById('ov-posture-hero');
@@ -1479,8 +1486,12 @@ function _renderPostureHero(posture, T) {
   nodata.style.display = 'none';
 
   // Score number
+  var postureStale = _ovStale(posture.generated_at, 30 * 60 * 1000);
   var scoreEl = document.getElementById('ov-posture-score-n');
-  if (scoreEl) scoreEl.textContent = String(posture.score);
+  if (scoreEl) {
+    scoreEl.textContent = String(posture.score);
+    scoreEl.style.color = postureStale ? 'var(--dim)' : '';
+  }
 
   // Component metrics
   var metricsEl = document.getElementById('ov-posture-metrics');
@@ -1517,6 +1528,11 @@ function _renderPostureHero(posture, T) {
               + '<div class="posture-metric-k">' + T('gui_ov_posture_lateral', 'Lateral movement') + '</div>'
               + '</div>';
       }
+    }
+    if (postureStale) {
+      html += '<div style="font-size:11px;color:var(--dim);width:100%;">' + (posture.generated_at
+            ? T('gui_ov_stale_since', 'stale') + ' ' + _fmtAge((Date.now() - Date.parse(posture.generated_at)) / 1000)
+            : T('gui_jh_never_ran', 'never ran')) + '</div>';
     }
     metricsEl.innerHTML = html;
   }
@@ -1652,13 +1668,17 @@ function renderOverview(d) {
   // VEN
   var v = d.ven || {};
   _ovMark('ov-ven-mark', v.verdict);
+  var venStale = _ovStale(v.computed_at, 15 * 60 * 1000);
   document.getElementById('ov-ven-body').innerHTML = (v.verdict === 'unknown')
     ? '<div style="color:var(--dim)">—</div>'
-    : '<div class="ov-big">' + v.online + '/' + v.total + '</div>'
+    : '<div class="ov-big"' + (venStale ? ' style="color:var(--dim)"' : '') + '>' + v.online + '/' + v.total + '</div>'
       + '<div class="ov-sub">'
         + (v.offline ? v.offline + ' ' + T('gui_ov_offline','offline') + ' &middot; ' : '')
         + T('gui_ov_oldest_hb','oldest heartbeat') + ' ' + _fmtAge(v.oldest_heartbeat_age_s)
       + '</div>'
+      + (venStale ? '<div style="font-size:11px;color:var(--dim);">' + (v.computed_at
+          ? T('gui_ov_stale_since', 'stale') + ' ' + _fmtAge((Date.now() - Date.parse(v.computed_at)) / 1000)
+          : T('gui_jh_never_ran', 'never ran')) + '</div>' : '')
       + '<div class="ov-drill">&#8594; ' + T('gui_ov_drill_workloads','Workloads') + '</div>';
   // Blocked (tile removed from redesign layout — guard for safety)
   var b = d.blocked || {};

@@ -91,3 +91,42 @@ def test_run_ven_summary_preserves_last_good_on_error(tmp_path, monkeypatch):
     s = json.load(open(dashboard_path))["ven_summary"]
     assert s["total"] == 5          # last-good counts preserved
     assert "last_error" in s and "PCE down" in s["last_error"]
+
+
+def test_ven_summary_writes_computed_at_on_success_only(tmp_path, monkeypatch):
+    """computed_at = last successful computation time. updated_at is bumped by
+    _mark_err on every attempt (success or failure), so it can't be used as a
+    freshness signal — computed_at must only move on success, staying frozen
+    while the job fails or hangs so the GUI can flag the frozen numbers."""
+    from src.scheduler.jobs import run_ven_summary
+
+    dashboard_path = str(tmp_path / "dashboard_summary.json")
+    state_file = str(tmp_path / "state.json")
+    monkeypatch.setattr(dashboard_store, "_dashboard_file", lambda: dashboard_path)
+
+    cm = MagicMock()
+    cm.config = {"settings": {}}
+    api = MagicMock()
+    api.fetch_managed_workloads.return_value = [_wl("a", 0.2), _wl("b", 0.3)]
+    api.__enter__.return_value = api
+    api.__exit__.return_value = False
+
+    # Success run: computed_at gets written.
+    with patch("src.scheduler.jobs.ApiClient", return_value=api), \
+         patch("src.scheduler.jobs._resolve_state_file", return_value=state_file):
+        run_ven_summary(cm)
+
+    s = json.load(open(dashboard_path))["ven_summary"]
+    assert s["computed_at"].endswith("Z")
+    computed_at_after_success = s["computed_at"]
+
+    # Failure run: computed_at must not change; last_error/updated_at do.
+    api.fetch_managed_workloads.side_effect = RuntimeError("PCE down")
+    with patch("src.scheduler.jobs.ApiClient", return_value=api), \
+         patch("src.scheduler.jobs._resolve_state_file", return_value=state_file):
+        run_ven_summary(cm)
+
+    s2 = json.load(open(dashboard_path))["ven_summary"]
+    assert s2["computed_at"] == computed_at_after_success   # frozen, not updated
+    assert "last_error" in s2 and "PCE down" in s2["last_error"]
+    assert s2["updated_at"]

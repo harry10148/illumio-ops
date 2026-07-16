@@ -342,6 +342,7 @@ def run_ven_summary(cm) -> None:
             "oldest_heartbeat_age_s": int(oldest_age),
             "attention": attention[:20],
             "updated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "computed_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             "os_distribution": estate_inventory.os_distribution(workloads or []),
             "enforcement_distribution": estate_inventory.enforcement_distribution(workloads or []),
         }

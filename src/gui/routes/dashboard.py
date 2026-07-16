@@ -211,6 +211,8 @@ def _overview_posture(state):
             p = compute_posture(snap.get("kpis") or snap)
             if p.get("available"):
                 p["source_date"] = snap.get("generated_at", "")
+                p["generated_at"] = datetime.datetime.now(datetime.timezone.utc).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ")
                 p["remediation"] = build_remediation(p)
                 return p
     except Exception:
@@ -242,7 +244,8 @@ def _overview_ven(state):
     return {"total": total, "online": int(vs.get("online", 0)), "offline": offline,
             "degraded": int(vs.get("degraded", 0)),
             "oldest_heartbeat_age_s": int(vs.get("oldest_heartbeat_age_s", 0)),
-            "attention": (vs.get("attention") or [])[:20], "verdict": verdict}
+            "attention": (vs.get("attention") or [])[:20], "verdict": verdict,
+            "computed_at": vs.get("computed_at")}
 
 
 def _overview_job_health():

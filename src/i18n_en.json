@@ -1807,6 +1807,7 @@
   "gui_ov_siem_queue": "SIEM Queue",
   "gui_ov_siem_success_1h": "Success (1h)",
   "gui_ov_stale": "data may be stale",
+  "gui_ov_stale_since": "stale for",
   "gui_ov_suppressed": "suppressed",
   "gui_ov_tls_cert": "TLS Certificate",
   "gui_ov_tls_days": "days",

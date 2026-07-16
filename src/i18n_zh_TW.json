@@ -1784,6 +1784,7 @@
   "gui_ov_siem_queue": "SIEM 佇列",
   "gui_ov_siem_success_1h": "成功率 (1h)",
   "gui_ov_stale": "資料可能過時",
+  "gui_ov_stale_since": "資料停更",
   "gui_ov_suppressed": "已抑制",
   "gui_ov_tls_cert": "TLS 憑證",
   "gui_ov_tls_days": "天",
