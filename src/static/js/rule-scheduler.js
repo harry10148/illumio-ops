@@ -479,7 +479,7 @@ async function rsSaveSchedule() {
 /* ── Schedules list ── */
 async function rsLoadSchedules() {
   const tbody = $('rs-schedules-body');
-  tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--dim);padding:24px;">' + _t('gui_rs_loading_schedules') + '</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--dim);padding:24px;">' + _t('gui_rs_loading_schedules') + '</td></tr>';
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 30000);
@@ -535,6 +535,15 @@ async function rsLoadSchedules() {
       const editBtn = h('button', { class: 'rs-edit-btn' }, _t('gui_rs_col_edit'));
       editBtn.dataset.action = 'rsEditSchedule';
       editBtn.dataset.args = JSON.stringify([s.id]);
+      // Last run cell: last_checked timestamp plus optional action/result suffix.
+      let lastTd;
+      if (s.last_checked) {
+        const resTxt = s.last_result === 'error' ? ' !' : '';
+        const text = s.last_checked + (s.last_action ? (' (' + s.last_action + resTxt + ')') : '');
+        lastTd = h('td', s.last_result === 'error' ? { style: { color: 'var(--danger)' } } : null, text);
+      } else {
+        lastTd = h('td', null, _t('gui_jh_never_ran'));
+      }
       tr.replaceChildren(
         h('td', null, cb),
         h('td', null, typeStr),
@@ -548,13 +557,14 @@ async function rsLoadSchedules() {
         h('td', { style: { fontSize: '.8rem' } }, ...timingChildren),
         h('td', null, String(s.id)),
         h('td', null, editBtn),
+        lastTd,
       );
       tbody.appendChild(tr);
     });
     initTableResizers();
   } catch (e) {
     const msg = e.name === 'AbortError' ? _t('gui_rs_request_timed_out_unreachable') : e.message;
-    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;color:var(--danger);padding:24px;">' + escapeHtml(msg) + '</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--danger);padding:24px;">' + escapeHtml(msg) + '</td></tr>';
     toast(_t('gui_rs_error_loading_schedules').replace('{error}', msg), true);
   }
 }

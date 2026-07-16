@@ -94,6 +94,15 @@ def compute_next_trigger(schedules, now=None):
     return min(candidates).isoformat()
 
 
+def _resolve_rule_state_file() -> str:
+    """rule 排程執行狀態存 logs/state.json（與 report scheduler 同檔異 key）。"""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(root, "logs", "state.json")
+
+
+_RULE_STATE_KEY = "rule_schedule_states"
+
+
 def truncate(text, width):
     """Truncate text to width, stripping schedule tags."""
     if not text:
@@ -231,8 +240,11 @@ class ScheduleEngine:
         log(f"[{now.strftime('%Y-%m-%d %H:%M:%S')} {tz_label}] {t('rs_checking', default='Checking schedules...')}")
 
         expired_hrefs = []
+        tick_states = {}
 
         for href, c in list(db_data.items()):
+            now_z = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            tick_states[href] = {"last_checked": now_z}
             try:
                 is_allow = (c.get('action', 'allow') == 'allow')
                 in_window = False
@@ -275,6 +287,7 @@ class ScheduleEngine:
                         self.api.toggle_and_provision(href, False, c.get('is_ruleset'))
                         self.api.update_rule_note(href, "", remove=True)
                         expired_hrefs.append(href)
+                        tick_states[href].update({"last_action": "expire", "last_result": "ok"})
                         continue
                     else:
                         target = True
@@ -300,10 +313,16 @@ class ScheduleEngine:
                         r_name = c.get('detail_name', c['name'])
                         status_str = f"{Colors.GREEN}Enabled{Colors.ENDC}" if target else f"{Colors.FAIL}Disabled{Colors.ENDC}"
                         log(f"[ACTION] {t('rs_toggle', default='Toggle')} -> {status_str} (ID: {Colors.CYAN}{extract_id(href)}{Colors.ENDC}) - {r_name}")
+                        action_label = "enable" if target else "disable"
                         if self.api.toggle_and_provision(href, target, c.get('is_ruleset')):
                             log(f"{Colors.GREEN}[SUCCESS] {t('rs_provisioned', default='Provisioned successfully')}{Colors.ENDC}")
+                            tick_states[href].update({"last_action": action_label, "last_result": "ok"})
                         else:
                             log(f"{Colors.FAIL}[FAILED] Toggle/provision failed for {r_name} (ID:{extract_id(href)}){Colors.ENDC}")
+                            tick_states[href].update({
+                                "last_action": action_label, "last_result": "error",
+                                "error": "Toggle/provision failed"[:300],
+                            })
                 elif status == 404:
                     r_name = c.get('detail_name', c['name'])
                     log(f"{Colors.WARNING}{t('rs_target_not_found', name=r_name, id=extract_id(href), default='[SKIP] {name} (ID:{id}) not found on PCE (deleted?). No action taken.')}{Colors.ENDC}")
@@ -317,11 +336,34 @@ class ScheduleEngine:
             except Exception as _item_err:
                 r_name = c.get('detail_name', c.get('name', href))
                 log(f"{Colors.FAIL}[ERROR] Exception processing {r_name} (ID:{extract_id(href)}): {_item_err}{Colors.ENDC}")
+                tick_states[href]["last_result"] = "error"
+                tick_states[href]["error"] = str(_item_err)[:300]
 
         # Clean up expired one-time schedules
         for h in expired_hrefs:
             self.db.delete(h)
         if expired_hrefs:
             log(f"{Colors.WARNING}[CLEANUP] {t('rs_cleanup', default='Removed')} {len(expired_hrefs)} {t('rs_expired_schedules', default='expired schedule(s)')}.{Colors.ENDC}")
+
+        if tick_states:
+            try:
+                from src.state_store import update_state_file
+
+                def _merge(data):
+                    live_hrefs = set(self.db.get_all())
+                    states = dict(data.get(_RULE_STATE_KEY) or {})
+                    for h in list(states):
+                        if h not in live_hrefs and h not in tick_states:
+                            states.pop(h)
+                    for h, st in tick_states.items():
+                        cur = dict(states.get(h) or {})
+                        cur.update(st)
+                        states[h] = cur
+                    data[_RULE_STATE_KEY] = states
+                    return data
+
+                update_state_file(_resolve_rule_state_file(), _merge)
+            except Exception:
+                logger.opt(exception=True).debug("rule schedule state persist failed")
 
         return logs

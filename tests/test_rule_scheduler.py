@@ -56,3 +56,88 @@ def test_one_time_reverse_tz_naive_now_aware_expire_stays_active(tmp_path):
 
     api.toggle_and_provision.assert_called_once_with(href, True, None)
     assert db.get(href) is not None, "not-yet-expired one_time schedule must stay in db"
+
+
+def test_check_persists_per_schedule_state(tmp_path, monkeypatch):
+    """2026-07-16 backlog：rule 排程要有 per-schedule 執行紀錄
+    （report scheduler 早有，rule 這側缺——排程沒生效時分不出
+    「時間未到」還是「從未觸發」）。"""
+    import json
+    from unittest.mock import MagicMock
+    from src.rule_scheduler import ScheduleDB, ScheduleEngine
+    state_file = str(tmp_path / "state.json")
+    monkeypatch.setattr("src.rule_scheduler._resolve_rule_state_file",
+                        lambda: state_file)
+    db = ScheduleDB(str(tmp_path / "rule_schedules.json"))
+    db.db = {"/orgs/1/sec_policy/active/rule_sets/1": {
+        "type": "recurring", "name": "rs", "is_ruleset": True,
+        "action": "enable", "days": ["mon", "tue", "wed", "thu", "fri",
+                                      "sat", "sun"],
+        "start": "00:00", "end": "23:59", "timezone": "UTC",
+    }}
+    api = MagicMock()
+    api.has_draft_changes.return_value = False
+    api.get_live_item.return_value = {"enabled": True}
+    engine = ScheduleEngine(db, api)
+    engine.check(silent=True, tz_str="UTC")
+    states = json.load(open(state_file))["rule_schedule_states"]
+    entry = states["/orgs/1/sec_policy/active/rule_sets/1"]
+    assert entry["last_checked"].endswith("Z")
+
+
+def test_schedules_list_enriches_last_state(client, monkeypatch, tmp_path):
+    """GET /api/rule_scheduler/schedules must enrich each schedule with
+    last_checked/last_action/last_result read from state.json, mirroring the
+    report-schedules list enrichment in gui/routes/reports.py."""
+    import json
+    from tests._helpers import _csrf
+
+    href = "/orgs/1/sec_policy/active/rule_sets/1"
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "rule_schedules.json").write_text(json.dumps({
+        href: {
+            "type": "recurring", "name": "rs", "is_ruleset": True,
+            "action": "allow", "days": ["mon", "tue", "wed", "thu", "fri",
+                                         "sat", "sun"],
+            "start": "00:00", "end": "23:59", "timezone": "UTC",
+        }
+    }), encoding="utf-8")
+
+    state_file = tmp_path / "state.json"
+    state_file.write_text(json.dumps({
+        "rule_schedule_states": {
+            href: {
+                "last_checked": "2026-07-16T00:00:00Z",
+                "last_action": "enable",
+                "last_result": "ok",
+            }
+        }
+    }), encoding="utf-8")
+
+    monkeypatch.setattr("src.gui.routes.rule_scheduler._resolve_config_dir",
+                        lambda: str(config_dir))
+    monkeypatch.setattr("src.rule_scheduler._resolve_rule_state_file",
+                        lambda: str(state_file))
+    monkeypatch.setattr("src.api_client.ApiClient.get_live_item",
+                        lambda self, h: (200, {"enabled": True, "name": "rs"}))
+
+    login = client.post(
+        "/api/login",
+        json={"username": "admin", "password": "testpass"},
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert login.status_code == 200
+    _csrf(login)
+
+    resp = client.get(
+        "/api/rule_scheduler/schedules",
+        environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+    )
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body) == 1
+    entry = body[0]
+    assert entry["last_checked"] == "2026-07-16T00:00:00Z"
+    assert entry["last_action"] == "enable"
+    assert entry["last_result"] == "ok"

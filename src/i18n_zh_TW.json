@@ -2056,6 +2056,7 @@
   "gui_rs_sun": "星期日",
   "gui_rs_tab": "規則排程",
   "gui_rs_target": "目標",
+  "gui_rs_th_last_run": "上次執行",
   "gui_rs_thu": "星期四",
   "gui_rs_timeline_empty": "過去 24 小時無規則切換紀錄",
   "gui_rs_timezone": "時區",

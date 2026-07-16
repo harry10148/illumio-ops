@@ -234,11 +234,18 @@ def make_rule_scheduler_blueprint(
     def rs_schedules_list():
         db, api, _ = _get_rs_components()
         db_data = db.get_all()
+        from src.state_store import load_state_file
+        from src.rule_scheduler import _resolve_rule_state_file, _RULE_STATE_KEY
+        states = load_state_file(_resolve_rule_state_file()).get(_RULE_STATE_KEY, {})
         result = []
         for href, conf in db_data.items():
             entry = dict(conf)
             entry['href'] = href
             entry['id'] = _extract_id_href(href)
+            st = states.get(href) or {}
+            entry['last_checked'] = st.get('last_checked')
+            entry['last_action'] = st.get('last_action')
+            entry['last_result'] = st.get('last_result')
             # Live status check
             try:
                 status, data = api.get_live_item(href)
