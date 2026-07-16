@@ -161,6 +161,11 @@ def test_async_fallback_returns_full_collection(api_client, monkeypatch):
     assert total == 700
     assert api_client.last_truncated_collections == []
     assert api_client._api_get_with_headers.call_count == 5
+    # 輪詢呼叫要打 Location 抽出的 job href，下載呼叫要打 result.href
+    calls = api_client._api_get_with_headers.call_args_list
+    assert calls[2].args[0] == "/orgs/1/jobs/abc123"  # 輪詢中
+    assert calls[3].args[0] == "/orgs/1/jobs/abc123"  # 輪詢到 done
+    assert calls[4].args[0] == "/orgs/1/workloads_datafile_xyz"  # 下載 datafile
 
 
 def test_async_fallback_failure_keeps_truncated_data(api_client, monkeypatch):
@@ -178,6 +183,39 @@ def test_async_fallback_failure_keeps_truncated_data(api_client, monkeypatch):
     assert len(data) == 500
     assert total == 700
     assert api_client.last_truncated_collections == ["/orgs/1/workloads"]
+    # 輪詢呼叫要打 Location 抽出的 job href
+    calls = api_client._api_get_with_headers.call_args_list
+    assert calls[2].args[0] == "/orgs/1/jobs/abc123"
+
+
+def test_truncation_record_cleared_after_successful_fallback(api_client, monkeypatch):
+    """跨呼叫「先失敗後成功」：第一次 fallback 失敗留下截斷紀錄，
+    第二次 fallback 成功恢復完整資料時，該紀錄必須被清除，否則永久殘留假陽性。"""
+    monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)
+    truncated = [{"href": f"/orgs/1/workloads/{i}"} for i in range(500)]
+    full = [{"href": f"/orgs/1/workloads/{i}"} for i in range(700)]
+
+    # 第一次呼叫：fallback 失敗，記錄存在
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),
+        (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),
+        (200, {"status": "failed"}, {}),
+    ])
+    api_client._get_collection("/orgs/1/workloads")
+    assert api_client.last_truncated_collections == ["/orgs/1/workloads"]
+
+    # 第二次呼叫：fallback 成功，記錄必須被清除
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),
+        (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),
+        (200, {"status": "done", "result": {"href": "/orgs/1/workloads_datafile_xyz"}}, {}),
+        (200, full, {}),
+    ])
+    status, data, total = api_client._get_collection("/orgs/1/workloads")
+    assert status == 200
+    assert data == full
+    assert total == 700
+    assert api_client.last_truncated_collections == []
 
 
 @responses.activate

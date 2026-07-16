@@ -824,12 +824,15 @@ class ApiClient:
             # 達到 total_count 九成以上（容忍輪詢期間物件增減）就當作修復完成，
             # 回傳完整資料且不留截斷紀錄；失敗則維持 Task 1 的截斷資料與 error
             # log 語意（永不比 Task 1 差）。
-            fallback_data = self._async_collection_get(path, total_count=total_count, timeout=timeout)
+            fallback_data = self._async_collection_get(path, timeout=timeout)
             if fallback_data is not None and len(fallback_data) >= total_count * 0.9:
                 logger.info(
                     "async GET fallback recovered collection: {} returned {}/{} objects",
                     path, len(fallback_data), total_count,
                 )
+                # 跨呼叫先失敗後成功：清除先前殘留的截斷紀錄，避免假陽性永久殘留
+                if path in self.last_truncated_collections:
+                    self.last_truncated_collections.remove(path)
                 return status, fallback_data, total_count
             # 去重：同一 path 因排程重複呼叫且反覆截斷失敗時，避免
             # last_truncated_collections 無上限纍積（Task 1 遺留的 append-only 問題）。
@@ -838,7 +841,7 @@ class ApiClient:
 
         return status, data, total_count
 
-    def _async_collection_get(self, path: str, *, total_count: int | None = None, timeout: int = 15) -> list[Any] | None:
+    def _async_collection_get(self, path: str, *, timeout: int = 15) -> list[Any] | None:
         """集合 GET 截斷時的官方 async GET fallback（vendor 已驗證流程）。
 
         1. 對同一 path 發 GET，headers 帶 ``Prefer: respond-async``，預期
