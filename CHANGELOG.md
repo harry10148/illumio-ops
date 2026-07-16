@@ -48,7 +48,9 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   unsynced (red) because it only recognized `synced`.
 - API layer hardening (phase B-1): collection GETs detect the PCE 500-item
   page cap from response headers and fall back to an async job for the full
-  collection instead of silently working from a truncated inventory; async
+  collection instead of silently working from a truncated inventory (if the
+  async fallback itself fails, the truncated data is kept and an error is
+  logged — reports do not fail on this residual path); async
   traffic-query result download failures now raise `AsyncDownloadError`
   instead of reporting zero flows (rule hit count could mark every rule
   unused); inventory getters gained `raise_on_error` and the policy diff /

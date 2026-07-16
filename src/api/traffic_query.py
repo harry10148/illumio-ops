@@ -1413,6 +1413,10 @@ class TrafficQueryBuilder:
             if not jobs.poll_async_query(job_href, timeout=120):
                 return 0
             return jobs.summarize_async_query(job_href)["count"]
+        except AsyncDownloadError:
+            # 下載失敗不得誤報 0 flows（會被解讀成 rule unused）——與
+            # batch_get_rule_traffic_counts 的失敗語意一致。
+            raise
         except Exception as e:
             logger.warning(f"get_rule_traffic_count error for {rule.get('href')}: {e}")
             return 0
