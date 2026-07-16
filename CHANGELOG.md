@@ -62,7 +62,13 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   treats `cancel_requested`/`cancelled`/`canceled` as terminal failure states;
   CSV export polling uses the same 900s budget as other async queries; label
   cache writes skip entries missing `href` instead of a KeyError rolling back
-  the whole batch.
+  the whole batch. Truncation detection is anchored to the 500-item cap:
+  on filtered queries (e.g. `workloads?managed=true`) the PCE reports the
+  unfiltered total in `X-Total-Count` (verified on PCE 25.2.40), which
+  previously false-positived every call below the cap. Fallback results are
+  memoized process-wide for 5 minutes and failures back off for 10 minutes,
+  so per-request `ApiClient` instances (GUI routes) cannot flood the PCE
+  with one async job per request.
 - Label cache refresh is now build-then-swap: readers keep seeing the old
   cache during the fetch (previously a force refresh cleared the caches
   first, so concurrent requests saw an empty cache mid-refresh), any failed

@@ -50,6 +50,14 @@ from src.utils import Colors
 MAX_RETRIES = 3
 _ASYNC_JOB_STATE_KEY = "async_query_jobs"
 _QUERY_LOOKUP_CACHE_TTL_SECONDS = 300
+# 截斷 async fallback 的 process 級 memo/退避：GUI 路由每請求建新 ApiClient，
+# per-instance 狀態擋不住「集合真 >500 時每請求都對 PCE 提交一個 async job」
+# 的放大效應（最終 review finding 1）。成功結果 memo 5 分鐘、失敗退避 10 分鐘。
+_ASYNC_FALLBACK_MEMO_TTL_SECONDS = 300
+_ASYNC_FALLBACK_FAILURE_BACKOFF_SECONDS = 600
+_ASYNC_FALLBACK_LOCK = threading.Lock()
+_ASYNC_FALLBACK_MEMO: dict[str, tuple[float, list]] = {}
+_ASYNC_FALLBACK_FAILED_AT: dict[str, float] = {}
 _LABEL_CACHE_TTL_SECONDS = 900  # 15 minutes — Phase 2 Q5 fix
 _ASYNC_JOB_CACHE_MAX_AGE_DAYS = 7
 _ASYNC_JOB_PRUNE_INTERVAL_SECONDS = 3600
@@ -878,7 +886,7 @@ class ApiClient:
             # 路徑上可能遠低於未過濾的 X-Total-Count——恢復判準用「比截斷頁拿
             # 到更多」；失敗則維持 Task 1 的截斷資料與 error log 語意
             # （永不比 Task 1 差）。
-            fallback_data = self._async_collection_get(path, timeout=timeout)
+            fallback_data = self._cached_async_collection_get(path, timeout=timeout)
             if fallback_data is not None and len(fallback_data) > actual_count:
                 logger.info(
                     "async GET fallback recovered collection: {} returned {}/{} objects",
@@ -894,6 +902,36 @@ class ApiClient:
                 self.last_truncated_collections.append(path)
 
         return status, data, total_count
+
+    def _cached_async_collection_get(self, path: str, *, timeout: int = 15) -> list[Any] | None:
+        """_async_collection_get 的 process 級 memo/退避包裝。
+
+        成功結果按 path memo（TTL 5 分鐘）：每請求新建 ApiClient 的 GUI 路由
+        在集合真 >500 時，不會每個請求都對 PCE 提交一個 async job。失敗按
+        path 退避（10 分鐘）：fallback 持續失敗時不反覆打 job＋等輪詢，直接
+        沿用截斷資料（呼叫端語意不變：回 None 即 fallback 失敗）。
+        併發下同 path 可能偶發重複提交（無 single-flight），穩態成本已由
+        memo/退避封頂，不值得加鎖等待。
+        """
+        now = time.monotonic()
+        with _ASYNC_FALLBACK_LOCK:
+            memo = _ASYNC_FALLBACK_MEMO.get(path)
+            if memo and now - memo[0] < _ASYNC_FALLBACK_MEMO_TTL_SECONDS:
+                return memo[1]
+            failed_at = _ASYNC_FALLBACK_FAILED_AT.get(path)
+            if failed_at is not None and now - failed_at < _ASYNC_FALLBACK_FAILURE_BACKOFF_SECONDS:
+                logger.debug(
+                    "async collection GET fallback suppressed (failure backoff): {}", path
+                )
+                return None
+        data = self._async_collection_get(path, timeout=timeout)
+        with _ASYNC_FALLBACK_LOCK:
+            if data is not None:
+                _ASYNC_FALLBACK_MEMO[path] = (time.monotonic(), data)
+                _ASYNC_FALLBACK_FAILED_AT.pop(path, None)
+            else:
+                _ASYNC_FALLBACK_FAILED_AT[path] = time.monotonic()
+        return data
 
     def _async_collection_get(self, path: str, *, timeout: int = 15) -> list[Any] | None:
         """集合 GET 截斷時的官方 async GET fallback（vendor 已驗證流程）。

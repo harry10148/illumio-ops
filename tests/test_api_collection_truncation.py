@@ -29,6 +29,18 @@ def api_client():
     return ApiClient(cm)
 
 
+@pytest.fixture(autouse=True)
+def _reset_fallback_state():
+    """fallback memo/退避是 process 級模組狀態——測試間必須清空，
+    否則前一個測試的失敗退避會讓後續同 path 測試靜默跳過 fallback。"""
+    from src import api_client as m
+    m._ASYNC_FALLBACK_MEMO.clear()
+    m._ASYNC_FALLBACK_FAILED_AT.clear()
+    yield
+    m._ASYNC_FALLBACK_MEMO.clear()
+    m._ASYNC_FALLBACK_FAILED_AT.clear()
+
+
 @responses.activate
 def test_get_collection_reads_total_count(api_client):
     body = [{"href": f"/orgs/1/labels/{i}"} for i in range(3)]
@@ -207,9 +219,12 @@ def test_async_fallback_failure_keeps_truncated_data(api_client, monkeypatch):
 
 
 def test_truncation_record_cleared_after_successful_fallback(api_client, monkeypatch):
-    """跨呼叫「先失敗後成功」：第一次 fallback 失敗留下截斷紀錄，
+    """跨呼叫「先失敗後成功」：第一次 fallback 失敗留下截斷紀錄，退避窗過期後
     第二次 fallback 成功恢復完整資料時，該紀錄必須被清除，否則永久殘留假陽性。"""
     monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)
+    from src import api_client as m
+    fake_now = {"t": 1000.0}
+    monkeypatch.setattr("src.api_client.time.monotonic", lambda: fake_now["t"])
     truncated = [{"href": f"/orgs/1/workloads/{i}"} for i in range(500)]
     full = [{"href": f"/orgs/1/workloads/{i}"} for i in range(700)]
 
@@ -222,7 +237,8 @@ def test_truncation_record_cleared_after_successful_fallback(api_client, monkeyp
     api_client._get_collection("/orgs/1/workloads")
     assert api_client.last_truncated_collections == ["/orgs/1/workloads"]
 
-    # 第二次呼叫：fallback 成功，記錄必須被清除
+    # 退避窗過期後第二次呼叫：fallback 成功，記錄必須被清除
+    fake_now["t"] += m._ASYNC_FALLBACK_FAILURE_BACKOFF_SECONDS + 1
     api_client._api_get_with_headers = MagicMock(side_effect=[
         (200, truncated, {"X-Total-Count": "700"}),
         (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),
@@ -234,6 +250,69 @@ def test_truncation_record_cleared_after_successful_fallback(api_client, monkeyp
     assert data == full
     assert total == 700
     assert api_client.last_truncated_collections == []
+
+
+@responses.activate
+def test_fallback_failure_backoff_suppresses_retry(api_client, monkeypatch):
+    """fallback 失敗後進入退避窗：同 path 的下一次截斷呼叫不得重打
+    respond-async（每請求新 ApiClient 的 GUI 路由會把 PCE 打爆）。"""
+    monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)
+    truncated = [{"href": f"/orgs/1/workloads/{i}"} for i in range(500)]
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),
+        (200, truncated, {"X-Total-Count": "700"}),  # fallback 提交非 202 → 失敗
+        (200, truncated, {"X-Total-Count": "700"}),  # 第二次呼叫的初始 GET
+    ])
+    s1, d1, _ = api_client._get_collection("/orgs/1/workloads")
+    s2, d2, _ = api_client._get_collection("/orgs/1/workloads")
+    assert s1 == s2 == 200
+    assert len(d1) == len(d2) == 500
+    # 恰 3 次：初始 GET ×2 + 第一次的 fallback 提交；退避窗內無第二次提交
+    assert api_client._api_get_with_headers.call_count == 3
+
+
+def test_fallback_success_memo_reused(api_client, monkeypatch):
+    """fallback 成功結果做 process 級 TTL memo：同 path 短時間內再截斷，
+    直接用 memo、不重打 async job。"""
+    monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)
+    truncated = [{"href": f"/orgs/1/workloads/{i}"} for i in range(500)]
+    full = [{"href": f"/orgs/1/workloads/{i}"} for i in range(700)]
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),
+        (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),
+        (200, {"status": "done", "result": {"href": "/orgs/1/workloads_datafile_xyz"}}, {}),
+        (200, full, {}),
+        (200, truncated, {"X-Total-Count": "700"}),  # 第二次呼叫的初始 GET
+    ])
+    s1, d1, _ = api_client._get_collection("/orgs/1/workloads")
+    s2, d2, _ = api_client._get_collection("/orgs/1/workloads")
+    assert len(d1) == 700
+    assert len(d2) == 700
+    # 恰 5 次：第一輪 4 次（初始+提交+輪詢+下載）+ 第二次初始 GET；無第二輪 job
+    assert api_client._api_get_with_headers.call_count == 5
+
+
+def test_fallback_backoff_expires_and_retries(api_client, monkeypatch):
+    """退避窗過期後，下一次截斷呼叫要重新嘗試 fallback（非永久放棄）。"""
+    from src import api_client as m
+    monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)
+    fake_now = {"t": 1000.0}
+    monkeypatch.setattr("src.api_client.time.monotonic", lambda: fake_now["t"])
+    truncated = [{"href": f"/orgs/1/workloads/{i}"} for i in range(500)]
+    full = [{"href": f"/orgs/1/workloads/{i}"} for i in range(700)]
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),
+        (200, truncated, {"X-Total-Count": "700"}),  # fallback 提交非 202 → 失敗、進退避
+        (200, truncated, {"X-Total-Count": "700"}),  # 退避過期後的初始 GET
+        (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),
+        (200, {"status": "done", "result": {"href": "/orgs/1/workloads_datafile_xyz"}}, {}),
+        (200, full, {}),
+    ])
+    _s, d1, _ = api_client._get_collection("/orgs/1/workloads")
+    assert len(d1) == 500
+    fake_now["t"] += m._ASYNC_FALLBACK_FAILURE_BACKOFF_SECONDS + 1
+    _s, d2, _ = api_client._get_collection("/orgs/1/workloads")
+    assert len(d2) == 700
 
 
 @responses.activate
