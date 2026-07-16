@@ -214,103 +214,112 @@ class LabelResolver:
                     c._iplist_href_cache.setdefault(display.replace("[IPList] ", "", 1), href)
 
     def update_label_cache(self, silent=False, force_refresh=True):
-        """Cache labels, IP lists, and services for display resolution."""
+        """Cache labels, IP lists, and services for display resolution.
+
+        Build-then-swap：fetch/組裝階段只寫區域 dict（共享快取不動，讀者全程
+        看到舊資料，沒有 clear-before-fetch 空窗）；四個集合全部 200 後才在
+        _cache_lock 內一次 clear+update swap（保留 TTLCache 實例與別名引用）。
+        任一集合非 200 或途中例外 → 共享快取完全不動，回傳 False。
+
+        force_refresh 參數保留呼叫端相容；swap 模式下 fetch 一律全量，
+        「快取未過期就早退」的邏輯在 _ensure_query_lookup_cache。
+        """
         c = self._client
         org = c.api_cfg['org_id']
-        # Snapshot current state without holding the lock (reads are safe here)
-        previous_state = (
-            dict(c.label_cache),
-            dict(c.service_ports_cache),
-            dict(c._label_href_cache),
-            dict(c._label_group_href_cache),
-            dict(c._iplist_href_cache),
-            c._query_lookup_cache_refreshed_at,
-        )
         try:
             # I/O phase: fetch data from API without holding lock (network latency)
-            if force_refresh:
-                self.invalidate_query_lookup_cache()  # acquires _cache_lock internally (RLock)
             s_labels, d_labels, _t1 = c._get_collection(f"/orgs/{org}/labels")
             s_groups, d_groups, _t2 = c._get_collection(f"/orgs/{org}/sec_policy/draft/label_groups")
             s_iplists, d_iplists, _t3 = c._get_collection(f"/orgs/{org}/sec_policy/draft/ip_lists")
             s_services, d_services, _t4 = c._get_collection(f"/orgs/{org}/sec_policy/draft/services")
 
-            # Write phase: acquire lock once to write all fetched data atomically
-            with c._cache_lock:
-                if s_labels == 200 and d_labels:
-                    for i in d_labels:
-                        href = i.get('href')
-                        if not href:
-                            # 缺 href 的條目無法快取，裸 i['href'] 會 KeyError 觸發
-                            # 整包 rollback（見 except 區），silent=True 下無聲失敗。
-                            continue
-                        label_str = f"{i.get('key')}:{i.get('value')}"
-                        c.label_cache[href] = label_str
-                        c._label_href_cache[label_str] = href
+            statuses = {"labels": s_labels, "label_groups": s_groups,
+                        "ip_lists": s_iplists, "services": s_services}
+            failed = [k for k, s in statuses.items() if s != 200]
+            if failed:
+                if not silent:
+                    logger.warning(f"Label cache update aborted, non-200 collections: {failed}")
+                return False
 
-                if s_groups == 200 and d_groups:
-                    for i in d_groups:
-                        href = i.get('href')
-                        name = i.get('name')
-                        if not href or not name:
-                            continue
-                        val = f"[LabelGroup] {name}"
-                        c.label_cache[href] = val
-                        c.label_cache[href.replace('/draft/', '/active/')] = val
-                        c._label_group_href_cache[name] = href
+            # Build phase: 區域 dict，共享快取不動
+            new_label_cache = {}
+            new_label_href = {}
+            new_group_href = {}
+            new_iplist_href = {}
+            new_service_ports = {}
 
-                if s_iplists == 200 and d_iplists:
-                    for i in d_iplists:
-                        href = i.get('href')
-                        if not href:
-                            continue
-                        val = f"[IPList] {i.get('name')}"
-                        c.label_cache[href] = val
-                        c.label_cache[href.replace('/draft/', '/active/')] = val
-                        if i.get('name'):
-                            c._iplist_href_cache[i['name']] = href
+            for i in d_labels or []:
+                href = i.get('href')
+                if not href:
+                    # 缺 href 的條目無法快取（裸 i['href'] 會 KeyError 使整批失敗）
+                    continue
+                label_str = f"{i.get('key')}:{i.get('value')}"
+                new_label_cache[href] = label_str
+                new_label_href[label_str] = href
 
-                if s_services == 200 and d_services:
-                    for i in d_services:
-                        href = i.get('href')
-                        if not href:
-                            continue
-                        name = i.get('name')
-                        ports = []
-                        for svc in i.get('service_ports', []):
-                            p = svc.get('port')
-                            if p:
-                                proto = "UDP" if svc.get('proto') == 17 else "TCP"
-                                top = f"-{svc['to_port']}" if svc.get('to_port') else ""
-                                ports.append(f"{proto}/{p}{top}")
-                        port_str = f" ({','.join(ports)})" if ports else ""
-                        val = f"{name}{port_str}"
-                        c.label_cache[href] = val
-                        c.label_cache[href.replace('/draft/', '/active/')] = val
-                        # 查詢用完整條目（含 windows_services、純 proto；filter
-                        # 的 service 展開與 per-rule query 共用）
-                        port_defs = LabelResolver._service_entry_defs(i)
-                        if port_defs:
-                            c.service_ports_cache[href] = port_defs
-                            c.service_ports_cache[href.replace('/draft/', '/active/')] = port_defs
-                c._query_lookup_cache_refreshed_at = time.time()
-        except Exception as e:
-            # Restore previous state — update caches in-place to preserve TTLCache instances
-            prev_label, prev_svc, prev_href, prev_grp, prev_ip, prev_ts = previous_state
+            for i in d_groups or []:
+                href = i.get('href')
+                name = i.get('name')
+                if not href or not name:
+                    continue
+                val = f"[LabelGroup] {name}"
+                new_label_cache[href] = val
+                new_label_cache[href.replace('/draft/', '/active/')] = val
+                new_group_href[name] = href
+
+            for i in d_iplists or []:
+                href = i.get('href')
+                if not href:
+                    continue
+                val = f"[IPList] {i.get('name')}"
+                new_label_cache[href] = val
+                new_label_cache[href.replace('/draft/', '/active/')] = val
+                if i.get('name'):
+                    new_iplist_href[i['name']] = href
+
+            for i in d_services or []:
+                href = i.get('href')
+                if not href:
+                    continue
+                name = i.get('name')
+                ports = []
+                for svc in i.get('service_ports', []):
+                    p = svc.get('port')
+                    if p:
+                        proto = "UDP" if svc.get('proto') == 17 else "TCP"
+                        top = f"-{svc['to_port']}" if svc.get('to_port') else ""
+                        ports.append(f"{proto}/{p}{top}")
+                port_str = f" ({','.join(ports)})" if ports else ""
+                val = f"{name}{port_str}"
+                new_label_cache[href] = val
+                new_label_cache[href.replace('/draft/', '/active/')] = val
+                # 查詢用完整條目（含 windows_services、純 proto；filter
+                # 的 service 展開與 per-rule query 共用）
+                port_defs = LabelResolver._service_entry_defs(i)
+                if port_defs:
+                    new_service_ports[href] = port_defs
+                    new_service_ports[href.replace('/draft/', '/active/')] = port_defs
+
+            # Swap phase: clear+update 保留既有實例，別名引用不失效
             with c._cache_lock:
                 c.label_cache.clear()
-                c.label_cache.update(prev_label)
+                c.label_cache.update(new_label_cache)
                 c.service_ports_cache.clear()
-                c.service_ports_cache.update(prev_svc)
+                c.service_ports_cache.update(new_service_ports)
                 c._label_href_cache.clear()
-                c._label_href_cache.update(prev_href)
+                c._label_href_cache.update(new_label_href)
                 c._label_group_href_cache.clear()
-                c._label_group_href_cache.update(prev_grp)
+                c._label_group_href_cache.update(new_group_href)
                 c._iplist_href_cache.clear()
-                c._iplist_href_cache.update(prev_ip)
-                c._query_lookup_cache_refreshed_at = prev_ts
+                c._iplist_href_cache.update(new_iplist_href)
+                c._query_lookup_cache_refreshed_at = time.time()
+            return True
+        except Exception as e:
+            # 例外只可能發生在 swap 前（fetch/build 階段），共享快取未被碰觸，
+            # 不需要 rollback snapshot——連帶消除 rollback 蓋掉並行更新的競態。
             if not silent:
                 logger.warning(f"Label cache update error: {e}")
+            return False
 
     def invalidate_labels(self) -> None:
         """Force the next label lookup to hit the PCE.

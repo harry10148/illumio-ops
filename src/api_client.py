@@ -413,7 +413,7 @@ class ApiClient:
     def _ensure_query_lookup_cache(self, force_refresh: bool = False) -> None:
         return self._labels._ensure_query_lookup_cache(force_refresh=force_refresh)
 
-    def update_label_cache(self, silent: bool = False, force_refresh: bool = True) -> None:
+    def update_label_cache(self, silent: bool = False, force_refresh: bool = True) -> bool:
         return self._labels.update_label_cache(silent=silent, force_refresh=force_refresh)
 
     def invalidate_labels(self) -> None:

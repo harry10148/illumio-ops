@@ -61,6 +61,12 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   CSV export polling uses the same 900s budget as other async queries; label
   cache writes skip entries missing `href` instead of a KeyError rolling back
   the whole batch.
+- Label cache refresh is now build-then-swap: readers keep seeing the old
+  cache during the fetch (previously a force refresh cleared the caches
+  first, so concurrent requests saw an empty cache mid-refresh), any failed
+  collection leaves the shared caches completely untouched, and the
+  exception-rollback snapshot (which could overwrite a concurrent update)
+  is gone.
 
 ### Changed
 
