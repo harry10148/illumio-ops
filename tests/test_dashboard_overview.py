@@ -139,3 +139,30 @@ def test_overview_includes_tls(client, monkeypatch):
     body = r.get_json()
     assert body["tls"]["days_remaining"] == 12
     assert body["tls"]["expiring_soon"] is True
+
+
+def test_overview_job_health_tolerates_corrupt_entries(client, tmp_path, monkeypatch):
+    """壞的 job_health.json 條目（非數字 interval_seconds）應被跳過，
+    不影響其他條目或端點回傳 200."""
+    import datetime
+    from src import job_health as jh
+    path = str(tmp_path / "job_health.json")
+    monkeypatch.setattr(jh, "_job_health_file", lambda: path)
+    import src.gui.routes.dashboard as dash
+    monkeypatch.setattr(dash.job_health, "_job_health_file", lambda: path,
+                        raising=False)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    fresh = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    json.dump({
+        "bad_job": {"last_run": fresh, "last_status": "ok",
+                    "interval_seconds": "not-a-number"},
+        "good_job": {"last_run": fresh, "last_status": "ok",
+                     "detail": "", "interval_seconds": 300},
+    }, open(path, "w"))
+    r = client.get("/api/dashboard/overview",
+                   environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert r.status_code == 200
+    body = r.get_json()
+    job_ids = {e["job_id"] for e in body["job_health"]}
+    assert "good_job" in job_ids
+    assert "bad_job" not in job_ids

@@ -246,30 +246,34 @@ def _overview_job_health():
     except Exception:
         return out
     for job_id, entry in (data or {}).items():
-        if not isinstance(entry, dict):
+        try:
+            if not isinstance(entry, dict):
+                continue
+            interval = int(entry.get("interval_seconds") or 0)
+            grace = max(2 * interval, 600)
+            status = entry.get("last_status") or ""
+            level = "ok"
+            if status == "error":
+                level = "error"
+            elif status == "registered":
+                reg = _parse(entry.get("registered_at") or "")
+                if reg is None or (now - reg).total_seconds() > grace:
+                    level = "warn"
+            else:
+                last = _parse(entry.get("last_run") or "")
+                if last is None or (now - last).total_seconds() > grace:
+                    level = "warn"
+            out.append({
+                "job_id": job_id,
+                "last_run": entry.get("last_run"),
+                "last_status": status,
+                "detail": entry.get("detail", ""),
+                "interval_seconds": interval,
+                "level": level,
+            })
+        except Exception:
+            # 單一壞條目（如手改檔案造成非數字 interval）不得炸掉整個 overview
             continue
-        interval = int(entry.get("interval_seconds") or 0)
-        grace = max(2 * interval, 600)
-        status = entry.get("last_status") or ""
-        level = "ok"
-        if status == "error":
-            level = "error"
-        elif status == "registered":
-            reg = _parse(entry.get("registered_at") or "")
-            if reg is None or (now - reg).total_seconds() > grace:
-                level = "warn"
-        else:
-            last = _parse(entry.get("last_run") or "")
-            if last is None or (now - last).total_seconds() > grace:
-                level = "warn"
-        out.append({
-            "job_id": job_id,
-            "last_run": entry.get("last_run"),
-            "last_status": status,
-            "detail": entry.get("detail", ""),
-            "interval_seconds": interval,
-            "level": level,
-        })
     rank = {"error": 0, "warn": 1, "ok": 2}
     out.sort(key=lambda e: (rank.get(e["level"], 3), e["job_id"]))
     return out
