@@ -638,15 +638,21 @@ class LabelResolver:
             """IP List → 有效 CIDR 清單（inclusion 聯集 − exclusion；PCE 語意）。
             修正前 exclusion:true 條目被一併展開成 inclusion，cache df 路徑
             over-include；native（PCE 端自套 exclusion）與 fallback
-            （_iplist_hit 比 PCE 標注 membership）本已正確——修這裡即三路一致。"""
+            （_iplist_hit 比 PCE 標注 membership）本已正確——修這裡即三路一致。
+
+            get_ip_lists 帶 raise_on_error=True：PCE 抓取失敗要讓例外往上炸，
+            避免誤把「抓取失敗」當成「IP List 已刪除」而靜默回空 CIDR 集合。
+            fetch 成功但名稱/href 找不到匹配才是合法的「查無」，回 [] 但留
+            warning log 供除錯。"""
             value = str(value).strip()
-            for ipl in (c.get_ip_lists() or []):
+            for ipl in (c.get_ip_lists(raise_on_error=True) or []):
                 if ipl.get("name") == value or ipl.get("href") == value:
                     include, exclude = [], []
                     for r in ipl.get("ip_ranges", []) or []:
                         bucket = exclude if r.get("exclusion") else include
                         bucket.extend(_range_to_cidrs(r, value))
                     return _subtract_cidrs(include, exclude)
+            logger.warning("expand_object_filters_for_df: IP List not found for value {}", value)
             return []
 
         def _workload_ips(value):

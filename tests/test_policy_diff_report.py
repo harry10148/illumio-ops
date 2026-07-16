@@ -47,7 +47,7 @@ def test_run_uses_force_refresh_for_draft(tmp_path):
     with patch("src.report.policy_diff_report.PolicyDiffReport._fetch_policy_events",
                return_value={"draft_events": pd.DataFrame()}):
         PolicyDiffReport(cm=MagicMock(), api_client=api).run(output_dir=str(tmp_path))
-    api.get_all_rulesets.assert_called_once_with(force_refresh=True)
+    api.get_all_rulesets.assert_called_once_with(force_refresh=True, raise_on_error=True)
 
 
 def test_build_without_api_returns_empty_diff():
@@ -71,15 +71,15 @@ def test_build_includes_object_layers():
     api = MagicMock()
     api.get_all_rulesets.return_value = []
     api.get_active_rulesets.return_value = []
-    api.get_ip_lists.side_effect = lambda pversion="active": {
+    api.get_ip_lists.side_effect = lambda pversion="active", raise_on_error=False: {
         "active": [{"href": "/orgs/1/sec_policy/active/ip_lists/5", "name": "L",
                     "ip_ranges": [{"from_ip": "10.0.0.0/8"}], "fqdns": [], "description": ""}],
         "draft": [{"href": "/orgs/1/sec_policy/draft/ip_lists/5", "name": "L",
                    "ip_ranges": [{"from_ip": "10.0.0.0/8"}, {"from_ip": "0.0.0.0/0"}],
                    "fqdns": [], "description": ""}],
     }[pversion]
-    api.get_services.side_effect = lambda pversion="active": []
-    api.get_label_groups.side_effect = lambda pversion="active": []
+    api.get_services.side_effect = lambda pversion="active", raise_on_error=False: []
+    api.get_label_groups.side_effect = lambda pversion="active", raise_on_error=False: []
     rep = PolicyDiffReport(MagicMock(), api_client=api)
     with patch.object(rep, "_fetch_policy_events", return_value={"draft_events": None}):
         diff = rep.build()
@@ -109,9 +109,9 @@ def test_label_group_members_resolve_via_all_labels():
     api = MagicMock()
     api.get_all_rulesets.return_value = []
     api.get_active_rulesets.return_value = []
-    api.get_ip_lists.side_effect = lambda pversion="active": []
-    api.get_services.side_effect = lambda pversion="active": []
-    api.get_label_groups.side_effect = lambda pversion="active": {
+    api.get_ip_lists.side_effect = lambda pversion="active", raise_on_error=False: []
+    api.get_services.side_effect = lambda pversion="active", raise_on_error=False: []
+    api.get_label_groups.side_effect = lambda pversion="active", raise_on_error=False: {
         "active": [{"href": "/orgs/1/sec_policy/active/label_groups/8", "name": "G",
                     "labels": [], "sub_groups": [], "description": ""}],
         "draft": [{"href": "/orgs/1/sec_policy/draft/label_groups/8", "name": "G",

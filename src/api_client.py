@@ -41,6 +41,7 @@ from src.api.traffic_query import (
     TrafficQuerySpec,
     _TRAFFIC_FILTER_CAPABILITIES,
 )
+from src.exceptions import APIError
 from src.href_utils import extract_id as _extract_id
 from src.i18n import t
 from src.utils import Colors
@@ -596,17 +597,24 @@ class ApiClient:
             logger.error(f"Fetch Labels Error: {e}")
             return []
 
-    def get_all_labels(self) -> list[dict[str, Any]]:
+    def get_all_labels(self, raise_on_error: bool = False) -> list[dict[str, Any]]:
         """Get every label across all dimensions (unscoped by key).
 
         Unlike get_labels(key) which filters one dimension, this returns all
         labels including custom dimensions (e.g. Net=) for the filter-object
         suggest cache. Returns [] on error.
+
+        raise_on_error=True：非 200（含 status 0 連線層失敗）raise APIError，
+        供 policy diff/resolver 等消費端區分「PCE 故障」與「合法空 org」。
+        預設 False 維持既有呼叫者行為不變。
         """
         org = self.api_cfg['org_id']
-        status, data, _total = self._get_collection(f"/orgs/{org}/labels")
+        path = f"/orgs/{org}/labels"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
             return data
+        if raise_on_error and status != 200:
+            raise APIError(f"get_all_labels failed: HTTP {status} for {path}")
         logger.warning(f"get_all_labels: status={status}, returned empty list")
         return []
 
@@ -969,66 +977,84 @@ class ApiClient:
             raise RuntimeError(f"get_all_rulesets failed: HTTP {status}")
         return []
 
-    def get_active_rulesets(self) -> list[dict[str, Any]]:
-        """Get all active (provisioned) rulesets with their rules."""
+    def get_active_rulesets(self, raise_on_error: bool = False) -> list[dict[str, Any]]:
+        """Get all active (provisioned) rulesets with their rules.
+
+        raise_on_error=True：非 200（含 status 0 連線層失敗）raise APIError，
+        供 policy diff/resolver 等消費端區分「PCE 故障」與「合法空 org」。
+        預設 False 維持既有呼叫者行為不變。
+        """
         org = self.api_cfg['org_id']
-        status, data, _total = self._get_collection(
-            f"/orgs/{org}/sec_policy/active/rule_sets"
-        )
+        path = f"/orgs/{org}/sec_policy/active/rule_sets"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
             return data
+        if raise_on_error and status != 200:
+            raise APIError(f"get_active_rulesets failed: HTTP {status} for {path}")
         logger.warning(f"get_active_rulesets: status={status}, returned empty list")
         return []
 
-    def get_ip_lists(self, pversion: str = "active") -> list[dict[str, Any]]:
+    def get_ip_lists(self, pversion: str = "active", raise_on_error: bool = False) -> list[dict[str, Any]]:
         """Get all IP Lists with their ip_ranges/fqdns.
 
         Default ACTIVE so returned hrefs (/sec_policy/active/ip_lists/...)
         match actor references inside active rulesets; pass pversion="draft"
         for the draft-side inventory (policy diff).
+
+        raise_on_error=True：非 200（含 status 0 連線層失敗）raise APIError。
+        預設 False 維持既有呼叫者行為不變。
         """
         if pversion not in ("active", "draft"):
             raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
-        status, data, _total = self._get_collection(
-            f"/orgs/{org}/sec_policy/{pversion}/ip_lists"
-        )
+        path = f"/orgs/{org}/sec_policy/{pversion}/ip_lists"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
             return data
+        if raise_on_error and status != 200:
+            raise APIError(f"get_ip_lists failed: HTTP {status} for {path}")
         logger.warning(f"get_ip_lists: status={status}, returned empty list")
         return []
 
-    def get_label_groups(self, pversion: str = "active") -> list[dict[str, Any]]:
+    def get_label_groups(self, pversion: str = "active", raise_on_error: bool = False) -> list[dict[str, Any]]:
         """Get all Label Groups with their member labels + sub_groups.
 
         Default ACTIVE so hrefs align with active-ruleset actor references;
         pass pversion="draft" for the draft-side inventory (policy diff).
+
+        raise_on_error=True：非 200（含 status 0 連線層失敗）raise APIError。
+        預設 False 維持既有呼叫者行為不變。
         """
         if pversion not in ("active", "draft"):
             raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
-        status, data, _total = self._get_collection(
-            f"/orgs/{org}/sec_policy/{pversion}/label_groups"
-        )
+        path = f"/orgs/{org}/sec_policy/{pversion}/label_groups"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
             return data
+        if raise_on_error and status != 200:
+            raise APIError(f"get_label_groups failed: HTTP {status} for {path}")
         logger.warning(f"get_label_groups: status={status}, returned empty list")
         return []
 
-    def get_services(self, pversion: str = "active") -> list[dict[str, Any]]:
+    def get_services(self, pversion: str = "active", raise_on_error: bool = False) -> list[dict[str, Any]]:
         """Get all Service definitions with their service_ports.
 
         Default ACTIVE so hrefs align with active-ruleset ingress_services
         references; pass pversion="draft" for the draft-side inventory (policy diff).
+
+        raise_on_error=True：非 200（含 status 0 連線層失敗）raise APIError。
+        預設 False 維持既有呼叫者行為不變。
         """
         if pversion not in ("active", "draft"):
             raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
-        status, data, _total = self._get_collection(
-            f"/orgs/{org}/sec_policy/{pversion}/services"
-        )
+        path = f"/orgs/{org}/sec_policy/{pversion}/services"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
             return data
+        if raise_on_error and status != 200:
+            raise APIError(f"get_services failed: HTTP {status} for {path}")
         logger.warning(f"get_services: status={status}, returned empty list")
         return []
 
