@@ -156,7 +156,10 @@ class ApiClient:
             total=MAX_RETRIES,
             backoff_factor=1.0,
             status_forcelist=[429, 502, 503, 504],
-            allowed_methods=frozenset(["GET", "POST", "PUT", "DELETE", "HEAD"]),
+            # POST 排除在自動重試之外：read-timeout 後 urllib3 若自動重送 POST，
+            # PCE 可能已經處理了第一次請求（provision/create 類端點會被重複執行）。
+            # 429 的補償見 _request（收到回應代表 PCE 尚未實際處理，安全單次重試）。
+            allowed_methods=frozenset(["GET", "HEAD", "PUT", "DELETE"]),
             respect_retry_after_header=True,
             raise_on_status=False,
         )
@@ -234,6 +237,30 @@ class ApiClient:
         except Exception as e:
             logger.error(f"Connection failed: {e}")
             return 0, str(e).encode('utf-8')
+
+        # POST 不在 urllib3 Retry 的 allowed_methods 內（見 __init__ 註解）。
+        # 但收到 429 代表 PCE 已回應、尚未實際處理這次請求，此時單次重試是安全的
+        # （不會重複 provision/create）。stream=True 目前只用在 GET 下載大檔路徑，
+        # 這裡明確排除、不涉入此重試邏輯。
+        if method == "POST" and resp.status_code == 429 and not stream:
+            retry_after = resp.headers.get("Retry-After")
+            try:
+                wait_s = float(retry_after) if retry_after is not None else 2.0
+            except (TypeError, ValueError):
+                wait_s = 2.0
+            time.sleep(max(wait_s, 0))
+            try:
+                resp = self._session.request(
+                    method=method,
+                    url=url,
+                    data=body,
+                    headers=req_headers,
+                    timeout=timeout,
+                    stream=stream,
+                )
+            except Exception as e:
+                logger.error(f"Connection failed on POST 429 retry: {e}")
+                return 0, str(e).encode('utf-8')
 
         if stream:
             return resp.status_code, resp

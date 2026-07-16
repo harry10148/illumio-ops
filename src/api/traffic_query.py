@@ -753,7 +753,7 @@ class TrafficQueryBuilder:
                 logger.info("Traffic query completed (matches={}).", expected_matches)
                 completed = True
                 break
-            if state == "failed":
+            if state in ("failed", "cancel_requested", "cancelled", "canceled"):
                 print(f" {t('query_failed', default='Failed.')}")
                 logger.error("Traffic query failed.")
                 c.last_fetch_error = f"async query state failed: {state}"
@@ -1204,7 +1204,9 @@ class TrafficQueryBuilder:
         carry draft_policy_decision for the R01-R05 rules. Off by default.
         """
         if policy_decisions is None:
-            policy_decisions = ["blocked", "potentially_blocked", "allowed"]
+            # vendor policy_decision 值域為四值：blocked/potentially_blocked/allowed/
+            # unknown——unknown 涵蓋 idle/快照模式與 Flowlink 未管理流量，預設不排除。
+            policy_decisions = ["blocked", "potentially_blocked", "allowed", "unknown"]
 
         query_spec = self.build_traffic_query_spec(filters)
         stream = self.execute_traffic_query_stream(
@@ -1612,8 +1614,8 @@ class TrafficQueryBuilder:
             for job_href, state in poll_results:
                 if state == "completed":
                     completed.add(job_href)
-                elif state == "failed":
-                    logger.debug(f"Async query failed: {job_href}")
+                elif state in ("failed", "cancel_requested", "cancelled", "canceled"):
+                    logger.debug(f"Async query failed (state={state}): {job_href}")
                     failed.add(job_href)
                 else:
                     still_pending.add(job_href)
@@ -1737,7 +1739,9 @@ class TrafficQueryBuilder:
         c = self._client
         jobs_mgr = c._jobs
         if policy_decisions is None:
-            policy_decisions = ["blocked", "potentially_blocked", "allowed"]
+            # vendor policy_decision 值域為四值：blocked/potentially_blocked/allowed/
+            # unknown——unknown 涵蓋 idle/快照模式與 Flowlink 未管理流量，預設不排除。
+            policy_decisions = ["blocked", "potentially_blocked", "allowed", "unknown"]
 
         query_spec = self.build_traffic_query_spec(filters)
         if query_spec.fallback_filters or query_spec.report_only_filters:
@@ -1766,7 +1770,9 @@ class TrafficQueryBuilder:
         if not job_href:
             raise RuntimeError("Failed to submit raw Explorer CSV query")
 
-        poll_result = jobs_mgr._wait_for_async_query(job_href, timeout=300, compute_draft=compute_draft)
+        poll_result = jobs_mgr._wait_for_async_query(
+            job_href, timeout=_ASYNC_QUERY_MAX_WAIT_SECONDS, compute_draft=compute_draft
+        )
         status = poll_result.get("status")
         rules_status = poll_result.get("rules")
         if status != "completed":

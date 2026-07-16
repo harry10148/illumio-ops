@@ -614,7 +614,8 @@ def make_dashboard_blueprint(
                 if pd_val == 1: pds = ["potentially_blocked"]
                 elif pd_val == 2: pds = ["blocked"]
                 elif pd_val == 0: pds = ["allowed"]
-                else: pds = ["blocked", "potentially_blocked", "allowed"]
+                # 「全部」須含 unknown（vendor 值域四值；涵蓋 idle/快照模式與 Flowlink 流量）
+                else: pds = ["blocked", "potentially_blocked", "allowed", "unknown"]
 
                 rank_by = d.get("rank_by", "bandwidth")
 

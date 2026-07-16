@@ -1005,7 +1005,8 @@ class Analyzer:
         traffic_stream = self.api.execute_traffic_query_stream(
             start_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
             now_utc.strftime('%Y-%m-%dT%H:%M:%SZ'),
-            ["blocked", "potentially_blocked", "allowed"]
+            # vendor 值域四值：unknown 涵蓋 idle/快照模式與 Flowlink 未管理流量
+            ["blocked", "potentially_blocked", "allowed", "unknown"]
         )
         return traffic_stream, now_utc
 
@@ -1385,13 +1386,15 @@ class Analyzer:
                 "query_flows: 'start_time' and 'end_time' must be ISO-format strings "
                 "(e.g. '2026-02-23T00:00:00Z')"
             )
-        pds = params.get("policy_decisions", ["blocked", "potentially_blocked", "allowed"])
-        
+        # 預設含 unknown（vendor 值域四值；涵蓋 idle/快照模式與 Flowlink 流量）
+        pds = params.get("policy_decisions", ["blocked", "potentially_blocked", "allowed", "unknown"])
+
         strict_pd: set[str] = set()
         for p in pds:
             if p == "potentially_blocked": strict_pd.add("potentially_blocked")
             elif p == "blocked": strict_pd.add("blocked")
             elif p == "allowed": strict_pd.add("allowed")
+            elif p == "unknown": strict_pd.add("unknown")
         
         query_filters = {
             "port": params.get("port"),
@@ -1472,7 +1475,7 @@ class Analyzer:
 
         # When filtering by draft policy decision, always query all reported PDs
         # because the draft EB may affect flows whose reported PD is "allowed".
-        query_pds = pds if not needs_draft else ["blocked", "potentially_blocked", "allowed"]
+        query_pds = pds if not needs_draft else ["blocked", "potentially_blocked", "allowed", "unknown"]
 
         # label_groups 類 key 無法在 client 端比對（成員展開只在 PCE 端）——
         # 帶這些 filter 時不可使用 cache（cache 資料未過濾），強制走 API。
@@ -1689,7 +1692,8 @@ class Analyzer:
             else:
                 pd_sel = int(pd_input)
 
-        pds = ["blocked", "potentially_blocked", "allowed"]
+        # 「全部」須含 unknown（vendor 值域四值；涵蓋 idle/快照模式與 Flowlink 流量）
+        pds = ["blocked", "potentially_blocked", "allowed", "unknown"]
         if pd_sel == 1: pds = ["blocked"]
         elif pd_sel == 2: pds = ["allowed"]
 

@@ -239,30 +239,42 @@ class LabelResolver:
             with c._cache_lock:
                 if s_labels == 200 and d_labels:
                     for i in d_labels:
+                        href = i.get('href')
+                        if not href:
+                            # 缺 href 的條目無法快取，裸 i['href'] 會 KeyError 觸發
+                            # 整包 rollback（見 except 區），silent=True 下無聲失敗。
+                            continue
                         label_str = f"{i.get('key')}:{i.get('value')}"
-                        c.label_cache[i['href']] = label_str
-                        c._label_href_cache[label_str] = i['href']
+                        c.label_cache[href] = label_str
+                        c._label_href_cache[label_str] = href
 
                 if s_groups == 200 and d_groups:
                     for i in d_groups:
+                        href = i.get('href')
                         name = i.get('name')
-                        if not name:
+                        if not href or not name:
                             continue
                         val = f"[LabelGroup] {name}"
-                        c.label_cache[i['href']] = val
-                        c.label_cache[i['href'].replace('/draft/', '/active/')] = val
-                        c._label_group_href_cache[name] = i['href']
+                        c.label_cache[href] = val
+                        c.label_cache[href.replace('/draft/', '/active/')] = val
+                        c._label_group_href_cache[name] = href
 
                 if s_iplists == 200 and d_iplists:
                     for i in d_iplists:
+                        href = i.get('href')
+                        if not href:
+                            continue
                         val = f"[IPList] {i.get('name')}"
-                        c.label_cache[i['href']] = val
-                        c.label_cache[i['href'].replace('/draft/', '/active/')] = val
+                        c.label_cache[href] = val
+                        c.label_cache[href.replace('/draft/', '/active/')] = val
                         if i.get('name'):
-                            c._iplist_href_cache[i['name']] = i['href']
+                            c._iplist_href_cache[i['name']] = href
 
                 if s_services == 200 and d_services:
                     for i in d_services:
+                        href = i.get('href')
+                        if not href:
+                            continue
                         name = i.get('name')
                         ports = []
                         for svc in i.get('service_ports', []):
@@ -273,14 +285,14 @@ class LabelResolver:
                                 ports.append(f"{proto}/{p}{top}")
                         port_str = f" ({','.join(ports)})" if ports else ""
                         val = f"{name}{port_str}"
-                        c.label_cache[i['href']] = val
-                        c.label_cache[i['href'].replace('/draft/', '/active/')] = val
+                        c.label_cache[href] = val
+                        c.label_cache[href.replace('/draft/', '/active/')] = val
                         # 查詢用完整條目（含 windows_services、純 proto；filter
                         # 的 service 展開與 per-rule query 共用）
                         port_defs = LabelResolver._service_entry_defs(i)
                         if port_defs:
-                            c.service_ports_cache[i['href']] = port_defs
-                            c.service_ports_cache[i['href'].replace('/draft/', '/active/')] = port_defs
+                            c.service_ports_cache[href] = port_defs
+                            c.service_ports_cache[href.replace('/draft/', '/active/')] = port_defs
                 c._query_lookup_cache_refreshed_at = time.time()
         except Exception as e:
             # Restore previous state — update caches in-place to preserve TTLCache instances

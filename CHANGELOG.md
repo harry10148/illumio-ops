@@ -46,9 +46,29 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   missing CSV descriptions no longer render a literal `nan`.
 - VEN report policy-sync badge treated the real-world `applied` state as
   unsynced (red) because it only recognized `synced`.
+- API layer hardening (phase B-1): collection GETs detect the PCE 500-item
+  page cap from response headers and fall back to an async job for the full
+  collection instead of silently working from a truncated inventory; async
+  traffic-query result download failures now raise `AsyncDownloadError`
+  instead of reporting zero flows (rule hit count could mark every rule
+  unused); inventory getters gained `raise_on_error` and the policy diff /
+  policy resolver reports fail loudly on PCE errors instead of emitting
+  "everything was deleted" diffs; all GUI route handlers close their
+  `ApiClient` (connection-pool leak); POST is excluded from urllib3
+  auto-retry (a read-timeout retry could double-execute provision/create) —
+  a POST 429 gets one manual retry honoring `Retry-After`; async job polling
+  treats `cancel_requested`/`cancelled`/`canceled` as terminal failure states;
+  CSV export polling uses the same 900s budget as other async queries; label
+  cache writes skip entries missing `href` instead of a KeyError rolling back
+  the whole batch.
 
 ### Changed
 
+- Traffic queries and reports that do not explicitly pick policy decisions now
+  include `unknown` (the vendor domain is blocked / potentially_blocked /
+  allowed / unknown; `unknown` covers idle/snapshot-mode VENs and
+  Flowlink-unmanaged flows). Traffic report totals may rise versus earlier
+  runs because unknown flows are now counted.
 - Report cards, generation modals, and the app header now use
   content-specific icons instead of a shared shield (shield stays with
   Security & Risk); the header carries an original micro-segmentation mark.

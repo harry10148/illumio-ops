@@ -425,7 +425,8 @@ class ReportGenerator:
 
         logger.info("[ReportGenerator] Starting API-source report generation")
         print(t("rpt_querying_traffic", start=start_date, end=end_date, lang=lang))
-        policy_decisions = list((filters or {}).get("policy_decisions") or ["blocked", "potentially_blocked", "allowed"])
+        # 預設含 unknown（vendor 值域四值；涵蓋 idle/快照模式與 Flowlink 流量）
+        policy_decisions = list((filters or {}).get("policy_decisions") or ["blocked", "potentially_blocked", "allowed", "unknown"])
 
         start_dt = datetime.datetime.fromisoformat(start_date.replace("Z", "+00:00"))
         end_dt = datetime.datetime.fromisoformat(end_date.replace("Z", "+00:00"))

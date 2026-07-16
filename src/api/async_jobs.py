@@ -319,8 +319,8 @@ class AsyncJobManager:
                 )
                 if state == "completed":
                     break
-                if state == "failed":
-                    logger.debug(f"Async query failed: {job_href}")
+                if state in ("failed", "cancel_requested", "cancelled", "canceled"):
+                    logger.debug(f"Async query failed (state={state}): {job_href}")
                     return poll_result
             else:
                 logger.debug(f"Async query timed out: {job_href}")
@@ -348,7 +348,7 @@ class AsyncJobManager:
                     )
                     if state == "completed" and rules_state in (None, "", "completed"):
                         return poll_result
-                    if state == "failed":
+                    if state in ("failed", "cancel_requested", "cancelled", "canceled"):
                         return poll_result
                     time.sleep(2)
             else:
