@@ -69,6 +69,95 @@ class TestPost429SingleRetry(unittest.TestCase):
         self.assertEqual(client._session.request.call_count, 2)
         mock_sleep.assert_called_once()
 
+    def test_post_429_stream_not_retried(self):
+        """stream=True 的 POST 不涉入 429 手動重試（stream 只用於大檔下載路徑）。"""
+        client = _make_client()
+        resp_429 = self._fake_resp(429, headers={"Retry-After": "0"})
+        client._session.request = MagicMock(return_value=resp_429)
+
+        with patch("time.sleep") as mock_sleep:
+            status, _ = client._request(
+                "https://pce.example.com:8443/api/v2/whatever",
+                method="POST",
+                stream=True,
+                timeout=10,
+            )
+
+        self.assertEqual(status, 429)
+        self.assertEqual(client._session.request.call_count, 1)
+        mock_sleep.assert_not_called()
+
+    def test_post_429_second_429_not_retried_again(self):
+        """重試恰一次：第二次仍 429 就回傳 429，不再有第三發。"""
+        client = _make_client()
+        resp_429a = self._fake_resp(429, headers={"Retry-After": "0"})
+        resp_429b = self._fake_resp(429, content=b"still limited", headers={"Retry-After": "0"})
+        client._session.request = MagicMock(side_effect=[resp_429a, resp_429b])
+
+        with patch("time.sleep"):
+            status, body = client._request(
+                "https://pce.example.com:8443/api/v2/orgs/1/sec_policy",
+                method="POST",
+                data={"a": 1},
+                timeout=10,
+            )
+
+        self.assertEqual(status, 429)
+        self.assertEqual(body, b"still limited")
+        self.assertEqual(client._session.request.call_count, 2)
+
+    def test_post_429_retry_sends_same_body_and_headers(self):
+        """重試必須帶與第一發完全相同的 body 與 headers（同一請求重送）。"""
+        client = _make_client()
+        resp_429 = self._fake_resp(429, headers={"Retry-After": "0"})
+        resp_200 = self._fake_resp(200)
+        client._session.request = MagicMock(side_effect=[resp_429, resp_200])
+
+        with patch("time.sleep"):
+            client._request(
+                "https://pce.example.com:8443/api/v2/orgs/1/sec_policy",
+                method="POST",
+                data={"a": 1},
+                headers={"X-Custom": "v"},
+                timeout=10,
+            )
+
+        first, second = client._session.request.call_args_list
+        self.assertEqual(first.kwargs["data"], second.kwargs["data"])
+        self.assertEqual(first.kwargs["headers"], second.kwargs["headers"])
+
+    def test_post_429_retry_after_clamped(self):
+        """Retry-After 解析須夾限：inf/nan/非數值 fallback 2s、過大值上限 30s、
+        負值下限 0——否則 time.sleep 會拋例外（違反 _request 不拋契約）或
+        同步阻塞 GUI worker。"""
+        cases = [
+            ("0", 0.0),
+            ("3600", 30.0),
+            ("-5", 0.0),
+            ("inf", 2.0),
+            ("nan", 2.0),
+            ("Wed, 21 Oct 2026 07:28:00 GMT", 2.0),
+            (None, 2.0),
+        ]
+        for header_val, expected_sleep in cases:
+            with self.subTest(retry_after=header_val):
+                client = _make_client()
+                headers = {} if header_val is None else {"Retry-After": header_val}
+                resp_429 = self._fake_resp(429, headers=headers)
+                resp_200 = self._fake_resp(200)
+                client._session.request = MagicMock(side_effect=[resp_429, resp_200])
+
+                with patch("time.sleep") as mock_sleep:
+                    status, _ = client._request(
+                        "https://pce.example.com:8443/api/v2/orgs/1/sec_policy",
+                        method="POST",
+                        data={"a": 1},
+                        timeout=10,
+                    )
+
+                self.assertEqual(status, 200)
+                mock_sleep.assert_called_once_with(expected_sleep)
+
     def test_get_429_not_retried_in_request_layer(self):
         """GET 的 429 重試交給 urllib3 Retry adapter；_request 本地邏輯不涉入，
         單一 mock 回應即代表只呼叫一次 session.request。"""
@@ -152,8 +241,8 @@ class TestPollTreatsCancelledAsFailure(unittest.TestCase):
 
 class TestDefaultPolicyDecisionsIncludeUnknown(unittest.TestCase):
     def test_default_policy_decisions_include_unknown(self):
-        """不帶 policy_decisions 呼叫 fetch_traffic_for_report / export_traffic_query_csv
-        時，預設值須含 unknown（vendor 四值域：idle/快照模式與 Flowlink 未管理流量）。"""
+        """不帶 policy_decisions 呼叫 fetch_traffic_for_report 時，預設值須含
+        unknown（vendor 四值域：idle/快照模式與 Flowlink 未管理流量）。"""
         client = _FakeTrafficClient(["completed"])
         client.last_traffic_query_diagnostics = {}
         client.last_rule_usage_batch_stats = {}
@@ -169,6 +258,64 @@ class TestDefaultPolicyDecisionsIncludeUnknown(unittest.TestCase):
         builder.fetch_traffic_for_report("2026-04-01T00:00:00Z", "2026-04-02T00:00:00Z")
 
         self.assertIn("unknown", captured["pds"])
+
+    def test_export_csv_default_policy_decisions_include_unknown(self):
+        """export_traffic_query_csv 不帶 policy_decisions 時，傳給
+        _build_native_traffic_payload 的預設值也須含 unknown。"""
+        client = _FakeTrafficClient(["completed"])
+        client._jobs = MagicMock()  # 只取用不呼叫——capture 後即中止
+        builder = TrafficQueryBuilder(client)
+        builder.build_traffic_query_spec = MagicMock(
+            return_value=MagicMock(fallback_filters={}, report_only_filters={})
+        )
+        captured = {}
+
+        def fake_build(start, end, pds, filters=None):
+            captured["pds"] = pds
+            raise RuntimeError("stop-after-capture")
+
+        builder._build_native_traffic_payload = fake_build
+        with self.assertRaises(RuntimeError):
+            builder.export_traffic_query_csv("2026-04-01T00:00:00Z", "2026-04-02T00:00:00Z")
+
+        self.assertIn("unknown", captured["pds"])
+
+    def test_query_flows_default_includes_unknown_and_keeps_unknown_flows(self):
+        """analyzer.query_flows 不帶 policy_decisions 時：(1) 送往 fetch 的預設
+        pds 含 unknown；(2) strict_pd 辨識集合含 unknown——抓回的 unknown flow
+        不得在 client 端過濾（analyzer.py ~1509）被丟棄。"""
+        from unittest.mock import MagicMock as _MM
+        from src.analyzer import Analyzer
+
+        cm = _MM()
+        cm.config = {"rules": []}
+        az = Analyzer(cm, _MM(), _MM())
+        az.load_state = _MM()
+        az.save_state = _MM()
+        az.api.last_fetch_error = None
+        spec = _MM(report_only_filters={}, requires_draft_pd=False,
+                   native_filters={}, fallback_filters={})
+        az.api.build_traffic_query_spec = _MM(return_value=spec)
+
+        flows = [
+            {"policy_decision": "unknown", "src": {"ip": "10.0.0.1"},
+             "dst": {"ip": "10.0.0.2"}, "service": {"port": 443, "proto": 6},
+             "num_connections": 1},
+            {"policy_decision": "allowed", "src": {"ip": "10.0.0.3"},
+             "dst": {"ip": "10.0.0.4"}, "service": {"port": 80, "proto": 6},
+             "num_connections": 1},
+        ]
+        az._fetch_query_flows = _MM(return_value=(flows, "api"))
+
+        results = az.query_flows(
+            {"start_time": "2026-01-01T00:00:00Z", "end_time": "2026-01-02T00:00:00Z"}
+        )
+
+        self.assertIn("unknown", az._fetch_query_flows.call_args[0][2])
+        self.assertEqual(
+            sorted(r.get("policy_decision") for r in results),
+            ["allowed", "unknown"],
+        )
 
 
 class TestLabelCacheSkipsEntryWithoutHref(unittest.TestCase):

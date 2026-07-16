@@ -168,6 +168,24 @@ def test_async_fallback_returns_full_collection(api_client, monkeypatch):
     assert calls[4].args[0] == "/orgs/1/workloads_datafile_xyz"  # 下載 datafile
 
 
+def test_async_fallback_cancelled_treated_as_terminal(api_client, monkeypatch):
+    """輪詢回 cancelled → 視為失敗終態立即結束（不空轉到 300s deadline），
+    回截斷資料（與 failed 同型，修類不修點）。"""
+    monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)
+    truncated = [{"href": f"/orgs/1/workloads/{i}"} for i in range(500)]
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),
+        (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),
+        (200, {"status": "cancelled"}, {}),
+    ])
+    status, data, total = api_client._get_collection("/orgs/1/workloads")
+    assert status == 200
+    assert data == truncated
+    # cancelled 後不得再輪詢：總共恰 3 次呼叫（初始 GET、202 提交、單次輪詢）
+    assert api_client._api_get_with_headers.call_count == 3
+    assert api_client.last_truncated_collections == ["/orgs/1/workloads"]
+
+
 def test_async_fallback_failure_keeps_truncated_data(api_client, monkeypatch):
     """輪詢回 failed → 回 500 筆截斷資料、error log 仍在（last_truncated_collections 有記錄）。"""
     monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)

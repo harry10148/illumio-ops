@@ -125,11 +125,13 @@ def policy_decision_analysis(df: pd.DataFrame, top_n: int = 20) -> dict:
                 'Allowed',
                 'Blocked',
                 'Potentially Blocked',
+                'Unknown',
             ],
             'values': [
                 results.get('allowed', {}).get('count', 0),
                 results.get('blocked', {}).get('count', 0),
                 results.get('potentially_blocked', {}).get('count', 0),
+                results.get('unknown', {}).get('count', 0),
             ],
         },
         'i18n': {'lang': get_language()},

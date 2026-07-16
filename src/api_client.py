@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import os
 import re
 import threading
@@ -248,7 +249,19 @@ class ApiClient:
                 wait_s = float(retry_after) if retry_after is not None else 2.0
             except (TypeError, ValueError):
                 wait_s = 2.0
-            time.sleep(max(wait_s, 0))
+            # 夾限：inf/nan 會使 time.sleep 拋例外（違反本函式不拋的契約），
+            # 過大值會同步阻塞 GUI worker 執行緒——上限 30s。
+            if not math.isfinite(wait_s):
+                wait_s = 2.0
+            wait_s = min(max(wait_s, 0.0), 30.0)
+            time.sleep(wait_s)
+            # 429 即限流訊號：重試須重新取全域 rate limiter 預算；取不到就
+            # 放棄重試、回傳原 429（維持本函式不拋的契約）。
+            if rate_limit:
+                from src.pce_cache.rate_limiter import get_rate_limiter
+                if not get_rate_limiter(rate_per_minute=self._rate_limit_per_minute).acquire(timeout=30.0):
+                    logger.warning("POST 429 retry skipped: rate limiter budget exhausted")
+                    return resp.status_code, resp.content
             try:
                 resp = self._session.request(
                     method=method,
@@ -927,10 +940,10 @@ class ApiClient:
             if state == "done":
                 job_body = poll_data
                 break
-            if state == "failed":
+            if state in ("failed", "cancel_requested", "cancelled", "canceled"):
                 logger.error(
-                    "async collection GET fallback: job {} reported failed for {}",
-                    job_href, path,
+                    "async collection GET fallback: job {} reported {} for {}",
+                    job_href, state, path,
                 )
                 return None
             # running/queued 等其他狀態繼續輪詢

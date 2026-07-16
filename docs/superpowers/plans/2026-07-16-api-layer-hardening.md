@@ -42,7 +42,7 @@
    - `test_get_collection_no_header`：無 header → total None、不誤報截斷。
    - `test_getters_route_through_get_collection`：以 monkeypatch 驗證 `get_ip_lists`/`get_services`/`get_label_groups`/`get_active_rulesets`/`get_all_labels`/`fetch_managed_workloads` 皆呼叫 `_get_collection`（修類不修點的守門）。
 
-- [ ] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(api): header-aware collection GET with 500-cap truncation detection`
+- [x] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(api): header-aware collection GET with 500-cap truncation detection`
 
 ### Task 2: 截斷時 async GET fallback
 
@@ -64,7 +64,7 @@
    - `test_async_fallback_failure_keeps_truncated_data`：輪詢回 failed → 回 500 筆截斷資料、error log 仍在。
    - `test_no_fallback_when_not_truncated`：未截斷不發 Prefer 請求。
 
-- [ ] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `feat(api): async GET fallback for truncated collections`
+- [x] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `feat(api): async GET fallback for truncated collections`
 
 ### Task 3: async 下載失敗誠實化（rule hit count 誤判 unused）
 
@@ -84,7 +84,7 @@
    - `test_summarize_success_marks_completed`：正常 2 flows → count=2、download_status="completed"。
    - `test_batch_counts_routes_download_failure_to_failed_details`：mock summarize 對某 rule 拋 AsyncDownloadError → 該 rule 出現在 failed_rule_details、不在 unused/hit 名單。
 
-- [ ] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(api): raise on async result download failure instead of reporting zero flows`
+- [x] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(api): raise on async result download failure instead of reporting zero flows`
 
 ### Task 4: inventory getter 錯誤傳播 + 消費端修復
 
@@ -103,7 +103,7 @@
    - `test_policy_diff_fails_loud_on_pce_error`：mock get_ip_lists 拋 APIError → 生成器往上拋（不產出報表）。
    - `test_iplist_cidrs_fetch_failure_raises`：`expand_object_filters_for_df` 帶 iplist 過濾 + mock fetch 失敗 → raise；名稱不匹配 → 回空 + warning log。
 
-- [ ] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(api): raise_on_error for inventory getters; loud failure in policy diff/resolver and df iplist expansion`
+- [x] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(api): raise_on_error for inventory getters; loud failure in policy diff/resolver and df iplist expansion`
 
 ### Task 5: GUI 路由 ApiClient 生命週期清掃（23 站點）
 
@@ -120,7 +120,7 @@
    - `test_apiclient_context_manager`：`with ApiClient(...)` 離開後 `_session is None`。
    - `test_routes_no_bare_apiclient`：靜態掃描 `src/gui/routes/*.py` 原始碼——每個 `ApiClient(` 出現行必須是 `with ` 開頭、或該函式內存在對應 `finally:`+`.close()`（通用不變量守門，未來新增站點忘記關直接紅）。
 
-- [ ] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(gui): close ApiClient in all route handlers (connection pool leak)`
+- [x] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(gui): close ApiClient in all route handlers (connection pool leak)`
 
 ### Task 6: PCE 契約小修包
 
@@ -144,7 +144,7 @@
    - `test_default_policy_decisions_include_unknown`：不帶 policy_decisions 呼叫 → payload 含 unknown。
    - `test_label_cache_skips_entry_without_href`：d_labels 混入無 href 條目 → 其餘正常寫入、不 rollback。
 
-- [ ] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(api): PCE contract gaps (POST retry idempotency, cancel states, unknown decision, csv timeout, href guard)`
+- [x] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(api): PCE contract gaps (POST retry idempotency, cancel states, unknown decision, csv timeout, href guard)`
 
 ### Task 7: label cache 並發：build-then-swap
 
@@ -162,7 +162,7 @@
    - `test_no_invalidate_before_fetch`：monkeypatch `invalidate_query_lookup_cache` 斷言 fetch 期間未被呼叫。
    - `test_swap_preserves_dict_identity`：swap 後 `c.label_cache` 物件 id 不變（別名引用不失效）。
 
-- [ ] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(api): build-then-swap label cache refresh (no clear-before-fetch window, no rollback race)`
+- [x] 寫失敗測試 → 驗證紅 → 實作 → 驗證綠 → commit `fix(api): build-then-swap label cache refresh (no clear-before-fetch window, no rollback race)`
 
 ---
 

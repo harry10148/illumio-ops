@@ -1684,7 +1684,7 @@ class Analyzer:
             print(f"\n{t('policy_decision')}")
             print(f"1. {t('pd_1_blocked_only', default='Blocked Only')}")
             print(f"2. {t('pd_2_allowed_only', default='Allowed Only')}")
-            print(f"3. {t('pd_3_all', default='All (Blocked + Potential + Allowed)')} [{t('nav_default', default='Default')}]")
+            print(f"3. {t('pd_3_all', default='All (Blocked + Potential + Allowed + Unknown)')} [{t('nav_default', default='Default')}]")
             pd_input = safe_input(t('please_select'), int, range(0, 4), allow_cancel=True)
             if pd_input is None: return  # user pressed 0 to go back
             if pd_input == '' or pd_input == 0:

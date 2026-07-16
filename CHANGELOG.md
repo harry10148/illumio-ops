@@ -74,7 +74,9 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
   include `unknown` (the vendor domain is blocked / potentially_blocked /
   allowed / unknown; `unknown` covers idle/snapshot-mode VENs and
   Flowlink-unmanaged flows). Traffic report totals may rise versus earlier
-  runs because unknown flows are now counted.
+  runs because unknown flows are now counted. Traffic data cached/backfilled
+  before this version was fetched without unknown flows — re-run the cache
+  backfill if cache-sourced reports should include them.
 - Report cards, generation modals, and the app header now use
   content-specific icons instead of a shared shield (shield stays with
   Security & Risk); the header carries an original micro-segmentation mark.
