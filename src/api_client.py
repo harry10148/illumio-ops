@@ -863,17 +863,23 @@ class ApiClient:
                     break
 
         actual_count = len(data) if isinstance(data, list) else 0
-        if status == 200 and total_count is not None and total_count > actual_count:
+        # 截斷只可能發生在 max_results=500 上限處。帶 query filter 的路徑
+        # （如 workloads?managed=true）X-Total-Count 回的是「未過濾」總數
+        # （PCE 25.2.40 真機實測：20 列 managed、header 30）——actual < 500
+        # 且 total > actual 是 filter 語意差異、不是截斷，觸發 fallback 會
+        # 造成假陽性：每次呼叫多打一個 PCE async job、多等 2s、留永久假紀錄。
+        if status == 200 and total_count is not None and actual_count >= 500 and total_count > actual_count:
             logger.error(
                 "collection GET truncated: {} returned {}/{} objects",
                 path, actual_count, total_count,
             )
-            # Task 2：截斷時自動改走官方 async GET 流程取回完整集合。成功且筆數
-            # 達到 total_count 九成以上（容忍輪詢期間物件增減）就當作修復完成，
-            # 回傳完整資料且不留截斷紀錄；失敗則維持 Task 1 的截斷資料與 error
-            # log 語意（永不比 Task 1 差）。
+            # Task 2：截斷時自動改走官方 async GET 流程取回完整集合。async GET
+            # 回傳的是套用同一 query filter 的完整結果集，其筆數在帶 filter 的
+            # 路徑上可能遠低於未過濾的 X-Total-Count——恢復判準用「比截斷頁拿
+            # 到更多」；失敗則維持 Task 1 的截斷資料與 error log 語意
+            # （永不比 Task 1 差）。
             fallback_data = self._async_collection_get(path, timeout=timeout)
-            if fallback_data is not None and len(fallback_data) >= total_count * 0.9:
+            if fallback_data is not None and len(fallback_data) > actual_count:
                 logger.info(
                     "async GET fallback recovered collection: {} returned {}/{} objects",
                     path, len(fallback_data), total_count,

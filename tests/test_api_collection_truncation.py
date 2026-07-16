@@ -237,6 +237,29 @@ def test_truncation_record_cleared_after_successful_fallback(api_client, monkeyp
 
 
 @responses.activate
+def test_no_truncation_below_cap_on_filtered_query(api_client):
+    """帶 query filter 的集合 GET，X-Total-Count 回的是未過濾總數（PCE 25.2.40
+    真機實測：workloads?managed=true 回 20 列、header 30）。actual < 500 上限
+    且 total > actual 是 filter 語意差異、不是截斷——不得觸發 async fallback、
+    不得留截斷紀錄（否則每次呼叫多打一個 PCE async job、多等 2s、永久假陽性）。"""
+    body = [{"href": f"/orgs/1/workloads/{i}"} for i in range(20)]
+    responses.add(
+        responses.GET,
+        "https://pce.example.com:8443/api/v2/orgs/1/workloads",
+        json=body,
+        status=200,
+        headers={"X-Total-Count": "30"},
+    )
+    status, data, total = api_client._get_collection("/orgs/1/workloads?managed=true")
+    assert status == 200
+    assert len(data) == 20
+    assert total == 30
+    assert api_client.last_truncated_collections == []
+    assert len(responses.calls) == 1
+    assert "Prefer" not in responses.calls[0].request.headers
+
+
+@responses.activate
 def test_no_fallback_when_not_truncated(api_client):
     """未截斷（X-Total-Count == 實收筆數）不應發 Prefer: respond-async 請求。"""
     body = [{"href": "/orgs/1/labels/1"}]
