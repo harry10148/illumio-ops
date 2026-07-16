@@ -10,6 +10,7 @@ from loguru import logger
 
 from src.config import ConfigManager
 from src import __version__
+from src import job_health
 from src.gui import _helpers
 from src.gui._helpers import (
     _ok, _err, _err_with_log,
@@ -226,6 +227,73 @@ def _overview_ven(state):
             "attention": (vs.get("attention") or [])[:20], "verdict": verdict}
 
 
+def _overview_job_health():
+    """job_health.json → 前端清單；level: error（上次失敗）/ warn（從未跑或
+    逾期 > max(2×interval, 600s)）/ ok。error → warn → ok 排序。"""
+    import datetime as _dt
+
+    def _parse(ts):
+        try:
+            return _dt.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=_dt.timezone.utc)
+        except Exception:
+            return None
+
+    now = _dt.datetime.now(_dt.timezone.utc)
+    out = []
+    try:
+        data = job_health.load_job_health()
+    except Exception:
+        return out
+    for job_id, entry in (data or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        interval = int(entry.get("interval_seconds") or 0)
+        grace = max(2 * interval, 600)
+        status = entry.get("last_status") or ""
+        level = "ok"
+        if status == "error":
+            level = "error"
+        elif status == "registered":
+            reg = _parse(entry.get("registered_at") or "")
+            if reg is None or (now - reg).total_seconds() > grace:
+                level = "warn"
+        else:
+            last = _parse(entry.get("last_run") or "")
+            if last is None or (now - last).total_seconds() > grace:
+                level = "warn"
+        out.append({
+            "job_id": job_id,
+            "last_run": entry.get("last_run"),
+            "last_status": status,
+            "detail": entry.get("detail", ""),
+            "interval_seconds": interval,
+            "level": level,
+        })
+    rank = {"error": 0, "warn": 1, "ok": 2}
+    out.sort(key=lambda e: (rank.get(e["level"], 3), e["job_id"]))
+    return out
+
+
+def _tls_overview(cm):
+    """TLS 憑證天數（self-signed 或自備憑證）；GUI 未啟用 TLS 回 enabled=False。"""
+    from src.gui._helpers import _cert_days_remaining, _ROOT_DIR
+    try:
+        tls_cfg = (cm.config.get("web_gui") or {}).get("tls") or {}
+        if not tls_cfg.get("enabled", True):
+            return {"enabled": False, "days_remaining": None, "expiring_soon": False}
+        if tls_cfg.get("self_signed", True):
+            cert_path = os.path.join(_ROOT_DIR, "config", "tls", "self_signed.pem")
+        else:
+            cert_path = tls_cfg.get("cert_file") or ""
+        days = _cert_days_remaining(cert_path) if cert_path else None
+        warn_days = int(tls_cfg.get("auto_renew_days", 30))
+        return {"enabled": True, "days_remaining": days,
+                "expiring_soon": days is not None and days <= warn_days}
+    except Exception:
+        return {"enabled": True, "days_remaining": None, "expiring_soon": False}
+
+
 def make_dashboard_blueprint(
     cm: ConfigManager,
     csrf,           # flask_wtf.csrf.CSRFProtect instance (unused here, kept for consistent signature)
@@ -324,6 +392,8 @@ def make_dashboard_blueprint(
             "os_dist": _overview_os_dist(state),
             "enforcement": _overview_enforcement(state),
             "posture": _overview_posture(state),
+            "job_health": _overview_job_health(),
+            "tls": _tls_overview(cm),
         })
 
     @bp.route('/api/dashboard/queries', methods=['GET'])

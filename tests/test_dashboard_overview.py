@@ -92,3 +92,50 @@ def test_overview_blocked_from_agg(client, tmp_path):
     blocked = r.get_json()["blocked"]
     assert blocked["blocked"] == 30 and blocked["potential"] == 70 and blocked["allowed"] == 100
     assert blocked["verdict"] == "ok"   # no spike vs prev window
+
+
+def test_overview_includes_job_health(client, tmp_path, monkeypatch):
+    """2026-07-16 可觀測性 backlog：overview 必須回 job_health 清單，
+    從未跑過（registered 超過 2×interval）與逾期的 job 標 warn。"""
+    import datetime
+    from src import job_health as jh
+    path = str(tmp_path / "job_health.json")
+    monkeypatch.setattr(jh, "_job_health_file", lambda: path)
+    import src.gui.routes.dashboard as dash
+    monkeypatch.setattr(dash.job_health, "_job_health_file", lambda: path,
+                        raising=False)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    old = (now - datetime.timedelta(hours=3)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    fresh = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    json.dump({
+        "pce_cache_archive": {"last_status": "registered",
+                               "registered_at": old, "interval_seconds": 3600},
+        "ven_summary": {"last_run": fresh, "last_status": "ok",
+                         "detail": "", "interval_seconds": 300},
+        "pce_cache_retention": {"last_run": old, "last_status": "ok",
+                                 "detail": "", "interval_seconds": 1800},
+        "monitor_cycle": {"last_run": fresh, "last_status": "error",
+                           "detail": "boom", "interval_seconds": 30},
+    }, open(path, "w"))
+    r = client.get("/api/dashboard/overview",
+                   environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    body = r.get_json()
+    levels = {e["job_id"]: e["level"] for e in body["job_health"]}
+    assert levels["pce_cache_archive"] == "warn"      # never ran
+    assert levels["pce_cache_retention"] == "warn"    # overdue（3h > 2×30m）
+    assert levels["ven_summary"] == "ok"
+    assert levels["monitor_cycle"] == "error"
+    order = [e["level"] for e in body["job_health"]]
+    assert order == sorted(order, key=lambda v: {"error": 0, "warn": 1, "ok": 2}[v])
+
+
+def test_overview_includes_tls(client, monkeypatch):
+    import src.gui.routes.dashboard as dash
+    monkeypatch.setattr(dash, "_tls_overview",
+                        lambda cm: {"enabled": True, "days_remaining": 12,
+                                    "expiring_soon": True})
+    r = client.get("/api/dashboard/overview",
+                   environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    body = r.get_json()
+    assert body["tls"]["days_remaining"] == 12
+    assert body["tls"]["expiring_soon"] is True
