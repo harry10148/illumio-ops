@@ -25,6 +25,7 @@ from io import BytesIO
 import orjson
 from loguru import logger
 
+from src.exceptions import AsyncDownloadError
 from src.i18n import t
 from src.port_token import parse_port_token
 
@@ -1623,17 +1624,29 @@ class TrafficQueryBuilder:
         failed_rule_details = []
         pending_rule_details = []
 
+        download_failed = set()
+
         def _download(job_href):
-            summary = jobs_mgr.summarize_async_query(job_href)
-            return job_href, summary
+            try:
+                summary = jobs_mgr.summarize_async_query(job_href)
+                return job_href, summary, None
+            except AsyncDownloadError as exc:
+                # 下載失敗（非 200）不得偽裝成 0 flows；交回呼叫端走 failed_rule_details，
+                # 不進 hit/unused 名單。單一 rule 失敗不得中斷整批下載。
+                logger.warning(f"Async result download failed for {job_href}: {exc}")
+                return job_href, None, exc
 
         with ThreadPoolExecutor(max_workers=max_concurrent) as ex:
             futs = {ex.submit(_download, jh): jh for jh in completed}
             for fut in as_completed(futs):
-                job_href, summary = fut.result()
+                job_href, summary, dl_error = fut.result()
                 job_info = job_map[job_href]
                 rule = job_info["rule"]
                 downloaded += 1
+                if dl_error is not None:
+                    download_failed.add(job_href)
+                    _progress(t("pu_progress_downloading", done=downloaded, total=len(completed)))
+                    continue
                 count = int(summary.get("count", 0) or 0)
                 if count > 0:
                     href = rule.get("href", "")
@@ -1642,7 +1655,7 @@ class TrafficQueryBuilder:
                     rule_port_summaries[href] = dict(summary.get("flows_by_port", {}) or {})
                 _progress(t("pu_progress_downloading", done=downloaded, total=len(completed)))
 
-        for job_href in sorted(failed):
+        for job_href in sorted(failed | download_failed):
             job_info = job_map.get(job_href, {})
             failed_rule_details.append(self._rule_usage_detail(
                 job_info.get("rule", {}),
@@ -1692,7 +1705,7 @@ class TrafficQueryBuilder:
             "cached_rules": cached_hits,
             "submitted_rules": len(pending_rules),
             "completed_jobs": len(completed),
-            "failed_jobs": len(failed),
+            "failed_jobs": len(failed) + len(download_failed),
             "pending_jobs": len(pending),
             "downloaded_jobs": downloaded,
             "hit_rules": len(hit_hrefs),

@@ -16,6 +16,7 @@ from io import BytesIO
 import orjson
 from loguru import logger
 
+from src.exceptions import AsyncDownloadError
 from src.i18n import t
 from src.state_store import load_state_file, update_state_file
 
@@ -367,9 +368,9 @@ class AsyncJobManager:
         dl_url = f"{c.api_cfg['url']}/api/v2{job_href}/download"
         dl_status, dl_body = c._request(dl_url, timeout=60)
         if dl_status != 200:
-            logger.debug(f"download_async_query failed: {dl_status}")
+            logger.error(f"download_async_query failed: {dl_status}")
             self._save_async_job_state(job_href, download_status=f"failed:{dl_status}")
-            return
+            raise AsyncDownloadError(f"download {job_href} failed: HTTP {dl_status}")
 
         buffer = BytesIO(dl_body)
 
