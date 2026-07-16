@@ -1486,12 +1486,63 @@ function _buildOvRecentTable(siemStatus) {
     + '</div>';
 }
 
+// Job 健康表格卡：每個排程 job 的上次執行與狀態（error/warn 置頂）。
+// level 由後端判定：error=上次失敗、warn=從未跑或逾期、ok=正常。
+function _buildOvJobHealth(jobHealth) {
+  var list = jobHealth || [];
+  if (!list.length) return '';
+  var rows = list.map(function (e) {
+    var mark = e.level === 'error' ? 'var(--color-danger,#f43f5e)'
+      : e.level === 'warn' ? 'var(--color-warning,#f59e0b)'
+      : 'var(--color-success,#22c55e)';
+    var lastRun = e.last_run ? escapeHtml(e.last_run)
+      : '<span data-i18n="gui_jh_never_ran">never ran</span>';
+    var statusTxt = e.level === 'warn' && e.last_run
+      ? (escapeHtml(e.last_status) + ' · <span data-i18n="gui_jh_overdue">overdue</span>')
+      : escapeHtml(e.last_status || '');
+    var mins = e.interval_seconds >= 3600
+      ? (Math.round(e.interval_seconds / 3600) + 'h')
+      : (Math.round(e.interval_seconds / 60) + 'm');
+    return '<tr>'
+      + '<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + mark + ';margin-right:6px;"></span>'
+      + escapeHtml(e.job_id) + '</td>'
+      + '<td>' + lastRun + '</td>'
+      + '<td>' + statusTxt + '</td>'
+      + '<td>' + mins + '</td>'
+      + '<td>' + escapeHtml(e.detail || '') + '</td>'
+      + '</tr>';
+  }).join('');
+  return '<h3 style="color:var(--accent2);font-size:.9rem;font-weight:700;margin:16px 0 8px;" data-i18n="gui_ov_job_health">Job Health</h3>'
+    + '<div class="table-container"><table class="rule-table">'
+    + '<thead><tr>'
+    + '<th data-i18n="gui_jh_th_job">Job</th>'
+    + '<th data-i18n="gui_jh_th_last_run">Last Run</th>'
+    + '<th data-i18n="gui_jh_th_status">Status</th>'
+    + '<th data-i18n="gui_jh_th_interval">Interval</th>'
+    + '<th data-i18n="gui_jh_th_detail">Detail</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+// TLS 憑證卡：剩餘天數；低於 auto_renew_days 門檻標 warn。
+function _buildOvTlsCard(tls) {
+  if (!tls || !tls.enabled) return '';
+  var warn = !!tls.expiring_soon;
+  var days = (tls.days_remaining == null) ? '—' : String(tls.days_remaining);
+  var cls = warn ? 'card-warn' : 'card-ok';
+  return '<div class="cards" style="margin-bottom:8px;">'
+    + '<div class="card ' + cls + '" style="flex:0 0 auto;min-width:160px;">'
+    + '<div class="label" data-i18n="gui_ov_tls_cert">TLS Certificate</div>'
+    + '<div class="value">' + days + ' <span data-i18n="gui_ov_tls_days">days</span></div>'
+    + (warn ? '<div style="font-size:.7rem;color:var(--dim);margin-top:4px;" data-i18n="gui_ov_tls_expiring">Expiring soon</div>' : '')
+    + '</div></div>';
+}
+
 window._integrations.setRender('overview', async function renderOverview() {
   var el = document.getElementById('it-pane-overview');
   if (!el) return;
   el.innerHTML = '<p class="subtitle" data-i18n="gui_it_loading">Loading...</p>';
 
-  var cache, siem, settings, health, throughput, dests;
+  var cache, siem, settings, health, throughput, dests, ovv;
   try {
     var results = await Promise.all([
       fetch('/api/cache/status').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
@@ -1500,6 +1551,7 @@ window._integrations.setRender('overview', async function renderOverview() {
       fetch('/api/cache/health').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
       fetch('/api/cache/throughput').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
       fetch('/api/siem/destinations').then(function(r) { return r.ok ? r.json() : Promise.resolve(null); }),
+      fetch('/api/dashboard/overview').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
     ]);
     cache      = results[0] || {};
     siem       = results[1] || {status: []};
@@ -1507,6 +1559,7 @@ window._integrations.setRender('overview', async function renderOverview() {
     health     = results[3] || {};
     throughput = results[4] || {};
     dests      = results[5] || null;
+    ovv        = results[6] || null;
   } catch (err) {
     el.textContent = '';
     var p = document.createElement('p');
@@ -1530,7 +1583,9 @@ window._integrations.setRender('overview', async function renderOverview() {
   });
 
   el.innerHTML = _buildOvPipelineHealth(health)
+               + _buildOvTlsCard(ovv && ovv.tls)
                + _buildOvCards(cache, destCount, totalPending, totalSent, totalFailed, totalDlq, throughput)
+               + _buildOvJobHealth(ovv && ovv.job_health)
                + _buildOvRecentTable(siemStatus)
                + _buildAlertChannelCards(settings);
   if (typeof window.i18nApply === 'function') window.i18nApply();
