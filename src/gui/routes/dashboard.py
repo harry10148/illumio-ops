@@ -600,154 +600,154 @@ def make_dashboard_blueprint(
             from src.reporter import Reporter
             import datetime
 
-            api = ApiClient(cm)
-            from src.main import _make_cache_reader
-            base_ana = Analyzer(cm, api, Reporter(cm),
-                                cache_reader=_make_cache_reader(cm))
+            with ApiClient(cm) as api:
+                from src.main import _make_cache_reader
+                base_ana = Analyzer(cm, api, Reporter(cm),
+                                    cache_reader=_make_cache_reader(cm))
 
-            mins = int(d.get("mins", 30))
-            now = datetime.datetime.now(datetime.timezone.utc)
-            start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
-            end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+                mins = int(d.get("mins", 30))
+                now = datetime.datetime.now(datetime.timezone.utc)
+                start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            pd_val = int(d.get("pd", 3))
-            if pd_val == 1: pds = ["potentially_blocked"]
-            elif pd_val == 2: pds = ["blocked"]
-            elif pd_val == 0: pds = ["allowed"]
-            else: pds = ["blocked", "potentially_blocked", "allowed"]
+                pd_val = int(d.get("pd", 3))
+                if pd_val == 1: pds = ["potentially_blocked"]
+                elif pd_val == 2: pds = ["blocked"]
+                elif pd_val == 0: pds = ["allowed"]
+                else: pds = ["blocked", "potentially_blocked", "allowed"]
 
-            rank_by = d.get("rank_by", "bandwidth")
+                rank_by = d.get("rank_by", "bandwidth")
 
-            # Map the inbound payload to the analyzer's query
-            params = {
-                "start_time": start_time,
-                "end_time": end_time,
-                "policy_decisions": pds,
-                "sort_by": rank_by,
-                "search": d.get("search", ""),
-                "src_ip_in": d.get("src_ip_in"), "dst_ip_in": d.get("dst_ip_in"),
-                "src_label": d.get("src_label"), "dst_label": d.get("dst_label"),
-                "ex_src_ip": d.get("ex_src_ip"), "ex_dst_ip": d.get("ex_dst_ip"),
-                "ex_src_label": d.get("ex_src_label"), "ex_dst_label": d.get("ex_dst_label"),
-                "port": d.get("port"), "ex_port": d.get("ex_port"),
-                "proto": d.get("proto"),
-                "any_label": d.get("any_label"), "any_ip": d.get("any_ip"),
-                "ex_any_label": d.get("ex_any_label"), "ex_any_ip": d.get("ex_any_ip"),
-                # Phase 4b：forward FilterBar 的 object/複數 key（原 params dict 漏收，
-                # 會在此被靜默丟棄；下游 query_flows whitelist 已全支援）。
-                "src_labels": d.get("src_labels", []),
-                "dst_labels": d.get("dst_labels", []),
-                "ex_src_labels": d.get("ex_src_labels", []),
-                "ex_dst_labels": d.get("ex_dst_labels", []),
-                "src_label_groups": d.get("src_label_groups", []),
-                "dst_label_groups": d.get("dst_label_groups", []),
-                "ex_src_label_groups": d.get("ex_src_label_groups", []),
-                "ex_dst_label_groups": d.get("ex_dst_label_groups", []),
-                "src_iplists": d.get("src_iplists", []),
-                "dst_iplists": d.get("dst_iplists", []),
-                "ex_src_iplists": d.get("ex_src_iplists", []),
-                "ex_dst_iplists": d.get("ex_dst_iplists", []),
-                "src_workloads": d.get("src_workloads", []),
-                "dst_workloads": d.get("dst_workloads", []),
-                "ex_src_workloads": d.get("ex_src_workloads", []),
-                "ex_dst_workloads": d.get("ex_dst_workloads", []),
-                "any_iplist": d.get("any_iplist", ""),
-                "any_workload": d.get("any_workload", ""),
-                "ex_any_iplist": d.get("ex_any_iplist", ""),
-                "ex_any_workload": d.get("ex_any_workload", ""),
-                "ports": d.get("ports", []),
-                "ex_ports": d.get("ex_ports", []),
-                "services": d.get("services", []),
-                "ex_services": d.get("ex_services", []),
-                "process_name": d.get("process_name"),
-                "ex_process_name": d.get("ex_process_name"),
-                "windows_service_name": d.get("windows_service_name"),
-                "ex_windows_service_name": d.get("ex_windows_service_name"),
-                "transmission": d.get("transmission"),
-                "ex_transmission": d.get("ex_transmission"),
-            }
-            results = base_ana.query_flows(params)
+                # Map the inbound payload to the analyzer's query
+                params = {
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "policy_decisions": pds,
+                    "sort_by": rank_by,
+                    "search": d.get("search", ""),
+                    "src_ip_in": d.get("src_ip_in"), "dst_ip_in": d.get("dst_ip_in"),
+                    "src_label": d.get("src_label"), "dst_label": d.get("dst_label"),
+                    "ex_src_ip": d.get("ex_src_ip"), "ex_dst_ip": d.get("ex_dst_ip"),
+                    "ex_src_label": d.get("ex_src_label"), "ex_dst_label": d.get("ex_dst_label"),
+                    "port": d.get("port"), "ex_port": d.get("ex_port"),
+                    "proto": d.get("proto"),
+                    "any_label": d.get("any_label"), "any_ip": d.get("any_ip"),
+                    "ex_any_label": d.get("ex_any_label"), "ex_any_ip": d.get("ex_any_ip"),
+                    # Phase 4b：forward FilterBar 的 object/複數 key（原 params dict 漏收，
+                    # 會在此被靜默丟棄；下游 query_flows whitelist 已全支援）。
+                    "src_labels": d.get("src_labels", []),
+                    "dst_labels": d.get("dst_labels", []),
+                    "ex_src_labels": d.get("ex_src_labels", []),
+                    "ex_dst_labels": d.get("ex_dst_labels", []),
+                    "src_label_groups": d.get("src_label_groups", []),
+                    "dst_label_groups": d.get("dst_label_groups", []),
+                    "ex_src_label_groups": d.get("ex_src_label_groups", []),
+                    "ex_dst_label_groups": d.get("ex_dst_label_groups", []),
+                    "src_iplists": d.get("src_iplists", []),
+                    "dst_iplists": d.get("dst_iplists", []),
+                    "ex_src_iplists": d.get("ex_src_iplists", []),
+                    "ex_dst_iplists": d.get("ex_dst_iplists", []),
+                    "src_workloads": d.get("src_workloads", []),
+                    "dst_workloads": d.get("dst_workloads", []),
+                    "ex_src_workloads": d.get("ex_src_workloads", []),
+                    "ex_dst_workloads": d.get("ex_dst_workloads", []),
+                    "any_iplist": d.get("any_iplist", ""),
+                    "any_workload": d.get("any_workload", ""),
+                    "ex_any_iplist": d.get("ex_any_iplist", ""),
+                    "ex_any_workload": d.get("ex_any_workload", ""),
+                    "ports": d.get("ports", []),
+                    "ex_ports": d.get("ex_ports", []),
+                    "services": d.get("services", []),
+                    "ex_services": d.get("ex_services", []),
+                    "process_name": d.get("process_name"),
+                    "ex_process_name": d.get("ex_process_name"),
+                    "windows_service_name": d.get("windows_service_name"),
+                    "ex_windows_service_name": d.get("ex_windows_service_name"),
+                    "transmission": d.get("transmission"),
+                    "ex_transmission": d.get("ex_transmission"),
+                }
+                results = base_ana.query_flows(params)
 
-            # Sort and get top 10
-            if rank_by == "bandwidth":
-                sorted_v = sorted(results, key=lambda x: x.get("max_bandwidth_mbps", 0), reverse=True)
-            elif rank_by == "volume":
-                sorted_v = sorted(results, key=lambda x: x.get("total_volume_mb", 0), reverse=True)
-            else: # count
-                sorted_v = sorted(results, key=lambda x: x.get("total_connections", 0), reverse=True)
-
-            top10 = []
-            for item in sorted_v[:10]:
-                s = item.get('source', {})
-                dst = item.get('destination', {})
-                sv = item.get('service', {})
-
-                s_name = s.get('name', 'N/A')
-                d_name = dst.get('name', 'N/A')
-                port = sv.get('port', 'All')
-                proto_name = sv.get('proto', '')
-                svc_name = sv.get('name') or getattr(sv, 'name', '') or ''
-                svc_str = f"{proto_name}/{port}"
-                if svc_name:
-                    svc_str = f"{svc_name} {svc_str}"
-
-                # Policy Decision mapping for UI
-                flow_pd = item.get("policy_decision", "")
-                if flow_pd == "allowed": pd_int = 0
-                elif flow_pd == "potentially_blocked": pd_int = 1
-                else: pd_int = 2 # default to Blocked if unknown or explicitly blocked
-
-                if rank_by == "bandwidth": val_fmt = f"{item.get('max_bandwidth_mbps', 0):.2f} Mbps"
+                # Sort and get top 10
+                if rank_by == "bandwidth":
+                    sorted_v = sorted(results, key=lambda x: x.get("max_bandwidth_mbps", 0), reverse=True)
                 elif rank_by == "volume":
-                    vol_bytes = (item.get('total_volume_mb', 0) or 0) * 1024 * 1024
-                    if vol_bytes >= 1024 ** 4:
-                        val_fmt = f"{vol_bytes / 1024 ** 4:.2f} TB"
-                    elif vol_bytes >= 1024 ** 3:
-                        val_fmt = f"{vol_bytes / 1024 ** 3:.2f} GB"
-                    elif vol_bytes >= 1024 ** 2:
-                        val_fmt = f"{vol_bytes / 1024 ** 2:.1f} MB"
-                    elif vol_bytes >= 1024:
-                        val_fmt = f"{vol_bytes / 1024:.1f} KB"
-                    else:
-                        val_fmt = f"{int(vol_bytes)} B"
-                else: val_fmt = f"{item.get('total_connections', 0)}"
+                    sorted_v = sorted(results, key=lambda x: x.get("total_volume_mb", 0), reverse=True)
+                else: # count
+                    sorted_v = sorted(results, key=lambda x: x.get("total_connections", 0), reverse=True)
 
-                first_seen = item.get("first_seen", "")
-                last_seen = item.get("last_seen", "")
+                top10 = []
+                for item in sorted_v[:10]:
+                    s = item.get('source', {})
+                    dst = item.get('destination', {})
+                    sv = item.get('service', {})
 
-                top10.append({
-                    "val_fmt": val_fmt,
-                    "first_seen": first_seen,
-                    "last_seen": last_seen,
-                    "dir": "<->",
-                    "s_name": s_name,
-                    "s_ip": s.get('ip', ''),
-                    "s_href": s.get('href', ''),
-                    "s_process": s.get('process', ''),
-                    "s_user": s.get('user', ''),
-                    "s_labels": s.get('labels', []),
-                    "d_name": d_name,
-                    "d_ip": dst.get('ip', ''),
-                    "d_href": dst.get('href', ''),
-                    "d_process": dst.get('process', ''),
-                    "d_user": dst.get('user', ''),
-                    "d_labels": dst.get('labels', []),
-                    "svc": svc_str,
-                    "svc_process": sv.get('process', ''),
-                    "svc_user": sv.get('user', ''),
-                    "pd": pd_int,
-                    "draft_pd": item.get('draft_policy_decision', ''),
+                    s_name = s.get('name', 'N/A')
+                    d_name = dst.get('name', 'N/A')
+                    port = sv.get('port', 'All')
+                    proto_name = sv.get('proto', '')
+                    svc_name = sv.get('name') or getattr(sv, 'name', '') or ''
+                    svc_str = f"{proto_name}/{port}"
+                    if svc_name:
+                        svc_str = f"{svc_name} {svc_str}"
+
+                    # Policy Decision mapping for UI
+                    flow_pd = item.get("policy_decision", "")
+                    if flow_pd == "allowed": pd_int = 0
+                    elif flow_pd == "potentially_blocked": pd_int = 1
+                    else: pd_int = 2 # default to Blocked if unknown or explicitly blocked
+
+                    if rank_by == "bandwidth": val_fmt = f"{item.get('max_bandwidth_mbps', 0):.2f} Mbps"
+                    elif rank_by == "volume":
+                        vol_bytes = (item.get('total_volume_mb', 0) or 0) * 1024 * 1024
+                        if vol_bytes >= 1024 ** 4:
+                            val_fmt = f"{vol_bytes / 1024 ** 4:.2f} TB"
+                        elif vol_bytes >= 1024 ** 3:
+                            val_fmt = f"{vol_bytes / 1024 ** 3:.2f} GB"
+                        elif vol_bytes >= 1024 ** 2:
+                            val_fmt = f"{vol_bytes / 1024 ** 2:.1f} MB"
+                        elif vol_bytes >= 1024:
+                            val_fmt = f"{vol_bytes / 1024:.1f} KB"
+                        else:
+                            val_fmt = f"{int(vol_bytes)} B"
+                    else: val_fmt = f"{item.get('total_connections', 0)}"
+
+                    first_seen = item.get("first_seen", "")
+                    last_seen = item.get("last_seen", "")
+
+                    top10.append({
+                        "val_fmt": val_fmt,
+                        "first_seen": first_seen,
+                        "last_seen": last_seen,
+                        "dir": "<->",
+                        "s_name": s_name,
+                        "s_ip": s.get('ip', ''),
+                        "s_href": s.get('href', ''),
+                        "s_process": s.get('process', ''),
+                        "s_user": s.get('user', ''),
+                        "s_labels": s.get('labels', []),
+                        "d_name": d_name,
+                        "d_ip": dst.get('ip', ''),
+                        "d_href": dst.get('href', ''),
+                        "d_process": dst.get('process', ''),
+                        "d_user": dst.get('user', ''),
+                        "d_labels": dst.get('labels', []),
+                        "svc": svc_str,
+                        "svc_process": sv.get('process', ''),
+                        "svc_user": sv.get('user', ''),
+                        "pd": pd_int,
+                        "draft_pd": item.get('draft_policy_decision', ''),
+                    })
+
+                stats = getattr(base_ana, "last_query_stats", {}) or {}
+                return jsonify({
+                    "ok": True,
+                    "data": top10,
+                    "total": len(sorted_v),
+                    "source": getattr(base_ana, "last_query_source", "api"),
+                    "truncated": bool(stats.get("truncated")),
+                    "cap": int(stats.get("cap", QUERY_RESULT_CAP)),
                 })
-
-            stats = getattr(base_ana, "last_query_stats", {}) or {}
-            return jsonify({
-                "ok": True,
-                "data": top10,
-                "total": len(sorted_v),
-                "source": getattr(base_ana, "last_query_source", "api"),
-                "truncated": bool(stats.get("truncated")),
-                "cap": int(stats.get("cap", QUERY_RESULT_CAP)),
-            })
         except TrafficQueryError as e:
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
             return jsonify({"ok": False, "error": t(
