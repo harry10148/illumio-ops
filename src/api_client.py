@@ -126,6 +126,9 @@ class ApiClient:
         # tell "PCE unreachable" apart from "PCE says genuinely 0 rows" (see
         # .superpowers/sdd/watchdog-live-reverify-report.md step 2).
         self.last_fetch_error: str | None = None
+        # Task 1 (API layer hardening)：_get_collection 偵測到集合 GET 截斷
+        # （X-Total-Count > 實收筆數）時記錄 path，供 Task 2 消費做 async fallback。
+        self.last_truncated_collections: list[str] = []
 
         # State-store paths + async job cache TTL parameters
         self._root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -601,7 +604,7 @@ class ApiClient:
         suggest cache. Returns [] on error.
         """
         org = self.api_cfg['org_id']
-        status, data = self._api_get(f"/orgs/{org}/labels?max_results=10000")
+        status, data, _total = self._get_collection(f"/orgs/{org}/labels")
         if status == 200 and data:
             return data
         logger.warning(f"get_all_labels: status={status}, returned empty list")
@@ -682,15 +685,17 @@ class ApiClient:
             return False
 
     def fetch_managed_workloads(self, max_results: int = 10000) -> list:
-        """Fetch all VEN-managed workloads (those with an active VEN agent)."""
+        """Fetch all VEN-managed workloads (those with an active VEN agent).
+
+        max_results 參數保留供呼叫端相容，但集合 GET 一律經 _get_collection
+        套用 PCE 硬上限 500（帶更大的值本來就無效、還會掩蓋截斷）。
+        """
         try:
-            params = urllib.parse.urlencode({'managed': 'true', 'max_results': max_results})
-            url = f"{self.base_url}/workloads?{params}"
-            status, body = self._request(url, timeout=30)
+            org = self.api_cfg['org_id']
+            status, data, _total = self._get_collection(f"/orgs/{org}/workloads?managed=true")
             if status == 200:
-                return orjson.loads(body)
-            err_msg = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
-            logger.error(f"Fetch Managed Workloads Failed: {status} - {err_msg}")
+                return data
+            logger.error(f"Fetch Managed Workloads Failed: {status}")
             return []
         except Exception as e:
             logger.error(f"Fetch Managed Workloads Error: {e}")
@@ -759,6 +764,57 @@ class ApiClient:
             logger.error(f"API GET {endpoint}: {e}")
             return 0, None
 
+    def _api_get_with_headers(self, endpoint: str, timeout: int = 15) -> tuple[int, Any, dict]:
+        """GET a PCE API endpoint，回傳連 headers 一起（供 _get_collection 讀 X-Total-Count）。
+
+        不透過 _request（其簽名回 (status, body) 丟棄 headers、呼叫點太多不便改），
+        直接用 self._session；錯誤處理比照 _request：連線例外回 (0, err_bytes, {})。
+        """
+        if self._session is None:
+            raise RuntimeError("ApiClient is closed; create a new instance")
+        url = f"{self.api_cfg['url']}/api/v2{endpoint}"
+        try:
+            resp = self._session.request(method="GET", url=url, timeout=timeout)
+        except Exception as e:
+            logger.error(f"API GET {endpoint}: {e}")
+            return 0, str(e).encode('utf-8'), {}
+        if resp.status_code == 200:
+            return resp.status_code, orjson.loads(resp.content), resp.headers
+        if resp.status_code == 204:
+            return resp.status_code, {}, resp.headers
+        return resp.status_code, None, resp.headers
+
+    def _get_collection(self, path: str, *, timeout: int = 15) -> tuple[int, Any, int | None]:
+        """同步集合 GET：max_results 一律用 PCE 硬上限 500（帶 10000 沒有意義，
+        且會掩蓋截斷）；path 由呼叫者帶好其餘 query string，這裡負責附加 max_results。
+
+        回傳 (status, data, total_count)：total_count 取自 X-Total-Count header
+        （無此 header 時 None）。當 total_count > 實收筆數時視為截斷，記錄到
+        self.last_truncated_collections 供後續（Task 2）消費。
+        """
+        sep = "&" if "?" in path else "?"
+        status, data, headers = self._api_get_with_headers(f"{path}{sep}max_results=500", timeout=timeout)
+
+        total_count: int | None = None
+        if headers:
+            for key, val in headers.items():
+                if key.lower() == "x-total-count":
+                    try:
+                        total_count = int(val)
+                    except (TypeError, ValueError):
+                        total_count = None
+                    break
+
+        actual_count = len(data) if isinstance(data, list) else 0
+        if total_count is not None and total_count > actual_count:
+            logger.error(
+                "collection GET truncated: {} returned {}/{} objects",
+                path, actual_count, total_count,
+            )
+            self.last_truncated_collections.append(path)
+
+        return status, data, total_count
+
     def _api_put(self, endpoint: str, payload: dict[str, Any], timeout: int = 15) -> int:
         """PUT a PCE API endpoint. Returns status_code."""
         url = f"{self.api_cfg['url']}/api/v2{endpoint}"
@@ -795,7 +851,7 @@ class ApiClient:
         if self.ruleset_cache and not force_refresh:
             return self.ruleset_cache
         org = self.api_cfg['org_id']
-        status, data = self._api_get(f"/orgs/{org}/sec_policy/draft/rule_sets?max_results=10000")
+        status, data, _total = self._get_collection(f"/orgs/{org}/sec_policy/draft/rule_sets")
         if status == 200 and data:
             self.ruleset_cache = data
             return self.ruleset_cache
@@ -806,8 +862,8 @@ class ApiClient:
     def get_active_rulesets(self) -> list[dict[str, Any]]:
         """Get all active (provisioned) rulesets with their rules."""
         org = self.api_cfg['org_id']
-        status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/active/rule_sets?max_results=10000"
+        status, data, _total = self._get_collection(
+            f"/orgs/{org}/sec_policy/active/rule_sets"
         )
         if status == 200 and data:
             return data
@@ -824,8 +880,8 @@ class ApiClient:
         if pversion not in ("active", "draft"):
             raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
-        status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/{pversion}/ip_lists?max_results=10000"
+        status, data, _total = self._get_collection(
+            f"/orgs/{org}/sec_policy/{pversion}/ip_lists"
         )
         if status == 200 and data:
             return data
@@ -841,8 +897,8 @@ class ApiClient:
         if pversion not in ("active", "draft"):
             raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
-        status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/{pversion}/label_groups?max_results=10000"
+        status, data, _total = self._get_collection(
+            f"/orgs/{org}/sec_policy/{pversion}/label_groups"
         )
         if status == 200 and data:
             return data
@@ -858,8 +914,8 @@ class ApiClient:
         if pversion not in ("active", "draft"):
             raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
-        status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/{pversion}/services?max_results=10000"
+        status, data, _total = self._get_collection(
+            f"/orgs/{org}/sec_policy/{pversion}/services"
         )
         if status == 200 and data:
             return data

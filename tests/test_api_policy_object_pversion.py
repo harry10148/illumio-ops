@@ -1,4 +1,9 @@
-"""pversion 參數化：物件 getter 可切換 draft/active 端點。"""
+"""pversion 參數化：物件 getter 可切換 draft/active 端點。
+
+Task 1 (API layer hardening)：這些 getter 改走 _get_collection（固定 500
+上限 + 截斷偵測），故 mock 對象改為 _get_collection；max_results 斷言改由
+_get_collection 自己的測試（tests/test_api_collection_truncation.py）覆蓋。
+"""
 
 import pytest
 from unittest.mock import MagicMock
@@ -10,7 +15,7 @@ from src.api_client import ApiClient
 def api():
     client = ApiClient.__new__(ApiClient)
     client.api_cfg = {"url": "https://pce.example.com:8443", "org_id": 1}
-    client._api_get = MagicMock(return_value=(200, [{"href": "/orgs/1/sec_policy/draft/ip_lists/5", "name": "L"}]))
+    client._get_collection = MagicMock(return_value=(200, [{"href": "/orgs/1/sec_policy/draft/ip_lists/5", "name": "L"}], None))
     return client
 
 
@@ -21,9 +26,8 @@ def api():
 ])
 def test_default_pversion_hits_active(api, method, segment):
     getattr(api, method)()
-    endpoint = api._api_get.call_args[0][0]
+    endpoint = api._get_collection.call_args[0][0]
     assert f"/sec_policy/active/{segment}" in endpoint
-    assert "max_results=10000" in endpoint
 
 
 @pytest.mark.parametrize("method,segment", [
@@ -33,7 +37,7 @@ def test_default_pversion_hits_active(api, method, segment):
 ])
 def test_draft_pversion_hits_draft(api, method, segment):
     result = getattr(api, method)(pversion="draft")
-    endpoint = api._api_get.call_args[0][0]
+    endpoint = api._get_collection.call_args[0][0]
     assert f"/sec_policy/draft/{segment}" in endpoint
     assert isinstance(result, list)
 

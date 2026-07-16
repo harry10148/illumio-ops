@@ -19,29 +19,33 @@ class TestGetAllRulesetsRaiseOnError(unittest.TestCase):
     def tearDown(self):
         self._td.cleanup()
 
+    # Task 1 (API layer hardening)：get_all_rulesets 改走 _get_collection
+    # （固定 500 上限 + 截斷偵測、回傳多一個 total_count），故這裡改 mock
+    # _get_collection 而非 _api_get；行為釘（raise_on_error 語意）不變。
+
     def test_default_returns_empty_on_http_error(self):
         # 零行為變更釘：預設仍回 []（rule_scheduler/policy_diff 等呼叫端依賴）
-        self.client._api_get = lambda ep, timeout=15: (403, None)
+        self.client._get_collection = lambda path, *, timeout=15: (403, None, None)
         self.assertEqual(self.client.get_all_rulesets(), [])
 
     def test_raise_on_error_raises_on_http_error(self):
-        self.client._api_get = lambda ep, timeout=15: (403, None)
+        self.client._get_collection = lambda path, *, timeout=15: (403, None, None)
         with self.assertRaises(RuntimeError) as ctx:
             self.client.get_all_rulesets(raise_on_error=True)
         self.assertIn("403", str(ctx.exception))
 
     def test_raise_on_error_raises_on_connection_layer_failure(self):
         # _request 連線層失敗慣例：status 0（v1 報告附註的未驗證縫，一併涵蓋）
-        self.client._api_get = lambda ep, timeout=15: (0, None)
+        self.client._get_collection = lambda path, *, timeout=15: (0, None, None)
         with self.assertRaises(RuntimeError):
             self.client.get_all_rulesets(raise_on_error=True)
 
     def test_raise_on_error_returns_data_on_200(self):
         rs = [{"href": "/orgs/1/sec_policy/draft/rule_sets/1", "rules": []}]
-        self.client._api_get = lambda ep, timeout=15: (200, rs)
+        self.client._get_collection = lambda path, *, timeout=15: (200, rs, None)
         self.assertEqual(self.client.get_all_rulesets(raise_on_error=True), rs)
 
     def test_raise_on_error_empty_200_is_legit_empty(self):
         # 200 且空 list = 合法空 org，不 raise
-        self.client._api_get = lambda ep, timeout=15: (200, [])
+        self.client._get_collection = lambda path, *, timeout=15: (200, [], None)
         self.assertEqual(self.client.get_all_rulesets(raise_on_error=True), [])

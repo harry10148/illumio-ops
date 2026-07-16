@@ -230,10 +230,10 @@ class LabelResolver:
             # I/O phase: fetch data from API without holding lock (network latency)
             if force_refresh:
                 self.invalidate_query_lookup_cache()  # acquires _cache_lock internally (RLock)
-            s_labels, d_labels = c._api_get(f"/orgs/{org}/labels?max_results=10000")
-            s_groups, d_groups = c._api_get(f"/orgs/{org}/sec_policy/draft/label_groups?max_results=10000")
-            s_iplists, d_iplists = c._api_get(f"/orgs/{org}/sec_policy/draft/ip_lists?max_results=10000")
-            s_services, d_services = c._api_get(f"/orgs/{org}/sec_policy/draft/services?max_results=10000")
+            s_labels, d_labels, _t1 = c._get_collection(f"/orgs/{org}/labels")
+            s_groups, d_groups, _t2 = c._get_collection(f"/orgs/{org}/sec_policy/draft/label_groups")
+            s_iplists, d_iplists, _t3 = c._get_collection(f"/orgs/{org}/sec_policy/draft/ip_lists")
+            s_services, d_services, _t4 = c._get_collection(f"/orgs/{org}/sec_policy/draft/services")
 
             # Write phase: acquire lock once to write all fetched data atomically
             with c._cache_lock:
