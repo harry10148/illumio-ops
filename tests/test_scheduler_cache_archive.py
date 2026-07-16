@@ -107,7 +107,8 @@ def test_periodic_cache_jobs_get_startup_kick(tmp_path):
     try:
         now = datetime.datetime.now(datetime.timezone.utc)
         kicks = {}
-        for job_id in ("pce_cache_aggregate", "pce_cache_retention", "pce_cache_archive"):
+        for job_id in ("pce_cache_aggregate", "pce_cache_retention", "pce_cache_archive",
+                       "pce_cache_capacity_monitor"):
             job = sched.get_job(job_id)
             assert job is not None, job_id
             nrt = job.next_run_time
@@ -116,7 +117,31 @@ def test_periodic_cache_jobs_get_startup_kick(tmp_path):
             assert 0 <= delta <= 900, f"{job_id} 首跑須在啟動後 15 分鐘內（實際 {delta:.0f}s）"
             kicks[job_id] = nrt
         # 錯開：三個 kick 不得同時（避免同刻搶 cache_writer 單 worker）
-        assert len(set(kicks.values())) == 3, f"kick 時間須錯開: {kicks}"
+        assert len(set(kicks.values())) == 4, f"kick 時間須錯開: {kicks}"
+    finally:
+        for j in list(sched.get_jobs()):
+            sched.remove_job(j.id)
+
+
+def test_top_level_periodic_jobs_get_startup_kick(tmp_path):
+    """monitor_cycle（cache 停用時 10m）與 posture_summary（10m）同屬長間隔
+    interval job：密集重啟下首跑會被無限推遲（同 2026-07-14 archive 事故類）。
+    兩者皆須有近期首跑。"""
+    import datetime
+    from src.scheduler import build_scheduler
+    cm = _cm(tmp_path, archive_enabled=False)
+    cm.models.pce_cache.enabled = False
+    cm.models.siem.enabled = False
+    cm.config = {}
+    sched = build_scheduler(cm)
+    try:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        for job_id in ("monitor_cycle", "posture_summary"):
+            job = sched.get_job(job_id)
+            assert job is not None, job_id
+            assert job.next_run_time is not None, f"{job_id} 缺首跑 kick"
+            delta = (job.next_run_time - now).total_seconds()
+            assert 0 <= delta <= 900, f"{job_id} 首跑須在 15 分鐘內（實際 {delta:.0f}s）"
     finally:
         for j in list(sched.get_jobs()):
             sched.remove_job(j.id)

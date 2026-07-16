@@ -53,6 +53,12 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
 
     sched = BackgroundScheduler(**kwargs)
 
+    # 長間隔 interval job 一律給近期首跑 kick（IntervalTrigger 預設首跑在啟動後
+    # 一整個間隔；部署頻繁重啟會把首跑無限推遲——2026-07-14 archive 事故的通則化，
+    # 秒級 tick job 不需要）。各 job 錯開偏移，避免啟動瞬間同時打 PCE/搶 executor。
+    import datetime as _dt0
+    _kick0 = _dt0.datetime.now(_dt0.timezone.utc) + _dt0.timedelta(seconds=10)
+
     try:
         _cache_enabled = cm.models.pce_cache.enabled
     except Exception as e:
@@ -72,6 +78,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         id="monitor_cycle",
         name="Monitor analysis cycle",
         replace_existing=True,
+        next_run_time=_kick0 + _dt0.timedelta(seconds=20),
     )
     sched.add_job(
         tick_report_schedules,
@@ -110,6 +117,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         id="posture_summary",
         name="Posture score summary",
         replace_existing=True,
+        next_run_time=_kick0 + _dt0.timedelta(seconds=80),
     )
 
     try:
@@ -150,9 +158,11 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             sched.add_job(run_cache_lag_monitor, _IT(seconds=60),
                           args=[cm], id="cache_lag_monitor", replace_existing=True)
             from src.scheduler.jobs import run_capacity_monitor
+            # capacity monitor 是「應跑未跑」告警的看門狗，自己更不能被重啟餓死
             sched.add_job(run_capacity_monitor, _IT(minutes=30),
                           args=[cm], id="pce_cache_capacity_monitor",
-                          replace_existing=True)
+                          replace_existing=True,
+                          next_run_time=_kick + _dt.timedelta(seconds=240))
             if cache_cfg.archive_enabled:
                 sched.add_job(run_cache_archive, _IT(hours=cache_cfg.archive_interval_hours),
                               args=[cm], id="pce_cache_archive", replace_existing=True,
