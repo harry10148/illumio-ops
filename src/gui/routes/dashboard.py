@@ -127,13 +127,31 @@ def _overview_pipeline(cm):
                                .where(SiemDispatch.status == "failed")
                                .where(SiemDispatch.queued_at >= hr_ago)).scalar() or 0
             dlq = s.execute(select(func.count()).select_from(DeadLetter)).scalar() or 0
+            siem_idle = False
+            try:
+                siem_cfg = cm.models.siem
+                if getattr(siem_cfg, "enabled", False):
+                    dests = [d for d in (getattr(siem_cfg, "destinations", None) or [])
+                             if getattr(d, "enabled", False)]
+                    if not dests:
+                        siem_idle = True
+                    else:
+                        day_ago = now - dt.timedelta(hours=24)
+                        enq_24h = s.execute(
+                            select(func.count()).select_from(SiemDispatch)
+                            .where(SiemDispatch.queued_at >= day_ago)).scalar() or 0
+                        has_source_data = any(
+                            c.get("lag_s") is not None for c in cache_lag)
+                        siem_idle = enq_24h == 0 and has_source_data
+            except Exception:
+                siem_idle = False
         denom = sent + failed
         success_1h = round(sent / denom * 100, 1) if denom else 100.0
         lag_levels = [c["level"] for c in cache_lag]
         verdict = pipeline_verdict(lag_levels=lag_levels, siem_success_1h=success_1h,
-                                   denom=denom, dlq=int(dlq))
+                                   denom=denom, dlq=int(dlq), siem_idle=siem_idle)
         return {"cache_lag": cache_lag, "siem_success_1h": success_1h,
-                "dlq": int(dlq), "verdict": verdict}
+                "dlq": int(dlq), "verdict": verdict, "siem_idle": siem_idle}
     except Exception as e:
         return {"verdict": "unknown", "note": str(e)[:120]}
 

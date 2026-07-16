@@ -49,6 +49,40 @@ def test_pipeline_verdict_thresholds():
     assert pipeline_verdict(lag_levels=["ok"], siem_success_1h=100.0, denom=0, dlq=0) == "ok"  # no traffic
 
 
+def test_pipeline_verdict_siem_idle_is_warn():
+    """SIEM enabled but idle (no enabled destination, or has data yet zero
+    24h enqueue) must not be green: 2026-07-16 scan caught the denom=0
+    short-circuit reading "SIEM completely stalled" as ok."""
+    from src.pce_cache.health import pipeline_verdict
+    assert pipeline_verdict(lag_levels=[], siem_success_1h=100.0,
+                            denom=0, dlq=0, siem_idle=True) == "warn"
+    assert pipeline_verdict(lag_levels=[], siem_success_1h=100.0,
+                            denom=0, dlq=0, siem_idle=False) == "ok"
+
+
+def test_overview_pipeline_flags_siem_idle_when_no_enabled_destination(tmp_path):
+    """siem.enabled=true with all destinations disabled -> pipeline verdict
+    warn/error and siem_idle True."""
+    from sqlalchemy import create_engine
+    from src.pce_cache.schema import init_schema
+    db_path = str(tmp_path / "c.sqlite")
+    fd, path = tempfile.mkstemp(suffix=".json"); os.close(fd)
+    with open(path, "w") as f:
+        json.dump({"web_gui": {"username": "admin", "password": "pw", "secret_key": "s",
+                               "allowed_ips": ["127.0.0.1"]},
+                   "pce_cache": {"enabled": True, "db_path": db_path},
+                   "siem": {"enabled": True, "destinations": [
+                       {"name": "x", "enabled": False, "host": "h", "port": 514}]}}, f)
+    init_schema(create_engine(f"sqlite:///{db_path}"))
+    cm = ConfigManager(config_file=path)
+    c = _client(cm)
+    body = c.get("/api/dashboard/overview",
+                 environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
+    os.unlink(path)
+    assert body["pipeline"]["siem_idle"] is True
+    assert body["pipeline"]["verdict"] in ("warn", "error")
+
+
 def test_siem_status_has_1h_window_and_latency(app_cm):
     cm, tmp = app_cm
     now = dt.datetime.now(dt.timezone.utc)
