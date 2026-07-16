@@ -70,3 +70,22 @@ def test_all_save_target_ids_still_in_render_helpers():
         assert f'id="{el_id}"' in js or f"id='{el_id}'" in js, (
             f"Input id {el_id!r} disappeared from settings.js — saveSettings() will break"
         )
+
+
+def test_alert_plugin_cards_have_test_send_button():
+    """2026-07-16 backlog：通道設定壞掉與健康閒置在 GUI 長相相同——
+    每張通道卡提供送測試按鈕（複用既有 /api/actions/test-alert）。"""
+    js = JS.read_text(encoding="utf-8")
+    fn = js.split("function _renderAlertPluginCards(", 1)[1].split("\nfunction ", 1)[0]
+    assert 'data-action="testAlertChannel"' in fn
+    assert "gui_set_test_send" in fn
+    assert "window.testAlertChannel" in js
+
+
+def test_test_send_i18n_bilingual():
+    import json
+
+    en = json.loads((ROOT / "src" / "i18n_en.json").read_text(encoding="utf-8"))
+    zh = json.loads((ROOT / "src" / "i18n_zh_TW.json").read_text(encoding="utf-8"))
+    for k in ("gui_set_test_send", "gui_set_test_sent", "gui_set_test_failed"):
+        assert k in en and k in zh, k

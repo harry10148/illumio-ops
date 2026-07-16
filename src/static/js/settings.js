@@ -244,11 +244,14 @@ function _renderAlertPluginCards(active, settings) {
             <div style="font-weight:800; color:var(--fg);">${escapeHtml(plugin.display_name || plugin.name || pluginName)}</div>
             <div style="color:var(--dim); font-size:0.88em; line-height:1.6; margin-top:4px;">${escapeHtml(plugin.description || '')}</div>
           </div>
-          <div class="chk" style="margin:0;">
-            <label>
-              <input type="checkbox" id="s-plugin-enabled-${pluginName}" ${active.includes(pluginName) ? 'checked' : ''}>
-              <span>Enabled</span>
-            </label>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <button type="button" class="btn btn-secondary btn-sm" data-action="testAlertChannel" data-args='${escapeHtml(JSON.stringify([pluginName]))}' data-i18n="gui_set_test_send">Send test</button>
+            <div class="chk" style="margin:0;">
+              <label>
+                <input type="checkbox" id="s-plugin-enabled-${pluginName}" ${active.includes(pluginName) ? 'checked' : ''}>
+                <span>Enabled</span>
+              </label>
+            </div>
           </div>
         </div>
         ${rows.join('')}
@@ -773,3 +776,22 @@ async function deletePceProfile(id) {
   const r = await post('/api/pce-profiles', { action: 'delete', id });
   if (r && r.ok) { toast(_t('gui_pce_delete_profile')); await loadSettings(); }
 }
+
+// 通道送測試：複用 actions 的 test-alert 端點，依 results[].status 判定成敗並以 toast 呈現。
+// "skipped"（例如未設定收件人）視同失敗，避免與健康閒置的通道混淆。
+window.testAlertChannel = async function (name) {
+  try {
+    const r = await post('/api/actions/test-alert', { channel: name });
+    const results = (r && r.results) || [];
+    const allSent = r && r.ok && results.length > 0 && results.every(x => x.status === 'success');
+    if (allSent) {
+      toast(`${_t('gui_set_test_sent')}: ${name}`);
+    } else {
+      const bad = results.find(x => x.status !== 'success');
+      const err = (bad && bad.error) || (r && r.error) || '';
+      toast(`${_t('gui_set_test_failed')}: ${name} ${err}`, 'err');
+    }
+  } catch (e) {
+    toast(`${_t('gui_set_test_failed')}: ${name}`, 'err');
+  }
+};
