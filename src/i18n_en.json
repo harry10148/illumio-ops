@@ -2654,7 +2654,7 @@
   "pd_2": "2. Potentially Blocked",
   "pd_2_allowed_only": "Allowed Only",
   "pd_3": "3. Allowed",
-  "pd_3_all": "All (Blocked + Potential + Allowed)",
+  "pd_3_all": "All (Blocked + Potential + Allowed + Unknown)",
   "pd_4": "4. All",
   "pd_allowed_across_boundary": "Allowed Across Boundary",
   "pd_blocked_by_boundary": "Blocked by Boundary",

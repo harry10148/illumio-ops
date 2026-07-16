@@ -86,7 +86,7 @@ class TestFetchTraffic(unittest.TestCase):
         self.assertIsInstance(now_utc, datetime.datetime)
 
     def test_calls_api_with_correct_policy_decisions(self):
-        """_fetch_traffic always queries blocked + potentially_blocked + allowed."""
+        """_fetch_traffic queries the full vendor policy_decision domain (incl. unknown)."""
         rule = _traffic_rule()
         az = _make_analyzer([rule])
         fake_stream = iter([_flow()])
@@ -96,7 +96,7 @@ class TestFetchTraffic(unittest.TestCase):
 
         az.api.execute_traffic_query_stream.assert_called_once()
         args = az.api.execute_traffic_query_stream.call_args[0]
-        self.assertEqual(args[2], ["blocked", "potentially_blocked", "allowed"])
+        self.assertEqual(args[2], ["blocked", "potentially_blocked", "allowed", "unknown"])
 
     def test_returns_traffic_rules_in_tuple(self):
         """_fetch_traffic returns only traffic/bandwidth/volume rules."""

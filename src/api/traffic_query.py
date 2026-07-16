@@ -25,6 +25,7 @@ from io import BytesIO
 import orjson
 from loguru import logger
 
+from src.exceptions import AsyncDownloadError
 from src.i18n import t
 from src.port_token import parse_port_token
 
@@ -752,7 +753,7 @@ class TrafficQueryBuilder:
                 logger.info("Traffic query completed (matches={}).", expected_matches)
                 completed = True
                 break
-            if state == "failed":
+            if state in ("failed", "cancel_requested", "cancelled", "canceled"):
                 print(f" {t('query_failed', default='Failed.')}")
                 logger.error("Traffic query failed.")
                 c.last_fetch_error = f"async query state failed: {state}"
@@ -1203,7 +1204,9 @@ class TrafficQueryBuilder:
         carry draft_policy_decision for the R01-R05 rules. Off by default.
         """
         if policy_decisions is None:
-            policy_decisions = ["blocked", "potentially_blocked", "allowed"]
+            # vendor policy_decision 值域為四值：blocked/potentially_blocked/allowed/
+            # unknown——unknown 涵蓋 idle/快照模式與 Flowlink 未管理流量，預設不排除。
+            policy_decisions = ["blocked", "potentially_blocked", "allowed", "unknown"]
 
         query_spec = self.build_traffic_query_spec(filters)
         stream = self.execute_traffic_query_stream(
@@ -1410,6 +1413,10 @@ class TrafficQueryBuilder:
             if not jobs.poll_async_query(job_href, timeout=120):
                 return 0
             return jobs.summarize_async_query(job_href)["count"]
+        except AsyncDownloadError:
+            # 下載失敗不得誤報 0 flows（會被解讀成 rule unused）——與
+            # batch_get_rule_traffic_counts 的失敗語意一致。
+            raise
         except Exception as e:
             logger.warning(f"get_rule_traffic_count error for {rule.get('href')}: {e}")
             return 0
@@ -1611,8 +1618,8 @@ class TrafficQueryBuilder:
             for job_href, state in poll_results:
                 if state == "completed":
                     completed.add(job_href)
-                elif state == "failed":
-                    logger.debug(f"Async query failed: {job_href}")
+                elif state in ("failed", "cancel_requested", "cancelled", "canceled"):
+                    logger.debug(f"Async query failed (state={state}): {job_href}")
                     failed.add(job_href)
                 else:
                     still_pending.add(job_href)
@@ -1623,17 +1630,29 @@ class TrafficQueryBuilder:
         failed_rule_details = []
         pending_rule_details = []
 
+        download_failed = set()
+
         def _download(job_href):
-            summary = jobs_mgr.summarize_async_query(job_href)
-            return job_href, summary
+            try:
+                summary = jobs_mgr.summarize_async_query(job_href)
+                return job_href, summary, None
+            except AsyncDownloadError as exc:
+                # 下載失敗（非 200）不得偽裝成 0 flows；交回呼叫端走 failed_rule_details，
+                # 不進 hit/unused 名單。單一 rule 失敗不得中斷整批下載。
+                logger.warning(f"Async result download failed for {job_href}: {exc}")
+                return job_href, None, exc
 
         with ThreadPoolExecutor(max_workers=max_concurrent) as ex:
             futs = {ex.submit(_download, jh): jh for jh in completed}
             for fut in as_completed(futs):
-                job_href, summary = fut.result()
+                job_href, summary, dl_error = fut.result()
                 job_info = job_map[job_href]
                 rule = job_info["rule"]
                 downloaded += 1
+                if dl_error is not None:
+                    download_failed.add(job_href)
+                    _progress(t("pu_progress_downloading", done=downloaded, total=len(completed)))
+                    continue
                 count = int(summary.get("count", 0) or 0)
                 if count > 0:
                     href = rule.get("href", "")
@@ -1642,7 +1661,7 @@ class TrafficQueryBuilder:
                     rule_port_summaries[href] = dict(summary.get("flows_by_port", {}) or {})
                 _progress(t("pu_progress_downloading", done=downloaded, total=len(completed)))
 
-        for job_href in sorted(failed):
+        for job_href in sorted(failed | download_failed):
             job_info = job_map.get(job_href, {})
             failed_rule_details.append(self._rule_usage_detail(
                 job_info.get("rule", {}),
@@ -1692,7 +1711,7 @@ class TrafficQueryBuilder:
             "cached_rules": cached_hits,
             "submitted_rules": len(pending_rules),
             "completed_jobs": len(completed),
-            "failed_jobs": len(failed),
+            "failed_jobs": len(failed) + len(download_failed),
             "pending_jobs": len(pending),
             "downloaded_jobs": downloaded,
             "hit_rules": len(hit_hrefs),
@@ -1724,7 +1743,9 @@ class TrafficQueryBuilder:
         c = self._client
         jobs_mgr = c._jobs
         if policy_decisions is None:
-            policy_decisions = ["blocked", "potentially_blocked", "allowed"]
+            # vendor policy_decision 值域為四值：blocked/potentially_blocked/allowed/
+            # unknown——unknown 涵蓋 idle/快照模式與 Flowlink 未管理流量，預設不排除。
+            policy_decisions = ["blocked", "potentially_blocked", "allowed", "unknown"]
 
         query_spec = self.build_traffic_query_spec(filters)
         if query_spec.fallback_filters or query_spec.report_only_filters:
@@ -1753,7 +1774,9 @@ class TrafficQueryBuilder:
         if not job_href:
             raise RuntimeError("Failed to submit raw Explorer CSV query")
 
-        poll_result = jobs_mgr._wait_for_async_query(job_href, timeout=300, compute_draft=compute_draft)
+        poll_result = jobs_mgr._wait_for_async_query(
+            job_href, timeout=_ASYNC_QUERY_MAX_WAIT_SECONDS, compute_draft=compute_draft
+        )
         status = poll_result.get("status")
         rules_status = poll_result.get("rules")
         if status != "completed":

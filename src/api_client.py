@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import base64
 import json
+import math
 import os
 import re
 import threading
@@ -41,6 +42,7 @@ from src.api.traffic_query import (
     TrafficQuerySpec,
     _TRAFFIC_FILTER_CAPABILITIES,
 )
+from src.exceptions import APIError
 from src.href_utils import extract_id as _extract_id
 from src.i18n import t
 from src.utils import Colors
@@ -126,6 +128,9 @@ class ApiClient:
         # tell "PCE unreachable" apart from "PCE says genuinely 0 rows" (see
         # .superpowers/sdd/watchdog-live-reverify-report.md step 2).
         self.last_fetch_error: str | None = None
+        # Task 1 (API layer hardening)：_get_collection 偵測到集合 GET 截斷
+        # （X-Total-Count > 實收筆數）時記錄 path，供 Task 2 消費做 async fallback。
+        self.last_truncated_collections: list[str] = []
 
         # State-store paths + async job cache TTL parameters
         self._root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -152,7 +157,10 @@ class ApiClient:
             total=MAX_RETRIES,
             backoff_factor=1.0,
             status_forcelist=[429, 502, 503, 504],
-            allowed_methods=frozenset(["GET", "POST", "PUT", "DELETE", "HEAD"]),
+            # POST 排除在自動重試之外：read-timeout 後 urllib3 若自動重送 POST，
+            # PCE 可能已經處理了第一次請求（provision/create 類端點會被重複執行）。
+            # 429 的補償見 _request（收到回應代表 PCE 尚未實際處理，安全單次重試）。
+            allowed_methods=frozenset(["GET", "HEAD", "PUT", "DELETE"]),
             respect_retry_after_header=True,
             raise_on_status=False,
         )
@@ -230,6 +238,42 @@ class ApiClient:
         except Exception as e:
             logger.error(f"Connection failed: {e}")
             return 0, str(e).encode('utf-8')
+
+        # POST 不在 urllib3 Retry 的 allowed_methods 內（見 __init__ 註解）。
+        # 但收到 429 代表 PCE 已回應、尚未實際處理這次請求，此時單次重試是安全的
+        # （不會重複 provision/create）。stream=True 目前只用在 GET 下載大檔路徑，
+        # 這裡明確排除、不涉入此重試邏輯。
+        if method == "POST" and resp.status_code == 429 and not stream:
+            retry_after = resp.headers.get("Retry-After")
+            try:
+                wait_s = float(retry_after) if retry_after is not None else 2.0
+            except (TypeError, ValueError):
+                wait_s = 2.0
+            # 夾限：inf/nan 會使 time.sleep 拋例外（違反本函式不拋的契約），
+            # 過大值會同步阻塞 GUI worker 執行緒——上限 30s。
+            if not math.isfinite(wait_s):
+                wait_s = 2.0
+            wait_s = min(max(wait_s, 0.0), 30.0)
+            time.sleep(wait_s)
+            # 429 即限流訊號：重試須重新取全域 rate limiter 預算；取不到就
+            # 放棄重試、回傳原 429（維持本函式不拋的契約）。
+            if rate_limit:
+                from src.pce_cache.rate_limiter import get_rate_limiter
+                if not get_rate_limiter(rate_per_minute=self._rate_limit_per_minute).acquire(timeout=30.0):
+                    logger.warning("POST 429 retry skipped: rate limiter budget exhausted")
+                    return resp.status_code, resp.content
+            try:
+                resp = self._session.request(
+                    method=method,
+                    url=url,
+                    data=body,
+                    headers=req_headers,
+                    timeout=timeout,
+                    stream=stream,
+                )
+            except Exception as e:
+                logger.error(f"Connection failed on POST 429 retry: {e}")
+                return 0, str(e).encode('utf-8')
 
         if stream:
             return resp.status_code, resp
@@ -382,7 +426,7 @@ class ApiClient:
     def _ensure_query_lookup_cache(self, force_refresh: bool = False) -> None:
         return self._labels._ensure_query_lookup_cache(force_refresh=force_refresh)
 
-    def update_label_cache(self, silent: bool = False, force_refresh: bool = True) -> None:
+    def update_label_cache(self, silent: bool = False, force_refresh: bool = True) -> bool:
         return self._labels.update_label_cache(silent=silent, force_refresh=force_refresh)
 
     def invalidate_labels(self) -> None:
@@ -593,17 +637,24 @@ class ApiClient:
             logger.error(f"Fetch Labels Error: {e}")
             return []
 
-    def get_all_labels(self) -> list[dict[str, Any]]:
+    def get_all_labels(self, raise_on_error: bool = False) -> list[dict[str, Any]]:
         """Get every label across all dimensions (unscoped by key).
 
         Unlike get_labels(key) which filters one dimension, this returns all
         labels including custom dimensions (e.g. Net=) for the filter-object
         suggest cache. Returns [] on error.
+
+        raise_on_error=True：非 200（含 status 0 連線層失敗）raise APIError，
+        供 policy diff/resolver 等消費端區分「PCE 故障」與「合法空 org」。
+        預設 False 維持既有呼叫者行為不變。
         """
         org = self.api_cfg['org_id']
-        status, data = self._api_get(f"/orgs/{org}/labels?max_results=10000")
+        path = f"/orgs/{org}/labels"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
             return data
+        if raise_on_error and status != 200:
+            raise APIError(f"get_all_labels failed: HTTP {status} for {path}")
         logger.warning(f"get_all_labels: status={status}, returned empty list")
         return []
 
@@ -682,15 +733,17 @@ class ApiClient:
             return False
 
     def fetch_managed_workloads(self, max_results: int = 10000) -> list:
-        """Fetch all VEN-managed workloads (those with an active VEN agent)."""
+        """Fetch all VEN-managed workloads (those with an active VEN agent).
+
+        max_results 參數保留供呼叫端相容，但集合 GET 一律經 _get_collection
+        套用 PCE 硬上限 500（帶更大的值本來就無效、還會掩蓋截斷）。
+        """
         try:
-            params = urllib.parse.urlencode({'managed': 'true', 'max_results': max_results})
-            url = f"{self.base_url}/workloads?{params}"
-            status, body = self._request(url, timeout=30)
+            org = self.api_cfg['org_id']
+            status, data, _total = self._get_collection(f"/orgs/{org}/workloads?managed=true", timeout=30)
             if status == 200:
-                return orjson.loads(body)
-            err_msg = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
-            logger.error(f"Fetch Managed Workloads Failed: {status} - {err_msg}")
+                return data
+            logger.error(f"Fetch Managed Workloads Failed: {status}")
             return []
         except Exception as e:
             logger.error(f"Fetch Managed Workloads Error: {e}")
@@ -759,6 +812,167 @@ class ApiClient:
             logger.error(f"API GET {endpoint}: {e}")
             return 0, None
 
+    def _api_get_with_headers(self, endpoint: str, timeout: int = 15, headers: dict[str, str] | None = None) -> tuple[int, Any, dict]:
+        """GET a PCE API endpoint，回傳連 headers 一起（供 _get_collection 讀 X-Total-Count）。
+
+        不透過 _request（其簽名回 (status, body) 丟棄 headers、呼叫點太多不便改），
+        直接用 self._session；錯誤處理比照 _request：連線例外回 (0, err_bytes, {})。
+
+        headers：額外請求 headers（Task 2 用來帶 Prefer: respond-async 觸發
+        async GET fallback）；預設 None，行為與 Task 1 完全相同。
+        """
+        if self._session is None:
+            raise RuntimeError("ApiClient is closed; create a new instance")
+        url = f"{self.api_cfg['url']}/api/v2{endpoint}"
+        try:
+            resp = self._session.request(method="GET", url=url, timeout=timeout, headers=headers)
+        except Exception as e:
+            logger.error(f"API GET {endpoint}: {e}")
+            return 0, str(e).encode('utf-8'), {}
+        if resp.status_code == 200:
+            try:
+                return resp.status_code, orjson.loads(resp.content), resp.headers
+            except Exception as e:
+                # body 非合法 JSON：比照 _api_get 的錯誤契約回 (0, None, {})，
+                # 避免例外炸穿到沒有 try/except 的 getter 呼叫端
+                logger.error(f"API GET {endpoint}: {e}")
+                return 0, None, {}
+        if resp.status_code == 204:
+            return resp.status_code, {}, resp.headers
+        return resp.status_code, None, resp.headers
+
+    def _get_collection(self, path: str, *, timeout: int = 15) -> tuple[int, Any, int | None]:
+        """同步集合 GET：max_results 一律用 PCE 硬上限 500（帶 10000 沒有意義，
+        且會掩蓋截斷）；path 由呼叫者帶好其餘 query string，這裡負責附加 max_results。
+
+        回傳 (status, data, total_count)：total_count 取自 X-Total-Count header
+        （無此 header 時 None）。當 total_count > 實收筆數時視為截斷，記錄到
+        self.last_truncated_collections 供後續（Task 2）消費。
+        """
+        sep = "&" if "?" in path else "?"
+        status, data, headers = self._api_get_with_headers(f"{path}{sep}max_results=500", timeout=timeout)
+
+        total_count: int | None = None
+        if headers:
+            for key, val in headers.items():
+                if key.lower() == "x-total-count":
+                    try:
+                        total_count = int(val)
+                    except (TypeError, ValueError):
+                        total_count = None
+                    break
+
+        actual_count = len(data) if isinstance(data, list) else 0
+        if status == 200 and total_count is not None and total_count > actual_count:
+            logger.error(
+                "collection GET truncated: {} returned {}/{} objects",
+                path, actual_count, total_count,
+            )
+            # Task 2：截斷時自動改走官方 async GET 流程取回完整集合。成功且筆數
+            # 達到 total_count 九成以上（容忍輪詢期間物件增減）就當作修復完成，
+            # 回傳完整資料且不留截斷紀錄；失敗則維持 Task 1 的截斷資料與 error
+            # log 語意（永不比 Task 1 差）。
+            fallback_data = self._async_collection_get(path, timeout=timeout)
+            if fallback_data is not None and len(fallback_data) >= total_count * 0.9:
+                logger.info(
+                    "async GET fallback recovered collection: {} returned {}/{} objects",
+                    path, len(fallback_data), total_count,
+                )
+                # 跨呼叫先失敗後成功：清除先前殘留的截斷紀錄，避免假陽性永久殘留
+                if path in self.last_truncated_collections:
+                    self.last_truncated_collections.remove(path)
+                return status, fallback_data, total_count
+            # 去重：同一 path 因排程重複呼叫且反覆截斷失敗時，避免
+            # last_truncated_collections 無上限纍積（Task 1 遺留的 append-only 問題）。
+            if path not in self.last_truncated_collections:
+                self.last_truncated_collections.append(path)
+
+        return status, data, total_count
+
+    def _async_collection_get(self, path: str, *, timeout: int = 15) -> list[Any] | None:
+        """集合 GET 截斷時的官方 async GET fallback（vendor 已驗證流程）。
+
+        1. 對同一 path 發 GET，headers 帶 ``Prefer: respond-async``，預期
+           202 且回應 headers 含 Location（job href）與 Retry-After。
+        2. 輪詢 ``GET /api/v2{job_href}``（複用 _api_get_with_headers）直到
+           body ``status == "done"``（Jobs API 用 done，不是 completed——
+           本專案既有 vendor 事實）；failed 或超過 300s 回 None。輪詢間隔
+           從 Retry-After 或 2s 起，夾在 [2, 10] 秒之間。
+        3. done 後從 body ``result.href`` 取得 datafile href，下載完整
+           JSON 陣列並回傳。
+
+        任何一步失敗都回 None；呼叫端（_get_collection）自行決定 fallback
+        失敗時要不要維持截斷資料。
+        """
+        status, _data, headers = self._api_get_with_headers(
+            path, timeout=timeout, headers={"Prefer": "respond-async"}
+        )
+        if status != 202:
+            logger.error(
+                "async collection GET fallback: expected 202 (respond-async), got {} for {}",
+                status, path,
+            )
+            return None
+
+        job_href = (headers or {}).get("Location")
+        if not job_href:
+            logger.error(
+                "async collection GET fallback: 202 response missing Location header for {}",
+                path,
+            )
+            return None
+
+        retry_after_raw = (headers or {}).get("Retry-After")
+        try:
+            poll_interval = float(retry_after_raw) if retry_after_raw else 2.0
+        except (TypeError, ValueError):
+            poll_interval = 2.0
+        poll_interval = min(max(poll_interval, 2.0), 10.0)
+
+        deadline = time.time() + 300
+        job_body: dict[str, Any] | None = None
+        while time.time() < deadline:
+            time.sleep(poll_interval)
+            poll_status, poll_data, _poll_headers = self._api_get_with_headers(job_href, timeout=timeout)
+            if poll_status != 200 or not isinstance(poll_data, dict):
+                continue
+            state = poll_data.get("status")
+            if state == "done":
+                job_body = poll_data
+                break
+            if state in ("failed", "cancel_requested", "cancelled", "canceled"):
+                logger.error(
+                    "async collection GET fallback: job {} reported {} for {}",
+                    job_href, state, path,
+                )
+                return None
+            # running/queued 等其他狀態繼續輪詢
+
+        if job_body is None:
+            logger.error(
+                "async collection GET fallback: job {} did not complete within 300s for {}",
+                job_href, path,
+            )
+            return None
+
+        result_href = (job_body.get("result") or {}).get("href")
+        if not result_href:
+            logger.error(
+                "async collection GET fallback: done job {} missing result.href for {}",
+                job_href, path,
+            )
+            return None
+
+        dl_status, dl_data, _dl_headers = self._api_get_with_headers(result_href, timeout=timeout)
+        if dl_status != 200 or not isinstance(dl_data, list):
+            logger.error(
+                "async collection GET fallback: datafile download failed status={} for {}",
+                dl_status, path,
+            )
+            return None
+
+        return dl_data
+
     def _api_put(self, endpoint: str, payload: dict[str, Any], timeout: int = 15) -> int:
         """PUT a PCE API endpoint. Returns status_code."""
         url = f"{self.api_cfg['url']}/api/v2{endpoint}"
@@ -795,7 +1009,7 @@ class ApiClient:
         if self.ruleset_cache and not force_refresh:
             return self.ruleset_cache
         org = self.api_cfg['org_id']
-        status, data = self._api_get(f"/orgs/{org}/sec_policy/draft/rule_sets?max_results=10000")
+        status, data, _total = self._get_collection(f"/orgs/{org}/sec_policy/draft/rule_sets")
         if status == 200 and data:
             self.ruleset_cache = data
             return self.ruleset_cache
@@ -803,66 +1017,84 @@ class ApiClient:
             raise RuntimeError(f"get_all_rulesets failed: HTTP {status}")
         return []
 
-    def get_active_rulesets(self) -> list[dict[str, Any]]:
-        """Get all active (provisioned) rulesets with their rules."""
+    def get_active_rulesets(self, raise_on_error: bool = False) -> list[dict[str, Any]]:
+        """Get all active (provisioned) rulesets with their rules.
+
+        raise_on_error=True：非 200（含 status 0 連線層失敗）raise APIError，
+        供 policy diff/resolver 等消費端區分「PCE 故障」與「合法空 org」。
+        預設 False 維持既有呼叫者行為不變。
+        """
         org = self.api_cfg['org_id']
-        status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/active/rule_sets?max_results=10000"
-        )
+        path = f"/orgs/{org}/sec_policy/active/rule_sets"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
             return data
+        if raise_on_error and status != 200:
+            raise APIError(f"get_active_rulesets failed: HTTP {status} for {path}")
         logger.warning(f"get_active_rulesets: status={status}, returned empty list")
         return []
 
-    def get_ip_lists(self, pversion: str = "active") -> list[dict[str, Any]]:
+    def get_ip_lists(self, pversion: str = "active", raise_on_error: bool = False) -> list[dict[str, Any]]:
         """Get all IP Lists with their ip_ranges/fqdns.
 
         Default ACTIVE so returned hrefs (/sec_policy/active/ip_lists/...)
         match actor references inside active rulesets; pass pversion="draft"
         for the draft-side inventory (policy diff).
+
+        raise_on_error=True：非 200（含 status 0 連線層失敗）raise APIError。
+        預設 False 維持既有呼叫者行為不變。
         """
         if pversion not in ("active", "draft"):
             raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
-        status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/{pversion}/ip_lists?max_results=10000"
-        )
+        path = f"/orgs/{org}/sec_policy/{pversion}/ip_lists"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
             return data
+        if raise_on_error and status != 200:
+            raise APIError(f"get_ip_lists failed: HTTP {status} for {path}")
         logger.warning(f"get_ip_lists: status={status}, returned empty list")
         return []
 
-    def get_label_groups(self, pversion: str = "active") -> list[dict[str, Any]]:
+    def get_label_groups(self, pversion: str = "active", raise_on_error: bool = False) -> list[dict[str, Any]]:
         """Get all Label Groups with their member labels + sub_groups.
 
         Default ACTIVE so hrefs align with active-ruleset actor references;
         pass pversion="draft" for the draft-side inventory (policy diff).
+
+        raise_on_error=True：非 200（含 status 0 連線層失敗）raise APIError。
+        預設 False 維持既有呼叫者行為不變。
         """
         if pversion not in ("active", "draft"):
             raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
-        status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/{pversion}/label_groups?max_results=10000"
-        )
+        path = f"/orgs/{org}/sec_policy/{pversion}/label_groups"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
             return data
+        if raise_on_error and status != 200:
+            raise APIError(f"get_label_groups failed: HTTP {status} for {path}")
         logger.warning(f"get_label_groups: status={status}, returned empty list")
         return []
 
-    def get_services(self, pversion: str = "active") -> list[dict[str, Any]]:
+    def get_services(self, pversion: str = "active", raise_on_error: bool = False) -> list[dict[str, Any]]:
         """Get all Service definitions with their service_ports.
 
         Default ACTIVE so hrefs align with active-ruleset ingress_services
         references; pass pversion="draft" for the draft-side inventory (policy diff).
+
+        raise_on_error=True：非 200（含 status 0 連線層失敗）raise APIError。
+        預設 False 維持既有呼叫者行為不變。
         """
         if pversion not in ("active", "draft"):
             raise ValueError(f"pversion must be 'active' or 'draft', got {pversion!r}")
         org = self.api_cfg['org_id']
-        status, data = self._api_get(
-            f"/orgs/{org}/sec_policy/{pversion}/services?max_results=10000"
-        )
+        path = f"/orgs/{org}/sec_policy/{pversion}/services"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
             return data
+        if raise_on_error and status != 200:
+            raise APIError(f"get_services failed: HTTP {status} for {path}")
         logger.warning(f"get_services: status={status}, returned empty list")
         return []
 

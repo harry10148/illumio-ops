@@ -34,22 +34,21 @@ def make_filter_objects_blueprint(cm, csrf, limiter, login_required):
         from src.api_client import ApiClient
         from src.gui.filter_object_cache import search_cached_objects
         cm.load()
-        api = ApiClient(cm)
+        with ApiClient(cm) as api:
+            results = {}
+            cached_types = [t for t in types if t in _CACHED_TYPES]
+            if cached_types:
+                # 快取類：module cache 若已填則離線也可回；填充失敗回空清單、不整體失敗
+                try:
+                    results.update(search_cached_objects(api, q, cached_types, limit))
+                except Exception:
+                    for t in cached_types:
+                        results[t] = {"items": [], "error": "pce_unreachable"}
 
-        results = {}
-        cached_types = [t for t in types if t in _CACHED_TYPES]
-        if cached_types:
-            # 快取類：module cache 若已填則離線也可回；填充失敗回空清單、不整體失敗
-            try:
-                results.update(search_cached_objects(api, q, cached_types, limit))
-            except Exception:
-                for t in cached_types:
-                    results[t] = {"items": [], "error": "pce_unreachable"}
+            if "workload" in types:
+                results["workload"] = _search_workloads(api, q, limit)
 
-        if "workload" in types:
-            results["workload"] = _search_workloads(api, q, limit)
-
-        return jsonify({"ok": True, "results": results})
+            return jsonify({"ok": True, "results": results})
 
     @bp.route('/api/filter-objects/browse', methods=['GET'])
     @limiter.limit("240 per hour")
@@ -70,19 +69,18 @@ def make_filter_objects_blueprint(cm, csrf, limiter, login_required):
         from src.api_client import ApiClient
         from src.gui.filter_object_cache import browse_cached_objects, cached_type_totals
         cm.load()
-        api = ApiClient(cm)
-
-        if btype == '_totals':
+        with ApiClient(cm) as api:
+            if btype == '_totals':
+                try:
+                    return jsonify({"ok": True, "totals": cached_type_totals(api)})
+                except Exception:
+                    return jsonify({"ok": False, "error": "pce_unreachable"}), 502
+            if btype not in _CACHED_TYPES:
+                return jsonify({"ok": False, "error": "unknown_type"}), 400
             try:
-                return jsonify({"ok": True, "totals": cached_type_totals(api)})
+                return jsonify({"ok": True, **browse_cached_objects(api, btype, offset, limit)})
             except Exception:
                 return jsonify({"ok": False, "error": "pce_unreachable"}), 502
-        if btype not in _CACHED_TYPES:
-            return jsonify({"ok": False, "error": "unknown_type"}), 400
-        try:
-            return jsonify({"ok": True, **browse_cached_objects(api, btype, offset, limit)})
-        except Exception:
-            return jsonify({"ok": False, "error": "pce_unreachable"}), 502
 
     return bp
 

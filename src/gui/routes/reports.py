@@ -244,6 +244,7 @@ def make_reports_blueprint(
         record = payload["record"]
         lang = payload["lang"]
         _rlog = None
+        api = None  # 背景 thread：ApiClient 建構留在 thread 內，finally 統一 close()
         try:
             from src.report.report_generator import ReportGenerator
             from src.api_client import ApiClient
@@ -325,6 +326,9 @@ def make_reports_blueprint(
                 _save_adhoc_job(job_id, record)
             except Exception:
                 logger.error(f"Could not persist failure for job {job_id}")
+        finally:
+            if api is not None:
+                api.close()
 
     @bp.route('/api/reports/generate', methods=['POST'])
     @limiter.limit("30 per hour")
@@ -487,31 +491,31 @@ def make_reports_blueprint(
 
             cm.load()
             config_dir = _resolve_config_dir()
-            api = ApiClient(cm)
-            from src.main import _make_cache_reader
-            gen = AuditGenerator(cm, api_client=api, config_dir=config_dir,
-                                 cache_reader=_make_cache_reader(cm))
+            with ApiClient(cm) as api:
+                from src.main import _make_cache_reader
+                gen = AuditGenerator(cm, api_client=api, config_dir=config_dir,
+                                     cache_reader=_make_cache_reader(cm))
 
-            start_date = d.get('start_date')
-            end_date = d.get('end_date')
+                start_date = d.get('start_date')
+                end_date = d.get('end_date')
 
-            result = gen.generate_from_api(start_date, end_date, lang=lang)
+                result = gen.generate_from_api(start_date, end_date, lang=lang)
 
-            if result.record_count == 0:
-                return jsonify({"ok": False, "error": t("gui_no_audit_data", lang=lang)})
+                if result.record_count == 0:
+                    return jsonify({"ok": False, "error": t("gui_no_audit_data", lang=lang)})
 
-            output_dir = _resolve_reports_dir(cm)
-            fmt = d.get('format', 'html')
-            fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
-            paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
-            _write_audit_dashboard_summary(output_dir, result)
-            filenames = [os.path.basename(p) for p in paths]
-            try:
-                if _arlog:
-                    _arlog.info(f"Saved: {filenames}")
-            except Exception:
-                pass  # intentional fallback: ModuleLog write is best-effort
-            return jsonify({"ok": True, "files": filenames, "record_count": result.record_count})
+                output_dir = _resolve_reports_dir(cm)
+                fmt = d.get('format', 'html')
+                fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
+                paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
+                _write_audit_dashboard_summary(output_dir, result)
+                filenames = [os.path.basename(p) for p in paths]
+                try:
+                    if _arlog:
+                        _arlog.info(f"Saved: {filenames}")
+                except Exception:
+                    pass  # intentional fallback: ModuleLog write is best-effort
+                return jsonify({"ok": True, "files": filenames, "record_count": result.record_count})
         except Exception as e:
             try:
                 if _arlog:
@@ -542,23 +546,23 @@ def make_reports_blueprint(
 
             cm.load()
             config_dir = _resolve_config_dir()
-            api = ApiClient(cm)
-            from src.main import _make_cache_reader
-            rep = PolicyDiffReport(cm, api_client=api, config_dir=config_dir,
-                                   cache_reader=_make_cache_reader(cm))
+            with ApiClient(cm) as api:
+                from src.main import _make_cache_reader
+                rep = PolicyDiffReport(cm, api_client=api, config_dir=config_dir,
+                                       cache_reader=_make_cache_reader(cm))
 
-            fmt = d.get('format', 'html')
-            fmt = fmt if fmt in ('html', 'csv') else 'html'
-            output_dir = _resolve_reports_dir(cm)
-            path = rep.run(output_dir=output_dir, lang=lang, fmt=fmt)
-            paths = path if isinstance(path, list) else [path]
-            filenames = [os.path.basename(p) for p in paths]
-            try:
-                if _pdlog:
-                    _pdlog.info(f"Saved: {filenames}")
-            except Exception:
-                pass  # intentional fallback: ModuleLog write is best-effort
-            return jsonify({"ok": True, "files": filenames})
+                fmt = d.get('format', 'html')
+                fmt = fmt if fmt in ('html', 'csv') else 'html'
+                output_dir = _resolve_reports_dir(cm)
+                path = rep.run(output_dir=output_dir, lang=lang, fmt=fmt)
+                paths = path if isinstance(path, list) else [path]
+                filenames = [os.path.basename(p) for p in paths]
+                try:
+                    if _pdlog:
+                        _pdlog.info(f"Saved: {filenames}")
+                except Exception:
+                    pass  # intentional fallback: ModuleLog write is best-effort
+                return jsonify({"ok": True, "files": filenames})
         except Exception as e:
             try:
                 if _pdlog:
@@ -581,15 +585,16 @@ def make_reports_blueprint(
             cm.load()
             config_dir = _resolve_config_dir()
             from src.main import _make_cache_reader
-            rep = PolicyResolverReport(cm, api_client=ApiClient(cm), config_dir=config_dir,
-                                       cache_reader=_make_cache_reader(cm))
-            fmt = d.get('format', 'all')
-            fmt = fmt if fmt in ('json', 'csv', 'all') else 'all'
-            output_dir = _resolve_reports_dir(cm)
-            paths = rep.run(output_dir=output_dir, lang=lang, fmt=fmt)
-            if not paths:
-                return jsonify({"ok": True, "files": [], "empty": True})
-            return jsonify({"ok": True, "files": [os.path.basename(p) for p in paths]})
+            with ApiClient(cm) as api:
+                rep = PolicyResolverReport(cm, api_client=api, config_dir=config_dir,
+                                           cache_reader=_make_cache_reader(cm))
+                fmt = d.get('format', 'all')
+                fmt = fmt if fmt in ('json', 'csv', 'all') else 'all'
+                output_dir = _resolve_reports_dir(cm)
+                paths = rep.run(output_dir=output_dir, lang=lang, fmt=fmt)
+                if not paths:
+                    return jsonify({"ok": True, "files": [], "empty": True})
+                return jsonify({"ok": True, "files": [os.path.basename(p) for p in paths]})
         except Exception as e:
             return _err_with_log("report_policy_resolver_generate", e, lang=lang)
 
@@ -604,7 +609,8 @@ def make_reports_blueprint(
         try:
             from src.api_client import ApiClient
             cm.load()
-            labels = ApiClient(cm).get_labels(key)
+            with ApiClient(cm) as api:
+                labels = api.get_labels(key)
             values = sorted({l.get('value', '') for l in labels if l.get('value')})
             return jsonify({"ok": True, "labels": values})
         except Exception as e:
@@ -644,12 +650,15 @@ def make_reports_blueprint(
             return _err_with_log("report_app_summary_generate", e, lang=lang)
 
         def _run_app_summary(jid, p):
+            # 背景 thread：ApiClient 建構留在 thread 內，finally 統一 close()
+            api = None
             try:
                 from src.report.app_summary_report import AppSummaryReport
                 from src.api_client import ApiClient
                 cm.load()
                 from src.main import _make_cache_reader
-                rep = AppSummaryReport(cm, api_client=ApiClient(cm),
+                api = ApiClient(cm)
+                rep = AppSummaryReport(cm, api_client=api,
                                        config_dir=_resolve_config_dir(),
                                        cache_reader=_make_cache_reader(cm))
                 path = rep.run(app=p["app"], env=p["env"], output_dir=_resolve_reports_dir(cm),
@@ -668,6 +677,9 @@ def make_reports_blueprint(
                     _save_adhoc_job(jid, record)
                 except Exception:
                     logger.error(f"Could not persist failure for job {jid}")
+            finally:
+                if api is not None:
+                    api.close()
 
         threading.Thread(target=_run_app_summary, args=(job_id, payload), daemon=True).start()
         return jsonify({"ok": True, "job_id": job_id})
@@ -692,26 +704,26 @@ def make_reports_blueprint(
                 pass  # intentional fallback: ModuleLog is optional; VEN status report must not fail if logging setup fails
 
             cm.load()
-            api = ApiClient(cm)
-            gen = VenStatusGenerator(cm, api_client=api)
+            with ApiClient(cm) as api:
+                gen = VenStatusGenerator(cm, api_client=api)
 
-            result = gen.generate(lang=lang)
+                result = gen.generate(lang=lang)
 
-            if result.record_count == 0:
-                return jsonify({"ok": False, "error": t("gui_no_ven_data", lang=lang)})
+                if result.record_count == 0:
+                    return jsonify({"ok": False, "error": t("gui_no_ven_data", lang=lang)})
 
-            output_dir = _resolve_reports_dir(cm)
-            fmt = d.get('format', 'html')
-            fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
-            paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
-            filenames = [os.path.basename(p) for p in paths]
-            kpis = result.module_results.get('kpis', [])
-            try:
-                if _vrlog:
-                    _vrlog.info(f"Saved: {filenames}")
-            except Exception:
-                pass  # intentional fallback: ModuleLog write is best-effort
-            return jsonify({"ok": True, "files": filenames, "record_count": result.record_count, "kpis": kpis})
+                output_dir = _resolve_reports_dir(cm)
+                fmt = d.get('format', 'html')
+                fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
+                paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
+                filenames = [os.path.basename(p) for p in paths]
+                kpis = result.module_results.get('kpis', [])
+                try:
+                    if _vrlog:
+                        _vrlog.info(f"Saved: {filenames}")
+                except Exception:
+                    pass  # intentional fallback: ModuleLog write is best-effort
+                return jsonify({"ok": True, "files": filenames, "record_count": result.record_count, "kpis": kpis})
         except Exception as e:
             try:
                 if _vrlog:
@@ -741,59 +753,59 @@ def make_reports_blueprint(
                 pass  # intentional fallback: ModuleLog is optional; policy usage report must not fail if logging setup fails
 
             cm.load()
-            api = ApiClient(cm)
-            config_dir = _resolve_config_dir()
-            gen = PolicyUsageGenerator(cm, api_client=api, config_dir=config_dir)
+            with ApiClient(cm) as api:
+                config_dir = _resolve_config_dir()
+                gen = PolicyUsageGenerator(cm, api_client=api, config_dir=config_dir)
 
-            start_date = d.get('start_date')
-            end_date   = d.get('end_date')
+                start_date = d.get('start_date')
+                end_date   = d.get('end_date')
 
-            source = d.get('source', 'api')
-            if source == 'csv':
-                import tempfile
-                if 'file' not in request.files or request.files['file'].filename == '':
-                    return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
-                csv_file = request.files['file']
-                if _csv_upload_rejected(csv_file):
-                    return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
-                safe_name = secure_filename(csv_file.filename) or 'upload.csv'
-                temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}_{safe_name}")
-                csv_file.save(temp_path)
-                try:
-                    result = gen.generate_from_csv(temp_path, lang=lang)
-                finally:
+                source = d.get('source', 'api')
+                if source == 'csv':
+                    import tempfile
+                    if 'file' not in request.files or request.files['file'].filename == '':
+                        return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
+                    csv_file = request.files['file']
+                    if _csv_upload_rejected(csv_file):
+                        return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
+                    safe_name = secure_filename(csv_file.filename) or 'upload.csv'
+                    temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}_{safe_name}")
+                    csv_file.save(temp_path)
                     try:
-                        os.unlink(temp_path)
-                    except OSError:
-                        pass
-            else:
-                result = gen.generate_from_api(start_date=start_date, end_date=end_date, lang=lang)
+                        result = gen.generate_from_csv(temp_path, lang=lang)
+                    finally:
+                        try:
+                            os.unlink(temp_path)
+                        except OSError:
+                            pass
+                else:
+                    result = gen.generate_from_api(start_date=start_date, end_date=end_date, lang=lang)
 
-            if result.record_count == 0:
-                return jsonify({"ok": False, "error": t("gui_no_pu_data", lang=lang)})
+                if result.record_count == 0:
+                    return jsonify({"ok": False, "error": t("gui_no_pu_data", lang=lang)})
 
-            output_dir = _resolve_reports_dir(cm)
-            fmt = d.get('format', 'html')
-            fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
-            paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
-            _write_policy_usage_dashboard_summary(output_dir, result)
-            filenames = [os.path.basename(p) for p in paths]
-            mod00 = result.module_results.get('mod00', {})
-            kpis = mod00.get('kpis', [])
-            execution_stats = getattr(result, "execution_stats", {}) or mod00.get("execution_stats", {})
-            execution_notes = mod00.get("execution_notes", [])
+                output_dir = _resolve_reports_dir(cm)
+                fmt = d.get('format', 'html')
+                fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
+                paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
+                _write_policy_usage_dashboard_summary(output_dir, result)
+                filenames = [os.path.basename(p) for p in paths]
+                mod00 = result.module_results.get('mod00', {})
+                kpis = mod00.get('kpis', [])
+                execution_stats = getattr(result, "execution_stats", {}) or mod00.get("execution_stats", {})
+                execution_notes = mod00.get("execution_notes", [])
 
-            try:
-                if _pulog:
-                    _pulog.info(f"Saved: {filenames}")
-            except Exception:
-                pass  # intentional fallback: ModuleLog write is best-effort
-            return jsonify({"ok": True, "files": filenames,
-                            "record_count": result.record_count, "kpis": kpis,
-                            "execution_stats": execution_stats, "execution_notes": execution_notes,
-                            "reused_rule_details": execution_stats.get("reused_rule_details", []),
-                            "pending_rule_details": execution_stats.get("pending_rule_details", []),
-                            "failed_rule_details": execution_stats.get("failed_rule_details", [])})
+                try:
+                    if _pulog:
+                        _pulog.info(f"Saved: {filenames}")
+                except Exception:
+                    pass  # intentional fallback: ModuleLog write is best-effort
+                return jsonify({"ok": True, "files": filenames,
+                                "record_count": result.record_count, "kpis": kpis,
+                                "execution_stats": execution_stats, "execution_notes": execution_notes,
+                                "reused_rule_details": execution_stats.get("reused_rule_details", []),
+                                "pending_rule_details": execution_stats.get("pending_rule_details", []),
+                                "failed_rule_details": execution_stats.get("failed_rule_details", [])})
         except Exception as e:
             try:
                 if _pulog:
@@ -808,12 +820,12 @@ def make_reports_blueprint(
         try:
             from src.api_client import ApiClient
             cm.load()
-            api = ApiClient(cm)
-            st = check_enablement(api)
-            return jsonify({"ok": True, "state": st.state,
-                            "pce_report_enabled": st.pce_report_enabled,
-                            "ven_scopes_enabled": st.ven_scopes_enabled,
-                            "detail": st.detail})
+            with ApiClient(cm) as api:
+                st = check_enablement(api)
+                return jsonify({"ok": True, "state": st.state,
+                                "pce_report_enabled": st.pce_report_enabled,
+                                "ven_scopes_enabled": st.ven_scopes_enabled,
+                                "detail": st.detail})
         except Exception as e:
             lang = request.args.get('lang') or cm.config.get('settings', {}).get('language', 'en')
             return _err_with_log("rule_hit_count_enablement", e, lang=lang)
@@ -828,16 +840,16 @@ def make_reports_blueprint(
         try:
             from src.api_client import ApiClient
             cm.load()
-            api = ApiClient(cm)
-            # GUI v1: ALL VENs only (scopes=None → [[]]); label scopes via CLI wizard.
-            steps = enable_rule_hit_count(api, scopes=None)
-            try:
-                from src.module_log import ModuleLog as _ML
-                _ML.get("reports").info(f"Rule hit count enabled via GUI: {steps}")
-            except Exception:
-                pass  # intentional fallback: ModuleLog write is best-effort
-            _audit_rhc_action("rule_hit_count_enable", "success", steps_done=steps)
-            return jsonify({"ok": True, "steps_done": steps})
+            with ApiClient(cm) as api:
+                # GUI v1: ALL VENs only (scopes=None → [[]]); label scopes via CLI wizard.
+                steps = enable_rule_hit_count(api, scopes=None)
+                try:
+                    from src.module_log import ModuleLog as _ML
+                    _ML.get("reports").info(f"Rule hit count enabled via GUI: {steps}")
+                except Exception:
+                    pass  # intentional fallback: ModuleLog write is best-effort
+                _audit_rhc_action("rule_hit_count_enable", "success", steps_done=steps)
+                return jsonify({"ok": True, "steps_done": steps})
         except EnablementError as e:
             _audit_rhc_action("rule_hit_count_enable", "failed", error=str(e), steps_done=e.steps_done)
             return jsonify({"ok": False, "error": str(e), "steps_done": e.steps_done})
@@ -864,62 +876,62 @@ def make_reports_blueprint(
                 pass  # intentional fallback: ModuleLog is optional
 
             cm.load()
-            api = ApiClient(cm)
-            config_dir = _resolve_config_dir()
-            gen = RuleHitCountGenerator(cm, api_client=api, config_dir=config_dir)
+            with ApiClient(cm) as api:
+                config_dir = _resolve_config_dir()
+                gen = RuleHitCountGenerator(cm, api_client=api, config_dir=config_dir)
 
-            source = d.get('source', 'native')
-            if source == 'csv':
-                import tempfile
-                if 'file' not in request.files or request.files['file'].filename == '':
-                    return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
-                csv_file = request.files['file']
-                if _csv_upload_rejected(csv_file):
-                    return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
-                safe_name = secure_filename(csv_file.filename) or 'upload.csv'
-                temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}_{safe_name}")
-                csv_file.save(temp_path)
-                try:
-                    result = gen.generate_from_csv(temp_path, lang=lang)
-                finally:
+                source = d.get('source', 'native')
+                if source == 'csv':
+                    import tempfile
+                    if 'file' not in request.files or request.files['file'].filename == '':
+                        return jsonify({"ok": False, "error": t("gui_err_no_csv", lang=lang)})
+                    csv_file = request.files['file']
+                    if _csv_upload_rejected(csv_file):
+                        return jsonify({"ok": False, "error": t("gui_err_invalid_file_type", lang=lang)}), 415
+                    safe_name = secure_filename(csv_file.filename) or 'upload.csv'
+                    temp_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4().hex}_{safe_name}")
+                    csv_file.save(temp_path)
                     try:
-                        os.unlink(temp_path)
-                    except OSError:
-                        pass
-            else:
+                        result = gen.generate_from_csv(temp_path, lang=lang)
+                    finally:
+                        try:
+                            os.unlink(temp_path)
+                        except OSError:
+                            pass
+                else:
+                    try:
+                        result = gen.generate_from_native(start_date=d.get('start_date'),
+                                                          end_date=d.get('end_date'), lang=lang)
+                    except RuleHitCountNotEnabled as exc:
+                        return jsonify({"ok": False, "needs_enablement": True,
+                                        "state": exc.status.state,
+                                        "detail": exc.status.detail,
+                                        "error": t("gui_rhc_use_pu_hint", lang=lang)})
+                    except RuleHitCountPullTimeout:
+                        # TimeoutError is an OSError subclass — must be caught here,
+                        # before the generic `except Exception` below, or it falls
+                        # through to a plain 500 "Internal server error" and the
+                        # frontend can't tell "PCE still preparing" from a hard
+                        # failure (mirrors src/cli/report.py's ordering).
+                        return jsonify({"ok": False, "pull_timeout": True,
+                                        "error": t("gui_rhc_pull_timeout", lang=lang)})
+
+                if result.record_count == 0:
+                    return jsonify({"ok": False, "error": t("gui_no_rhc_data", lang=lang)})
+
+                output_dir = _resolve_reports_dir(cm)
+                fmt = d.get('format', 'html')
+                fmt = fmt if fmt in ('html', 'csv', 'all') else 'html'
+                paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
+                filenames = [os.path.basename(p) for p in paths]
+                kpis = (result.module_results or {}).get('kpis', {})
                 try:
-                    result = gen.generate_from_native(start_date=d.get('start_date'),
-                                                      end_date=d.get('end_date'), lang=lang)
-                except RuleHitCountNotEnabled as exc:
-                    return jsonify({"ok": False, "needs_enablement": True,
-                                    "state": exc.status.state,
-                                    "detail": exc.status.detail,
-                                    "error": t("gui_rhc_use_pu_hint", lang=lang)})
-                except RuleHitCountPullTimeout:
-                    # TimeoutError is an OSError subclass — must be caught here,
-                    # before the generic `except Exception` below, or it falls
-                    # through to a plain 500 "Internal server error" and the
-                    # frontend can't tell "PCE still preparing" from a hard
-                    # failure (mirrors src/cli/report.py's ordering).
-                    return jsonify({"ok": False, "pull_timeout": True,
-                                    "error": t("gui_rhc_pull_timeout", lang=lang)})
-
-            if result.record_count == 0:
-                return jsonify({"ok": False, "error": t("gui_no_rhc_data", lang=lang)})
-
-            output_dir = _resolve_reports_dir(cm)
-            fmt = d.get('format', 'html')
-            fmt = fmt if fmt in ('html', 'csv', 'all') else 'html'
-            paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
-            filenames = [os.path.basename(p) for p in paths]
-            kpis = (result.module_results or {}).get('kpis', {})
-            try:
-                if _rhlog:
-                    _rhlog.info(f"Saved: {filenames}")
-            except Exception:
-                pass  # intentional fallback: ModuleLog write is best-effort
-            return jsonify({"ok": True, "files": filenames,
-                            "record_count": result.record_count, "kpis": kpis})
+                    if _rhlog:
+                        _rhlog.info(f"Saved: {filenames}")
+                except Exception:
+                    pass  # intentional fallback: ModuleLog write is best-effort
+                return jsonify({"ok": True, "files": filenames,
+                                "record_count": result.record_count, "kpis": kpis})
         except Exception as e:
             try:
                 if _rhlog:
@@ -941,24 +953,24 @@ def make_reports_blueprint(
             from src.main import _make_cache_reader
             from src.report.readiness_report import ReadinessReportGenerator
             cm.load()
-            api = ApiClient(cm)
-            use_cache, _clip, _ds_warn = _data_source_from_payload(d, cache_available(cm))
-            gen = ReadinessReportGenerator(cm, api_client=api,
-                                           cache_reader=_make_cache_reader(cm))
-            output_dir = _resolve_reports_dir(cm)
-            result = gen.generate_from_api(start_date=d.get('start_date'),
-                                           end_date=d.get('end_date'),
-                                           lang=lang, use_cache=use_cache,
-                                           output_dir=output_dir)
-            if result.record_count == 0:
-                return jsonify({"ok": False, "error": t("gui_no_traffic_data", lang=lang)})
-            fmt = d.get('format', 'html')
-            fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
-            paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
-            return jsonify({"ok": True,
-                            "files": [os.path.basename(p) for p in paths],
-                            "record_count": result.record_count,
-                            "kpis": result.module_results.get('kpis', [])})
+            with ApiClient(cm) as api:
+                use_cache, _clip, _ds_warn = _data_source_from_payload(d, cache_available(cm))
+                gen = ReadinessReportGenerator(cm, api_client=api,
+                                               cache_reader=_make_cache_reader(cm))
+                output_dir = _resolve_reports_dir(cm)
+                result = gen.generate_from_api(start_date=d.get('start_date'),
+                                               end_date=d.get('end_date'),
+                                               lang=lang, use_cache=use_cache,
+                                               output_dir=output_dir)
+                if result.record_count == 0:
+                    return jsonify({"ok": False, "error": t("gui_no_traffic_data", lang=lang)})
+                fmt = d.get('format', 'html')
+                fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
+                paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
+                return jsonify({"ok": True,
+                                "files": [os.path.basename(p) for p in paths],
+                                "record_count": result.record_count,
+                                "kpis": result.module_results.get('kpis', [])})
         except Exception as e:
             return _err_with_log("report_readiness_generate", e, lang=lang)
 

@@ -49,9 +49,9 @@ def make_actions_blueprint(
         """Ensure Quarantine labels exist on the PCE upon loading the new UI module."""
         cm.load()
         from src.api_client import ApiClient
-        api = ApiClient(cm)
-        api.check_and_create_quarantine_labels()
-        return jsonify({"ok": True})
+        with ApiClient(cm) as api:
+            api.check_and_create_quarantine_labels()
+            return jsonify({"ok": True})
 
     @bp.route('/api/quarantine/search', methods=['POST'])
     def api_quarantine_search():
@@ -63,119 +63,120 @@ def make_actions_blueprint(
             from src.reporter import Reporter
             import datetime
 
-            api = ApiClient(cm)
-            from src.main import _make_cache_reader
-            # 資料來源：live（即時快取）預設，archive 則查已載入的 review DB。
-            source = d.get("source", "live")
-            reader_db = None
-            if source == "archive":
-                from src.pce_cache.archive_import import review_db_path
-                reader_db = review_db_path(cm.models.pce_cache)
-            cache_reader = _make_cache_reader(cm, db_path=reader_db)
-            base_ana = Analyzer(cm, api, Reporter(cm), cache_reader=cache_reader)
+            with ApiClient(cm) as api:
+                from src.main import _make_cache_reader
+                # 資料來源：live（即時快取）預設，archive 則查已載入的 review DB。
+                source = d.get("source", "live")
+                reader_db = None
+                if source == "archive":
+                    from src.pce_cache.archive_import import review_db_path
+                    reader_db = review_db_path(cm.models.pce_cache)
+                cache_reader = _make_cache_reader(cm, db_path=reader_db)
+                base_ana = Analyzer(cm, api, Reporter(cm), cache_reader=cache_reader)
 
-            now = datetime.datetime.now(datetime.timezone.utc)
-            if source == "archive":
-                # archive 查閱：查詢窗設為 [review 最早資料, now]，讓 cover_state 判 full、
-                # 只讀 review DB，不 fallback 打即時 PCE API。review 空則直接回空。
-                earliest = cache_reader.earliest_data_timestamp("traffic") if cache_reader else None
-                if earliest is None:
-                    return jsonify({"ok": True, "data": []})
-                start_time = earliest.strftime("%Y-%m-%dT%H:%M:%SZ")
-                end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
-            else:
-                mins = int(d.get("mins", 30))
-                start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
-                end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+                now = datetime.datetime.now(datetime.timezone.utc)
+                if source == "archive":
+                    # archive 查閱：查詢窗設為 [review 最早資料, now]，讓 cover_state 判 full、
+                    # 只讀 review DB，不 fallback 打即時 PCE API。review 空則直接回空。
+                    earliest = cache_reader.earliest_data_timestamp("traffic") if cache_reader else None
+                    if earliest is None:
+                        return jsonify({"ok": True, "data": []})
+                    start_time = earliest.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+                else:
+                    mins = int(d.get("mins", 30))
+                    start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
+                    end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            # policy_decision now accepts string values: "blocked", "potentially_blocked", "allowed", or "-1"/""=all
-            pd_val = str(d.get("policy_decision", "-1")).strip()
-            if pd_val == "blocked": pds = ["blocked"]
-            elif pd_val == "potentially_blocked": pds = ["potentially_blocked"]
-            elif pd_val == "allowed": pds = ["allowed"]
-            # legacy integer values kept for backwards compat
-            elif pd_val == "2": pds = ["blocked"]
-            elif pd_val == "1": pds = ["potentially_blocked"]
-            elif pd_val == "0": pds = ["allowed"]
-            else: pds = ["blocked", "potentially_blocked", "allowed"]
+                # policy_decision now accepts string values: "blocked", "potentially_blocked", "allowed", or "-1"/""=all
+                pd_val = str(d.get("policy_decision", "-1")).strip()
+                if pd_val == "blocked": pds = ["blocked"]
+                elif pd_val == "potentially_blocked": pds = ["potentially_blocked"]
+                elif pd_val == "allowed": pds = ["allowed"]
+                # legacy integer values kept for backwards compat
+                elif pd_val == "2": pds = ["blocked"]
+                elif pd_val == "1": pds = ["potentially_blocked"]
+                elif pd_val == "0": pds = ["allowed"]
+                # 「全部」須含 unknown（vendor 值域四值；涵蓋 idle/快照模式與 Flowlink 流量）
+                else: pds = ["blocked", "potentially_blocked", "allowed", "unknown"]
 
-            # Map the inbound payload to the analyzer's query
-            params = {
-                "start_time": start_time,
-                "end_time": end_time,
-                "policy_decisions": pds,
-                "draft_policy_decision": d.get("draft_policy_decision", ""),
-                "sort_by": d.get("sort_by", "bandwidth"),
-                "search": d.get("search", ""),
-                "src_label": d.get("src_label", ""),
-                "src_ip_in": d.get("src_ip_in", ""),
-                "dst_label": d.get("dst_label", ""),
-                "dst_ip_in": d.get("dst_ip_in", ""),
-                "ex_src_label": d.get("ex_src_label", ""),
-                "ex_src_ip": d.get("ex_src_ip", ""),
-                "ex_dst_label": d.get("ex_dst_label", ""),
-                "ex_dst_ip": d.get("ex_dst_ip", ""),
-                "port": d.get("port", ""),
-                "ex_port": d.get("ex_port", ""),
-                "proto": d.get("proto", ""),
-                "any_label": d.get("any_label", ""),
-                "any_ip": d.get("any_ip", ""),
-                "ex_any_label": d.get("ex_any_label", ""),
-                "ex_any_ip": d.get("ex_any_ip", ""),
-                # 物件 filter key（Phase 1 analyzer 已支援；FilterBar 送複數 list）
-                "src_labels": d.get("src_labels", []),
-                "dst_labels": d.get("dst_labels", []),
-                "ex_src_labels": d.get("ex_src_labels", []),
-                "ex_dst_labels": d.get("ex_dst_labels", []),
-                # Task 11：qt-port/qt-proto/qt-expt scalar 欄位移除，FilterBar 的
-                # service/port pill 序列化 key 需直通到 analyzer（同 query_flows whitelist）。
-                "services": d.get("services", []),
-                "ex_services": d.get("ex_services", []),
-                "ports": d.get("ports", []),
-                "ex_ports": d.get("ex_ports", []),
-                "process_name": d.get("process_name", []),
-                "ex_process_name": d.get("ex_process_name", []),
-                "windows_service_name": d.get("windows_service_name", []),
-                "ex_windows_service_name": d.get("ex_windows_service_name", []),
-                "transmission": d.get("transmission", []),
-                "ex_transmission": d.get("ex_transmission", []),
-                # FilterBar 的 label group pill 序列化 key，須與 analyzer.py query_flows
-                # whitelist（~1053-1064）及 _TRAFFIC_FILTER_CAPABILITIES（traffic_query.py ~90-96）保持一致
-                "src_label_groups": d.get("src_label_groups", []),
-                "dst_label_groups": d.get("dst_label_groups", []),
-                "ex_src_label_groups": d.get("ex_src_label_groups", []),
-                "ex_dst_label_groups": d.get("ex_dst_label_groups", []),
-                "src_iplist": d.get("src_iplist", ""),
-                "src_iplists": d.get("src_iplists", []),
-                "dst_iplist": d.get("dst_iplist", ""),
-                "dst_iplists": d.get("dst_iplists", []),
-                "ex_src_iplists": d.get("ex_src_iplists", []),
-                "ex_dst_iplists": d.get("ex_dst_iplists", []),
-                "src_workloads": d.get("src_workloads", []),
-                "dst_workloads": d.get("dst_workloads", []),
-                "ex_src_workloads": d.get("ex_src_workloads", []),
-                "ex_dst_workloads": d.get("ex_dst_workloads", []),
-                "any_iplist": d.get("any_iplist", ""),
-                "any_workload": d.get("any_workload", ""),
-                "ex_any_iplist": d.get("ex_any_iplist", ""),
-                "ex_any_workload": d.get("ex_any_workload", ""),
-            }
-            results = base_ana.query_flows(params)
+                # Map the inbound payload to the analyzer's query
+                params = {
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "policy_decisions": pds,
+                    "draft_policy_decision": d.get("draft_policy_decision", ""),
+                    "sort_by": d.get("sort_by", "bandwidth"),
+                    "search": d.get("search", ""),
+                    "src_label": d.get("src_label", ""),
+                    "src_ip_in": d.get("src_ip_in", ""),
+                    "dst_label": d.get("dst_label", ""),
+                    "dst_ip_in": d.get("dst_ip_in", ""),
+                    "ex_src_label": d.get("ex_src_label", ""),
+                    "ex_src_ip": d.get("ex_src_ip", ""),
+                    "ex_dst_label": d.get("ex_dst_label", ""),
+                    "ex_dst_ip": d.get("ex_dst_ip", ""),
+                    "port": d.get("port", ""),
+                    "ex_port": d.get("ex_port", ""),
+                    "proto": d.get("proto", ""),
+                    "any_label": d.get("any_label", ""),
+                    "any_ip": d.get("any_ip", ""),
+                    "ex_any_label": d.get("ex_any_label", ""),
+                    "ex_any_ip": d.get("ex_any_ip", ""),
+                    # 物件 filter key（Phase 1 analyzer 已支援；FilterBar 送複數 list）
+                    "src_labels": d.get("src_labels", []),
+                    "dst_labels": d.get("dst_labels", []),
+                    "ex_src_labels": d.get("ex_src_labels", []),
+                    "ex_dst_labels": d.get("ex_dst_labels", []),
+                    # Task 11：qt-port/qt-proto/qt-expt scalar 欄位移除，FilterBar 的
+                    # service/port pill 序列化 key 需直通到 analyzer（同 query_flows whitelist）。
+                    "services": d.get("services", []),
+                    "ex_services": d.get("ex_services", []),
+                    "ports": d.get("ports", []),
+                    "ex_ports": d.get("ex_ports", []),
+                    "process_name": d.get("process_name", []),
+                    "ex_process_name": d.get("ex_process_name", []),
+                    "windows_service_name": d.get("windows_service_name", []),
+                    "ex_windows_service_name": d.get("ex_windows_service_name", []),
+                    "transmission": d.get("transmission", []),
+                    "ex_transmission": d.get("ex_transmission", []),
+                    # FilterBar 的 label group pill 序列化 key，須與 analyzer.py query_flows
+                    # whitelist（~1053-1064）及 _TRAFFIC_FILTER_CAPABILITIES（traffic_query.py ~90-96）保持一致
+                    "src_label_groups": d.get("src_label_groups", []),
+                    "dst_label_groups": d.get("dst_label_groups", []),
+                    "ex_src_label_groups": d.get("ex_src_label_groups", []),
+                    "ex_dst_label_groups": d.get("ex_dst_label_groups", []),
+                    "src_iplist": d.get("src_iplist", ""),
+                    "src_iplists": d.get("src_iplists", []),
+                    "dst_iplist": d.get("dst_iplist", ""),
+                    "dst_iplists": d.get("dst_iplists", []),
+                    "ex_src_iplists": d.get("ex_src_iplists", []),
+                    "ex_dst_iplists": d.get("ex_dst_iplists", []),
+                    "src_workloads": d.get("src_workloads", []),
+                    "dst_workloads": d.get("dst_workloads", []),
+                    "ex_src_workloads": d.get("ex_src_workloads", []),
+                    "ex_dst_workloads": d.get("ex_dst_workloads", []),
+                    "any_iplist": d.get("any_iplist", ""),
+                    "any_workload": d.get("any_workload", ""),
+                    "ex_any_iplist": d.get("ex_any_iplist", ""),
+                    "ex_any_workload": d.get("ex_any_workload", ""),
+                }
+                results = base_ana.query_flows(params)
 
-            for r in results:
-                flow_pd = r.get("policy_decision", "")
-                if flow_pd == "allowed": r["pd"] = 0
-                elif flow_pd == "potentially_blocked": r["pd"] = 1
-                else: r["pd"] = 2
+                for r in results:
+                    flow_pd = r.get("policy_decision", "")
+                    if flow_pd == "allowed": r["pd"] = 0
+                    elif flow_pd == "potentially_blocked": r["pd"] = 1
+                    else: r["pd"] = 2
 
-            stats = getattr(base_ana, "last_query_stats", {}) or {}
-            return jsonify({
-                "ok": True,
-                "data": results,
-                "total_matches": int(stats.get("total_matches", len(results))),
-                "truncated": bool(stats.get("truncated")),
-                "cap": int(stats.get("cap", QUERY_RESULT_CAP)),
-            })
+                stats = getattr(base_ana, "last_query_stats", {}) or {}
+                return jsonify({
+                    "ok": True,
+                    "data": results,
+                    "total_matches": int(stats.get("total_matches", len(results))),
+                    "truncated": bool(stats.get("truncated")),
+                    "cap": int(stats.get("cap", QUERY_RESULT_CAP)),
+                })
         except TrafficQueryError as e:
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
             return jsonify({"ok": False, "error": t(
@@ -192,67 +193,67 @@ def make_actions_blueprint(
             d = request.args.to_dict()
         try:
             from src.api_client import ApiClient
-            api = ApiClient(cm)
+            with ApiClient(cm) as api:
 
-            # API query parameters mapping
-            params = {}
-            if "name" in d and d["name"]: params["name"] = d["name"]
-            if "hostname" in d and d["hostname"]: params["hostname"] = d["hostname"]
+                # API query parameters mapping
+                params = {}
+                if "name" in d and d["name"]: params["name"] = d["name"]
+                if "hostname" in d and d["hostname"]: params["hostname"] = d["hostname"]
 
-            ip_query = d.get("ip_address", "").strip()
-            local_ip_filter = False
-            target_networks = []
+                ip_query = d.get("ip_address", "").strip()
+                local_ip_filter = False
+                target_networks = []
 
-            if ip_query:
-                if "," in ip_query or "/" in ip_query:
-                    local_ip_filter = True
-                    parts = [p.strip() for p in ip_query.split(",") if p.strip()]
-                    for p in parts:
-                        try:
-                            if "/" in p:
-                                target_networks.append(ipaddress.ip_network(p, strict=False))
-                            else:
-                                target_networks.append(ipaddress.ip_address(p))
-                        except ValueError:
-                            pass
-                else:
-                    params["ip_address"] = ip_query
-
-            if "max_results" in d:
-                params["max_results"] = d["max_results"]
-            else:
-                params["max_results"] = 100000 if local_ip_filter else 500
-
-            workloads = api.search_workloads(params)
-
-            if local_ip_filter and target_networks:
-                filtered_workloads = []
-                for wl in workloads:
-                    interfaces = wl.get("interfaces", [])
-                    matched = False
-                    for iface in interfaces:
-                        ip_str = iface.get("address")
-                        if ip_str:
+                if ip_query:
+                    if "," in ip_query or "/" in ip_query:
+                        local_ip_filter = True
+                        parts = [p.strip() for p in ip_query.split(",") if p.strip()]
+                        for p in parts:
                             try:
-                                ip_obj = ipaddress.ip_address(ip_str)
-                                for target in target_networks:
-                                    if isinstance(target, (ipaddress.IPv4Network, ipaddress.IPv6Network)):
-                                        if ip_obj in target:
-                                            matched = True
-                                            break
-                                    else:
-                                        if ip_obj == target:
-                                            matched = True
-                                            break
+                                if "/" in p:
+                                    target_networks.append(ipaddress.ip_network(p, strict=False))
+                                else:
+                                    target_networks.append(ipaddress.ip_address(p))
                             except ValueError:
                                 pass
-                        if matched:
-                            break
-                    if matched:
-                        filtered_workloads.append(wl)
-                workloads = filtered_workloads
+                    else:
+                        params["ip_address"] = ip_query
 
-            return jsonify({"ok": True, "data": workloads})
+                if "max_results" in d:
+                    params["max_results"] = d["max_results"]
+                else:
+                    params["max_results"] = 100000 if local_ip_filter else 500
+
+                workloads = api.search_workloads(params)
+
+                if local_ip_filter and target_networks:
+                    filtered_workloads = []
+                    for wl in workloads:
+                        interfaces = wl.get("interfaces", [])
+                        matched = False
+                        for iface in interfaces:
+                            ip_str = iface.get("address")
+                            if ip_str:
+                                try:
+                                    ip_obj = ipaddress.ip_address(ip_str)
+                                    for target in target_networks:
+                                        if isinstance(target, (ipaddress.IPv4Network, ipaddress.IPv6Network)):
+                                            if ip_obj in target:
+                                                matched = True
+                                                break
+                                        else:
+                                            if ip_obj == target:
+                                                matched = True
+                                                break
+                                except ValueError:
+                                    pass
+                            if matched:
+                                break
+                        if matched:
+                            filtered_workloads.append(wl)
+                    workloads = filtered_workloads
+
+                return jsonify({"ok": True, "data": workloads})
         except Exception as e:
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
             return _err_with_log("workloads_search", e, lang=lang)
@@ -267,32 +268,32 @@ def make_actions_blueprint(
             if not _is_workload_href(href):
                 return jsonify({"ok": False, "error": t("gui_q_invalid_target", lang=lang)})
             from src.api_client import ApiClient
-            api = ApiClient(cm)
+            with ApiClient(cm) as api:
 
-            # 1. Fetch labels to get target Href
-            q_hrefs = api.check_and_create_quarantine_labels()
-            target_label_href = q_hrefs.get(level)
-            if not target_label_href:
-                return jsonify({"ok": False, "error": t("gui_label_fetch_failed", lang=lang, level=level)})
+                # 1. Fetch labels to get target Href
+                q_hrefs = api.check_and_create_quarantine_labels()
+                target_label_href = q_hrefs.get(level)
+                if not target_label_href:
+                    return jsonify({"ok": False, "error": t("gui_label_fetch_failed", lang=lang, level=level)})
 
-            # 2. Fetch Workload's current labels
-            wl = api.get_workload(href)
-            if not wl:
-                return jsonify({"ok": False, "error": t("gui_workload_not_found", lang=lang)})
+                # 2. Fetch Workload's current labels
+                wl = api.get_workload(href)
+                if not wl:
+                    return jsonify({"ok": False, "error": t("gui_workload_not_found", lang=lang)})
 
-            # 3. Filter out existing Quarantine labels and append the new one
-            current_labels = wl.get("labels", [])
-            new_labels = [{"href": l.get("href")} for l in current_labels if l.get("href") not in q_hrefs.values()]
-            new_labels.append({"href": target_label_href})
+                # 3. Filter out existing Quarantine labels and append the new one
+                current_labels = wl.get("labels", [])
+                new_labels = [{"href": l.get("href")} for l in current_labels if l.get("href") not in q_hrefs.values()]
+                new_labels.append({"href": target_label_href})
 
-            # 4. Commit
-            success = api.update_workload_labels(href, new_labels)
-            _audit_action("quarantine_apply", href=href, level=level,
-                          result=("ok" if success else "update_failed"))
-            if success:
-                return jsonify({"ok": True, "level": level})
-            else:
-                return jsonify({"ok": False, "error": t("gui_api_update_failed", lang=lang)})
+                # 4. Commit
+                success = api.update_workload_labels(href, new_labels)
+                _audit_action("quarantine_apply", href=href, level=level,
+                              result=("ok" if success else "update_failed"))
+                if success:
+                    return jsonify({"ok": True, "level": level})
+                else:
+                    return jsonify({"ok": False, "error": t("gui_api_update_failed", lang=lang)})
         except Exception as e:
             return _err_with_log("quarantine_apply", e, lang=lang)
 
@@ -307,40 +308,40 @@ def make_actions_blueprint(
             if not hrefs:
                 return jsonify({"ok": False, "error": t("gui_q_no_targets", lang=lang)})
             from src.api_client import ApiClient
-            api = ApiClient(cm)
-            q_hrefs = api.check_and_create_quarantine_labels()
-            target_label_href = q_hrefs.get(level)
+            with ApiClient(cm) as api:
+                q_hrefs = api.check_and_create_quarantine_labels()
+                target_label_href = q_hrefs.get(level)
 
-            invalid_count = sum(1 for h in (raw_hrefs or []) if str(h or "").strip() and not _is_workload_href(h))
-            results = {"success": 0, "failed": [], "skipped_invalid": invalid_count}
-            import concurrent.futures
+                invalid_count = sum(1 for h in (raw_hrefs or []) if str(h or "").strip() and not _is_workload_href(h))
+                results = {"success": 0, "failed": [], "skipped_invalid": invalid_count}
+                import concurrent.futures
 
-            def process_wl(href):
-                if not _is_workload_href(href):
-                    return href, False
-                wl = api.get_workload(href)
-                if not wl: return href, False
-                current_labels = wl.get("labels", [])
-                new_labels = [{"href": l.get("href")} for l in current_labels if l.get("href") not in q_hrefs.values()]
-                new_labels.append({"href": target_label_href})
-                return href, api.update_workload_labels(href, new_labels)
+                def process_wl(href):
+                    if not _is_workload_href(href):
+                        return href, False
+                    wl = api.get_workload(href)
+                    if not wl: return href, False
+                    current_labels = wl.get("labels", [])
+                    new_labels = [{"href": l.get("href")} for l in current_labels if l.get("href") not in q_hrefs.values()]
+                    new_labels.append({"href": target_label_href})
+                    return href, api.update_workload_labels(href, new_labels)
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
-                futures = {ex.submit(process_wl, h): h for h in hrefs}
-                for f in concurrent.futures.as_completed(futures):
-                    h, ok = f.result()
-                    if ok:
-                        results["success"] = int(results["success"]) + 1
-                    else:
-                        failed_list = results["failed"]
-                        if isinstance(failed_list, list):
-                            failed_list.append(h)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+                    futures = {ex.submit(process_wl, h): h for h in hrefs}
+                    for f in concurrent.futures.as_completed(futures):
+                        h, ok = f.result()
+                        if ok:
+                            results["success"] = int(results["success"]) + 1
+                        else:
+                            failed_list = results["failed"]
+                            if isinstance(failed_list, list):
+                                failed_list.append(h)
 
-            _audit_action("quarantine_bulk_apply", level=level,
-                          success=results["success"], failed=len(results["failed"]),
-                          skipped_invalid=results["skipped_invalid"],
-                          hrefs=",".join(hrefs))
-            return jsonify({"ok": True, "results": results})
+                _audit_action("quarantine_bulk_apply", level=level,
+                              success=results["success"], failed=len(results["failed"]),
+                              skipped_invalid=results["skipped_invalid"],
+                              hrefs=",".join(hrefs))
+                return jsonify({"ok": True, "results": results})
         except Exception as e:
             return _err_with_log("quarantine_bulk_apply", e, lang=lang)
 
@@ -359,44 +360,44 @@ def make_actions_blueprint(
             if not hrefs:
                 return jsonify({"ok": False, "error": t("gui_q_no_targets", lang=lang)})
             from src.api_client import ApiClient
-            api = ApiClient(cm)
-            q_hrefs = set(api.check_and_create_quarantine_labels().values())
+            with ApiClient(cm) as api:
+                q_hrefs = set(api.check_and_create_quarantine_labels().values())
 
-            invalid_count = sum(1 for h in (raw_hrefs or [])
-                                if str(h or "").strip() and not _is_workload_href(h))
-            results = {"success": 0, "failed": [], "skipped_invalid": invalid_count,
-                       "not_quarantined": 0}
-            import concurrent.futures
+                invalid_count = sum(1 for h in (raw_hrefs or [])
+                                    if str(h or "").strip() and not _is_workload_href(h))
+                results = {"success": 0, "failed": [], "skipped_invalid": invalid_count,
+                           "not_quarantined": 0}
+                import concurrent.futures
 
-            def process_wl(href):
-                if not _is_workload_href(href):
-                    return href, "invalid"
-                wl = api.get_workload(href)
-                if not wl:
-                    return href, "failed"
-                current = wl.get("labels", [])
-                kept = [{"href": l.get("href")} for l in current
-                        if l.get("href") not in q_hrefs]
-                if len(kept) == len(current):
-                    return href, "not_quarantined"
-                return href, ("ok" if api.update_workload_labels(href, kept) else "failed")
+                def process_wl(href):
+                    if not _is_workload_href(href):
+                        return href, "invalid"
+                    wl = api.get_workload(href)
+                    if not wl:
+                        return href, "failed"
+                    current = wl.get("labels", [])
+                    kept = [{"href": l.get("href")} for l in current
+                            if l.get("href") not in q_hrefs]
+                    if len(kept) == len(current):
+                        return href, "not_quarantined"
+                    return href, ("ok" if api.update_workload_labels(href, kept) else "failed")
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
-                futures = {ex.submit(process_wl, h): h for h in hrefs}
-                for f in concurrent.futures.as_completed(futures):
-                    h, st = f.result()
-                    if st == "ok":
-                        results["success"] += 1
-                    elif st == "not_quarantined":
-                        results["not_quarantined"] += 1
-                    elif st == "failed":
-                        results["failed"].append(h)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as ex:
+                    futures = {ex.submit(process_wl, h): h for h in hrefs}
+                    for f in concurrent.futures.as_completed(futures):
+                        h, st = f.result()
+                        if st == "ok":
+                            results["success"] += 1
+                        elif st == "not_quarantined":
+                            results["not_quarantined"] += 1
+                        elif st == "failed":
+                            results["failed"].append(h)
 
-            _audit_action("quarantine_lift", success=results["success"],
-                          failed=len(results["failed"]),
-                          not_quarantined=results["not_quarantined"],
-                          hrefs=",".join(hrefs))
-            return jsonify({"ok": True, "results": results})
+                _audit_action("quarantine_lift", success=results["success"],
+                              failed=len(results["failed"]),
+                              not_quarantined=results["not_quarantined"],
+                              hrefs=",".join(hrefs))
+                return jsonify({"ok": True, "results": results})
         except Exception as e:
             return _err_with_log("quarantine_lift", e, lang=lang)
 
@@ -424,22 +425,22 @@ def make_actions_blueprint(
 
         try:
             from src.api_client import ApiClient
-            api = ApiClient(cm)
-            success, fail = api.set_flow_reporting_frequency(hrefs)
-            try:
-                from src.module_log import ModuleLog as _ML
-                _ML.get("actions").info(
-                    f"Accelerate: success={success}, fail={fail}, "
-                    f"skipped_invalid={skipped_invalid}, duration_minutes={duration}"
-                )
-            except Exception:
-                pass  # audit-log best-effort, must not block primary action
-            return jsonify({
-                "ok": True,
-                "success": success,
-                "failed": fail,
-                "skipped_invalid": skipped_invalid,
-            })
+            with ApiClient(cm) as api:
+                success, fail = api.set_flow_reporting_frequency(hrefs)
+                try:
+                    from src.module_log import ModuleLog as _ML
+                    _ML.get("actions").info(
+                        f"Accelerate: success={success}, fail={fail}, "
+                        f"skipped_invalid={skipped_invalid}, duration_minutes={duration}"
+                    )
+                except Exception:
+                    pass  # audit-log best-effort, must not block primary action
+                return jsonify({
+                    "ok": True,
+                    "success": success,
+                    "failed": fail,
+                    "skipped_invalid": skipped_invalid,
+                })
         except Exception as e:
             return _err_with_log("workloads_accelerate", e, lang=lang)
 
@@ -456,12 +457,12 @@ def make_actions_blueprint(
         from src.reporter import Reporter
         from src.analyzer import Analyzer
         from src.main import _make_cache_reader
-        api = ApiClient(cm)
-        rep = Reporter(cm)
-        ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
-        ana.run_analysis()
-        rep.send_alerts(lang=lang)
-        return jsonify({"ok": True, "output": t("gui_action_run_completed", lang=lang)})
+        with ApiClient(cm) as api:
+            rep = Reporter(cm)
+            ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
+            ana.run_analysis()
+            rep.send_alerts(lang=lang)
+            return jsonify({"ok": True, "output": t("gui_action_run_completed", lang=lang)})
 
     @bp.route('/api/actions/debug', methods=['POST'])
     @limiter.limit("10 per hour")
@@ -480,13 +481,13 @@ def make_actions_blueprint(
         from src.reporter import Reporter
         from src.analyzer import Analyzer
         from src.main import _make_cache_reader
-        api = ApiClient(cm)
-        rep = Reporter(cm)
-        ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
-        buf = io.StringIO()
-        with redirect_stdout(buf):
-            ana.run_debug_mode(mins=mins, pd_sel=pd_sel, interactive=False)
-        return jsonify({"ok": True, "output": _strip_ansi(buf.getvalue()).strip() or t("gui_action_debug_completed", lang=lang)})
+        with ApiClient(cm) as api:
+            rep = Reporter(cm)
+            ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
+            buf = io.StringIO()
+            with redirect_stdout(buf):
+                ana.run_debug_mode(mins=mins, pd_sel=pd_sel, interactive=False)
+            return jsonify({"ok": True, "output": _strip_ansi(buf.getvalue()).strip() or t("gui_action_debug_completed", lang=lang)})
 
     @bp.route('/api/actions/test-alert', methods=['POST'])
     @limiter.limit("10 per hour")
@@ -658,16 +659,16 @@ def make_actions_blueprint(
             pass  # intentional: audit-log best-effort, must not block primary action
         try:
             from src.api_client import ApiClient
-            api = ApiClient(cm)
-            status, body = api.check_health()
-            body_text = str(body)
-            clean_body = _strip_ansi(body_text)
-            try:
-                from src.module_log import ModuleLog as _ML
-                _ML.get("actions").info(f"Connection result: status={status}")
-            except Exception:
-                pass  # intentional: audit-log best-effort, must not block primary action
-            return jsonify({"ok": status == 200, "status": status, "body": clean_body[:500]})
+            with ApiClient(cm) as api:
+                status, body = api.check_health()
+                body_text = str(body)
+                clean_body = _strip_ansi(body_text)
+                try:
+                    from src.module_log import ModuleLog as _ML
+                    _ML.get("actions").info(f"Connection result: status={status}")
+                except Exception:
+                    pass  # intentional: audit-log best-effort, must not block primary action
+                return jsonify({"ok": status == 200, "status": status, "body": clean_body[:500]})
         except Exception as e:
             try:
                 from src.module_log import ModuleLog as _ML

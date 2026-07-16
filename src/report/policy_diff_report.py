@@ -75,16 +75,18 @@ class PolicyDiffReport:
 
     def build(self, lang: str = "en") -> dict:
         """Return the attributed diff module_results (no export)."""
-        draft = self.api.get_all_rulesets(force_refresh=True) if self.api else []
-        active = self.api.get_active_rulesets() if self.api else []
+        # PCE 抓取失敗一律 raise_on_error=True：故障要讓報表往上炸失敗，
+        # 不得誤把「抓取失敗」當成「規則全被移除」產出誤導性 diff。
+        draft = self.api.get_all_rulesets(force_refresh=True, raise_on_error=True) if self.api else []
+        active = self.api.get_active_rulesets(raise_on_error=True) if self.api else []
         active_inv, draft_inv = {}, {}
         for key, method, kind, fields in self._OBJECT_SPECS:
             fetch = getattr(self.api, method) if self.api else None
-            active_inv[kind] = fetch() if fetch else []
-            draft_inv[kind] = fetch(pversion="draft") if fetch else []
+            active_inv[kind] = fetch(raise_on_error=True) if fetch else []
+            draft_inv[kind] = fetch(pversion="draft", raise_on_error=True) if fetch else []
         names = self._build_name_map(*active_inv.values())
         # 個別 label 無 name 欄，以 PCE 慣例 key:value 呈現，供 label_group 成員解析
-        labels = self.api.get_all_labels() if self.api else []
+        labels = self.api.get_all_labels(raise_on_error=True) if self.api else []
         if not isinstance(labels, list):
             labels = []
         names.update({

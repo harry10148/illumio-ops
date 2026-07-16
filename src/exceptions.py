@@ -18,6 +18,16 @@ class TrafficQueryError(APIError):
     """
 
 
+class AsyncDownloadError(APIError):
+    """Async traffic-query result download failed (non-200).
+
+    Raised by AsyncJobManager.iter_async_query_results so callers can
+    distinguish "download failed" from "0 flows matched" — a silent empty
+    generator here previously let downstream rule-hit-count logic treat a
+    failed download the same as a genuinely unused rule.
+    """
+
+
 class ConfigError(IllumioOpsError):
     pass
 

@@ -62,20 +62,20 @@ def make_events_blueprint(
         fetch_limit = 5000 if any_filter else min(max((offset + limit) * 4, 100), 5000)
         pce_event_type = event_type_filter if event_type_filter else None
 
-        api_client = ApiClient(cm)
-        try:
-            raw_events = api_client.fetch_events_strict(
-                start_time_str=query_since,
-                end_time_str=query_until,
-                max_results=fetch_limit,
-                event_type=pce_event_type,
-            )
-        except EventFetchError as exc:
-            logger.error("Event viewer fetch failed: {} - {}", exc.status, exc.message)
-            return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300], lang=lang), 502)
-        except Exception as exc:
-            logger.exception("Event viewer fetch failed: {}", exc)
-            return _err(t("gui_err_pce_event_fetch", exc=exc, lang=lang), 502)
+        with ApiClient(cm) as api_client:
+            try:
+                raw_events = api_client.fetch_events_strict(
+                    start_time_str=query_since,
+                    end_time_str=query_until,
+                    max_results=fetch_limit,
+                    event_type=pce_event_type,
+                )
+            except EventFetchError as exc:
+                logger.error("Event viewer fetch failed: {} - {}", exc.status, exc.message)
+                return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300], lang=lang), 502)
+            except Exception as exc:
+                logger.exception("Event viewer fetch failed: {}", exc)
+                return _err(t("gui_err_pce_event_fetch", exc=exc, lang=lang), 502)
 
         items = []
         for raw_event in raw_events:
@@ -169,17 +169,17 @@ def make_events_blueprint(
         query_since = format_utc(since_utc)
         query_until = format_utc(now_utc)
 
-        api_client = ApiClient(cm)
-        try:
-            events = api_client.fetch_events_strict(
-                start_time_str=query_since,
-                end_time_str=query_until,
-                max_results=limit,
-            )
-        except EventFetchError as exc:
-            return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300], lang=lang), 502)
-        except Exception as exc:
-            return _err(t("gui_err_pce_event_fetch", exc=exc, lang=lang), 502)
+        with ApiClient(cm) as api_client:
+            try:
+                events = api_client.fetch_events_strict(
+                    start_time_str=query_since,
+                    end_time_str=query_until,
+                    max_results=limit,
+                )
+            except EventFetchError as exc:
+                return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300], lang=lang), 502)
+            except Exception as exc:
+                return _err(t("gui_err_pce_event_fetch", exc=exc, lang=lang), 502)
 
         event_rules = [rule for rule in cm.config.get("rules", []) if rule.get("type") == "event"]
         comparisons = compare_event_rules(event_rules, events)
@@ -240,17 +240,17 @@ def make_events_blueprint(
         query_since = format_utc(since_utc)
         query_until = format_utc(now_utc)
 
-        api_client = ApiClient(cm)
-        try:
-            events = api_client.fetch_events_strict(
-                start_time_str=query_since,
-                end_time_str=query_until,
-                max_results=limit,
-            )
-        except EventFetchError as exc:
-            return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300], lang=lang), 502)
-        except Exception as exc:
-            return _err(t("gui_err_pce_event_fetch", exc=exc, lang=lang), 502)
+        with ApiClient(cm) as api_client:
+            try:
+                events = api_client.fetch_events_strict(
+                    start_time_str=query_since,
+                    end_time_str=query_until,
+                    max_results=limit,
+                )
+            except EventFetchError as exc:
+                return _err(t("gui_err_pce_event_fetch_status", status=exc.status, message=exc.message[:300], lang=lang), 502)
+            except Exception as exc:
+                return _err(t("gui_err_pce_event_fetch", exc=exc, lang=lang), 502)
 
         event_lookup = {event_identity(event): event for event in events}
         current_ids = {
