@@ -11,6 +11,14 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Added
 
+- Job health observability: every scheduled job records its last run and
+  status to `logs/job_health.json`; the Integrations overview shows a Job
+  Health table (never-ran and overdue jobs flagged) plus a TLS certificate
+  card, and a daily job renews the self-signed cert on disk when close to
+  expiry (restart still required to apply). Rule schedules now persist and
+  display per-schedule last-run state like report schedules; VEN/posture
+  dashboard tiles show data freshness and grey out when stale; alert channel
+  settings cards gained a test-send button.
 - VEN report: policy sync tracking for VENs that report normally — a KPI, a
   dedicated section, and an XLSX sheet flag online VENs with agent health
   errors/warnings, a sync state stuck off `applied`, stale firewall config, or
@@ -20,6 +28,9 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Pipeline health no longer reads green when SIEM is enabled but idle (no
+  enabled destination, or ingest has data while nothing was enqueued for
+  24h) — such states now surface as warn with a `siem_idle` flag.
 - Periodic cache jobs (traffic aggregate, retention, archive) never fired on
   frequently-restarted deployments: IntervalTrigger schedules the first run a
   full interval after startup, so the 24h archive/retention jobs kept being
