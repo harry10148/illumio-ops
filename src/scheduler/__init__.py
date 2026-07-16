@@ -59,6 +59,27 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     import datetime as _dt0
     _kick0 = _dt0.datetime.now(_dt0.timezone.utc) + _dt0.timedelta(seconds=10)
 
+    # 每個 job 都包 instrument wrapper：執行後寫 logs/job_health.json 的
+    # last_run/status（「應跑未跑」可觀測化，archive 事故根治配套）。
+    # 註冊當下先種 registered 記錄，讓從未跑過的 job 立即可見。
+    import functools as _ft
+    from src.job_health import record_job_registered, record_job_run
+
+    def _instrument(job_id, fn, interval_seconds):
+        record_job_registered(job_id, interval_seconds)
+
+        @_ft.wraps(fn)
+        def _run(*args, **kwargs):
+            try:
+                result = fn(*args, **kwargs)
+            except Exception as exc:
+                record_job_run(job_id, "error", str(exc),
+                               interval_seconds=interval_seconds)
+                raise
+            record_job_run(job_id, "ok", interval_seconds=interval_seconds)
+            return result
+        return _run
+
     try:
         _cache_enabled = cm.models.pce_cache.enabled
     except Exception as e:
@@ -72,7 +93,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         monitor_trigger = IntervalTrigger(minutes=interval_minutes)
 
     sched.add_job(
-        run_monitor_cycle,
+        _instrument("monitor_cycle", run_monitor_cycle, 30 if _cache_enabled else interval_minutes * 60),
         trigger=monitor_trigger,
         args=[cm],
         id="monitor_cycle",
@@ -81,7 +102,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         next_run_time=_kick0 + _dt0.timedelta(seconds=20),
     )
     sched.add_job(
-        tick_report_schedules,
+        _instrument("tick_report_schedules", tick_report_schedules, 60),
         trigger=IntervalTrigger(seconds=60),
         args=[cm],
         id="tick_report_schedules",
@@ -89,7 +110,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         replace_existing=True,
     )
     sched.add_job(
-        tick_rule_schedules,
+        _instrument("tick_rule_schedules", tick_rule_schedules, rule_interval),
         trigger=IntervalTrigger(seconds=rule_interval),
         args=[cm],
         id="tick_rule_schedules",
@@ -101,7 +122,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         cm.config.get("dashboard", {}).get("ven_summary_interval_seconds", 300)
     )
     sched.add_job(
-        run_ven_summary,
+        _instrument("ven_summary", run_ven_summary, ven_summary_interval),
         trigger=IntervalTrigger(seconds=ven_summary_interval),
         args=[cm],
         id="ven_summary",
@@ -113,7 +134,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         cm.config.get("dashboard", {}).get("posture_summary_interval_seconds", 600)
     )
     sched.add_job(
-        run_posture_summary,
+        _instrument("posture_summary", run_posture_summary, posture_summary_interval),
         trigger=IntervalTrigger(seconds=posture_summary_interval),
         args=[cm],
         id="posture_summary",
@@ -138,10 +159,12 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             # previously kept periodic ingest from ever firing across many
             # restarts within one interval window.
             _kick = _dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(seconds=10)
-            sched.add_job(run_events_ingest, _IT(seconds=cache_cfg.events_poll_interval_seconds),
+            sched.add_job(_instrument("pce_cache_ingest_events", run_events_ingest, cache_cfg.events_poll_interval_seconds),
+                          _IT(seconds=cache_cfg.events_poll_interval_seconds),
                           args=[cm], id="pce_cache_ingest_events", replace_existing=True,
                           next_run_time=_kick, executor="cache_writer")
-            sched.add_job(run_traffic_ingest, _IT(seconds=cache_cfg.traffic_poll_interval_seconds),
+            sched.add_job(_instrument("pce_cache_ingest_traffic", run_traffic_ingest, cache_cfg.traffic_poll_interval_seconds),
+                          _IT(seconds=cache_cfg.traffic_poll_interval_seconds),
                           args=[cm], id="pce_cache_ingest_traffic", replace_existing=True,
                           next_run_time=_kick, executor="cache_writer")
             # aggregate/retention/archive 同樣需要首跑 kick（2026-07-14 真機事故：
@@ -149,24 +172,25 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             # 部署頻繁重啟下 24h 間隔的 archive/retention 一次都沒跑過——
             # data/archive 恆空、retention 停刪、DB 無上限成長）。
             # kick 時間錯開，避免同刻搶 cache_writer 單 worker。
-            sched.add_job(run_traffic_aggregate, _IT(hours=1),
+            sched.add_job(_instrument("pce_cache_aggregate", run_traffic_aggregate, 3600), _IT(hours=1),
                           args=[cm], id="pce_cache_aggregate", replace_existing=True,
                           next_run_time=_kick + _dt.timedelta(seconds=60),
                           executor="cache_writer")
-            sched.add_job(run_cache_retention, _IT(hours=24),
+            sched.add_job(_instrument("pce_cache_retention", run_cache_retention, 86400), _IT(hours=24),
                           args=[cm], id="pce_cache_retention", replace_existing=True,
                           next_run_time=_kick + _dt.timedelta(seconds=180),
                           executor="cache_writer")
-            sched.add_job(run_cache_lag_monitor, _IT(seconds=60),
+            sched.add_job(_instrument("cache_lag_monitor", run_cache_lag_monitor, 60), _IT(seconds=60),
                           args=[cm], id="cache_lag_monitor", replace_existing=True)
             from src.scheduler.jobs import run_capacity_monitor
             # capacity monitor 是「應跑未跑」告警的看門狗，自己更不能被重啟餓死
-            sched.add_job(run_capacity_monitor, _IT(minutes=30),
+            sched.add_job(_instrument("pce_cache_capacity_monitor", run_capacity_monitor, 1800), _IT(minutes=30),
                           args=[cm], id="pce_cache_capacity_monitor",
                           replace_existing=True,
                           next_run_time=_kick + _dt.timedelta(seconds=240))
             if cache_cfg.archive_enabled:
-                sched.add_job(run_cache_archive, _IT(hours=cache_cfg.archive_interval_hours),
+                sched.add_job(_instrument("pce_cache_archive", run_cache_archive, cache_cfg.archive_interval_hours * 3600),
+                              _IT(hours=cache_cfg.archive_interval_hours),
                               args=[cm], id="pce_cache_archive", replace_existing=True,
                               next_run_time=_kick + _dt.timedelta(seconds=120),
                               executor="cache_writer")
@@ -179,7 +203,8 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             emit_preview_warning(cm, context="scheduler_startup")
             from apscheduler.triggers.interval import IntervalTrigger as _IT
             from src.scheduler.jobs import run_siem_dispatch
-            sched.add_job(run_siem_dispatch, _IT(seconds=siem_cfg.dispatch_tick_seconds),
+            sched.add_job(_instrument("siem_dispatch", run_siem_dispatch, siem_cfg.dispatch_tick_seconds),
+                          _IT(seconds=siem_cfg.dispatch_tick_seconds),
                           args=[cm], id="siem_dispatch", replace_existing=True)
     except Exception as exc:
         logger.exception("Failed to register SIEM scheduler jobs: {}", exc)
