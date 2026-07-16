@@ -166,3 +166,26 @@ def test_overview_job_health_tolerates_corrupt_entries(client, tmp_path, monkeyp
     job_ids = {e["job_id"] for e in body["job_health"]}
     assert "good_job" in job_ids
     assert "bad_job" not in job_ids
+
+
+def test_overview_posture_generated_at_from_snapshot(client, monkeypatch):
+    """Fast path (sync compute from snapshot) must transmit snapshot.generated_at,
+    not request-time now(). The posture tile's freshness signal depends on the
+    underlying traffic data age, not the request processing time."""
+    from unittest.mock import patch
+    from src.report.posture import compute_posture
+    snap_date = "2026-06-08T00:00:00Z"
+    kpis = {
+        "enforced_coverage_pct": 80.0,
+        "maturity_score": 70.0,
+        "risk_flows_total": 4,
+        "true_gap_pct": 20.0,
+        "maturity_dimensions": {"lateral_movement_control": {"ratio": 0.5}},
+    }
+    snap = {"kpis": kpis, "generated_at": snap_date}
+    with patch("src.report.snapshot_store.read_latest",
+               return_value=snap):
+        r = client.get("/api/dashboard/overview",
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    body = r.get_json()
+    assert body["posture"]["generated_at"] == snap_date
