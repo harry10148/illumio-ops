@@ -145,8 +145,10 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
 
     try:
         _tls_cfg = (cm.config.get("web_gui") or {}).get("tls") or {}
-        if (_tls_cfg.get("enabled", True) and _tls_cfg.get("self_signed", True)
-                and _tls_cfg.get("auto_renew", True)):
+        _tls_cert_file = _tls_cfg.get("cert_file")
+        _tls_key_file = _tls_cfg.get("key_file")
+        if (bool(_tls_cfg.get("enabled")) and not (_tls_cert_file and _tls_key_file)
+                and _tls_cfg.get("self_signed", True) and _tls_cfg.get("auto_renew", True)):
             from src.scheduler.jobs import run_tls_renew_check
             sched.add_job(
                 _instrument("tls_renew_check", run_tls_renew_check, 86400),

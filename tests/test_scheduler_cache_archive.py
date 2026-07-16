@@ -208,3 +208,36 @@ def test_tls_renew_job_absent_when_disabled(tmp_path):
     finally:
         for j in list(sched.get_jobs()):
             sched.remove_job(j.id)
+
+
+def test_tls_renew_job_absent_when_no_tls_block(tmp_path):
+    # 未設定 tls 區塊：伺服器啟動語意是 HTTP（falsy 預設），renew job 不應註冊。
+    from src.scheduler import build_scheduler
+    cm = _cm(tmp_path, archive_enabled=False)
+    cm.models.pce_cache.enabled = False
+    cm.models.siem.enabled = False
+    cm.config = {}
+    sched = build_scheduler(cm)
+    try:
+        assert sched.get_job("tls_renew_check") is None
+    finally:
+        for j in list(sched.get_jobs()):
+            sched.remove_job(j.id)
+
+
+def test_tls_renew_job_absent_when_user_supplied_cert(tmp_path):
+    # 自備憑證（cert_file/key_file）部署不得註冊 self-signed renew job。
+    from src.scheduler import build_scheduler
+    cm = _cm(tmp_path, archive_enabled=False)
+    cm.models.pce_cache.enabled = False
+    cm.models.siem.enabled = False
+    cm.config = {"web_gui": {"tls": {"enabled": True,
+                                      "cert_file": str(tmp_path / "cert.pem"),
+                                      "key_file": str(tmp_path / "key.pem"),
+                                      "self_signed": True, "auto_renew": True}}}
+    sched = build_scheduler(cm)
+    try:
+        assert sched.get_job("tls_renew_check") is None
+    finally:
+        for j in list(sched.get_jobs()):
+            sched.remove_job(j.id)

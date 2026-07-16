@@ -304,12 +304,17 @@ def _tls_overview(cm):
     from src.gui._helpers import _cert_days_remaining, _ROOT_DIR
     try:
         tls_cfg = (cm.config.get("web_gui") or {}).get("tls") or {}
-        if not tls_cfg.get("enabled", True):
+        enabled = bool(tls_cfg.get("enabled"))
+        if not enabled:
             return {"enabled": False, "days_remaining": None, "expiring_soon": False}
-        if tls_cfg.get("self_signed", True):
+        cert_file = tls_cfg.get("cert_file")
+        key_file = tls_cfg.get("key_file")
+        if cert_file and key_file:
+            cert_path = cert_file
+        elif tls_cfg.get("self_signed", True):
             cert_path = os.path.join(_ROOT_DIR, "config", "tls", "self_signed.pem")
         else:
-            cert_path = tls_cfg.get("cert_file") or ""
+            cert_path = None
         days = _cert_days_remaining(cert_path) if cert_path else None
         warn_days = int(tls_cfg.get("auto_renew_days", 30))
         return {"enabled": True, "days_remaining": days,

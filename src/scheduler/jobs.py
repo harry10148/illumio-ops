@@ -460,8 +460,10 @@ def run_tls_renew_check(cm) -> None:
     try:
         from src.gui._helpers import _maybe_auto_renew_self_signed, _ROOT_DIR
         tls_cfg = (cm.config.get("web_gui") or {}).get("tls") or {}
-        if not (tls_cfg.get("enabled", True) and tls_cfg.get("self_signed", True)
-                and tls_cfg.get("auto_renew", True)):
+        cert_file = tls_cfg.get("cert_file")
+        key_file = tls_cfg.get("key_file")
+        if not (bool(tls_cfg.get("enabled")) and not (cert_file and key_file)
+                and tls_cfg.get("self_signed", True) and tls_cfg.get("auto_renew", True)):
             return
         cert_dir = os.path.join(_ROOT_DIR, "config", "tls")
         threshold = int(tls_cfg.get("auto_renew_days", 30))

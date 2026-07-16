@@ -141,6 +141,40 @@ def test_overview_includes_tls(client, monkeypatch):
     assert body["tls"]["expiring_soon"] is True
 
 
+def test_tls_overview_disabled_when_no_tls_block():
+    import src.gui.routes.dashboard as dash
+
+    class _CM:
+        config = {}
+
+    assert dash._tls_overview(_CM()) == {
+        "enabled": False, "days_remaining": None, "expiring_soon": False}
+
+
+def test_tls_overview_monitors_user_supplied_cert(monkeypatch):
+    import src.gui.routes.dashboard as dash
+    import src.gui._helpers as gui_helpers
+
+    seen = {}
+
+    def _fake_cert_days_remaining(path):
+        seen["path"] = path
+        return 42
+
+    monkeypatch.setattr(gui_helpers, "_cert_days_remaining", _fake_cert_days_remaining)
+
+    class _CM:
+        config = {"web_gui": {"tls": {"enabled": True,
+                                       "cert_file": "/etc/certs/mine.pem",
+                                       "key_file": "/etc/certs/mine.key",
+                                       "self_signed": True}}}
+
+    result = dash._tls_overview(_CM())
+    assert seen["path"] == "/etc/certs/mine.pem"
+    assert result["enabled"] is True
+    assert result["days_remaining"] == 42
+
+
 def test_overview_job_health_tolerates_corrupt_entries(client, tmp_path, monkeypatch):
     """壞的 job_health.json 條目（非數字 interval_seconds）應被跳過，
     不影響其他條目或端點回傳 200."""
