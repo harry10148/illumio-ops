@@ -284,10 +284,16 @@ class ScheduleEngine:
                     item_now_cmp = item_now.replace(tzinfo=None) if item_now.tzinfo is not None else item_now
                     if item_now_cmp > expire_dt:
                         log(f"{Colors.FAIL}[EXPIRED] {c['name']} (ID:{extract_id(href)}) {t('rs_expired', default='has expired.')}{Colors.ENDC}")
-                        self.api.toggle_and_provision(href, False, c.get('is_ruleset'))
+                        expire_ok = self.api.toggle_and_provision(href, False, c.get('is_ruleset'))
                         self.api.update_rule_note(href, "", remove=True)
                         expired_hrefs.append(href)
-                        tick_states[href].update({"last_action": "expire", "last_result": "ok"})
+                        if expire_ok:
+                            tick_states[href].update({"last_action": "expire", "last_result": "ok"})
+                        else:
+                            tick_states[href].update({
+                                "last_action": "expire", "last_result": "error",
+                                "error": "toggle_and_provision failed",
+                            })
                         continue
                     else:
                         target = True
@@ -333,6 +339,7 @@ class ScheduleEngine:
                 else:
                     r_name = c.get('detail_name', c['name'])
                     log(f"{Colors.FAIL}[ERROR] API returned HTTP {status} for {r_name} (ID:{extract_id(href)}). Check PCE credentials/connectivity.{Colors.ENDC}")
+                    tick_states[href].update({"last_result": "error", "error": f"HTTP {status}"[:300]})
             except Exception as _item_err:
                 r_name = c.get('detail_name', c.get('name', href))
                 log(f"{Colors.FAIL}[ERROR] Exception processing {r_name} (ID:{extract_id(href)}): {_item_err}{Colors.ENDC}")

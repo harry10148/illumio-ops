@@ -77,12 +77,70 @@ def test_check_persists_per_schedule_state(tmp_path, monkeypatch):
     }}
     api = MagicMock()
     api.has_draft_changes.return_value = False
-    api.get_live_item.return_value = {"enabled": True}
+    api.get_live_item.return_value = (200, {"enabled": True})
     engine = ScheduleEngine(db, api)
     engine.check(silent=True, tz_str="UTC")
     states = json.load(open(state_file))["rule_schedule_states"]
     entry = states["/orgs/1/sec_policy/active/rule_sets/1"]
     assert entry["last_checked"].endswith("Z")
+
+
+def test_check_toggle_success_records_ok(tmp_path, monkeypatch):
+    """live state (enabled=False) 與排程 target(全天 allow 視窗內應 enabled)
+    不一致時觸發 toggle；toggle_and_provision 成功應記
+    last_action/last_result=ok。"""
+    import json
+    from unittest.mock import MagicMock
+    from src.rule_scheduler import ScheduleDB, ScheduleEngine
+    state_file = str(tmp_path / "state.json")
+    monkeypatch.setattr("src.rule_scheduler._resolve_rule_state_file",
+                        lambda: state_file)
+    href = "/orgs/1/sec_policy/active/rule_sets/1"
+    db = ScheduleDB(str(tmp_path / "rule_schedules.json"))
+    db.db = {href: {
+        "type": "recurring", "name": "rs", "is_ruleset": True,
+        "action": "allow", "days": ["mon", "tue", "wed", "thu", "fri",
+                                     "sat", "sun"],
+        "start": "00:00", "end": "23:59", "timezone": "UTC",
+    }}
+    api = MagicMock()
+    api.has_draft_changes.return_value = False
+    api.get_live_item.return_value = (200, {"enabled": False})
+    api.toggle_and_provision.return_value = True
+    engine = ScheduleEngine(db, api)
+    engine.check(silent=True, tz_str="UTC")
+    states = json.load(open(state_file))["rule_schedule_states"]
+    entry = states[href]
+    assert entry["last_action"] in ("enable", "disable")
+    assert entry["last_result"] == "ok"
+
+
+def test_check_toggle_failure_records_error(tmp_path, monkeypatch):
+    """同上情境，但 toggle_and_provision 失敗（回傳 False）應記
+    last_result=error，不可誤記為 ok。"""
+    import json
+    from unittest.mock import MagicMock
+    from src.rule_scheduler import ScheduleDB, ScheduleEngine
+    state_file = str(tmp_path / "state.json")
+    monkeypatch.setattr("src.rule_scheduler._resolve_rule_state_file",
+                        lambda: state_file)
+    href = "/orgs/1/sec_policy/active/rule_sets/1"
+    db = ScheduleDB(str(tmp_path / "rule_schedules.json"))
+    db.db = {href: {
+        "type": "recurring", "name": "rs", "is_ruleset": True,
+        "action": "allow", "days": ["mon", "tue", "wed", "thu", "fri",
+                                     "sat", "sun"],
+        "start": "00:00", "end": "23:59", "timezone": "UTC",
+    }}
+    api = MagicMock()
+    api.has_draft_changes.return_value = False
+    api.get_live_item.return_value = (200, {"enabled": False})
+    api.toggle_and_provision.return_value = False
+    engine = ScheduleEngine(db, api)
+    engine.check(silent=True, tz_str="UTC")
+    states = json.load(open(state_file))["rule_schedule_states"]
+    entry = states[href]
+    assert entry["last_result"] == "error"
 
 
 def test_schedules_list_enriches_last_state(client, monkeypatch, tmp_path):
