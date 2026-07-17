@@ -58,7 +58,7 @@ illumio-ops [--json] [-q] [-v] <子命令> [參數...]
 | 旗標 | 縮寫 | 說明 |
 |------|------|------|
 | `--json` | | 將機器可讀的 JSON 輸出至 stdout（每筆結果一個物件）。錯誤仍以 JSON 輸出至 stderr。 |
-| `--quiet` | `-q` | 抑制非必要輸出；錯誤仍會輸出至 stderr。與 `--verbose` 互斥（同時給會回傳 `EXIT_USAGE`）。 |
+| `--quiet` | `-q` | 抑制非必要輸出；錯誤仍會輸出至 stderr。與 `--verbose` 互斥（併用時 Click 以 UsageError 結束、exit code 為 2 —— Click 內建值，非本專案的 EXIT_USAGE=64，後者用於明確呼叫 ctx.exit(EXIT_USAGE) 的路徑）。 |
 | `--verbose` | `-v` | 詳細輸出，包含 debug 層級資訊。 |
 | `--help` | `-h` | 顯示說明訊息並退出。 |
 
@@ -246,7 +246,7 @@ illumio-ops gui [選項]
 
 | 選項 | 型別 | 預設 | 說明 |
 |------|------|------|------|
-| `--port` | INTEGER | `5001` | HTTP 監聽連接埠。 |
+| `-p, --port` | INTEGER | `5001` | HTTP 監聽連接埠。 |
 | `-h, --host` | TEXT | `0.0.0.0` | 綁定位址。 |
 | `--help` | | | 顯示說明並退出（本子命令的 `-h` 已被 `--host` 佔用，說明旗標只有長格式）。 |
 
