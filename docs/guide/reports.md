@@ -108,7 +108,7 @@ GUI：Reports → Audit 卡片 Generate。
 
 關鍵欄位：`action.src_ip`／`api_method`／`api_endpoint`、`created_by`（分辨 user／agent／system 來源）、`change_detail`（欄位前後值摘要）、`workloads_affected`。
 
-注意事項：長文字欄位（例如 before/after 變更值）在 HTML 匯出用 `<details>` 折疊：超過門檻長度（80 字元）的內容顯示截斷摘要＋刪節號，點開才顯示完整值；CSV 匯出一律帶完整未截斷的值。這是明確可回復的截斷，不是靜默丟資料。
+注意事項：這裡有兩層獨立的截斷，不要混為一談。第一層在 generator（`audit_generator.py`）組 `change_detail` 字串時就發生：每個 before/after 欄位值先裁到 80 字元、最多納入 8 個欄位（`_truncate_val(val, max_len=80)` ＋ `summaries[:8]`），HTML 與 CSV 的 `change_detail` 拿到的都是同一條已裁切字串，無法回復。第二層只在 HTML 匯出層（`audit_html_exporter.py` 的 `_LONG_TEXT_TRUNCATE_AT = 150`）：`change_detail` 字串若超過 150 字元會再用 `<details>` 折疊顯示，點開可看到 `change_detail` 的完整內容——但那仍是第一層裁過的摘要，不是原始值。真正未裁切的原始變更資料只在 CSV 匯出的 `raw_events` 分頁的 `resource_changes` 欄位裡。
 
 ## 4. Policy Usage Report
 
