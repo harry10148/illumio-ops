@@ -171,7 +171,7 @@ facade 上的所有 TTL 快取（label、href 別名快取等）共用一把 `th
 
 `illumio-ops.py` 是唯一入口，內含一個 dispatcher，讓兩套解析器共存（見該檔 docstring）：
 
-- **click 子命令（建議）**：`illumio-ops monitor / gui / monitor-gui / report / rule / workload / cache / config / siem / status / version`（`src/cli/`）。
+- **click 子命令（建議）**：`illumio-ops monitor / gui / monitor-gui / report / rule / workload / cache / config / siem / status / version / shell / completion`（`src/cli/`）。
 - **legacy argparse 旗標（向後相容）**：`--monitor`、`--gui`、`--monitor-gui`、`--report`、`-i`、`-p`。
 - **不帶參數**：進入互動式選單（`src/main.py`），涵蓋監控、各報表子選單、log 檢視等。
 
@@ -214,4 +214,4 @@ daemon 啟動時由 `src/scheduler/__init__.py:build_scheduler` 註冊。每個 
 
 - PCE API 與 policy 模型的 vendor 事實（值域、限流、版本門檻）：[pce-domain-notes.md](pce-domain-notes.md)
 - 開發流程與測試守門：[development.md](development.md)
-- 日常操作與 GUI 功能：見 docs/guide/ 系列（重寫中）。
+- 日常操作與 GUI 功能：見 [docs/guide/ 系列](../INDEX.md)。

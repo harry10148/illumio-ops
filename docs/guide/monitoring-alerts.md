@@ -261,7 +261,7 @@ R 系列只在 unified DataFrame 帶有 **`draft_policy_decision`** 欄時才會
 
 啟用哪些通道由 `alerts.active` 清單決定（例如 `["mail", "line"]`）。各通道所需欄位、必填/密鑰標記見 `src/alerts/metadata.py` 的 `PLUGIN_METADATA`（GUI 表單即由此動態產生）。Teams webhook URL 內嵌有效機密（`sig=` 查詢字串），`redact_webhook_url()` 確保日誌與持久化只留 `scheme://host[:port]/...`，不外洩完整網址。
 
-GUI 操作路徑（Alerts → Settings → Channels 各通道卡片；Rules → Actions 全域測試）見 [gui-tour.md](gui-tour.md)。
+GUI 操作路徑（Settings → Channels 各通道卡片；Rules → Actions 全域測試）見 [gui-tour.md](gui-tour.md)。
 
 ### 4.2 Test-send
 
@@ -306,7 +306,7 @@ if len(message) > self._LINE_MESSAGE_CAP:
     message = message[: self._LINE_MESSAGE_CAP - len(footer) - 1].rstrip() + "\n" + footer
 ```
 
-即**明確截斷並附上「內容已截斷」的 i18n footer**，而非無聲截斷；Telegram 通道另有獨立的截斷 footer（`telegram_truncated_footer`，於最後一個換行處截斷以維持 Markdown 標記平衡）。
+即**明確截斷並附上「內容已截斷」的 i18n footer**，而非無聲截斷；Telegram 通道另有獨立的截斷 footer（`telegram_truncated_footer`，於最後一個換行處截斷以維持 HTML 標記平衡）。
 
 ---
 

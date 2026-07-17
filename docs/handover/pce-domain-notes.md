@@ -169,7 +169,7 @@ Flow 紀錄裡只有 workload 的 label，不帶 label group 成員資訊，clie
 | deny／override_deny 展開、scope AND-OR、exclusion 扣除 | `src/report/analysis/policy_resolver.py` `_scope_ip_set()` 與 action 欄解析 |
 | draft decision 過濾須查全量 reported | `src/analyzer.py` draft 過濾段（查全 reported PD 再篩 draft 值） |
 | Jobs API 終態 `done` | `src/api_client.py` `_async_collection_get()`（docstring 明載＋輪詢實作） |
-| async traffic query 終態 `completed`／四種失敗態 | `src/api/async_jobs.py` `_wait_for_async_query()` 終態列舉 |
+| async traffic query 終態 `completed`／四種失敗態 | `src/api/async_jobs.py` `_wait_for_async_query()` 終態列舉；`src/api/traffic_query.py:756、1621` |
 | 集合 GET 500 上限與截斷偵測 | `src/api_client.py` `_get_collection()`（`max_results` 一律 500、截斷記錄）；`tests/test_api_collection_truncation.py` |
 | X-Total-Count 未過濾總數陷阱 | `src/api_client.py` `_get_collection()` 截斷判準（實收達 500 才視為截斷）＋行內註解（PCE 25.2.40 實測數字） |
 | respond-async fallback 流程 | `src/api_client.py` `_async_collection_get()` |
