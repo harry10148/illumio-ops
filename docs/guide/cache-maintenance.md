@@ -72,7 +72,7 @@ PCE（events API／traffic flows API）
 
   另有 CacheSubscriber（siem_dispatch 佇列的來源）、LagMonitor（60s 偵測 ingest 落後）、
   capacity_snapshot（30 分鐘記錄 DB 大小／磁碟／SIEM 積壓／archiver 落後）三條旁支，
-  都讀同一份 pce_events / pce_traffic_flows_raw，不额外複製資料。
+  都讀同一份 pce_events / pce_traffic_flows_raw，不額外複製資料。
 ```
 
 對照 [automation.md](automation.md) §3 的 14-job 總表：本圖涉及 `pce_cache_ingest_events`、

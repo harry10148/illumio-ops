@@ -182,7 +182,10 @@ stale 灰化邏輯，僅在資料不可用（`verdict === 'unknown'` 或 `no_cac
 - **Traffic Analyzer**：依 Policy Decision（Blocked／Potentially
   Blocked／Allowed／All，含 unknown 語意）、以及 FilterBar 物件選擇器
   （見上節）篩選流量，KPI 條顯示 flows／connections／目的 IP 數／尖峰頻
-  寬，並有 7 天趨勢圖（可切換「僅顯示已標記」）。
+  寬，並有 7 天趨勢圖（可切換「僅顯示已標記」）。查詢工具列的「Data source」
+  下拉可切換至 Archive 模式，輸入日期區間並點擊「Load archive」按鈕即可
+  載入已從主 cache 清除但仍保存在歸檔 JSONL 中的舊流量記錄，詳見 
+  [cache-maintenance.md](cache-maintenance.md) §3.4。
 - **Workload Search**：依名稱／IP／hostname 查 Workload，顯示線上狀態、
   介面、labels、管理狀態。
 - **Rankings（legacy）**：舊版 Top-N 排行小工具，維持向下相容，UI 上以
