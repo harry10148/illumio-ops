@@ -159,7 +159,7 @@ PCE 的流量查詢又貴又慢（async query 要 submit、poll、download，分
 
 ### 4.5 為什麼集合 GET 有 async fallback
 
-PCE 的同步集合 GET 有 500 筆硬上限，超過就默默截斷——對 rulesets、workloads 這類會成長的集合，截斷等於報表算錯。`_get_collection` 用回應的 `X-Total-Count` 偵測截斷，觸發官方 async GET 流程補救：同一路徑帶 `Prefer: respond-async` 重發，收 202＋`Location` job href，輪詢到 `done` 後從 `result.href` 下載完整集合（`src/api_client.py:_get_collection`、`_async_collection_get`）。fallback 失敗時保留截斷資料＋錯誤 log，行為永遠不比沒有 fallback 差。X-Total-Count 帶 filter 時的語意陷阱等 vendor 事實見 pce-domain-notes.md。
+PCE 的同步集合 GET 有 500 筆硬上限，超過就默默截斷——對 rulesets、workloads 這類會成長的集合，截斷等於報表算錯。`_get_collection` 用回應的 `X-Total-Count` 偵測截斷，觸發官方 async GET 流程補救：同一路徑帶 `Prefer: respond-async` 重發，收 202＋`Location` job href，輪詢到 `done` 後從 `result.href` 下載完整集合（`src/api_client.py:_get_collection`、`_async_collection_get`）。fallback 失敗時保留截斷資料＋錯誤 log，行為永遠不比沒有 fallback 差。X-Total-Count 帶 filter 時的語意陷阱等 vendor 事實見 [pce-domain-notes.md](pce-domain-notes.md)。
 
 ### 4.6 為什麼只有一把 `_cache_lock`（RLock）
 
@@ -212,6 +212,6 @@ daemon 啟動時由 `src/scheduler/__init__.py:build_scheduler` 註冊。每個 
 
 ### 5.3 下一步閱讀
 
-- PCE API 與 policy 模型的 vendor 事實（值域、限流、版本門檻）：pce-domain-notes.md
-- 開發流程與測試守門：development.md
+- PCE API 與 policy 模型的 vendor 事實（值域、限流、版本門檻）：[pce-domain-notes.md](pce-domain-notes.md)
+- 開發流程與測試守門：[development.md](development.md)
 - 日常操作與 GUI 功能：見 docs/guide/ 系列（重寫中）。

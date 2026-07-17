@@ -32,7 +32,7 @@ verified_against:
 Web GUI 是單頁式應用（SPA）：登入後以頂部 8 個分頁切換，內容全部由前端 JS 模組向約
 85 條 JSON API（`/api/...`）取資料，伺服器不重新整頁。精確端點清單見 [rest-api.md](../reference/rest-api.md)。啟動方式與埠號見
 `illumio-ops gui`（預設埠 **5001**，`--host 0.0.0.0`），完整 CLI 選項見
-reference/cli.md。
+[cli.md](../reference/cli.md)。
 
 > **全域安全提醒**：除 `/login`、`/api/login`、`/logout`、`/api/csrf-token` 外，
 > 所有路由都需登入 session。`web_gui.allowed_ips` 提供 IP 允許清單，比對的是
@@ -174,7 +174,7 @@ stale 灰化邏輯，僅在資料不可用（`verdict === 'unknown'` 或 `no_cac
 （`.ov-fresh.stale`，紅字，門檻與磚塊各自的門檻是獨立邏輯）。
 
 對應設定：儀表板顯示語言／主題見 [configuration.md](configuration.md) 的「settings（一般
-設定）」；Security Posture 報表產生方式見 reports.md（尚待建立）。
+設定）」；Security Posture 報表產生方式見 [reports.md](reports.md)。
 
 ### 2) Traffic & Workloads
 
@@ -231,7 +231,7 @@ PCE 稽核事件檢視，左表右詳版面：可依時間視窗、category／gr
 **Shadow Compare**（規則對實際事件的命中比對）、**Rule Test**（單一規則
 測試）、**Event Catalog**（事件型錄，vendor catalog 對映）。以上皆為
 **唯讀**功能，會即時呼叫 PCE API 取事件，不寫入本地狀態。事件規則語意
-與 vendor catalog 詳見 monitoring-alerts.md（尚待建立）。
+與 vendor catalog 詳見 [monitoring-alerts.md](monitoring-alerts.md)。
 
 ### 4) Rules（告警規則，分頁標題為 Alerts）
 
@@ -240,7 +240,7 @@ PCE 稽核事件檢視，左表右詳版面：可依時間視窗、category／gr
   會**寫入 `config/alerts.json`**。**Load Best Practices** 可一鍵附加
   或取代為內建最佳實務規則組（16 條 event + 1 條 traffic），操作前會有
   確認對話：replace 模式兩層（先警告會覆寫、再次確認），append
-  模式一層。規則型別與門檻語意見 monitoring-alerts.md（尚待建立）。
+  模式一層。規則型別與門檻語意見 [monitoring-alerts.md](monitoring-alerts.md)。
 - **Actions 子頁**：
   - **Send Test Alert（All）／Test [通道]**：`POST
     /api/actions/test-alert` 會**實際發送**測試訊息到指定（或全部）
@@ -259,7 +259,7 @@ PCE 稽核事件檢視，左表右詳版面：可依時間視窗、category／gr
   Delete（**會刪檔，不可復原**），並提供各類報表的 **Generate** 鈕
   （Traffic／Security／Audit／Policy Usage／VEN Status／Readiness／
   Rule Hit Count／Policy Diff／Policy Resolver 等，各報表細節見
-  reports.md，尚待建立）。產生報表會在伺服器端排入背景執行緒、即時查詢
+  [reports.md](reports.md)）。產生報表會在伺服器端排入背景執行緒、即時查詢
   PCE 並寫出檔案，可能耗時數分鐘。
 - **Schedules 子頁**：建立／編輯／啟用停用／立即執行（Run Now）／刪除報
   表排程。排程需 daemon 持續執行才會觸發；勾選 Email 需先設定好郵件通
@@ -286,7 +286,7 @@ last-run 狀態）、**Logs**。
 > rule 的啟用旗標，佈署需操作員另行處理；排程未啟用時只會顯示 warning，
 > 絕不自動幫你 enable。
 
-詳細操作流程與背景 job 對照表見 automation.md（尚待建立）。
+詳細操作流程與背景 job 對照表見 [automation.md](automation.md)。
 
 ### 7) Integrations
 
@@ -318,10 +318,10 @@ last-run 狀態）、**Logs**。
   filter／sampling）。儲存後需 **Restart Monitor**（`POST
   /api/daemon/restart`）才生效。可手動 **Backfill**（補填歷史，會查 PCE
   並寫入 cache DB）或 **Retention Now**（會永久刪除過期列，UI 有
-  `confirm()`）。詳見 cache-maintenance.md（尚待建立）。
+  `confirm()`）。詳見 [cache-maintenance.md](cache-maintenance.md)。
 - **SIEM**：destination 清單與 KPI（sent／failed／DLQ／成功率／延遲）。
   新增／編輯／刪除 destination，及 **Test**（會實際送出測試事件）。詳見
-  siem.md（尚待建立）。
+  [siem.md](siem.md)。
 - **DLQ**：死信佇列檢視，可 **Retry（replay）**（重送失敗事件）或
   **Clear／Purge**（永久刪除，全部清除需額外輸入 destination 名稱確
   認——比一般 `confirm()` 更高一階的防呆）。

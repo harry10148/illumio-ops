@@ -22,8 +22,8 @@ verified_against:
 
 illumio-ops 是針對 Illumio PCE 的無代理（agentless）監控與自動化平台，只透過 REST API
 連線一台或多台 PCE，不需要在受管端點部署代理程式。本文件涵蓋兩種安裝方式（從原始碼、
-離線安裝包）、升級與移除。安裝完成後的設定細節見 configuration.md（設定參照）；
-啟動後的故障排除見 troubleshooting.md（故障排除）。
+離線安裝包）、升級與移除。安裝完成後的設定細節見 [configuration.md](configuration.md)（設定參照）；
+啟動後的故障排除見 [troubleshooting.md](troubleshooting.md)（故障排除）。
 
 ## 系統需求
 
@@ -162,7 +162,7 @@ Get-Service IllumioOps                # 應顯示：Running
 
 編輯 `config/config.json`（服務安裝則為 `/opt/illumio-ops/config/config.json` 或
 `C:\illumio-ops\config\config.json`），填入 `api` 區塊的欄位（完整鍵值說明見
-configuration.md（設定參照））：
+[configuration.md](configuration.md)（設定參照））：
 
 ```json
 "api": {
@@ -312,6 +312,6 @@ sudo /opt/illumio-ops/uninstall.sh --purge    # 全部移除
 
 ## 下一步
 
-- configuration.md（設定參照）— config.json 各區塊鍵值說明
-- troubleshooting.md（故障排除）— 服務起不來、PCE 連不上、GUI 埠衝突等症狀導向排錯
+- [configuration.md](configuration.md)（設定參照）— config.json 各區塊鍵值說明
+- [troubleshooting.md](troubleshooting.md)（故障排除）— 服務起不來、PCE 連不上、GUI 埠衝突等症狀導向排錯
 - [architecture.md](../handover/architecture.md) — 架構導覽與模組地圖

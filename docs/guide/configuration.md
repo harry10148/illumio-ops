@@ -24,8 +24,8 @@ schema）為 ground truth——`ConfigManager.load()` 時會用這份 schema 驗
 是安裝範本，內容可能落後於 schema；本文件遇到範本與 schema 不一致的地方，一律以
 schema 的預設值為準，並在下方「已知落差」標註。
 
-安裝與升級流程見 installation.md（安裝與部署）；監控規則／告警通道的規則語意見
-monitoring-alerts.md（規則語意不在本文件範圍）。
+安裝與升級流程見 [installation.md](installation.md)（安裝與部署）；監控規則／告警通道的規則語意見
+[monitoring-alerts.md](monitoring-alerts.md)（規則語意不在本文件範圍）。
 
 ## 設定檔案總表
 
@@ -34,7 +34,7 @@ illumio-ops 的設定分散在四個檔案，全部位於 `config/`（`.gitignor
 | 檔案 | 內容 | 驗證方式 |
 |---|---|---|
 | `config.json` | 主設定檔，本文件涵蓋的所有區塊 | `ConfigSchema`（pydantic，`extra="forbid"`） |
-| `alerts.json` | 告警規則定義（event／traffic／bandwidth），原子寫入，權限 `0600` | 無獨立 pydantic schema，語意見 monitoring-alerts.md |
+| `alerts.json` | 告警規則定義（event／traffic／bandwidth），原子寫入，權限 `0600` | 無獨立 pydantic schema，語意見 [monitoring-alerts.md](monitoring-alerts.md) |
 | `report_config.yaml` | 報表分析參數（風險埠分級、B/L 系列規則門檻、輸出設定） | 無 pydantic 驗證，純 YAML |
 | `rule_schedules.json` | Rule Scheduler 的排程紀錄（依 PCE rule/ruleset href 索引），由程式維護 | 無 pydantic 驗證，一般不手動編輯 |
 
@@ -158,11 +158,11 @@ profile。切換方式：
 `rules`（`list[Rule]`，每筆只固定 `type`／`name` 兩鍵、其餘欄位任意）在記憶體中的實際
 內容是從獨立檔案 `config/alerts.json` 讀入合併（`ConfigManager._read_alerts_file`／
 `_write_alerts_file`），`config.json` 磁碟上的 `rules` 陣列本身不使用；完整的規則型別、
-欄位語意與最佳實務規則集見 monitoring-alerts.md。
+欄位語意與最佳實務規則集見 [monitoring-alerts.md](monitoring-alerts.md)。
 
 | 鍵 | 型別 | 預設 | 說明 |
 |---|---|---|---|
-| `type` | str | 必填 | 規則型別（`event`／`traffic`／`bandwidth`，語意見 monitoring-alerts.md） |
+| `type` | str | 必填 | 規則型別（`event`／`traffic`／`bandwidth`，語意見 [monitoring-alerts.md](monitoring-alerts.md)） |
 | `name` | str | `""` | 規則顯示名稱或 i18n key |
 
 ## report ／ report_schedules（報表預設值）
@@ -201,9 +201,9 @@ profile。切換方式：
 也不屬於 `config.json`；多數操作者不需要修改。內容包含勒索軟體風險埠分級
 （critical/high/medium/low）、橫向移動埠清單、B/L 系列規則門檻（例如
 `min_policy_coverage_pct: 30`）與輸出設定（`top_n`、`include_raw_data`、
-`filename_prefix`）。門檻背後對應哪條規則、如何解讀，見 monitoring-alerts.md。
+`filename_prefix`）。門檻背後對應哪條規則、如何解讀，見 [monitoring-alerts.md](monitoring-alerts.md)。
 
-各報表本身（種類、產生方式、欄位）見 reports.md。
+各報表本身（種類、產生方式、欄位）見 [reports.md](reports.md)。
 
 ## rule_scheduler
 
@@ -212,7 +212,7 @@ profile。切換方式：
 | `enabled` | bool | `true` | 是否啟用 Rule Scheduler 輪詢（schema 預設 `true`；範本 `config.json.example` 明確設為 `false`，見上方已知落差） |
 | `check_interval_seconds` | int（≥60） | `300` | 輪詢間隔（秒），下限 60 秒 |
 
-Rule Scheduler 的排程建立、時窗語意與安全約束見 automation.md。
+Rule Scheduler 的排程建立、時窗語意與安全約束見 [automation.md](automation.md)。
 
 ## scheduler（APScheduler 執行期，已棄用欄位）
 
@@ -244,7 +244,7 @@ Rule Scheduler 的排程建立、時窗語意與安全約束見 automation.md。
 | `siem_pending_warn_rows` | int（≥1000） | `50000` | SIEM 佇列積壓筆數告警門檻 |
 | `cache_read_max_rows` | int（≥10000） | `500000` | cache 讀取單次視窗列數護欄 |
 
-cache 架構、容量規劃與 archive 排程細節見 cache-maintenance.md。
+cache 架構、容量規劃與 archive 排程細節見 [cache-maintenance.md](cache-maintenance.md)。
 
 ### pce_cache.traffic_filter
 
@@ -293,7 +293,7 @@ cache 架構、容量規劃與 archive 排程細節見 cache-maintenance.md。
 > **安全護欄**：`profile="production"` 時 `tls_verify=false` 會拒絕載入，語意同 `api.profile`。
 
 舊版設定的 `endpoint`（`"host:port"` 或 HEC URL 字串）會在載入時自動遷移成
-`host`／`port`，不需手動轉換。DLQ 三命令與健康判讀見 siem.md。
+`host`／`port`，不需手動轉換。DLQ 三命令與健康判讀見 [siem.md](siem.md)。
 
 ## web_gui ／ TLS
 
@@ -321,7 +321,7 @@ cache 架構、容量規劃與 archive 排程細節見 cache-maintenance.md。
 
 > GUI 監聽埠**不是** `config.json` 鍵；由 CLI 選項決定，`illumio-ops gui --port`
 > 預設埠為 `5001`（`src/cli/gui_cmd.py`），服務化安裝時同一預設值也會寫進
-> systemd/NSSM 服務定義（見 installation.md）。
+> systemd/NSSM 服務定義（見 [installation.md](installation.md)）。
 
 ### TLS：self-signed 憑證每日續期 job
 
@@ -350,15 +350,15 @@ cache 架構、容量規劃與 archive 排程細節見 cache-maintenance.md。
 ## 語言
 
 `settings.language` 只接受 `"en"` 或 `"zh_TW"`（`Literal`，不接受其他值）。新增/調整
-介面字串的流程（en/zh_TW 雙檔同步、JS 引用鍵稽核）見 development.md 的 i18n
+介面字串的流程（en/zh_TW 雙檔同步、JS 引用鍵稽核）見 [development.md](../handover/development.md) 的 i18n
 workflow 一節。
 
 ## 下一步
 
 - [installation.md](installation.md) — 安裝、升級與「升級後保留的檔案」清單
-- monitoring-alerts.md — 監控規則、告警通道規則語意、事件規則、B/L/R 系列門檻解讀
-- reports.md — 各報表種類、產生方式與欄位
-- automation.md — Rule Scheduler 排程語意與 quarantine
-- siem.md — SIEM 目的地設定、DLQ 三命令、健康判讀
-- cache-maintenance.md — pce_cache 架構、容量規劃、archive 操作
+- [monitoring-alerts.md](monitoring-alerts.md) — 監控規則、告警通道規則語意、事件規則、B/L/R 系列門檻解讀
+- [reports.md](reports.md) — 各報表種類、產生方式與欄位
+- [automation.md](automation.md) — Rule Scheduler 排程語意與 quarantine
+- [siem.md](siem.md) — SIEM 目的地設定、DLQ 三命令、健康判讀
+- [cache-maintenance.md](cache-maintenance.md) — pce_cache 架構、容量規劃、archive 操作
 - [development.md](../handover/development.md) — i18n workflow、開發環境、常見斷鏈坑

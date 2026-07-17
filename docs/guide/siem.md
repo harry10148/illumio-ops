@@ -21,11 +21,11 @@ verified_against:
 
 # SIEM 轉送
 
-illumio-ops 可將 PCE audit events 與 traffic 摘要轉送到任意 syslog 相容 SIEM、Splunk HEC，或本地 JSON sink。轉送具備持久性：事件先進入本地 SQLite 派送佇列（`siem_dispatch` 表，與 pce_cache 共用資料庫，見 cache-maintenance.md），失敗會依退避策略重試，超過重試上限後移入 **DLQ（dead-letter queue，死信佇列）**。
+illumio-ops 可將 PCE audit events 與 traffic 摘要轉送到任意 syslog 相容 SIEM、Splunk HEC，或本地 JSON sink。轉送具備持久性：事件先進入本地 SQLite 派送佇列（`siem_dispatch` 表，與 pce_cache 共用資料庫，見 [cache-maintenance.md](cache-maintenance.md)），失敗會依退避策略重試，超過重試上限後移入 **DLQ（dead-letter queue，死信佇列）**。
 
 > **狀態提示**：`config.json › siem.enabled = true` 時，程式啟動（`src/main.py`、`illumio-ops siem` 子命令）會透過 `src/siem/preview.py` 記錄一次 warning 級別的日誌，內容為「SIEM forwarder is PREVIEW」。這是程式碼目前的實際行為（每個程序生命週期只記一次），操作者在啟動記錄中看到此警告屬正常現象，不代表設定有誤。
 
-SIEM 轉送依賴 pce_cache（見 cache-maintenance.md）：`siem_dispatch`／`dead_letter` 兩張表都存在 cache 資料庫中，`pce_cache.enabled=false` 時 SIEM 轉送無從運作。
+SIEM 轉送依賴 pce_cache（見 [cache-maintenance.md](cache-maintenance.md)）：`siem_dispatch`／`dead_letter` 兩張表都存在 cache 資料庫中，`pce_cache.enabled=false` 時 SIEM 轉送無從運作。
 
 ---
 
@@ -200,6 +200,6 @@ Integrations Overview（`src/gui/routes/dashboard.py` 的 `_overview_pipeline()`
 - 設定鍵完整表格（型別／預設值／說明）：[configuration.md](configuration.md)
 - GUI Integrations 頁面的 SIEM／DLQ 子頁操作：[gui-tour.md](gui-tour.md)
 - `siem_dispatch` 排程 job 的完整 job 清單與 Job Health 判讀：[automation.md](automation.md)
-- pce_cache 架構、ingest／retention／容量規劃：見 cache-maintenance.md（尚待建立）
-- 常見故障排除（連線失敗、憑證問題、佇列積壓）：見 troubleshooting.md（尚待建立）
+- pce_cache 架構、ingest／retention／容量規劃：見 [cache-maintenance.md](cache-maintenance.md)
+- 常見故障排除（連線失敗、憑證問題、佇列積壓）：見 [troubleshooting.md](troubleshooting.md)
 - 模組地圖與「為什麼 SIEM enqueue 與 cache 寫入同交易」的設計決策：[architecture.md](../handover/architecture.md)

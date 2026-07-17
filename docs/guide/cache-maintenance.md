@@ -312,4 +312,4 @@ sudo systemctl start illumio-ops
 - SIEM dispatch、DLQ 與轉送健康判讀：[siem.md](siem.md)
 - traffic 報表 unknown 值域與 2026-07 查詢預設變更：[reports.md](reports.md)、
   [pce-domain-notes.md](../handover/pce-domain-notes.md)
-- job never-ran／overdue、DB 肥大、archive 沒跑等症狀排查：見 troubleshooting.md（尚待建立）
+- job never-ran／overdue、DB 肥大、archive 沒跑等症狀排查：見 [troubleshooting.md](troubleshooting.md)

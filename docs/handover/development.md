@@ -165,7 +165,7 @@ python scripts/check_doc_links.py
 1. **決定鍵名稱**：`<area>_<purpose>` 格式，常見前綴：`gui_`（GUI 元件）、`menu_`（選單）、`alert_`（警報）、`rpt_`（報告／Dashboard）、`rs_`（規則排程器）、`pd_`（原則判斷）、`lbl_`（通用標籤）、`pu_`（原則使用模組）、`rule_`（告警規則 name/desc/rec）、`sched_`（排程器狀態，嚴格前綴）。
 2. 在 `src/i18n_en.json` 按字母順序新增英文值，插值用 `{variable_name}` 語法。
 3. 在 `src/i18n_zh_TW.json` 新增對應 zh_TW 值——**必須同一個 commit**，CI Category I（`audit_zh_parity_against_en`）強制鍵集一致。
-4. 若涵蓋 Illumio 產品術語，先查 `docs/reference/glossary.md` 確認是否已有核可翻譯，再新增到 `src/i18n/data/zh_explicit.json`；不得在 `i18n_zh_TW.json` 寫入與其矛盾的翻譯（Category E 會擋）。
+4. 若涵蓋 Illumio 產品術語，先查 [glossary.md](../reference/glossary.md) 確認是否已有核可翻譯，再新增到 `src/i18n/data/zh_explicit.json`；不得在 `i18n_zh_TW.json` 寫入與其矛盾的翻譯（Category E 會擋）。
 5. 若為 Dashboard KPI，同步新增到 `src/i18n/data/dashboard_approved.json`。
 6. 原始碼中用 `from src.i18n import t`；請求處理器內**一律**顯式傳 `lang`：`t("your_key", lang=lang)`，絕不要用無 `lang` 的 `t("your_key")`（會落到全域語系，並發請求下不可靠）。
 7. 執行稽核：`python scripts/audit_i18n_usage.py`（全部 Category）或 `pytest tests/test_i18n_audit.py tests/test_i18n_strings_parity.py -v`；只查單一 Category 用 `--only <字母>`。合併前所有 Category 須以 0 退出碼結束。
