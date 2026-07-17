@@ -26,11 +26,11 @@ illumio-ops 提供 9 種報表（GUI Reports 分頁的 Generate 鈕與 CLI `illu
 
 | 報表 | 回答什麼問題 | 資料來源 | 輸出格式 |
 |---|---|---|---|
-| Traffic Flow（`traffic`） | 這段時間誰跟誰通了什麼、政策決策分布如何、有沒有安全訊號 | cache(hybrid，可切換) + live PCE，或 CSV 匯入 | html / csv / pdf / xlsx / all |
-| Security & Risk（`security`） | 目前有哪些安全風險（未覆蓋流量、橫向移動、暴露埠） | 同 Traffic | html / csv / pdf / xlsx / all |
-| Audit & System Events（`audit`） | 誰在什麼時候透過 API/GUI/agent 改了什麼 | cache(hybrid，自動) + live 補洞 | html / csv / pdf / xlsx / all |
-| Policy Usage（`policy-usage`） | 哪些 Active 規則有被流量用到，哪些可能是死規則 | live（逐規則 async 查詢），或 workloader CSV 匯入 | html / csv / pdf / xlsx / all |
-| VEN Status（`ven-status`） | 哪些 VEN 離線／失聯，失聯多久 | 即時 live only | html / csv / pdf / xlsx / all |
+| Traffic Flow（`traffic`） | 這段時間誰跟誰通了什麼、政策決策分布如何、有沒有安全訊號 | cache(hybrid，可切換) + live PCE，或 CSV 匯入 | html / csv / xlsx / all |
+| Security & Risk（`security`） | 目前有哪些安全風險（未覆蓋流量、橫向移動、暴露埠） | 同 Traffic | html / csv / xlsx / all |
+| Audit & System Events（`audit`） | 誰在什麼時候透過 API/GUI/agent 改了什麼 | cache(hybrid，自動) + live 補洞 | html / csv / xlsx / all |
+| Policy Usage（`policy-usage`） | 哪些 Active 規則有被流量用到，哪些可能是死規則 | live（逐規則 async 查詢），或 workloader CSV 匯入 | html / csv / xlsx / all |
+| VEN Status（`ven-status`） | 哪些 VEN 離線／失聯，失聯多久 | 即時 live only | html / csv / xlsx / all |
 | Enforcement Readiness（`readiness`） | 哪個 App(Env) 可以安全推進到下一個 enforcement mode | cache(hybrid，可切換) + live | html / csv / all |
 | Rule Hit Count（`rule-hit-count`） | 哪些 Active 規則實際在 VEN 防火牆被命中過（原生量測） | live（PCE native pull），或 PCE UI 原生 CSV 匯入 | html / csv / all |
 | Policy Diff（`policy-diff`） | draft policy 佈署後政策物件會怎麼變、是誰改的 | live（同時抓 draft／active） | html / csv / all |
@@ -185,7 +185,7 @@ GUI：Reports → Rule Hit Count 卡片 Generate。
 
 關鍵欄位：`hit_count`、`last_hit_at`、`days_since_last_hit`、即時 enrich 出的規則 consumers／providers／services。
 
-注意事項：只計 Active 規則，計數資料保留期 90 天（`CLEANUP_DAYS_THRESHOLD`）；HTML 長字串欄位同樣是截斷＋刪節號＋title 屬性顯示全值＋CSV 保留全值的模式。輸出格式只有 html／csv／all（沒有 pdf／xlsx）。
+注意事項：只計 Active 規則，計數資料保留期 90 天（`CLEANUP_DAYS_THRESHOLD`）；HTML 長字串欄位同樣是截斷＋刪節號＋title 屬性顯示全值＋CSV 保留全值的模式。輸出格式只有 html／csv／all（沒有 xlsx）。
 
 ## 8. Policy Diff Report（DRAFT vs ACTIVE）
 
@@ -221,7 +221,7 @@ GUI：Reports → Policy Resolver 卡片 Generate。
 
 關鍵欄位：依 ruleset 分組的展開結果——label→IP、iplist→CIDR/FQDN、label_group（遞迴展開子群組）→label、service→port 皆在本機用查表方式一次性展開，不是交給 PCE 端計算。
 
-注意事項：只支援 ACTIVE policy（不含 draft）；展開結果為 0 筆時不寫出任何檔案，CLI／GUI 都會明確顯示「空結果」提示，避免與失敗混淆。輸出格式只有 json／csv／all（沒有 html／pdf／xlsx）。這裡展開的是**政策物件本身**的 label group 成員；與 traffic 查詢時 label group 過濾只能交給 PCE 端展開是兩件不同的事（後者見 [pce-domain-notes.md](../handover/pce-domain-notes.md)），不要混淆。
+注意事項：只支援 ACTIVE policy（不含 draft）；展開結果為 0 筆時不寫出任何檔案，CLI／GUI 都會明確顯示「空結果」提示，避免與失敗混淆。輸出格式只有 json／csv／all（沒有 html／xlsx）。這裡展開的是**政策物件本身**的 label group 成員；與 traffic 查詢時 label group 過濾只能交給 PCE 端展開是兩件不同的事（後者見 [pce-domain-notes.md](../handover/pce-domain-notes.md)），不要混淆。
 
 ## 排程與寄送
 

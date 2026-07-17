@@ -28,6 +28,17 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Rule-scheduler note cleanup now recognizes the GUI's alarm-clock (U+23F0)
+  one-time tag prefix in both the PCE description strip and the CLI display
+  truncation: GUI-created one-time schedule notes were never cleaned up on
+  delete or expiry (the strip patterns only matched the CLI's hourglass and
+  the shared calendar prefixes) and stayed on the rule's description
+  forever. Pre-existing leftover tags are not retroactively cleaned —
+  re-create and delete a schedule on the affected rule to clear them.
+- `siem.dlq_max_per_dest` is now enforced: each quarantine write prunes the
+  oldest dead-letter entries beyond the per-destination cap (ring-buffer
+  semantics, logged) instead of letting a persistently failing destination
+  grow the DLQ without bound.
 - Pipeline health no longer reads green when SIEM is enabled but idle (no
   enabled destination, or ingest has data while nothing was enqueued for
   24h) — such states now surface as warn with a `siem_idle` flag.
@@ -88,6 +99,20 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 - Report cards, generation modals, and the app header now use
   content-specific icons instead of a shared shield (shield stays with
   Security & Risk); the header carries an original micro-segmentation mark.
+- The `pdf` report format was removed from the CLI (`--format` now offers
+  html/csv/xlsx/all): no exporter ever implemented it, so selecting it
+  silently produced no file with exit code 0. The removal guard tests that
+  were supposed to enforce this only matched an unrelated argparse choices
+  list and have been strengthened to scan every choices list plus
+  `_REPORT_FORMATS`.
+- The SIEM forwarder no longer logs a startup "PREVIEW" warning
+  (`src/siem/preview.py` removed) — the feature has been GA per the earlier
+  changelog entry and the warning contradicted it.
+- The Windows NSSM service now registers with `--monitor-gui --interval 10`,
+  matching the Linux systemd unit (previously `--monitor`, which silently
+  omitted the Web GUI on Windows service deployments). Already-registered
+  services keep their existing parameters; re-register or adjust
+  AppParameters to adopt the new default.
 - Documentation rebuilt zh-primary: task-oriented operator guides under
   `docs/guide/` (installation, configuration, GUI tour, reports,
   monitoring/alerts, automation, SIEM, cache maintenance, troubleshooting),

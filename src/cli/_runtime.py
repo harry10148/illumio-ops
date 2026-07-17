@@ -53,9 +53,7 @@ def run_daemon_loop(cm, interval: int = 10) -> None:
 
     from src.scheduler import build_scheduler
     from src.scheduler.jobs import run_monitor_cycle
-    from src.siem.preview import emit_preview_warning
 
-    emit_preview_warning(cm, context="daemon_startup")
     print(t("daemon_start", interval=interval))
     print(t("daemon_stop_hint"))
     logger.info("Starting scheduler-backed daemon (interval={}m)", interval)

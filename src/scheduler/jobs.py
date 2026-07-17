@@ -443,7 +443,7 @@ def run_siem_dispatch(cm) -> None:
             logger.info("run_siem_dispatch: enqueued {} new records", new_count)
         for dest_cfg in enabled_dests:
             try:
-                with build_dispatcher(dest_cfg, sf) as dispatcher:
+                with build_dispatcher(dest_cfg, sf, dlq_max_per_dest=siem_cfg.dlq_max_per_dest) as dispatcher:
                     dispatcher.tick()
             except Exception as exc:
                 logger.exception("run_siem_dispatch destination {!r} failed: {}", dest_cfg.name, exc)

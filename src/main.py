@@ -557,9 +557,9 @@ def main():
     )
     parser.add_argument(
         "--format",
-        choices=["html", "csv", "pdf", "xlsx", "all"],
+        choices=["html", "csv", "xlsx", "all"],
         default="html",
-        help="Report output format: html (default), csv, pdf, xlsx, or all",
+        help="Report output format: html (default), csv, xlsx, or all",
     )
 
     parser.add_argument(
@@ -592,11 +592,6 @@ def main():
     setup_logger("src", LOG_FILE,
                  level=_log_cfg.get("level", "INFO"),
                  json_sink=_log_cfg.get("json_sink", False))
-    try:
-        from src.siem.preview import emit_preview_warning
-        emit_preview_warning(_early_cm, context="main_entrypoint")
-    except Exception:
-        pass  # intentional fallback: preview warning must not block CLI startup
 
     gui_cfg = _early_cm.config.get("web_gui", {})
     if gui_cfg.get("_initial_password"):

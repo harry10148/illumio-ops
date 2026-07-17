@@ -726,11 +726,6 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
     use_https = bool(tls_cfg.get("enabled"))
 
     app = build_app(cm, persistent_mode=persistent_mode, use_https=use_https)
-    try:
-        from src.siem.preview import emit_preview_warning
-        emit_preview_warning(cm, context="web_gui_startup")
-    except Exception:
-        pass  # intentional fallback: preview warning must not block GUI startup
     ssl_context = None
     cert_file = ""
     key_file = ""

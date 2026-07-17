@@ -1231,9 +1231,13 @@ class ApiClient:
 
         current_desc = data.get('description', '') or ''
 
-        # Strip existing schedule tags
+        # Strip existing schedule tags — 前綴三種都要認：行事曆（recurring，
+        # GUI/CLI 共用）、沙漏（CLI one_time）、鬧鐘（GUI one_time，
+        # src/gui/routes/rule_scheduler.py）。漏認任何一種＝該來源建立的
+        # 註記刪除/到期都清不掉，永久殘留在 PCE description。
         clean_desc = re.sub(r'\s*\[📅[^\]]*\]', '', current_desc)
         clean_desc = re.sub(r'\s*\[⏳[^\]]*\]', '', clean_desc)
+        clean_desc = re.sub(r'\s*\[⏰[^\]]*\]', '', clean_desc)
         clean_desc = clean_desc.strip()
 
         new_desc = clean_desc

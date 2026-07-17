@@ -69,15 +69,14 @@ window]`；one_time 類型的註記內容格式為 `[Expires: 2026-08-01 00:00]`
 PCE 的 description 裡，日後被 Policy Usage／Audit 等報表原樣讀出，用操作者當下語言寫入會汙染
 其他語言的報表輸出。
 
-刪除排程時引擎會嘗試清除該註記，但清除樣式（`update_rule_note` 內的 strip regex，
-`src/api_client.py:1236`；CLI 顯示端另有一份同樣式的 truncate 邏輯，`src/rule_scheduler.py:112`）
-只匹配沙漏符號（U+23F3）開頭的 one_time 標記，與行事曆符號（U+1F4C5）開頭的 recurring 標記。
-CLI 建立 one_time 排程時寫入的正是沙漏符號前綴（`src/rule_scheduler_cli.py:337`），因此 CLI
-建立的一次性註記在刪除／到期時會被正確清除；但 GUI 建立 one_time 排程時寫入的是鬧鐘符號
-（U+23F0，`src/gui/routes/rule_scheduler.py:339`），不在清除樣式的匹配範圍內——**GUI 建立的
-一次性排程註記，不論是手動刪除還是到期自動失效，目前都不會被清掉，會永久殘留在 PCE 該 rule
-的 description 裡**（已知缺陷，見上述三個檔案位置；recurring 類型註記不受影響，因為 GUI／CLI
-兩邊都使用同一個行事曆符號前綴）。
+刪除排程或到期失效時，引擎會清除該註記：清除樣式（`update_rule_note` 內的 strip regex，
+`src/api_client.py`；CLI 顯示端另有一份同樣式的 truncate 邏輯，`src/rule_scheduler.py`）
+匹配三種前綴——行事曆符號（U+1F4C5，recurring，GUI／CLI 共用）、沙漏符號（U+23F3，CLI
+one_time，`src/rule_scheduler_cli.py`）與鬧鐘符號（U+23F0，GUI one_time，
+`src/gui/routes/rule_scheduler.py`）。歷史注意：2026-07-17 之前的版本清除樣式漏認鬧鐘符號，
+GUI 建立的一次性註記刪除／到期都清不掉；已修復（守門測試 `tests/test_rule_note_tag_strip.py`），
+但**修復前殘留在 PCE description 的舊註記不會被回溯清理**——看到殘留註記時，對該 rule 再建立
+並刪除一次排程（或手動編輯 description）即可清掉。
 
 ### 1.3 時窗語意
 
@@ -92,9 +91,8 @@ CLI 建立 one_time 排程時寫入的正是沙漏符號前綴（`src/rule_sched
 - **one_time**：到期前 `target=True`（維持啟用）；一旦當下時間超過 `expire_at`，引擎立即把
   目標**停用並 provision**、嘗試清除 PCE 上的排程註記（`src/rule_scheduler.py:288` 呼叫
   `update_rule_note(href, "", remove=True)`）、把這筆排程從 `rule_schedules.json` 刪除
-  （過期排程不會留在清單裡）。**但如上節所述，此清除對 GUI 建立的一次性排程不生效**：GUI
-  建立的 one_time 註記用鬧鐘符號（U+23F0）前綴，不在清除 regex 的匹配範圍內，到期後仍會殘留
-  在 description 欄位；只有 CLI 建立的一次性排程（沙漏符號 U+23F3 前綴）到期清除才會成功。
+  （過期排程不會留在清單裡）。清除對 GUI（鬧鐘符號前綴）與 CLI（沙漏符號前綴）建立的
+  一次性註記皆生效（2026-07-17 起；更早版本殘留的舊註記處理方式見上節）。
 - **Draft 狀態一律跳過**：比對前會先呼叫 `has_draft_changes(href)`，只要目標（或其所屬
   Ruleset）在 PCE 上有未佈署的草稿變更，本輪直接跳過、不做任何切換，避免排程動作疊加在
   未審核的變更之上。

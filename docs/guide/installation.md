@@ -149,7 +149,7 @@ Get-Service IllumioOps                # 應顯示：Running
 | 檔案 | 用途 |
 |---|---|
 | `deploy/illumio-ops.service` | Linux systemd 服務單元（安裝至 `/opt/illumio-ops`），啟動旗標為 `--monitor-gui --interval 10`（監控 daemon ＋ Web GUI 一併啟動）。 |
-| `deploy/install_service.ps1` | Windows NSSM 安裝腳本，註冊 `IllumioOps` 服務，預設啟動旗標為 `--monitor --interval 10`（**不含** `--monitor-gui`；如需常駐 Web GUI，需另行以 `nssm set IllumioOps AppParameters` 調整參數，或改用 `python.exe illumio-ops.py gui` 手動啟動）。 |
+| `deploy/install_service.ps1` | Windows NSSM 安裝腳本，註冊 `IllumioOps` 服務，預設啟動旗標為 `--monitor-gui --interval 10`（2026-07-17 起與 Linux systemd 對齊，監控 daemon ＋ Web GUI 一併啟動；既有已註冊的服務不會被自動改參數，如需套用新預設請以 `nssm set IllumioOps AppParameters` 手動調整或移除服務重裝）。 |
 
 離線安裝的 `install.sh` / `install.ps1` 會自動複製並設定這些檔案。若需自訂安裝路徑，
 可對 `install.sh` 傳入 `--install-root <path>`，systemd 服務單元將自動更新為指向該
