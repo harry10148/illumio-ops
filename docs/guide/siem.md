@@ -11,7 +11,6 @@ verified_against:
   - src/siem/formatters/syslog_wrapped.py
   - src/siem/formatters/syslog_header.py
   - src/siem/mask.py
-  - src/siem/preview.py
   - src/siem_cli.py
   - src/cli/siem.py
   - src/config_models.py
@@ -23,7 +22,7 @@ verified_against:
 
 illumio-ops 可將 PCE audit events 與 traffic 摘要轉送到任意 syslog 相容 SIEM、Splunk HEC，或本地 JSON sink。轉送具備持久性：事件先進入本地 SQLite 派送佇列（`siem_dispatch` 表，與 pce_cache 共用資料庫，見 [cache-maintenance.md](cache-maintenance.md)），失敗會依退避策略重試，超過重試上限後移入 **DLQ（dead-letter queue，死信佇列）**。
 
-> **狀態提示**：`config.json › siem.enabled = true` 時，程式啟動（`src/main.py`、`illumio-ops siem` 子命令）會透過 `src/siem/preview.py` 記錄一次 warning 級別的日誌，內容為「SIEM forwarder is PREVIEW」。這是程式碼目前的實際行為（每個程序生命週期只記一次），操作者在啟動記錄中看到此警告屬正常現象，不代表設定有誤。
+> **狀態提示**：SIEM 轉送為正式功能。舊版（2026-07-17 之前）啟動時會記一條「SIEM forwarder is PREVIEW」的 warning——該提示與其 `src/siem/preview.py` 模組已移除；升級後啟動記錄不會再出現此警告，若仍看到即代表跑的是舊版程式。
 
 SIEM 轉送依賴 pce_cache（見 [cache-maintenance.md](cache-maintenance.md)）：`siem_dispatch`／`dead_letter` 兩張表都存在 cache 資料庫中，`pce_cache.enabled=false` 時 SIEM 轉送無從運作。
 
@@ -161,7 +160,7 @@ illumio-ops siem purge --dest splunk-prod --older-than 30
 Purged 87 DLQ entries for 'splunk-prod'
 ```
 
-行為：刪除該目的地 `quarantined_at` 早於「現在 − `--older-than` 天」（預設 30 天）的 DLQ 列，**永久刪除、不可還原**。目前的程式碼中，`dlq_max_per_dest`（預設 10000）只是設定欄位本身，寫入 DLQ 的路徑（`_quarantine()`）並不會依此值自動裁剪既有項目——換言之目的地的 DLQ 筆數沒有自動上限，`purge` 是唯一會實際刪除資料的手段。若要清空整個目的地的 DLQ，可用 `--older-than 0`（等同「早於現在」，涵蓋全部既有項目）。
+行為：刪除該目的地 `quarantined_at` 早於「現在 − `--older-than` 天」（預設 30 天）的 DLQ 列，**永久刪除、不可還原**。另外 `dlq_max_per_dest`（預設 10000）自 2026-07-17 起實際生效：每次寫入 DLQ（`_quarantine()`）後若該目的地筆數超過上限，**最舊的項目會被自動刪除**（ring-buffer 語意，同交易內完成並記 warning 日誌）——持續失敗的目的地不會再讓 `dead_letter` 表無上限成長。`purge` 仍是手動批次刪除的手段；要清空整個目的地的 DLQ，可用 `--older-than 0`（等同「早於現在」，涵蓋全部既有項目）。
 
 > `illumio-ops siem` 底下沒有手動清空佇列（flush）用的子命令——派送本身由 `siem_dispatch` job 依 tick 間隔自動排空佇列，不需要、也不存在這種手動動作；DLQ 的手動出口只有 `replay`（送回去）與 `purge`（丟掉）兩種。
 

@@ -78,10 +78,17 @@ def test_policy_usage_generator_export_accepts_format(tmp_path, fmt):
 
 
 def test_traffic_pdf_rejected_after_removal():
-    """fmt='pdf' has been removed from the allowed format list; CLI/argparse should reject it."""
+    """fmt='pdf' has been removed from the allowed format list; CLI/argparse should reject it.
+
+    2026-07-17 補強：舊版只查第一個 choices=[...]（空轉），改掃全部並
+    直接對 click 的 _REPORT_FORMATS 斷言。"""
     import re
     import pathlib
     src = pathlib.Path("src/main.py").read_text(encoding="utf-8")
-    m = re.search(r'choices=\[([^\]]+)\]', src)
-    assert m, "argparse choices not found in src/main.py"
-    assert '"pdf"' not in m.group(1), "pdf must not be a --format choice"
+    groups = re.findall(r'choices=\[([^\]]+)\]', src)
+    assert groups, "argparse choices not found in src/main.py"
+    for group in groups:
+        assert '"pdf"' not in group and "'pdf'" not in group, \
+            f"pdf must not be a --format choice: [{group}]"
+    from src.cli.report import _REPORT_FORMATS
+    assert "pdf" not in _REPORT_FORMATS

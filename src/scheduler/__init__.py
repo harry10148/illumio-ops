@@ -14,7 +14,6 @@ from src.scheduler.jobs import (
     run_ven_summary,
     run_posture_summary,
 )
-from src.siem.preview import emit_preview_warning
 from src.i18n import t, get_language
 
 def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
@@ -219,7 +218,6 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     try:
         siem_cfg = cm.models.siem
         if siem_cfg.enabled:
-            emit_preview_warning(cm, context="scheduler_startup")
             from apscheduler.triggers.interval import IntervalTrigger as _IT
             from src.scheduler.jobs import run_siem_dispatch
             sched.add_job(_instrument("siem_dispatch", run_siem_dispatch, siem_cfg.dispatch_tick_seconds),

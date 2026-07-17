@@ -15,12 +15,6 @@ console = Console()
 @click.group("siem")
 def siem_group():
     """SIEM forwarder management."""
-    try:
-        from src.config import ConfigManager
-        from src.siem.preview import emit_preview_warning
-        emit_preview_warning(ConfigManager(), context="cli_siem")
-    except Exception:
-        pass  # intentional fallback: warning hook must never break CLI command routing
 
 
 @siem_group.command("test")

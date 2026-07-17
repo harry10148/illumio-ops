@@ -6,7 +6,7 @@ from typing import Optional
 
 import orjson
 from loguru import logger
-from sqlalchemy import or_, select, update
+from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import sessionmaker
 
 from src.pce_cache.models import (
@@ -38,6 +38,7 @@ class DestinationDispatcher:
         max_retries: int = 10,
         batch_size: int = 100,
         mask_pii: bool = False,
+        dlq_max: int = 10000,
     ):
         self._name = name
         self._sf = session_factory
@@ -46,6 +47,7 @@ class DestinationDispatcher:
         self._max_retries = max_retries
         self._batch_size = batch_size
         self._mask_pii = mask_pii
+        self._dlq_max = dlq_max
         self._lock = threading.Lock()
 
     def close(self) -> None:
@@ -203,6 +205,22 @@ class DestinationDispatcher:
                 payload_preview=payload[:512] if payload else "",
                 quarantined_at=now,
             ))
+            # dlq_max_per_dest：ring-buffer 語意，超過上限即刪最舊項目，
+            # 否則持續失敗的目的地會讓 dead_letter 無上限成長。
+            if self._dlq_max and self._dlq_max > 0:
+                s.flush()
+                excess_ids = s.execute(
+                    select(DeadLetter.id)
+                    .where(DeadLetter.destination == self._name)
+                    .order_by(DeadLetter.quarantined_at.desc(), DeadLetter.id.desc())
+                    .offset(self._dlq_max)
+                ).scalars().all()
+                if excess_ids:
+                    s.execute(delete(DeadLetter).where(DeadLetter.id.in_(excess_ids)))
+                    logger.warning(
+                        "SIEM DLQ cap ({}) reached for {!r}: pruned {} oldest entries",
+                        self._dlq_max, self._name, len(excess_ids),
+                    )
             s.execute(
                 update(SiemDispatch)
                 .where(SiemDispatch.id == row.id)
@@ -254,8 +272,12 @@ def _transport_for(dest_cfg):
     raise ValueError(f"Unknown transport: {transport_type}")
 
 
-def build_dispatcher(dest_cfg, session_factory) -> "DestinationDispatcher":
-    """Build a DestinationDispatcher from a SiemDestinationSettings instance."""
+def build_dispatcher(dest_cfg, session_factory, dlq_max_per_dest: int = 10000) -> "DestinationDispatcher":
+    """Build a DestinationDispatcher from a SiemDestinationSettings instance.
+
+    dlq_max_per_dest 是全域 SiemSettings 欄位（非 per-destination），由呼叫端
+    帶入；預設值與 config_models.SiemSettings.dlq_max_per_dest 一致。
+    """
     return DestinationDispatcher(
         name=dest_cfg.name,
         session_factory=session_factory,
@@ -264,6 +286,7 @@ def build_dispatcher(dest_cfg, session_factory) -> "DestinationDispatcher":
         max_retries=dest_cfg.max_retries,
         batch_size=dest_cfg.batch_size,
         mask_pii=bool(getattr(dest_cfg, "mask_pii", False)),
+        dlq_max=dlq_max_per_dest,
     )
 
 

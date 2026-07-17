@@ -110,6 +110,7 @@ def truncate(text, width):
     text = str(text).replace("\n", " ")
     text = re.sub(r'\[📅 .*?\]', '', text).strip()
     text = re.sub(r'\[⏳ .*?\]', '', text).strip()
+    text = re.sub(r'\[⏰ .*?\]', '', text).strip()
     if not text:
         return "-"
     if len(text) > width:

@@ -15,7 +15,7 @@ from src.cli._exit_codes import (
 from src.cli._output import echo_error, echo_json, is_json
 from src.i18n import t
 
-_REPORT_FORMATS = ["html", "csv", "pdf", "xlsx", "all"]
+_REPORT_FORMATS = ["html", "csv", "xlsx", "all"]
 
 log = logging.getLogger(__name__)
 

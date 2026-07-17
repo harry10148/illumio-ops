@@ -14,11 +14,19 @@ def test_cli_format_choice_accepted(fmt):
 
 
 def test_cli_format_pdf_no_longer_accepted():
-    """pdf was removed: argparse choices must not include it."""
-    src = pathlib.Path("src/main.py").read_text(encoding="utf-8")
+    """pdf was removed: NO argparse/click choices list may include it.
+
+    2026-07-17 補強：舊版只 re.search 第一個 choices=[...]（命中別的參數），
+    形同空轉——改掃 main.py 全部 choices 清單與 cli/report.py 的
+    _REPORT_FORMATS。"""
     import re
-    m = re.search(r"choices=\[([^\]]+)\]", src)
-    assert m and '"pdf"' not in m.group(1), "pdf must not be a --format choice"
+    src = pathlib.Path("src/main.py").read_text(encoding="utf-8")
+    for group in re.findall(r"choices=\[([^\]]+)\]", src):
+        assert '"pdf"' not in group and "'pdf'" not in group, \
+            f"pdf must not be an argparse choice: [{group}]"
+    cli_src = pathlib.Path("src/cli/report.py").read_text(encoding="utf-8")
+    m = re.search(r"_REPORT_FORMATS\s*=\s*\[([^\]]+)\]", cli_src)
+    assert m and '"pdf"' not in m.group(1), "pdf must not be in _REPORT_FORMATS"
 
 
 def test_default_format_is_html_not_all():

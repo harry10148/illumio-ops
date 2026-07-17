@@ -106,7 +106,7 @@ function Install-Service {
     if ($existingSvc) {
         Write-Host "  Service $ServiceName already registered — skipping nssm install" -ForegroundColor Gray
     } else {
-        & $NSSM install $ServiceName $PythonExe $EntryScript --monitor --interval $Interval
+        & $NSSM install $ServiceName $PythonExe $EntryScript --monitor-gui --interval $Interval
     }
     & $NSSM set $ServiceName DisplayName $DisplayName
     & $NSSM set $ServiceName Description $Description
