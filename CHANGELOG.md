@@ -88,6 +88,16 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 - Report cards, generation modals, and the app header now use
   content-specific icons instead of a shared shield (shield stays with
   Security & Risk); the header carries an original micro-segmentation mark.
+- Documentation rebuilt zh-primary: task-oriented operator guides under
+  `docs/guide/` (installation, configuration, GUI tour, reports,
+  monitoring/alerts, automation, SIEM, cache maintenance, troubleshooting),
+  developer handover docs under `docs/handover/` (architecture guide and
+  module map, PCE domain notes with source-graded vendor facts, development
+  workflow), and rewritten references (CLI, REST API incl. previously
+  undocumented filter/job-health endpoints, glossary). Legacy bilingual doc
+  pairs were removed — English is retained as a slim README only — and the
+  doc gates (docs_check bilingual semantics, coverage mapping, contract
+  tests) were adapted to the new tree.
 
 ### Changed
 

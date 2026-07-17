@@ -1,56 +1,83 @@
 ---
-title: illumio-ops Documentation
+title: illumio-ops 文件總目錄
 audience: [operator, developer, api, security]
-last_verified: 2026-06-26
+version: 4.1.0
+last_verified: 2026-07-17
 verified_against:
-  - README.md
-  - docs/operations-manual_zh.md
-  - docs/event-rules_zh.md
-  - reports/audit/2026-06-26-static-findings.md
+  - docs/guide/installation.md
+  - docs/guide/configuration.md
+  - docs/guide/gui-tour.md
+  - docs/guide/monitoring-alerts.md
+  - docs/guide/reports.md
+  - docs/guide/siem.md
+  - docs/guide/automation.md
+  - docs/guide/cache-maintenance.md
+  - docs/guide/troubleshooting.md
+  - docs/handover/architecture.md
+  - docs/handover/development.md
+  - docs/handover/pce-domain-notes.md
+  - docs/reference/cli.md
+  - docs/reference/rest-api.md
+  - docs/reference/glossary.md
 ---
 
-> 🌐 **[English](INDEX.md)** | **[繁體中文](INDEX_zh.md)**
-> 📍 You are here — the documentation hub.
-> 🔍 Last verified **2026-06-26**
+> 這裡是文件總目錄。
+> 最後校驗 **2026-07-17**
 
-# illumio-ops Documentation
+# illumio-ops 文件總目錄
 
-Start with the project **[README](../README.md)** (**[繁體中文](../README_zh.md)**) for the overview,
-architecture diagram, quick start, and security notes. The two core manuals below go deeper;
-reference and contributing material follows.
+從專案根目錄的 **`README.md`**（**`README_zh.md`**）開始看總覽、架構圖與快速上手。
+2026-07 文件重整後，`docs/` 底下全面改為**繁體中文單語**（僅 repo 根的 `README.md`／`README_zh.md`
+仍維持中英成對）。以下三區涵蓋全部文件。
 
-## Core docs
+## 操作（`guide/`，9 篇）
 
-| Doc | What it covers |
-|-----|----------------|
-| **[操作手冊 — Operations Manual](operations-manual_zh.md)** | Install, deploy (systemd / NSSM / offline bundle), configure, run, and operate illumio-ops end to end. 繁體中文. |
-| **[事件規則說明 — Event Rules](event-rules_zh.md)** | The real-time monitor rule engine, the B/L/R report rule engine (R01–R05 included), and the event pipeline — audited line-by-line against the source. 繁體中文. |
-| **[Getting Started](getting-started.md)** / **[（繁體中文）](getting-started_zh.md)** | First install, first connection, and upgrade. |
+面向操作員：安裝、設定、日常操作與排錯。
 
-## Reference
+| 文件 | 一句話說明 |
+|---|---|
+| [安裝與部署](guide/installation.md) | 從原始碼或離線安裝包安裝、systemd／NSSM 服務化部署、升級與解除安裝。 |
+| [設定參照](guide/configuration.md) | `config/config.json` 每個鍵的權威參照，以 pydantic schema 為 ground truth。 |
+| [Web GUI 導覽](guide/gui-tour.md) | 8 個分頁的 SPA 導覽：登入、Dashboard、Reports、Rules、Events 等。 |
+| [監控規則、告警與事件規則](guide/monitoring-alerts.md) | 即時監控規則引擎、B/L/R 報表安全規則引擎與事件處理管線的差異與設定方式。 |
+| [報表家族](guide/reports.md) | 9 種報表的業務用途、關鍵欄位、CLI／GUI／排程三種產生方式。 |
+| [SIEM 轉送](guide/siem.md) | 把 audit events 與 traffic 摘要轉送到 syslog／Splunk HEC／JSON sink，含 DLQ 重送與清除。 |
+| [自動化：規則排程、隔離操作與背景 Job](guide/automation.md) | 會主動改變 PCE 狀態的自動化能力：Rule Scheduler 與隔離操作。 |
+| [pce_cache 維運與容量規劃](guide/cache-maintenance.md) | 選用的本機 SQLite 鏡像維運、保留策略與容量估算。 |
+| [故障排除](guide/troubleshooting.md) | 症狀導向排錯 runbook：現象、判讀依據、可執行的處置指令。 |
 
-| Topic | EN | 中文 |
-|-------|----|----|
-| CLI | [reference/cli.md](reference/cli.md) | [reference/cli_zh.md](reference/cli_zh.md) |
-| Glossary | [reference/glossary.md](reference/glossary.md) | [reference/glossary_zh.md](reference/glossary_zh.md) |
-| REST API | [reference/rest-api.md](reference/rest-api.md) | [reference/rest-api_zh.md](reference/rest-api_zh.md) |
-| i18n Contract | [reference/i18n-contract.md](reference/i18n-contract.md) | [reference/i18n-contract_zh.md](reference/i18n-contract_zh.md) |
+## 接手開發（`handover/`，3 篇）
 
-## Contributing
+面向新加入的開發者：零背景接手 codebase 所需的架構、開發流程與踩坑知識。
 
-| Topic | EN | 中文 |
-|-------|----|----|
-| Dev Setup | [contributing/dev-setup.md](contributing/dev-setup.md) | [contributing/dev-setup_zh.md](contributing/dev-setup_zh.md) |
-| i18n Workflow | [contributing/i18n-workflow.md](contributing/i18n-workflow.md) | [contributing/i18n-workflow_zh.md](contributing/i18n-workflow_zh.md) |
-| Release Process | [contributing/release-process.md](contributing/release-process.md) | [contributing/release-process_zh.md](contributing/release-process_zh.md) |
+| 文件 | 一句話說明 |
+|---|---|
+| [架構導覽與模組地圖](handover/architecture.md) | 資料從哪裡進、在哪裡算、從哪裡出；`src/` 各頂層模組職責與關鍵設計決策。 |
+| [開發流程與慣習](handover/development.md) | 開發環境建置、測試與 CI 守門、i18n 鍵值合約、常見斷鏈坑、發版流程。 |
+| [PCE domain 須知（vendor 事實集）](handover/pce-domain-notes.md) | 無法從程式碼反推、踩過坑才知道的 Illumio PCE vendor 知識。 |
 
-## Audit & history
+## 參考（`reference/`，3 篇）
 
-- **Latest audit:** `reports/audit/2026-06-26-static-findings.md` — the 2026-06-26 static review. All 11 HIGH-severity findings were resolved on this branch.
-- **Historical / superseded docs** — the previous `user-guide/` and `architecture/` sets, the UX reviews, the 2026-05-22 security audit, and the session handoffs — have been removed from the tree; they remain recoverable from git history.
+| 文件 | 一句話說明 |
+|---|---|
+| [CLI 參考手冊](reference/cli.md) | `illumio-ops` 完整命令樹：13 個頂層子命令的旗標、範例與行為。 |
+| [REST API 參考](reference/rest-api.md) | Web GUI 背後 Flask 應用的完整 JSON API 端點清單。 |
+| [詞彙表](reference/glossary.md) | Illumio 產品術語中英對照；決策/狀態類術語刻意不強譯，與產品 UI 一致。 |
 
-## How docs are kept fresh
+## 文件如何保鮮
 
-Each doc carries `last_verified` / `verified_against` frontmatter. Run `python3 scripts/docs_check.py --all`
-to audit bilingual coverage, freshness, frontmatter, and internal links. The two core manuals are
-intentionally **繁體中文-first** (no English sibling), so `--bilingual` flags them by design.
+每篇文件的 frontmatter 都帶 `last_verified` / `verified_against`。2026-07 文件重整後，`docs/`
+語意改為**繁中單語**：不再要求每篇 `.md` 都有 `_zh.md` 對應檔，`--bilingual` 檢查改為只驗證 repo
+根的 `README.md`／`README_zh.md` 是否成對存在（詳見 `docs/handover/development.md` §2.4）。
+
+建議提交文件變更前執行：
+
+```bash
+python scripts/docs_check.py --all --exclude 'superpowers/**' --exclude 'ux-review*'
+```
+
+`docs/superpowers/` 底下是計畫／規格文件，本來就沒有 frontmatter，用 `--exclude` 排除；本機工作目錄
+若殘留舊的 `docs/ux-review-2026-05-14/`（已 gitignore、非追蹤檔案，`docs_check` 仍會掃到磁碟上的檔案）
+也一併排除。已實測此指令在 2026-07 文件重整（刪除舊雙語檔、改寫 INDEX）後對 `docs/` 其餘部分回傳
+exit 0（links／frontmatter／bilingual 檢查全過）。連結正確性另有 CI 硬閘門
+`python scripts/check_doc_links.py` 把關，範圍涵蓋整個 repo，不受 `--exclude` 限制。

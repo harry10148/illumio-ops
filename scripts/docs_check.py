@@ -83,17 +83,15 @@ def all_md_targets(root: Path) -> list[Path]:
 
 
 def check_bilingual(md: list[Path], issues: list[tuple[str, str, str]]) -> None:
-    by_dir: dict[Path, set[str]] = {}
-    for p in md:
-        by_dir.setdefault(p.parent, set()).add(p.name)
-    for parent, names in by_dir.items():
-        for name in names:
-            if name.endswith("_zh.md"):
-                counterpart = name[: -len("_zh.md")] + ".md"
-            else:
-                counterpart = name[: -len(".md")] + "_zh.md"
-            if counterpart not in names:
-                issues.append((str(parent / name), "bilingual", f"missing counterpart: {counterpart}"))
+    """2026-07 docs overhaul 後 docs/ 為繁中單語；僅倉庫根 README.md 與
+    README_zh.md 仍要求成對（md 清單掃的是 docs/，故直接檢查 repo 根）。"""
+    repo_root = Path(__file__).resolve().parent.parent
+    readme = repo_root / "README.md"
+    readme_zh = repo_root / "README_zh.md"
+    if readme.is_file() != readme_zh.is_file():
+        missing = "README_zh.md" if readme.is_file() else "README.md"
+        present = "README.md" if readme.is_file() else "README_zh.md"
+        issues.append((present, "bilingual", f"missing counterpart: {missing}"))
 
 
 def check_freshness(md: list[Path], days: int, issues: list[tuple[str, str, str]]) -> None:

@@ -13,7 +13,7 @@ set -euo pipefail
 
 declare -A DOC_FOR_FAMILY=(
   ["subcommand"]="docs/reference/cli.md"
-  ["script"]="docs/getting-started.md"
+  ["script"]="docs/guide/installation.md"
 )
 
 for d in "${DOC_FOR_FAMILY[@]}"; do

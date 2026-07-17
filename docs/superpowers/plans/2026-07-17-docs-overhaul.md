@@ -36,10 +36,10 @@ verified_against:
 **每份文件的共同驗證步驟**（下文以「跑文件驗證」代稱）：
 
 ```bash
-venv/bin/python scripts/docs_check.py --links --frontmatter
+venv/bin/python scripts/docs_check.py --frontmatter --exclude 'superpowers/**'
 venv/bin/python scripts/check_doc_links.py
 ```
-Expected: 兩者 exit 0（Phase 1 期間舊文件仍在、皆已合規，任何非零都是本次新檔引入的問題）。
+Expected: 兩者 exit 0。（2026-07-17 勘誤：原版加 `--links` 且無 exclude，但 baseline 本來就非零——docs/superpowers/ 無 frontmatter、INDEX/reference 連到 docs root 之外的 README 是 docs_check --links 的視野限制；連結正確性由 repo-root 視野的 check_doc_links.py 守。）
 
 ---
 
