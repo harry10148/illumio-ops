@@ -31,7 +31,7 @@ verified_against:
 # Web GUI 導覽
 
 Web GUI 是單頁式應用（SPA）：登入後以頂部 8 個分頁切換，內容全部由前端 JS 模組向約
-109 條 JSON API（`/api/...`）取資料，伺服器不重新整頁。啟動方式與埠號見
+85 條 JSON API（`/api/...`）取資料，伺服器不重新整頁。啟動方式與埠號見
 `illumio-ops gui`（預設埠 **5001**，`--host 0.0.0.0`），完整 CLI 選項見
 reference/cli.md。
 
@@ -39,7 +39,7 @@ reference/cli.md。
 > 所有路由都需登入 session。`web_gui.allowed_ips` 提供 IP 允許清單，比對的是
 > **直接連線來源 IP**（`request.remote_addr`），被拒的連線以 TCP RST 靜默切斷
 > （避免被埠掃描偵測到有服務在監聽）。所有 POST／PUT／DELETE 都需 CSRF token。
-> 設定細節見 configuration.md 的「web_gui／TLS」一節。
+> 設定細節見 [configuration.md](configuration.md) 的「web_gui／TLS」一節。
 
 ## 登入與 session
 
@@ -112,9 +112,7 @@ pill 一律加上 `ex_` 前綴對應到 native filter key（例如 `dst_labels` 
 
 ### 同 key OR、跨 key AND
 
-這是元件與後端比對器共用的核心語意（`src/analyzer.py` 原始碼註解逐字
-確認：「同 key OR、跨 key 委派報表路徑同一套比對器 `_flow_matches_filters`
-…與 native 語意一致」）：
+這是元件與後端比對器共用的核心語意（`src/analyzer.py` 原始碼註解語意摘要）：
 
 - **同一個 filter key 內的多個值 = OR**。例如同時加兩個 Destination Label
   pill（`Env=prod`、`Env=staging`），序列化為 `dst_labels: ["Env=prod",
@@ -176,7 +174,7 @@ stale 灰化邏輯，僅在資料不可用（`verdict === 'unknown'` 或 `no_cac
 「as of HH:MM:SS」）也有自己的 stale 判斷：距 `as_of` 超過 60 秒即整列變色
 （`.ov-fresh.stale`，紅字，門檻與磚塊各自的門檻是獨立邏輯）。
 
-對應設定：儀表板顯示語言／主題見 configuration.md 的「settings（一般
+對應設定：儀表板顯示語言／主題見 [configuration.md](configuration.md) 的「settings（一般
 設定）」；Security Posture 報表產生方式見 reports.md（尚待建立）。
 
 ### 2) Traffic & Workloads
@@ -238,9 +236,9 @@ PCE 稽核事件檢視，左表右詳版面：可依時間視窗、category／gr
 - **Rules 子頁**：依型別（Event／Traffic／Bandwidth／System Health）篩
   選、搜尋、編輯、刪除、批次刪除規則；新增規則開對應 modal。儲存／刪除
   會**寫入 `config/alerts.json`**。**Load Best Practices** 可一鍵附加
-  或取代為內建最佳實務規則組（17 條 event + 1 條 traffic），操作前會有
-  兩層 `confirm()`（先警告會覆寫、再次確認）。規則型別與門檻語意見
-  monitoring-alerts.md（尚待建立）。
+  或取代為內建最佳實務規則組（16 條 event + 1 條 traffic），操作前會有
+  確認對話：replace 模式兩層（先警告會覆寫、再次確認），append
+  模式一層。規則型別與門檻語意見 monitoring-alerts.md（尚待建立）。
 - **Actions 子頁**：
   - **Send Test Alert（All）／Test [通道]**：`POST
     /api/actions/test-alert` 會**實際發送**測試訊息到指定（或全部）
@@ -250,7 +248,7 @@ PCE 稽核事件檢視，左表右詳版面：可依時間視窗、category／gr
   - 亦提供手動分析 Run、Reset watermark 等除錯動作，皆屬高風險（見文末
     彙整表）。
 
-對應設定：告警規則欄位定義與通道金鑰見 configuration.md 的
+對應設定：告警規則欄位定義與通道金鑰見 [configuration.md](configuration.md) 的
 「alerts（告警通道）」與「email／smtp」兩節。
 
 ### 5) Reports
@@ -266,7 +264,7 @@ PCE 稽核事件檢視，左表右詳版面：可依時間視窗、category／gr
   道（Settings → Channels）。
 
 對應設定：輸出目錄與保留天數見 Settings → Display；報表排程資料結構見
-configuration.md 的「report／report_schedules」節。
+[configuration.md](configuration.md) 的「report／report_schedules」節。
 
 ### 6) Rule Scheduler
 
@@ -312,7 +310,7 @@ last-run 狀態）、**Logs**。
   **TLS 憑證卡**（`_tls_overview()`）：GUI 未啟用 TLS 時整張卡不顯示
   （`enabled: false`）；啟用時顯示剩餘天數，低於設定的 `auto_renew_days`
   門檻會額外標示「Expiring soon」。憑證輪替與每日續期 job 見
-  configuration.md 的「TLS：self-signed 憑證每日續期 job」節。
+  [configuration.md](configuration.md) 的「TLS：self-signed 憑證每日續期 job」節。
 
 - **Cache**：PCE cache 狀態卡、設定表單（保留天數、輪詢間隔、traffic
   filter／sampling）。儲存後需 **Restart Monitor**（`POST
@@ -332,7 +330,7 @@ last-run 狀態）、**Logs**。
 
 - **PCE**：PCE profile 清單與 **Activate**（切換作用中 profile，立即對
   daemon 生效，無需重啟；只按 Save 不會切換）、以及 API 連線欄位。多
-  PCE 設定細節見 configuration.md 的「pce_profiles／active_pce_id」節。
+  PCE 設定細節見 [configuration.md](configuration.md) 的「pce_profiles／active_pce_id」節。
 - **Channels**：各告警通道（mail、LINE、webhook、Telegram、Teams）的
   啟用開關與欄位。每張通道卡片有獨立的 **Send test** 按鈕（全庫未記錄
   過的功能，`src/static/js/settings.js` `testAlertChannel()`）：呼叫與
@@ -351,7 +349,7 @@ last-run 狀態）、**Logs**。
   > 前端有 `confirm()`。
 
 對應設定：本分頁即 `config.json` 大部分區塊的圖形化編輯介面，逐鍵對照
-表見 configuration.md。
+表見 [configuration.md](configuration.md)。
 
 ## 高風險動作彙整
 
