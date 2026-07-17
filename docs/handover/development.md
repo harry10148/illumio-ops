@@ -36,7 +36,7 @@ verified_against:
 
 # 開發流程與慣習
 
-本文件的讀者是**要對這個 codebase 送 PR 的開發者**。涵蓋開發環境建置、測試與 CI 守門、i18n 鍵值合約（取代已刪除的 `docs/reference/i18n-contract.md`）、幾個重複發生過的斷鏈坑，以及發版流程。架構全貌見 [architecture.md](architecture.md)，PCE vendor 知識見 [pce-domain-notes.md](pce-domain-notes.md)。
+本文件的讀者是**要對這個 codebase 送 PR 的開發者**。涵蓋開發環境建置、測試與 CI 守門、i18n 鍵值合約（涵蓋範圍規劃取代 `docs/reference/i18n-contract.md`；該檔案目前尚未刪除，刪除排在後續任務執行）、幾個重複發生過的斷鏈坑，以及發版流程。架構全貌見 [architecture.md](architecture.md)，PCE vendor 知識見 [pce-domain-notes.md](pce-domain-notes.md)。
 
 ---
 
@@ -94,7 +94,7 @@ pytest -m "not slow and not integration"    # 僅單元測試
 pytest --cov=src --cov-report=term-missing  # 覆蓋率
 ```
 
-`pytest.ini` 定義的三個標記：`slow`（>~1 秒）、`integration`（跨子系統）、`requires_pce`（需連線真實 PCE，CI 中預設略過，僅供實驗室測試機執行；主機/帳密資訊見 `AGENTS.md` 或當下的 session-handoff 文件，切勿寫進本文件）。
+`pytest.ini` 定義的三個標記：`slow`（>~1 秒）、`integration`（跨子系統）、`requires_pce`（需連線真實 PCE，CI 中預設略過，僅供實驗室測試機執行；主機/帳密資訊見當下的 session-handoff 文件，切勿寫進本文件——`AGENTS.md` 僅含 i18n guardrails，不含主機或帳密資訊）。
 
 ### 2.3 型別檢查與 Lint
 
@@ -155,6 +155,8 @@ python scripts/check_doc_links.py
 | `src/i18n/data/glossary.json` | zh_TW 中必須保留英文的術語白名單 |
 | `src/i18n/data/phrase_overrides.json` | `_translate_text()` 套用的詞組替換規則 |
 | `src/i18n/data/strict_prefixes.json` | 缺口時應發 `[MISSING:key]` 而非靜默回退的鍵值前綴 |
+| `src/i18n/data/token_map_en.json` | `_humanize_key_en()` 用的 token → 英文詞對照表 |
+| `src/i18n/data/token_map_zh.json` | `_humanize_key_zh()` 用的 token → zh_TW 詞對照表 |
 
 **`src/i18n/data/zh_TW.json` 不存在於本 repo**——zh_TW 翻譯來自 `src/i18n_zh_TW.json`（`src/` 根目錄下），不是 `src/i18n/data/` 內部；引擎載入路徑為 `_ZH_MESSAGES_PATH = _ROOT / "i18n_zh_TW.json"`。
 
@@ -169,6 +171,8 @@ python scripts/check_doc_links.py
 7. 執行稽核：`python scripts/audit_i18n_usage.py`（全部 Category）或 `pytest tests/test_i18n_audit.py tests/test_i18n_strings_parity.py -v`；只查單一 Category 用 `--only <字母>`。合併前所有 Category 須以 0 退出碼結束。
 8. 切換語言在 UI 中人工驗證：跑起應用程式，設定 → 語言 → 切換 zh_TW，確認無版面溢出或缺字。
 
+`gui_`、`sched_`、`status_`、`error_`、`pd_` 前綴的鍵是「GUI-surface」鍵：`src/gui/_helpers.py` 的 `_ui_translation_dict()` 只挑出這幾個前綴（加上 `_UI_EXTRA_KEYS` 白名單的少數例外）餵給前端 JS 的翻譯字典，因此這批鍵的驗證要求比一般鍵更嚴格——`strict_prefixes.json` 決定的嚴格前綴集合與此重疊，缺口會直接以 `[MISSING:key]` 曝露在使用者看得到的畫面上，而不是靜默回退。新增這幾類前綴的鍵時，要意識到它會進到前端曝露面，翻譯缺漏的可見度比後端/報表鍵更高。
+
 ### 3.4 `t()` 執行期解析順序
 
 ```python
@@ -181,6 +185,25 @@ def t(key: str, *, lang: str | None = None, default: str | None = None, **kwargs
 4. 仍找不到且鍵值符合嚴格前綴 → 回傳 `[MISSING:key]`。
 5. 仍找不到 → 回傳 `default`（若有），否則 zh_TW 用 `_humanize_key_zh(key)`、en 用 `_humanize_key_en(key)` 產生可讀回退字串。
 6. 有 `kwargs` 則套用 `str.format(**kwargs)`。
+
+上面 6 步是**執行期**（每次呼叫 `t()` 都會走一遍）查的是 `get_messages(_lang)` 回傳的**已經建好**的字典。這個字典本身是怎麼建出來的，是另一套獨立、發生在**字典建構期**的解析順序，兩者容易混淆，分開說明：
+
+**字典建構期解析順序（`_build_messages(lang)`，`src/i18n/engine.py`，`@lru_cache(maxsize=2)`——每個語系只建一次，之後都吃快取）**
+
+當 `lang == "zh_TW"` 時，對 `src/i18n_en.json` 收錄的每一個鍵：
+
+1. 在 `_normalized_zh_messages()`（由 `src/i18n_zh_TW.json` 正規化而來）查這個鍵。
+2. 找到、且值是非空字串 → 直接採用該值寫入字典。
+3. 找不到、但鍵值命中 `strict_prefixes.json` 定義的嚴格前綴 → 該鍵在字典中的值直接寫成 `[MISSING:key]`。
+4. 找不到、且不是嚴格前綴 → 呼叫一次 `logger.warning()` 記錄缺口，該鍵在字典中的值寫成**鍵名本身**（原始字串，不經過 `_humanize_key_*()` 加工）。
+
+`lang == "en"` 走同構的單語系版本：只查 `_normalized_en_messages()`，找不到時一樣依是否為嚴格前綴決定寫入 `[MISSING:key]` 或鍵名本身。
+
+**兩套順序的關係與各自何時可見**：
+
+- 執行期 `t()` 第 2 步查到的值，多數情況下就是字典建構期已經定案的結果——包含建構期就寫死的 `[MISSING:key]` 或「鍵名本身」，並不是 `t()` 呼叫當下現算的。
+- 執行期 `t()` 第 4 步（「仍找不到且符合嚴格前綴 → `[MISSING:key]`」）實務上很少觸發，因為字典建構期已經把嚴格前綴的鍵全部填滿（找到翻譯，或寫入 `[MISSING:key]`）；這一步是防禦性的第二層。
+- `_humanize_key_zh()` / `_humanize_key_en()`（執行期第 5 步）跟建構期第 4 步回傳的「鍵名本身」是**兩種不同的字串**：前者是人類可讀的回退字串（token 對照表產生），後者是原始鍵名；只有執行期第 5 步真正被觸發時才會看到 humanize 過的字串，這種情況通常代表這個鍵根本不在 `src/i18n_en.json` 裡（否則字典建構期早就把它填成鍵名或 `[MISSING:key]`）。
 
 `set_language()` **僅供程序引導使用**，源碼明文禁止在請求處理器／排程任務／並發上下文呼叫，白名單由 `tests/test_i18n_set_language_callers.py` 強制。並發 Web 請求走每請求語系解析（`src/gui/__init__.py` 的 `_request_lang()`：session > config 預設），不修改全域狀態、不用 thread-local。
 
@@ -222,7 +245,7 @@ def t(key: str, *, lang: str | None = None, default: str | None = None, **kwargs
 
 1. **`src/gui/routes/actions.py`（約 L104–165）**——GUI 路由把請求 payload `d` 映射成 `params` dict，餵給 `analyzer.query_flows()`。第 144 行的行內註解明文要求與下面兩層鍵名保持一致：
    > `whitelist（~1053-1064）及 _TRAFFIC_FILTER_CAPABILITIES（traffic_query.py ~90-96）保持一致`
-2. **`src/analyzer.py` `query_flows()` 的 `query_filters` whitelist（L1399–1466）**——鍵名須與 (1) 完全一致，否則「在這個 whitelist 被靜默丟棄，永遠到不了 `build_traffic_query_spec` / `_flow_matches_filters`」（L1447–1450 原文註解）。同檔案內還有兩個附屬登記表，同一批鍵要一起檢查：
+2. **`src/analyzer.py` `query_flows()` 的 `query_filters` whitelist（L1399–1469，含收尾 `}`）**——鍵名須與 (1) 完全一致，否則「在這個 whitelist 被靜默丟棄，永遠到不了 `build_traffic_query_spec` / `_flow_matches_filters`」（L1447–1450 原文註解）。同檔案內還有兩個附屬登記表，同一批鍵要一起檢查：
    - `_OBJECT_FILTER_KEYS`（L63–74）：決定該鍵在 cache 命中路徑要委派給 `TrafficQueryBuilder._flow_matches_filters` 做 client 端比對（legacy scalar 鍵走另一套 `check_flow_match`，兩套比對器互不相通，L59–62、L76–79 原文註解）。
    - `_CACHE_UNEVALUABLE_FILTER_KEYS`（L80–84）：client 端比對器完全無法評估的鍵（label group 展開只存在於 PCE 端）；帶這些鍵時 cache 路徑必須讓路給 API，否則會靜默回傳未過濾資料。
 3. **`src/api/traffic_query.py` 的 `_TRAFFIC_FILTER_CAPABILITIES`（L50–130）**——每個鍵登記 `native`（推進 PCE async query payload）／`fallback`（client 端過濾）／`report_only`（fetch 後才套用，如排序、搜尋、分頁）三種 execution 模式之一；未登記的鍵預設降級 `fallback` 並附警告文字。`build_traffic_query_spec()`（L187）依此表把 `raw_filters` 分流進 `native_filters`／`fallback_filters`／`report_only_filters`。
