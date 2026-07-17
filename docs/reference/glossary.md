@@ -50,7 +50,7 @@ verified_against:
 |------|------|----------|
 | policy_decision（四值域） | Traffic flow 的 policy 判定欄位，值域固定四值：`blocked`／`potentially_blocked`／`allowed`／`unknown`。`unknown` 涵蓋 idle/快照模式 VEN 回報的流量與 Flowlink 未管理流量；查詢時若只帶前三值，`unknown` 流量整批消失、統計數字會大幅偏低。本專案自 2026-07-16 起所有未明確指定的查詢**預設含 unknown**（`src/analyzer.py` `query_flows` 預設值）。 | [PCE domain 須知 §2.1](../handover/pce-domain-notes.md) |
 | draft_policy_decision | PCE 在查詢執行當下，把歷史 flow 套上目前 draft policy 做的 what-if 模擬判定，是 on-demand 計算、不隨 flow 儲存；與 `policy_decision`（VEN 當下記錄的靜態歷史值）不同。 | [PCE domain 須知 §2.2](../handover/pce-domain-notes.md) |
-| Async Traffic Query | Explorer/traffic flow 查詢的非同步流程：`POST /traffic_flows/async_queries` → 202 → 輪詢 job 狀態直到終態 `done` → 下載 gzip JSON 結果。失敗終態另含 `failed`／`cancel_requested`／`cancelled`／`canceled`。 | [PCE domain 須知 §2.3](../handover/pce-domain-notes.md) |
+| Async Traffic Query | Explorer/traffic flow 查詢的非同步流程：`POST /traffic_flows/async_queries` → 202 → 輪詢 job 狀態直到終態 `completed` → 下載 gzip JSON 結果。失敗終態另含 `failed`／`cancel_requested`／`cancelled`／`canceled`。注意：`completed` 僅屬此 async traffic query 機制；另一套 Jobs API（`Prefer: respond-async` 集合 GET／rule hit count report）的成功終態是 `done`，兩套字彙不同、不可混用。 | [PCE domain 須知 §2.3、§3.1](../handover/pce-domain-notes.md) |
 | Rule Hit Count | VEN 原生量測的規則命中次數，回答「哪些 Active 規則實際被命中過」。只計 Active 規則（draft 不計）；保留期 90 天；規則最佳化可能使命中數高估；每 flow 最多歸因 100 條規則；hit 與 flow 計數語意不同（src/dst 各自回報一次，故常見 1 flow 對應 2 hit）。啟用需寫入 draft `firewall_settings` 並 provision 到生產 policy，版本門檻 SaaS PCE 24.2.0+／地端 23.5.10+／VEN 23.2.30+。 | [PCE domain 須知 §4](../handover/pce-domain-notes.md)、[報表家族 §7](../guide/reports.md) |
 
 ---
@@ -63,10 +63,11 @@ verified_against:
 | Alert Rule（告警規則） | illumio-ops 中的命名偵測定義，監控 PCE 事件或指標的特定模式；觸發時告警引擎評估 Action Matrix 並派發通知。 | [監控規則、告警與 SIEM](../guide/monitoring-alerts.md) |
 | Backfill（補填） | 以 `illumio-ops cache backfill` 觸發的歷史日期範圍填充，直接寫入 `pce_events`／`pce_traffic_flows_raw`，繞過 Watermark。用於首次啟用後補齊快取資料，或補齊舊資料缺少 `unknown` policy_decision 的缺口。 | [pce_cache 維運](../guide/cache-maintenance.md) |
 | DLQ（Dead Letter Queue，死信佇列） | PCE Cache 中的 `dead_letter` 資料表，存放已用盡所有重試的 SIEM 派發，隔離保留 30 天供操作員檢查，不影響即時佇列。 | [SIEM 轉送](../guide/siem.md) |
+| Draft Policy Alignment（R 系列） | `src/report/rules/r01`–`r05` 實作的 5 條治理型偵測規則（R01–R05），只在 DataFrame 帶 `draft_policy_decision` 欄時才會評估，該欄由查詢時 `compute_draft=True` 產生；標準／cache 報表路徑預設不含此欄，須透過獨立命令 `illumio-ops report draft-policy` 按需觸發即時 PCE 查詢。MITRE ATT&CK 全部刻意不對應（治理／衛生型規則）。 | [監控規則、告警與 SIEM §2.4](../guide/monitoring-alerts.md) |
 | FilterBar（v2 物件選擇器） | GUI 各分頁共用的篩選元件（`src/static/js/filter-bar.js` 的 `createFilterBar()`），以 labels／label groups／IP lists／workloads／services pill 取代純文字輸入。序列化出的 key（`src_labels`／`dst_workloads`／`services` 等）同 key 之間為 OR、跨 key 之間為 AND；後端物件查詢由 `src/gui/routes/filter_objects.py` 提供。 | [Web GUI 導覽](../guide/gui-tour.md) |
 | Hub Apps（中樞應用） | illumio-ops Web UI 中捆綁的第一方功能模組集合（Dashboard、Reports、Alerts、Settings、SIEM 等），每個 Hub App 是獨立的 Flask Blueprint。 | [Web GUI 導覽](../guide/gui-tour.md) |
 | Ingestor（擷取器） | 每個資料來源（`events`、`traffic`）各一個的背景輪詢器，依固定排程從 PCE API 拉取新資料列至 PCE Cache，受共享 token-bucket 速率限制器管控。 | [pce_cache 維運](../guide/cache-maintenance.md) |
-| Job Health（Job 健康） | 每個排程 job 的 last_run／last_status 落地 `logs/job_health.json`（`src/job_health.py`），是「應跑未跑」可觀測性的根治配套。GUI 的 Integrations → Job Health 表格用 `never-ran`／`overdue` 旗標呈現異常。 | [自動化：排程與 quarantine §3](../guide/automation.md)、[故障排除 §5](../guide/troubleshooting.md) |
+| Job Health（Job 健康） | 每個排程 job 的 last_run／last_status 落地 `logs/job_health.json`（`src/job_health.py`），是「應跑未跑」可觀測性的根治配套。GUI 的 Integrations → Overview 的 Job Health 表格用 `never-ran`／`overdue` 旗標呈現異常。 | [自動化：排程與 quarantine §3](../guide/automation.md)、[故障排除 §5](../guide/troubleshooting.md) |
 | Multi-PCE Profile（多 PCE 設定檔） | `config/config.json` 中的命名組態槽，存放單一 PCE 的憑證與端點設定，允許單一 illumio-ops 安裝指向多個 PCE。 | [設定參照](../guide/configuration.md) |
 | pce_cache（PCE Cache） | 位於 `data/pce_cache.sqlite`（`db_path` 設定鍵，`src/config_models.py`）的本地 SQLite（WAL 模式）資料庫，儲存 PCE 稽核事件與流量記錄的滾動窗口，作為 SIEM 轉發器、報表模組與告警迴圈的共享緩衝區。 | [pce_cache 維運](../guide/cache-maintenance.md) |
 | Rule Scheduler（規則排程器） | illumio-ops 內基於 APScheduler 的作業執行器，依設定間隔執行擷取器、告警評估、SIEM 派發滴答與報表生成；亦指 GUI 的規則排程分頁，可對特定 monitoring rule 建立定期執行排程。 | [自動化：排程與 quarantine §1](../guide/automation.md) |
@@ -84,6 +85,7 @@ verified_against:
 | `name_key` | 實體顯示名稱的 i18n 鍵命名慣例，與 `label_key`（表單標籤）和 `desc_key`（說明）分離，允許各介面分別翻譯。 | [開發流程](../handover/development.md) |
 | `rec_key` | 告警或驗證錯誤旁顯示的建議字串的 i18n 鍵命名慣例（例如 `alert_rec_agent_offline_check`），簡短、可操作、面向操作員。 | [開發流程](../handover/development.md) |
 | `t()` 函式 | illumio-ops 中的 Python 執行期翻譯輔助函式，對照現用語系的 JSON 檔案解析 i18n 鍵，若未找到則回退至 `zh_explicit.json`。 | [開發流程](../handover/development.md) |
+| `zh_explicit` | 檔案 `src/i18n/data/zh_explicit.json`，所有 Illumio 領域及 illumio-ops UI 字串的 zh_TW 核准翻譯主要來源，覆蓋基礎語系檔 `src/i18n_zh_TW.json` 中的產品專用術語。 | [開發流程](../handover/development.md) |
 | zh_explicit override | 查找優先級規則：`src/i18n/data/zh_explicit.json` 中找到的鍵優先於基礎 `src/i18n_zh_TW.json` 中的相同鍵，確保告警訊息、欄位標籤與建議字串採用經核准、符合產品規範的翻譯（例如 `blocked`／`draft` 等決策術語刻意不強譯，本詞彙表沿用此慣例）。 | [開發流程](../handover/development.md) |
 
 ---
