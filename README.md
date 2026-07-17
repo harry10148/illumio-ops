@@ -44,7 +44,7 @@ pip install -r requirements.txt
 python illumio-ops.py --monitor-gui --interval 5 --port 5001
 ```
 
-**First login:** account `illumio`, with a **forced password change on first use**. GUI passwords are hashed
+**First login:** default account `illumio` / password `illumio`; the forced first-login password change is currently disabled — change the password manually in Settings after first login. GUI passwords are hashed
 with **Argon2id**.
 
 The entry point `illumio-ops.py` dispatches to the **Click** command tree (e.g. `illumio-ops report traffic

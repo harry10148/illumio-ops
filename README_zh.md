@@ -39,21 +39,28 @@ SQLite，交給規則引擎與報表引擎評估，最後透過 Web GUI、CLI、
         +--------------------------------------------+
              |                          |
              | 即時查詢                  | 背景輪詢（ingest jobs）
-             v                          v
-   +--------------------------+   +------------------------------+
-   | 消費端（同進程）            |   |  pce_cache/（SQLite 鏡像）      |
-   |  analyzer  監控＋告警規則   |   |  raw flows / events、聚合、      |
-   |  events    事件正規化/比對  |   |  保留、封存 JSONL、容量監控        |
-   |  report    報表家族        |   +------------------------------+
-   +--------------------------+                |
-             |                                 v enqueue
-             v                          +------------------+
-   +-----------------------------+      | siem/            |
-   | 出口                         |      | dispatcher + DLQ |
-   |  gui/（Flask）· cli/（click） |      +------------------+
-   |  report_scheduler／rule_    |               |
-   |  scheduler（排程觸發）        |               v
-   |  reporter.py 告警派送        |        SIEM destinations
+             |（報表、GUI 即查）          v
+             |            +------------------------------+
+             |            |  pce_cache/（SQLite 鏡像）      |
+             |            |  raw flows / events、聚合、      |
+             |            |  保留、封存 JSONL、容量監控        |
+             |            +------------------------------+
+             |                 |                |
+             v                 v                | enqueue（與寫入同交易）
+   +--------------------------------------+    v
+   | 消費端（同進程）                        |  +------------------+
+   |  analyzer  監控＋告警規則              |  | siem/            |
+   |  events    事件正規化/比對             |  | dispatcher + DLQ |
+   |  report    報表家族                   |  +------------------+
+   +--------------------------------------+          |
+             |                                        v
+             v                                  SIEM destinations
+   +-----------------------------+
+   | 出口                         |
+   |  gui/（Flask）· cli/（click） |
+   |  report_scheduler／rule_    |
+   |  scheduler（排程觸發）        |
+   |  reporter.py 告警派送        |
    |  （Email/LINE/Webhook/...）  |
    +-----------------------------+
 ```
@@ -92,7 +99,7 @@ pip install -r requirements.txt
 python illumio-ops.py --monitor-gui --interval 5 --port 5001
 ```
 
-**首次登入：** 帳號為 `illumio`，**首次使用時強制變更密碼**。GUI 密碼以 **Argon2id** 雜湊。
+**首次登入：** 預設帳密 `illumio`／`illumio`；首登強制改密碼機制目前預設停用，請登入後自行至 Settings 變更密碼。GUI 密碼以 **Argon2id** 雜湊。
 
 進入點 `illumio-ops.py` 會將子命令分派到 **Click** 命令樹（例如 `illumio-ops report traffic --format
 html`、`illumio-ops status`），同時保留 **legacy argparse** 路徑以支援傳統的 `--monitor`／`--gui`／
