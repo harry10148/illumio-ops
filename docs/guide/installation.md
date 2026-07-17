@@ -16,7 +16,6 @@ verified_against:
   - src/__init__.py
   - src/cli/gui_cmd.py
   - illumio-ops.py
-  - docs/getting-started_zh.md (legacy, audited)
 ---
 
 # 安裝與部署

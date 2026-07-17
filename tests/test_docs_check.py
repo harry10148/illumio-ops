@@ -25,14 +25,17 @@ def test_bilingual_check_passes_when_paired(tmp_path: Path) -> None:
     assert rc == 0, out
 
 
-def test_bilingual_check_fails_on_orphan(tmp_path: Path) -> None:
+def test_bilingual_check_no_longer_flags_orphaned_docs_dir_files(tmp_path: Path) -> None:
+    # 2026-07 docs overhaul: docs/ is 繁中單語, so --bilingual no longer
+    # checks per-file _zh.md pairing under --root; it only checks the
+    # repo-root README.md/README_zh.md pair (both present in this repo), so
+    # an orphaned file inside an arbitrary docs/ tree no longer fails.
     docs = tmp_path / "docs"
     docs.mkdir()
     (docs / "alpha.md").write_text("# Alpha\n")
-    # missing alpha_zh.md
+    # missing alpha_zh.md — no longer relevant to --bilingual
     rc, out, _ = run_check("--bilingual", "--root", str(docs))
-    assert rc != 0
-    assert "alpha_zh.md" in out
+    assert rc == 0, out
 
 
 def test_freshness_check_flags_stale(tmp_path: Path) -> None:

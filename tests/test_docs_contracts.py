@@ -1,9 +1,9 @@
 """Documentation contracts for deployment/runtime promises.
 
 These tests guard against silent drift between code defaults and what user-
-facing docs claim. The 2026-05 doc refactor (PR #29) reorganised the docs
-into `docs/INDEX.md` + a structured tree (getting-started / user-guide /
-reference / architecture / contributing); tests now point at the new paths.
+facing docs claim. The 2026-07 docs overhaul made docs/ 繁體中文單語 with a
+`guide/` / `handover/` / `reference/` tree (`docs/INDEX.md` is the hub);
+tests now point at the new paths.
 """
 from __future__ import annotations
 
@@ -22,8 +22,7 @@ def test_docs_do_not_advertise_python38_source_runtime():
     docs = {
         "README.md": _read("README.md"),
         "README_zh.md": _read("README_zh.md"),
-        "docs/getting-started.md": _read("docs/getting-started.md"),
-        "docs/getting-started_zh.md": _read("docs/getting-started_zh.md"),
+        "docs/guide/installation.md": _read("docs/guide/installation.md"),
     }
 
     for path, text in docs.items():
@@ -32,34 +31,29 @@ def test_docs_do_not_advertise_python38_source_runtime():
 
     assert "Python-3.10%2B" in docs["README.md"]
     assert "Python-3.10%2B" in docs["README_zh.md"]
-    assert "3.10 or later" in docs["docs/getting-started.md"]
-    assert "3.10 以上" in docs["docs/getting-started_zh.md"]
-    assert "CPython 3.12" in docs["docs/getting-started.md"]
-    assert "CPython 3.12" in docs["docs/getting-started_zh.md"]
+    assert "3.10 以上" in docs["docs/guide/installation.md"]
+    assert "CPython 3.12" in docs["docs/guide/installation.md"]
 
 
 def test_docs_list_alerts_json_as_preserved_operator_config():
-    # The 2026-06 rebuild removed the docs/user-guide/ subtree; the alerts /
-    # quarantine content now lives in the operations manual.
+    # The 2026-07 docs overhaul folded getting-started / operations-manual
+    # into docs/guide/installation.md and docs/guide/monitoring-alerts.md.
     docs = {
-        "docs/getting-started.md": _read("docs/getting-started.md"),
-        "docs/getting-started_zh.md": _read("docs/getting-started_zh.md"),
-        "docs/operations-manual_zh.md": _read("docs/operations-manual_zh.md"),
+        "docs/guide/installation.md": _read("docs/guide/installation.md"),
+        "docs/guide/monitoring-alerts.md": _read("docs/guide/monitoring-alerts.md"),
     }
 
     for path, text in docs.items():
         assert "alerts.json" in text, f"{path} must document the alert rules file"
 
-    # getting-started must explicitly list the operator-owned trio as
+    # installation.md must explicitly list the operator-owned trio as
     # preserved across upgrades.
-    for path in ("docs/getting-started.md", "docs/getting-started_zh.md"):
-        text = docs[path]
-        assert "config.json" in text
-        assert "alerts.json" in text
-        assert "rule_schedules.json" in text
+    text = docs["docs/guide/installation.md"]
+    assert "config.json" in text
+    assert "alerts.json" in text
+    assert "rule_schedules.json" in text
 
-    assert "Files preserved across upgrades" in docs["docs/getting-started.md"]
-    assert "升級後保留的檔案" in docs["docs/getting-started_zh.md"]
+    assert "升級後保留的檔案" in docs["docs/guide/installation.md"]
 
 
 def test_version_badges_match_runtime_version():
@@ -73,13 +67,12 @@ def test_version_badges_match_runtime_version():
 
 
 def test_gui_port_and_bind_host_docs_match_runtime_defaults():
-    # No new user-facing doc may advertise the stale GUI port 5000. (The 2026-06
-    # rebuild folded the troubleshooting / settings user-guide pages into the
-    # operations manual.)
+    # No new user-facing doc may advertise the stale GUI port 5000. (The 2026-07
+    # docs overhaul folded the troubleshooting / settings pages into guide/.)
     doc_paths = [
-        "docs/getting-started.md", "docs/getting-started_zh.md",
-        "docs/operations-manual_zh.md",
-        "docs/reference/cli.md", "docs/reference/cli_zh.md",
+        "docs/guide/installation.md",
+        "docs/guide/gui-tour.md",
+        "docs/reference/cli.md",
     ]
     for path in doc_paths:
         text = _read(path)
@@ -93,17 +86,15 @@ def test_gui_port_and_bind_host_docs_match_runtime_defaults():
     # Runtime source default still 0.0.0.0; CLI reference docs the example.
     assert 'default="0.0.0.0"' in _read("src/cli/gui_cmd.py")
     assert "--host 0.0.0.0" in _read("docs/reference/cli.md")
-    assert "--host 0.0.0.0" in _read("docs/reference/cli_zh.md")
 
 
 def test_report_format_and_click_examples_match_cli_contracts():
-    # The 2026-06 rebuild folded the reports user-guide page into the operations manual.
+    # The 2026-07 docs overhaul folded the reports page into docs/guide/reports.md.
     docs = {
         "README.md": _read("README.md"),
         "README_zh.md": _read("README_zh.md"),
         "docs/reference/cli.md": _read("docs/reference/cli.md"),
-        "docs/reference/cli_zh.md": _read("docs/reference/cli_zh.md"),
-        "docs/operations-manual_zh.md": _read("docs/operations-manual_zh.md"),
+        "docs/guide/reports.md": _read("docs/guide/reports.md"),
     }
 
     stale_fragments = (
@@ -120,13 +111,13 @@ def test_report_format_and_click_examples_match_cli_contracts():
     assert 'choices=["html", "csv", "pdf", "xlsx", "all"]' in _read("src/main.py")
     assert '_REPORT_FORMATS = ["html", "csv", "pdf", "xlsx", "all"]' in _read("src/cli/report.py")
     assert "illumio-ops report traffic --format html" in docs["docs/reference/cli.md"]
-    assert "illumio-ops report traffic --format html" in docs["docs/reference/cli_zh.md"]
+    assert "illumio-ops report traffic --format html" in docs["docs/guide/reports.md"]
 
 
 def test_siem_docs_do_not_list_nonexistent_flush_command():
     # CLI reference is the canonical command list; it must not document a
     # nonexistent `siem flush` subcommand, and must document the real triplet.
-    for path in ("docs/reference/cli.md", "docs/reference/cli_zh.md"):
+    for path in ("docs/reference/cli.md", "docs/guide/siem.md"):
         text = _read(path)
         assert "siem flush" not in text, f"{path} must not document nonexistent siem flush"
         assert "siem dlq" in text

@@ -36,7 +36,7 @@ verified_against:
 
 # 開發流程與慣習
 
-本文件的讀者是**要對這個 codebase 送 PR 的開發者**。涵蓋開發環境建置、測試與 CI 守門、i18n 鍵值合約（涵蓋範圍規劃取代 `docs/reference/i18n-contract.md`；該檔案目前尚未刪除，刪除排在後續任務執行）、幾個重複發生過的斷鏈坑，以及發版流程。架構全貌見 [architecture.md](architecture.md)，PCE vendor 知識見 [pce-domain-notes.md](pce-domain-notes.md)。
+本文件的讀者是**要對這個 codebase 送 PR 的開發者**。涵蓋開發環境建置、測試與 CI 守門、i18n 鍵值合約（已取代並刪除 `docs/reference/i18n-contract.md`）、幾個重複發生過的斷鏈坑，以及發版流程。架構全貌見 [architecture.md](architecture.md)，PCE vendor 知識見 [pce-domain-notes.md](pce-domain-notes.md)。
 
 ---
 
@@ -118,7 +118,7 @@ ruff check --fix .    # 自動修正
 
 | 旗標 | 檢查內容 |
 |---|---|
-| `--bilingual` | 每個 `.md` 是否有 `_zh.md` 對應檔（僅適用於仍維持雙語配對的舊文件目錄） |
+| `--bilingual` | 2026-07 docs overhaul 後 `docs/` 為繁中單語，此旗標只檢查 repo 根的 `README.md`／`README_zh.md` 是否成對存在 |
 | `--freshness N` | `last_verified` 是否超過 N 天（`--all` 預設 30 天） |
 | `--frontmatter` | frontmatter 是否存在，且 `title`／`last_verified`／`verified_against` 三個必要鍵非空 |
 | `--links` | 文件內部相對連結是否指向 `docs/` 內存在的檔案 |
@@ -165,7 +165,7 @@ python scripts/check_doc_links.py
 1. **決定鍵名稱**：`<area>_<purpose>` 格式，常見前綴：`gui_`（GUI 元件）、`menu_`（選單）、`alert_`（警報）、`rpt_`（報告／Dashboard）、`rs_`（規則排程器）、`pd_`（原則判斷）、`lbl_`（通用標籤）、`pu_`（原則使用模組）、`rule_`（告警規則 name/desc/rec）、`sched_`（排程器狀態，嚴格前綴）。
 2. 在 `src/i18n_en.json` 按字母順序新增英文值，插值用 `{variable_name}` 語法。
 3. 在 `src/i18n_zh_TW.json` 新增對應 zh_TW 值——**必須同一個 commit**，CI Category I（`audit_zh_parity_against_en`）強制鍵集一致。
-4. 若涵蓋 Illumio 產品術語，先查 `docs/reference/glossary.md`（尚未刪除）確認是否已有核可翻譯，再新增到 `src/i18n/data/zh_explicit.json`；不得在 `i18n_zh_TW.json` 寫入與其矛盾的翻譯（Category E 會擋）。
+4. 若涵蓋 Illumio 產品術語，先查 `docs/reference/glossary.md` 確認是否已有核可翻譯，再新增到 `src/i18n/data/zh_explicit.json`；不得在 `i18n_zh_TW.json` 寫入與其矛盾的翻譯（Category E 會擋）。
 5. 若為 Dashboard KPI，同步新增到 `src/i18n/data/dashboard_approved.json`。
 6. 原始碼中用 `from src.i18n import t`；請求處理器內**一律**顯式傳 `lang`：`t("your_key", lang=lang)`，絕不要用無 `lang` 的 `t("your_key")`（會落到全域語系，並發請求下不可靠）。
 7. 執行稽核：`python scripts/audit_i18n_usage.py`（全部 Category）或 `pytest tests/test_i18n_audit.py tests/test_i18n_strings_parity.py -v`；只查單一 Category 用 `--only <字母>`。合併前所有 Category 須以 0 退出碼結束。
@@ -216,6 +216,8 @@ def t(key: str, *, lang: str | None = None, default: str | None = None, **kwargs
 | Report HTML | 產生時的語言凍結 |
 
 **Dashboard 快照重譯**：快照 JSON 的 `kpis` 條目可帶 `label_key`（如 `{"label": "Hit Rules", "value": "42", "label_key": "rpt_pu_hit_rules"}`）。`src/gui/routes/dashboard.py` 的 `_retranslate_kpi_labels(data, lang)` 在三個端點（`/api/dashboard`、`/api/dashboard/story`、`/api/dashboard/policy-usage`）遍歷 `kpis`，有 `label_key` 就用 `t(label_key, lang=lang)` 覆寫 `label`，讓 Dashboard 顯示跟隨當前 UI 語言而非快照寫入時的語言。沒有 `label_key` 的舊快照維持原樣，隨新快照產生自然淘汰。
+
+**前端規則：一律存 `label_key`，`label` 只作顯示用**。這不只適用於 Dashboard 快照——任何帶 `label_key` 欄位的物件（快照 KPI、FieldMeta、chart spec）都遵守同一原則：`label_key` 是權威值，`label` 是目前語言的渲染結果，不應被當作資料來源使用。`_retranslate_kpi_labels()` 與 `FieldMeta.render(lang=)` 都依賴 `label_key` 存在才能重新翻譯；新增前端程式碼時，只要物件會被跨語言重用，就必須連帶存 `label_key`。
 
 **alerts.json 鍵值解析**：規則記錄有 `name`/`desc`/`rec` 文字欄位與對應 `name_key`/`desc_key`/`rec_key` 鍵值欄位。`src/config.py` 的 `_resolve_rule_keys()` 在 `ConfigManager.load()` 讀完 `alerts.json` 後立即處理三種情況：（1）新式規則已設 `*_key` → 用 `t(key, lang=lang)` 渲染回填；（2）舊式 `[MISSING:key]` 標記 → 重新解析並回填 `*_key`；（3）純舊式純文字且與已知最佳實踐規則的規範渲染相符（透過 `_LEGACY_FILTER_TO_NAME_KEY` 映射）→ 升級為鍵值式儲存，使用者自訂名稱不受影響。`_write_alerts_file()` 儲存時只寫 `*_key`，渲染文字視為暫時性資料。
 

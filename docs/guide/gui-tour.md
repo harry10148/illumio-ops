@@ -25,7 +25,6 @@ verified_against:
   - src/config.py
   - src/job_health.py
   - src/cli/gui_cmd.py
-  - docs/operations-manual_zh.md（§3，素材來源，已依現況校正）
 ---
 
 # Web GUI 導覽

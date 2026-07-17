@@ -14,7 +14,6 @@ verified_against:
   - src/scheduler/jobs.py
   - src/alerts/plugins.py
   - src/gui/routes/config.py
-  - docs/operations-manual.md (legacy, audited)
 ---
 
 # 設定參照

@@ -882,4 +882,4 @@ esac
 - [故障排除](../guide/troubleshooting.md) — `--format pdf` 無聲落差等症狀導向排錯
 - [REST API](rest-api.md) — 程式化等效操作
 - [詞彙表](glossary.md) — Illumio 術語說明
-- [操作手冊](../operations-manual_zh.md) — 操作員層級操作總覽
+- [安裝與部署](../guide/installation.md) — 操作員層級操作總覽

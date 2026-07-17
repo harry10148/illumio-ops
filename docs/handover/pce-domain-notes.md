@@ -14,7 +14,6 @@ verified_against:
   - src/report/policy_resolver_report.py
   - src/report/analysis/policy_resolver.py
   - src/report/rule_hit_count_generator.py
-  - docs/event-rules_zh.md
 ---
 
 # PCE domain 須知（vendor 事實集）
