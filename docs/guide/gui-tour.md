@@ -31,7 +31,7 @@ verified_against:
 # Web GUI 導覽
 
 Web GUI 是單頁式應用（SPA）：登入後以頂部 8 個分頁切換，內容全部由前端 JS 模組向約
-85 條 JSON API（`/api/...`）取資料，伺服器不重新整頁。啟動方式與埠號見
+85 條 JSON API（`/api/...`）取資料，伺服器不重新整頁。精確端點清單見 [rest-api.md](../reference/rest-api.md)。啟動方式與埠號見
 `illumio-ops gui`（預設埠 **5001**，`--host 0.0.0.0`），完整 CLI 選項見
 reference/cli.md。
 

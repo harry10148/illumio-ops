@@ -378,10 +378,8 @@ TLS 相關端點存檔後都需要**重啟服務**才會套用；自簽憑證每
 此數字為 `grep -c "@[a-z_]*\.route(" src/gui/routes/*.py src/gui/__init__.py`（94）
 加上另外掛載的 `src/siem/web.py`（13）與 `src/pce_cache/web.py`（10）。其中 4 個是頁面
 路由（`/`、`/login`、`/logout`、`/reports/<filename>`），其餘 113 個是 `/api/` JSON
-端點。[gui-tour.md](../guide/gui-tour.md) 開頭寫「約 85 條 JSON API」是概數，口徑上只算
-`/api/` 前綴且未逐一計入這次盤點新補上的 `filter_objects.py`、`pce_cache` 的
-`archive/load`／`archive/status`（舊版 REST API 文件遺漏）等新端點；本篇數字以本次
-`grep` 逐檔核對為準。
+端點。[gui-tour.md](../guide/gui-tour.md) 的『約 85 條』是較早盤點的粗略數字（僅計 src/gui/routes
+與 gui/__init__ 的 /api 路由），非逐條稽核；本檔的對帳表才是權威清單。
 
 ---
 
