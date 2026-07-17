@@ -252,6 +252,41 @@ Get-Service IllumioOps
 Linux 版另外只更新 `*.example` 範本檔（`config.json.example` 等），方便操作者用
 `diff` 比對新版有無新增設定鍵；不會動到操作者自己的 `config.json`。
 
+## 部署安全注意事項
+
+以下四項風險由部署層面（反向代理、正式環境 git 工作流程）負責，illumio-ops
+應用程式本身不會自動處理，操作者需自行確認並補齊。
+
+### 反向代理（ProxyFix）
+
+服務**不會**自動設定 Flask 的 `ProxyFix`。若部署在 nginx / Apache / Traefik 等
+反向代理之後，**必須**在 cheroot 伺服器啟動前自行套用 `ProxyFix`（且只信任一層
+hop），否則 IP allowlist 只會看到代理本身的位址，所有請求都會顯示為來自同一
+來源。GUI 端的驗證與 session 機制見 [rest-api.md](../reference/rest-api.md)。
+
+### Telegram 告警外掛 — token 可能透過代理存取日誌洩漏
+
+Telegram Bot API 會把 bot token 直接嵌在 **URL path** 中
+（`https://api.telegram.org/bot<TOKEN>/sendMessage`）。在高敏感環境中，應避免
+任何正向代理或 WAF 把完整 URL path 寫入 access log，或改用直連（NoProxy）繞過
+企業代理，或改用 webhook 模式（webhook URL 不含 token）。Loguru 的 token 遮罩
+機制只能清除本機日誌，無法保護中間網路設備上留下的紀錄。
+
+### Server header 指紋辨識
+
+cheroot 預設會送出 `Server: Cheroot/<version>`，暴露版本資訊供指紋辨識；目前
+程式已將 `server_name` 覆寫為通用值（`Web`），避免直接洩漏實際版本號。若稽核
+政策要求連伺服器類型都不得洩漏，可在反向代理層以 `proxy_hide_header Server;`
+（nginx）或等效指令完全隱藏該 server header。
+
+### 正式環境 git 工作流程 — autoStash 與可重現性
+
+`scripts/setup-prod-git.sh` 會啟用 `git config merge.autoStash=true`（及
+`rebase.autoStash=true`），讓正式主機在 `git pull` 時可能靜默 stash 掉未提交的
+本機修改。這代表主機狀態可能不再與已部署的 git tag 逐位元
+（bit-for-bit）**reproducible**。每次部署後請執行 `git stash list` 並確認結果
+為空；若該主機要求可重現性必須被保證，請改用 `scripts/setup.sh`。
+
 ## 移除
 
 **Linux**：
