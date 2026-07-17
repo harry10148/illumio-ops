@@ -11,7 +11,6 @@ verified_against:
   - src/siem/formatters/syslog_wrapped.py
   - src/siem/formatters/syslog_header.py
   - src/siem/mask.py
-  - src/siem/preview.py
   - src/siem_cli.py
   - src/cli/siem.py
   - src/config_models.py
