@@ -321,3 +321,126 @@ class TestAnalyzerOnCache(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTrafficWindowOnCache(unittest.TestCase):
+    """A1（2026-07-24 審查）：cache 路徑流量規則必須全視窗查詢，
+    不得用 cursor 增量（視窗會退化成輪詢間隔、嚴重漏告警）。"""
+
+    @staticmethod
+    def _traffic_rule(threshold=100, window=10):
+        return {"id": "t1", "type": "traffic", "name": "conn spike",
+                "threshold_count": threshold, "threshold_window": window,
+                "threshold_type": "count", "cooldown_minutes": 0,
+                "filter_type": "port", "filter_value": "443"}
+
+    def test_fetch_traffic_uses_window_query_not_cursor(self):
+        import datetime as dt
+        mock_sub = MagicMock()
+        mock_sub.fetch_window_rows.return_value = []
+        az = _make_analyzer(rules=[self._traffic_rule(window=10)],
+                            subscriber_flows=mock_sub)
+        _stream, _rules, now_utc = az._fetch_traffic()
+        mock_sub.fetch_window_rows.assert_called_once()
+        mock_sub.poll_new_rows.assert_not_called()
+        call = mock_sub.fetch_window_rows.call_args
+        since = call.args[0] if call.args else call.kwargs["since"]
+        span = (now_utc - since).total_seconds()
+        # legacy 語意：max_win + 2 分鐘
+        self.assertGreaterEqual(span, 12 * 60 - 5)
+
+    def test_window_accumulation_reaches_threshold(self):
+        import datetime as dt
+        flows = [{"num_connections": 1, "timestamp": ""} for _ in range(120)]
+        mock_sub = MagicMock()
+        mock_sub.fetch_window_rows.return_value = flows
+        rule = self._traffic_rule(threshold=100, window=10)
+        az = _make_analyzer(rules=[rule], subscriber_flows=mock_sub)
+        stream, tr_rules, now_utc = az._fetch_traffic()
+        with unittest.mock.patch.object(az, "check_flow_match", return_value=True):
+            result = az._run_rule_engine(iter(stream), tr_rules, now_utc)
+        _, res = result[0]
+        self.assertGreaterEqual(res["max_val"], 100)
+
+
+class TestCountRuleEdges(unittest.TestCase):
+    """A2（2026-07-24 審查）：count 型規則在本 cycle 無新事件時
+    不得發出 time=N/A、內容全空的空殼告警。"""
+
+    @staticmethod
+    def _count_rule(threshold=1):
+        return {"id": "cr1", "name": "count rule", "type": "event",
+                "threshold_type": "count", "threshold_count": threshold,
+                "threshold_window": 10, "filter_type": "any",
+                "filter_value": "", "cooldown_minutes": 0}
+
+    def test_window_count_met_but_no_new_matches_no_alert(self):
+        import datetime as dt
+        # 非空輪詢（其他事件到達）但無一匹配本規則 → matches=[] 而視窗計數達標
+        other = _raw_event(event_type="user.login")
+        other["timestamp"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        mock_sub = MagicMock()
+        mock_sub.poll_new_rows.return_value = [other]
+        az = _make_analyzer(rules=[self._count_rule(threshold=1)],
+                            subscriber_events=mock_sub)
+        recent = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2)
+        az.state["history"] = {"cr1": [{"t": recent.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                        "event_id": "x"}]}
+        with patch("src.analyzer.matches_event_rule", return_value=False):
+            az._run_event_analysis()
+        az.reporter.add_event_alert.assert_not_called()
+
+    def test_new_match_alerts_with_window_count(self):
+        import datetime as dt
+        mock_sub = MagicMock()
+        ev = _raw_event()
+        ev["timestamp"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        mock_sub.poll_new_rows.return_value = [ev]
+        az = _make_analyzer(rules=[self._count_rule(threshold=1)],
+                            subscriber_events=mock_sub)
+        az.state["history"] = {}
+        with patch("src.analyzer.matches_event_rule", return_value=True):
+            az._run_event_analysis()
+        az.reporter.add_event_alert.assert_called_once()
+        alert = az.reporter.add_event_alert.call_args[0][0]
+        self.assertNotEqual(alert["time"], "N/A")
+
+
+class TestHistoryRetention(unittest.TestCase):
+    """A3（2026-07-24 審查）：history 保留期須跟著最大 count 視窗走，
+    否則 >2h 視窗被靜默低估。"""
+
+    def test_history_retained_for_large_window(self):
+        import datetime as dt
+        import json as _json
+        import tempfile, os
+        rule = {"id": "big", "name": "big", "type": "event",
+                "threshold_type": "count", "threshold_count": 5,
+                "threshold_window": 180, "filter_type": "any", "filter_value": ""}
+        az = _make_analyzer(rules=[rule])
+        az.save_state = Analyzer.save_state.__get__(az)
+        old = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=150)
+        az.state["history"] = {"big": [{"t": old.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                        "event_id": "x"}]}
+        with tempfile.TemporaryDirectory() as td:
+            sf = os.path.join(td, "state.json")
+            with patch("src.analyzer.STATE_FILE", sf):
+                az.save_state()
+            persisted = _json.load(open(sf))
+        # 150 分鐘前的紀錄在 180 分鐘視窗下必須保留（舊版 2h 固定裁剪會刪掉）
+        self.assertEqual(len(persisted["history"].get("big", [])), 1)
+
+
+class TestStrictWindow(unittest.TestCase):
+    """A4（2026-07-24 審查）：fail-closed 只限規則引擎加總路徑
+    （strict_window=True）；query/報表路徑維持舊語意——cache/archive
+    投影常無 timestamp，整批誤殺會清空查詢結果。"""
+
+    def test_missing_timestamp_excluded_only_in_strict_mode(self):
+        import datetime as dt
+        rule = {"id": "t1", "type": "traffic", "name": "t", "pd": -1}
+        az = _make_analyzer(rules=[rule])
+        flow = {"num_connections": 1}  # 無 timestamp
+        win = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=10)
+        self.assertFalse(az.check_flow_match(rule, flow, win, strict_window=True))
+        self.assertTrue(az.check_flow_match(rule, flow, win))

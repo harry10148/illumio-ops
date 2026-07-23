@@ -53,11 +53,19 @@ class EventBatch:
     seen_events: dict[str, str]
 
 class EventPoller:
-    def __init__(self, api_client, max_results: int = 5000, overlap_seconds: int = 60,
-                 subscriber=None):
+    # overlap 是 watermark（貼著 now 推進）之下唯一的補抓保險：PCE 事件索引
+    # 延遲超過 overlap 即靜默漏事件（2026-07-24 審查 D1）。預設 300s；
+    # event_seen dedup（4h）保證加大 overlap 不會產生重複告警。
+    DEFAULT_OVERLAP_SECONDS = 300
+
+    def __init__(self, api_client, max_results: int = 5000,
+                 overlap_seconds: int | None = None, subscriber=None):
         self.api = api_client
         self.max_results = max_results
-        self.overlap_seconds = overlap_seconds
+        self.overlap_seconds = (
+            self.DEFAULT_OVERLAP_SECONDS if overlap_seconds is None
+            else max(60, min(int(overlap_seconds), 900))
+        )
         self._subscriber = subscriber
 
     def poll(self) -> list[dict[str, Any]]:

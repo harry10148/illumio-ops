@@ -17,6 +17,12 @@ _MODEL_MAP = {
     "pce_traffic_flows_raw": PceTrafficFlowRaw,
 }
 
+# fetch_window_rows 的事件時間欄（非 ingested_at：規則視窗語意看事件時間）
+_TIME_COL = {
+    "pce_events": "timestamp",
+    "pce_traffic_flows_raw": "last_detected",
+}
+
 
 class CacheSubscriber:
     def __init__(self, session_factory: sessionmaker, consumer: str, source_table: str):
@@ -67,6 +73,21 @@ class CacheSubscriber:
         if row is None:
             return (None, None)
         return (row.last_ingested_at, row.last_row_id)
+
+    def fetch_window_rows(self, since: datetime, limit: int = 10000) -> list[dict]:
+        """全視窗查詢（**不動 cursor**）。
+
+        規則引擎的 threshold_window 加總需要「視窗內全部列」；cursor 增量
+        （poll_new_rows）會把有效視窗退化成單次輪詢間隔，在 30s cycle 的
+        cache 部署上造成嚴重漏告警（2026-07-24 審查 A1）。
+        """
+        col = getattr(self._model, _TIME_COL[self._source])
+        with self._sf() as s:
+            rows = s.execute(
+                select(self._model).where(col >= since)
+                .order_by(col.asc()).limit(limit)
+            ).scalars().all()
+        return [_row_to_dict(r) for r in rows]
 
     def _write_cursor(self, ts: datetime, row_id: int) -> None:
         now = datetime.now(timezone.utc)

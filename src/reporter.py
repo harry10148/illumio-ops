@@ -821,6 +821,9 @@ class Reporter:
         return _html.escape(text)
 
     ALERT_DLQ_MAX_ATTEMPTS = 3
+    # 全 skipped（無可用通道）時 DLQ 會逐 cycle 累積新告警——單 bucket 上限
+    # 防無界成長，超出裁掉最舊（2026-07-24 審查 B1 配套）
+    ALERT_DLQ_BUCKET_CAP = 100
 
     def _pop_alert_dlq(self) -> list[dict[str, Any]]:
         """Atomically take all pending DLQ entries from the state file."""
@@ -841,7 +844,16 @@ class Reporter:
         return popped
 
     def _push_alert_dlq(self, buckets: dict[str, list], attempts: int, first_failed_at: str) -> None:
-        entry = {"buckets": buckets, "attempts": attempts, "first_failed_at": first_failed_at}
+        capped = {}
+        for name, items in buckets.items():
+            if len(items) > self.ALERT_DLQ_BUCKET_CAP:
+                logger.warning(
+                    "Alert DLQ: {} bucket exceeds cap ({} > {}), keeping newest",
+                    name, len(items), self.ALERT_DLQ_BUCKET_CAP,
+                )
+                items = items[-self.ALERT_DLQ_BUCKET_CAP:]
+            capped[name] = items
+        entry = {"buckets": capped, "attempts": attempts, "first_failed_at": first_failed_at}
 
         def _append(existing: dict) -> dict:
             out = dict(existing)
@@ -854,6 +866,13 @@ class Reporter:
             logger.error("Failed to persist alert DLQ (alerts lost): {}", exc)
 
     def send_alerts(self, force_test: bool = False, channels: list[str] | None = None, *, lang: str | None = None) -> list[dict[str, Any]]:
+        """派送四個 bucket 到全部啟用通道。
+
+        DLQ 為 **all-or-nothing**：任一通道成功即視為已遞送、不重試其餘
+        失敗通道（部分失敗只記 dispatch_history）；全數未遞送才整批入列
+        重試（真嘗試過才消耗 3 次額度）。per-channel 重試是刻意不做的
+        取捨——見 docs/guide/monitoring-alerts.md（2026-07-24 審查 B3）。
+        """
         _lang = lang or self._lang
         # Bind the subject's t() to the dispatch language; _dispatch_lang (set
         # around the plugin loop below) carries the same language into the
@@ -861,6 +880,7 @@ class Reporter:
         t = self._lang_t(_lang)
         replayed_attempts = 0
         replayed_first_failed_at = ""
+        _replayed_attempt_values: list[int] = []
         if not force_test:
             for entry in self._pop_alert_dlq():
                 buckets = entry.get("buckets", {})
@@ -868,8 +888,11 @@ class Reporter:
                 self.event_alerts.extend(buckets.get("event", []))
                 self.traffic_alerts.extend(buckets.get("traffic", []))
                 self.metric_alerts.extend(buckets.get("metric", []))
-                replayed_attempts = max(replayed_attempts, int(entry.get("attempts", 0)))
+                _replayed_attempt_values.append(int(entry.get("attempts", 0)))
                 replayed_first_failed_at = replayed_first_failed_at or entry.get("first_failed_at", "")
+            # 多筆合併取 min：以最年輕條目計次，避免較新告警被提早丟棄
+            # （2026-07-24 審查 B4；常態單筆時 min == 該筆值）
+            replayed_attempts = min(_replayed_attempt_values, default=0)
         if (
             not any(
                 [
@@ -995,8 +1018,11 @@ class Reporter:
 
         attempted = [r for r in results if r.get("status") != "skipped"]
         delivered = any(r.get("status") == "success" for r in results)
-        if attempted and not delivered and not force_test:
-            attempts = replayed_attempts + 1
+        if not delivered and not force_test:
+            # 全 skipped（設定缺失/通道冷卻）也要入列——抽乾後不回寫等於
+            # 永久遺失；但只有真的嘗試過遞送才消耗重試額度
+            # （2026-07-24 審查 B1/B2）
+            attempts = replayed_attempts + (1 if attempted else 0)
             first_failed_at = replayed_first_failed_at or format_utc(
                 datetime.datetime.now(datetime.timezone.utc)
             )
@@ -1006,16 +1032,20 @@ class Reporter:
                 "traffic": list(self.traffic_alerts),
                 "metric": list(self.metric_alerts),
             }
-            if attempts >= self.ALERT_DLQ_MAX_ATTEMPTS:
-                logger.error(
-                    "Alert DLQ: dropping {} alert bucket(s) after {} failed dispatch attempts",
-                    sum(len(v) for v in buckets.values()), attempts,
-                )
-                results.append({"channel": "dlq", "status": "dropped", "target": "",
-                                "error": f"dropped after {attempts} attempts"})
-            else:
-                logger.warning("Alert DLQ: all channels failed, queuing for retry (attempt {})", attempts)
-                self._push_alert_dlq(buckets, attempts, first_failed_at)
+            if any(buckets.values()):
+                if attempted and attempts >= self.ALERT_DLQ_MAX_ATTEMPTS:
+                    logger.error(
+                        "Alert DLQ: dropping {} alert bucket(s) after {} failed dispatch attempts",
+                        sum(len(v) for v in buckets.values()), attempts,
+                    )
+                    results.append({"channel": "dlq", "status": "dropped", "target": "",
+                                    "error": f"dropped after {attempts} attempts"})
+                else:
+                    logger.warning(
+                        "Alert DLQ: no delivery ({} attempted), queuing for retry (attempt {})",
+                        len(attempted), attempts,
+                    )
+                    self._push_alert_dlq(buckets, attempts, first_failed_at)
 
         try:
             persist_dispatch_results(
@@ -1031,7 +1061,8 @@ class Reporter:
 
     _LINE_MESSAGE_CAP = 4500  # LINE push API 實際上限 ~5000，留 buffer（spec §C）
 
-    def _build_line_message(self, subj: str, *, lang: str | None = None) -> str:
+    def _build_line_message(self, subj: str, *, lang: str | None = None,
+                            cap: "int | None" = _LINE_MESSAGE_CAP) -> str:
         """Build a LINE-friendly alert digest aligned to the vendor event content baseline."""
         _lang = lang or self._dispatch_lang or self._lang
         t = self._lang_t(_lang)
@@ -1155,9 +1186,9 @@ class Reporter:
             metric_section="\n".join(metric_section_lines),
         ).strip()
 
-        if len(message) > self._LINE_MESSAGE_CAP:
+        if cap is not None and len(message) > cap:
             footer = t("line_message_truncated")
-            message = message[: self._LINE_MESSAGE_CAP - len(footer) - 1].rstrip() + "\n" + footer
+            message = message[: cap - len(footer) - 1].rstrip() + "\n" + footer
         return message
 
     def _build_telegram_message(self, subj: str, *, lang: str | None = None) -> str:
@@ -1397,8 +1428,11 @@ class Reporter:
 
         Reuses _build_line_message which already renders line_digest.txt.tmpl
         from the same alert lists, ensuring parity with LINE channel content.
+        Email 無長度上限，cap=None 解除 LINE 的 4500 字截斷
+        （2026-07-24 審查 B5）。
         """
-        return self._build_line_message(subject, lang=lang or self._dispatch_lang or self._lang)
+        return self._build_line_message(
+            subject, lang=lang or self._dispatch_lang or self._lang, cap=None)
 
     def _build_mail_html(self, subj: str, *, lang: str | None = None) -> str:
         _lang = lang or self._dispatch_lang or self._lang

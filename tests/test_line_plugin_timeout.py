@@ -79,7 +79,8 @@ def test_line_plugin_cooldown_after_failures():
     with patch("urllib.request.urlopen", side_effect=counting_urlopen):
         result = plugin.send(reporter, "s2")
 
-    assert result["status"] == "failed", "Cooldown should make send return failed"
+    # 2026-07-24 審查 B2：冷卻是暫時不可用 → skipped（failed 會消耗 DLQ 額度）
+    assert result["status"] == "skipped", "Cooldown should make send return skipped"
     assert call_count["value"] == 0, (
         f"During cooldown urlopen() should not be called; was called {call_count['value']} times"
     )

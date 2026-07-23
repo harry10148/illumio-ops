@@ -9,6 +9,31 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ## [Unreleased]
 
+### Fixed
+
+- Alert-chain review remediation (2026-07-24 audit): cache-deployment
+  traffic/volume rules now evaluate the full threshold window instead of
+  the per-poll increment (a 30s-cycle deployment effectively watched a
+  30-second window and under-alerted); count-type event rules no longer
+  emit empty-shell alerts without fresh matches; threshold_window is
+  capped at 24h with history retention following the largest window;
+  windowed rules exclude flows with missing timestamps. The alert DLQ
+  now survives skipped-only cycles (missing channel config no longer
+  loses queued alerts), only real delivery attempts consume the 3-try
+  budget, buckets are capped at 100 entries, multi-entry replays merge
+  on the youngest attempt count, and the LINE self-cooldown reports
+  skipped instead of failed. The plain-text email part is no longer
+  truncated at the LINE 4500-char cap. The event poller's watermark
+  overlap defaults to 300s (was 60s; configurable via
+  events.overlap_seconds, clamped 60-900) to survive PCE indexing lag.
+  Corrupt cooldown timestamps log a warning before the one-shot bypass.
+- Event-tips wording verified against the official manuals:
+  sec_policy.create now says policy is recomputed for the affected
+  workloads (not "pushed to all VENs"), and the two NEN heartbeat tips
+  are marked as field-observed semantics absent from the official event
+  list. Cooldown=0 (disabled) and the DLQ/throttle design trade-offs
+  are documented in the GUI help and operator guide.
+
 ### Added
 
 - PCE health monitoring now probes the official SLB endpoint

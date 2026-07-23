@@ -47,6 +47,10 @@ TOP_MATCHES_LIMIT = 10
 # analyzer self-alerts (via _check_watchdog), because a dead poller otherwise
 # fails silent — no events polled, no alerts fired. Own cooldown keeps a
 # long outage to one alert per hour instead of one per cycle.
+# threshold_window 上限（分鐘）：history 保留隨最大 count 視窗動態延長至此上限，
+# 超過即在輸入層拒絕——否則視窗被 prune 靜默低估（2026-07-24 審查 A3）
+MAX_THRESHOLD_WINDOW_MINUTES = 1440
+
 WATCHDOG_FAILURE_THRESHOLD = 3
 WATCHDOG_COOLDOWN_MINUTES = 60
 
@@ -190,7 +194,17 @@ class Analyzer:
             "event_parser_samples": [],
         }
         ensure_monitoring_state(self.state)
-        self.event_poller = EventPoller(self.api, subscriber=subscriber_events)
+        # overlap 可調（events.overlap_seconds，預設 300、夾 [60, 900]）：
+        # PCE 事件索引延遲的唯一補抓保險（2026-07-24 審查 D1）
+        _overlap_cfg = None
+        try:
+            _overlap_cfg = (self.cm.config.get("events") or {}).get("overlap_seconds")
+        except Exception:
+            _overlap_cfg = None
+        self.event_poller = EventPoller(
+            self.api, subscriber=subscriber_events,
+            overlap_seconds=_overlap_cfg if _overlap_cfg is not None else None,
+        )
         self.load_state()
         ensure_monitoring_state(self.state)
         self.stats = StatsTracker(self.state)
@@ -258,7 +272,19 @@ class Analyzer:
         now = datetime.datetime.now(datetime.timezone.utc)
         self.state["last_check"] = self.state.get("event_watermark") or format_utc(now)
 
-        cutoff = now - datetime.timedelta(hours=2)
+        # history 保留期跟著最大 count 視窗走（下限 2h、上限 24h＋10min 緩衝），
+        # 否則 >2h 的 threshold_window 會被裁剪靜默低估（2026-07-24 審查 A3）
+        try:
+            _max_win = max(
+                (int(r.get("threshold_window", 10))
+                 for r in self.cm.config.get("rules", [])
+                 if r.get("type") == "event" and r.get("threshold_type") == "count"),
+                default=0,
+            )
+        except (TypeError, ValueError):
+            _max_win = 0
+        _max_win = min(_max_win, MAX_THRESHOLD_WINDOW_MINUTES)
+        cutoff = now - datetime.timedelta(minutes=max(120, _max_win + 10))
         new_history = {}
         for rid, records in self.state.get("history", {}).items():
             valid = []
@@ -380,13 +406,15 @@ class Analyzer:
         """Delegate to module-level calculate_volume_mb(). See src.analyzer.calculate_volume_mb."""
         return calculate_volume_mb(flow)
 
-    def check_flow_match(self, rule: dict[str, Any], f: dict[str, Any], start_time_limit: datetime.datetime | None) -> bool:
+    def check_flow_match(self, rule: dict[str, Any], f: dict[str, Any], start_time_limit: datetime.datetime | None,
+                         *, strict_window: bool = False) -> bool:
         # Dynamic Sliding Window Check
         if start_time_limit:
             ts_str = f.get("timestamp")
             if not ts_str and "timestamp_range" in f:
                 ts_str = f["timestamp_range"].get("last_detected") or f["timestamp_range"].get("first_detected")
-                
+
+            f_time = None
             if ts_str:
                 try:
                     f_time = datetime.datetime.strptime(ts_str, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=datetime.timezone.utc)
@@ -396,8 +424,14 @@ class Analyzer:
                     except ValueError:
                         f_time = None
 
-                if f_time and f_time < start_time_limit:
-                    return False
+            # strict_window（規則引擎加總路徑）fail-closed：無/不可解析時戳
+            # 的 flow 不得計入門檻加總（2026-07-24 審查 A4）。query/報表路徑
+            # （strict_window=False）維持舊語意——那些 flow 已由 SQL/上游過窗，
+            # cache/archive 投影常無 timestamp 欄，fail-closed 會整批誤殺。
+            if f_time is not None and f_time < start_time_limit:
+                return False
+            if f_time is None and strict_window:
+                return False
 
         # Criteria Check
         p = f.get("pd")
@@ -483,7 +517,8 @@ class Analyzer:
 
         return True
 
-    def _match_flow_filters(self, rule: dict[str, Any], f: dict[str, Any], window_start: datetime.datetime | None) -> bool:
+    def _match_flow_filters(self, rule: dict[str, Any], f: dict[str, Any], window_start: datetime.datetime | None,
+                            *, strict_window: bool = False) -> bool:
         """統一的 flow×filter 比對：legacy 純量 key 走 check_flow_match（含
         pd/時間窗/port/proto/list 形 IP），物件/複數 key 投影委派給報表路徑
         同一套 _flow_matches_filters（兩者 AND）。三個呼叫點共用：規則引擎、
@@ -492,7 +527,7 @@ class Analyzer:
         （不影響比對結果）。此函式在 per-flow 熱迴圈內被逐筆呼叫，故不在此記
         debug log（會被洗版）；只有手改 alerts.json 繞過端點拒收才會走到這個
         分支，屬邊角情境。"""
-        if not self.check_flow_match(rule, f, window_start):
+        if not self.check_flow_match(rule, f, window_start, strict_window=strict_window):
             return False
         object_rule = {k: rule[k] for k in _OBJECT_FILTER_KEYS if rule.get(k)}
         if object_rule:
@@ -986,7 +1021,10 @@ class Analyzer:
                     win_start = now_utc - datetime.timedelta(minutes=win_minutes)
                     count_val = self._event_count_in_window(rule["id"], win_start)
 
-                if count_val >= rule["threshold_count"] and count_val > 0:
+                # count 型須有本 cycle 新事件（matches 非空）才告警：視窗計數
+                # 只作門檻；無新證據時發出的告警必然是 time=N/A 的空殼
+                # （2026-07-24 審查 A2）
+                if count_val >= rule["threshold_count"] and count_val > 0 and matches:
                     if self._check_cooldown(rule):
                         self.stats.record_rule_trigger(rule, match_count=count_val, metric_value=count_val)
                         first = matches[0] if matches else {}
@@ -1047,8 +1085,12 @@ class Analyzer:
         now_utc = datetime.datetime.now(datetime.timezone.utc)
 
         if self._sub_flows is not None:
-            flows = self._sub_flows.poll_new_rows(limit=10000)
-            logger.info("Analyzer flow path: cache ({} rows)", len(flows))
+            # 全視窗查詢（同 legacy API 語意：max_win + 2 分鐘）——cursor 增量
+            # 會把 count/volume 規則的視窗退化成輪詢間隔（2026-07-24 審查 A1）
+            max_win = max(r.get('threshold_window', 10) for r in tr_rules)
+            since = now_utc - datetime.timedelta(minutes=max_win + 2)
+            flows = self._sub_flows.fetch_window_rows(since, limit=10000)
+            logger.info("Analyzer flow path: cache window ({} rows)", len(flows))
             return flows, tr_rules, now_utc
 
         traffic_stream, now_utc = self._legacy_fetch_traffic()
@@ -1104,7 +1146,7 @@ class Analyzer:
                 r_win = rule.get("threshold_window", 10)
                 r_start = now_utc - datetime.timedelta(minutes=r_win)
 
-                if not self._match_flow_filters(rule, f, r_start):
+                if not self._match_flow_filters(rule, f, r_start, strict_window=True):
                     continue
 
                 res = rule_results[rid]
@@ -1188,6 +1230,9 @@ class Analyzer:
                     self.reporter.add_traffic_alert(alert_data)
 
     def _check_cooldown(self, rule: dict[str, Any]) -> bool:
+        """冷卻＋節流閘門。cooldown_minutes=0 是刻意語意：停用冷卻
+        （每個 cycle 都可再告警，僅剩 throttle 限制）——GUI/CLI hint 與
+        monitoring-alerts.md 已明文（審查 A5 確認項）。"""
         rid = str(rule["id"])
         now_utc = datetime.datetime.now(datetime.timezone.utc)
         last_alert = self.state.get("alert_history", {}).get(rid)
@@ -1210,7 +1255,12 @@ class Analyzer:
                     logger.info(f"Rule '{rule['name']}' in cooldown.")
                     return False
             except ValueError:
-                pass  # intentional fallback: unparseable last_alert timestamp means cooldown is not enforced
+                # intentional fallback：損壞的 last_alert 時戳讓冷卻放行一次
+                # （隨後以正確格式覆寫、自癒）——但要留下可見證據（審查 A5）
+                logger.warning(
+                    "corrupt alert_history timestamp for rule {} ({!r}) — cooldown bypassed once",
+                    rid, last_alert,
+                )
 
         allowed, throttle_meta = self.alert_throttler.allow(rule, now_utc)
         if not allowed:

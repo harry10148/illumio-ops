@@ -126,7 +126,9 @@ class LineAlertPlugin(AlertOutputPlugin):
 
         if time.monotonic() < self._cooldown_until:
             self._maybe_log_cooldown(target_id)
-            return {"channel": "line", "status": "failed", "target": target_id, "error": "channel cooldown active"}
+            # skipped 而非 failed：自我冷卻是暫時不可用，不得消耗 DLQ 重試
+            # 額度（2026-07-24 審查 B2——failed 會在冷卻窗內燒完 3 次而丟棄）
+            return {"channel": "line", "status": "skipped", "target": target_id, "error": "channel cooldown active"}
 
         # Cooldown has expired (or was never set): reset counter for a fresh 3-strike window
         if self._cooldown_until > 0 and self._consecutive_failures >= 3:

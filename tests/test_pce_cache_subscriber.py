@@ -141,3 +141,19 @@ def test_ties_on_ingested_at_broken_by_row_id(session_factory):
     rows2 = sub.poll_new_rows(limit=1)
     assert len(rows2) == 1
     assert rows[0]["pce_event_id"] != rows2[0]["pce_event_id"]
+
+
+def test_fetch_window_rows_filters_by_time_and_keeps_cursor(session_factory):
+    """規則引擎的視窗加總需要「視窗內全部列」且不得推進 cursor
+    （2026-07-24 審查 A1：cursor 增量會把視窗退化成輪詢間隔）。"""
+    from src.pce_cache.subscriber import CacheSubscriber
+    now = datetime.now(timezone.utc)
+    _seed(session_factory, "w1", now - timedelta(minutes=10))
+    _seed(session_factory, "w2", now - timedelta(minutes=5))
+    _seed(session_factory, "w3", now - timedelta(minutes=1))
+    sub = CacheSubscriber(session_factory, "rule_engine", "pce_events")
+    rows = sub.fetch_window_rows(now - timedelta(minutes=6))
+    assert len(rows) == 2
+    assert len(sub.poll_new_rows()) == 3
+    rows2 = sub.fetch_window_rows(now - timedelta(minutes=6))
+    assert len(rows2) == 2
