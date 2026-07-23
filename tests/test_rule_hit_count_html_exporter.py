@@ -98,3 +98,12 @@ class TestExporter(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_hit_metrics_columns_precede_long_text_columns():
+    """命中量測欄必須排在 consumers 等長文字欄之前——主指標曾被推出
+    可視範圍（2026-07-23 視覺實檢）。"""
+    from src.report.exporters.rule_hit_count_html_exporter import _COLS
+    assert _COLS.index("hit_count") < _COLS.index("consumers")
+    assert _COLS.index("days_since_last_hit") < _COLS.index("consumers")
+    assert _COLS.index("last_hit_at") < _COLS.index("consumers")

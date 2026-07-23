@@ -93,6 +93,8 @@ BASE_CSS = """\
   .section-intro { margin: 0 0 14px; color: var(--slate-50); font-size: 12px; line-height: 1.6; }
 
   .kpi-grid { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; }
+  /* RHC 等報表用 kpi-row 包 kpi-card：無此規則時卡片直排、右側大片留白 */
+  .kpi-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
   .kpi-card { background: #fff; border-radius: 8px; padding: 14px 18px; box-shadow: var(--shadow-card); min-width: 150px; flex: 1 1 150px; max-width: 220px; border-top: 3px solid var(--orange); }
   .kpi-label { font-size: 11px; color: var(--slate-50); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
   .kpi-value { font-size: 20px; font-weight: 700; color: var(--cyan-120); font-variant-numeric: tabular-nums; }
