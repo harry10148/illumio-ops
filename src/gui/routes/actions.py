@@ -490,7 +490,7 @@ def make_actions_blueprint(
             return jsonify({"ok": True, "output": _strip_ansi(buf.getvalue()).strip() or t("gui_action_debug_completed", lang=lang)})
 
     @bp.route('/api/actions/test-alert', methods=['POST'])
-    @limiter.limit("10 per hour")
+    @limiter.limit("30 per hour")
     def api_test_alert():
         try:
             from src.module_log import ModuleLog as _ML
