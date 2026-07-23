@@ -404,3 +404,28 @@ class TestCountRuleEdges(unittest.TestCase):
         az.reporter.add_event_alert.assert_called_once()
         alert = az.reporter.add_event_alert.call_args[0][0]
         self.assertNotEqual(alert["time"], "N/A")
+
+
+class TestHistoryRetention(unittest.TestCase):
+    """A3（2026-07-24 審查）：history 保留期須跟著最大 count 視窗走，
+    否則 >2h 視窗被靜默低估。"""
+
+    def test_history_retained_for_large_window(self):
+        import datetime as dt
+        import json as _json
+        import tempfile, os
+        rule = {"id": "big", "name": "big", "type": "event",
+                "threshold_type": "count", "threshold_count": 5,
+                "threshold_window": 180, "filter_type": "any", "filter_value": ""}
+        az = _make_analyzer(rules=[rule])
+        az.save_state = Analyzer.save_state.__get__(az)
+        old = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=150)
+        az.state["history"] = {"big": [{"t": old.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                        "event_id": "x"}]}
+        with tempfile.TemporaryDirectory() as td:
+            sf = os.path.join(td, "state.json")
+            with patch("src.analyzer.STATE_FILE", sf):
+                az.save_state()
+            persisted = _json.load(open(sf))
+        # 150 分鐘前的紀錄在 180 分鐘視窗下必須保留（舊版 2h 固定裁剪會刪掉）
+        self.assertEqual(len(persisted["history"].get("big", [])), 1)

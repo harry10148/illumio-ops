@@ -276,3 +276,46 @@ def test_rules_api_returns_throttle_state(client, monkeypatch, tmp_path):
     assert created["throttle_state"]["cooldown_suppressed"] == 2
     assert created["throttle_state"]["throttle_suppressed"] == 3
     assert created["throttle_state"]["next_allowed_at"] == "2026-04-08T12:10:00Z"
+
+
+def _login_csrf(client):
+    login = client.post('/api/login', json={"username": "admin", "password": "testpass"},
+                        environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
+    assert login.status_code == 200
+    return _csrf(login)
+
+
+def test_event_rule_rejects_window_over_24h(client):
+    """threshold_window 超過 1440 分鐘要被拒——analyzer history 保留有上限，
+    超大視窗會被靜默低估（2026-07-24 審查 A3）。"""
+    token = _login_csrf(client)
+    resp = client.post("/api/rules/event",
+                       json={"name": "big window", "filter_value": "user.login",
+                             "threshold_type": "count", "threshold_count": 5,
+                             "threshold_window": 2000},
+                       headers={"X-CSRF-Token": token},
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 400
+    assert "1440" in (resp.get_json() or {}).get("error", "")
+
+
+def test_event_rule_accepts_window_within_cap(client):
+    token = _login_csrf(client)
+    resp = client.post("/api/rules/event",
+                       json={"name": "ok window", "filter_value": "user.login",
+                             "threshold_type": "count", "threshold_count": 5,
+                             "threshold_window": 180},
+                       headers={"X-CSRF-Token": token},
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+
+
+def test_traffic_rule_rejects_window_over_24h(client):
+    token = _login_csrf(client)
+    resp = client.post("/api/rules/traffic",
+                       json={"name": "big window", "threshold_count": 5,
+                             "threshold_window": 2000},
+                       headers={"X-CSRF-Token": token},
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 400
+    assert "1440" in (resp.get_json() or {}).get("error", "")

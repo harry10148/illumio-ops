@@ -45,6 +45,24 @@ _RULE_LEGACY_SCALAR_KEYS = (
 )
 
 
+def _parse_threshold_window(d, lang):
+    """threshold_window 解析＋上限驗證（1..1440）。
+
+    analyzer history 保留隨最大 count 視窗動態延長、上限 24h——超過必須在
+    輸入層拒絕，否則視窗被 prune 靜默低估（2026-07-24 審查 A3）。
+    Raises ValueError（訊息已 i18n）供呼叫端轉 400。
+    """
+    from src.analyzer import MAX_THRESHOLD_WINDOW_MINUTES
+    try:
+        win = int(d.get('threshold_window', 10))
+    except (TypeError, ValueError):
+        raise ValueError(t("gui_err_invalid_number", lang=lang))
+    if not (1 <= win <= MAX_THRESHOLD_WINDOW_MINUTES):
+        raise ValueError(t("gui_err_window_too_large", lang=lang,
+                           max=MAX_THRESHOLD_WINDOW_MINUTES))
+    return win
+
+
 def _extract_rule_filters(f, lang):
     """filters dict → (flat_dict, error_response|None)。label_group key 回 400。"""
     bad = [k for k in _RULE_REJECTED_KEYS if f.get(k)]
@@ -126,10 +144,11 @@ def make_rules_blueprint(
             return _err(t("gui_err_pce_health_use_system_form", lang=lang), 400)
         try:
             threshold_count = int(d.get('threshold_count', 1))
-            threshold_window = int(d.get('threshold_window', 10))
+            threshold_window = _parse_threshold_window(d, lang)
             cooldown_minutes = int(d.get('cooldown_minutes', 10))
-        except (TypeError, ValueError):
-            return _err(t("gui_err_invalid_number", lang=lang), 400)
+        except (TypeError, ValueError) as exc:
+            msg = str(exc) or t("gui_err_invalid_number", lang=lang)
+            return _err(msg, 400)
         cm.add_or_update_rule({
             "id": gen_rule_id(),
             "type": "event",
@@ -182,6 +201,7 @@ def make_rules_blueprint(
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             throttle = _normalize_rule_throttle(d.get('throttle', ''))
+            _win = _parse_threshold_window(d, lang)
         except ValueError as exc:
             return _err(str(exc), 400)
         src = (d.get('src') or '').strip()
@@ -222,7 +242,7 @@ def make_rules_blueprint(
                 "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_policy", lang=lang, default="Check Policy"),
                 "threshold_type": "count",
                 "threshold_count": int(d.get('threshold_count', 10)),
-                "threshold_window": int(d.get('threshold_window', 10)),
+                "threshold_window": _win,
                 "cooldown_minutes": int(d.get('cooldown_minutes', 10)),
                 "throttle": throttle,
                 **flat,
@@ -242,7 +262,7 @@ def make_rules_blueprint(
                 "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_policy", lang=lang, default="Check Policy"),
                 "threshold_type": "count",
                 "threshold_count": int(d.get('threshold_count', 10)),
-                "threshold_window": int(d.get('threshold_window', 10)),
+                "threshold_window": _win,
                 "cooldown_minutes": int(d.get('cooldown_minutes', 10)),
                 "throttle": throttle,
             })
@@ -254,6 +274,7 @@ def make_rules_blueprint(
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             throttle = _normalize_rule_throttle(d.get('throttle', ''))
+            _win = _parse_threshold_window(d, lang)
         except ValueError as exc:
             return _err(str(exc), 400)
         src = (d.get('src') or '').strip()
@@ -290,7 +311,7 @@ def make_rules_blueprint(
                 "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
                 "threshold_type": "count",
                 "threshold_count": float(d.get('threshold_count', 100)),
-                "threshold_window": int(d.get('threshold_window', 10)),
+                "threshold_window": _win,
                 "cooldown_minutes": int(d.get('cooldown_minutes', 30)),
                 "throttle": throttle,
                 **flat,
@@ -310,7 +331,7 @@ def make_rules_blueprint(
                 "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
                 "threshold_type": "count",
                 "threshold_count": float(d.get('threshold_count', 100)),
-                "threshold_window": int(d.get('threshold_window', 10)),
+                "threshold_window": _win,
                 "cooldown_minutes": int(d.get('cooldown_minutes', 30)),
                 "throttle": throttle,
             })
@@ -390,6 +411,13 @@ def make_rules_blueprint(
                     if k in old and old[k] is not None:
                         try: old[k] = int(old[k]) if k != 'threshold_count' else float(old[k])
                         except (ValueError, TypeError): pass  # intentional fallback: keep raw value if numeric cast fails
+                # 視窗上限同建立路徑（2026-07-24 審查 A3）
+                _tw = old.get('threshold_window')
+                if isinstance(_tw, int):
+                    from src.analyzer import MAX_THRESHOLD_WINDOW_MINUTES
+                    if not (1 <= _tw <= MAX_THRESHOLD_WINDOW_MINUTES):
+                        return _err(t("gui_err_window_too_large", lang=lang,
+                                      max=MAX_THRESHOLD_WINDOW_MINUTES), 400)
                 cm.save()
                 return jsonify({"ok": True})
             return _err(t("gui_not_found", lang=lang), 404)

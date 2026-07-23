@@ -122,6 +122,11 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
             if win_in is None:
                 continue
             win = int(win_in) if win_in != "" else def_win
+            # 視窗上限 24h：超過會被 analyzer history 保留期靜默低估（審查 A3）
+            from src.analyzer import MAX_THRESHOLD_WINDOW_MINUTES
+            if not (1 <= win <= MAX_THRESHOLD_WINDOW_MINUTES):
+                print(f"{Colors.WARNING}{t('cli_err_window_too_large', max=MAX_THRESHOLD_WINDOW_MINUTES)}{Colors.ENDC}")
+                continue
 
         def_cd = edit_rule.get("cooldown_minutes", win) if edit_rule else win
         cd_in = safe_input(

@@ -47,6 +47,10 @@ TOP_MATCHES_LIMIT = 10
 # analyzer self-alerts (via _check_watchdog), because a dead poller otherwise
 # fails silent — no events polled, no alerts fired. Own cooldown keeps a
 # long outage to one alert per hour instead of one per cycle.
+# threshold_window 上限（分鐘）：history 保留隨最大 count 視窗動態延長至此上限，
+# 超過即在輸入層拒絕——否則視窗被 prune 靜默低估（2026-07-24 審查 A3）
+MAX_THRESHOLD_WINDOW_MINUTES = 1440
+
 WATCHDOG_FAILURE_THRESHOLD = 3
 WATCHDOG_COOLDOWN_MINUTES = 60
 
@@ -258,7 +262,19 @@ class Analyzer:
         now = datetime.datetime.now(datetime.timezone.utc)
         self.state["last_check"] = self.state.get("event_watermark") or format_utc(now)
 
-        cutoff = now - datetime.timedelta(hours=2)
+        # history 保留期跟著最大 count 視窗走（下限 2h、上限 24h＋10min 緩衝），
+        # 否則 >2h 的 threshold_window 會被裁剪靜默低估（2026-07-24 審查 A3）
+        try:
+            _max_win = max(
+                (int(r.get("threshold_window", 10))
+                 for r in self.cm.config.get("rules", [])
+                 if r.get("type") == "event" and r.get("threshold_type") == "count"),
+                default=0,
+            )
+        except (TypeError, ValueError):
+            _max_win = 0
+        _max_win = min(_max_win, MAX_THRESHOLD_WINDOW_MINUTES)
+        cutoff = now - datetime.timedelta(minutes=max(120, _max_win + 10))
         new_history = {}
         for rid, records in self.state.get("history", {}).items():
             valid = []
