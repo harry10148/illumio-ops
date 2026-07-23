@@ -94,6 +94,47 @@ def test_scheduler_jobs_are_instrumented(tmp_path, monkeypatch):
             sched.remove_job(j.id)
 
 
+def test_prune_job_health_removes_orphans(jh_file):
+    """job 改名/停用後的殘留條目會被 overview 永久判 warn——
+    prune 以本次註冊集合修剪。"""
+    job_health.record_job_registered("keep_me", 60)
+    job_health.record_job_run("keep_me", "ok")
+    job_health.record_job_registered("orphan", 60)
+    job_health.prune_job_health(["keep_me"])
+    data = job_health.load_job_health()
+    assert "keep_me" in data
+    assert "orphan" not in data
+
+
+def test_build_scheduler_prunes_orphans(tmp_path, monkeypatch):
+    """build_scheduler 完成註冊後，儲存內不在本次註冊集合的條目必須消失。"""
+    path = str(tmp_path / "job_health.json")
+    monkeypatch.setattr(job_health, "_job_health_file", lambda: path)
+    job_health.record_job_registered("renamed_away_job", 300)
+    from unittest.mock import MagicMock
+    from src.scheduler import build_scheduler
+    cm = MagicMock()
+    cm.models.pce_cache.enabled = True
+    cm.models.pce_cache.db_path = str(tmp_path / "c.sqlite")
+    cm.models.pce_cache.archive_enabled = True
+    cm.models.pce_cache.archive_dir = str(tmp_path / "archive")
+    cm.models.pce_cache.archive_interval_hours = 24
+    cm.models.pce_cache.archive_gzip_after_days = 7
+    cm.models.pce_cache.archive_retention_days = 0
+    cm.models.pce_cache.events_poll_interval_seconds = 300
+    cm.models.pce_cache.traffic_poll_interval_seconds = 3600
+    cm.models.siem.enabled = False
+    cm.config = {}
+    sched = build_scheduler(cm)
+    try:
+        data = job_health.load_job_health()
+        assert "renamed_away_job" not in data
+        assert all(job.id in data for job in sched.get_jobs())
+    finally:
+        for j in list(sched.get_jobs()):
+            sched.remove_job(j.id)
+
+
 def test_run_tls_renew_check_invokes_helper(tmp_path, monkeypatch):
     from unittest.mock import MagicMock, patch
     from src.scheduler.jobs import run_tls_renew_check

@@ -226,6 +226,10 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     except Exception as exc:
         logger.exception("Failed to register SIEM scheduler jobs: {}", exc)
 
+    # 修剪孤兒 job_health 條目：改名/停用的 job 不得永久佔據 warn
+    from src.job_health import prune_job_health
+    prune_job_health([j.id for j in sched.get_jobs()])
+
     logger.info(
         "Scheduler built: monitor={}m report=60s rule={}s",
         interval_minutes,
