@@ -41,6 +41,15 @@ def _reset_fallback_state():
     m._ASYNC_FALLBACK_FAILED_AT.clear()
 
 
+@pytest.fixture(autouse=True)
+def _di_file(tmp_path, monkeypatch):
+    """截斷路徑會寫 data_integrity 遙測——導向 tmp_path，勿汙染 repo logs/。"""
+    from src import data_integrity
+    path = str(tmp_path / "data_integrity.json")
+    monkeypatch.setattr(data_integrity, "_data_integrity_file", lambda: path)
+    return path
+
+
 @responses.activate
 def test_get_collection_reads_total_count(api_client):
     body = [{"href": f"/orgs/1/labels/{i}"} for i in range(3)]
@@ -250,6 +259,49 @@ def test_truncation_record_cleared_after_successful_fallback(api_client, monkeyp
     assert data == full
     assert total == 700
     assert api_client.last_truncated_collections == []
+
+
+def test_truncation_persisted_to_data_integrity(api_client, monkeypatch, _di_file):
+    """截斷且 fallback 失敗 → 事件落地 data_integrity.json（面板消費）。"""
+    import json
+    monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)
+    truncated = [{"href": f"/orgs/1/workloads/{i}"} for i in range(500)]
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),
+        (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),
+        (200, {"status": "failed"}, {}),
+    ])
+    api_client._get_collection("/orgs/1/workloads")
+    stored = json.load(open(_di_file))
+    entry = stored["/orgs/1/workloads"]
+    assert entry["got"] == 500 and entry["total"] == 700
+
+
+def test_data_integrity_cleared_on_fallback_recovery(api_client, monkeypatch, _di_file):
+    """fallback 恢復 → data_integrity 紀錄清除（不留永久假陽性）。"""
+    import json
+    monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)
+    from src import api_client as m
+    fake_now = {"t": 1000.0}
+    monkeypatch.setattr("src.api_client.time.monotonic", lambda: fake_now["t"])
+    truncated = [{"href": f"/orgs/1/workloads/{i}"} for i in range(500)]
+    full = [{"href": f"/orgs/1/workloads/{i}"} for i in range(700)]
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),
+        (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),
+        (200, {"status": "failed"}, {}),
+    ])
+    api_client._get_collection("/orgs/1/workloads")
+    fake_now["t"] += m._ASYNC_FALLBACK_FAILURE_BACKOFF_SECONDS + 1
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),
+        (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),
+        (200, {"status": "done", "result": {"href": "/orgs/1/workloads_datafile_xyz"}}, {}),
+        (200, full, {}),
+    ])
+    api_client._get_collection("/orgs/1/workloads")
+    stored = json.load(open(_di_file))
+    assert "/orgs/1/workloads" not in stored
 
 
 @responses.activate

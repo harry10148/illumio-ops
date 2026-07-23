@@ -906,11 +906,21 @@ class ApiClient:
                 # 跨呼叫先失敗後成功：清除先前殘留的截斷紀錄，避免假陽性永久殘留
                 if path in self.last_truncated_collections:
                     self.last_truncated_collections.remove(path)
+                try:
+                    from src.data_integrity import clear_truncation
+                    clear_truncation(path)
+                except Exception:
+                    pass  # 遙測失敗不得影響 API 主路徑
                 return status, fallback_data, total_count
             # 去重：同一 path 因排程重複呼叫且反覆截斷失敗時，避免
             # last_truncated_collections 無上限纍積（Task 1 遺留的 append-only 問題）。
             if path not in self.last_truncated_collections:
                 self.last_truncated_collections.append(path)
+            try:
+                from src.data_integrity import record_truncation
+                record_truncation(path, actual_count, total_count)
+            except Exception:
+                pass  # 遙測失敗不得影響 API 主路徑
 
         return status, data, total_count
 
