@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
+from loguru import logger
+
 SCHEMA_VERSION = 1
 _BASE_DIR = "reports/snapshots"
 
@@ -43,7 +45,9 @@ def list_snapshots(report_type: str, *, profile: Optional[str] = None) -> list[d
     for f in _dir_for(report_type).glob("*.json"):
         try:
             data = json.loads(f.read_text())
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as exc:
+            # 靜默跳過會讓 read_latest 回較舊快照、過期資料被當成當前資料
+            logger.warning("skipping corrupt snapshot {}: {}", f, exc)
             continue
         if profile is not None and data.get("profile") != profile:
             continue
@@ -65,7 +69,8 @@ def cleanup_old(report_type: str, *, retention_days: int, today: Optional[dateti
         try:
             data = json.loads(f.read_text())
             snap_date = datetime.fromisoformat(data["generated_at"].replace("Z", "+00:00")).date()
-        except (KeyError, ValueError, json.JSONDecodeError, OSError):
+        except (KeyError, ValueError, json.JSONDecodeError, OSError) as exc:
+            logger.warning("skipping corrupt snapshot {}: {}", f, exc)
             continue
         age_days = (cutoff - snap_date).days
         if age_days > retention_days:

@@ -129,6 +129,7 @@ class RuleHitCountGenerator:
                 "need at least 'Rule HREF' and 'Rule Hit Count'")
 
         rows = []
+        unparsed_rows = 0
         for _, row in df.iterrows():
             href = str(row.get('rule_href', '') or '').strip()
             if not href or href == 'nan':
@@ -136,7 +137,11 @@ class RuleHitCountGenerator:
             try:
                 hits = int(float(row.get('hit_count', 0) or 0))
             except (TypeError, ValueError):
-                hits = 0
+                # 記 0 會把該 rule 塞進「未使用可停用」名單——跳過並警示
+                logger.warning("unparsable hit_count for {}: {!r} — row skipped",
+                               href, row.get('hit_count'))
+                unparsed_rows += 1
+                continue
             days = row.get('days_since_last_hit', '')
 
             def _s(col: str) -> str:
@@ -170,7 +175,8 @@ class RuleHitCountGenerator:
 
         enrich_failed = self._enrich_rows(rows)
         return self._finalize(rows, source='csv', date_range=date_range,
-                              enrich_failed=enrich_failed)
+                              enrich_failed=enrich_failed,
+                              unparsed_rows=unparsed_rows)
 
     def export(
         self,
@@ -293,7 +299,8 @@ class RuleHitCountGenerator:
         return False
 
     def _finalize(self, rows: list, source: str, date_range: tuple,
-                  enrich_failed: bool = False) -> RuleHitCountResult:
+                  enrich_failed: bool = False,
+                  unparsed_rows: int = 0) -> RuleHitCountResult:
         import pandas as pd
         df = pd.DataFrame(rows)
         total = len(rows)
@@ -321,6 +328,7 @@ class RuleHitCountGenerator:
             date_range=date_range,
             source=source,
             module_results={'kpis': kpis, 'hit_df': hit_df, 'unused_df': unused_df,
-                            'cleanup_df': cleanup_df, 'enrich_failed': enrich_failed},
+                            'cleanup_df': cleanup_df, 'enrich_failed': enrich_failed,
+                            'unparsed_rows': unparsed_rows},
             dataframe=df,
         )

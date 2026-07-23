@@ -175,6 +175,46 @@ def test_tls_overview_monitors_user_supplied_cert(monkeypatch):
     assert result["days_remaining"] == 42
 
 
+def test_tls_overview_check_failure_not_reported_healthy(monkeypatch):
+    """憑證檢查炸掉不得回「健康」預設：要帶 check_failed=True 並記 warning。"""
+    import src.gui.routes.dashboard as dash
+    import src.gui._helpers as gui_helpers
+    from loguru import logger as _logger
+
+    def _boom(path):
+        raise RuntimeError("openssl exploded")
+
+    monkeypatch.setattr(gui_helpers, "_cert_days_remaining", _boom)
+
+    class _CM:
+        config = {"web_gui": {"tls": {"enabled": True,
+                                       "cert_file": "/etc/certs/mine.pem",
+                                       "key_file": "/etc/certs/mine.key"}}}
+
+    records = []
+    sink_id = _logger.add(lambda m: records.append(m), level="WARNING")
+    try:
+        result = dash._tls_overview(_CM())
+    finally:
+        _logger.remove(sink_id)
+    assert result["check_failed"] is True
+    assert result["days_remaining"] is None
+    assert any("tls overview" in str(m).lower() for m in records)
+
+
+def test_tls_overview_success_marks_check_ok(monkeypatch):
+    import src.gui.routes.dashboard as dash
+    import src.gui._helpers as gui_helpers
+    monkeypatch.setattr(gui_helpers, "_cert_days_remaining", lambda p: 42)
+
+    class _CM:
+        config = {"web_gui": {"tls": {"enabled": True,
+                                       "cert_file": "/etc/certs/mine.pem",
+                                       "key_file": "/etc/certs/mine.key"}}}
+
+    assert dash._tls_overview(_CM())["check_failed"] is False
+
+
 def test_overview_job_health_tolerates_corrupt_entries(client, tmp_path, monkeypatch):
     """壞的 job_health.json 條目（非數字 interval_seconds）應被跳過，
     不影響其他條目或端點回傳 200."""
@@ -223,3 +263,33 @@ def test_overview_posture_generated_at_from_snapshot(client, monkeypatch):
                        environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     body = r.get_json()
     assert body["posture"]["generated_at"] == snap_date
+
+
+def test_overview_data_integrity_lists_recent_truncations(client, tmp_path, monkeypatch):
+    """data_integrity.json 近 7 天條目要出現在 overview；過期條目過濾掉。"""
+    import datetime
+    from src import data_integrity as di
+    path = str(tmp_path / "data_integrity.json")
+    monkeypatch.setattr(di, "_data_integrity_file", lambda: path)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    fresh = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    old = (now - datetime.timedelta(days=8)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    json.dump({
+        "/orgs/1/workloads?managed=true": {"last_seen": fresh, "got": 500, "total": 700},
+        "/orgs/1/labels": {"last_seen": old, "got": 500, "total": 600},
+    }, open(path, "w"))
+    r = client.get("/api/dashboard/overview",
+                   environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    body = r.get_json()
+    di_list = body["data_integrity"]
+    assert [e["path"] for e in di_list] == ["/orgs/1/workloads?managed=true"]
+    assert di_list[0]["got"] == 500 and di_list[0]["total"] == 700
+
+
+def test_overview_data_integrity_empty_by_default(client, tmp_path, monkeypatch):
+    from src import data_integrity as di
+    monkeypatch.setattr(di, "_data_integrity_file",
+                        lambda: str(tmp_path / "data_integrity.json"))
+    r = client.get("/api/dashboard/overview",
+                   environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert r.get_json()["data_integrity"] == []

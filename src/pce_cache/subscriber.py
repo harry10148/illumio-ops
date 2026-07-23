@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Callable, Optional
 
 import orjson
+from loguru import logger
 from sqlalchemy import select, and_, or_
 from sqlalchemy.orm import sessionmaker
 
@@ -87,6 +88,8 @@ def _row_to_dict(row) -> dict:
             if parsed:
                 return parsed
         except orjson.JSONDecodeError:
-            pass
+            # 降級成欄位投影（缺 raw payload 細節）——要留下損毀證據
+            logger.warning("corrupt cached payload row id={}; falling back to column projection",
+                           getattr(row, "id", "?"))
     # Fallback minimal projection
     return {c.name: getattr(row, c.name) for c in row.__table__.columns}

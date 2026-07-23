@@ -292,7 +292,7 @@ last-run 狀態）、**Logs**。
 
 四個子頁，`overview`／`cache`／`siem`／`dlq`：
 
-- **Overview**：管線健康總覽，含以下兩項全庫未記錄過的卡片：
+- **Overview**：管線健康總覽，含以下幾項卡片：
 
   **Job Health 表格**（`src/gui/routes/dashboard.py` 的
   `_overview_job_health()`，讀 `logs/job_health.json`）：列出所有已註冊
@@ -311,8 +311,15 @@ last-run 狀態）、**Logs**。
 
   **TLS 憑證卡**（`_tls_overview()`）：GUI 未啟用 TLS 時整張卡不顯示
   （`enabled: false`）；啟用時顯示剩餘天數，低於設定的 `auto_renew_days`
-  門檻會額外標示「Expiring soon」。憑證輪替與每日續期 job 見
+  門檻會額外標示「Expiring soon」；憑證檢查本身失敗（如 openssl 不可用）
+  顯示「TLS 檢查失敗」而非天數。憑證輪替與每日續期 job 見
   [configuration.md](configuration.md) 的「TLS：self-signed 憑證每日續期 job」節。
+
+  **資料完整性表格**（`_overview_data_integrity()`，讀
+  `logs/data_integrity.json`）：列出近 7 天內「集合 GET 被 PCE 500 筆上限
+  截斷、且 async fallback 未能取回完整集合」的 API path（含實得/總數）。
+  平時為空、整節不顯示；出現條目代表以該集合為來源的報表資料不完整，
+  fallback 恢復後條目自動清除。
 
 - **Cache**：PCE cache 狀態卡、設定表單（保留天數、輪詢間隔、traffic
   filter／sampling）。儲存後需 **Restart Monitor**（`POST

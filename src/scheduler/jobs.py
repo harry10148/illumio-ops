@@ -299,7 +299,8 @@ def run_ven_summary(cm) -> None:
     now = datetime.datetime.now(datetime.timezone.utc)
     try:
         with ApiClient(cm) as api:
-            workloads = api.fetch_managed_workloads()
+            # raise_on_error：PCE 失敗走下方 last_error 路徑，不得寫出 0/0
+            workloads = api.fetch_managed_workloads(raise_on_error=True)
         total = online = 0
         attention = []
         oldest_age = 0.0

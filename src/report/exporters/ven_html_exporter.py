@@ -428,7 +428,9 @@ class VenHtmlExporter:
         # ── per-VEN risk ranking table
         ven_df = pd.DataFrame([{
             "Hostname": r["hostname"], "Severity": r["severity"],
-            "Protection %": r["protection_percent"], "High-Risk Open Ports": r["open_risky_count"],
+            "Protection %": r["protection_percent"],
+            # enrichment 失敗時 0 是「不知道」不是「乾淨」——顯示 ?
+            "High-Risk Open Ports": ("?" if r.get("enrichment_error") else r["open_risky_count"]),
         } for r in per_ven])
         ven_col_i18n = {"Hostname": "rpt_rwp_host", "Severity": "rpt_rwp_severity",
                         "Protection %": "rpt_rwp_coverage", "High-Risk Open Ports": "rpt_rwp_open_ports"}

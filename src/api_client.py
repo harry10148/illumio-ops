@@ -297,6 +297,22 @@ class ApiClient:
             logger.error(f"Health check failed: {e}")
             return 0, str(e)
 
+    def check_node_available(self) -> tuple[int, str]:
+        """GET /api/v2/node_available（官方 SLB 健康檢查端點，免驗證）。
+
+        healthy 判準：HTTP 200（on-prem SLB 文件；lab PCE 25.2.40 實測）或
+        202（Supercluster 文件）；404/502/連線失敗為節點不可服務。官方註明
+        狀態反映最多延遲 30 秒，呼叫端（monitor cycle）節奏遠慢於此。
+        """
+        url = f"{self.api_cfg['url']}/api/v2/node_available"
+        try:
+            status, body = self._request(url, timeout=10)
+            text = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
+            return status, text
+        except Exception as e:
+            logger.error(f"node_available check failed: {e}")
+            return 0, str(e)
+
     # ═══════════════════════════════════════════════════════════════════════
     # Events (stays on facade — not part of any moved domain)
     # ═══════════════════════════════════════════════════════════════════════
@@ -660,6 +676,8 @@ class ApiClient:
         path = f"/orgs/{org}/labels"
         status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_all_labels")
             return data
         if raise_on_error and status != 200:
             raise APIError(f"get_all_labels failed: HTTP {status} for {path}")
@@ -740,21 +758,35 @@ class ApiClient:
             logger.error(f"Update Workload Labels Error: {e}")
             return False
 
-    def fetch_managed_workloads(self, max_results: int = 10000) -> list:
+    def fetch_managed_workloads(self, max_results: int = 10000,
+                                raise_on_error: bool = False) -> list:
         """Fetch all VEN-managed workloads (those with an active VEN agent).
 
         max_results 參數保留供呼叫端相容，但集合 GET 一律經 _get_collection
         套用 PCE 硬上限 500（帶更大的值本來就無效、還會掩蓋截斷）。
+
+        raise_on_error=True：非 200（含連線層失敗）raise APIError，供 VEN
+        summary 等消費端區分「PCE 故障」與「合法空集合」（否則 0/0 會被
+        當成真相寫進 dashboard）。預設 False 維持既有呼叫者行為。
         """
         try:
             org = self.api_cfg['org_id']
-            status, data, _total = self._get_collection(f"/orgs/{org}/workloads?managed=true", timeout=30)
+            path = f"/orgs/{org}/workloads?managed=true"
+            status, data, _total = self._get_collection(path, timeout=30)
             if status == 200:
+                if raise_on_error:
+                    self._raise_if_truncated(path, "fetch_managed_workloads")
                 return data
             logger.error(f"Fetch Managed Workloads Failed: {status}")
+            if raise_on_error:
+                raise APIError(f"fetch_managed_workloads failed: HTTP {status}")
             return []
+        except APIError:
+            raise
         except Exception as e:
             logger.error(f"Fetch Managed Workloads Error: {e}")
+            if raise_on_error:
+                raise APIError(f"fetch_managed_workloads failed: {e}") from e
             return []
 
     def search_workloads(self, params: dict) -> list:
@@ -895,13 +927,31 @@ class ApiClient:
                 # 跨呼叫先失敗後成功：清除先前殘留的截斷紀錄，避免假陽性永久殘留
                 if path in self.last_truncated_collections:
                     self.last_truncated_collections.remove(path)
+                try:
+                    from src.data_integrity import clear_truncation
+                    clear_truncation(path)
+                except Exception:
+                    pass  # 遙測失敗不得影響 API 主路徑
                 return status, fallback_data, total_count
             # 去重：同一 path 因排程重複呼叫且反覆截斷失敗時，避免
             # last_truncated_collections 無上限纍積（Task 1 遺留的 append-only 問題）。
             if path not in self.last_truncated_collections:
                 self.last_truncated_collections.append(path)
+            try:
+                from src.data_integrity import record_truncation
+                record_truncation(path, actual_count, total_count)
+            except Exception:
+                pass  # 遙測失敗不得影響 API 主路徑
 
         return status, data, total_count
+
+    def _raise_if_truncated(self, path: str, name: str) -> None:
+        """raise_on_error getter 的截斷防門：截斷且 fallback 未恢復時大聲失敗，
+        不讓不完整集合流進「必須區分失敗與空集合」的消費端。"""
+        if path in self.last_truncated_collections:
+            from src.exceptions import TruncatedCollectionError
+            raise TruncatedCollectionError(
+                f"{name}: collection {path} truncated at PCE 500 cap and async fallback failed")
 
     def _cached_async_collection_get(self, path: str, *, timeout: int = 15) -> list[Any] | None:
         """_async_collection_get 的 process 級 memo/退避包裝。
@@ -1053,8 +1103,11 @@ class ApiClient:
         if self.ruleset_cache and not force_refresh:
             return self.ruleset_cache
         org = self.api_cfg['org_id']
-        status, data, _total = self._get_collection(f"/orgs/{org}/sec_policy/draft/rule_sets")
+        path = f"/orgs/{org}/sec_policy/draft/rule_sets"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_all_rulesets")
             self.ruleset_cache = data
             return self.ruleset_cache
         if raise_on_error and status != 200:
@@ -1072,6 +1125,8 @@ class ApiClient:
         path = f"/orgs/{org}/sec_policy/active/rule_sets"
         status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_active_rulesets")
             return data
         if raise_on_error and status != 200:
             raise APIError(f"get_active_rulesets failed: HTTP {status} for {path}")
@@ -1094,6 +1149,8 @@ class ApiClient:
         path = f"/orgs/{org}/sec_policy/{pversion}/ip_lists"
         status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_ip_lists")
             return data
         if raise_on_error and status != 200:
             raise APIError(f"get_ip_lists failed: HTTP {status} for {path}")
@@ -1115,6 +1172,8 @@ class ApiClient:
         path = f"/orgs/{org}/sec_policy/{pversion}/label_groups"
         status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_label_groups")
             return data
         if raise_on_error and status != 200:
             raise APIError(f"get_label_groups failed: HTTP {status} for {path}")
@@ -1136,6 +1195,8 @@ class ApiClient:
         path = f"/orgs/{org}/sec_policy/{pversion}/services"
         status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_services")
             return data
         if raise_on_error and status != 200:
             raise APIError(f"get_services failed: HTTP {status} for {path}")

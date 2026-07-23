@@ -61,10 +61,48 @@ def test_stale_cache_refetches(tmp_path):
     assert api.workload_calls == 2
 
 
-def test_per_workload_error_is_swallowed(tmp_path):
+def test_per_workload_error_flagged_not_silently_clean(tmp_path):
+    """失敗不得偽裝乾淨：條目要帶 enrichment_error、要記 warning，
+    且不得寫入 cache（否則假性乾淨會存活整個 TTL）。"""
+    import json as _json
+    from loguru import logger as _logger
+
     class BoomApi(FakeApi):
         def get_workload_risk_details(self, href):
             raise RuntimeError("boom")
-    out = refresh_ransomware_posture(BoomApi(), [_wl("/w/a")],
-                                     cache_path=str(tmp_path / "c.json"), now=1.0)
-    assert out["/w/a"]["details"] == []
+
+    records = []
+    sink_id = _logger.add(lambda m: records.append(m), level="WARNING")
+    try:
+        cache = tmp_path / "c.json"
+        out = refresh_ransomware_posture(BoomApi(), [_wl("/w/a")],
+                                         cache_path=str(cache), now=1.0)
+        assert out["/w/a"]["details"] == []
+        assert "boom" in out["/w/a"]["enrichment_error"]
+        assert any("enrichment failed" in str(m) for m in records)
+        cached = _json.loads(cache.read_text()) if cache.exists() else {}
+        assert "/w/a" not in cached
+    finally:
+        _logger.remove(sink_id)
+
+
+def test_error_entry_retried_next_run(tmp_path):
+    """失敗條目未入 cache：下一輪（API 恢復）要重抓並轉乾淨。"""
+    class FlakyApi(FakeApi):
+        def __init__(self):
+            super().__init__()
+            self.fail = True
+
+        def get_workload(self, href):
+            if self.fail:
+                raise RuntimeError("down")
+            return super().get_workload(href)
+
+    api = FlakyApi()
+    cache = str(tmp_path / "c.json")
+    out1 = refresh_ransomware_posture(api, [_wl("/w/a")], cache_path=cache, now=1.0)
+    assert out1["/w/a"].get("enrichment_error")
+    api.fail = False
+    out2 = refresh_ransomware_posture(api, [_wl("/w/a")], cache_path=cache, now=2.0)
+    assert not out2["/w/a"].get("enrichment_error")
+    assert out2["/w/a"]["open_service_ports"]

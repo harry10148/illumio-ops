@@ -760,11 +760,32 @@ class Analyzer:
                             "details": t('health_degraded_details', status=body_status),
                         })
             else:
-                logger.info(t('status_ok'))
-                logger.info("PCE health check OK.")
-                self.stats.record_pce_success("health", status=h_status, message=h_msg[:120])
-                self._pce_stats_dirty = True
-                self._watchdog_dirty = True
+                # /health 過再探官方 SLB 端點 /node_available（200/202=健康；
+                # 404/502/連線失敗=節點不可服務——Illumio 官方判準）。Protocol
+                # stub 可能沒實作此方法，缺就跳過。
+                na_check = getattr(self.api, "check_node_available", None)
+                na_status = None
+                if callable(na_check):
+                    na_status, _na_msg = na_check()
+                if na_status is not None and na_status not in (200, 202):
+                    logger.warning(f"PCE node_available check failed: HTTP {na_status}")
+                    self.stats.record_pce_error(
+                        "health", f"node_available: HTTP {na_status}", status=na_status)
+                    self._pce_stats_dirty = True
+                    for rule in pce_health_rules:
+                        if self._check_cooldown(rule):
+                            self.reporter.add_health_alert({
+                                "time": datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M:%S'),
+                                "rule": rule["name"],
+                                "status": str(na_status),
+                                "details": t('health_node_unavailable_details', status=na_status),
+                            })
+                else:
+                    logger.info(t('status_ok'))
+                    logger.info("PCE health check OK.")
+                    self.stats.record_pce_success("health", status=h_status, message=h_msg[:120])
+                    self._pce_stats_dirty = True
+                    self._watchdog_dirty = True
         return True
 
     def _check_watchdog(self) -> None:
