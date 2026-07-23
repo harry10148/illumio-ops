@@ -740,11 +740,16 @@ class ApiClient:
             logger.error(f"Update Workload Labels Error: {e}")
             return False
 
-    def fetch_managed_workloads(self, max_results: int = 10000) -> list:
+    def fetch_managed_workloads(self, max_results: int = 10000,
+                                raise_on_error: bool = False) -> list:
         """Fetch all VEN-managed workloads (those with an active VEN agent).
 
         max_results 參數保留供呼叫端相容，但集合 GET 一律經 _get_collection
         套用 PCE 硬上限 500（帶更大的值本來就無效、還會掩蓋截斷）。
+
+        raise_on_error=True：非 200（含連線層失敗）raise APIError，供 VEN
+        summary 等消費端區分「PCE 故障」與「合法空集合」（否則 0/0 會被
+        當成真相寫進 dashboard）。預設 False 維持既有呼叫者行為。
         """
         try:
             org = self.api_cfg['org_id']
@@ -752,9 +757,15 @@ class ApiClient:
             if status == 200:
                 return data
             logger.error(f"Fetch Managed Workloads Failed: {status}")
+            if raise_on_error:
+                raise APIError(f"fetch_managed_workloads failed: HTTP {status}")
             return []
+        except APIError:
+            raise
         except Exception as e:
             logger.error(f"Fetch Managed Workloads Error: {e}")
+            if raise_on_error:
+                raise APIError(f"fetch_managed_workloads failed: {e}") from e
             return []
 
     def search_workloads(self, params: dict) -> list:
