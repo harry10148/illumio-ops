@@ -212,7 +212,8 @@ def test_schedules_list_enriches_last_state(client, monkeypatch, tmp_path):
             href: {
                 "last_checked": "2026-07-16T00:00:00Z",
                 "last_action": "enable",
-                "last_result": "ok",
+                "last_result": "error",
+                "error": "HTTP 500",
             }
         }
     }), encoding="utf-8")
@@ -242,4 +243,5 @@ def test_schedules_list_enriches_last_state(client, monkeypatch, tmp_path):
     entry = body[0]
     assert entry["last_checked"] == "2026-07-16T00:00:00Z"
     assert entry["last_action"] == "enable"
-    assert entry["last_result"] == "ok"
+    assert entry["last_result"] == "error"
+    assert entry["last_error"] == "HTTP 500"

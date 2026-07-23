@@ -254,6 +254,7 @@ def make_rule_scheduler_blueprint(
                 entry['last_checked'] = st.get('last_checked')
                 entry['last_action'] = st.get('last_action')
                 entry['last_result'] = st.get('last_result')
+                entry['last_error'] = st.get('error')
                 # Live status check
                 try:
                     status, data = api.get_live_item(href)

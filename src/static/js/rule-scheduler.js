@@ -536,11 +536,15 @@ async function rsLoadSchedules() {
       editBtn.dataset.action = 'rsEditSchedule';
       editBtn.dataset.args = JSON.stringify([s.id]);
       // Last run cell: last_checked timestamp plus optional action/result suffix.
+      // On error, tint the cell and surface the recorded error text via title.
       let lastTd;
       if (s.last_checked) {
         const resTxt = s.last_result === 'error' ? ' !' : '';
         const text = s.last_checked + (s.last_action ? (' (' + s.last_action + resTxt + ')') : '');
-        lastTd = h('td', s.last_result === 'error' ? { style: { color: 'var(--danger)' } } : null, text);
+        const attrs = s.last_result === 'error'
+          ? { style: { color: 'var(--danger)' }, title: s.last_error || '' }
+          : null;
+        lastTd = h('td', attrs, text);
       } else {
         lastTd = h('td', null, _t('gui_jh_never_ran'));
       }
