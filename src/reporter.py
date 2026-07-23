@@ -821,6 +821,9 @@ class Reporter:
         return _html.escape(text)
 
     ALERT_DLQ_MAX_ATTEMPTS = 3
+    # 全 skipped（無可用通道）時 DLQ 會逐 cycle 累積新告警——單 bucket 上限
+    # 防無界成長，超出裁掉最舊（2026-07-24 審查 B1 配套）
+    ALERT_DLQ_BUCKET_CAP = 100
 
     def _pop_alert_dlq(self) -> list[dict[str, Any]]:
         """Atomically take all pending DLQ entries from the state file."""
@@ -841,7 +844,16 @@ class Reporter:
         return popped
 
     def _push_alert_dlq(self, buckets: dict[str, list], attempts: int, first_failed_at: str) -> None:
-        entry = {"buckets": buckets, "attempts": attempts, "first_failed_at": first_failed_at}
+        capped = {}
+        for name, items in buckets.items():
+            if len(items) > self.ALERT_DLQ_BUCKET_CAP:
+                logger.warning(
+                    "Alert DLQ: {} bucket exceeds cap ({} > {}), keeping newest",
+                    name, len(items), self.ALERT_DLQ_BUCKET_CAP,
+                )
+                items = items[-self.ALERT_DLQ_BUCKET_CAP:]
+            capped[name] = items
+        entry = {"buckets": capped, "attempts": attempts, "first_failed_at": first_failed_at}
 
         def _append(existing: dict) -> dict:
             out = dict(existing)
@@ -861,6 +873,7 @@ class Reporter:
         t = self._lang_t(_lang)
         replayed_attempts = 0
         replayed_first_failed_at = ""
+        _replayed_attempt_values: list[int] = []
         if not force_test:
             for entry in self._pop_alert_dlq():
                 buckets = entry.get("buckets", {})
@@ -868,8 +881,11 @@ class Reporter:
                 self.event_alerts.extend(buckets.get("event", []))
                 self.traffic_alerts.extend(buckets.get("traffic", []))
                 self.metric_alerts.extend(buckets.get("metric", []))
-                replayed_attempts = max(replayed_attempts, int(entry.get("attempts", 0)))
+                _replayed_attempt_values.append(int(entry.get("attempts", 0)))
                 replayed_first_failed_at = replayed_first_failed_at or entry.get("first_failed_at", "")
+            # 多筆合併取 min：以最年輕條目計次，避免較新告警被提早丟棄
+            # （2026-07-24 審查 B4；常態單筆時 min == 該筆值）
+            replayed_attempts = min(_replayed_attempt_values, default=0)
         if (
             not any(
                 [
@@ -995,8 +1011,11 @@ class Reporter:
 
         attempted = [r for r in results if r.get("status") != "skipped"]
         delivered = any(r.get("status") == "success" for r in results)
-        if attempted and not delivered and not force_test:
-            attempts = replayed_attempts + 1
+        if not delivered and not force_test:
+            # 全 skipped（設定缺失/通道冷卻）也要入列——抽乾後不回寫等於
+            # 永久遺失；但只有真的嘗試過遞送才消耗重試額度
+            # （2026-07-24 審查 B1/B2）
+            attempts = replayed_attempts + (1 if attempted else 0)
             first_failed_at = replayed_first_failed_at or format_utc(
                 datetime.datetime.now(datetime.timezone.utc)
             )
@@ -1006,16 +1025,20 @@ class Reporter:
                 "traffic": list(self.traffic_alerts),
                 "metric": list(self.metric_alerts),
             }
-            if attempts >= self.ALERT_DLQ_MAX_ATTEMPTS:
-                logger.error(
-                    "Alert DLQ: dropping {} alert bucket(s) after {} failed dispatch attempts",
-                    sum(len(v) for v in buckets.values()), attempts,
-                )
-                results.append({"channel": "dlq", "status": "dropped", "target": "",
-                                "error": f"dropped after {attempts} attempts"})
-            else:
-                logger.warning("Alert DLQ: all channels failed, queuing for retry (attempt {})", attempts)
-                self._push_alert_dlq(buckets, attempts, first_failed_at)
+            if any(buckets.values()):
+                if attempted and attempts >= self.ALERT_DLQ_MAX_ATTEMPTS:
+                    logger.error(
+                        "Alert DLQ: dropping {} alert bucket(s) after {} failed dispatch attempts",
+                        sum(len(v) for v in buckets.values()), attempts,
+                    )
+                    results.append({"channel": "dlq", "status": "dropped", "target": "",
+                                    "error": f"dropped after {attempts} attempts"})
+                else:
+                    logger.warning(
+                        "Alert DLQ: no delivery ({} attempted), queuing for retry (attempt {})",
+                        len(attempted), attempts,
+                    )
+                    self._push_alert_dlq(buckets, attempts, first_failed_at)
 
         try:
             persist_dispatch_results(
