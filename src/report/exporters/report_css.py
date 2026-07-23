@@ -298,6 +298,12 @@ BASE_CSS = """\
     .card { box-shadow: none; border: 1px solid var(--slate-20); }
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
+    /* 寬表列印保命：螢幕上靠 overflow-x 捲動的內容，列印時捲動區會被
+       整段裁掉（2026-07-23 視覺實檢：發現與行動表近半內容消失）——改為
+       可見＋縮字＋長字換行，寧可擠也不能無聲消失 */
+    .report-table-wrap { overflow: visible !important; }
+    .report-table-wrap table { font-size: 8pt; table-layout: auto !important; width: 100% !important; }
+    .report-table-wrap td, .report-table-wrap th { word-break: break-word; white-space: normal !important; }
     /* Override JS auto-fit: data-auto-fitted=true triggers table-layout:fixed in base CSS.
        !important overrides the higher-specificity attribute selector. */
     .report-table { width: 100% !important; min-width: 0 !important; overflow-wrap: break-word; table-layout: auto !important; }
@@ -540,16 +546,19 @@ EXEC_SUMMARY_CSS = """
 .exec-summary .verdict { font-weight: 600; font-size: 1.1rem; }
 .exec-summary .kpi-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  /* 150px 下限＋clamp 字級：120px 時「15,283,332」溢進鄰欄（2026-07-23
+     視覺實檢，郵件寬度 ~780px 首當其衝） */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   margin: 16px 0;
 }
-.exec-summary .kpi { display: flex; flex-direction: column; align-items: flex-start; }
+.exec-summary .kpi { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .exec-summary .kpi-label { font-size: 0.85rem; color: var(--slate-50); }
 .exec-summary .kpi-value {
-  font-size: 1.6rem;
+  font-size: clamp(1.1rem, 2.4vw, 1.6rem);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .exec-summary .summary-text { margin: 12px 0; line-height: 1.6; }
 .exec-summary .notes { margin: 12px 0 0 20px; color: var(--slate-50); }
