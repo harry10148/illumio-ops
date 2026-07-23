@@ -3546,6 +3546,7 @@
   "rpt_rhc_note_optimization": "PCE rule optimization may increment merged rules together (counts can overestimate). Each flow attributes at most 100 rules.",
   "rpt_rhc_note_retention": "Counts are retained for 90 days; last-hit timestamps are kept permanently.",
   "rpt_rhc_note_enrich_failed": "Rule detail enrichment failed — consumer/provider/service columns are empty.",
+  "rpt_rhc_note_unparsed": "{n} CSV row(s) had an unparsable hit count and were excluded — they are NOT counted as unused rules.",
   "rpt_rhc_note_csv_window": "Data window taken from the imported CSV's Start/End Date columns.",
   "rpt_rhc_col_ruleset": "Ruleset",
   "rpt_rhc_col_rule_no": "No.",

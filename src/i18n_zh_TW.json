@@ -4320,6 +4320,7 @@
   "rpt_rhc_note_optimization": "PCE 規則最佳化可能使合併規則同時累加（計數可能高估）；每筆 flow 最多歸因 100 條規則。",
   "rpt_rhc_note_retention": "計數保留 90 天；「距上次命中」時間戳為永久保留。",
   "rpt_rhc_note_enrich_failed": "規則明細 enrichment 失敗——來源/目的/Service 欄位為空。",
+  "rpt_rhc_note_unparsed": "{n} 列 CSV 的命中次數無法解析，已排除——這些規則「不會」被計入未使用規則。",
   "rpt_rhc_note_csv_window": "資料時窗取自匯入 CSV 的 Start/End Date 欄。",
   "rpt_rhc_col_ruleset": "Ruleset",
   "rpt_rhc_col_rule_no": "編號",

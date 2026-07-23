@@ -96,6 +96,33 @@ class TestGenerateFromCsv(unittest.TestCase):
         hit_df = result.module_results["hit_df"]
         self.assertEqual(list(hit_df["hit_count"]), [42, 5])   # desc by hits
 
+    def test_unparsable_hit_count_not_counted_as_zero(self):
+        """hit_count 解析失敗不得記 0 命中（會被當「未使用可停用」的真相），
+        該列跳過、計入 unparsed_rows、記 warning。"""
+        from loguru import logger as _logger
+        gen = RuleHitCountGenerator(MagicMock(), api_client=None)
+        records = []
+        sink_id = _logger.add(lambda m: records.append(m), level="WARNING")
+        try:
+            with tempfile.TemporaryDirectory() as td:
+                path = os.path.join(td, "garbage-hits.csv")
+                with open(path, "w", encoding="utf-8-sig") as fh:
+                    fh.write(
+                        "Rule HREF,Rule Hit Count,Start Date,End Date\n"
+                        "/orgs/1/sec_policy/active/rule_sets/10/sec_rules/100,42,"
+                        "2026-06-01,2026-07-01\n"
+                        "/orgs/1/sec_policy/active/rule_sets/10/sec_rules/101,garbage,"
+                        "2026-06-01,2026-07-01\n"
+                    )
+                result = gen.generate_from_csv(path, lang="en")
+        finally:
+            _logger.remove(sink_id)
+        self.assertEqual(result.record_count, 1)
+        self.assertEqual(result.module_results["unparsed_rows"], 1)
+        kpis = result.module_results["kpis"]
+        self.assertEqual(kpis["unused_rules"], 0)
+        self.assertTrue(any("unparsable hit_count" in str(m) for m in records))
+
     def test_missing_required_columns_raises(self):
         gen = RuleHitCountGenerator(MagicMock(), api_client=None)
         with tempfile.TemporaryDirectory() as td:

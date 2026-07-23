@@ -96,6 +96,9 @@ class RuleHitCountHtmlExporter:
             notes.append(t("rpt_rhc_note_csv_window", lang=lang))
         if (self._result.module_results or {}).get("enrich_failed"):
             notes.append(t("rpt_rhc_note_enrich_failed", lang=lang))
+        _unparsed = (self._result.module_results or {}).get("unparsed_rows") or 0
+        if _unparsed:
+            notes.append(t("rpt_rhc_note_unparsed", lang=lang, n=_unparsed))
         items = "".join(f"<li>{_esc(n)}</li>" for n in notes)
         return f'<section class="card"><ul class="note">{items}</ul></section>'
 
