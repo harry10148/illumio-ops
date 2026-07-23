@@ -55,6 +55,8 @@ def test_freshness_check_flags_stale(tmp_path: Path) -> None:
 def test_frontmatter_check_passes_on_clean(tmp_path: Path) -> None:
     docs = tmp_path / "docs"
     docs.mkdir()
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "alpha.py").write_text("x = 1\n")
     body = (
         "---\n"
         "title: Alpha\n"
@@ -119,6 +121,9 @@ def test_frontmatter_rejects_empty_verified_against(tmp_path: Path) -> None:
 def test_frontmatter_accepts_list_verified_against(tmp_path: Path) -> None:
     docs = tmp_path / "docs"
     docs.mkdir()
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "alpha.py").write_text("x = 1\n")
+    (tmp_path / "src" / "beta.py").write_text("x = 1\n")
     body = (
         "---\n"
         "title: Alpha\n"
@@ -131,6 +136,44 @@ def test_frontmatter_accepts_list_verified_against(tmp_path: Path) -> None:
     )
     (docs / "alpha.md").write_text(body)
     (docs / "alpha_zh.md").write_text(body)
+    rc, out, _ = run_check("--frontmatter", "--root", str(docs))
+    assert rc == 0, out
+
+
+def test_verified_against_dangling_path_flagged(tmp_path: Path) -> None:
+    # 2026-07-17 事故防門：verified_against 指向已刪除檔案必須被抓出
+    # （preview.py 懸空引用當時靠人工 review 才發現）。
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    body = (
+        "---\n"
+        "title: Alpha\n"
+        "last_verified: 2026-05-15\n"
+        "verified_against:\n"
+        "  - src/definitely_missing_xyz.py\n"
+        "---\n"
+        "# Alpha\n"
+    )
+    (docs / "alpha.md").write_text(body)
+    rc, out, _ = run_check("--frontmatter", "--root", str(docs))
+    assert rc != 0
+    assert "path not found" in out and "definitely_missing_xyz" in out
+
+
+def test_verified_against_non_path_entries_skipped(tmp_path: Path) -> None:
+    # 不含 '/' 的條目（版本字樣等）不做存在性檢查
+    docs = tmp_path / "docs"
+    docs.mkdir()
+    body = (
+        "---\n"
+        "title: Alpha\n"
+        "last_verified: 2026-05-15\n"
+        "verified_against:\n"
+        "  - PCE 25.2.40\n"
+        "---\n"
+        "# Alpha\n"
+    )
+    (docs / "alpha.md").write_text(body)
     rc, out, _ = run_check("--frontmatter", "--root", str(docs))
     assert rc == 0, out
 

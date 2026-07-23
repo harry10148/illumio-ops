@@ -131,6 +131,28 @@ def check_frontmatter(md: list[Path], issues: list[tuple[str, str, str]]) -> Non
                 issues.append((str(path), "frontmatter", f"{key} is empty"))
 
 
+def check_verified_against_paths(
+    md: list[Path], issues: list[tuple[str, str, str]], repo_root: Path,
+) -> None:
+    """verified_against 裡「長得像 repo 路徑」的條目必須存在。
+
+    只檢查含 '/' 的條目（如 src/foo.py）；不含 '/' 的版本字樣
+    （如 "PCE 25.2.40"）跳過。2026-07-17 preview.py 懸空引用事故的防門。
+    """
+    for path in md:
+        fm = parse_frontmatter(path.read_text(encoding="utf-8"))
+        if not fm:
+            continue
+        va = fm.get("verified_against")
+        entries = va if isinstance(va, list) else ([va] if isinstance(va, str) else [])
+        for item in entries:
+            item = (item or "").strip()
+            if not item or "/" not in item or item.startswith(("http://", "https://")):
+                continue
+            if not (repo_root / item).exists():
+                issues.append((str(path), "verified_against", f"path not found: {item}"))
+
+
 def check_links(md: list[Path], md_targets: list[Path], issues: list[tuple[str, str, str]]) -> None:
     target_set = {p.resolve() for p in md_targets}
     for path in md:
@@ -184,6 +206,7 @@ def main(argv: list[str]) -> int:
         check_freshness(md, args.freshness if args.freshness is not None else DEFAULT_FRESHNESS_DAYS, issues)
     if args.all or args.frontmatter:
         check_frontmatter(md, issues)
+        check_verified_against_paths(md, issues, root.parent)
     if args.all or args.links:
         check_links(md, md_targets, issues)
 
