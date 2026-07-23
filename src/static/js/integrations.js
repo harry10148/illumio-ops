@@ -1500,9 +1500,11 @@ function _buildOvJobHealth(jobHealth) {
     var statusTxt = e.level === 'warn' && e.last_run
       ? (escapeHtml(e.last_status) + ' · <span data-i18n="gui_jh_overdue">overdue</span>')
       : escapeHtml(e.last_status || '');
-    var mins = e.interval_seconds >= 3600
-      ? (Math.round(e.interval_seconds / 3600) + 'h')
-      : (Math.round(e.interval_seconds / 60) + 'm');
+    var ivs = Number(e.interval_seconds) || 0;
+    var mins = !ivs ? '-'
+      : ivs >= 3600 ? (Math.round(ivs / 3600) + 'h')
+      : ivs >= 60 ? (Math.round(ivs / 60) + 'm')
+      : (ivs + 's');
     return '<tr>'
       + '<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + mark + ';margin-right:6px;"></span>'
       + escapeHtml(e.job_id) + '</td>'
