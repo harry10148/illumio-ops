@@ -69,16 +69,3 @@ def test_quarantine_search_archive_empty_when_not_loaded(client):
                   environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert resp.status_code == 200
     assert resp.get_json() == {"ok": True, "data": []}
-
-
-def test_traffic_trend_archive_source_shows_loaded_days(client):
-    c, cm = client
-    from src.pce_cache.archive_import import load_archive_review
-    load_archive_review(cm.models.pce_cache, date(2026, 6, 1), date(2026, 6, 30))
-    resp = c.get("/api/traffic/trend?source=archive",
-                 environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
-    assert resp.status_code == 200
-    body = resp.get_json()
-    assert body["ok"] is True
-    # 近 8 天窗不套用，載入的 2026-06-20 應出現
-    assert any(b["ts"] == "2026-06-20" for b in body["buckets"])

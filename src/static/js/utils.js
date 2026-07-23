@@ -58,8 +58,8 @@ const api = async (url, opt = {}) => {
 const post = (url, body) => api(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() }, body: JSON.stringify(body) });
 const put = (url, body) => api(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken() }, body: JSON.stringify(body) });
 const del = url => api(url, { method: 'DELETE', headers: { 'X-CSRF-Token': _csrfToken() } });
-// R5: callers (quarantine.js loadTrafficTrend, etc.) use get(); without this
-// alias it throws ReferenceError and the chart silently shows "No history data".
+// R5: GET-only callers use get(); without this alias they throw
+// ReferenceError and their panels silently render empty.
 const get = url => api(url);
 const rv = name => document.querySelector(`input[name="${name}"]:checked`)?.value;
 const setRv = (name, val) => { const r = document.querySelector(`input[name="${name}"][value="${val}"]`); if (r) r.checked = true };

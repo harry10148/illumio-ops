@@ -9,6 +9,13 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ## [Unreleased]
 
+### Removed
+
+- The "past 7 days traffic trend" chart on the traffic-workload tab and its
+  backing `GET /api/traffic/trend` endpoint were removed (operator verdict:
+  no value). The KPI strip and traffic analyzer query on that tab are
+  unchanged.
+
 ### Added
 
 - Job health observability: every scheduled job records its last run and
