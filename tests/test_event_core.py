@@ -565,3 +565,35 @@ def test_run_debug_mode_system_rule_uses_health_check_not_traffic(monkeypatch, t
     assert "upstream timeout" in output
     assert "PD:" not in output
     assert "計算出的總數" not in output
+
+
+def test_poller_default_overlap_300_and_clamped():
+    """D1（2026-07-24 審查）：overlap 是 watermark 下唯一補抓保險，
+    預設 300s、config 覆寫夾在 [60, 900]。"""
+    from unittest.mock import MagicMock
+    from src.events.poller import EventPoller
+    assert EventPoller(MagicMock()).overlap_seconds == 300
+    assert EventPoller(MagicMock(), overlap_seconds=30).overlap_seconds == 60
+    assert EventPoller(MagicMock(), overlap_seconds=1200).overlap_seconds == 900
+    assert EventPoller(MagicMock(), overlap_seconds=120).overlap_seconds == 120
+
+
+def test_mail_plain_not_truncated_at_line_cap():
+    """B5：email 純文字段沿用 LINE builder，但不得套 LINE 截斷。
+    直接驗 cap 參數：小 cap 會截（footer 出現）、cap=None 不截。"""
+    from src.config import ConfigManager
+    from src.reporter import Reporter
+    from src.i18n import t as _t
+    cm = ConfigManager()
+    r = Reporter(cm)
+    for i in range(3):
+        r.add_health_alert({"time": f"2026-07-24T00:00:0{i}Z", "rule": "R" * 60,
+                            "status": "503", "details": "d" * 80})
+    footer = _t("line_message_truncated", lang="en")
+    capped = r._build_line_message("subj", lang="en", cap=80)
+    assert footer in capped and len(capped) <= 80
+    uncapped = r._build_line_message("subj", lang="en", cap=None)
+    assert footer not in uncapped
+    plain = r._build_mail_plain("subj", lang="en")
+    assert footer not in plain
+    assert plain == uncapped

@@ -1054,7 +1054,8 @@ class Reporter:
 
     _LINE_MESSAGE_CAP = 4500  # LINE push API 實際上限 ~5000，留 buffer（spec §C）
 
-    def _build_line_message(self, subj: str, *, lang: str | None = None) -> str:
+    def _build_line_message(self, subj: str, *, lang: str | None = None,
+                            cap: "int | None" = _LINE_MESSAGE_CAP) -> str:
         """Build a LINE-friendly alert digest aligned to the vendor event content baseline."""
         _lang = lang or self._dispatch_lang or self._lang
         t = self._lang_t(_lang)
@@ -1178,9 +1179,9 @@ class Reporter:
             metric_section="\n".join(metric_section_lines),
         ).strip()
 
-        if len(message) > self._LINE_MESSAGE_CAP:
+        if cap is not None and len(message) > cap:
             footer = t("line_message_truncated")
-            message = message[: self._LINE_MESSAGE_CAP - len(footer) - 1].rstrip() + "\n" + footer
+            message = message[: cap - len(footer) - 1].rstrip() + "\n" + footer
         return message
 
     def _build_telegram_message(self, subj: str, *, lang: str | None = None) -> str:
@@ -1420,8 +1421,11 @@ class Reporter:
 
         Reuses _build_line_message which already renders line_digest.txt.tmpl
         from the same alert lists, ensuring parity with LINE channel content.
+        Email 無長度上限，cap=None 解除 LINE 的 4500 字截斷
+        （2026-07-24 審查 B5）。
         """
-        return self._build_line_message(subject, lang=lang or self._dispatch_lang or self._lang)
+        return self._build_line_message(
+            subject, lang=lang or self._dispatch_lang or self._lang, cap=None)
 
     def _build_mail_html(self, subj: str, *, lang: str | None = None) -> str:
         _lang = lang or self._dispatch_lang or self._lang

@@ -194,7 +194,17 @@ class Analyzer:
             "event_parser_samples": [],
         }
         ensure_monitoring_state(self.state)
-        self.event_poller = EventPoller(self.api, subscriber=subscriber_events)
+        # overlap 可調（events.overlap_seconds，預設 300、夾 [60, 900]）：
+        # PCE 事件索引延遲的唯一補抓保險（2026-07-24 審查 D1）
+        _overlap_cfg = None
+        try:
+            _overlap_cfg = (self.cm.config.get("events") or {}).get("overlap_seconds")
+        except Exception:
+            _overlap_cfg = None
+        self.event_poller = EventPoller(
+            self.api, subscriber=subscriber_events,
+            overlap_seconds=_overlap_cfg if _overlap_cfg is not None else None,
+        )
         self.load_state()
         ensure_monitoring_state(self.state)
         self.stats = StatsTracker(self.state)
