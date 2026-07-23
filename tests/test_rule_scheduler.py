@@ -85,6 +85,50 @@ def test_check_persists_per_schedule_state(tmp_path, monkeypatch):
     assert entry["last_checked"].endswith("Z")
 
 
+def _noop_engine(tmp_path):
+    """一條 recurring schedule 且 PCE 已在目標態（無動作、純心跳）。"""
+    from unittest.mock import MagicMock
+    db = ScheduleDB(str(tmp_path / "rule_schedules.json"))
+    db.db = {"/orgs/1/sec_policy/active/rule_sets/1": {
+        "type": "recurring", "name": "rs", "is_ruleset": True,
+        "action": "allow", "days": ["mon", "tue", "wed", "thu", "fri",
+                                     "sat", "sun"],
+        "start": "00:00", "end": "23:59", "timezone": "UTC",
+    }}
+    api = MagicMock()
+    api.has_draft_changes.return_value = False
+    api.get_live_item.return_value = (200, {"enabled": True})
+    return ScheduleEngine(db, api)
+
+
+def test_pure_heartbeat_tick_skips_state_rewrite(tmp_path, monkeypatch):
+    """純 last_checked 心跳在 _CHECK_PERSIST_GAP_S 內不得全量重寫共享
+    state.json（2026-07-23 觀測性殘債：每 300s tick 一次全檔重寫）。"""
+    import src.rule_scheduler as rule_scheduler
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(rule_scheduler, "_resolve_rule_state_file",
+                        lambda: str(state_file))
+    engine = _noop_engine(tmp_path)
+    engine.check(silent=True, tz_str="UTC")
+    first_mtime = state_file.stat().st_mtime_ns
+    engine.check(silent=True, tz_str="UTC")
+    assert state_file.stat().st_mtime_ns == first_mtime
+
+
+def test_heartbeat_persists_after_gap(tmp_path, monkeypatch):
+    """gap 歸零時心跳照舊落盤（節流只是延後、不是不寫）。"""
+    import src.rule_scheduler as rule_scheduler
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(rule_scheduler, "_resolve_rule_state_file",
+                        lambda: str(state_file))
+    monkeypatch.setattr(rule_scheduler, "_CHECK_PERSIST_GAP_S", 0)
+    engine = _noop_engine(tmp_path)
+    engine.check(silent=True, tz_str="UTC")
+    first_mtime = state_file.stat().st_mtime_ns
+    engine.check(silent=True, tz_str="UTC")
+    assert state_file.stat().st_mtime_ns != first_mtime
+
+
 def test_check_toggle_success_records_ok(tmp_path, monkeypatch):
     """live state (enabled=False) 與排程 target(全天 allow 視窗內應 enabled)
     不一致時觸發 toggle；toggle_and_provision 成功應記
