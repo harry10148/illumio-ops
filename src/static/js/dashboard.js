@@ -1486,7 +1486,10 @@ function _renderPostureHero(posture, T) {
   nodata.style.display = 'none';
 
   // Score number
-  var postureStale = _ovStale(posture.generated_at, 30 * 60 * 1000);
+  // posture 資料源是日更 traffic snapshot：新鮮度看 source_date（26h = 日更 + 寬限）。
+  // generated_at 只是 10 分鐘級重算時戳；job 停跑由 Job Health 表涵蓋。
+  var postureTs = posture.source_date || posture.generated_at;
+  var postureStale = _ovStale(postureTs, 26 * 60 * 60 * 1000);
   var scoreEl = document.getElementById('ov-posture-score-n');
   if (scoreEl) {
     scoreEl.textContent = String(posture.score);
@@ -1530,8 +1533,8 @@ function _renderPostureHero(posture, T) {
       }
     }
     if (postureStale) {
-      html += '<div style="font-size:11px;color:var(--dim);width:100%;">' + (posture.generated_at
-            ? T('gui_ov_stale_since', 'stale') + ' ' + _fmtAge((Date.now() - Date.parse(posture.generated_at)) / 1000)
+      html += '<div style="font-size:11px;color:var(--dim);width:100%;">' + (postureTs
+            ? T('gui_ov_stale_since', 'stale') + ' ' + _fmtAge((Date.now() - Date.parse(postureTs)) / 1000)
             : T('gui_jh_never_ran', 'never ran')) + '</div>';
     }
     metricsEl.innerHTML = html;
