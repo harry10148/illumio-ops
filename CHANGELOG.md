@@ -9,6 +9,30 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ## [Unreleased]
 
+### Added
+
+- PCE health monitoring now probes the official SLB endpoint
+  `GET /api/v2/node_available` after a passing `/health` (healthy = HTTP
+  200/202; 404/502/no-response raises the existing pce_health alert). Data
+  integrity telemetry: unrecovered collection-GET truncations persist to
+  `logs/data_integrity.json` and surface as a warn table on the
+  Integrations overview; `raise_on_error=True` collection getters now raise
+  `TruncatedCollectionError` instead of silently returning a truncated
+  page. A new cross-layer filter-key chain invariant test locks all seven
+  whitelist layers against silent-drop regressions.
+
+### Fixed
+
+- Error-swallowing sweep (repo-wide triage of 296 handlers): ransomware
+  posture enrichment failures no longer render as a falsely-clean zero
+  (warning + `enrichment_error` marker + no cache write + `?` in the VEN
+  report); TLS overview reports `check_failed` instead of a healthy
+  default when cert inspection throws; unparsable rule hit-count CSV rows
+  are excluded with a report note instead of counting as 0 hits (feeding
+  the cleanup list); corrupt snapshot files, capacity stat failures and
+  corrupt cached payload rows now log warnings; the VEN summary job raises
+  on PCE fetch failure instead of writing 0/0 as truth.
+
 ### Removed
 
 - The "past 7 days traffic trend" chart on the traffic-workload tab and its
