@@ -50,6 +50,26 @@ def _esc(v) -> str:
     return _html.escape(str(v), quote=True)
 
 
+# 計數欄千分位、天數欄整數（1.0/28.0 浮點與無分位是 2026-07-23 視覺殘項）
+_THOUSANDS_COLS = {"hit_count"}
+_INT_COLS = {"days_since_last_hit"}
+
+
+def _fmt_cell_value(col: str, value) -> str:
+    text = "" if value is None else str(value)
+    if col in _THOUSANDS_COLS or col in _INT_COLS:
+        if text.strip() == "":
+            return text
+        try:
+            num = float(text)
+        except ValueError:
+            return text
+        if num.is_integer():
+            return f"{int(num):,}" if col in _THOUSANDS_COLS else str(int(num))
+        return f"{num:,.1f}" if col in _THOUSANDS_COLS else f"{num:.1f}"
+    return text
+
+
 def _kpi(value, label) -> str:
     return (
         '<div class="kpi-card">'
@@ -66,7 +86,7 @@ class RuleHitCountHtmlExporter:
         self._org_name = org_name
 
     def _cell(self, col: str, value) -> str:
-        text = "" if value is None else str(value)
+        text = _fmt_cell_value(col, value)
         if col in _TRUNC_COLS and len(text) > _CELL_MAX:
             shown = text[:_CELL_MAX - 1] + "…"
             return f'<td title="{_esc(text)}">{_esc(shown)}</td>'
@@ -118,7 +138,7 @@ class RuleHitCountHtmlExporter:
             _kpi(kpis.get("hit_rules", 0), t("rpt_rhc_kpi_hit", lang=lang)),
             _kpi(kpis.get("unused_rules", 0), t("rpt_rhc_kpi_unused", lang=lang)),
             _kpi(f'{kpis.get("hit_rate_pct", 0)}%', t("rpt_rhc_kpi_hit_rate", lang=lang)),
-            _kpi(kpis.get("total_hits", 0), t("rpt_rhc_kpi_total_hits", lang=lang)),
+            _kpi(f'{int(kpis.get("total_hits", 0) or 0):,}', t("rpt_rhc_kpi_total_hits", lang=lang)),
         ]) + "</div>"
         sections = [
             ("rhc-hit", t("rpt_rhc_sec_hit", lang=lang), mr.get("hit_df")),
