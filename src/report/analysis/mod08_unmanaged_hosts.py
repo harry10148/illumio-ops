@@ -1,7 +1,20 @@
 """Module 8: Unmanaged Host Analysis."""
 from __future__ import annotations
+import ipaddress
 import pandas as pd
 from src.i18n import get_language
+
+
+def _classify_network(ip: str) -> str:
+    """internal（RFC1918/loopback/link-local）或 external（公網）。
+
+    公網未受管來源打進 managed services 是高風險訊號，須在報表獨立
+    辨識；解析失敗保守判 external（寧可誤標紅、不可誤標安全）。
+    """
+    try:
+        return "internal" if ipaddress.ip_address(str(ip)).is_private else "external"
+    except ValueError:
+        return "external"
 
 def unmanaged_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
     """
@@ -31,6 +44,15 @@ def unmanaged_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
                      'unique_dst': 'Unique Dst',
                      'unique_ports': 'Unique Ports',
                      'bytes_total': 'Bytes'}))
+    if not top_unmanaged_src.empty:
+        # 內外網分類欄插在 IP 旁：公網來源是獨立的高風險訊號
+        top_unmanaged_src.insert(
+            1, 'Network',
+            top_unmanaged_src['Unmanaged Source IP'].map(_classify_network))
+    external_unmanaged_src = int(
+        unmanaged_src['src_ip'].dropna().map(_classify_network).eq('external')
+        .groupby(unmanaged_src['src_ip'].dropna()).first().sum()
+    ) if not unmanaged_src.empty else 0
 
     # Top unmanaged destination IPs
     top_unmanaged_dst = (unmanaged_dst.groupby('dst_ip').agg(
@@ -68,6 +90,7 @@ def unmanaged_traffic(df: pd.DataFrame, top_n: int = 20) -> dict:
         'unmanaged_pct': unmanaged_pct,
         'unique_unmanaged_src': unmanaged_src['src_ip'].nunique(),
         'unique_unmanaged_dst': unmanaged_dst['dst_ip'].nunique(),
+        'external_unmanaged_src': external_unmanaged_src,
         'top_unmanaged_src': top_unmanaged_src,
         'top_unmanaged_dst': top_unmanaged_dst,
         'managed_hosts_targeted_by_unmanaged': managed_dst_from_unmanaged,

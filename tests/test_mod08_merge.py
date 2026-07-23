@@ -54,3 +54,25 @@ def test_inventory_renders_three_tables():
     assert "Exposed Ports / Protocols" not in html
     assert "Unmanaged Source Port Detail" not in html
     assert "Managed Hosts Targeted by Unmanaged Sources" not in html
+
+
+def test_top_unmanaged_src_network_classification():
+    """未受管來源要區分內網/公網——公網來源打進 managed services 是高風險
+    訊號，不能混在同一張表無從辨識（2026-07-23 視覺實檢）。"""
+    df = _df()
+    df.loc[df["src_ip"] == "10.9.0.1", "src_ip"] = "45.148.10.119"  # 公網
+    out = unmanaged_traffic(df)
+    top = out["top_unmanaged_src"]
+    assert "Network" in top.columns
+    by_ip = dict(zip(top["Unmanaged Source IP"], top["Network"]))
+    assert by_ip["45.148.10.119"] == "external"
+    assert by_ip["10.9.0.2"] == "internal"
+    assert out["external_unmanaged_src"] == 1
+
+
+def test_network_classification_bad_ip_defaults_external():
+    """非法 IP 保守判為 external（寧可誤標紅也不誤標安全）。"""
+    from src.report.analysis.mod08_unmanaged_hosts import _classify_network
+    assert _classify_network("not-an-ip") == "external"
+    assert _classify_network("192.168.1.5") == "internal"
+    assert _classify_network("8.8.8.8") == "external"

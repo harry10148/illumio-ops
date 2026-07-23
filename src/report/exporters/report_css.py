@@ -204,6 +204,8 @@ BASE_CSS = """\
   .badge-MEDIUM { background: var(--gold-110); }
   .badge-LOW { background: var(--green); }
   .badge-INFO { background: var(--cyan-100); }
+  .badge-EXTERNAL { background: var(--red); }
+  .badge-INTERNAL { background: var(--slate-50); }
 
   .dual-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; margin: 12px 0 18px; }
   .dual-grid > div { min-width: 0; }

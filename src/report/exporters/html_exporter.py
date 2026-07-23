@@ -326,7 +326,16 @@ _RULE_DESCRIPTIONS = {
              'CRITICAL: Detects lateral movement ports (SMB 445, RDP 3389, WinRM 5985/5986, RPC 135) allowed between different environments. Environment segmentation is the macro-security boundary. If lateral ports cross it, an attacker who compromises Dev/Test can directly pivot into Production using exactly the same techniques, bypassing all environment-level controls.'),
 }
 
-_SEVERITY_TOKENS = {'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'}
+# EXTERNAL/INTERNAL：mod08 Network 欄的內外網 badge（公網未受管來源標紅）
+_SEVERITY_TOKENS = {'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'EXTERNAL', 'INTERNAL'}
+
+
+def _net_i18n_map(lang: str) -> dict[str, dict[str, str]]:
+    """mod08 Network 欄的顯示值地圖（badge 色由原始英文值決定）。"""
+    return {'Network': {
+        'external': t('rpt_net_external', lang=lang),
+        'internal': t('rpt_net_internal', lang=lang),
+    }}
 
 # Column-name fragments that should render as integers (strip trailing ".0"
 # when dtype was promoted to float by pandas groupby/unstack).
@@ -1094,10 +1103,12 @@ class _TrafficReportBase:
             + _cov_stat(_s('rpt_tr_unmanaged_flow_stat'), str(m.get('unmanaged_flow_count', 0)) + ' (' + str(m.get('unmanaged_pct', 0)) + '%)')
             + _cov_stat(_s('rpt_tr_unique_unmanaged_src'), str(m.get('unique_unmanaged_src', 0)))
             + _cov_stat(_s('rpt_tr_unique_unmanaged_dst'), str(m.get('unique_unmanaged_dst', 0)))
+            + _cov_stat(_s('rpt_tr_external_unmanaged_src'), str(m.get('external_unmanaged_src', 0)))
             + '</div>'
             + self._subnote('rpt_tr_unmanaged_subnote')
             + f'<h3>{_s("rpt_tr_top_unmanaged")}</h3>'
-            + _df_to_html(m.get('top_unmanaged_src'), lang=_lang)
+            + _df_to_html(m.get('top_unmanaged_src'), severity_col='Network',
+                          lang=_lang, value_i18n_maps=_net_i18n_map(_lang))
         )
         pa = m.get('per_dst_app')
         if pa is not None and hasattr(pa, 'empty') and not pa.empty:
@@ -1789,9 +1800,11 @@ class TrafficFlowsHtmlExporter(_TrafficReportBase):
             + _cov_stat(_s('rpt_tr_unmanaged_flow_stat'), str(m.get('unmanaged_flow_count', 0)) + ' (' + str(m.get('unmanaged_pct', 0)) + '%)')
             + _cov_stat(_s('rpt_tr_unique_unmanaged_src'), str(m.get('unique_unmanaged_src', 0)))
             + _cov_stat(_s('rpt_tr_unique_unmanaged_dst'), str(m.get('unique_unmanaged_dst', 0)))
+            + _cov_stat(_s('rpt_tr_external_unmanaged_src'), str(m.get('external_unmanaged_src', 0)))
             + '</div>'
             + self._subnote('rpt_tr_unmanaged_subnote')
             + f'<h3>{_s("rpt_tr_top_unmanaged")}</h3>'
-            + _df_to_html(m.get('top_unmanaged_src'), lang=_lang)
+            + _df_to_html(m.get('top_unmanaged_src'), severity_col='Network',
+                          lang=_lang, value_i18n_maps=_net_i18n_map(_lang))
         )
 
