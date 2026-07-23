@@ -81,3 +81,22 @@ def test_read_latest_filters_by_profile(store_dir):
     net = read_latest("traffic", profile="network_inventory")
     assert sec["kpis"]["pb_uncovered_exposure"] == 111
     assert net["kpis"]["pb_uncovered_exposure"] == 999
+
+
+def test_corrupt_snapshot_logged_not_silently_skipped(store_dir):
+    """損毀的 snapshot 檔被跳過時必須記 warning——否則 read_latest 靜默
+    回較舊快照，過期資料被當成當前資料。"""
+    from loguru import logger as _logger
+    from src.report.snapshot_store import _dir_for
+    write_snapshot("traffic", _make_snapshot("2026-07-01"))
+    corrupt = _dir_for("traffic") / "2026-07-02.json"
+    corrupt.write_text("{not json")
+    records = []
+    sink_id = _logger.add(lambda m: records.append(m), level="WARNING")
+    try:
+        latest = read_latest("traffic")
+    finally:
+        _logger.remove(sink_id)
+    assert latest is not None
+    assert latest["generated_at"].startswith("2026-07-01")
+    assert any("corrupt snapshot" in str(m) for m in records)

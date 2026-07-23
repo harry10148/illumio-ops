@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import shutil
 
+from loguru import logger
 from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
@@ -27,8 +28,11 @@ def capacity_snapshot(session_factory: sessionmaker, cfg) -> dict:
     for suffix in ("", "-wal", "-shm"):
         try:
             db_bytes += os.path.getsize(db_path + suffix)
-        except OSError:
-            pass
+        except FileNotFoundError:
+            pass  # -wal/-shm 不存在是常態（checkpoint 後）
+        except OSError as exc:
+            # 其他 stat 失敗（權限等）少算 db_bytes 會抑制容量告警——要看得見
+            logger.warning("capacity stat failed for {}{}: {}", db_path, suffix, exc)
     try:
         disk_free_bytes = shutil.disk_usage(
             os.path.dirname(os.path.abspath(db_path))).free
