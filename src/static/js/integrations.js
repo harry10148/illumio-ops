@@ -1546,6 +1546,29 @@ function _buildOvTlsCard(tls) {
     + '</div></div>';
 }
 
+// 資料完整性警示：集合 GET 截斷且 fallback 未恢復的 path 清單（近 7 天）。
+// 空清單不顯示；有條目一律 warn 色——截斷代表報表資料不完整。
+function _buildOvDataIntegrity(list) {
+  var items = list || [];
+  if (!items.length) return '';
+  var rows = items.map(function (e) {
+    var msg = (_t('gui_ov_truncated_fmt') || '{path}: {got}/{total}')
+      .replace('{path}', e.path).replace('{got}', String(e.got)).replace('{total}', String(e.total));
+    return '<tr>'
+      + '<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;'
+      + 'background:var(--color-warning,#f59e0b);margin-right:6px;"></span>'
+      + escapeHtml(msg) + '</td>'
+      + '<td>' + escapeHtml(e.last_seen || '') + '</td>'
+      + '</tr>';
+  }).join('');
+  return '<h3 style="color:var(--accent2);font-size:.9rem;font-weight:700;margin:16px 0 8px;" data-i18n="gui_ov_data_integrity">Data Integrity</h3>'
+    + '<div class="table-container"><table class="rule-table">'
+    + '<thead><tr>'
+    + '<th data-i18n="gui_ov_di_th_collection">Collection</th>'
+    + '<th data-i18n="gui_ov_di_th_last_seen">Last Seen</th>'
+    + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
 window._integrations.setRender('overview', async function renderOverview() {
   var el = document.getElementById('it-pane-overview');
   if (!el) return;
@@ -1595,6 +1618,7 @@ window._integrations.setRender('overview', async function renderOverview() {
                + _buildOvTlsCard(ovv && ovv.tls)
                + _buildOvCards(cache, destCount, totalPending, totalSent, totalFailed, totalDlq, throughput)
                + _buildOvJobHealth(ovv && ovv.job_health)
+               + _buildOvDataIntegrity(ovv && ovv.data_integrity)
                + _buildOvRecentTable(siemStatus)
                + _buildAlertChannelCards(settings);
   if (typeof window.i18nApply === 'function') window.i18nApply();

@@ -299,6 +299,36 @@ def _overview_job_health():
     return out
 
 
+def _overview_data_integrity():
+    """logs/data_integrity.json → 近 7 天內仍在截斷的集合清單（warn 呈現）。
+    過期條目（fallback 早已恢復但 clear 沒跑到，如程序中斷）不再嚇人。"""
+    import datetime as _dt
+
+    out = []
+    try:
+        from src.data_integrity import load_data_integrity
+        data = load_data_integrity()
+    except Exception:
+        return out
+    now = _dt.datetime.now(_dt.timezone.utc)
+    for path, entry in (data or {}).items():
+        try:
+            if not isinstance(entry, dict):
+                continue
+            seen = _dt.datetime.strptime(
+                entry.get("last_seen", ""), "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=_dt.timezone.utc)
+            if (now - seen).total_seconds() > 7 * 86400:
+                continue
+            out.append({"path": path, "got": int(entry.get("got") or 0),
+                        "total": int(entry.get("total") or 0),
+                        "last_seen": entry.get("last_seen")})
+        except Exception:
+            continue
+    out.sort(key=lambda e: e["path"])
+    return out
+
+
 def _tls_overview(cm):
     """TLS 憑證天數（self-signed 或自備憑證）；GUI 未啟用 TLS 回 enabled=False。"""
     from src.gui._helpers import _cert_days_remaining, _ROOT_DIR
@@ -426,6 +456,7 @@ def make_dashboard_blueprint(
             "enforcement": _overview_enforcement(state),
             "posture": _overview_posture(state),
             "job_health": _overview_job_health(),
+            "data_integrity": _overview_data_integrity(),
             "tls": _tls_overview(cm),
         })
 
