@@ -110,3 +110,31 @@ def test_export_all_writes_html_and_csv_zip(monkeypatch, tmp_path):
     assert exts == ["html", "zip"]
     import os
     assert all(os.path.basename(p).startswith("Illumio_Readiness_Report_") for p in paths)
+
+
+def test_recommended_action_matches_blocking_factor(monkeypatch, tmp_path):
+    """建議動作必須依該列 blocking factor 分化——原本一律取全域 P1
+    （通常是 MOVE_TO_ENFORCEMENT），與該列的阻塞因素對不上
+    （2026-07-23 視覺實檢：整欄同一句樣板）。"""
+    gen = _gen(monkeypatch, _flows_df(), _workloads())
+    q = gen.generate_from_api(output_dir=str(tmp_path)).module_results["queue_df"]
+    row_b = q[q["app_env_key"] == "appb|prod"].iloc[0]
+    assert row_b["blocking_factor_key"] == "policy_coverage"
+    # policy_coverage 阻塞 → 動作講 allow policy/覆蓋率，不是推進 enforcement
+    assert "allow" in row_b["recommended_action"].lower() or "覆蓋" in row_b["recommended_action"]
+    row_a = q[q["app_env_key"] == "appa|prod"].iloc[0]
+    # 兩列 blocking factor 不同 → 動作文字不同
+    if row_a["blocking_factor_key"] != row_b["blocking_factor_key"]:
+        assert row_a["recommended_action"] != row_b["recommended_action"]
+
+
+def test_enforcement_blocking_full_mode_variant(monkeypatch, tmp_path):
+    """blocking=enforcement_mode 且 current_mode 已含 selective →
+    文字用「推進到 full enforcement」變體，不再說「由 visibility/testing 推進」。"""
+    from src.report.readiness_report import ReadinessReportGenerator
+    gen = ReadinessReportGenerator(config_manager=None, api_client=None)
+    gen._lang = "zh_TW"
+    txt = gen._action_for_blocking("enforcement_mode", {"selective": 3})
+    assert "full" in txt.lower()
+    txt2 = gen._action_for_blocking("enforcement_mode", {"visibility_only": 2})
+    assert "visibility" in txt2.lower() or "selective" in txt2.lower()

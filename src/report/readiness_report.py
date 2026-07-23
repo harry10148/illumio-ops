@@ -134,6 +134,25 @@ class ReadinessReportGenerator:
         self._attach_trend(result, output_dir)
         return result
 
+    def _action_for_blocking(self, blocking: str, modes: dict) -> str:
+        """blocking factor → 建議動作文字。
+
+        enforcement_mode 阻塞再依現況分兩型：已有 selective/full 的往 full
+        推進；否則從 visibility/testing 起步。其他因素各有對應動作鍵。
+        """
+        if blocking == "enforcement_mode":
+            has_enforcing = any(m in ("selective", "full") for m in modes)
+            key = ("rpt_qact_enforcement_full" if has_enforcing
+                   else "rpt_qact_enforcement")
+            return t(key, lang=self._lang)
+        key = {
+            "policy_coverage": "rpt_qact_policy_coverage",
+            "ringfence_maturity": "rpt_qact_ringfence",
+            "staged_readiness": "rpt_qact_staged",
+            "remote_app_coverage": "rpt_qact_remote",
+        }.get(blocking)
+        return t(key, lang=self._lang) if key else "-"
+
     # ── Queue synthesis (generator-side; NOT in mod13) ───────────────────
     def _build_queue(self, readiness: dict, workloads: list | None) -> pd.DataFrame:
         scores = readiness.get("app_env_scores")
@@ -145,27 +164,25 @@ class ReadinessReportGenerator:
             mode = str(w.get("enforcement_mode", "unknown")).lower().strip() or "unknown"
             bucket = modes_by_key.setdefault(key, {})
             bucket[mode] = bucket.get(mode, 0) + 1
-        action_by_key: dict[str, str] = {}
-        recs = readiness.get("recommendations")
-        if recs is not None and not recs.empty and "App Env Key" in recs.columns:
-            # recommendations are pre-ranked P1..P5 — keep the FIRST per app.
-            for _, r in recs.iterrows():
-                action_by_key.setdefault(str(r["App Env Key"]), str(r["Action"]))
         rows = []
         for _, s in scores.iterrows():
             ratios = {name: float(s.get(col, 0.0)) for name, col in _QUEUE_FACTORS}
             blocking = min(ratios, key=ratios.get)
             key = str(s["app_env_key"])
             score = float(s["readiness_score"])
+            modes = modes_by_key.get(key, {})
             rows.append({
                 "app_display": s.get("app_display", key),
                 "app_env_key": key,
                 "readiness_score": score,
                 "grade": _score_to_grade(score),
-                "current_mode": _mode_summary(modes_by_key.get(key, {})),
+                "current_mode": _mode_summary(modes),
                 "blocking_factor": t(f"rpt_factor_{blocking}", lang=self._lang),
                 "blocking_factor_key": blocking,
-                "recommended_action": action_by_key.get(key, "-"),
+                # 依該列 blocking factor 給對應動作——原本一律取全域 P1
+                # 建議（多為 MOVE_TO_ENFORCEMENT），整欄同句且與阻塞因素
+                # 對不上（2026-07-23 視覺實檢）
+                "recommended_action": self._action_for_blocking(blocking, modes),
                 "flow_count": int(s.get("flow_count", 0)),
                 "pb_uncovered_count": int(s.get("pb_uncovered_count", 0)),
             })
