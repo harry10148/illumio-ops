@@ -495,10 +495,11 @@ def _cert_has_san(cert_path: str) -> bool:
     try:
         result = subprocess.run(
             ["openssl", "x509", "-in", cert_path, "-noout", "-ext", "subjectAltName"],
-            capture_output=True, text=True,
+            capture_output=True, text=True, timeout=15,
         )
         return "Subject Alternative Name" in result.stdout
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    except (FileNotFoundError, subprocess.CalledProcessError,
+            subprocess.TimeoutExpired):
         return False
 
 
@@ -652,6 +653,7 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
                     ],
                     check=True,
                     capture_output=True,
+                    timeout=60,
                 )
             finally:
                 try:
@@ -669,6 +671,8 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
             )
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Failed to generate self-signed certificate: {e.stderr.decode()}")
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("openssl timed out while generating the self-signed certificate")
 
 def _generate_csr(cert_dir: str, cn: str, o: str = '', ou: str = '', c: str = '',
                   san_dns: list | None = None, san_ip: list | None = None,
@@ -778,9 +782,10 @@ def _cert_days_remaining(cert_path: str) -> int | None:
     try:
         result = subprocess.run(
             ["openssl", "x509", "-in", cert_path, "-noout", "-enddate"],
-            capture_output=True, text=True, check=True,
+            capture_output=True, text=True, check=True, timeout=15,
         )
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    except (FileNotFoundError, subprocess.CalledProcessError,
+            subprocess.TimeoutExpired):
         return None
     line = result.stdout.strip()
     if not line.startswith("notAfter="):
@@ -828,7 +833,7 @@ def _get_cert_info(cert_path: str) -> dict:
         result = subprocess.run(
             ["openssl", "x509", "-in", cert_path, "-noout",
              "-subject", "-enddate", "-startdate"],
-            capture_output=True, text=True, check=True,
+            capture_output=True, text=True, check=True, timeout=15,
         )
         for line in result.stdout.strip().splitlines():
             if line.startswith("subject="):
@@ -840,16 +845,17 @@ def _get_cert_info(cert_path: str) -> dict:
         # Check if expired
         check = subprocess.run(
             ["openssl", "x509", "-in", cert_path, "-noout", "-checkend", "0"],
-            capture_output=True,
+            capture_output=True, timeout=15,
         )
         info["expired"] = check.returncode != 0
         # Check if expiring within 30 days
         check30 = subprocess.run(
             ["openssl", "x509", "-in", cert_path, "-noout", "-checkend", "2592000"],
-            capture_output=True,
+            capture_output=True, timeout=15,
         )
         info["expiring_soon"] = check30.returncode != 0
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    except (FileNotFoundError, subprocess.CalledProcessError,
+            subprocess.TimeoutExpired):
         info["error"] = "openssl not available"
     return info
 
