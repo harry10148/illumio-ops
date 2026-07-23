@@ -2370,6 +2370,7 @@
   "gui_tls_days_remaining": "剩餘天數",
   "gui_tls_enable": "啟用 HTTPS",
   "gui_tls_expired": "已過期",
+  "gui_tls_check_failed": "TLS 檢查失敗",
   "gui_tls_expiring_soon": "即將過期",
   "gui_tls_import_btn": "匯入憑證",
   "gui_tls_import_hint": "貼上 CA 簽署後的 PEM 憑證，設定將自動更新。",

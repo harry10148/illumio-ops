@@ -1528,6 +1528,13 @@ function _buildOvJobHealth(jobHealth) {
 // TLS 憑證卡：剩餘天數；低於 auto_renew_days 門檻標 warn。
 function _buildOvTlsCard(tls) {
   if (!tls || !tls.enabled) return '';
+  if (tls.check_failed) {
+    return '<div class="cards" style="margin-bottom:8px;">'
+      + '<div class="card card-warn" style="flex:0 0 auto;min-width:160px;">'
+      + '<div class="label" data-i18n="gui_ov_tls_cert">TLS Certificate</div>'
+      + '<div class="value" data-i18n="gui_tls_check_failed">TLS check failed</div>'
+      + '</div></div>';
+  }
   var warn = !!tls.expiring_soon;
   var days = (tls.days_remaining == null) ? '—' : String(tls.days_remaining);
   var cls = warn ? 'card-warn' : 'card-ok';

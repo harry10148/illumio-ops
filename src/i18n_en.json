@@ -2385,6 +2385,7 @@
   "gui_tls_days_remaining": "Days Remaining",
   "gui_tls_enable": "Enable HTTPS",
   "gui_tls_expired": "EXPIRED",
+  "gui_tls_check_failed": "TLS check failed",
   "gui_tls_expiring_soon": "EXPIRING SOON",
   "gui_tls_import_btn": "Import Certificate",
   "gui_tls_import_hint": "Paste the PEM certificate signed by your CA. The configuration will be updated automatically.",

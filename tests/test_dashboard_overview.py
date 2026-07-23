@@ -175,6 +175,46 @@ def test_tls_overview_monitors_user_supplied_cert(monkeypatch):
     assert result["days_remaining"] == 42
 
 
+def test_tls_overview_check_failure_not_reported_healthy(monkeypatch):
+    """憑證檢查炸掉不得回「健康」預設：要帶 check_failed=True 並記 warning。"""
+    import src.gui.routes.dashboard as dash
+    import src.gui._helpers as gui_helpers
+    from loguru import logger as _logger
+
+    def _boom(path):
+        raise RuntimeError("openssl exploded")
+
+    monkeypatch.setattr(gui_helpers, "_cert_days_remaining", _boom)
+
+    class _CM:
+        config = {"web_gui": {"tls": {"enabled": True,
+                                       "cert_file": "/etc/certs/mine.pem",
+                                       "key_file": "/etc/certs/mine.key"}}}
+
+    records = []
+    sink_id = _logger.add(lambda m: records.append(m), level="WARNING")
+    try:
+        result = dash._tls_overview(_CM())
+    finally:
+        _logger.remove(sink_id)
+    assert result["check_failed"] is True
+    assert result["days_remaining"] is None
+    assert any("tls overview" in str(m).lower() for m in records)
+
+
+def test_tls_overview_success_marks_check_ok(monkeypatch):
+    import src.gui.routes.dashboard as dash
+    import src.gui._helpers as gui_helpers
+    monkeypatch.setattr(gui_helpers, "_cert_days_remaining", lambda p: 42)
+
+    class _CM:
+        config = {"web_gui": {"tls": {"enabled": True,
+                                       "cert_file": "/etc/certs/mine.pem",
+                                       "key_file": "/etc/certs/mine.key"}}}
+
+    assert dash._tls_overview(_CM())["check_failed"] is False
+
+
 def test_overview_job_health_tolerates_corrupt_entries(client, tmp_path, monkeypatch):
     """壞的 job_health.json 條目（非數字 interval_seconds）應被跳過，
     不影響其他條目或端點回傳 200."""

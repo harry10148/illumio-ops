@@ -318,9 +318,13 @@ def _tls_overview(cm):
         days = _cert_days_remaining(cert_path) if cert_path else None
         warn_days = int(tls_cfg.get("auto_renew_days", 30))
         return {"enabled": True, "days_remaining": days,
-                "expiring_soon": days is not None and days <= warn_days}
-    except Exception:
-        return {"enabled": True, "days_remaining": None, "expiring_soon": False}
+                "expiring_soon": days is not None and days <= warn_days,
+                "check_failed": False}
+    except Exception as exc:
+        # 檢查失敗不得偽裝健康：讓前端顯示「TLS 檢查失敗」而非天數
+        logger.warning("tls overview check failed: {}", exc)
+        return {"enabled": True, "days_remaining": None, "expiring_soon": False,
+                "check_failed": True}
 
 
 def make_dashboard_blueprint(
