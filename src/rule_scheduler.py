@@ -102,6 +102,9 @@ def _resolve_rule_state_file() -> str:
 
 _RULE_STATE_KEY = "rule_schedule_states"
 
+# 純 last_checked 心跳的落盤節流（秒）：有動作/錯誤/成員變動照舊立即寫
+_CHECK_PERSIST_GAP_S = 900
+
 
 def truncate(text, width):
     """Truncate text to width, stripping schedule tags."""
@@ -355,22 +358,48 @@ class ScheduleEngine:
 
         if tick_states:
             try:
-                from src.state_store import update_state_file
+                from src.state_store import load_state_file, update_state_file
 
-                def _merge(data):
-                    live_hrefs = set(self.db.get_all())
-                    states = dict(data.get(_RULE_STATE_KEY) or {})
-                    for h in list(states):
-                        if h not in live_hrefs and h not in tick_states:
-                            states.pop(h)
-                    for h, st in tick_states.items():
-                        cur = dict(states.get(h) or {})
-                        cur.update(st)
-                        states[h] = cur
-                    data[_RULE_STATE_KEY] = states
-                    return data
+                state_file = _resolve_rule_state_file()
+                prev_states = (load_state_file(state_file) or {}).get(_RULE_STATE_KEY) or {}
+                live_hrefs = set(self.db.get_all())
+                # 「有料」= 任一條目帶動作/結果/錯誤、成員新增、或有待修剪殘留
+                meaningful = (
+                    any(set(st) - {"last_checked"} for st in tick_states.values())
+                    or any(h not in prev_states for h in tick_states)
+                    or any(h not in live_hrefs and h not in tick_states
+                           for h in prev_states)
+                )
+                skip = False
+                if not meaningful:
+                    # 純心跳：至多每 _CHECK_PERSIST_GAP_S 落盤一次，避免每個
+                    # tick 全量重寫共享 state.json（2026-07-23 觀測性殘債）
+                    newest = max((str(st.get("last_checked") or "")
+                                  for st in prev_states.values()), default="")
+                    try:
+                        newest_dt = datetime.datetime.strptime(
+                            newest, "%Y-%m-%dT%H:%M:%SZ").replace(
+                            tzinfo=datetime.timezone.utc)
+                        age = (datetime.datetime.now(datetime.timezone.utc)
+                               - newest_dt).total_seconds()
+                        skip = age < _CHECK_PERSIST_GAP_S
+                    except ValueError:
+                        skip = False  # 無法解析（含空檔）一律落盤修復
 
-                update_state_file(_resolve_rule_state_file(), _merge)
+                if not skip:
+                    def _merge(data):
+                        states = dict(data.get(_RULE_STATE_KEY) or {})
+                        for h in list(states):
+                            if h not in live_hrefs and h not in tick_states:
+                                states.pop(h)
+                        for h, st in tick_states.items():
+                            cur = dict(states.get(h) or {})
+                            cur.update(st)
+                            states[h] = cur
+                        data[_RULE_STATE_KEY] = states
+                        return data
+
+                    update_state_file(state_file, _merge)
             except Exception:
                 logger.opt(exception=True).debug("rule schedule state persist failed")
 

@@ -74,6 +74,21 @@ def record_job_run(job_id: str, status: str, detail: str = "", *,
     _safe_update(_merge)
 
 
+def prune_job_health(active_job_ids) -> None:
+    """移除不在本次註冊清單中的孤兒條目。
+
+    job 改名或條件性 job 停用後，殘留條目會被 overview 永久判 warn
+    （2026-07-16 Phase A 殘債）。每次 scheduler 建立時以實際註冊
+    集合修剪一次。
+    """
+    active = set(active_job_ids)
+
+    def _merge(data: dict) -> dict:
+        return {k: v for k, v in data.items() if k in active}
+
+    _safe_update(_merge)
+
+
 def _safe_update(merge) -> None:
     """健康記錄是輔助訊號：寫入失敗絕不影響 job 本體，吞掉並靜默。"""
     try:

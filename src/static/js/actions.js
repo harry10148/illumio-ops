@@ -55,9 +55,23 @@ async function loadAlertTestActions() {
   }
 }
 
+// API responses use {ok:false, error, description} on failure (incl. 429
+// rate_limit_exceeded from gui/__init__.py). Runners must not toast
+// "completed" for these.
+function _apiFailed(r) {
+  if (!r || r.ok !== false) return false;
+  const msg = r.error === 'rate_limit_exceeded'
+    ? _t('gui_err_rate_limited').replace('{description}', r.description || '')
+    : (r.error || r.description || _t('gui_action_failed'));
+  alog(msg);
+  toast(msg, 'err');
+  return true;
+}
+
 async function runAction(name, body = {}) {
   $('a-log').textContent = '[' + new Date().toLocaleTimeString() + '] ' + _t('gui_action_running').replace('{name}', name);
   const r = await post('/api/actions/' + name, body);
+  if (_apiFailed(r)) return;
   alog(r.output || _t('gui_action_done'));
   if (r.results && r.results.length) {
     r.results.forEach(result => {
@@ -72,6 +86,7 @@ async function runAction(name, body = {}) {
 async function runPluginTestAlert(channel) {
   $('a-log').textContent = '[' + new Date().toLocaleTimeString() + '] ' + _t('gui_action_send_test_alert_via').replace('{channel}', channel);
   const r = await post('/api/actions/test-alert', { channel });
+  if (_apiFailed(r)) return;
   alog(r.output || _t('gui_action_done'));
   if (r.results && r.results.length) {
     r.results.forEach(result => {
@@ -86,6 +101,7 @@ async function runPluginTestAlert(channel) {
 async function runDebug() {
   $('a-log').textContent = '[' + new Date().toLocaleTimeString() + '] ' + _t('gui_action_debug_running');
   const r = await post('/api/actions/debug', { mins: $('a-debug-mins').value, pd_sel: $('a-debug-pd').value });
+  if (_apiFailed(r)) return;
   alog(r.output || _t('gui_action_done'));
   toast(_t('gui_action_debug_completed'));
 }
@@ -94,6 +110,7 @@ async function resetWatermark() {
   if (!confirm(_t('gui_reset_watermark_confirm'))) return;
   $('a-log').textContent = '[' + new Date().toLocaleTimeString() + '] ' + _t('gui_reset_watermark_label');
   const r = await post('/api/actions/reset-watermark', {});
+  if (_apiFailed(r)) return;
   alog(r.output || _t('gui_action_done'));
   toast(r.output || _t('gui_action_done'));
 }

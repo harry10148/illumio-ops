@@ -9,6 +9,13 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ## [Unreleased]
 
+### Removed
+
+- The "past 7 days traffic trend" chart on the traffic-workload tab and its
+  backing `GET /api/traffic/trend` endpoint were removed (operator verdict:
+  no value). The KPI strip and traffic analyzer query on that tab are
+  unchanged.
+
 ### Added
 
 - Job health observability: every scheduled job records its last run and
@@ -28,6 +35,28 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Job Health no longer accumulates false alarms from renamed or disabled
+  jobs: the store is pruned to the actually-registered job set at scheduler
+  startup, and sub-minute intervals render as seconds (siem_dispatch showed
+  a rounded-minute figure before).
+- The posture tile's stale indicator now anchors to the daily traffic
+  snapshot date (`source_date`, 26h threshold) instead of the 10-minute
+  recompute timestamp, so a stalled snapshot actually greys the tile.
+- Rule schedule ticks no longer rewrite the shared `logs/state.json` every
+  cycle when nothing changed; pure last-checked heartbeats persist at most
+  every 15 minutes, while actions, errors and membership changes still
+  write immediately. The per-schedule error text recorded by the engine is
+  now returned by the schedules API and shown as a hover title on the
+  Last-run cell.
+- All six openssl subprocess calls in the GUI TLS helpers carry timeouts;
+  a hung openssl no longer wedges the TLS renew job or dashboard overview.
+- GUI action buttons no longer report "completed" when the API returned a
+  failure: rate-limit (429) and other error responses are logged and
+  toasted with the actual message. The test-alert limit was raised from 10
+  to 30 per hour to fit per-channel testing.
+- `docs_check.py --frontmatter` now flags `verified_against` entries whose
+  repo path no longer exists (dangling references previously survived until
+  manual review).
 - Rule-scheduler note cleanup now recognizes the GUI's alarm-clock (U+23F0)
   one-time tag prefix in both the PCE description strip and the CLI display
   truncation: GUI-created one-time schedule notes were never cleaned up on
