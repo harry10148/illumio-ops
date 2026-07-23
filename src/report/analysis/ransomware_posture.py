@@ -118,6 +118,9 @@ def ransomware_posture(workloads: list[dict], enrichment: dict) -> dict:
             "severity": sev,
             "protection_percent": round(pct, 1),
             "open_risky_count": open_risky,
+            # enrichment 失敗時 open_risky_count=0 是「不知道」不是「乾淨」，
+            # 由 exporter 顯示為資料不可得
+            "enrichment_error": bool(enr.get("enrichment_error")),
         })
 
     per_ven.sort(key=lambda r: (_SEVERITY_RANK.get(r["severity"], 9), -r["open_risky_count"]))

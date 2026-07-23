@@ -5,7 +5,10 @@ For each computed, non-fully-protected workload (up to ``max_workloads``):
 - Cache MISS / stale -> ``api.get_workload`` (open_service_ports) +
   ``api.get_workload_risk_details`` (ransomware.details), rate-limited.
 
-Per-workload API errors are swallowed (that workload gets empty lists).
+Per-workload API errors are logged (warning), the entry carries an
+``enrichment_error`` marker so reports can render "data unavailable"
+instead of a falsely-clean zero, and the failed entry is NOT cached —
+otherwise the false-clean result would survive the whole TTL.
 """
 from __future__ import annotations
 
@@ -76,24 +79,34 @@ def refresh_ransomware_posture(
                          "details": cached.get("details", [])}
             continue
 
+        fetch_error: str | None = None
+
         limiter.acquire(timeout=60.0)
         try:
             full = api.get_workload(href)
             osp = (full.get("services") or {}).get("open_service_ports") or [] if full else []
-        except Exception:
+        except Exception as exc:
+            logger.warning("[ransomware_posture] enrichment failed for {}: {}", href, exc)
             osp = []
+            fetch_error = str(exc)[:200]
 
         limiter.acquire(timeout=60.0)
         try:
             rd = api.get_workload_risk_details(href)
             rw = (rd.get("risk_details") or {}).get("ransomware") if rd else None
             details = (rw.get("details") or []) if isinstance(rw, dict) else []
-        except Exception:
+        except Exception as exc:
+            logger.warning("[ransomware_posture] enrichment failed for {}: {}", href, exc)
             details = []
+            fetch_error = str(exc)[:200]
 
+        out[href] = {"open_service_ports": list(osp), "details": list(details)}
+        if fetch_error is not None:
+            # 失敗不入 cache：讓下一輪重抓，避免假性乾淨存活整個 TTL
+            out[href]["enrichment_error"] = fetch_error
+            continue
         cache[href] = {"open_service_ports": list(osp), "details": list(details),
                        "fetched_at": now}
-        out[href] = {"open_service_ports": list(osp), "details": list(details)}
 
     _save_cache(cache, cache_path)
     return out
