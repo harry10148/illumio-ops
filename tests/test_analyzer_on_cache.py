@@ -429,3 +429,18 @@ class TestHistoryRetention(unittest.TestCase):
             persisted = _json.load(open(sf))
         # 150 分鐘前的紀錄在 180 分鐘視窗下必須保留（舊版 2h 固定裁剪會刪掉）
         self.assertEqual(len(persisted["history"].get("big", [])), 1)
+
+
+class TestStrictWindow(unittest.TestCase):
+    """A4（2026-07-24 審查）：fail-closed 只限規則引擎加總路徑
+    （strict_window=True）；query/報表路徑維持舊語意——cache/archive
+    投影常無 timestamp，整批誤殺會清空查詢結果。"""
+
+    def test_missing_timestamp_excluded_only_in_strict_mode(self):
+        import datetime as dt
+        rule = {"id": "t1", "type": "traffic", "name": "t", "pd": -1}
+        az = _make_analyzer(rules=[rule])
+        flow = {"num_connections": 1}  # 無 timestamp
+        win = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=10)
+        self.assertFalse(az.check_flow_match(rule, flow, win, strict_window=True))
+        self.assertTrue(az.check_flow_match(rule, flow, win))

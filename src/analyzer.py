@@ -406,7 +406,8 @@ class Analyzer:
         """Delegate to module-level calculate_volume_mb(). See src.analyzer.calculate_volume_mb."""
         return calculate_volume_mb(flow)
 
-    def check_flow_match(self, rule: dict[str, Any], f: dict[str, Any], start_time_limit: datetime.datetime | None) -> bool:
+    def check_flow_match(self, rule: dict[str, Any], f: dict[str, Any], start_time_limit: datetime.datetime | None,
+                         *, strict_window: bool = False) -> bool:
         # Dynamic Sliding Window Check
         if start_time_limit:
             ts_str = f.get("timestamp")
@@ -423,10 +424,13 @@ class Analyzer:
                     except ValueError:
                         f_time = None
 
-            # fail-closed：帶視窗的規則不得把「無/不可解析時戳」的 flow 計入
-            # 加總——過舊或離群 flow 會污染門檻（2026-07-24 審查 A4）。cache
-            # 路徑已在 SQL 層以 last_detected 過窗，此分支主要保護 legacy 流。
-            if f_time is None or f_time < start_time_limit:
+            # strict_window（規則引擎加總路徑）fail-closed：無/不可解析時戳
+            # 的 flow 不得計入門檻加總（2026-07-24 審查 A4）。query/報表路徑
+            # （strict_window=False）維持舊語意——那些 flow 已由 SQL/上游過窗，
+            # cache/archive 投影常無 timestamp 欄，fail-closed 會整批誤殺。
+            if f_time is not None and f_time < start_time_limit:
+                return False
+            if f_time is None and strict_window:
                 return False
 
         # Criteria Check
@@ -513,7 +517,8 @@ class Analyzer:
 
         return True
 
-    def _match_flow_filters(self, rule: dict[str, Any], f: dict[str, Any], window_start: datetime.datetime | None) -> bool:
+    def _match_flow_filters(self, rule: dict[str, Any], f: dict[str, Any], window_start: datetime.datetime | None,
+                            *, strict_window: bool = False) -> bool:
         """統一的 flow×filter 比對：legacy 純量 key 走 check_flow_match（含
         pd/時間窗/port/proto/list 形 IP），物件/複數 key 投影委派給報表路徑
         同一套 _flow_matches_filters（兩者 AND）。三個呼叫點共用：規則引擎、
@@ -522,7 +527,7 @@ class Analyzer:
         （不影響比對結果）。此函式在 per-flow 熱迴圈內被逐筆呼叫，故不在此記
         debug log（會被洗版）；只有手改 alerts.json 繞過端點拒收才會走到這個
         分支，屬邊角情境。"""
-        if not self.check_flow_match(rule, f, window_start):
+        if not self.check_flow_match(rule, f, window_start, strict_window=strict_window):
             return False
         object_rule = {k: rule[k] for k in _OBJECT_FILTER_KEYS if rule.get(k)}
         if object_rule:
@@ -1141,7 +1146,7 @@ class Analyzer:
                 r_win = rule.get("threshold_window", 10)
                 r_start = now_utc - datetime.timedelta(minutes=r_win)
 
-                if not self._match_flow_filters(rule, f, r_start):
+                if not self._match_flow_filters(rule, f, r_start, strict_window=True):
                     continue
 
                 res = rule_results[rid]
