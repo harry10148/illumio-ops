@@ -261,7 +261,9 @@ def _trend_deltas_section(deltas: list | None, lang: str = "en", mismatch: list 
             )
         if col in ('Previous', 'Current'):
             try:
-                return f'{float(val):,.1f}'
+                _f = float(val)
+                # 計數型指標顯示 19,809 而非 19,809.0
+                return f'{int(_f):,}' if _f.is_integer() else f'{_f:,.1f}'
             except (TypeError, ValueError):
                 return str(val) if val is not None else ''
         return str(val) if val is not None else ''

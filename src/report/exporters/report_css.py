@@ -8,26 +8,41 @@ Shared CSS/JS foundation for HTML report exporters.
 # REPORT_FONT_FACE_CSS below; no CDN preconnect / link tag needed.
 FONT_LINK = ""
 
-REPORT_FONT_FACE_CSS = """\
-@font-face {
-  font-family: 'Space Grotesk';
-  font-style: normal;
-  font-weight: 400 700;
-  src: url('/static/fonts/SpaceGrotesk-VF.woff2') format('woff2');
+# 報表是獨立交付物（寄送/另存後 /static 路徑不存在，字型 404 退回系統字型，
+# 2026-07-23 視覺實檢）——三個變數字型都很小（~40-50KB），內嵌 base64 讓
+# HTML 自帶字型；檔案讀不到時退回原 URL（GUI 同源仍可載）。
+_FONT_FILES = {
+    "Space Grotesk": ("SpaceGrotesk-VF.woff2", "400 700"),
+    "Inter": ("Inter-VF.woff2", "100 900"),
+    "JetBrains Mono": ("JetBrainsMono-VF.woff2", "100 800"),
 }
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 100 900;
-  src: url('/static/fonts/Inter-VF.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 100 800;
-  src: url('/static/fonts/JetBrainsMono-VF.woff2') format('woff2');
-}
-"""
+
+
+def _font_face_css() -> str:
+    import base64
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    blocks = []
+    for family, (fname, weight) in _FONT_FILES.items():
+        src = f"url('/static/fonts/{fname}') format('woff2')"
+        try:
+            with open(os.path.join(root, "static", "fonts", fname), "rb") as fh:
+                b64 = base64.b64encode(fh.read()).decode("ascii")
+            src = f"url(data:font/woff2;base64,{b64}) format('woff2')"
+        except OSError:
+            pass
+        blocks.append(
+            "@font-face {\n"
+            f"  font-family: '{family}';\n"
+            "  font-style: normal;\n"
+            f"  font-weight: {weight};\n"
+            f"  src: {src};\n"
+            "}"
+        )
+    return "\n".join(blocks) + "\n"
+
+
+REPORT_FONT_FACE_CSS = _font_face_css()
 
 BASE_CSS = """\
   :root {

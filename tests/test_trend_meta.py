@@ -150,3 +150,21 @@ def test_mismatch_flags_legacy_policy_decisions_basis():
                             "policy_decisions": "abpu"}}
     assert not any(m["field"] == "policy_decisions"
                    for m in snapshot_mismatch(cur, prev_same))
+
+
+def test_delta_table_formats_integer_counts_without_decimal():
+    """計數型指標顯示 19,809 而非 19,809.0（2026-07-23 視覺實檢）。"""
+    deltas = [{"metric": "m1", "previous": 19809.0, "current": 19889.0,
+               "delta": 80.0, "delta_pct": 0.4, "direction": "up"},
+              {"metric": "m2", "previous": 2.5, "current": 3.5,
+               "delta": 1.0, "delta_pct": 40.0, "direction": "up"}]
+    html = _trend_deltas_section(deltas, lang="en")
+    assert "19,809" in html and "19,809.0" not in html
+    assert "2.5" in html
+
+
+def test_report_css_embeds_fonts_as_data_uri():
+    """報表是獨立交付物：字型須內嵌 base64，不得依賴 /static 相對路徑。"""
+    from src.report.exporters.report_css import REPORT_FONT_FACE_CSS
+    assert "data:font/woff2;base64," in REPORT_FONT_FACE_CSS
+    assert "url('/static/fonts/" not in REPORT_FONT_FACE_CSS
