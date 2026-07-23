@@ -757,3 +757,73 @@ function _showAccelCountdown() {
     remEl.textContent = fmt(left);
   }, 1000);
 }
+
+// ─── Archive 查閱：資料來源切換 + 載入控制 ─────────────────────────────
+// 切換「即時快取 / Archive」：顯示/隱藏 archive 載入控制，選 archive 時刷新狀態。
+function onTrafficSourceChange() {
+  const sel = document.getElementById('traffic-source');
+  const box = document.getElementById('traffic-archive-controls');
+  const isArchive = sel && sel.value === 'archive';
+  if (box) box.style.display = isArchive ? 'flex' : 'none';
+  if (isArchive) refreshArchiveStatus();
+}
+
+async function refreshArchiveStatus() {
+  const el = document.getElementById('archive-status');
+  if (!el) return;
+  try {
+    const st = await get('/api/cache/archive/status');
+    el.textContent = (st && st.loaded)
+      ? _t('gui_traffic_archive_loaded_fmt')
+          .replace('{start}', st.start).replace('{end}', st.end).replace('{n}', st.rows)
+      : _t('gui_traffic_archive_none');
+  } catch (_) { el.textContent = ''; }
+}
+
+// 輪詢上限：避免背景 load 卡住（例如伺服端程序異常退出、_PROGRESS 永遠停在
+// running）時前端無限輪詢下去。720 次 * 2s 間隔 = 上限時間，超過即停止輪詢、
+// 以既有錯誤樣式顯示逾時訊息（不再視為進行中）。
+const ARCHIVE_POLL_MAX = 720;
+
+// 載入指定日期範圍的 archive（背景執行）：POST 立即回 202，之後輪詢 status。
+async function loadArchiveRange() {
+  const el = document.getElementById('archive-status');
+  const start = (document.getElementById('archive-start') || {}).value;
+  const end = (document.getElementById('archive-end') || {}).value;
+  if (el) el.textContent = '…';
+  try {
+    const body = await post('/api/cache/archive/load', { start_date: start, end_date: end });
+    if (!body || body.ok === false) {
+      if (el) el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', (body && body.error) || '');
+      return;
+    }
+    if (el) el.textContent = _t('gui_traffic_archive_loading');
+    let timedOut = true;
+    for (let i = 0; i < ARCHIVE_POLL_MAX; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const st = await get('/api/cache/archive/status');
+      const load = (st && st.load) || {};
+      if (load.state === 'running') continue;
+      if (load.state === 'error') {
+        if (el) el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', load.error || '');
+        return;
+      }
+      if (load.no_files) {
+        if (el) el.textContent = _t('gui_traffic_archive_no_files');
+        return;
+      }
+      // done → 以既有 status 呈現邏輯刷新
+      timedOut = false;
+      break;
+    }
+    if (timedOut) {
+      if (el) el.textContent = _t('gui_traffic_archive_poll_timeout');
+      return;
+    }
+  } catch (e) {
+    if (el) el.textContent = _t('gui_traffic_archive_load_error').replace('{err}', String(e));
+    return;
+  }
+  await refreshArchiveStatus();
+}
+
