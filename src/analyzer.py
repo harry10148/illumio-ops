@@ -1047,8 +1047,12 @@ class Analyzer:
         now_utc = datetime.datetime.now(datetime.timezone.utc)
 
         if self._sub_flows is not None:
-            flows = self._sub_flows.poll_new_rows(limit=10000)
-            logger.info("Analyzer flow path: cache ({} rows)", len(flows))
+            # 全視窗查詢（同 legacy API 語意：max_win + 2 分鐘）——cursor 增量
+            # 會把 count/volume 規則的視窗退化成輪詢間隔（2026-07-24 審查 A1）
+            max_win = max(r.get('threshold_window', 10) for r in tr_rules)
+            since = now_utc - datetime.timedelta(minutes=max_win + 2)
+            flows = self._sub_flows.fetch_window_rows(since, limit=10000)
+            logger.info("Analyzer flow path: cache window ({} rows)", len(flows))
             return flows, tr_rules, now_utc
 
         traffic_stream, now_utc = self._legacy_fetch_traffic()

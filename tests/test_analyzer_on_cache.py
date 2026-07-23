@@ -321,3 +321,43 @@ class TestAnalyzerOnCache(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestTrafficWindowOnCache(unittest.TestCase):
+    """A1（2026-07-24 審查）：cache 路徑流量規則必須全視窗查詢，
+    不得用 cursor 增量（視窗會退化成輪詢間隔、嚴重漏告警）。"""
+
+    @staticmethod
+    def _traffic_rule(threshold=100, window=10):
+        return {"id": "t1", "type": "traffic", "name": "conn spike",
+                "threshold_count": threshold, "threshold_window": window,
+                "threshold_type": "count", "cooldown_minutes": 0,
+                "filter_type": "port", "filter_value": "443"}
+
+    def test_fetch_traffic_uses_window_query_not_cursor(self):
+        import datetime as dt
+        mock_sub = MagicMock()
+        mock_sub.fetch_window_rows.return_value = []
+        az = _make_analyzer(rules=[self._traffic_rule(window=10)],
+                            subscriber_flows=mock_sub)
+        _stream, _rules, now_utc = az._fetch_traffic()
+        mock_sub.fetch_window_rows.assert_called_once()
+        mock_sub.poll_new_rows.assert_not_called()
+        call = mock_sub.fetch_window_rows.call_args
+        since = call.args[0] if call.args else call.kwargs["since"]
+        span = (now_utc - since).total_seconds()
+        # legacy 語意：max_win + 2 分鐘
+        self.assertGreaterEqual(span, 12 * 60 - 5)
+
+    def test_window_accumulation_reaches_threshold(self):
+        import datetime as dt
+        flows = [{"num_connections": 1, "timestamp": ""} for _ in range(120)]
+        mock_sub = MagicMock()
+        mock_sub.fetch_window_rows.return_value = flows
+        rule = self._traffic_rule(threshold=100, window=10)
+        az = _make_analyzer(rules=[rule], subscriber_flows=mock_sub)
+        stream, tr_rules, now_utc = az._fetch_traffic()
+        with unittest.mock.patch.object(az, "check_flow_match", return_value=True):
+            result = az._run_rule_engine(iter(stream), tr_rules, now_utc)
+        _, res = result[0]
+        self.assertGreaterEqual(res["max_val"], 100)
