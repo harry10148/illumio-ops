@@ -304,6 +304,32 @@ def test_data_integrity_cleared_on_fallback_recovery(api_client, monkeypatch, _d
     assert "/orgs/1/workloads" not in stored
 
 
+def _truncated_then_failed_fallback(api_client, monkeypatch, path="/orgs/1/labels"):
+    monkeypatch.setattr("src.api_client.time.sleep", lambda *_a, **_kw: None)
+    truncated = [{"href": f"{path}/{i}"} for i in range(500)]
+    api_client._api_get_with_headers = MagicMock(side_effect=[
+        (200, truncated, {"X-Total-Count": "700"}),
+        (202, None, {"Location": "/orgs/1/jobs/abc123", "Retry-After": "1"}),
+        (200, {"status": "failed"}, {}),
+    ])
+    return truncated
+
+
+def test_raise_on_error_getter_raises_on_unrecovered_truncation(api_client, monkeypatch):
+    """截斷且 fallback 失敗＋raise_on_error=True → TruncatedCollectionError，
+    不得靜默回不完整集合（CHANGELOG 曾誠實記載的 gap，本批收掉）。"""
+    from src.exceptions import TruncatedCollectionError
+    _truncated_then_failed_fallback(api_client, monkeypatch)
+    with pytest.raises(TruncatedCollectionError):
+        api_client.get_all_labels(raise_on_error=True)
+
+
+def test_default_getter_still_returns_truncated_data(api_client, monkeypatch):
+    """raise_on_error=False（預設）維持舊契約：回截斷資料不 raise。"""
+    truncated = _truncated_then_failed_fallback(api_client, monkeypatch)
+    assert api_client.get_all_labels() == truncated
+
+
 @responses.activate
 def test_fallback_failure_backoff_suppresses_retry(api_client, monkeypatch):
     """fallback 失敗後進入退避窗：同 path 的下一次截斷呼叫不得重打

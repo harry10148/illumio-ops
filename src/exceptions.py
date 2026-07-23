@@ -28,6 +28,16 @@ class AsyncDownloadError(APIError):
     """
 
 
+class TruncatedCollectionError(APIError):
+    """Collection GET hit the PCE 500-object cap and the async-GET
+    fallback could not recover the full set.
+
+    Raised only for raise_on_error=True callers: silently returning the
+    truncated page would let incomplete data flow into reports as if it
+    were the complete collection.
+    """
+
+
 class ConfigError(IllumioOpsError):
     pass
 

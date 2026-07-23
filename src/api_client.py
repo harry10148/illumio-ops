@@ -660,6 +660,8 @@ class ApiClient:
         path = f"/orgs/{org}/labels"
         status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_all_labels")
             return data
         if raise_on_error and status != 200:
             raise APIError(f"get_all_labels failed: HTTP {status} for {path}")
@@ -753,8 +755,11 @@ class ApiClient:
         """
         try:
             org = self.api_cfg['org_id']
-            status, data, _total = self._get_collection(f"/orgs/{org}/workloads?managed=true", timeout=30)
+            path = f"/orgs/{org}/workloads?managed=true"
+            status, data, _total = self._get_collection(path, timeout=30)
             if status == 200:
+                if raise_on_error:
+                    self._raise_if_truncated(path, "fetch_managed_workloads")
                 return data
             logger.error(f"Fetch Managed Workloads Failed: {status}")
             if raise_on_error:
@@ -924,6 +929,14 @@ class ApiClient:
 
         return status, data, total_count
 
+    def _raise_if_truncated(self, path: str, name: str) -> None:
+        """raise_on_error getter 的截斷防門：截斷且 fallback 未恢復時大聲失敗，
+        不讓不完整集合流進「必須區分失敗與空集合」的消費端。"""
+        if path in self.last_truncated_collections:
+            from src.exceptions import TruncatedCollectionError
+            raise TruncatedCollectionError(
+                f"{name}: collection {path} truncated at PCE 500 cap and async fallback failed")
+
     def _cached_async_collection_get(self, path: str, *, timeout: int = 15) -> list[Any] | None:
         """_async_collection_get 的 process 級 memo/退避包裝。
 
@@ -1074,8 +1087,11 @@ class ApiClient:
         if self.ruleset_cache and not force_refresh:
             return self.ruleset_cache
         org = self.api_cfg['org_id']
-        status, data, _total = self._get_collection(f"/orgs/{org}/sec_policy/draft/rule_sets")
+        path = f"/orgs/{org}/sec_policy/draft/rule_sets"
+        status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_all_rulesets")
             self.ruleset_cache = data
             return self.ruleset_cache
         if raise_on_error and status != 200:
@@ -1093,6 +1109,8 @@ class ApiClient:
         path = f"/orgs/{org}/sec_policy/active/rule_sets"
         status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_active_rulesets")
             return data
         if raise_on_error and status != 200:
             raise APIError(f"get_active_rulesets failed: HTTP {status} for {path}")
@@ -1115,6 +1133,8 @@ class ApiClient:
         path = f"/orgs/{org}/sec_policy/{pversion}/ip_lists"
         status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_ip_lists")
             return data
         if raise_on_error and status != 200:
             raise APIError(f"get_ip_lists failed: HTTP {status} for {path}")
@@ -1136,6 +1156,8 @@ class ApiClient:
         path = f"/orgs/{org}/sec_policy/{pversion}/label_groups"
         status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_label_groups")
             return data
         if raise_on_error and status != 200:
             raise APIError(f"get_label_groups failed: HTTP {status} for {path}")
@@ -1157,6 +1179,8 @@ class ApiClient:
         path = f"/orgs/{org}/sec_policy/{pversion}/services"
         status, data, _total = self._get_collection(path)
         if status == 200 and data:
+            if raise_on_error:
+                self._raise_if_truncated(path, "get_services")
             return data
         if raise_on_error and status != 200:
             raise APIError(f"get_services failed: HTTP {status} for {path}")
