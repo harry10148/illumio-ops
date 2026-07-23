@@ -1225,6 +1225,9 @@ class Analyzer:
                     self.reporter.add_traffic_alert(alert_data)
 
     def _check_cooldown(self, rule: dict[str, Any]) -> bool:
+        """冷卻＋節流閘門。cooldown_minutes=0 是刻意語意：停用冷卻
+        （每個 cycle 都可再告警，僅剩 throttle 限制）——GUI/CLI hint 與
+        monitoring-alerts.md 已明文（審查 A5 確認項）。"""
         rid = str(rule["id"])
         now_utc = datetime.datetime.now(datetime.timezone.utc)
         last_alert = self.state.get("alert_history", {}).get(rid)
@@ -1247,7 +1250,12 @@ class Analyzer:
                     logger.info(f"Rule '{rule['name']}' in cooldown.")
                     return False
             except ValueError:
-                pass  # intentional fallback: unparseable last_alert timestamp means cooldown is not enforced
+                # intentional fallback：損壞的 last_alert 時戳讓冷卻放行一次
+                # （隨後以正確格式覆寫、自癒）——但要留下可見證據（審查 A5）
+                logger.warning(
+                    "corrupt alert_history timestamp for rule {} ({!r}) — cooldown bypassed once",
+                    rid, last_alert,
+                )
 
         allowed, throttle_meta = self.alert_throttler.allow(rule, now_utc)
         if not allowed:

@@ -276,12 +276,16 @@ GUI 操作路徑（Settings → Channels 各通道卡片；Rules → Actions 全
 
 ### 5.1 Dead-letter queue（DLQ）— 3 次重試
 
-`Reporter.send_alerts()` 派送後若**所有**啟用通道皆失敗（非 `force_test`）：
+`Reporter.send_alerts()` 派送後若**沒有任何**啟用通道成功（非 `force_test`）：
 
-1. 累計失敗次數 `attempts`；未達上限則把本輪四個 bucket（health/event/traffic/metric）連同 `attempts`、`first_failed_at` 存入 `state.json` 的 `alert_dlq`，等下次 `send_alerts` 呼叫時（`_pop_alert_dlq`）自動與新告警合併重送。
-2. `ALERT_DLQ_MAX_ATTEMPTS = 3`：達到第 3 次仍失敗，直接**丟棄**該批告警並記一筆 `{"channel": "dlq", "status": "dropped", ...}` 結果，寫 error log。
+1. 累計失敗次數 `attempts`；未達上限則把本輪四個 bucket（health/event/traffic/metric）連同 `attempts`、`first_failed_at` 存入 `state.json` 的 `alert_dlq`，等下次 `send_alerts` 呼叫時（`_pop_alert_dlq`）自動與新告警合併重送。**只有真的嘗試過遞送（有非 skipped 結果）才把 `attempts` +1**：全數 skipped（設定缺失、LINE 冷卻中）的 cycle 一樣入列保留告警，但不消耗重試額度。單一 bucket 上限 `ALERT_DLQ_BUCKET_CAP = 100` 筆（超出裁掉最舊並記 warning），防止長期無通道時無界成長。
+2. `ALERT_DLQ_MAX_ATTEMPTS = 3`：真實嘗試達第 3 次仍失敗，直接**丟棄**該批告警並記一筆 `{"channel": "dlq", "status": "dropped", ...}` 結果，寫 error log。
 
-DLQ 讀寫皆透過 `update_state_file` 做原子檔案更新，避免併發寫壞 state。
+DLQ 讀寫皆透過 `update_state_file` 做原子檔案更新，避免併發寫壞 state。三個刻意的設計取捨（2026-07-24 審查明文化）：
+
+- **DLQ 是 all-or-nothing**：任一通道成功即視為已遞送，其餘失敗通道不重試（只在 dispatch_history 記 failed）。次要通道長期故障請看 Integrations 的告警通道狀態，不會由 DLQ 補送。
+- **LINE 自我冷卻（3 連敗→5 分鐘）是程序內狀態**：monitor daemon 長駐期間跨 cycle 有效，程序重啟即歸零；冷卻中回報 `skipped`，不消耗 DLQ 額度。
+- **throttle 於決策時記帳**：告警放行即消耗節流額度，之後遞送失敗經 DLQ 重送不再過 throttle（不會二次記帳）；失敗遞送佔用預算屬預期語意。
 
 ### 5.2 Watchdog — PCE 連續失敗自我告警
 

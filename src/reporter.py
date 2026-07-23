@@ -866,6 +866,13 @@ class Reporter:
             logger.error("Failed to persist alert DLQ (alerts lost): {}", exc)
 
     def send_alerts(self, force_test: bool = False, channels: list[str] | None = None, *, lang: str | None = None) -> list[dict[str, Any]]:
+        """派送四個 bucket 到全部啟用通道。
+
+        DLQ 為 **all-or-nothing**：任一通道成功即視為已遞送、不重試其餘
+        失敗通道（部分失敗只記 dispatch_history）；全數未遞送才整批入列
+        重試（真嘗試過才消耗 3 次額度）。per-channel 重試是刻意不做的
+        取捨——見 docs/guide/monitoring-alerts.md（2026-07-24 審查 B3）。
+        """
         _lang = lang or self._lang
         # Bind the subject's t() to the dispatch language; _dispatch_lang (set
         # around the plugin loop below) carries the same language into the

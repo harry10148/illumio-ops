@@ -103,6 +103,12 @@ class AlertThrottler:
         return dict(entry)
 
     def allow(self, rule: dict, now_utc: datetime.datetime | None = None):
+        """滑動視窗速率限制。
+
+        注意記帳時點：放行即記一次 dispatch——即使該告警之後遞送失敗進
+        DLQ，額度已消耗（DLQ 重播走 reporter、不再過 throttle，不會二次
+        記帳；失敗遞送佔用預算屬預期語意，2026-07-24 審查 D3 確認）。
+        """
         if now_utc is None:
             now_utc = datetime.datetime.now(datetime.timezone.utc)
         spec = parse_throttle(rule.get("throttle") or rule.get("alert_throttle"))
