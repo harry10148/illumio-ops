@@ -107,3 +107,29 @@ def test_hit_metrics_columns_precede_long_text_columns():
     assert _COLS.index("hit_count") < _COLS.index("consumers")
     assert _COLS.index("days_since_last_hit") < _COLS.index("consumers")
     assert _COLS.index("last_hit_at") < _COLS.index("consumers")
+
+
+def test_numeric_cells_formatted_for_display():
+    """命中次數帶千分位、天數欄整數顯示（1.0/28.0 浮點與 463399 無分位
+    是 2026-07-23 視覺驗證的殘項）。"""
+    from src.report.exporters.rule_hit_count_html_exporter import _fmt_cell_value
+    assert _fmt_cell_value("hit_count", 463399) == "463,399"
+    assert _fmt_cell_value("hit_count", "463399") == "463,399"
+    assert _fmt_cell_value("days_since_last_hit", 28.0) == "28"
+    assert _fmt_cell_value("days_since_last_hit", "1.0") == "1"
+    assert _fmt_cell_value("days_since_last_hit", "") == ""
+    assert _fmt_cell_value("description", "1.0") == "1.0"
+
+
+def test_kpi_total_hits_thousands_separator():
+    from unittest.mock import MagicMock
+    from src.report.exporters.rule_hit_count_html_exporter import RuleHitCountHtmlExporter
+    result = MagicMock()
+    result.module_results = {"kpis": {"total_rules": 12, "hit_rules": 4,
+                                       "unused_rules": 8, "hit_rate_pct": 33.3,
+                                       "total_hits": 463809},
+                             "hit_df": None, "unused_df": None, "cleanup_df": None}
+    result.source = "native"
+    result.date_range = ("2026-06-23", "2026-07-22")
+    html = RuleHitCountHtmlExporter(result, lang="en")._render_html()
+    assert "463,809" in html
