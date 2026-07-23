@@ -24,9 +24,11 @@ _CSS = build_css("rule_hit_count")   # unknown type → base styling only
 _CELL_MAX = 160
 _TRUNC_COLS = {"consumers", "providers", "services", "description"}
 
-_COLS = ["ruleset", "rule_no", "rule_type", "description", "consumers",
-         "providers", "services", "enabled", "hit_count", "days_since_last_hit",
-         "last_hit_at"]
+# 命中量測欄前移：報表主指標（hit_count/days_since/last_hit）曾排在長文字
+# 欄之後，1440px 下被推出可視範圍（2026-07-23 視覺實檢）
+_COLS = ["ruleset", "rule_no", "hit_count", "days_since_last_hit", "last_hit_at",
+         "rule_type", "description", "consumers", "providers", "services",
+         "enabled"]
 
 _COL_I18N = {
     "ruleset": "rpt_rhc_col_ruleset",

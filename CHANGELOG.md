@@ -23,6 +23,19 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Report content polish (visual review sweep): pie charts use fixed
+  semantic decision/severity colors (order-based palette rendered 98%
+  potentially-blocked traffic in green) with sub-3% slice labels moved
+  to a full legend; the traffic mod02 intro explains the unknown
+  decision bucket and exec summaries carry all four decision buckets;
+  trend comparisons warn when the previous snapshot predates the
+  unknown-decision basis; rule hit count tables put hit metrics before
+  long text columns and its KPI cards render horizontally; printed
+  reports expand horizontally-scrolled tables instead of cutting them;
+  exec KPI strips no longer collide at mail-client widths; readiness
+  queue actions match each row's blocking factor; unmanaged sources are
+  classified internal/public with public flagged red; report fonts are
+  embedded as data URIs; trend delta counts render as integers.
 - Error-swallowing sweep (repo-wide triage of 296 handlers): ransomware
   posture enrichment failures no longer render as a falsely-clean zero
   (warning + `enrichment_error` marker + no cache write + `?` in the VEN

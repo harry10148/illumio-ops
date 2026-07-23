@@ -124,14 +124,39 @@ def _resolve_chart_text(spec: dict[str, Any], field: str, *, lang: str = "en") -
 def _pie_autopct(pct: float, *, threshold: float = 0.0) -> str:
     """Suppress autopct labels for slices at or below `threshold` percent.
 
-    Default threshold=0.0 with strict `>` hides only literally-zero slices,
-    which were causing the '0.0%5.5%0.0%' label clusters in the sample
-    report. Higher thresholds risk hiding operationally-significant slices
-    (e.g. a 0.08% 'Critical' category is exactly the slice a security
-    operator needs to see) — only raise the threshold when the chart's
-    domain makes sub-N% noise meaningless.
+    圓餅現在一律附完整圖例（名稱＋件數＋百分比），小切片的就地標籤只是
+    重疊噪音（2026-07-23 視覺實檢：0.1%/0.0% 兩切片的名稱與百分比擠成一
+    團）——pie 分支以 threshold=_PIE_LABEL_MIN_PCT 呼叫，資訊不會消失，
+    只是移到圖例。
     """
     return f"{pct:.1f}%" if pct > threshold else ""
+
+
+# 就地標籤（切片名＋百分比）的最小占比：低於此值只留圖例
+_PIE_LABEL_MIN_PCT = 3.0
+
+# 判定/嚴重度語意色：label 正規化（小寫、底線轉空白）後比對。
+# 順序色曾把 98% Potentially Blocked 畫成安全綠（2026-07-23 視覺實檢）。
+_SEMANTIC_COLORS = {
+    "allowed": "#16a34a",
+    "blocked": "#dc2626",
+    "potentially blocked": "#f59e0b",
+    "unknown": "#6b7280",
+    "critical": "#dc2626",
+    "high": "#f97316",
+    "medium": "#f59e0b",
+    "low": "#16a34a",
+    "info": "#64748b",
+    "warning": "#f59e0b",
+    "error": "#dc2626",
+}
+
+
+def _semantic_pie_colors(labels: list) -> "list[str] | None":
+    """全部 label 都有語意色才回色列，否則 None（維持預設循環，不混用）。"""
+    colors = [_SEMANTIC_COLORS.get(str(l).strip().lower().replace("_", " "))
+              for l in labels]
+    return colors if colors and all(colors) else None
 
 
 def _build_matplotlib_figure(spec: dict[str, Any], *, lang: str = "en"):
@@ -163,15 +188,31 @@ def _build_matplotlib_figure(spec: dict[str, Any], *, lang: str = "en"):
             ax.set_xticks(range(len(labels)))
             ax.set_xticklabels(labels, rotation=30, ha="right")
     elif chart_type == "pie":
+        values = data.get("values", [])
+        labels = data.get("labels", [])
+        total = float(sum(values)) or 1.0
+        pcts = [v * 100.0 / total for v in values]
+        # 小切片就地標籤留白：完整名稱/件數/百分比一律在圖例
+        draw_labels = [l if p >= _PIE_LABEL_MIN_PCT else ""
+                       for l, p in zip(labels, pcts)]
+        import functools as _ft
         ax.pie(
-            data.get("values", []),
-            labels=data.get("labels", []),
-            autopct=_pie_autopct,
+            values,
+            labels=draw_labels,
+            colors=_semantic_pie_colors(labels),
+            autopct=_ft.partial(_pie_autopct, threshold=_PIE_LABEL_MIN_PCT),
             startangle=90,
             pctdistance=0.78,        # % labels at 78% of radius (default 0.6)
             labeldistance=1.08,      # slice labels at 108% of radius (default 1.1)
             textprops={"fontsize": 9},
         )
+        if labels:
+            ax.legend(
+                [f"{l} — {v:,} ({p:.1f}%)"
+                 for l, v, p in zip(labels, values, pcts)],
+                loc="center left", bbox_to_anchor=(1.0, 0.5), fontsize=8,
+                frameon=False,
+            )
         ax.axis("equal")
     elif chart_type == "line":
         ax.plot(data.get("x", []), data.get("y", []), marker="o")

@@ -146,3 +146,78 @@ def test_bar_many_labels_rotates_xticks():
     rot2 = {round(lbl.get_rotation()) for lbl in fig2.axes[0].get_xticklabels()}
     matplotlib.pyplot.close(fig2)
     assert rot2 == {0}
+
+
+SEMANTIC_PIE_SPEC = {
+    "type": "pie",
+    "title": "Policy Decision Breakdown",
+    "data": {
+        "labels": ["Allowed", "Blocked", "Potentially Blocked", "Unknown"],
+        "values": [208, 1, 11642, 190218],
+    },
+    "i18n": {"lang": "en"},
+}
+
+
+def test_pie_semantic_colors_fixed_by_label():
+    """判定圓餅顏色必須依語意固定（allowed 綠/blocked 紅/PB 橘/unknown 灰），
+    不得依切片順序輪替——順序色曾把 98% 未覆蓋流量畫成安全綠。"""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from src.report.exporters.chart_renderer import _build_matplotlib_figure
+    fig = _build_matplotlib_figure(SEMANTIC_PIE_SPEC, lang="en")
+    try:
+        ax = fig.axes[0]
+        wedges = [p for p in ax.patches]
+        got = [w.get_facecolor() for w in wedges]
+        from matplotlib.colors import to_rgba
+        assert got[0] == to_rgba("#16a34a")   # allowed
+        assert got[1] == to_rgba("#dc2626")   # blocked
+        assert got[2] == to_rgba("#f59e0b")   # potentially blocked
+        assert got[3] == to_rgba("#6b7280")   # unknown
+    finally:
+        plt.close(fig)
+
+
+def test_pie_small_slices_move_to_legend():
+    """<3% 切片的切片名與百分比標籤留白（防重疊），完整資訊移到圖例。"""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from src.report.exporters.chart_renderer import _build_matplotlib_figure
+    fig = _build_matplotlib_figure(SEMANTIC_PIE_SPEC, lang="en")
+    try:
+        ax = fig.axes[0]
+        texts = [t.get_text() for t in ax.texts]
+        # Allowed(0.1%)/Blocked(0.0%) 切片名不得出現在切片標籤上
+        assert "Allowed" not in texts
+        assert "Blocked" not in texts
+        # 大切片仍就地標示
+        assert "Unknown" in texts
+        legend = ax.get_legend()
+        assert legend is not None
+        legend_texts = " ".join(t.get_text() for t in legend.get_texts())
+        assert "Allowed" in legend_texts and "208" in legend_texts
+        assert "Blocked" in legend_texts
+    finally:
+        plt.close(fig)
+
+
+def test_pie_unknown_labels_keep_default_palette():
+    """任一 label 不在語意表中 → 整組維持 matplotlib 預設循環（不混用）。"""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.colors import to_rgba
+    from src.report.exporters.chart_renderer import _build_matplotlib_figure
+    spec = {"type": "pie", "title": "x",
+            "data": {"labels": ["Alpha", "Beta"], "values": [60, 40]},
+            "i18n": {"lang": "en"}}
+    fig = _build_matplotlib_figure(spec, lang="en")
+    try:
+        ax = fig.axes[0]
+        got = [w.get_facecolor() for w in ax.patches]
+        assert got[0] != to_rgba("#16a34a")
+    finally:
+        plt.close(fig)

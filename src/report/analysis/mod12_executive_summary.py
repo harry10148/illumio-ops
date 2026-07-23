@@ -150,6 +150,7 @@ def _traffic_flows_summary(results: dict[str, Any], lang: str = "en") -> dict:
         {"label_key": "mod12_kpi_allowed_flows",     "label": t("mod12_kpi_allowed_flows", default="Allowed Flows", lang=lang), "value": _fmt(mod01.get("allowed_flows", 0))},
         {"label_key": "mod12_kpi_blocked_flows",     "label": t("mod12_kpi_blocked_flows", default="Blocked Flows", lang=lang), "value": _fmt(mod01.get("blocked_flows", 0))},
         {"label_key": "mod12_kpi_pb_flows",          "label": t("mod12_kpi_pb_flows", default="Potentially Blocked Flows", lang=lang), "value": _fmt(mod01.get("potentially_blocked_flows", 0))},
+        {"label_key": "mod12_kpi_unknown_flows",     "label": t("mod12_kpi_unknown_flows", default="Unknown Flows", lang=lang), "value": _fmt(mod01.get("unknown_flows", 0))},
         {"label_key": "mod12_kpi_total_data_volume", "label": t("mod12_kpi_total_data_volume", default="Total Data Volume", lang=lang), "value": fmt_bytes_auto(mod01.get("total_mb", 0), input_unit="MB")},
         {"label_key": "mod12_kpi_date_range",        "label": t("mod12_kpi_date_range", default="Date Range", lang=lang), "value": mod01.get("date_range", "N/A")},
     ]

@@ -8,26 +8,41 @@ Shared CSS/JS foundation for HTML report exporters.
 # REPORT_FONT_FACE_CSS below; no CDN preconnect / link tag needed.
 FONT_LINK = ""
 
-REPORT_FONT_FACE_CSS = """\
-@font-face {
-  font-family: 'Space Grotesk';
-  font-style: normal;
-  font-weight: 400 700;
-  src: url('/static/fonts/SpaceGrotesk-VF.woff2') format('woff2');
+# 報表是獨立交付物（寄送/另存後 /static 路徑不存在，字型 404 退回系統字型，
+# 2026-07-23 視覺實檢）——三個變數字型都很小（~40-50KB），內嵌 base64 讓
+# HTML 自帶字型；檔案讀不到時退回原 URL（GUI 同源仍可載）。
+_FONT_FILES = {
+    "Space Grotesk": ("SpaceGrotesk-VF.woff2", "400 700"),
+    "Inter": ("Inter-VF.woff2", "100 900"),
+    "JetBrains Mono": ("JetBrainsMono-VF.woff2", "100 800"),
 }
-@font-face {
-  font-family: 'Inter';
-  font-style: normal;
-  font-weight: 100 900;
-  src: url('/static/fonts/Inter-VF.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 100 800;
-  src: url('/static/fonts/JetBrainsMono-VF.woff2') format('woff2');
-}
-"""
+
+
+def _font_face_css() -> str:
+    import base64
+    import os
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    blocks = []
+    for family, (fname, weight) in _FONT_FILES.items():
+        src = f"url('/static/fonts/{fname}') format('woff2')"
+        try:
+            with open(os.path.join(root, "static", "fonts", fname), "rb") as fh:
+                b64 = base64.b64encode(fh.read()).decode("ascii")
+            src = f"url(data:font/woff2;base64,{b64}) format('woff2')"
+        except OSError:
+            pass
+        blocks.append(
+            "@font-face {\n"
+            f"  font-family: '{family}';\n"
+            "  font-style: normal;\n"
+            f"  font-weight: {weight};\n"
+            f"  src: {src};\n"
+            "}"
+        )
+    return "\n".join(blocks) + "\n"
+
+
+REPORT_FONT_FACE_CSS = _font_face_css()
 
 BASE_CSS = """\
   :root {
@@ -93,6 +108,8 @@ BASE_CSS = """\
   .section-intro { margin: 0 0 14px; color: var(--slate-50); font-size: 12px; line-height: 1.6; }
 
   .kpi-grid { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 24px; }
+  /* RHC 等報表用 kpi-row 包 kpi-card：無此規則時卡片直排、右側大片留白 */
+  .kpi-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
   .kpi-card { background: #fff; border-radius: 8px; padding: 14px 18px; box-shadow: var(--shadow-card); min-width: 150px; flex: 1 1 150px; max-width: 220px; border-top: 3px solid var(--orange); }
   .kpi-label { font-size: 11px; color: var(--slate-50); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
   .kpi-value { font-size: 20px; font-weight: 700; color: var(--cyan-120); font-variant-numeric: tabular-nums; }
@@ -202,6 +219,8 @@ BASE_CSS = """\
   .badge-MEDIUM { background: var(--gold-110); }
   .badge-LOW { background: var(--green); }
   .badge-INFO { background: var(--cyan-100); }
+  .badge-EXTERNAL { background: var(--red); }
+  .badge-INTERNAL { background: var(--slate-50); }
 
   .dual-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-items: start; margin: 12px 0 18px; }
   .dual-grid > div { min-width: 0; }
@@ -296,6 +315,12 @@ BASE_CSS = """\
     .card { box-shadow: none; border: 1px solid var(--slate-20); }
     thead { display: table-header-group; }
     tr { page-break-inside: avoid; }
+    /* 寬表列印保命：螢幕上靠 overflow-x 捲動的內容，列印時捲動區會被
+       整段裁掉（2026-07-23 視覺實檢：發現與行動表近半內容消失）——改為
+       可見＋縮字＋長字換行，寧可擠也不能無聲消失 */
+    .report-table-wrap { overflow: visible !important; }
+    .report-table-wrap table { font-size: 8pt; table-layout: auto !important; width: 100% !important; }
+    .report-table-wrap td, .report-table-wrap th { word-break: break-word; white-space: normal !important; }
     /* Override JS auto-fit: data-auto-fitted=true triggers table-layout:fixed in base CSS.
        !important overrides the higher-specificity attribute selector. */
     .report-table { width: 100% !important; min-width: 0 !important; overflow-wrap: break-word; table-layout: auto !important; }
@@ -538,16 +563,19 @@ EXEC_SUMMARY_CSS = """
 .exec-summary .verdict { font-weight: 600; font-size: 1.1rem; }
 .exec-summary .kpi-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  /* 150px 下限＋clamp 字級：120px 時「15,283,332」溢進鄰欄（2026-07-23
+     視覺實檢，郵件寬度 ~780px 首當其衝） */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   margin: 16px 0;
 }
-.exec-summary .kpi { display: flex; flex-direction: column; align-items: flex-start; }
+.exec-summary .kpi { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
 .exec-summary .kpi-label { font-size: 0.85rem; color: var(--slate-50); }
 .exec-summary .kpi-value {
-  font-size: 1.6rem;
+  font-size: clamp(1.1rem, 2.4vw, 1.6rem);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .exec-summary .summary-text { margin: 12px 0; line-height: 1.6; }
 .exec-summary .notes { margin: 12px 0 0 20px; color: var(--slate-50); }
