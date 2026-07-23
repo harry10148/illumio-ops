@@ -361,3 +361,46 @@ class TestTrafficWindowOnCache(unittest.TestCase):
             result = az._run_rule_engine(iter(stream), tr_rules, now_utc)
         _, res = result[0]
         self.assertGreaterEqual(res["max_val"], 100)
+
+
+class TestCountRuleEdges(unittest.TestCase):
+    """A2（2026-07-24 審查）：count 型規則在本 cycle 無新事件時
+    不得發出 time=N/A、內容全空的空殼告警。"""
+
+    @staticmethod
+    def _count_rule(threshold=1):
+        return {"id": "cr1", "name": "count rule", "type": "event",
+                "threshold_type": "count", "threshold_count": threshold,
+                "threshold_window": 10, "filter_type": "any",
+                "filter_value": "", "cooldown_minutes": 0}
+
+    def test_window_count_met_but_no_new_matches_no_alert(self):
+        import datetime as dt
+        # 非空輪詢（其他事件到達）但無一匹配本規則 → matches=[] 而視窗計數達標
+        other = _raw_event(event_type="user.login")
+        other["timestamp"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        mock_sub = MagicMock()
+        mock_sub.poll_new_rows.return_value = [other]
+        az = _make_analyzer(rules=[self._count_rule(threshold=1)],
+                            subscriber_events=mock_sub)
+        recent = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2)
+        az.state["history"] = {"cr1": [{"t": recent.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                                        "event_id": "x"}]}
+        with patch("src.analyzer.matches_event_rule", return_value=False):
+            az._run_event_analysis()
+        az.reporter.add_event_alert.assert_not_called()
+
+    def test_new_match_alerts_with_window_count(self):
+        import datetime as dt
+        mock_sub = MagicMock()
+        ev = _raw_event()
+        ev["timestamp"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        mock_sub.poll_new_rows.return_value = [ev]
+        az = _make_analyzer(rules=[self._count_rule(threshold=1)],
+                            subscriber_events=mock_sub)
+        az.state["history"] = {}
+        with patch("src.analyzer.matches_event_rule", return_value=True):
+            az._run_event_analysis()
+        az.reporter.add_event_alert.assert_called_once()
+        alert = az.reporter.add_event_alert.call_args[0][0]
+        self.assertNotEqual(alert["time"], "N/A")

@@ -386,7 +386,8 @@ class Analyzer:
             ts_str = f.get("timestamp")
             if not ts_str and "timestamp_range" in f:
                 ts_str = f["timestamp_range"].get("last_detected") or f["timestamp_range"].get("first_detected")
-                
+
+            f_time = None
             if ts_str:
                 try:
                     f_time = datetime.datetime.strptime(ts_str, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=datetime.timezone.utc)
@@ -396,8 +397,11 @@ class Analyzer:
                     except ValueError:
                         f_time = None
 
-                if f_time and f_time < start_time_limit:
-                    return False
+            # fail-closed：帶視窗的規則不得把「無/不可解析時戳」的 flow 計入
+            # 加總——過舊或離群 flow 會污染門檻（2026-07-24 審查 A4）。cache
+            # 路徑已在 SQL 層以 last_detected 過窗，此分支主要保護 legacy 流。
+            if f_time is None or f_time < start_time_limit:
+                return False
 
         # Criteria Check
         p = f.get("pd")
@@ -986,7 +990,10 @@ class Analyzer:
                     win_start = now_utc - datetime.timedelta(minutes=win_minutes)
                     count_val = self._event_count_in_window(rule["id"], win_start)
 
-                if count_val >= rule["threshold_count"] and count_val > 0:
+                # count 型須有本 cycle 新事件（matches 非空）才告警：視窗計數
+                # 只作門檻；無新證據時發出的告警必然是 time=N/A 的空殼
+                # （2026-07-24 審查 A2）
+                if count_val >= rule["threshold_count"] and count_val > 0 and matches:
                     if self._check_cooldown(rule):
                         self.stats.record_rule_trigger(rule, match_count=count_val, metric_value=count_val)
                         first = matches[0] if matches else {}
