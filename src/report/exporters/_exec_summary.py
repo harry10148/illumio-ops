@@ -42,7 +42,9 @@ def render_exec_summary_html(mod00: dict, report_name: str, lang: str = 'en') ->
     kpi_html = ''
     if kpis:
         items = []
-        for k in kpis[:6]:
+        # 8 桶：traffic 檔案的四個判定桶（allowed/blocked/pb/unknown）都要
+        # 進執行摘要——[:6] 曾把 pb/unknown 裁掉（2026-07-23 視覺實檢）
+        for k in kpis[:8]:
             label = escape(_resolve_label(k, lang))
             value = escape(str(k.get('value', '')))
             items.append(

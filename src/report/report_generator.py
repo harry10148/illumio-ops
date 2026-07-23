@@ -569,6 +569,10 @@ class ReportGenerator:
                 },
                 "data_source": result.data_source,
                 "profile": traffic_report_profile,
+                # 判定值域代碼：abpu = allowed/blocked/potentially_blocked/unknown
+                # （2026-07 起預設含 unknown）。舊快照無此欄——snapshot_mismatch
+                # 據此對「換基準」比較發出警語。
+                "policy_decisions": "abpu",
             }
             save_snapshot(output_dir, _trend_key, kpi_dict, generated_at=ts, meta=_snapshot_meta)
             if prev:

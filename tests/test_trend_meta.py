@@ -133,3 +133,20 @@ def test_trend_deltas_section_no_warning_when_mismatch_empty():
                "delta": 50.0, "delta_pct": 50.0, "direction": "up"}]
     html = _trend_deltas_section(deltas, lang="en", mismatch=[])
     assert "note-warn" not in html
+
+
+def test_mismatch_flags_legacy_policy_decisions_basis():
+    """前次快照無 policy_decisions（2026-07 unknown 改版前）→ 換基準警語；
+    兩邊同值 → 無警語。"""
+    cur = {"window": None, "data_source": "hybrid", "profile": "traffic",
+           "policy_decisions": "abpu"}
+    prev_legacy = {"_meta": {"data_source": "hybrid", "profile": "traffic"}}
+    ms = snapshot_mismatch(cur, prev_legacy)
+    assert any(m["field"] == "policy_decisions" for m in ms)
+    entry = next(m for m in ms if m["field"] == "policy_decisions")
+    assert entry["previous"] == "legacy (pre-unknown)"
+
+    prev_same = {"_meta": {"data_source": "hybrid", "profile": "traffic",
+                            "policy_decisions": "abpu"}}
+    assert not any(m["field"] == "policy_decisions"
+                   for m in snapshot_mismatch(cur, prev_same))

@@ -177,6 +177,15 @@ def snapshot_mismatch(
         if cur_val is not None and prev_val is not None and cur_val != prev_val:
             mismatches.append({"field": field, "previous": prev_val, "current": cur_val})
 
+    # policy_decisions（判定值域）特別處理：前次快照「缺此欄」正是 2026-07
+    # unknown 改版前的舊基準——這正是要警告的換基準情境，不能靜默相容。
+    cur_pd = current_meta.get("policy_decisions")
+    prev_pd = previous_meta.get("policy_decisions")
+    if cur_pd is not None and prev_pd != cur_pd:
+        mismatches.append({"field": "policy_decisions",
+                           "previous": prev_pd or "legacy (pre-unknown)",
+                           "current": cur_pd})
+
     return mismatches
 
 def build_kpi_dict_from_metadata(kpis: list[dict]) -> dict[str, Any]:
