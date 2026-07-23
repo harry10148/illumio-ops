@@ -2484,6 +2484,7 @@
   "gui_ws_name_placeholder": "完整或部分名稱",
   "gui_ws_search": "Workload 搜尋",
   "health_degraded_details": "PCE /health 回傳 HTTP 200，但 body status={status}。請檢查 PCE 主控台的節點健康、資料庫複寫延遲與服務狀態。",
+  "health_node_unavailable_details": "PCE /node_available 回應 HTTP {status}，節點可能已無法服務請求（官方 SLB 健康判準；狀態反映最多延遲 30 秒）。",
   "health_details": "詳細資訊",
   "health_status": "狀態",
   "health_time": "時間",

@@ -297,6 +297,22 @@ class ApiClient:
             logger.error(f"Health check failed: {e}")
             return 0, str(e)
 
+    def check_node_available(self) -> tuple[int, str]:
+        """GET /api/v2/node_available（官方 SLB 健康檢查端點，免驗證）。
+
+        healthy 判準：HTTP 200（on-prem SLB 文件；lab PCE 25.2.40 實測）或
+        202（Supercluster 文件）；404/502/連線失敗為節點不可服務。官方註明
+        狀態反映最多延遲 30 秒，呼叫端（monitor cycle）節奏遠慢於此。
+        """
+        url = f"{self.api_cfg['url']}/api/v2/node_available"
+        try:
+            status, body = self._request(url, timeout=10)
+            text = body.decode('utf-8', errors='replace') if isinstance(body, bytes) else str(body)
+            return status, text
+        except Exception as e:
+            logger.error(f"node_available check failed: {e}")
+            return 0, str(e)
+
     # ═══════════════════════════════════════════════════════════════════════
     # Events (stays on facade — not part of any moved domain)
     # ═══════════════════════════════════════════════════════════════════════

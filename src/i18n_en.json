@@ -2506,6 +2506,7 @@
   "gui_ws_name_placeholder": "Exact or partial name",
   "gui_ws_search": "Workload Search",
   "health_degraded_details": "PCE /health returned HTTP 200 but reports status={status}. Check node health, database replication lag, and service status in the PCE web console.",
+  "health_node_unavailable_details": "PCE /node_available returned HTTP {status} - the node may be unable to serve requests (official SLB health criterion; state can lag up to 30s).",
   "health_details": "Details",
   "health_status": "Status",
   "health_time": "Time",
