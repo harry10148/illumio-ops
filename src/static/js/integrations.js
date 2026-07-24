@@ -1055,7 +1055,7 @@ function buildDlqSkeleton() {
   return '<div class="toolbar" style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;">'
     + '<div class="form-group" style="margin:0;min-width:130px;">'
     + '<label data-i18n="gui_dlq_filter_dest">Destination</label>'
-    + '<select id="dlq-dest" style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;color:var(--fg);font-size:.83rem;">'
+    + '<select id="dlq-dest" style="width:100%;background-color:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;color:var(--fg);font-size:.83rem;">'
     + '<option value="" data-i18n="gui_dlq_filter_all">All</option></select>'
     + '</div>'
     + '<div class="form-group" style="margin:0;flex:1;min-width:140px;">'
