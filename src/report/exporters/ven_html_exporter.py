@@ -158,6 +158,19 @@ class VenHtmlExporter:
             except Exception:
                 pass
 
+        # OS-platform distribution chart (from the generator's os_chart_spec,
+        # populated once the dataframe carries os_id). Rendered here — the
+        # exporter previously never consumed the spec, so it never appeared.
+        os_chart_html = ""
+        _os_spec = self._r.get("os_chart_spec")
+        if _os_spec:
+            try:
+                _os_svg = render_matplotlib_svg(_os_spec, lang=self._lang)
+                if _os_svg:
+                    os_chart_html = f'<figure class="chart-static">{_os_svg}</figure>'
+            except Exception:
+                pass
+
         def _df_to_html(df, no_data_key: str = "rpt_no_records") -> str:
             def _render_cell(col, val, _row):
                 val_str = "" if val is None or str(val) in ("None", "nan") else str(val)
@@ -216,6 +229,7 @@ class VenHtmlExporter:
             + "</p></div>"
             + self._summary_pills(online_count, offline_count, today_count, yest_count)
             + status_chart_html
+            + os_chart_html
             + "</section>\n"
             + self._section("online", "rpt_ven_sec_online_title", online_count, _online_summary_html(df_online), "rpt_ven_sec_online_intro", "online", "ven_online_inventory")
             + "\n"
