@@ -349,8 +349,10 @@ class ReportScheduler:
                 _rslog.info(f"Completed: {[os.path.basename(p) for p in paths]}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
+            sched_id = schedule.get("id")
+            self._stamp_schedule_id(paths, sched_id)
             max_reports = int(schedule.get("max_reports", 30))
-            self._prune_by_count(output_dir, report_type, max_reports)
+            self._prune_by_count(output_dir, report_type, max_reports, schedule_id=sched_id)
             self._prune_old_reports(output_dir)
             return True
 
@@ -705,7 +707,50 @@ class ReportScheduler:
                 break
         return name
 
-    def _prune_by_count(self, output_dir: str, report_type: str, max_reports: int):
+    @staticmethod
+    def _unit_schedule_id(unit: dict):
+        """Read the schedule_id stamped into a report unit's metadata sidecar.
+
+        Returns the value (as stored) or None when there is no sidecar, it is
+        unreadable, or it predates stamping (legacy reports).
+        """
+        for fpath in unit["files"]:
+            if fpath.endswith(".metadata.json"):
+                try:
+                    with open(fpath, encoding="utf-8") as fh:
+                        return json.load(fh).get("schedule_id")
+                except Exception:
+                    return None
+        return None
+
+    @staticmethod
+    def _stamp_schedule_id(paths: list, schedule_id):
+        """Record which schedule produced each report in its metadata sidecar.
+
+        Enables per-schedule retention so two schedules sharing a report_type
+        and output_dir do not prune each other's history. Best-effort: a failed
+        stamp merely falls the report back to legacy (unattributed) handling.
+        """
+        if schedule_id is None:
+            return
+        for p in paths:
+            side = p + ".metadata.json"
+            data = {}
+            try:
+                if os.path.exists(side):
+                    with open(side, encoding="utf-8") as fh:
+                        data = json.load(fh) or {}
+            except Exception:
+                data = {}
+            data["schedule_id"] = schedule_id
+            try:
+                with open(side, "w", encoding="utf-8") as fh:
+                    json.dump(data, fh)
+            except Exception as e:
+                logger.warning(f"[Scheduler] Could not stamp schedule_id on {side}: {e}")
+
+    def _prune_by_count(self, output_dir: str, report_type: str, max_reports: int,
+                        schedule_id=None):
         """Keep only the newest max_reports REPORTS for the given report type.
 
         A report is a UNIT: its ``.html`` (or ``.zip``/``.json``) file plus the
@@ -714,6 +759,13 @@ class ReportScheduler:
         grouped into units, the units are sorted by their newest member's mtime
         (filename as a deterministic tie-break), and every file in the surplus
         units is deleted. Set max_reports to 0 to disable.
+
+        When ``schedule_id`` is given, retention is scoped to that schedule:
+        only units stamped with the matching schedule_id are counted and pruned,
+        so a sibling schedule sharing the same report_type/output_dir keeps its
+        own history. Legacy units without a stamp are left for the age-based
+        sweep. When ``schedule_id`` is None the original report_type-pool
+        behavior applies (manual runs and existing callers).
         """
         if max_reports <= 0 or not os.path.isdir(output_dir):
             return
@@ -740,6 +792,13 @@ class ReportScheduler:
             unit["files"].append(fpath)
             if mtime > unit["mtime"]:
                 unit["mtime"] = mtime
+
+        # Scope to this schedule's own reports when a schedule_id is supplied;
+        # units that are unattributed (legacy) or belong to another schedule are
+        # excluded so they are neither counted nor pruned here.
+        if schedule_id is not None:
+            units = {k: u for k, u in units.items()
+                     if str(self._unit_schedule_id(u)) == str(schedule_id)}
 
         # Sort report units newest-first (mtime, then key for determinism on
         # ties) and delete every file in the units beyond max_reports.
