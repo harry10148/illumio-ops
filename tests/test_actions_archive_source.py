@@ -68,4 +68,35 @@ def test_quarantine_search_archive_empty_when_not_loaded(client):
     resp = c.post("/api/quarantine/search", json={"source": "archive"},
                   environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
     assert resp.status_code == 200
-    assert resp.get_json() == {"ok": True, "data": []}
+    # F3（2026-07-24 審查）：not_loaded 旗標區分「未載入 review DB」與「查無流量」
+    body = resp.get_json()
+    assert body["ok"] is True and body["data"] == [] and body.get("not_loaded") is True
+
+
+def test_quarantine_search_mins_clamped(client):
+    """F1：live 分支 mins 須夾限（同 debug/events 端點基線 5..10080）——
+    攔截 query_flows 驗證送進去的查詢窗不超過 10080 分鐘。"""
+    import datetime
+    from unittest.mock import patch
+    c, _cm = client
+    captured = {}
+
+    def _fake_query_flows(self, params):
+        captured["params"] = params
+        return []
+
+    with patch("src.analyzer.Analyzer.query_flows", _fake_query_flows):
+        resp = c.post("/api/quarantine/search", json={"source": "live", "mins": 99999999},
+                      environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    st = datetime.datetime.strptime(captured["params"]["start_time"], "%Y-%m-%dT%H:%M:%SZ")
+    et = datetime.datetime.strptime(captured["params"]["end_time"], "%Y-%m-%dT%H:%M:%SZ")
+    assert (et - st).total_seconds() <= 10080 * 60 + 1
+
+
+def test_quarantine_search_mins_non_numeric_400(client):
+    """F2：非數字 mins 回 typed 400，非 generic 500。"""
+    c, _cm = client
+    resp = c.post("/api/quarantine/search", json={"source": "live", "mins": "abc"},
+                  environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 400

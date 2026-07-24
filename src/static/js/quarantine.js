@@ -289,7 +289,8 @@ async function runTrafficAnalyzer() {
 
     // --- Pagination Logic ---
     _qt_data = r.data || [];
-    _qt_meta = { total: r.total_matches || _qt_data.length, truncated: !!r.truncated, cap: r.cap || 0 };
+    _qt_meta = { total: r.total_matches || _qt_data.length, truncated: !!r.truncated,
+                 cap: r.cap || 0, notLoaded: !!r.not_loaded };
     _qt_page = 1;
     renderQtPage();
     // R5 Bug 1: previously the KPI strip (tw-kpi-flows / -conns / -dst-ips
@@ -389,7 +390,9 @@ function renderQtPage() {
     pageNumDisplay.textContent = _qt_page;
   } else {
     pagBar.style.display = 'none';
-    bd.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--dim);">${_t('gui_no_traffic')}</td></tr>`;
+    // 區分「未載入封存資料」與「查無流量」（2026-07-24 審查 F3）
+    const emptyMsg = _qt_meta.notLoaded ? _t('gui_archive_not_loaded') : _t('gui_no_traffic');
+    bd.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--dim);">${escapeHtml(emptyMsg)}</td></tr>`;
     return;
   }
 
@@ -592,7 +595,7 @@ function renderQwPage() {
       : `<button class="btn btn-secondary btn-sm" style="margin-left:6px;" disabled title="${_t('gui_accel_unmanaged_tip')}">${_t('gui_btn_accelerate')}</button>`;
 
     html += `<tr>
-          <td style="text-align:center;"><input type="checkbox" class="qw-chk" value="${href}" data-managed="${isManaged ? '1' : '0'}"></td>
+          <td style="text-align:center;"><input type="checkbox" class="qw-chk" value="${escapeHtml(href)}" data-managed="${isManaged ? '1' : '0'}"></td>
           <td>
             <div style="display:flex;align-items:center;">
               ${statusDot} <strong style="font-size:0.95rem;">${escapeHtml(w.name || w.hostname)}</strong>

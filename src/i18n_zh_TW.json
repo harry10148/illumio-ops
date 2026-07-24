@@ -1736,6 +1736,7 @@
   "gui_no_rules_add_one": "沒有規則，請先新增",
   "gui_no_rules_title": "尚無規則",
   "gui_no_snapshot": "目前沒有 Dashboard 快照。",
+  "gui_archive_not_loaded": "尚未載入封存資料——請先於資料來源選單匯入 review DB。",
   "gui_no_traffic": "沒有流量資料",
   "gui_no_traffic_data": "API 未回傳流量資料。",
   "gui_no_ven_data": "API 未回傳 VEN 或 managed workload 資料。",
