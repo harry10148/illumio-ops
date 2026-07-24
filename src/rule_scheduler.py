@@ -289,9 +289,12 @@ class ScheduleEngine:
                     if item_now_cmp > expire_dt:
                         log(f"{Colors.FAIL}[EXPIRED] {c['name']} (ID:{extract_id(href)}) {t('rs_expired', default='has expired.')}{Colors.ENDC}")
                         expire_ok = self.api.toggle_and_provision(href, False, c.get('is_ruleset'))
-                        self.api.update_rule_note(href, "", remove=True)
-                        expired_hrefs.append(href)
                         if expire_ok:
+                            # 只有 disable 成功才移除排程並清 note——失敗時保留排程，
+                            # 下 tick 重試，否則規則留在 PCE enabled 卻被 scheduler
+                            # 遺忘（2026-07-24 審查 BUG-1，安全相關）
+                            self.api.update_rule_note(href, "", remove=True)
+                            expired_hrefs.append(href)
                             tick_states[href].update({"last_action": "expire", "last_result": "ok"})
                         else:
                             tick_states[href].update({

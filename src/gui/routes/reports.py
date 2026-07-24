@@ -19,6 +19,7 @@ from src.gui._helpers import (
     _resolve_reports_dir,
     _resolve_config_dir,
     _resolve_state_file,
+    _err,
     _err_with_log,
     _write_audit_dashboard_summary,
     _write_policy_usage_dashboard_summary,
@@ -97,6 +98,37 @@ def _save_adhoc_job(job_id: str, record: dict) -> None:
         return data
 
     update_state_file(_resolve_state_file(), _merge)
+
+
+def _validate_report_schedule(d: dict, lang: str) -> None:
+    """報表排程輸入驗證（2026-07-24 審查 BUG-2）。畸形值原本 verbatim 存下、
+    tick 靜默不跑無 operator 訊號。raise ValueError（已 i18n）供端點轉 400。"""
+    cron_expr = d.get("cron_expr")
+    if cron_expr:
+        # 有 cron_expr 時它主導觸發；試解析，畸形即拒
+        try:
+            from apscheduler.triggers.cron import CronTrigger
+            CronTrigger.from_crontab(str(cron_expr))
+        except Exception:
+            raise ValueError(t("gui_err_invalid_cron", lang=lang))
+        return
+    stype = d.get("schedule_type", "weekly")
+    if stype not in ("daily", "weekly", "monthly"):
+        raise ValueError(t("gui_err_invalid_schedule_type", lang=lang))
+    try:
+        hour = int(d.get("hour", 8))
+        minute = int(d.get("minute", 0))
+    except (TypeError, ValueError):
+        raise ValueError(t("gui_err_invalid_schedule_time", lang=lang))
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        raise ValueError(t("gui_err_invalid_schedule_time", lang=lang))
+    if stype == "monthly":
+        try:
+            dom = int(d.get("day_of_month", 1))
+        except (TypeError, ValueError):
+            raise ValueError(t("gui_err_invalid_schedule_time", lang=lang))
+        if not (1 <= dom <= 31):
+            raise ValueError(t("gui_err_invalid_schedule_time", lang=lang))
 
 
 def make_reports_blueprint(
@@ -1003,6 +1035,11 @@ def make_reports_blueprint(
     @bp.route('/api/report-schedules', methods=['POST'])
     def api_create_report_schedule():
         d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+        try:
+            _validate_report_schedule(d, lang)
+        except ValueError as ve:
+            return _err(str(ve), 400)
         try:
             cm.load()
             # Preserve optional traffic filters if provided
@@ -1020,6 +1057,10 @@ def make_reports_blueprint(
     def api_update_report_schedule(schedule_id):
         d = request.json or {}
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+        try:
+            _validate_report_schedule(d, lang)
+        except ValueError as ve:
+            return _err(str(ve), 400)
         try:
             cm.load()
             ok = cm.update_report_schedule(schedule_id, d)

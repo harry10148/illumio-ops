@@ -188,3 +188,74 @@ def test_tick_isolates_a_failing_should_run_per_schedule(monkeypatch):
 
     scheduler.tick()  # must not raise
     assert evaluated == [1, 2]
+
+
+# ─── H（2026-07-24 審查）：報表失敗不推進 last_run、該期重試、有界 backoff ──
+
+def _due_daily_sched():
+    return {"id": 7, "name": "Daily", "enabled": True,
+            "schedule_type": "daily", "hour": 0, "minute": 0}
+
+
+def test_run_failure_does_not_advance_last_run(tmp_path, monkeypatch):
+    """產報表失敗不得推進 last_run——否則 daily 下 tick 判已跑、該期永久漏。"""
+    import json
+    reporter = _DummyReporter()
+    cm = _DummyConfigManager()
+    cm.config = {"settings": {"timezone": "UTC"},
+                 "report_schedules": [_due_daily_sched()]}
+    cm.load = lambda: None
+    scheduler = ReportScheduler(cm, reporter)
+    state_file = str(tmp_path / "state.json")
+    monkeypatch.setattr(scheduler, "_state_file", state_file)
+    monkeypatch.setattr(scheduler, "should_run", lambda sched, now: True)
+    monkeypatch.setattr(scheduler, "run_schedule",
+                        lambda sched: (_ for _ in ()).throw(RuntimeError("PCE down")))
+    scheduler.tick()
+    st = json.load(open(state_file))["report_schedule_states"]["7"]
+    assert st["status"] == "failed"
+    assert not st.get("last_run")          # 未推進
+    assert st.get("consecutive_failures", 0) >= 1
+    assert st.get("last_attempt")
+
+
+def test_run_failure_backoff_skips_immediate_retry(tmp_path, monkeypatch):
+    """連續失敗要 backoff：剛失敗過的排程同一輪/下一輪 tick 內不重打。"""
+    reporter = _DummyReporter()
+    cm = _DummyConfigManager()
+    cm.config = {"settings": {"timezone": "UTC"},
+                 "report_schedules": [_due_daily_sched()]}
+    cm.load = lambda: None
+    scheduler = ReportScheduler(cm, reporter)
+    state_file = str(tmp_path / "state.json")
+    monkeypatch.setattr(scheduler, "_state_file", state_file)
+    monkeypatch.setattr(scheduler, "should_run", lambda sched, now: True)
+    calls = {"n": 0}
+
+    def _boom(sched):
+        calls["n"] += 1
+        raise RuntimeError("PCE down")
+
+    monkeypatch.setattr(scheduler, "run_schedule", _boom)
+    scheduler.tick()   # 第一次失敗
+    scheduler.tick()   # backoff 內 → 不重打
+    assert calls["n"] == 1
+
+
+def test_run_success_clears_failure_tracking(tmp_path, monkeypatch):
+    import json
+    reporter = _DummyReporter()
+    cm = _DummyConfigManager()
+    cm.config = {"settings": {"timezone": "UTC"},
+                 "report_schedules": [_due_daily_sched()]}
+    cm.load = lambda: None
+    scheduler = ReportScheduler(cm, reporter)
+    state_file = str(tmp_path / "state.json")
+    monkeypatch.setattr(scheduler, "_state_file", state_file)
+    monkeypatch.setattr(scheduler, "should_run", lambda sched, now: True)
+    monkeypatch.setattr(scheduler, "run_schedule", lambda sched: True)
+    scheduler.tick()
+    st = json.load(open(state_file))["report_schedule_states"]["7"]
+    assert st["status"] == "success"
+    assert st["last_run"]
+    assert st.get("consecutive_failures", 0) == 0

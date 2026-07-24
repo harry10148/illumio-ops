@@ -227,9 +227,10 @@ GUI：Reports → Policy Resolver 卡片 Generate。
 
 `src/report_scheduler.py` 的 `ReportScheduler.tick()` 由背景 daemon 每 60 秒呼叫一次，逐一評估 `report_schedules[]` 裡的排程是否到期：
 
-- **觸發方式**：每筆排程可用 `schedule_type`（`daily`／`weekly`／`monthly`，依當地時區的時／分匹配，並有限於「目標日當天」的補跑語意）或 `cron_expr`（優先於 `schedule_type`，用 APScheduler 的 cron 表示式，如 `0 8 * * MON-FRI`）擇一設定；時區依 `timezone` 欄位解析，未設定時視同 UTC。
+- **觸發方式**：每筆排程可用 `schedule_type`（`daily`／`weekly`／`monthly`，依當地時區的時／分匹配，並有限於「目標日當天」的補跑語意）或 `cron_expr`（優先於 `schedule_type`，用 APScheduler 的 cron 表示式，如 `0 8 * * MON-FRI`）擇一設定；時區依 `timezone` 欄位解析，未設定時視同 UTC。cron 排程首次評估時，引擎會以「當下往前一小段補跑窗」為基準計算下一次觸發，確保 tick 落在觸發秒之後也會在首輪就觸發（不會因首跑無前次時間而永遠錯過）。`monthly` 排程設 `day_of_month` 大於當月天數時（如 31 遇到 2 月），會自動夾取到當月最後一天。
 - **可排程的 report_type**：`traffic`、`security_risk`、`network_inventory`、`audit`、`ven_status`、`policy_usage`、`policy_diff`、`policy_resolver`、`app_summary`、`rule_hit_count`、`readiness`——這 11 種直接對應內部 dispatch 字串，比 GUI Generate 鈕的 9 種多出 `network_inventory` 與 `app_summary`（後兩者在 GUI 是 Traffic 家族底下的變體，未各自出現在 Generate 鈕列）。
+- **失敗重試**：產出失敗不會推進「已跑」時間，而是記錄失敗次數與時間並套用指數退避（60 秒起、每次翻倍、上限 1 小時），退避窗內的 tick 會跳過該排程；下次成功後計數歸零。避免壞排程每 60 秒重試灌爆與遮蔽其他排程。
 - **寄送**：排程設 `email_report: true` 時，成功產出後會組一封 HTML email 寄出（主旨含排程名稱與日期），收件人預設用系統郵件設定、可用 `email_recipients` 覆寫。寄送失敗不影響已產出的檔案。
-- **保留**：`max_reports` 依 report_type 分組，只保留最新 N 份「報表」而非個別檔案（同一次產出的 html+csv 算同一份，一起留或一起刪）；`retention_days` 依時間裁剪過舊檔案。兩者鍵位語意見 [configuration.md](configuration.md) 「report／report_schedules」節。
+- **保留**：`max_reports` 只保留最新 N 份「報表」而非個別檔案（同一次產出的 html+csv 算同一份，一起留或一起刪）。保留以**單一排程為範圍**——每次排程產出會在 metadata sidecar 標記所屬排程 id，裁剪只影響同一排程自己的歷史，因此同 report_type、同輸出目錄的兩個排程不會互相刪檔（早於此機制、未標記的舊檔改由 `retention_days` 依時間裁剪）。兩者鍵位語意見 [configuration.md](configuration.md) 「report／report_schedules」節。
 
 GUI 排程操作（建立／編輯／啟用停用／立即執行 Run Now／刪除）見 [gui-tour.md](gui-tour.md) 「5) Reports」節的 Schedules 子頁；排程需 daemon 持續執行才會觸發，勾選 Email 需先在 Settings → Channels 設定好郵件通道。

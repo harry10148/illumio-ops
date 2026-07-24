@@ -13,6 +13,7 @@ Two bugs are pinned here:
    independently, so ``max_reports`` effectively kept ~half as many reports.
 """
 import datetime
+import json
 import os
 
 from src.report_scheduler import ReportScheduler, _now_in_schedule_tz
@@ -131,6 +132,71 @@ def test_prune_traffic_matches_only_unsuffixed_timestamp_filename(tmp_path):
     assert traffic_new.name in names
     assert sr.name in names, "own SecurityRisk report wrongly pruned"
     assert ni.name in names
+
+
+# ─── M4: retention scoped per schedule_id (shared report_type + dir) ───────────
+
+def _make_report_for(directory, kind, ts, mtime, schedule_id):
+    """A report unit whose sidecar records which schedule produced it."""
+    stem = f"Illumio_Traffic_Report_{kind}_{ts}"
+    html = directory / f"{stem}.html"
+    meta = directory / f"{stem}.html.metadata.json"
+    html.write_text("x")
+    meta.write_text(json.dumps({"schedule_id": schedule_id}))
+    for f in (html, meta):
+        os.utime(f, (mtime, mtime))
+    return html, meta
+
+
+def test_prune_scoped_to_schedule_spares_sibling_schedule(tmp_path):
+    """Two schedules of the SAME report_type in the SAME dir must not prune each
+    other: a scoped prune(schedule_id=1) trims only schedule 1's reports and
+    leaves every report produced by schedule 2 untouched."""
+    s1 = [_make_report_for(tmp_path, "SecurityRisk", f"2026-06-0{i + 1}_0000",
+                           1_000_000 + i, schedule_id=1) for i in range(3)]
+    s2 = [_make_report_for(tmp_path, "SecurityRisk", f"2026-06-1{i + 1}_0000",
+                           2_000_000 + i, schedule_id=2) for i in range(3)]
+
+    sched = ReportScheduler.__new__(ReportScheduler)
+    sched._prune_by_count(str(tmp_path), "security_risk", max_reports=2, schedule_id=1)
+
+    names = {p.name for p in tmp_path.iterdir()}
+    # Schedule 2's three reports (6 files) all survive.
+    for html, meta in s2:
+        assert html.name in names and meta.name in names, "sibling schedule wrongly pruned"
+    # Schedule 1 trimmed to its 2 newest reports.
+    assert s1[0][0].name not in names and s1[0][1].name not in names
+    assert s1[1][0].name in names and s1[2][0].name in names
+
+
+def test_scoped_prune_ignores_legacy_files_without_schedule_id(tmp_path):
+    """Legacy reports (sidecar has no schedule_id) predate stamping; a scoped
+    prune must leave them for the age-based sweep rather than count-pruning
+    them against a schedule they cannot be attributed to."""
+    legacy = [_make_report(tmp_path, "SecurityRisk", f"2026-05-0{i + 1}_0000",
+                          500_000 + i) for i in range(4)]  # meta = "{}", no schedule_id
+
+    sched = ReportScheduler.__new__(ReportScheduler)
+    sched._prune_by_count(str(tmp_path), "security_risk", max_reports=1, schedule_id=1)
+
+    names = {p.name for p in tmp_path.iterdir()}
+    for html, meta in legacy:
+        assert html.name in names and meta.name in names, "legacy report wrongly count-pruned"
+
+
+def test_unscoped_prune_preserves_pool_behavior(tmp_path):
+    """Backward compatibility: without schedule_id the prune keeps its original
+    report_type-pool semantics (used by manual runs and existing callers)."""
+    reports = [_make_report_for(tmp_path, "SecurityRisk", f"2026-06-0{i + 1}_0000",
+                               1_000_000 + i, schedule_id=i) for i in range(4)]
+
+    sched = ReportScheduler.__new__(ReportScheduler)
+    sched._prune_by_count(str(tmp_path), "security_risk", max_reports=2)
+
+    names = {p.name for p in tmp_path.iterdir()}
+    assert len([n for n in names if n.endswith(".html")]) == 2
+    for html, meta in reports[2:]:
+        assert html.name in names and meta.name in names
 
 
 # ─── Finding #6: schedule timezone 'local'/unset semantics ────────────────────

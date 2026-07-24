@@ -11,6 +11,29 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Scheduler review remediation (2026-07-24 audit): cron report schedules
+  now fire on their first evaluation — previously `get_next_fire_time`
+  was seeded with no previous run, so any tick landing past the trigger
+  second computed the NEXT occurrence and the schedule never self-fired
+  until the daemon restarted at exactly the right instant (Critical). A
+  failed report run no longer advances the schedule's last-run time and
+  no longer retries every 60s: failures are recorded with an exponential
+  backoff (60s doubling to a 1h cap) that clears on the next success.
+  Report-schedule create/update endpoints now validate `cron_expr`,
+  `schedule_type`, `hour`, `minute`, and `day_of_month`, returning 400 on
+  malformed input instead of storing an unrunnable schedule that silently
+  never fires; rule-schedule create validates `type` the same way.
+  Monthly schedules with `day_of_month` beyond the month's length (e.g.
+  31 in February) clamp to the last day. An expired one-time rule whose
+  PCE disable fails is kept and retried rather than being dropped while
+  still enabled on the PCE. Report retention (`max_reports`) is now scoped
+  per schedule via a metadata sidecar stamp, so two schedules sharing a
+  report_type and output directory no longer prune each other's history.
+  The tick save-state path tolerates a schedule missing its `id` without
+  aborting the rest of the tick.
+
+### Fixed
+
 - Traffic-query review remediation (2026-07-24): the traffic analyzer
   no longer returns silently empty or under-counted results when a draft
   policy-decision filter is set on a cache-covered window (cache flows

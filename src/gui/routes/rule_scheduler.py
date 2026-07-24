@@ -294,6 +294,13 @@ def make_rule_scheduler_blueprint(
             if api.has_draft_changes(href) or not api.is_provisioned(href):
                 return jsonify({"ok": False, "error": t("rs_sch_draft_block", lang=lang)}), 400
 
+            # type 前置驗證：預設 'recurring' 與精確比對的組裝分支不一致，缺/畸形
+            # type 會存成無 days/start/end 的畸形 recurring→check 每 tick KeyError，
+            # 或缺 expire_at→500（2026-07-24 審查 BUG-3）
+            rtype = data.get('type')
+            if rtype not in ('recurring', 'one_time'):
+                return _err(t("gui_err_invalid_rule_sched_type", lang=lang), 400)
+
             # Validate time format for recurring
             if data.get('type') == 'recurring':
                 try:

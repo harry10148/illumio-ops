@@ -56,6 +56,12 @@ _STATE_KEY = "report_schedule_states"
 # sub-hourly cron (e.g. '*/15 * * * *') isn't collapsed to firing once/hour.
 _MIN_RERUN_GAP = 3600
 
+# cron 首跑補跑窗（秒）：last_run=None 時，get_next_fire_time(None, now) 恆回
+# ≥ceil(now)，next<=now 只在 tick 落整秒才成立→cron 排程永不首跑（2026-07-24
+# 審查 C1，archive「首跑無限推遲」事故重演）。給 prev 一個略大於 daemon 60s
+# tick 的下界，讓剛過的 cron 點能補跑一次，但不 replay 更舊的週期。
+_CRON_CATCHUP_WINDOW_SECONDS = 90
+
 # Sentinel for "not provided" — distinguishes None (never run) from missing arg
 _UNSET = object()
 
@@ -77,21 +83,62 @@ class ReportScheduler:
         return data.get(_STATE_KEY, {})
 
     def _save_state(self, schedule_id: int, last_run: str, status: str, error: str = ""):
-        """Persist schedule execution result into state.json."""
+        """Persist a successful/running/manual run: advance last_run and clear
+        any failure-backoff tracking (2026-07-24 審查 H)."""
         try:
             def _merge(existing):
                 data = dict(existing)
                 states = data.setdefault(_STATE_KEY, {})
-                states[str(schedule_id)] = {
-                    "last_run": last_run,
-                    "status": status,
-                    "error": error,
-                }
+                entry = dict(states.get(str(schedule_id), {}))
+                entry.update({"last_run": last_run, "status": status, "error": error})
+                # 成功/手動執行清掉失敗計數與 backoff 時戳
+                entry.pop("consecutive_failures", None)
+                entry.pop("last_attempt", None)
+                states[str(schedule_id)] = entry
                 return data
 
             update_state_file(self._state_file, _merge)
         except Exception as e:
             logger.error(f"Failed to save schedule state: {e}")
+
+    # 失敗 backoff 上限（秒）：2^(n-1)*60，夾在 [60, _FAILURE_BACKOFF_MAX]
+    _FAILURE_BACKOFF_MAX = 3600
+
+    def _record_failure(self, schedule_id, error: str, attempt_iso: str):
+        """記錄一次執行失敗但**不推進 last_run**——該期下 tick 仍 due 會重試
+        （2026-07-24 審查 H：暫時性故障不得讓當期報表永久漏）。累計
+        consecutive_failures 與 last_attempt 供 backoff 判定。"""
+        try:
+            def _merge(existing):
+                data = dict(existing)
+                states = data.setdefault(_STATE_KEY, {})
+                entry = dict(states.get(str(schedule_id), {}))
+                entry["status"] = "failed"
+                entry["error"] = str(error)[:300]
+                entry["last_attempt"] = attempt_iso
+                entry["consecutive_failures"] = int(entry.get("consecutive_failures", 0)) + 1
+                states[str(schedule_id)] = entry
+                return data
+
+            update_state_file(self._state_file, _merge)
+        except Exception as e:
+            logger.error(f"Failed to save schedule failure state: {e}")
+
+    def _failure_backoff_active(self, schedule_id, now: datetime.datetime) -> bool:
+        """連續失敗後在 backoff 窗內回 True（跳過本次重試，避免每 tick spam）。"""
+        st = self._load_states().get(str(schedule_id), {})
+        n = int(st.get("consecutive_failures", 0) or 0)
+        last_attempt = st.get("last_attempt")
+        if n <= 0 or not last_attempt:
+            return False
+        try:
+            la = datetime.datetime.fromisoformat(last_attempt)
+        except (ValueError, TypeError):
+            return False
+        la = la.replace(tzinfo=None) if la.tzinfo else la
+        now_naive = now.replace(tzinfo=None) if now.tzinfo else now
+        backoff = min(2 ** (n - 1) * 60, self._FAILURE_BACKOFF_MAX)
+        return (now_naive - la).total_seconds() < backoff
 
     # ─── Scheduling logic ────────────────────────────────────────────────────
 
@@ -186,7 +233,11 @@ class ReportScheduler:
                 from apscheduler.triggers.cron import CronTrigger
                 trigger = CronTrigger.from_crontab(cron_expr, timezone=tz_obj)
                 now_aware = now_naive.replace(tzinfo=tz_obj)
-                prev = last_run_dt.replace(tzinfo=tz_obj) if last_run_dt else None
+                if last_run_dt:
+                    prev = last_run_dt.replace(tzinfo=tz_obj)
+                else:
+                    # 從未跑過：給補跑下界讓剛過的 cron 點能首跑（審查 C1）
+                    prev = now_aware - datetime.timedelta(seconds=_CRON_CATCHUP_WINDOW_SECONDS)
                 next_fire = trigger.get_next_fire_time(prev, now_aware)
                 return next_fire is not None and next_fire <= now_aware
             except Exception:
@@ -209,7 +260,12 @@ class ReportScheduler:
             day_matches = now_naive.strftime("%A").lower() == dow
         elif stype == "monthly":
             dom = int(schedule.get("day_of_month", 1))
-            day_matches = now_naive.day == dom
+            # 月底夾取：day_of_month=29/30/31 在短月夾到當月最後一天，否則短月
+            # 靜默 0 次（2026-07-24 審查 M5）
+            import calendar
+            last_day = calendar.monthrange(now_naive.year, now_naive.month)[1]
+            effective_dom = min(dom, last_day)
+            day_matches = now_naive.day == effective_dom
         else:
             return False
 
@@ -293,8 +349,10 @@ class ReportScheduler:
                 _rslog.info(f"Completed: {[os.path.basename(p) for p in paths]}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
+            sched_id = schedule.get("id")
+            self._stamp_schedule_id(paths, sched_id)
             max_reports = int(schedule.get("max_reports", 30))
-            self._prune_by_count(output_dir, report_type, max_reports)
+            self._prune_by_count(output_dir, report_type, max_reports, schedule_id=sched_id)
             self._prune_old_reports(output_dir)
             return True
 
@@ -649,7 +707,50 @@ class ReportScheduler:
                 break
         return name
 
-    def _prune_by_count(self, output_dir: str, report_type: str, max_reports: int):
+    @staticmethod
+    def _unit_schedule_id(unit: dict):
+        """Read the schedule_id stamped into a report unit's metadata sidecar.
+
+        Returns the value (as stored) or None when there is no sidecar, it is
+        unreadable, or it predates stamping (legacy reports).
+        """
+        for fpath in unit["files"]:
+            if fpath.endswith(".metadata.json"):
+                try:
+                    with open(fpath, encoding="utf-8") as fh:
+                        return json.load(fh).get("schedule_id")
+                except Exception:
+                    return None
+        return None
+
+    @staticmethod
+    def _stamp_schedule_id(paths: list, schedule_id):
+        """Record which schedule produced each report in its metadata sidecar.
+
+        Enables per-schedule retention so two schedules sharing a report_type
+        and output_dir do not prune each other's history. Best-effort: a failed
+        stamp merely falls the report back to legacy (unattributed) handling.
+        """
+        if schedule_id is None:
+            return
+        for p in paths:
+            side = p + ".metadata.json"
+            data = {}
+            try:
+                if os.path.exists(side):
+                    with open(side, encoding="utf-8") as fh:
+                        data = json.load(fh) or {}
+            except Exception:
+                data = {}
+            data["schedule_id"] = schedule_id
+            try:
+                with open(side, "w", encoding="utf-8") as fh:
+                    json.dump(data, fh)
+            except Exception as e:
+                logger.warning(f"[Scheduler] Could not stamp schedule_id on {side}: {e}")
+
+    def _prune_by_count(self, output_dir: str, report_type: str, max_reports: int,
+                        schedule_id=None):
         """Keep only the newest max_reports REPORTS for the given report type.
 
         A report is a UNIT: its ``.html`` (or ``.zip``/``.json``) file plus the
@@ -658,6 +759,13 @@ class ReportScheduler:
         grouped into units, the units are sorted by their newest member's mtime
         (filename as a deterministic tie-break), and every file in the surplus
         units is deleted. Set max_reports to 0 to disable.
+
+        When ``schedule_id`` is given, retention is scoped to that schedule:
+        only units stamped with the matching schedule_id are counted and pruned,
+        so a sibling schedule sharing the same report_type/output_dir keeps its
+        own history. Legacy units without a stamp are left for the age-based
+        sweep. When ``schedule_id`` is None the original report_type-pool
+        behavior applies (manual runs and existing callers).
         """
         if max_reports <= 0 or not os.path.isdir(output_dir):
             return
@@ -684,6 +792,13 @@ class ReportScheduler:
             unit["files"].append(fpath)
             if mtime > unit["mtime"]:
                 unit["mtime"] = mtime
+
+        # Scope to this schedule's own reports when a schedule_id is supplied;
+        # units that are unattributed (legacy) or belong to another schedule are
+        # excluded so they are neither counted nor pruned here.
+        if schedule_id is not None:
+            units = {k: u for k, u in units.items()
+                     if str(self._unit_schedule_id(u)) == str(schedule_id)}
 
         # Sort report units newest-first (mtime, then key for determinism on
         # ties) and delete every file in the units beyond max_reports.
@@ -758,9 +873,15 @@ class ReportScheduler:
             name = sched.get("name", "Unnamed")
             run_ts = now.isoformat()
 
+            # 連續失敗 backoff：due 但仍在退避窗內就跳過（審查 H，防每 tick spam）
+            if self._failure_backoff_active(sid, now):
+                continue
+
             logger.info(f"[Scheduler] Triggering schedule id={sid} name='{name}'")
             try:
                 self.run_schedule(sched)
-                self._save_state(sched["id"], run_ts, "success")
+                # id 缺失容錯：用已算好的 sid，不用 sched["id"]（審查 L6）
+                self._save_state(sid, run_ts, "success")
             except Exception as e:
-                self._save_state(sched["id"], run_ts, "failed", str(e))
+                # 失敗不推進 last_run——該期下 tick 仍 due 會重試（審查 H）
+                self._record_failure(sid, str(e), run_ts)

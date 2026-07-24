@@ -119,3 +119,31 @@ def test_rs_schedule_delete_null_body_does_not_500(client):
     body = r.get_json()
     assert body["ok"] is True
     assert body["deleted"] == []
+
+
+def test_rs_schedule_create_missing_type_rejected(client):
+    """BUG-3（2026-07-24 審查）：缺 type 不得存成畸形 recurring（無 days）
+    導致 check() 每 tick KeyError；直接 400。"""
+    csrf = _login(client)
+    with patch("src.api_client.ApiClient.has_draft_changes", lambda self, h: False), \
+         patch("src.api_client.ApiClient.is_provisioned", lambda self, h: True):
+        r = client.post(
+            "/api/rule_scheduler/schedules",
+            json={"href": "/orgs/1/sec_policy/active/rule_sets/1", "name": "x"},
+            headers={"X-CSRF-Token": csrf},
+            environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+        )
+    assert r.status_code == 400
+
+
+def test_rs_schedule_create_unknown_type_rejected(client):
+    csrf = _login(client)
+    with patch("src.api_client.ApiClient.has_draft_changes", lambda self, h: False), \
+         patch("src.api_client.ApiClient.is_provisioned", lambda self, h: True):
+        r = client.post(
+            "/api/rule_scheduler/schedules",
+            json={"href": "/orgs/1/sec_policy/active/rule_sets/1", "name": "x", "type": "weird"},
+            headers={"X-CSRF-Token": csrf},
+            environ_overrides={"REMOTE_ADDR": "127.0.0.1"},
+        )
+    assert r.status_code == 400
