@@ -71,6 +71,11 @@ BILINGUAL_DATA_FILES = {
     # Bilingual key-finding templates keyed by template name; consumers pick
     # the right lang via `_kf(key, lang, ...)`.
     SRC / "report" / "analysis" / "mod12_executive_summary.py",
+    # CSS module: CJK is developer commentary inside `/* */` embedded in
+    # triple-quoted CSS string literals (visual-review notes on print/layout
+    # behavior), not user-facing UI text — same status as CJK in `#` comments
+    # elsewhere, which the scanner only misses because those aren't literals.
+    SRC / "report" / "exporters" / "report_css.py",
 }
 
 # (file_relpath, needle) pairs — specific intentional CJK spots that
