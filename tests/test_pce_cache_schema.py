@@ -247,3 +247,22 @@ def test_schema_sets_read_perf_pragmas():
         with engine.connect() as conn:
             assert conn.execute(text("PRAGMA cache_size")).scalar() == -65536
             assert conn.execute(text("PRAGMA mmap_size")).scalar() == 268435456
+
+
+def test_ensure_schema_once_attaches_pragmas_to_every_engine(tmp_path):
+    """_ensure_schema_once 對同一 db_path 的「第二個 engine 物件」也必須掛
+    per-connection PRAGMA listener（busy_timeout 等）——DDL 可略過，但
+    listener 是掛在特定 engine 上的；src/main.py 每次呼叫都 create_engine
+    新物件，漏掛會讓後續 engine 的連線退回 SQLite 預設（無 30s
+    busy_timeout），重演 "database is locked" 失敗類。"""
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.pool import NullPool
+    from src.pce_cache.schema import _ensure_schema_once
+    db_path = str(tmp_path / "pragma_twice.sqlite")
+    e1 = create_engine(f"sqlite:///{db_path}", poolclass=NullPool)
+    _ensure_schema_once(e1, db_path)
+    e2 = create_engine(f"sqlite:///{db_path}", poolclass=NullPool)
+    _ensure_schema_once(e2, db_path)  # ensured-set 已含 db_path → 走略過分支
+    with e2.connect() as conn:
+        timeout = conn.execute(text("PRAGMA busy_timeout")).scalar()
+    assert int(timeout) == 30000

@@ -451,3 +451,42 @@ def test_process_batch_mixed_success_and_failure(sf):
     assert pending[0].retries == 1 and pending[0].next_attempt_at is not None
     # 1 個逐列 retry 交易 + 1 個批次 sent 交易 = 2
     assert counting.begin_calls == 2
+
+
+def test_enqueue_new_records_skips_rows_beyond_dispatch_retention(sf):
+    """守門：retention 會在 dispatch_days（預設 14 天）後清掉 sent dispatch
+    row，但 source row（events 90 天）還活著。安全網補登不得把「dispatch row
+    被 retention 清掉」誤判成「從未 enqueue」而重複派送整段舊資料——掃描
+    必須以 ingested_at 界在 dispatch retention 視窗內。"""
+    from src.siem.dispatcher import enqueue_new_records
+    from src.pce_cache.models import PceEvent, SiemDispatch
+
+    now = datetime.now(timezone.utc)
+    old = now - timedelta(days=30)   # 已過 dispatch retention（14 天）
+    with sf.begin() as s:
+        # 模擬「曾 sent、dispatch row 已被 retention 刪除」：只剩 source row。
+        s.add(PceEvent(
+            pce_href="/orgs/1/events/old", pce_event_id="uuid-old",
+            timestamp=old, event_type="policy.update", severity="info",
+            status="success", pce_fqdn="pce.test", raw_json="{}",
+            ingested_at=old,
+        ))
+        # 對照組：視窗內、真的沒 enqueue 過的新列，補登仍要抓到。
+        s.add(PceEvent(
+            pce_href="/orgs/1/events/new", pce_event_id="uuid-new",
+            timestamp=now, event_type="policy.update", severity="info",
+            status="success", pce_fqdn="pce.test", raw_json="{}",
+            ingested_at=now,
+        ))
+
+    created = enqueue_new_records(sf, {"pce_events": ["test-dest"]})
+
+    assert created == 1   # 只補視窗內那筆，舊列不得重新 enqueue
+    with sf() as s:
+        rows = s.execute(select(SiemDispatch)).scalars().all()
+    assert len(rows) == 1
+    with sf() as s:
+        new_id = s.execute(
+            select(PceEvent.id).where(PceEvent.pce_event_id == "uuid-new")
+        ).scalar_one()
+    assert rows[0].source_id == new_id

@@ -125,6 +125,16 @@ class _StdLibInterceptHandler(logging.Handler):
         )
 
 
+def _open_0o640(name: str, flags: int) -> int:
+    """File opener passed to loguru's file sinks (L5/L6).
+
+    Creates log files with mode 0o640 (further masked by umask) so the ACTIVE
+    log is never world-readable — this covers both the first-ever creation and
+    every post-rotation reopen, which a one-shot chmod at setup cannot.
+    """
+    return os.open(name, flags, 0o640)
+
+
 def _compress_and_chmod(filepath: str) -> None:
     """Loguru compression hook: gzip rotated log files and chmod to 0o640.
 
@@ -167,8 +177,9 @@ def setup_loguru(
 
     log_path = Path(log_file)
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    # L5/L6: Pre-chmod the log file to 0o640 before loguru opens it, so the
-    # active log is not world-readable even before the first rotation fires.
+    # L5/L6: Pre-chmod an already-existing log file to 0o640 (files created by
+    # an older version may be 0o644); new/reopened files get 0o640 from the
+    # opener below, so the active log is never world-readable.
     if log_path.exists():
         try:
             os.chmod(log_path, 0o640)
@@ -184,18 +195,25 @@ def setup_loguru(
         enqueue=True,
         filter=_redact_log_record,  # L4
         format="{time:YYYY-MM-DD HH:mm:ss} {level: <8} {name}:{line} - {message}",
+        opener=_open_0o640,  # L5/L6: active file 0o640 on create/rotation-reopen
     )
 
     if json_sink:
-        json_path = str(Path(log_file).with_suffix(".json.log"))
+        json_path = Path(log_file).with_suffix(".json.log")
+        if json_path.exists():
+            try:
+                os.chmod(json_path, 0o640)
+            except OSError:
+                pass
         logger.add(
-            json_path,
+            str(json_path),
             level=level,
             rotation=rotation,
             retention=retention,
             serialize=True,
             enqueue=True,
             filter=_redact_log_record,  # L4
+            opener=_open_0o640,  # L5/L6
         )
 
     logging.basicConfig(handlers=[_StdLibInterceptHandler()], level=0, force=True)

@@ -1,6 +1,8 @@
 import json, os, tempfile
 from unittest.mock import patch, MagicMock
 
+import pytest
+
 import src.dashboard_store as dashboard_store
 
 
@@ -86,7 +88,10 @@ def test_run_ven_summary_preserves_last_good_on_error(tmp_path, monkeypatch):
 
     with patch("src.scheduler.jobs.ApiClient", return_value=api), \
          patch("src.scheduler.jobs._resolve_state_file", return_value=state_file):
-        run_ven_summary(cm)
+        # 失敗要先寫 last_error（保留 last-good counts），再 re-raise 給
+        # _instrument 記 job_health status=error
+        with pytest.raises(RuntimeError):
+            run_ven_summary(cm)
 
     s = json.load(open(dashboard_path))["ven_summary"]
     assert s["total"] == 5          # last-good counts preserved
@@ -124,7 +129,8 @@ def test_ven_summary_writes_computed_at_on_success_only(tmp_path, monkeypatch):
     api.fetch_managed_workloads.side_effect = RuntimeError("PCE down")
     with patch("src.scheduler.jobs.ApiClient", return_value=api), \
          patch("src.scheduler.jobs._resolve_state_file", return_value=state_file):
-        run_ven_summary(cm)
+        with pytest.raises(RuntimeError):
+            run_ven_summary(cm)
 
     s2 = json.load(open(dashboard_path))["ven_summary"]
     assert s2["computed_at"] == computed_at_after_success   # frozen, not updated

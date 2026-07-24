@@ -318,6 +318,7 @@ _ENQUEUE_CHUNK = 500
 def enqueue_new_records(
     session_factory: sessionmaker,
     destinations_by_source_table: dict[str, list[str]],
+    dispatch_retention_days: int = 14,
 ) -> int:
     """Safety-net backfill: enqueue any (cache row, destination) pairs that
     ingestors didn't enqueue inline.
@@ -328,6 +329,17 @@ def enqueue_new_records(
     of that source_type were never enqueued to it, even if the same cache row
     already has dispatch rows for other destinations — (b) crash recovery,
     and (c) operator-driven backfill.
+
+    The scan is bounded to source rows with ingested_at inside the dispatch
+    retention horizon (dispatch_retention_days; must match retention.run_once
+    dispatch_days, default 14). Retention prunes *sent* dispatch rows after
+    that horizon while source rows live longer (events: 90 days), so an
+    unbounded scan would misread "dispatch row pruned" as "never enqueued"
+    and re-deliver the whole older window as duplicates every tick. Within
+    the horizon the bound is loss-free: a sent row's sent_at >= its source's
+    ingested_at, so its dispatch row cannot have been pruned yet. Trade-off:
+    a newly added destination is only backfilled this window, not the full
+    source retention.
 
     The anti-join is scoped per (source_table, source_id, destination), not
     just per (source_table, source_id): a row already dispatched to
@@ -342,8 +354,9 @@ def enqueue_new_records(
     ingest-side filter so, e.g., an audit-only destination is never backfilled
     a traffic row and vice versa.
 
-    Steady-state cost: exactly one full scan of each source table per call,
-    independent of the number of destinations. This runs unconditionally
+    Steady-state cost: exactly one scan of each source table's in-horizon
+    rows per call (ingested_at is indexed), independent of the number of
+    destinations. This runs unconditionally
     every dispatch tick (default 30s), so the candidate scan folds all
     destinations' NOT EXISTS into a single OR'd query (phase 1); only the
     normally-empty candidate set pays a second, indexed per-destination
@@ -360,6 +373,7 @@ def enqueue_new_records(
         ("pce_traffic_flows_raw", PceTrafficFlowRaw),
     ]
     to_enqueue: list[tuple[str, int, str]] = []  # (source_table, source_id, destination)
+    horizon = datetime.now(timezone.utc) - timedelta(days=dispatch_retention_days)
     with session_factory() as s:
         for source_table, model in pairs:
             dests = destinations_by_source_table.get(source_table) or []
@@ -386,9 +400,9 @@ def enqueue_new_records(
             # row 的 source rows（全部 destination 的 NOT EXISTS 以 OR 合併）。
             # 正常情況（ingest 已 inline enqueue）回空集合，直接結束。
             candidates = s.execute(
-                select(model.id).where(
-                    or_(*[~_dispatched_to(dest) for dest in dests])
-                )
+                select(model.id)
+                .where(model.ingested_at >= horizon)
+                .where(or_(*[~_dispatched_to(dest) for dest in dests]))
             ).scalars().all()
             if not candidates:
                 continue

@@ -505,3 +505,60 @@ def test_cache_lag_requires_login(tmp_path):
             assert resp.status_code in (302, 401)
     finally:
         os.unlink(path)
+
+
+def test_backfill_returns_409_when_busy(client):
+    """backfill 是長跑寫入：第二個併發 POST 必須立即拿 409（non-blocking
+    lock，同 archive load 模式），不可並行互搶 SQLite 寫鎖、重複灌列。"""
+    from src.pce_cache import web as cache_web
+    assert cache_web._BACKFILL_LOCK.acquire(blocking=False)
+    try:
+        resp = client.post("/api/cache/backfill",
+                           json={"source": "events", "since": "2026-06-01",
+                                 "until": "2026-06-02"},
+                           environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+        assert resp.status_code == 409
+        assert resp.get_json()["error"]
+    finally:
+        cache_web._BACKFILL_LOCK.release()
+
+
+def test_backfill_until_date_is_inclusive(client):
+    """GUI 的 End date 是含端點語意（同 /archive/load）：until=6/10 必須把
+    6/10 整天納入查詢窗（上界 6/11 00:00 排他），不可靜默丟掉最後一天。"""
+    from unittest.mock import patch
+    from datetime import datetime, timezone
+
+    class _R:
+        total_rows = 0
+        inserted = 0
+        duplicates = 0
+        elapsed_seconds = 0.0
+
+    with patch("src.pce_cache.web._get_api"), \
+         patch("src.pce_cache.backfill.BackfillRunner") as MockRunner:
+        MockRunner.return_value.run_events.return_value = _R()
+        resp = client.post("/api/cache/backfill",
+                           json={"source": "events", "since": "2026-06-01",
+                                 "until": "2026-06-10"},
+                           environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 200
+    args, _ = MockRunner.return_value.run_events.call_args
+    assert args[0] == datetime(2026, 6, 1, tzinfo=timezone.utc)
+    assert args[1] == datetime(2026, 6, 11, tzinfo=timezone.utc)
+
+
+def test_backfill_get_sf_failure_does_not_leak_exception_detail(client, monkeypatch):
+    """_get_sf 失敗（cache 未設定/DB 壞）回 503 時不可外洩原始例外文字
+    （SQL/engine/路徑細節）；經 _err_with_log 回通用訊息 + request_id。"""
+    def _boom():
+        raise RuntimeError("secret-engine-detail-leak")
+
+    monkeypatch.setattr("src.pce_cache.web._get_sf", _boom)
+    resp = client.post("/api/cache/backfill",
+                       json={"source": "events", "since": "2026-06-01"},
+                       environ_overrides={"REMOTE_ADDR": "127.0.0.1"})
+    assert resp.status_code == 503
+    body = resp.get_json()
+    assert "request_id" in body
+    assert "secret-engine-detail-leak" not in body["error"]

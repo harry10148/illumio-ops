@@ -258,3 +258,54 @@ def test_retention_deletes_across_multiple_batches(session_factory, monkeypatch)
         remaining = s.execute(
             select(func.count()).select_from(PceTrafficFlowRaw)).scalar()
     assert remaining == 1
+
+
+def test_retention_withholds_raw_referenced_by_pending_dispatch(session_factory):
+    """到期 raw 列若仍被未送達（pending/failed）的 siem_dispatch 引用，不可刪
+    ——dispatcher 送出時才回讀來源列建 payload，先刪會讓補送永久失敗。"""
+    from src.pce_cache.retention import RetentionWorker
+    _seed_raw_flows(session_factory, old_count=3, new_count=0)
+    with session_factory() as s:
+        ids = sorted(r.id for r in s.execute(select(PceTrafficFlowRaw)).scalars())
+    with session_factory.begin() as s:
+        s.add(SiemDispatch(
+            source_table="pce_traffic_flows_raw", source_id=ids[0],
+            destination="splunk", status="pending", retries=0, queued_at=_old()))
+    deleted = RetentionWorker(session_factory).run_once(traffic_raw_days=7)
+    assert deleted["traffic_raw"] == 2  # 被引用那筆保留
+    with session_factory() as s:
+        remaining = [r.id for r in s.execute(select(PceTrafficFlowRaw)).scalars()]
+    assert remaining == [ids[0]]
+
+
+def test_retention_withholds_events_referenced_by_dlq(session_factory):
+    """到期 event 若仍被 DLQ 引用（replay 只重新 enqueue 同組 key），不可刪。"""
+    from src.pce_cache.retention import RetentionWorker
+    _seed_events(session_factory, old_count=3, new_count=0)
+    with session_factory() as s:
+        ids = sorted(r.id for r in s.execute(select(PceEvent)).scalars())
+    with session_factory.begin() as s:
+        s.add(DeadLetter(
+            source_table="pce_events", source_id=ids[1], destination="dest1",
+            retries=10, last_error="down", payload_preview="",
+            quarantined_at=_now()))
+    deleted = RetentionWorker(session_factory).run_once(events_days=30)
+    assert deleted["events"] == 2
+    with session_factory() as s:
+        remaining = [r.id for r in s.execute(select(PceEvent)).scalars()]
+    assert remaining == [ids[1]]
+
+
+def test_retention_deletes_raw_once_dispatch_sent(session_factory):
+    """引用一旦送達（status='sent'）就不再擋刪——防護不可把 retention 永久卡死。"""
+    from src.pce_cache.retention import RetentionWorker
+    _seed_raw_flows(session_factory, old_count=2, new_count=0)
+    with session_factory() as s:
+        ids = sorted(r.id for r in s.execute(select(PceTrafficFlowRaw)).scalars())
+    with session_factory.begin() as s:
+        s.add(SiemDispatch(
+            source_table="pce_traffic_flows_raw", source_id=ids[0],
+            destination="splunk", status="sent", retries=0,
+            queued_at=_old(), sent_at=_old()))
+    deleted = RetentionWorker(session_factory).run_once(traffic_raw_days=7)
+    assert deleted["traffic_raw"] == 2  # sent 引用不擋刪

@@ -25,9 +25,14 @@ class SyslogTLSTransport(Transport):
         self._lock = threading.Lock()
 
     def _connect(self) -> None:
-        ctx = ssl.create_default_context()
         if self._ca_bundle:
-            ctx.load_verify_locations(self._ca_bundle)
+            # Pin trust to the operator-provided bundle only: passing cafile
+            # makes create_default_context skip loading the system CA store,
+            # whereas load_verify_locations on a default context would ADD the
+            # bundle on top of every public CA (defeating the pin).
+            ctx = ssl.create_default_context(cafile=self._ca_bundle)
+        else:
+            ctx = ssl.create_default_context()
         if not self._tls_verify:
             logger.warning("TLS verification disabled — plaintext risk")
             ctx.check_hostname = False

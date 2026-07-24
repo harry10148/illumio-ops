@@ -4610,5 +4610,9 @@
   "rsc_commands": "Commands",
   "rsc_refresh": "Refresh",
   "rsc_toggle_result": "[+] Rule Scheduler → {status}",
-  "rsc_interval_result": "[+] Interval → {raw}s"
+  "rsc_interval_result": "[+] Interval → {raw}s",
+  "event_label_system_task_event_pruning_completed": "System Task Event Pruning Completed",
+  "event_label_system_task_hard_limit_recovery_completed": "System Task Hard Limit Recovery Completed",
+  "event_desc_system_task_event_pruning_completed": "Routine pruning of old records from the event database completed.",
+  "event_desc_system_task_hard_limit_recovery_completed": "Recovery completed after the event database reached its hard storage limit."
 }

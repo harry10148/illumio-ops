@@ -14,9 +14,9 @@ def test_suggest_cached_and_workload(app_persistent, monkeypatch):
     from src.gui.filter_object_cache import invalidate_object_cache
     invalidate_object_cache()
     monkeypatch.setattr("src.api_client.ApiClient.get_all_labels",
-                        lambda self: [{"key": "env", "value": "Production", "href": "/orgs/1/labels/3"}])
-    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self: [])
+                        lambda self, **kw: [{"key": "env", "value": "Production", "href": "/orgs/1/labels/3"}])
+    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self, **kw: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self, **kw: [])
 
     calls = []
     def fake_search(self, params):
@@ -45,9 +45,9 @@ def test_suggest_workload_offline_degrades(app_persistent, monkeypatch):
     from src.gui.filter_object_cache import invalidate_object_cache
     invalidate_object_cache()
     monkeypatch.setattr("src.api_client.ApiClient.get_all_labels",
-                        lambda self: [{"key": "env", "value": "Prod", "href": "/orgs/1/labels/3"}])
-    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self: [])
+                        lambda self, **kw: [{"key": "env", "value": "Prod", "href": "/orgs/1/labels/3"}])
+    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self, **kw: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self, **kw: [])
     # 真實生產路徑：ApiClient.search_workloads 失敗時吞例外回 []（不 raise），
     # 必須靠 check_health 才能區分「PCE 不通」vs「真的無符合」。
     monkeypatch.setattr("src.api_client.ApiClient.search_workloads", lambda self, params: [])
@@ -67,9 +67,9 @@ def test_suggest_workload_empty_but_pce_up(app_persistent, monkeypatch):
     from src.gui.filter_object_cache import invalidate_object_cache
     invalidate_object_cache()
     monkeypatch.setattr("src.api_client.ApiClient.get_all_labels",
-                        lambda self: [{"key": "env", "value": "Prod", "href": "/orgs/1/labels/3"}])
-    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self: [])
+                        lambda self, **kw: [{"key": "env", "value": "Prod", "href": "/orgs/1/labels/3"}])
+    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self, **kw: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self, **kw: [])
     # 真的沒有符合的 workload（PCE 正常）：search_workloads 回 []，check_health 回 200
     monkeypatch.setattr("src.api_client.ApiClient.search_workloads", lambda self, params: [])
     monkeypatch.setattr("src.api_client.ApiClient.check_health", lambda self: (200, "ok"))
@@ -100,12 +100,12 @@ def test_suggest_service_cached(app_persistent, monkeypatch):
     from src.gui.filter_object_cache import invalidate_object_cache
     invalidate_object_cache()
     monkeypatch.setattr("src.api_client.ApiClient.get_all_labels",
-                        lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self: [])
+                        lambda self, **kw: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self, **kw: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self, **kw: [])
     monkeypatch.setattr("src.api_client.ApiClient.get_services",
-                        lambda self: [{"name": "Web-Ports", "href": "/s/1",
-                                       "service_ports": [{"port": 80, "proto": 6}, {"port": 443, "proto": 6}]}])
+                        lambda self, **kw: [{"name": "Web-Ports", "href": "/s/1",
+                                             "service_ports": [{"port": 80, "proto": 6}, {"port": 443, "proto": 6}]}])
 
     r = client.get('/api/filter-objects/suggest?q=web&types=service&limit=10',
                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'})
@@ -125,11 +125,11 @@ def test_suggest_service_offline_degrades(app_persistent, monkeypatch):
     from src.gui.filter_object_cache import invalidate_object_cache
     invalidate_object_cache()
     monkeypatch.setattr("src.api_client.ApiClient.get_all_labels",
-                        lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self: [])
+                        lambda self, **kw: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self, **kw: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self, **kw: [])
 
-    def _boom(self):
+    def _boom(self, **kw):
         raise RuntimeError("pce down")
     monkeypatch.setattr("src.api_client.ApiClient.get_services", _boom)
 

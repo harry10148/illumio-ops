@@ -125,7 +125,9 @@ def test_run_events_ingest_records_failure_on_unhandled_exception(tmp_path):
 
     cm = _cm(tmp_path)
     with patch("src.scheduler.jobs._get_cache_engine", side_effect=RuntimeError("db open failed")):
-        run_events_ingest(cm)
+        # 記完 pce_stats 後必須 re-raise 給 _instrument 記 job_health error
+        with pytest.raises(RuntimeError):
+            run_events_ingest(cm)
 
     state = _load_state(tmp_path)
     assert state["pce_stats"]["consecutive_failures"] == 1

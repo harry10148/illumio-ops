@@ -181,7 +181,9 @@ def test_security_post_allowed_ips_change_succeeds_without_old_password(app_clie
     r = client.post('/api/login', json={'username': 'illumio', 'password': 'illumio'})
     assert r.status_code == 200
     csrf_token = (r.get_json() or {}).get('csrf_token', '')
-    r = client.post('/api/security', json={'allowed_ips': ['1.2.3.4']},
+    # Include the requester (127.0.0.1) so this is not a self-lockout, which the
+    # allowlist guard now rejects with 400.
+    r = client.post('/api/security', json={'allowed_ips': ['1.2.3.4', '127.0.0.1']},
                     headers={'X-CSRF-Token': csrf_token})
     assert r.status_code == 200
     assert r.get_json()['ok'] is True

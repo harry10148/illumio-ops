@@ -31,6 +31,7 @@ def test_send_test_event_failure():
         bt.return_value = tx
         r = send_test_event(_dest())
     assert r.ok is False and "refused" in r.error
+    tx.close.assert_called_once()   # failure path must not leak the transport
 
 
 def test_send_test_event_hec_json():
@@ -95,7 +96,10 @@ def test_build_transport_hec_custom_port():
 
 
 def test_build_transport_unknown_raises():
-    cfg = _dest(transport="mqtt")
+    # transport 已是 config_models 的 Literal，正常建構到不了未知值；用
+    # model_construct 略過驗證，鎖住 _build_transport 自身的防禦分支。
+    cfg = SiemDestinationSettings.model_construct(
+        name="demo", transport="mqtt", host="127.0.0.1", port=514)
     with pytest.raises(ValueError, match="unsupported"):
         _build_transport(cfg)
 

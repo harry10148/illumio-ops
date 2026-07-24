@@ -9,6 +9,7 @@ from flask import (
 )
 from flask_login import login_user, logout_user
 from flask_wtf.csrf import generate_csrf
+from loguru import logger
 
 from src.config import ConfigManager, verify_password
 from src.gui._helpers import (
@@ -88,7 +89,13 @@ def make_auth_blueprint(
         try:
             form = LoginForm.model_validate(_body)
         except _ValidationError as e:
-            return jsonify({"ok": False, "error": "invalid_form", "detail": str(e)}), 400
+            # 不可回傳 str(e)：pydantic 會把 input_value=...（即送來的密碼
+            # 片段/全值）嵌進錯誤訊息（同 src/config.py load() 的既有慣例）。
+            # server 端只記欄位位置，client 只拿泛用錯誤。
+            locs = ["/".join(str(p) for p in err.get("loc", ())) or "?"
+                    for err in e.errors()]
+            logger.warning("login form validation failed: fields={}", locs)
+            return jsonify({"ok": False, "error": "invalid_form"}), 400
 
         username = form.username
         password = form.password
@@ -109,8 +116,16 @@ def make_auth_blueprint(
             session.permanent = True
             login_user(AdminUser(username))
             if gui_cfg.get("_initial_password"):
-                gui_cfg.pop("_initial_password", None)
-                cm.save()
+                # 首登清除 _initial_password：與其他 config 寫入端一致，整段
+                # load→mutate→save 以共用鎖序列化，並在鎖內重讀（cm.load()/
+                # api_save_settings 都會整個替換 cm.config 物件，鎖外抓的
+                # gui_cfg 可能已是孤兒 dict——直接 pop+save 會把明文初始密碼
+                # 留在磁碟或蓋掉併發存檔）。
+                with cm.write_lock:
+                    cm.load()
+                    fresh_cfg = cm.config.get("web_gui", {})
+                    if fresh_cfg.pop("_initial_password", None) is not None:
+                        cm.save()
             return jsonify({
                 "ok": True,
                 "csrf_token": generate_csrf(),

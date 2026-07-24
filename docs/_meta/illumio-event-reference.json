@@ -1525,6 +1525,18 @@
     "remediation": "",
     "doc_url": ""
   },
+  "system_task.event_pruning_completed": {
+    "category": "Platform & System",
+    "description": "A routine system task finished pruning old records from the event database to keep it within its configured size.",
+    "severity": "info",
+    "remediation": "Automated maintenance — no action required."
+  },
+  "system_task.hard_limit_recovery_completed": {
+    "category": "Platform & System",
+    "description": "The system finished recovering after the event database reached its hard storage limit; older events were pruned to restore normal operation.",
+    "severity": "info",
+    "remediation": "Informational. If this recurs frequently, review event volume and retention/storage sizing."
+  },
   "system_task.provision_container_cluster_services": {
     "category": "Platform & System",
     "description": "This event is triggered by a system daemon provisioning container cluster services.",

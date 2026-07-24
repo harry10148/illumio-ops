@@ -489,18 +489,40 @@ def _write_policy_usage_dashboard_summary(output_dir: str, result) -> str:
 # the auto-renew path meaningful runway before expiry.
 _SELF_SIGNED_VALIDITY_DAYS = 397  # ~13 months (browser-accepted maximum)
 
-def _cert_has_san(cert_path: str) -> bool:
-    """Return True if the certificate contains a SubjectAlternativeName extension."""
+def _cert_has_san(cert_path: str) -> bool | None:
+    """Return True/False if SAN presence is known, or None when it cannot be checked.
+
+    Prefers the ``cryptography`` package (already a hard dependency — cert
+    generation uses it); falls back to the openssl CLI. When neither can
+    answer (e.g. no openssl binary and cryptography missing), returns None —
+    callers must NOT treat that as "no SAN", or hosts without the openssl
+    CLI would regenerate a perfectly valid cert on every startup.
+    An unreadable/corrupt certificate returns False (regeneration is correct).
+    """
+    try:
+        from cryptography import x509 as _x509
+    except ImportError:
+        _x509 = None
+    if _x509 is not None:
+        try:
+            with open(cert_path, "rb") as f:
+                cert = _x509.load_pem_x509_certificate(f.read())
+        except (OSError, ValueError):
+            return False  # unreadable/corrupt cert — regenerating is the right call
+        try:
+            cert.extensions.get_extension_for_class(_x509.SubjectAlternativeName)
+            return True
+        except _x509.ExtensionNotFound:
+            return False
     import subprocess
     try:
         result = subprocess.run(
             ["openssl", "x509", "-in", cert_path, "-noout", "-ext", "subjectAltName"],
             capture_output=True, text=True, timeout=15,
         )
-        return "Subject Alternative Name" in result.stdout
-    except (FileNotFoundError, subprocess.CalledProcessError,
-            subprocess.TimeoutExpired):
-        return False
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None  # cannot check — do not force regeneration
+    return "Subject Alternative Name" in result.stdout
 
 
 def _get_local_ips() -> list[str]:
@@ -547,7 +569,9 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
     if not force and os.path.exists(cert_path) and os.path.exists(key_path):
         # Regenerate if the existing cert lacks SAN — browsers reject SAN-less certs
         # for fetch()/XHR even when the user has accepted the page-level warning.
-        if _cert_has_san(cert_path):
+        # None means "cannot check" (no openssl CLI / no cryptography): keep the
+        # existing cert rather than minting a new key on every startup.
+        if _cert_has_san(cert_path) is not False:
             return cert_path, key_path
         force = True
 
@@ -601,14 +625,17 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
             .sign(private_key, _hashes.SHA256())
         )
 
-        # Write key (restricted permissions) and certificate
-        with open(key_path, "wb") as fk:
+        # Write key with 0600 applied at creation time — plain open() honors
+        # the umask (0644), leaving a window where the plaintext key is
+        # world-readable until a later chmod.
+        fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "wb") as fk:
             fk.write(private_key.private_bytes(
                 encoding=_serial.Encoding.PEM,
                 format=_serial.PrivateFormat.TraditionalOpenSSL,
                 encryption_algorithm=_serial.NoEncryption(),
             ))
-        os.chmod(key_path, 0o600)
+        os.chmod(key_path, 0o600)  # tighten pre-existing files (O_CREAT mode only applies on create)
         with open(cert_path, "wb") as fc:
             fc.write(cert.public_bytes(_serial.Encoding.PEM))
 
@@ -644,6 +671,10 @@ def _generate_self_signed_cert(cert_dir: str, force: bool = False,
                 cfg_path = f.name
 
             try:
+                # Pre-create the key file 0600 — openssl truncates in place and
+                # preserves the mode, so its write never passes through a
+                # umask-widened (0644) window.
+                os.close(os.open(key_path, os.O_WRONLY | os.O_CREAT, 0o600))
                 subprocess.run(
                     [
                         "openssl", "req", "-x509", "-newkey", "rsa:2048",
@@ -722,13 +753,15 @@ def _generate_csr(cert_dir: str, cn: str, o: str = '', ou: str = '', c: str = ''
 
     csr = csr_builder.sign(private_key, _hashes.SHA256())
 
-    with open(key_path, 'wb') as fk:
+    # 0600 at creation time — see _generate_self_signed_cert for rationale.
+    fd = os.open(key_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'wb') as fk:
         fk.write(private_key.private_bytes(
             encoding=_serial.Encoding.PEM,
             format=_serial.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=_serial.NoEncryption(),
         ))
-    os.chmod(key_path, 0o600)
+    os.chmod(key_path, 0o600)  # tighten pre-existing files
 
     return csr.public_bytes(_serial.Encoding.PEM).decode(), key_path
 
@@ -771,14 +804,26 @@ def _import_signed_cert(cert_dir: str, cert_pem: str) -> dict:
 def _cert_days_remaining(cert_path: str) -> int | None:
     """Return the number of days until the cert expires, or None if unknown.
 
-    Negative values mean the cert is already expired. Works via openssl's
-    enddate field so no Python cryptography dependency is required.
+    Negative values mean the cert is already expired. Prefers the
+    ``cryptography`` package; falls back to openssl's enddate field so hosts
+    without the openssl CLI (e.g. Windows service installs) still get
+    auto-renew and the days-remaining startup message.
     """
     import subprocess
     from datetime import datetime, timezone
 
     if not os.path.exists(cert_path):
         return None
+    try:
+        from cryptography import x509 as _x509
+        with open(cert_path, "rb") as f:
+            cert = _x509.load_pem_x509_certificate(f.read())
+        delta = cert.not_valid_after_utc - datetime.now(timezone.utc)
+        return int(delta.total_seconds() // 86400)
+    except ImportError:
+        pass  # cryptography absent — fall back to the openssl CLI below
+    except (OSError, ValueError):
+        return None  # unreadable/corrupt cert
     try:
         result = subprocess.run(
             ["openssl", "x509", "-in", cert_path, "-noout", "-enddate"],
@@ -803,24 +848,31 @@ def _cert_days_remaining(cert_path: str) -> int | None:
     delta = expiry - datetime.now(timezone.utc)
     return int(delta.total_seconds() // 86400)
 
-def _maybe_auto_renew_self_signed(cert_dir: str, threshold_days: int = 30) -> tuple[bool, int | None]:
+def _maybe_auto_renew_self_signed(cert_dir: str, threshold_days: int = 30,
+                                  days: int = _SELF_SIGNED_VALIDITY_DAYS,
+                                  key_algorithm: str = "ecdsa-p256") -> tuple[bool, int | None]:
     """Regenerate the self-signed cert if it expires within ``threshold_days``.
 
     Called at server startup. Returns ``(renewed, days_remaining_after)`` so
     the caller can log what happened.
+
+    ``days``/``key_algorithm`` are passed through to the regeneration so a
+    forced renewal honors the operator-configured tls.validity_days /
+    tls.key_algorithm instead of silently reverting to the defaults.
     """
     cert_path = os.path.join(cert_dir, "self_signed.pem")
-    days = _cert_days_remaining(cert_path)
-    if days is None:
-        # No cert present (or openssl unavailable) — caller will generate
+    days_left = _cert_days_remaining(cert_path)
+    if days_left is None:
+        # No cert present (or expiry unknown) — caller will generate
         # one fresh via the normal path.
         return False, None
-    if days > threshold_days:
-        return False, days
+    if days_left > threshold_days:
+        return False, days_left
     try:
-        _generate_self_signed_cert(cert_dir, force=True)
+        _generate_self_signed_cert(cert_dir, force=True,
+                                   days=days, key_algorithm=key_algorithm)
     except RuntimeError:
-        return False, days
+        return False, days_left
     return True, _cert_days_remaining(cert_path)
 
 def _get_cert_info(cert_path: str) -> dict:

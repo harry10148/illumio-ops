@@ -159,7 +159,21 @@ class ArchiveExporter:
         written: set[str] = set()
         for day, lines in by_day.items():
             path = os.path.join(self._dir, f"{prefix}-{day}.jsonl")
+            # 崩潰在前一輪寫到一半時，檔尾可能是「無換行的殘行」；cursor 未
+            # 推進、同批會重寫——若直接 append，本批第一筆會黏在殘行後面變
+            # 成一行無效 JSON（importer 會跳過，該筆的完整副本就此遺失，
+            # 違反 at-least-once 的無資料遺失承諾）。先補一個換行把殘行終結
+            # 掉（importer 的 _iter_lines 本就略過空行/壞行）。
+            needs_newline = False
+            try:
+                with open(path, "rb") as prev:
+                    prev.seek(-1, os.SEEK_END)
+                    needs_newline = prev.read(1) != b"\n"
+            except (FileNotFoundError, OSError):
+                pass  # 檔案不存在或為空：無殘行可終結
             with open(path, "ab") as fh:
+                if needs_newline:
+                    fh.write(b"\n")
                 for ln in lines:
                     fh.write(ln)
                     fh.write(b"\n")

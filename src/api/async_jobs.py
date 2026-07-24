@@ -300,6 +300,10 @@ class AsyncJobManager:
         else:
             progress_ctx = nullcontext()
 
+        # 只在狀態轉換時持久化：900s 匯出可 poll 到 450 次，每次都全檔
+        # 重寫+fsync state.json 是純冗餘 I/O。
+        last_saved_state = None
+
         with progress_ctx as prog:
             task_id = prog.add_task(t("pu_progress_async_polling"), total=None) if show_progress else None
             for poll_num in range(max_polls):
@@ -307,16 +311,24 @@ class AsyncJobManager:
                 poll_status, poll_body = c._request(poll_url, timeout=15)
                 if poll_status != 200:
                     continue
-                poll_result = orjson.loads(poll_body)
+                try:
+                    poll_result = orjson.loads(poll_body)
+                except (orjson.JSONDecodeError, ValueError, TypeError):
+                    # 200 但 body 非 JSON（LB/proxy 攔截頁）：當作這輪 poll
+                    # 無效繼續等，不讓例外往上炸成誤報（鏡射 _poll_one 的防護）。
+                    logger.warning(f"Failed to parse async job poll response for {job_href}; retrying")
+                    continue
                 state = poll_result.get("status")
                 if show_progress and prog is not None:
                     prog.update(task_id, description=t("pu_progress_async_state", state=state, n=poll_num + 1, m=max_polls))
-                self._save_async_job_state(
-                    job_href,
-                    status=state,
-                    rules_status=poll_result.get("rules"),
-                    result_href=poll_result.get("result"),
-                )
+                if state != last_saved_state:
+                    self._save_async_job_state(
+                        job_href,
+                        status=state,
+                        rules_status=poll_result.get("rules"),
+                        result_href=poll_result.get("result"),
+                    )
+                    last_saved_state = state
                 if state == "completed":
                     break
                 if state in ("failed", "cancel_requested", "cancelled", "canceled"):
@@ -332,20 +344,28 @@ class AsyncJobManager:
             ur_status, ur_body = c._request(update_rules_url, method="PUT", data={}, timeout=30)
             if ur_status in (202, 204):
                 time.sleep(10)
+                last_saved_draft_state = None
                 for _ in range(max_polls):
                     poll_status, poll_body = c._request(poll_url, timeout=15)
                     if poll_status != 200:
                         time.sleep(2)
                         continue
-                    poll_result = orjson.loads(poll_body)
+                    try:
+                        poll_result = orjson.loads(poll_body)
+                    except (orjson.JSONDecodeError, ValueError, TypeError):
+                        logger.warning(f"Failed to parse async job poll response for {job_href}; retrying")
+                        time.sleep(2)
+                        continue
                     state = poll_result.get("status")
                     rules_state = poll_result.get("rules")
-                    self._save_async_job_state(
-                        job_href,
-                        status=state,
-                        rules_status=rules_state,
-                        result_href=poll_result.get("result"),
-                    )
+                    if (state, rules_state) != last_saved_draft_state:
+                        self._save_async_job_state(
+                            job_href,
+                            status=state,
+                            rules_status=rules_state,
+                            result_href=poll_result.get("result"),
+                        )
+                        last_saved_draft_state = (state, rules_state)
                     if state == "completed" and rules_state in (None, "", "completed"):
                         return poll_result
                     if state in ("failed", "cancel_requested", "cancelled", "canceled"):

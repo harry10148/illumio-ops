@@ -1,6 +1,8 @@
 """Flask Blueprint for PCE cache management endpoints."""
 from __future__ import annotations
 
+import threading
+
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required
 from loguru import logger
@@ -9,6 +11,11 @@ from src.i18n import t
 from src.gui._helpers import _err_with_log
 
 bp = Blueprint("pce_cache", __name__, url_prefix="/api/cache")
+
+# 同時只允許一個 backfill 在跑（non-blocking，同 archive_import._LOAD_LOCK
+# 模式）：backfill + 全量 aggregator 重算是長跑寫入，兩個併發 POST 會互搶
+# SQLite 寫鎖並重複灌同一批列。第二個請求立即回 409，不排隊。
+_BACKFILL_LOCK = threading.Lock()
 
 
 def _get_sf():
@@ -34,7 +41,7 @@ def _get_api():
 @login_required
 def api_cache_backfill():
     """Synchronous backfill endpoint. POST body: {source, since, until}."""
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
     data = request.get_json(silent=True) or {}
     lang = data.get('lang') or current_app.config["CM"].config.get('settings', {}).get('language', 'en')
     source = data.get("source", "events")
@@ -44,13 +51,21 @@ def api_cache_backfill():
         return jsonify({"error": t("gui_err_cache_missing_since", lang=lang)}), 400
     try:
         since_dt = datetime.strptime(since_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
-        until_dt = datetime.strptime(until_str, "%Y-%m-%d").replace(tzinfo=timezone.utc) if until_str else datetime.now(timezone.utc)
+        # until 為含端點語意（GUI 標示 End date；/archive/load 的 [start, end]
+        # 亦含端點）：解析出的午夜 +1 天成為排他上界，讓 until 當天整天入窗，
+        # 而非靜默丟掉最後一天。
+        until_dt = (
+            datetime.strptime(until_str, "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1)
+            if until_str else datetime.now(timezone.utc)
+        )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     try:
         sf = _get_sf()
     except Exception as e:
-        return jsonify({"error": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
+        return _err_with_log("cache_backfill", e, status=503, lang=lang)
+    if not _BACKFILL_LOCK.acquire(blocking=False):
+        return jsonify({"error": "backfill already in progress"}), 409
     try:
         from src.pce_cache.backfill import BackfillRunner
         api = _get_api()
@@ -61,6 +76,7 @@ def api_cache_backfill():
             result = runner.run_traffic(since_dt, until_dt)
             # backfill 會灌入舊日期資料，落在 aggregator 增量視窗之外，
             # 必須顯式全量重算一次，否則趨勢圖看不到 backfill 的 bucket。
+            # （aggregator 現另有游標式 backfill 偵測，此處全量重算是雙保險。）
             from src.pce_cache.aggregator import TrafficAggregator
             TrafficAggregator(sf).run_once(full=True)
         return jsonify({
@@ -71,6 +87,8 @@ def api_cache_backfill():
         })
     except Exception as e:
         return _err_with_log("cache_backfill", e, lang=lang)
+    finally:
+        _BACKFILL_LOCK.release()
 
 
 @bp.route("/retention/run", methods=["POST"])
@@ -81,7 +99,9 @@ def api_cache_retention_run():
     try:
         sf = _get_sf()
     except Exception as e:
-        return jsonify({"error": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
+        # 不把原始例外（可含 SQL/engine/路徑細節）回給 client——經 _err_with_log
+        # 記 server-side traceback、回通用訊息 + request_id（H3 慣例）。
+        return _err_with_log("cache_retention_run", e, status=503, lang=lang)
     cfg = current_app.config["CM"].models.pce_cache
     try:
         from src.pce_cache.retention import RetentionWorker
@@ -104,7 +124,7 @@ def api_cache_status():
     try:
         sf = _get_sf()
     except Exception as e:
-        return jsonify({"error": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
+        return _err_with_log("cache_status", e, status=503, lang=lang)
     try:
         from sqlalchemy import func, select
         from src.pce_cache.models import PceEvent, PceTrafficFlowRaw, PceTrafficFlowAgg
@@ -129,7 +149,7 @@ def api_cache_lag():
     try:
         sf = _get_sf()
     except Exception as e:
-        return jsonify({"error": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
+        return _err_with_log("cache_lag", e, status=503, lang=lang)
     try:
         from src.pce_cache.lag_monitor import check_cache_lag
         cfg = current_app.config["CM"].models.pce_cache
@@ -163,8 +183,12 @@ def api_cache_health():
     lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
     try:
         sf = _get_sf()
-    except Exception as e:
-        return jsonify({"verdict": "unknown", "note": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
+    except Exception:
+        # 保留 {"verdict": ...} 形狀（health widget 依賴），但不外洩原始例外：
+        # traceback 記 server-side，client 只拿通用訊息。
+        logger.exception("[GUI:cache_health] _get_sf failed")
+        return jsonify({"verdict": "unknown",
+                        "note": t("gui_err_internal", default="Internal server error", lang=lang)}), 503
     try:
         from src.pce_cache.health import pipeline_verdict
         from src.pce_cache.lag_monitor import check_cache_lag
@@ -223,7 +247,7 @@ def api_cache_throughput():
     try:
         sf = _get_sf()
     except Exception as e:
-        return jsonify({"error": t("gui_err_cache_not_configured", e=e, lang=lang)}), 503
+        return _err_with_log("cache_throughput", e, status=503, lang=lang)
     now = dt.datetime.now(dt.timezone.utc)
     hr = now - dt.timedelta(hours=1)
     day = now - dt.timedelta(hours=24)

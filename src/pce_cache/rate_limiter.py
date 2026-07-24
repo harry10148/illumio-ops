@@ -18,11 +18,25 @@ class GlobalRateLimiter:
     def __init__(self, rate_per_minute: int = 400, burst: int | None = None):
         if rate_per_minute < 1:
             raise ValueError("rate_per_minute must be >= 1")
+        self._rate_per_minute = rate_per_minute
         self._rate_per_sec = rate_per_minute / 60.0
         self._capacity = burst if burst is not None else max(rate_per_minute // 6, 1)
         self._tokens = float(self._capacity)
         self._last_refill = time.monotonic()
         self._lock = threading.Lock()
+
+    def set_rate(self, rate_per_minute: int) -> None:
+        """就地調整速率（burst 回到預設公式）。操作者透過 GUI 改
+        rate_limit_per_minute 後，長駐 process 的 singleton 必須立即生效，
+        不能凍結在首次呼叫的值直到整個 service 重啟。"""
+        if rate_per_minute < 1:
+            raise ValueError("rate_per_minute must be >= 1")
+        with self._lock:
+            self._refill_locked()   # 先按舊速率結算至當下，再切換
+            self._rate_per_minute = rate_per_minute
+            self._rate_per_sec = rate_per_minute / 60.0
+            self._capacity = max(rate_per_minute // 6, 1)
+            self._tokens = min(self._tokens, float(self._capacity))
 
     def acquire(self, timeout: float = 0.0) -> bool:
         deadline = time.monotonic() + timeout
@@ -57,6 +71,11 @@ def get_rate_limiter(rate_per_minute: int = 400) -> GlobalRateLimiter:
     with _INSTANCE_LOCK:
         if _INSTANCE is None:
             _INSTANCE = GlobalRateLimiter(rate_per_minute=rate_per_minute)
+        elif rate_per_minute != _INSTANCE._rate_per_minute:
+            # api_client 每次請求都帶當前設定值進來：值變了就就地調速，
+            # 否則 singleton 永遠停在第一次呼叫的速率直到 process 重啟
+            # （操作者調低限速保護 PCE 時，設定會靜默失效）。
+            _INSTANCE.set_rate(rate_per_minute)
         return _INSTANCE
 
 

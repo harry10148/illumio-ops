@@ -82,9 +82,12 @@ def test_rejected_security_post_still_returns_same_error_message(authed_client):
 def test_security_post_happy_path_unchanged(authed_client, app_persistent):
     """行為不變：成功路徑輸出與最終落地狀態維持原樣。"""
     client, csrf = authed_client
+    # Include the requester (test client is 127.0.0.1) so the change is not a
+    # self-lockout — the new guard rejects an allowlist that would lock the
+    # current admin out.
     res = _post(client, csrf, "/api/security", {
         "username": "admin2",
-        "allowed_ips": ["10.0.0.0/8"],
+        "allowed_ips": ["10.0.0.0/8", "127.0.0.1"],
     })
     assert res.status_code == 200
     assert res.get_json() == {"ok": True}
@@ -92,7 +95,7 @@ def test_security_post_happy_path_unchanged(authed_client, app_persistent):
     cm = app_persistent.config["CM"]
     cm.load()
     assert cm.config["web_gui"]["username"] == "admin2"
-    assert cm.config["web_gui"]["allowed_ips"] == ["10.0.0.0/8"]
+    assert cm.config["web_gui"]["allowed_ips"] == ["10.0.0.0/8", "127.0.0.1"]
 
 
 # ── 子項 2：report.output_dir 防護 ──────────────────────────────────────────

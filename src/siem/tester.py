@@ -19,16 +19,24 @@ class TestResult:
 
 def send_test_event(dest_cfg: SiemDestinationSettings) -> TestResult:
     started = time.monotonic()
+    transport = None
     try:
         formatter = _build_formatter(dest_cfg.format)
         transport = _build_transport(dest_cfg)
         payload = formatter.format_event(_synthetic_event())
         transport.send(payload)
-        transport.close()
         return TestResult(ok=True, latency_ms=int((time.monotonic() - started) * 1000))
     except Exception as exc:
         return TestResult(ok=False, error=str(exc),
                           latency_ms=int((time.monotonic() - started) * 1000))
+    finally:
+        # Close on the failure path too — a failed send (the very case the
+        # tester exists for) must not leak the HTTP session / socket.
+        if transport is not None:
+            try:
+                transport.close()
+            except Exception:
+                pass
 
 
 def _synthetic_event() -> dict:

@@ -858,6 +858,16 @@ class TrafficQueryBuilder:
             c.last_fetch_error = None
             logger.info("Async query recovered {} rows after {} re-download(s).",
                         len(rows), attempt)
+        if not rows and expected_matches > 0:
+            # 重試耗盡仍 0 rows 但 PCE 明說有 match：這不是「查詢真的沒流量」，
+            # 必須設 last_fetch_error 讓 fail-closed 消費端（report、ingest
+            # watermark、watchdog）能與合法空結果區分，不得無聲吞掉。
+            msg = (f"async query download returned 0 rows after {attempt} re-download "
+                   f"attempt(s), but PCE reported {expected_matches} matches")
+            logger.error(msg)
+            if not c.last_fetch_error:
+                c.last_fetch_error = msg
+            return
         for item in rows:
             yield item
 
@@ -1509,7 +1519,16 @@ class TrafficQueryBuilder:
                         resumed_jobs += 1
                         continue
                     if existing_status in {"failed", "timeout"}:
-                        retry_href = jobs_mgr.retry_async_query_job(existing_job["job_href"])
+                        # 單一 rule 的重送失敗（transient 非 2xx、state 缺
+                        # query_body）不得中斷整批——降級為 fresh submit，與
+                        # 本批其餘路徑的 per-rule 失敗隔離一致。
+                        try:
+                            retry_href = jobs_mgr.retry_async_query_job(existing_job["job_href"])
+                        except (RuntimeError, ValueError) as exc:
+                            logger.warning(
+                                f"retry_async_query_job failed for {existing_job['job_href']}: "
+                                f"{exc}; falling back to fresh submit")
+                            retry_href = None
                         pending_rules.append((rule, payload, retry_href))
                         retried_jobs += 1
                         continue
@@ -1592,20 +1611,34 @@ class TrafficQueryBuilder:
         failed = set()
         deadline = time.time() + 300
 
+        # 上一次已持久化的 poll 狀態（job_href → status）。每輪 poll 都對
+        # state.json 全檔重寫+fsync 會讓 poll 執行緒在 .lock 後面排隊
+        # （O(jobs×polls) I/O），只在狀態轉換時寫入。
+        persisted_poll_states = {}
+
         def _poll_one(job_href):
             url = f"{c.api_cfg['url']}/api/v2{job_href}"
             status, body = c._request(url, timeout=15)
+            if status in (404, 410):
+                # PCE 已清掉這個 async job（保留期短、重啟即消失）——視為終局
+                # 並持久化 failed，讓下一輪執行走 retry 重送，而不是把死掉的
+                # href 一路 poll 到 deadline 燒光整批預算。
+                logger.warning(f"Async job gone on PCE (HTTP {status}): {job_href}")
+                jobs_mgr._save_async_job_state(job_href, status="failed")
+                return job_href, "failed"
             if status != 200:
                 return job_href, "pending"
             try:
                 poll_result = orjson.loads(body)
                 state = poll_result.get("status", "pending")
-                jobs_mgr._save_async_job_state(
-                    job_href,
-                    status=state,
-                    rules_status=poll_result.get("rules"),
-                    result_href=poll_result.get("result"),
-                )
+                if persisted_poll_states.get(job_href) != state:
+                    jobs_mgr._save_async_job_state(
+                        job_href,
+                        status=state,
+                        rules_status=poll_result.get("rules"),
+                        result_href=poll_result.get("result"),
+                    )
+                    persisted_poll_states[job_href] = state
             except Exception as exc:
                 logger.warning("Failed to parse async job poll response for {}: {}", job_href, exc)
                 state = "pending"

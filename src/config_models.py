@@ -269,8 +269,8 @@ class SiemDestinationSettings(_Base):
     model_config = ConfigDict(extra="ignore")
     name: str = Field(min_length=1, max_length=64)
     enabled: bool = True
-    transport: str = "udp"  # udp|tcp|tls|hec
-    format: str = "cef"    # cef|json|syslog_cef|syslog_json
+    transport: Literal["udp", "tcp", "tls", "hec"] = "udp"
+    format: Literal["cef", "json", "syslog_cef", "syslog_json"] = "cef"
     host: str = ""
     port: int = Field(default=514, ge=1, le=65535)
     profile: Literal["production", "dev"] = "production"

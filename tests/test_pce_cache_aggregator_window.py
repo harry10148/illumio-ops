@@ -80,3 +80,28 @@ def test_full_flag_forces_whole_table(session_factory):
         s.add(_raw(2, now - timedelta(days=10)))
     agg.run_once(full=True)
     assert len(_bucket_days(session_factory)) == 2
+
+
+def test_backfilled_old_days_aggregated_without_full_flag(session_factory):
+    """Backfill 情境：raw 列 ingested_at=now（新進）但 last_detected 在數週前。
+    牆鐘視窗與 max_agg_day 錨點都照不到——aggregator 必須自我防護（游標式
+    偵測新進舊日期列），不能依賴呼叫端記得帶 full=True（web.py 有帶、CLI
+    沒帶，2026-07-25 審查）。"""
+    from src.pce_cache.aggregator import TrafficAggregator
+    from src.pce_cache.models import PceTrafficFlowRaw
+    agg = TrafficAggregator(session_factory)
+    now = datetime.now(timezone.utc)
+    with session_factory.begin() as s:
+        s.add(_raw(1, now))
+    agg.run_once()  # agg 非空、游標推進到 now
+    # 模擬 backfill：老日期資料、ingested_at = 現在
+    old_day = now - timedelta(days=30)
+    with session_factory.begin() as s:
+        s.add(PceTrafficFlowRaw(
+            flow_hash="agg-backfill", src_ip="1.1.1.1", dst_ip="2.2.2.2",
+            port=80, protocol="tcp", action="allowed", flow_count=1,
+            bytes_in=1, bytes_out=1,
+            first_detected=old_day, last_detected=old_day,
+            ingested_at=datetime.now(timezone.utc), raw_json="{}"))
+    agg.run_once()  # 增量（排程預設）——不帶 full=True
+    assert len(_bucket_days(session_factory)) == 2

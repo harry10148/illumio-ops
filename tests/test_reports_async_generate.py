@@ -160,26 +160,42 @@ def _seed_future_jobs(state_file, n=20):
     update_state_file(state_file, _merge)
 
 
-def test_stale_future_jobs_evict_fresh_job(client_logged_in, isolated_state_file):
-    """機制釘測試：state.json 殘留 20 筆未來 started_at 的 job 時，新 job 在
-    _save_adhoc_job 的 most-recent-20 prune 中「建立當下」即被剔除 → poll 404。
-    這就是本檔曾在全套順序中 flake 的注入式重現——共享 repo logs/state.json
-    時，外部殘留可讓本檔的 job 憑空消失。隔離 fixture 後僅在刻意注入時發生。"""
+def test_stale_future_jobs_do_not_evict_fresh_running_job(client_logged_in, isolated_state_file):
+    """機制釘測試（2026-07-25 修正後行為）：state.json 殘留 20 筆未來
+    started_at 的 done job 時，新 job 的 status=running 記錄豁免 most-recent-20
+    prune——「建立當下」不得被剔除（否則長工作進行中被較新 job 擠掉，poll 直接
+    404「unknown job」）。被修剪的只能是 done/error 記錄。"""
+    import threading as _threading
     _seed_future_jobs(isolated_state_file)
+    gate = _threading.Event()
     with patch("src.report.report_generator.ReportGenerator") as MockGen:
         inst = MockGen.return_value
-        inst.generate_from_api.return_value = SimpleNamespace(record_count=5)
+        # worker 卡在 gate 上，保證 poll 當下 job 仍是 running 狀態（消除
+        # 「worker 先完成、done 記錄再被未來殘留擠掉」的競態）。
+        inst.generate_from_api.side_effect = (
+            lambda **kw: (gate.wait(5), SimpleNamespace(record_count=5))[1])
         inst.export.return_value = ["/tmp/x/x.html"]
         inst.last_export_errors = {}
-        r = client_logged_in.post("/api/reports/generate", json={
-            "source": "api", "format": "html",
-            "start_date": "2026-01-01T00:00:00Z",
-            "end_date": "2026-01-02T23:59:59Z",
-        })
-        assert r.status_code == 200
-        job_id = r.get_json()["job_id"]
-        # prune 在 POST 內同步發生：第一個 poll 就是 404，不需等 worker
-        assert client_logged_in.get(f"/api/reports/jobs/{job_id}").status_code == 404
+        try:
+            r = client_logged_in.post("/api/reports/generate", json={
+                "source": "api", "format": "html",
+                "start_date": "2026-01-01T00:00:00Z",
+                "end_date": "2026-01-02T23:59:59Z",
+            })
+            assert r.status_code == 200
+            job_id = r.get_json()["job_id"]
+            # prune 在 POST 內同步發生：running 記錄豁免，poll 不得 404。
+            poll = client_logged_in.get(f"/api/reports/jobs/{job_id}")
+            assert poll.status_code == 200
+            assert poll.get_json()["status"] == "running"
+            # 上限仍受控：修剪後總數 ≤ 20（running 保護 + done 殘留裁到 19）。
+            import json as _json
+            with open(isolated_state_file, encoding="utf-8") as fh:
+                jobs = _json.load(fh)["adhoc_report_jobs"]
+            assert job_id in jobs
+            assert len(jobs) <= 20
+        finally:
+            gate.set()
 
 
 def test_jobs_persist_to_isolated_state_file(client_logged_in, isolated_state_file):

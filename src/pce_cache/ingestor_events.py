@@ -97,6 +97,12 @@ class EventsIngestor:
         last = wm.last_timestamp if wm else None
         if last is None:
             last = datetime.now(timezone.utc) - timedelta(hours=24)
+        else:
+            # Grace window：多節點 PCE（schema 逐事件記 pce_fqdn）的事件可能
+            # 亂序晚到；watermark 只有秒級 flooring（~1s 容忍），比照 traffic
+            # ingestor 的 5 分鐘 re-pull。pce_href unique + ON CONFLICT DO
+            # NOTHING 讓重拉完全冪等。
+            last = last - timedelta(minutes=5)
         if last.tzinfo is None:
             last = last.replace(tzinfo=timezone.utc)
         return last.replace(microsecond=0).isoformat()

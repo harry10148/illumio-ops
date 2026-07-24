@@ -16,6 +16,12 @@ from src.scheduler.jobs import (
 )
 from src.i18n import t, get_language
 
+# 世代序號：GUI config-restart 走 shutdown(wait=False) → build_scheduler，
+# 舊排程器的 in-flight job 可能在 prune_job_health 之後才跑完；用世代比對
+# 讓過期 wrapper 不再寫 job_health，避免已修剪的孤兒條目被復活成永久 warn。
+_BUILD_GENERATION = 0
+
+
 def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     """Factory for a BackgroundScheduler wired with illumio_ops jobs.
 
@@ -24,6 +30,10 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
     SchedulerSettings docstring): jobs always use the default in-memory
     job store; persist=true only logs a warning.
     """
+    global _BUILD_GENERATION
+    _BUILD_GENERATION += 1
+    _generation = _BUILD_GENERATION
+
     rule_interval = cm.config.get("rule_scheduler", {}).get("check_interval_seconds", 300)
     sched_cfg = cm.config.get("scheduler", {}) or {}
 
@@ -47,6 +57,10 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
         "max_instances": 1,        # prevent concurrent re-entry
         "misfire_grace_time": 60,  # allow up to 60s late fire
     }
+    # 長間隔（時級/日級）job 的 misfire 寬限：60s 全域值會讓「跨過每日觸發點
+    # 的 VM pause/snapshot/負載停頓」直接棄跑並順延一整個間隔（retention/
+    # archive 一天不跑）。遲到一小時內的日級批次仍然值得跑。
+    _LONG_JOB_GRACE = 3600
 
     kwargs: dict = {"executors": executors, "job_defaults": job_defaults}
 
@@ -72,10 +86,14 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             try:
                 result = fn(*args, **kwargs)
             except Exception as exc:
-                record_job_run(job_id, "error", str(exc),
-                               interval_seconds=interval_seconds)
+                if _generation == _BUILD_GENERATION:
+                    record_job_run(job_id, "error", str(exc),
+                                   interval_seconds=interval_seconds)
                 raise
-            record_job_run(job_id, "ok", interval_seconds=interval_seconds)
+            # 舊世代排程器的 in-flight job 不得回寫 job_health（見
+            # _BUILD_GENERATION 註解），否則 prune 過的條目會被復活。
+            if _generation == _BUILD_GENERATION:
+                record_job_run(job_id, "ok", interval_seconds=interval_seconds)
             return result
         return _run
 
@@ -157,6 +175,7 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
                 name="TLS self-signed renew check",
                 replace_existing=True,
                 next_run_time=_kick0 + _dt0.timedelta(seconds=100),
+                misfire_grace_time=_LONG_JOB_GRACE,
             )
     except Exception as exc:
         logger.exception("Failed to register tls renew job: {}", exc)
@@ -193,11 +212,13 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
             sched.add_job(_instrument("pce_cache_aggregate", run_traffic_aggregate, 3600), _IT(hours=1),
                           args=[cm], id="pce_cache_aggregate", replace_existing=True,
                           next_run_time=_kick + _dt.timedelta(seconds=60),
-                          executor="cache_writer")
+                          executor="cache_writer",
+                          misfire_grace_time=_LONG_JOB_GRACE)
             sched.add_job(_instrument("pce_cache_retention", run_cache_retention, 86400), _IT(hours=24),
                           args=[cm], id="pce_cache_retention", replace_existing=True,
                           next_run_time=_kick + _dt.timedelta(seconds=180),
-                          executor="cache_writer")
+                          executor="cache_writer",
+                          misfire_grace_time=_LONG_JOB_GRACE)
             sched.add_job(_instrument("cache_lag_monitor", run_cache_lag_monitor, 60), _IT(seconds=60),
                           args=[cm], id="cache_lag_monitor", replace_existing=True)
             from src.scheduler.jobs import run_capacity_monitor
@@ -211,7 +232,8 @@ def build_scheduler(cm, interval_minutes: int = 10) -> BackgroundScheduler:
                               _IT(hours=cache_cfg.archive_interval_hours),
                               args=[cm], id="pce_cache_archive", replace_existing=True,
                               next_run_time=_kick + _dt.timedelta(seconds=120),
-                              executor="cache_writer")
+                              executor="cache_writer",
+                              misfire_grace_time=_LONG_JOB_GRACE)
     except Exception as exc:
         logger.exception("Failed to register pce_cache scheduler jobs: {}", exc)
 
