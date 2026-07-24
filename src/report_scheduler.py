@@ -83,21 +83,62 @@ class ReportScheduler:
         return data.get(_STATE_KEY, {})
 
     def _save_state(self, schedule_id: int, last_run: str, status: str, error: str = ""):
-        """Persist schedule execution result into state.json."""
+        """Persist a successful/running/manual run: advance last_run and clear
+        any failure-backoff tracking (2026-07-24 審查 H)."""
         try:
             def _merge(existing):
                 data = dict(existing)
                 states = data.setdefault(_STATE_KEY, {})
-                states[str(schedule_id)] = {
-                    "last_run": last_run,
-                    "status": status,
-                    "error": error,
-                }
+                entry = dict(states.get(str(schedule_id), {}))
+                entry.update({"last_run": last_run, "status": status, "error": error})
+                # 成功/手動執行清掉失敗計數與 backoff 時戳
+                entry.pop("consecutive_failures", None)
+                entry.pop("last_attempt", None)
+                states[str(schedule_id)] = entry
                 return data
 
             update_state_file(self._state_file, _merge)
         except Exception as e:
             logger.error(f"Failed to save schedule state: {e}")
+
+    # 失敗 backoff 上限（秒）：2^(n-1)*60，夾在 [60, _FAILURE_BACKOFF_MAX]
+    _FAILURE_BACKOFF_MAX = 3600
+
+    def _record_failure(self, schedule_id, error: str, attempt_iso: str):
+        """記錄一次執行失敗但**不推進 last_run**——該期下 tick 仍 due 會重試
+        （2026-07-24 審查 H：暫時性故障不得讓當期報表永久漏）。累計
+        consecutive_failures 與 last_attempt 供 backoff 判定。"""
+        try:
+            def _merge(existing):
+                data = dict(existing)
+                states = data.setdefault(_STATE_KEY, {})
+                entry = dict(states.get(str(schedule_id), {}))
+                entry["status"] = "failed"
+                entry["error"] = str(error)[:300]
+                entry["last_attempt"] = attempt_iso
+                entry["consecutive_failures"] = int(entry.get("consecutive_failures", 0)) + 1
+                states[str(schedule_id)] = entry
+                return data
+
+            update_state_file(self._state_file, _merge)
+        except Exception as e:
+            logger.error(f"Failed to save schedule failure state: {e}")
+
+    def _failure_backoff_active(self, schedule_id, now: datetime.datetime) -> bool:
+        """連續失敗後在 backoff 窗內回 True（跳過本次重試，避免每 tick spam）。"""
+        st = self._load_states().get(str(schedule_id), {})
+        n = int(st.get("consecutive_failures", 0) or 0)
+        last_attempt = st.get("last_attempt")
+        if n <= 0 or not last_attempt:
+            return False
+        try:
+            la = datetime.datetime.fromisoformat(last_attempt)
+        except (ValueError, TypeError):
+            return False
+        la = la.replace(tzinfo=None) if la.tzinfo else la
+        now_naive = now.replace(tzinfo=None) if now.tzinfo else now
+        backoff = min(2 ** (n - 1) * 60, self._FAILURE_BACKOFF_MAX)
+        return (now_naive - la).total_seconds() < backoff
 
     # ─── Scheduling logic ────────────────────────────────────────────────────
 
@@ -768,9 +809,15 @@ class ReportScheduler:
             name = sched.get("name", "Unnamed")
             run_ts = now.isoformat()
 
+            # 連續失敗 backoff：due 但仍在退避窗內就跳過（審查 H，防每 tick spam）
+            if self._failure_backoff_active(sid, now):
+                continue
+
             logger.info(f"[Scheduler] Triggering schedule id={sid} name='{name}'")
             try:
                 self.run_schedule(sched)
-                self._save_state(sched["id"], run_ts, "success")
+                # id 缺失容錯：用已算好的 sid，不用 sched["id"]（審查 L6）
+                self._save_state(sid, run_ts, "success")
             except Exception as e:
-                self._save_state(sched["id"], run_ts, "failed", str(e))
+                # 失敗不推進 last_run——該期下 tick 仍 due 會重試（審查 H）
+                self._record_failure(sid, str(e), run_ts)
