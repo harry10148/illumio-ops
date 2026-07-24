@@ -403,7 +403,7 @@ function _renderDisplaySection(st, rpt) {
   <div class="form-row">
     <div class="form-group">
       <label data-i18n="gui_timezone">Timezone</label>
-      <select id="s-timezone" style="width:100%; padding:8px; border-radius:var(--radius); background:var(--bg3); border:1px solid var(--border); color:var(--fg);">
+      <select id="s-timezone" style="width:100%; padding:8px; border-radius:var(--radius); background-color:var(--bg3); border:1px solid var(--border); color:var(--fg);">
         <option value="local" ${st.timezone === 'local' || !st.timezone ? 'selected' : ''}>${_t('gui_local_browser_time')}</option>
         <option value="UTC" ${st.timezone === 'UTC' ? 'selected' : ''}>UTC</option>
         <option value="UTC-12" ${st.timezone === 'UTC-12' ? 'selected' : ''}>UTC-12</option>
