@@ -42,6 +42,7 @@ def pu_unused_detail(
         rows.append(_build_unused_row(rule, ruleset_map, hit_rule_port_details.get(href, {}), api_client))
 
     rows.sort(key=lambda r: (r.get("Ruleset", ""), r.get("No", 0)))
+    total_unused = len(rows)  # full count BEFORE the display/export cap
     rows = rows[:_MAX_ROWS]
 
     columns = [
@@ -62,6 +63,7 @@ def pu_unused_detail(
     return {
         "unused_df": unused_df,
         "record_count": len(rows),
+        "total_unused": total_unused,  # full count for accurate truncation disclosure
         "caveat": t("rpt_pu_unused_caveat", default=_CAVEAT_EN, lang=lang),
     }
 

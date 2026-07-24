@@ -509,7 +509,12 @@ class PolicyUsageGenerator:
             rows = list(self.api._traffic._submit_and_stream_async_query(
                 payload, compute_draft=True
             ))
-            return pu_draft_pd_summary(rows)
+            result = pu_draft_pd_summary(rows)
+            # The draft-PD counts are absolute; if the query hit its ceiling the
+            # totals are a floor, not the true count — flag it for disclosure.
+            if len(rows) >= payload["max_results"]:
+                result["truncated_at"] = payload["max_results"]
+            return result
         except Exception as exc:
             logger.warning("Draft PD analysis failed (non-fatal): {}", exc)
             return {"skipped": True, "reason": str(exc)}

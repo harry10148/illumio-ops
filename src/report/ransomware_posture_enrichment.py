@@ -62,14 +62,23 @@ def refresh_ransomware_posture(
     limiter = GlobalRateLimiter(rate_per_minute)
 
     targets = [w for w in workloads if _wants_enrichment(w)]
+    overflow: list[dict] = []
     if len(targets) > max_workloads:
         logger.warning(
             "[ransomware_posture] {} eligible workloads exceed cap {}; truncating",
             len(targets), max_workloads,
         )
+        overflow = targets[max_workloads:]
         targets = targets[:max_workloads]
 
     out: dict = {}
+    # Eligible workloads dropped by the cap must NOT read as clean downstream
+    # (missing entry → open_risky_count=0). Mark them as not-evaluated so the
+    # exporter renders "data unavailable" instead of a false all-clear.
+    for wl in overflow:
+        href = wl.get("href", "")
+        if href:
+            out[href] = {"open_service_ports": [], "details": [], "enrichment_error": True}
     for wl in targets:
         href = wl.get("href", "")
         cached = cache.get(href)

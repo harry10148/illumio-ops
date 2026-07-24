@@ -303,6 +303,10 @@ class PolicyUsageHtmlExporter:
             return intro + f'<p class="note">{_s("rpt_pu_draft_pd_empty")}</p>'
 
         html = intro
+        if m.get("truncated_at"):
+            _cap = t("rpt_pu_draft_pd_truncated", lang=self._lang).replace(
+                "{n}", str(m["truncated_at"]))
+            html += f'<p class="note note-warn">{_cap}</p>'
 
         vis = m.get("visibility_risk", {})
         if vis.get("total", 0):
@@ -517,10 +521,13 @@ class PolicyUsageHtmlExporter:
                 + f'<p class="note">{self._s("rpt_pu_no_unused_rules")}</p>'
             )
         else:
-            if count > 50:
-                note_text = t("rpt_pu_unused_truncated", lang=self._lang, count=count)
+            # Disclose against the TRUE unused total (before the 1000-row df cap),
+            # not the post-cap record_count.
+            total_unused = mod03.get("total_unused", count)
+            if total_unused > 50:
+                note_text = t("rpt_pu_unused_truncated", lang=self._lang, count=total_unused)
             else:
-                note_text = f"{count} rows" if count else ""
+                note_text = f"{total_unused} rows" if total_unused else ""
             note = f'<p style="color:#718096;font-size:12px;">{note_text}</p>' if note_text else ""
             html_parts.append(
                 caveat_html + note + _rule_cards_html(unused_df.head(50), mode="unused", lang=self._lang)

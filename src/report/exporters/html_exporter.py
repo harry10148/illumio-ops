@@ -377,6 +377,21 @@ def _fmt_int_cell(val, group: bool = True) -> str:
     else:
         return f'{f:.1f}'
 
+def _trunc_note(shown_df, total, lang: str = "en") -> str:
+    """Disclose a capped table when a heading/count reflects the FULL set but the
+    rendered table only shows the top N rows."""
+    shown = 0 if shown_df is None or getattr(shown_df, "empty", True) else len(shown_df)
+    try:
+        total = int(total)
+    except (TypeError, ValueError):
+        return ""
+    if total and shown and total > shown:
+        msg = html.escape(t("rpt_table_truncated_note", lang=lang)
+                          .replace("{shown}", str(shown)).replace("{total}", str(total)))
+        return f'<p class="note">{msg}</p>'
+    return ""
+
+
 def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
                 no_data_key: str = "rpt_no_data", lang: str = "en",
                 value_i18n_maps: dict[str, dict[str, str]] | None = None) -> str:
@@ -676,6 +691,14 @@ class _TrafficReportBase:
         }[self.REPORT_KIND or "SecurityRisk"]
         _findings_block = ((f'<h2>{_s("rpt_key_findings")}</h2>' + key_findings_html)
                            if self._hero_includes_findings() else '')
+        # Disclose when the raw flow set was capped before analysis: every total
+        # and finding below reflects only the retained rows.
+        _cap = self._r.get('_analysis_truncation') or {}
+        _cap_banner = ''
+        if _cap.get('from') and _cap.get('to') and _cap['from'] > _cap['to']:
+            _cap_banner = ('<p class="note note-warn">' + html.escape(
+                t("rpt_analysis_truncated", lang=_sl)
+                .replace("{shown}", f"{_cap['to']:,}").replace("{total}", f"{_cap['from']:,}")) + '</p>')
         _hero = (
             '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
@@ -683,6 +706,7 @@ class _TrafficReportBase:
             + _badge_html
             + f'<h1>{_s(_title_key)}</h1>'
             f'<p class="report-subtitle">{_s("rpt_generated")} ' + generated_at + '</p></div>'
+            + _cap_banner
             + summary_pills + _maturity_block + trend_html
             + _findings_block + '</section>\n'
         )
@@ -957,6 +981,7 @@ class _TrafficReportBase:
                 self._subnote('rpt_tr_audit_flags_subnote')
                 + f'<h3>{_s("rpt_tr_audit_flags")} ({m.get("audit_flag_count", 0)})</h3>'
                 + _df_to_html(flags, lang=_lang)
+                + _trunc_note(flags, m.get("audit_flag_count", 0), _lang)
             )
         return (
             '<div class="section-top">'
@@ -1029,6 +1054,7 @@ class _TrafficReportBase:
                 f'<span style="font-size:12px">{_s("rpt_tr_investigation_desc")}</span>'
                 '</div>'
                 + _df_to_html(part_e, 'Risk Level', lang=_lang)
+                + _trunc_note(part_e, m.get('part_e_total_hosts', 0), _lang)
             )
         else:
             out += (
@@ -1059,6 +1085,7 @@ class _TrafficReportBase:
             f'<h3>{_s("rpt_tr_host_exposure")}</h3>'
             + f'<p class="note" style="font-size:11px">{_s("rpt_tr_host_exposure_note")}</p>'
             + _df_to_html(m.get('part_d_host_exposure'), lang=_lang)
+            + _trunc_note(m.get('part_d_host_exposure'), m.get('part_d_total_hosts', 0), _lang)
         )
         return out
 
@@ -1174,9 +1201,11 @@ class _TrafficReportBase:
             + f'<h3>{t("rpt_drift_new_pairs", lang=_lang)} ({m.get("new_count", 0)})</h3>'
             + new_collapsed_note
             + _df_to_html(m.get('new_pairs'), lang=_lang)
+            + _trunc_note(m.get('new_pairs'), m.get("new_count", 0), _lang)
             + f'<h3>{t("rpt_drift_disappeared", lang=_lang)} ({m.get("disappeared_count", 0)})</h3>'
             + disappeared_collapsed_note
             + _df_to_html(m.get('disappeared_pairs'), lang=_lang)
+            + _trunc_note(m.get('disappeared_pairs'), m.get("disappeared_count", 0), _lang)
         )
 
     def _mod_vuln_html(self):
@@ -1192,6 +1221,7 @@ class _TrafficReportBase:
             + _render_chart_for_html(m.get('chart_spec'), lang=_lang)
             + f'<h3>{t("rpt_vuln_exposed_table", lang=_lang)} ({exposed})</h3>'
             + _df_to_html(m.get('exposed'), severity_col='Severity', lang=_lang)
+            + _trunc_note(m.get('exposed'), exposed, _lang)
         )
 
     def _mod_labels_html(self):
@@ -1207,6 +1237,7 @@ class _TrafficReportBase:
             parts.append(f'<h3>{t("rpt_labels_unlabeled_workloads", lang=_lang)} '
                          f'({m.get("unlabeled_workload_count", 0)})</h3>')
             parts.append(_df_to_html(m.get('unlabeled_workloads'), lang=_lang))
+            parts.append(_trunc_note(m.get('unlabeled_workloads'), m.get("unlabeled_workload_count", 0), _lang))
         else:
             parts.append(f'<p class="note">{t("rpt_labels_no_inventory", lang=_lang)}</p>')
         parts.append(f'<h3>{t("rpt_labels_flow_gap", lang=_lang)}: '

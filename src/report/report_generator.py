@@ -459,8 +459,10 @@ class ReportGenerator:
             filters["requires_draft_pd"] = True
         df, _source = self._fetch_traffic_df(start_dt, end_dt, filters, use_cache=use_cache,
                                              compute_draft=draft_policy)
+        _truncated_from = None
         if max_results and not df.empty and len(df) > max_results:
             logger.info("[ReportGenerator] capping {} rows to max_results={}", len(df), max_results)
+            _truncated_from = len(df)
             df = self._cap_records(df, max_results, draft_policy)
 
         if df.empty:
@@ -482,7 +484,7 @@ class ReportGenerator:
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
         self._vuln_csv_path = vuln_csv_path
-        return self._run_pipeline(
+        result = self._run_pipeline(
             df,
             source=_source,
             query_context={
@@ -494,6 +496,13 @@ class ReportGenerator:
             },
             traffic_report_profile=traffic_report_profile,
         )
+        if _truncated_from and result.module_results is not None:
+            # Surface the pre-cap count so the exporter can disclose that every
+            # total/finding reflects only the retained rows.
+            result.module_results["_analysis_truncation"] = {
+                "from": _truncated_from, "to": max_results,
+            }
+        return result
 
     def generate_from_csv(self, csv_path: str,
                           traffic_report_profile: str = "security_risk",

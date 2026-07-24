@@ -3512,6 +3512,8 @@
   "rpt_pu_unused_rules": "未使用 Rules",
   "rpt_pu_unused_truncated": "顯示前 50 筆（共 {count} 筆），完整清單見 CSV/XLSX 匯出。",
   "rpt_table_truncated_note": "顯示前 {shown} 筆（共 {total} 筆），完整資料見 CSV/XLSX 匯出。",
+  "rpt_pu_draft_pd_truncated": "計數為下限：草稿政策查詢已達上限 {n} 筆流量，實際總數可能更高。",
+  "rpt_analysis_truncated": "分析僅涵蓋 {total} 筆中的 {shown} 筆流量，以下所有總數與發現僅反映保留的資料列。",
   "rpt_querying_traffic": "正在查詢流量（{start} 至 {end}）...",
   "rpt_r_enforcement": "Enforcement",
   "rpt_r_policy": "Policy",

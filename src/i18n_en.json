@@ -3535,6 +3535,8 @@
   "rpt_pu_unused_rules": "Unused Rules",
   "rpt_pu_unused_truncated": "Showing first 50 of {count} unused rules — full list in CSV/XLSX export.",
   "rpt_table_truncated_note": "Showing top {shown} of {total} — full data in the CSV/XLSX export.",
+  "rpt_pu_draft_pd_truncated": "Counts are a floor: the draft-policy query returned its maximum of {n} flows, so the true totals may be higher.",
+  "rpt_analysis_truncated": "Analysis limited to {shown} of {total} flows — all totals and findings below reflect only the retained rows.",
   "rpt_readiness_report_title": "Enforcement Readiness Report",
   "rpt_readiness_cover_type": "Enforcement Readiness",
   "rpt_readiness_subnote": "Answers one question: which app (env) can safely move to enforcement next, and what is blocking the rest. Scores come from the same mod13 analysis as the Security report's readiness chapter.",
