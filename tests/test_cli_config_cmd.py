@@ -62,6 +62,34 @@ def test_show_section_api_emits_parseable_json(runner, tmp_path):
     assert parsed["url"] == "https://pce.test"
 
 
+def test_show_redacts_secrets(runner, tmp_path):
+    """show must never print credential values in plaintext (whole config or section)."""
+    from unittest.mock import MagicMock, patch
+
+    mock_cm = MagicMock()
+    mock_cm.config = {
+        "api": {"url": "https://pce.test", "key": "AK123", "secret": "topsecret"},
+        "smtp": {"host": "mail", "password": "mailpw"},
+        "web_gui": {"username": "illumio", "password": "hashed", "secret_key": "sk"},
+        "alerts": {"line_channel_access_token": "linetok", "telegram_bot_token": ""},
+        "settings": {},
+    }
+
+    with patch("src.config.ConfigManager", return_value=mock_cm):
+        result = runner.invoke(config_group, ["show"])
+
+    assert result.exit_code == 0
+    # Non-secret values remain visible; secret-named fields are redacted.
+    assert "https://pce.test" in result.output
+    assert "illumio" in result.output
+    for leaked in ("topsecret", "mailpw", "hashed", "linetok", "AK123"):
+        assert leaked not in result.output, f"credential leaked: {leaked}"
+    assert "[REDACTED]" in result.output
+    # An empty secret stays empty (unset stays visibly unset), not "[REDACTED]".
+    parsed = json.loads(result.output)
+    assert parsed["alerts"]["telegram_bot_token"] == ""
+
+
 # ---------------------------------------------------------------------------
 # config set tests
 # ---------------------------------------------------------------------------

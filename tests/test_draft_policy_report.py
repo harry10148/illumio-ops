@@ -194,8 +194,11 @@ def test_cli_report_draft_policy_passes_date_window():
             ["report", "draft-policy", "--start-date", "2026-06-26", "--end-date", "2026-06-27"],
             catch_exceptions=True,
         )
-    assert captured.get("start_date") == "2026-06-26"
-    assert captured.get("end_date") == "2026-06-27"
+    # Traffic/draft-policy dates now flow through _iso_date() for validation and
+    # consistency with the other report commands: start anchors to 00:00:00Z and
+    # end to end-of-day 23:59:59Z (inclusive), instead of the raw YYYY-MM-DD string.
+    assert captured.get("start_date") == "2026-06-26T00:00:00Z"
+    assert captured.get("end_date") == "2026-06-27T23:59:59Z"
     assert captured.get("draft_policy") is True
 
 

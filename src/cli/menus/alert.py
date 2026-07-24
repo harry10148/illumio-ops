@@ -80,7 +80,7 @@ def alert_settings_menu(cm: ConfigManager) -> None:
             )
             masked = current_token[:5] + "..." if current_token else t("not_set")
             new_token = safe_input(
-                t("line_token_input"), str, allow_cancel=True, hint=masked
+                t("line_token_input"), str, allow_cancel=True, hint=masked, hidden=True
             )
             if new_token:
                 cm.config.setdefault("alerts", {})["line_channel_access_token"] = (

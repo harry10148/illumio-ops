@@ -86,7 +86,7 @@ def settings_menu(cm: ConfigManager) -> None:
                 safe_input(t("lbl_api_key"), str, allow_cancel=True, hint=masked_key)
                 or cm.config["api"]["key"]
             )
-            new_sec = safe_input(t("lbl_api_secret"), str, allow_cancel=True, hint="******")
+            new_sec = safe_input(t("lbl_api_secret"), str, allow_cancel=True, hint="******", hidden=True)
             if new_sec:
                 cm.config["api"]["secret"] = new_sec
             # Sync changes back to active PCE profile (if any)
@@ -138,7 +138,7 @@ def settings_menu(cm: ConfigManager) -> None:
                 c["user"] = safe_input(
                     t("lbl_username"), str, allow_cancel=True, hint=c.get("user", "")
                 ) or c.get("user", "")
-                new_pass = safe_input(t("lbl_password"), str, allow_cancel=True, hint="******")
+                new_pass = safe_input(t("lbl_password"), str, allow_cancel=True, hint="******", hidden=True)
                 if new_pass:
                     c["password"] = new_pass
 

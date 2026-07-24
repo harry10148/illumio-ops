@@ -156,8 +156,8 @@ class _RuleSchedulerCLI:
         status = f"{Colors.GREEN}{st_pad}{Colors.ENDC}" if is_en else f"{Colors.FAIL}{st_pad}{Colors.ENDC}"
 
         dest_field = r.get('destinations', r.get('consumers', []))
-        src = truncate(self.api.resolve_actor_str(dest_field), 15)
-        dst = truncate(self.api.resolve_actor_str(r.get('providers', [])), 15)
+        src = truncate(self.api.resolve_actor_str(dest_field), 12)
+        dst = truncate(self.api.resolve_actor_str(r.get('providers', [])), 12)
         svc = truncate(self.api.resolve_service_str(r.get('ingress_services', [])), 10)
 
         ut = r.get('update_type')
@@ -208,7 +208,6 @@ class _RuleSchedulerCLI:
                         print(f"{Colors.FAIL}[-] {t('rs_invalid_input')}{Colors.ENDC}")
             except Exception as e:
                 print(f"{Colors.FAIL}[ERROR] {e}{Colors.ENDC}")
-                traceback.print_exc()
 
     # ── Collect Schedule Parameters ──
 
@@ -249,14 +248,26 @@ class _RuleSchedulerCLI:
             print(f"[{t('rs_sch_days_prompt')}]")
             if default_days:
                 print(f"{Colors.DARK_GRAY}({t('rs_sch_current')}: {default_days}){Colors.ENDC}")
-            raw_days = clean_input(input(">> "))
-            if raw_days.lower() in ['q', 'b']:
-                return None, None
-            if not raw_days and default_days:
-                raw_days = default_days
-            days = [d.strip() for d in raw_days.split(',')] if raw_days else [
-                "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
-            ]
+            while True:
+                raw_days = clean_input(input(">> "))
+                if raw_days.lower() in ['q', 'b']:
+                    return None, None
+                if not raw_days and default_days:
+                    raw_days = default_days
+                if not raw_days:
+                    days = ["Monday", "Tuesday", "Wednesday", "Thursday",
+                            "Friday", "Saturday", "Sunday"]
+                    break
+                candidate = [d.strip() for d in raw_days.split(',') if d.strip()]
+                # Validate against the same weekday map the scheduler matches on;
+                # an unrecognised name would silently never fire otherwise.
+                invalid = [d for d in candidate
+                           if d.lower()[:3] not in ScheduleEngine.DAY_MAP]
+                if invalid:
+                    print(f"{Colors.FAIL}{t('rs_invalid_days', days=', '.join(invalid))}{Colors.ENDC}")
+                    continue
+                days = candidate
+                break
             # English-only — see note_msg comment below.
             days_str = t('rs_action_everyday', lang='en') if not raw_days else raw_days
 

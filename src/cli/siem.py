@@ -220,7 +220,7 @@ def siem_replay(ctx: click.Context, dest: str, limit: int):
             ctx.exit(EXIT_SOFTWARE)
         # SIEM cache db not initialized — replay needs existing dispatch records.
         echo_error(ctx, t("cli_siem_err_no_replay_data", dest=dest))
-        ctx.exit(1)
+        ctx.exit(EXIT_UNAVAILABLE)
     except Exception as exc:
         echo_error(ctx, str(exc))
         ctx.exit(EXIT_SOFTWARE)
@@ -228,7 +228,8 @@ def siem_replay(ctx: click.Context, dest: str, limit: int):
 
 @siem_group.command("purge")
 @click.option("--dest", required=True, help="Destination name")
-@click.option("--older-than", default=30, show_default=True, help="Purge entries older than N days")
+@click.option("--older-than", type=click.IntRange(min=0), default=30, show_default=True,
+              help="Purge entries older than N days")
 @click.pass_context
 def siem_purge(ctx: click.Context, dest: str, older_than: int):
     """Delete DLQ entries for DEST older than N days."""
@@ -298,8 +299,11 @@ def siem_dlq(ctx: click.Context, dest: str, limit: int):
         table.add_column("Error")
         table.add_column("Quarantined At")
         for e in entries:
+            err_text = e.last_error or ""
+            if len(err_text) > 60:
+                err_text = err_text[:59] + "…"
             table.add_row(str(e.id), e.source_table, str(e.retries),
-                          e.last_error[:60], str(e.quarantined_at)[:19])
+                          err_text, str(e.quarantined_at)[:19])
         console.print(table)
     except Exception as exc:
         echo_error(ctx, str(exc))

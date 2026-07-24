@@ -21,23 +21,32 @@ MENU = (
 def manage_pce_cache_menu(cm) -> None:
     while True:
         print(MENU)
-        choice = input("> ").strip()
-        if choice == "0":
+        try:
+            choice = input("> ").strip()
+            if choice == "0":
+                return
+            elif choice == "1":
+                _view_status(cm)
+            elif choice == "2":
+                _edit_core_settings(cm)
+            elif choice == "3":
+                _edit_traffic_filter(cm)
+            elif choice == "4":
+                _edit_traffic_sampling(cm)
+            elif choice == "5":
+                _run_backfill(cm)
+            elif choice == "6":
+                _run_retention(cm)
+            else:
+                print("invalid choice; please enter 0-6")
+        except EOFError:
+            # EOF (Ctrl-D / piped input end): leave the submenu cleanly.
+            print()
             return
-        elif choice == "1":
-            _view_status(cm)
-        elif choice == "2":
-            _edit_core_settings(cm)
-        elif choice == "3":
-            _edit_traffic_filter(cm)
-        elif choice == "4":
-            _edit_traffic_sampling(cm)
-        elif choice == "5":
-            _run_backfill(cm)
-        elif choice == "6":
-            _run_retention(cm)
-        else:
-            print("invalid choice; please enter 0-6")
+        except KeyboardInterrupt:
+            # Ctrl-C cancels the current action and returns to this menu,
+            # rather than aborting the whole application.
+            print("\n(cancelled)")
 
 
 def _pick_or_cancel(api, cats, title, preselected=None, label_key_filter=None):

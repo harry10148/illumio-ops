@@ -88,7 +88,7 @@ def run_gui_only(cm, port: int = 5001, host: str = "0.0.0.0") -> None:
     if not HAS_FLASK:
         print(t("report_requires_flask"))
         if FLASK_IMPORT_ERROR:
-            print(f"Import error: {FLASK_IMPORT_ERROR}")
+            print(f"{t('cli_import_error', default='Import error')}: {FLASK_IMPORT_ERROR}")
         print(t("cli_pip_install_hint", pkg="flask"))
         sys.exit(1)
 

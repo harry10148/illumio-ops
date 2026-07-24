@@ -155,6 +155,7 @@ def cache_status(ctx: click.Context):
         console.print(table)
     except Exception as exc:
         echo_error(ctx, t("cli_cache_status_failed", exc=exc))
+        ctx.exit(EXIT_SOFTWARE)
 
 
 @cache_group.command("retention")

@@ -130,7 +130,8 @@ def generate_traffic_report(
         result = gen.generate_from_csv(file_path, traffic_report_profile=traffic_report_profile, lang=lang,
                                        vuln_csv_path=vuln_csv_path)
     else:
-        result = gen.generate_from_api(start_date=start_date, end_date=end_date,
+        result = gen.generate_from_api(start_date=_iso_date(start_date, end_of_day=False),
+                                       end_date=_iso_date(end_date, end_of_day=True),
                                        max_results=max_results,
                                        traffic_report_profile=traffic_report_profile, lang=lang,
                                        vuln_csv_path=vuln_csv_path, use_cache=use_cache,
@@ -450,7 +451,7 @@ def report_traffic(ctx: click.Context, source: str, file_path, fmt: str, output_
 @report_group.command("draft-policy")
 @click.option("--start-date", type=str, default=None, help="Start date in YYYY-MM-DD")
 @click.option("--end-date", type=str, default=None, help="End date in YYYY-MM-DD")
-@click.option("--max-records", type=int, default=None,
+@click.option("--max-records", type=click.IntRange(min=1), default=None,
               help="Cap analysed flows (draft-divergent flows are kept first) — keeps render "
                    "tractable on high-volume PCEs")
 @click.option("--format", "fmt", type=click.Choice(_REPORT_FORMATS), default="html")
@@ -869,7 +870,7 @@ def generate_app_summary_report(
 @report_group.command("app-summary")
 @click.option("--app", required=True, help="App Label value to scope the report to.")
 @click.option("--env", default=None, help="Optional Env Label refinement.")
-@click.option("--days", type=int, default=7, show_default=True,
+@click.option("--days", type=click.IntRange(min=1), default=7, show_default=True,
               help="Lookback window (days) for traffic flows.")
 @click.option("--output-dir", type=click.Path(), default=None)
 @_data_source_options
@@ -1002,7 +1003,7 @@ def report_readiness(ctx: click.Context, start_date: str | None, end_date: str |
 @click.option("--format", "fmt", type=click.Choice(["html", "csv", "all"]), default="html")
 @click.option("--output-dir", type=click.Path(), default=None)
 @click.option("--email", is_flag=True)
-@click.option("--attribution-days", type=int, default=30, show_default=True,
+@click.option("--attribution-days", type=click.IntRange(min=1), default=30, show_default=True,
               help="Audit-event lookback window for operator attribution.")
 @click.pass_context
 def report_policy_diff(ctx: click.Context, fmt: str, output_dir, email: bool,

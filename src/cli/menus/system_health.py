@@ -7,7 +7,7 @@ from src.config import ConfigManager
 from src.i18n import t
 from src.rule_id import gen_rule_id
 from src.utils import Colors, safe_input, draw_panel
-from src.cli.menus._helpers import _menu_hints, _wizard_step, _wizard_confirm
+from src.cli.menus._helpers import _menu_hints, _wizard_step, _wizard_confirm, _empty_uses_default
 
 
 def add_system_health_menu(cm: ConfigManager, edit_rule=None) -> None:
@@ -46,8 +46,12 @@ def add_system_health_menu(cm: ConfigManager, edit_rule=None) -> None:
         help_text=t("def_cooldown"),
     )
     if cd_in is None:
-        return
-    cooldown = int(cd_in) if cd_in != "" else def_cd
+        # Enter (empty) means "accept the default"; only a real back/cancel aborts.
+        if not _empty_uses_default(def_cd):
+            return
+        cooldown = def_cd
+    else:
+        cooldown = int(cd_in)
 
     _wizard_step(3, 3, t("wiz_review_save"))
     summary = [

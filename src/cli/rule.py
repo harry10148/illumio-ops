@@ -59,12 +59,13 @@ def list_rules(ctx: click.Context, rule_type: str, enabled_only: bool) -> None:
         return
 
     console = Console()
-    table = Table(title=f"Monitoring Rules ({len(rules)})", show_header=True, header_style="cyan")
-    table.add_column("#", justify="right", no_wrap=True, width=4)
-    table.add_column("Type", width=12)
-    table.add_column("Name")
-    table.add_column("Enabled", justify="center", width=8)
-    table.add_column("Threshold", justify="right", width=10)
+    table = Table(title=t("cli_rule_table_title", n=len(rules), default="Monitoring Rules ({n})"),
+                  show_header=True, header_style="cyan")
+    table.add_column(t("cli_rule_col_num", default="#"), justify="right", no_wrap=True, width=4)
+    table.add_column(t("cli_rule_col_type", default="Type"), width=12)
+    table.add_column(t("cli_rule_col_name", default="Name"))
+    table.add_column(t("cli_rule_col_enabled", default="Enabled"), justify="center", width=8)
+    table.add_column(t("cli_rule_col_threshold", default="Threshold"), justify="right", width=10)
 
     for i, r in enumerate(rules, 1):
         table.add_row(
@@ -98,10 +99,12 @@ def edit_rule(ctx: click.Context, rule_id: int, no_preview: bool) -> None:
     rule = rules[rule_id - 1]
     before = json.dumps(rule, indent=2, ensure_ascii=False)
 
-    name = questionary.text("Rule name:", default=rule.get("name", "")).unsafe_ask()
-    enabled = questionary.confirm("Enabled?", default=bool(rule.get("enabled", True))).unsafe_ask()
+    name = questionary.text(t("cli_rule_edit_name", default="Rule name:"),
+                            default=rule.get("name", "")).unsafe_ask()
+    enabled = questionary.confirm(t("cli_rule_edit_enabled", default="Enabled?"),
+                                  default=bool(rule.get("enabled", True))).unsafe_ask()
     threshold_str = questionary.text(
-        "Threshold (blank to keep):",
+        t("cli_rule_edit_threshold", default="Threshold (blank to keep):"),
         default=str(rule.get("threshold", "")),
     ).unsafe_ask()
 

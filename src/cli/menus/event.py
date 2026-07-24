@@ -116,6 +116,9 @@ def add_event_menu(cm: ConfigManager, edit_rule=None):
             if cnt_in is None:
                 continue
             cnt = int(cnt_in) if cnt_in != "" else def_cnt
+            if cnt < 1:
+                print(f"{Colors.WARNING}{t('cli_err_count_too_small')}{Colors.ENDC}")
+                continue
             win_in = safe_input(
                 t("time_window_mins"), int, hint=str(def_win), allow_cancel=True
             )

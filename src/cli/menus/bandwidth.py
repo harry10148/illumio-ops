@@ -85,7 +85,8 @@ def add_bandwidth_volume_menu(cm: ConfigManager, edit_rule=None) -> None:
         else (2 if edit_rule else None)
     )
     m_sel = safe_input(
-        t("please_select"), int, range(0, 3), allow_cancel=True, hint=str(def_msel)
+        t("please_select"), int, range(0, 3), allow_cancel=True,
+        hint=str(def_msel) if def_msel is not None else None,
     )
     if m_sel is None:
         if _empty_uses_default(def_msel):

@@ -17,6 +17,11 @@ from src.cli._exit_codes import EXIT_UNAVAILABLE
 from src.i18n import t
 
 
+def _ellip(value: str, width: int) -> str:
+    """Truncate with an ellipsis so overflow is visible, not silent."""
+    return value if len(value) <= width else value[: width - 1] + "…"
+
+
 @click.group("workload")
 def workload_group() -> None:
     """Inspect PCE workloads."""
@@ -44,66 +49,77 @@ def list_workloads(
     from src.api_client import ApiClient
 
     cm = ConfigManager()
-    api = ApiClient(cm)
-
     use_spinner = not is_json(ctx) and not is_quiet(ctx)
     console = Console()
 
+    fetch_cap = limit * 5
+    # ApiClient holds a requests.Session pool; close it on every exit path.
+    api = ApiClient(cm)
     try:
-        if use_spinner:
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                transient=True,
-                console=console,
-            ) as prog:
-                prog.add_task(t("cli_wl_fetching"), total=None)
-                if managed_only:
-                    workloads = api.fetch_managed_workloads(max_results=limit * 5)
-                else:
-                    workloads = api.search_workloads({"max_results": min(limit * 5, 1000)})
-        else:
-            if managed_only:
-                workloads = api.fetch_managed_workloads(max_results=limit * 5)
+        try:
+            if use_spinner:
+                with Progress(
+                    SpinnerColumn(),
+                    TextColumn("[progress.description]{task.description}"),
+                    transient=True,
+                    console=console,
+                ) as prog:
+                    prog.add_task(t("cli_wl_fetching"), total=None)
+                    if managed_only:
+                        workloads = api.fetch_managed_workloads(max_results=fetch_cap)
+                    else:
+                        workloads = api.search_workloads({"max_results": min(fetch_cap, 1000)})
             else:
-                workloads = api.search_workloads({"max_results": min(limit * 5, 1000)})
-    except ConnectionError as exc:
-        echo_error(ctx, t("cli_wl_cannot_reach_pce", exc=exc))
-        ctx.exit(EXIT_UNAVAILABLE)
-        return
+                if managed_only:
+                    workloads = api.fetch_managed_workloads(max_results=fetch_cap)
+                else:
+                    workloads = api.search_workloads({"max_results": min(fetch_cap, 1000)})
+        except ConnectionError as exc:
+            echo_error(ctx, t("cli_wl_cannot_reach_pce", exc=exc))
+            ctx.exit(EXIT_UNAVAILABLE)
+            return
 
-    # Filter
-    if env:
-        workloads = [
-            w for w in workloads
-            if any(
-                lbl.get("key") == "env" and lbl.get("value") == env
-                for lbl in w.get("labels", [])
-            )
-        ]
-    if enforcement != "all":
-        workloads = [w for w in workloads if w.get("enforcement_mode") == enforcement]
+        # The fetch is capped; client-side --env/--enforcement/--pick filtering
+        # below can under-report if matches exist beyond the cap. Track it.
+        hit_cap = len(workloads) >= min(fetch_cap, 1000)
 
-    if pick:
-        from src.cli import object_picker
-
-        if object_picker._interactive_ok():
-            try:
-                picked = object_picker.pick_objects(
-                    api, cats=("label",), title=t("cli_wl_pick_title", default="Workload label filter"),
+        # Filter
+        if env:
+            workloads = [
+                w for w in workloads
+                if any(
+                    lbl.get("key") == "env" and lbl.get("value") == env
+                    for lbl in w.get("labels", [])
                 )
-            except KeyboardInterrupt:
-                # Ctrl-C：取消挑選，list 是唯讀查詢指令，不因取消而中斷，繼續顯示未過濾結果
-                picked = None
-            selected_labels = set(picked["labels"]) if picked and picked.get("labels") else None
-            if selected_labels:
-                # 與既有 --env 過濾同語意：workload 的 labels 含任一選中 label 即保留
-                workloads = [
-                    w for w in workloads
-                    if selected_labels & {f"{lbl.get('key')}={lbl.get('value')}" for lbl in w.get("labels", [])}
-                ]
-        else:
-            echo_warning(ctx, t("cli_wl_pick_non_tty_hint"))
+            ]
+        if enforcement != "all":
+            workloads = [w for w in workloads if w.get("enforcement_mode") == enforcement]
+
+        if pick:
+            from src.cli import object_picker
+
+            if object_picker._interactive_ok():
+                try:
+                    picked = object_picker.pick_objects(
+                        api, cats=("label",), title=t("cli_wl_pick_title", default="Workload label filter"),
+                    )
+                except KeyboardInterrupt:
+                    # Ctrl-C：取消挑選，list 是唯讀查詢指令，不因取消而中斷，繼續顯示未過濾結果
+                    picked = None
+                selected_labels = set(picked["labels"]) if picked and picked.get("labels") else None
+                if selected_labels:
+                    # 與既有 --env 過濾同語意：workload 的 labels 含任一選中 label 即保留
+                    workloads = [
+                        w for w in workloads
+                        if selected_labels & {f"{lbl.get('key')}={lbl.get('value')}" for lbl in w.get("labels", [])}
+                    ]
+            else:
+                echo_warning(ctx, t("cli_wl_pick_non_tty_hint"))
+    finally:
+        api.close()
+
+    if hit_cap and (env or enforcement != "all" or pick):
+        echo_warning(ctx, t("cli_wl_capped_filter_warning", cap=min(fetch_cap, 1000)))
 
     workloads = workloads[:limit]
 
@@ -144,11 +160,11 @@ def list_workloads(
         )
         table.add_row(
             str(i),
-            (w.get("name") or w.get("hostname") or "-")[:40],
-            (w.get("hostname") or "-")[:30],
+            _ellip(w.get("name") or w.get("hostname") or "-", 40),
+            _ellip(w.get("hostname") or "-", 30),
             env_val,
             w.get("enforcement_mode", ""),
-            (w.get("os_id") or "-")[:20],
+            _ellip(w.get("os_id") or "-", 20),
         )
 
     console.print(table)

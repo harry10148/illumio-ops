@@ -11,6 +11,8 @@ import difflib
 import signal
 import sys
 
+from src.i18n import t
+
 from src.cli._exit_codes import (
     EXIT_INTERRUPT,
     EXIT_SOFTWARE,
@@ -28,11 +30,11 @@ def format_error(cause: str, recovery: str | None = None,
         Did you mean: <suggestion>?      (optional)
         Try: <recovery hint>             (optional)
     """
-    lines = [f"Error: {cause}"]
+    lines = [f"{t('cli_err_label', default='Error')}: {cause}"]
     if did_you_mean:
-        lines.append(f"Did you mean: {did_you_mean}?")
+        lines.append(f"{t('cli_err_did_you_mean', default='Did you mean')}: {did_you_mean}?")
     if recovery:
-        lines.append(f"Try: {recovery}")
+        lines.append(f"{t('cli_err_try', default='Try')}: {recovery}")
     return "\n".join(lines)
 
 

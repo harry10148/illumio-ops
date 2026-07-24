@@ -24,7 +24,11 @@ def _tz_offset_info(cm) -> tuple[str, float]:
         return 'UTC', 0.0
     if tz_str.startswith('UTC+') or tz_str.startswith('UTC-'):
         sign = 1 if tz_str[3] == '+' else -1
-        hours = sign * float(tz_str[4:])
+        try:
+            hours = sign * float(tz_str[4:])
+        except ValueError:
+            # Malformed offset (e.g. "UTC+abc"): fall back to UTC rather than crash.
+            return 'UTC', 0.0
         return tz_str, hours
     return 'UTC', 0.0
 
@@ -53,11 +57,16 @@ def _wizard_confirm(summary_lines: list[str]) -> bool:
     title = t("wiz_review_config")
     draw_panel(title, summary_lines)
     prompt = t("wiz_save_rule_confirm")
-    answer = (
-        input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {prompt} {Colors.GREEN}❯{Colors.ENDC} ")
-        .strip()
-        .lower()
-    )
+    try:
+        answer = (
+            input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {prompt} {Colors.GREEN}❯{Colors.ENDC} ")
+            .strip()
+            .lower()
+        )
+    except (EOFError, KeyboardInterrupt):
+        # Cancel at the confirm prompt means "do not save".
+        print()
+        return False
     if not answer:
         return True
     return answer in ["y", "yes", "是", "好"]

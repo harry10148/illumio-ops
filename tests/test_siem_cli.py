@@ -17,10 +17,13 @@ def test_siem_status_no_db(runner, tmp_path, monkeypatch):
 
 
 def test_siem_replay_missing_dest_exits_1(runner, tmp_path, monkeypatch):
-    """Replay with no DB exits with error code."""
+    """Replay with no DB exits with an error code."""
     from src.cli.siem import siem_group
+    from src.cli._exit_codes import EXIT_UNAVAILABLE
     result = runner.invoke(siem_group, ["replay", "--dest", "nonexistent"])
-    assert result.exit_code in (0, 1)
+    # No replay data / uninitialised DB now maps to the centralised
+    # EXIT_UNAVAILABLE instead of a raw ctx.exit(1).
+    assert result.exit_code in (0, 1, EXIT_UNAVAILABLE)
 
 
 def test_siem_dlq_empty(runner, tmp_path, monkeypatch):

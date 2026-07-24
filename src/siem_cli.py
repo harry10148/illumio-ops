@@ -55,8 +55,9 @@ def manage_siem_menu(cm) -> None:
             print("invalid choice")
 
 
-def _prompt(name, current, cast=str):
-    raw = input(f"  {name} [{current}]: ").strip()
+def _prompt(name, current, cast=str, secret=False):
+    shown = ("*" * min(len(str(current)), 8)) if (secret and current) else current
+    raw = input(f"  {name} [{shown}]: ").strip()
     if raw == "":
         return current
     if cast is bool:
@@ -135,7 +136,7 @@ def _prompt_destination(existing=None):
     endpoint = _prompt("endpoint", existing.get("endpoint", ""))
     tls_verify = _prompt("tls_verify", existing.get("tls_verify", True), bool)
     tls_ca_bundle = _prompt("tls_ca_bundle", existing.get("tls_ca_bundle") or "")
-    hec_token = _prompt("hec_token", existing.get("hec_token") or "")
+    hec_token = _prompt("hec_token", existing.get("hec_token") or "", secret=True)
     batch_size = _prompt("batch_size", existing.get("batch_size", 100), int)
     raw = input(f"  source_types (comma, [{','.join(existing.get('source_types', ['audit', 'traffic']))}]): ").strip()
     source_types = (
@@ -294,13 +295,18 @@ def _dlq_export(cm):
     path = input("  output path (e.g. dlq.csv): ").strip()
     if not path:
         return
-    with open(path, "w") as f:
-        w = csv.writer(f)
-        w.writerow(["id", "destination", "source_id", "last_error", "quarantined_at"])
-        with _dlq_engine(cm)() as s:
-            for row in s.scalars(select(DeadLetter)):
-                w.writerow([
-                    row.id, row.destination, row.source_id, row.last_error,
-                    row.quarantined_at.isoformat() if row.quarantined_at else "",
-                ])
+    try:
+        with open(path, "w") as f:
+            w = csv.writer(f)
+            w.writerow(["id", "destination", "source_id", "last_error", "quarantined_at"])
+            with _dlq_engine(cm)() as s:
+                for row in s.scalars(select(DeadLetter)):
+                    w.writerow([
+                        row.id, row.destination, row.source_id, row.last_error,
+                        row.quarantined_at.isoformat() if row.quarantined_at else "",
+                    ])
+    except OSError as exc:
+        print(f"  export failed: {exc}")
+        return
+    print(f"  exported to {path}")
     print(f"  exported to {path}")

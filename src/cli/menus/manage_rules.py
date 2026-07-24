@@ -65,10 +65,10 @@ def manage_rules_menu(cm: ConfigManager):
             filters = []
             if r["type"] == "traffic":
                 pd_map = {
-                    2: t("decision_blocked"),
-                    1: t("decision_potential"),
-                    0: t("decision_allowed"),
-                    -1: t("pd_4"),
+                    2: t("pd_label_blocked"),
+                    1: t("pd_label_allowed"),
+                    0: t("pd_label_potential"),
+                    -1: t("pd_label_all"),
                 }
                 filters.append(f"[{pd_map.get(r.get('pd', 2), '?')}]")
             if r.get("port"):
