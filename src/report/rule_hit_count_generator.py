@@ -316,7 +316,11 @@ class RuleHitCountGenerator:
             hit_df = df[df['hit_count'] > 0].sort_values('hit_count', ascending=False)
             unused_df = df[df['hit_count'] == 0]
             days = pd.to_numeric(df['days_since_last_hit'], errors='coerce')
-            cleanup_df = df[df['enabled'].astype(bool) &
+            # Treat un-enriched rows (default enabled='') as unknown → keep them
+            # as cleanup candidates; bool('') is False and would silently drop
+            # every rule when enrichment failed.
+            enabled_mask = df['enabled'].map(lambda v: True if v == '' else bool(v))
+            cleanup_df = df[enabled_mask &
                             ((df['hit_count'] == 0) | (days >= CLEANUP_DAYS_THRESHOLD))]
             cleanup_df = cleanup_df.assign(_days=days[cleanup_df.index]) \
                                    .sort_values('_days', ascending=False, na_position='last') \

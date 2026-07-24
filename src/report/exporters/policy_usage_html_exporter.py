@@ -275,7 +275,9 @@ class PolicyUsageHtmlExporter:
 
     def _summary_pills(self, mod00: dict) -> str:
         _s = self._s
-        hit_rate = mod00.get("hit_rate_pct", None)
+        # hit_rate_pct is produced by mod01 (overview), not mod00 (executive) —
+        # reading it off mod00 always yielded None and rendered '—'.
+        hit_rate = self._r.get("mod01", {}).get("hit_rate_pct", None)
         hit_rate_str = f"{hit_rate:.1f}%" if hit_rate is not None else "—"
         pills = [
             (_s("rpt_pill_lookback"), f"{self._lookback_days} days"),

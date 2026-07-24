@@ -17,9 +17,19 @@ from typing import Any
 _ANY = "ANY"
 
 
+_PROTO_NAMES = {6: "TCP", 17: "UDP", 1: "ICMP", 58: "ICMPv6", 47: "GRE", 50: "ESP", -1: "ANY"}
+
+
 def _proto_name(proto: Any) -> str:
-    # Assumes Illumio ingress_services proto is 6 (TCP) or 17 (UDP); anything non-17 maps to TCP.
-    return "UDP" if proto == 17 else "TCP"
+    # Illumio ingress_services proto numbers: 6=TCP, 17=UDP, 1=ICMP, 58=ICMPv6,
+    # -1/None=ANY. Map known values; fall back to str(proto) for unknowns rather
+    # than mislabelling everything non-UDP as TCP.
+    if proto is None:
+        return "ANY"
+    try:
+        return _PROTO_NAMES.get(int(proto), str(proto))
+    except (TypeError, ValueError):
+        return str(proto)
 
 
 def _actor_ips(
@@ -193,6 +203,10 @@ def _services(rule: dict, service_to_ports: dict[str, list[dict]],
                 if p.get("to_port"):
                     entry["port_to"] = p["to_port"]
                 out.append(entry)
+        elif "proto" in s:
+            # Proto-only inline service (no port): ICMP ({"proto": 1}), ICMPv6,
+            # GRE, etc. Represent it instead of silently dropping the rule.
+            out.append({"port": _ANY, "protocol": _proto_name(s.get("proto")), "name": ""})
     return out
 
 

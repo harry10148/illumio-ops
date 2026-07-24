@@ -1545,7 +1545,9 @@ class _TrafficReportBase:
         }
         role_summary = m.get('role_summary')
         if role_summary is not None and not role_summary.empty:
-            html += f'<h4>{_s("rpt_tr_role_distribution")}</h4>' + _df_to_html(
+            # role_summary is grouped by tier (column 'Tier', TIER_VALUE_I18N) —
+            # the heading was mislabelled 'Role Distribution'.
+            html += f'<h4>{_s("rpt_tr_tier_distribution")}</h4>' + _df_to_html(
                 role_summary, lang=_lang,
                 value_i18n_maps={"Tier": TIER_VALUE_I18N},
             )

@@ -822,8 +822,12 @@ class RulesEngine:
         top_ips = matched['src_ip'].value_counts().head(5).to_dict()
         top_ports = matched['port'].value_counts().head(5).to_dict()
         top_dst = matched['dst_app'].fillna('unknown').value_counts().head(5).to_dict()
-        _all_names = {1433: 'MSSQL', 3306: 'MySQL', 5432: 'PgSQL', 88: 'Kerberos',
-                      389: 'LDAP', 445: 'SMB', 135: 'RPC', 5985: 'WinRM', **{p: str(p) for p in self._DB_PORTS}}
+        # Numeric fallbacks FIRST so the explicit friendly names win the merge —
+        # otherwise the spread clobbers MSSQL/MySQL/PgSQL (1433/3306/5432 are in
+        # _DB_PORTS) back to bare numbers.
+        _all_names = {**{p: str(p) for p in self._DB_PORTS},
+                      1433: 'MSSQL', 3306: 'MySQL', 5432: 'PgSQL', 88: 'Kerberos',
+                      389: 'LDAP', 445: 'SMB', 135: 'RPC', 5985: 'WinRM'}
         named_ports = {_all_names.get(p, str(p)): c for p, c in top_ports.items()}
         return Finding(
             rule_id='L007', rule_name='Unmanaged Host Accessing Critical Services',
