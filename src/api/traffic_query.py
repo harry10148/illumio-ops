@@ -1039,7 +1039,9 @@ class TrafficQueryBuilder:
                 if flow_port is None or int(flow_port) != int(port_filter):
                     return False
             except (ValueError, TypeError):
-                pass
+                # include 過濾器不可解析 → fail-closed（不命中），與 ports list
+                # 及 check_flow_match 一致；fail-open 會靜默回未過濾（審查 M5）
+                return False
 
         ports_inc = filters.get('ports')
         if ports_inc:
@@ -1056,7 +1058,8 @@ class TrafficQueryBuilder:
                 if flow_proto is None or int(flow_proto) != int(proto_filter):
                     return False
             except (ValueError, TypeError):
-                pass
+                # include 過濾器不可解析 → fail-closed（同 port，審查 M5）
+                return False
 
         any_label = filters.get('any_label')
         if any_label:

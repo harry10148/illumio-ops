@@ -186,3 +186,22 @@ def test_ex_src_ip_cidr_excludes_on_containment():
     flow = _flow_with_ips(src_ip="10.0.0.5")
     assert _match(flow, {"ex_src_ip": "10.0.0.0/24"}) is False
     assert _match(flow, {"ex_src_ip": "192.168.0.0/24"}) is True
+
+
+def test_scalar_port_include_unparseable_fails_closed():
+    """M5（2026-07-24 審查）：純量 port include 過濾遇不可解析值必須
+    fail-closed（不命中），與 ports list 及 check_flow_match 一致——
+    否則 include 過濾靜默失效、回傳全部未過濾 flow。"""
+    flow = {"src": {}, "dst": {}, "service": {"port": 443, "proto": 6}}
+    assert _match(flow, {"port": "not-a-number"}) is False
+
+
+def test_scalar_proto_include_unparseable_fails_closed():
+    flow = {"src": {}, "dst": {}, "service": {"port": 443, "proto": 6}}
+    assert _match(flow, {"proto": "tcp-ish"}) is False
+
+
+def test_scalar_port_valid_still_matches():
+    flow = {"src": {}, "dst": {}, "service": {"port": 443, "proto": 6}}
+    assert _match(flow, {"port": "443"}) is True
+    assert _match(flow, {"port": "80"}) is False
