@@ -871,7 +871,7 @@ class _TrafficReportBase:
         )
         return render_df_table(
             df,
-            col_i18n={},
+            col_i18n={"Metric": "rpt_col_metric", "Value": "rpt_col_value"},
             value_i18n_maps={"Metric": MOD01_METRIC_VALUE_I18N},
             lang=self._lang,
         )

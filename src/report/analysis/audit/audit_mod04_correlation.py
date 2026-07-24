@@ -33,7 +33,7 @@ _AGENT_SECURITY_EVENTS = frozenset({
     "agent.suspend",
 })
 
-_BUSINESS_HOURS = range(8, 19)  # 08:00–18:59 local time
+_BUSINESS_HOURS = range(8, 19)  # 08:00–18:59 UTC (the off-hours column is labelled "Hour (UTC)")
 
 def _parse_ts(df: pd.DataFrame) -> pd.DataFrame:
     """Ensure timestamp column is datetime and sorted."""

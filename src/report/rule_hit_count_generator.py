@@ -235,7 +235,7 @@ class RuleHitCountGenerator:
 
     def _actor_str(self, actors) -> str:
         if not actors:
-            return 'Any'
+            return t("rpt_rhc_actor_any", lang=self._lang)
         try:
             return self.api.resolve_actor_str(actors)
         except Exception:
@@ -244,7 +244,7 @@ class RuleHitCountGenerator:
 
     def _service_str(self, services) -> str:
         if not services:
-            return 'All Services'
+            return t("rpt_rhc_service_all", lang=self._lang)
         try:
             return self.api.resolve_service_str(services)
         except Exception:

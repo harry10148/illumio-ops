@@ -9,7 +9,7 @@ def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20, 
     port classification (20 high-risk ports across 4 levels).
     """
     if df.empty:
-        return {'error': 'No data'}
+        return {'error': t("rpt_mod_err_no_data", lang=lang)}
 
     # Build port → level mapping
     port_to_level: dict[int, dict] = {}
@@ -26,7 +26,7 @@ def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20, 
                 }
 
     if not port_to_level:
-        return {'error': 'No ransomware risk port configuration found'}
+        return {'error': t("rpt_tr_no_ransomware_config", lang=lang)}
 
     # Tag each flow
     df2 = df.copy()
