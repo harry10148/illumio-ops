@@ -216,9 +216,12 @@ def add_traffic_menu(cm: ConfigManager, edit_rule=None) -> None:
     preserved_any = preserve_any_filters(edit_rule)
 
     _wizard_step(5, 5, t("wiz_review_save"))
-    pd_text = {2: "Blocked", 0: "Potential", 1: "Allowed", -1: "All"}.get(
-        target_pd, "All"
-    )
+    pd_text = {
+        2: t("pd_label_blocked"),
+        0: t("pd_label_potential"),
+        1: t("pd_label_allowed"),
+        -1: t("pd_label_all"),
+    }.get(target_pd, t("pd_label_all"))
     summary = [
         f"{t('sum_type')}: traffic",
         f"{t('sum_name')}: {name}",

@@ -40,8 +40,8 @@ def web_gui_security_menu(cm: ConfigManager) -> None:
             else (t("wgs_tls_mode_custom", default="Custom cert") if tls_cfg.get("cert_file") else "-")
         )
         tls_status = (
-            f"{Colors.GREEN}ON{Colors.ENDC} ({tls_mode})" if tls_on
-            else f"{Colors.WARNING}OFF{Colors.ENDC}"
+            f"{Colors.GREEN}{t('status_on', default='ON')}{Colors.ENDC} ({tls_mode})" if tls_on
+            else f"{Colors.WARNING}{t('status_off', default='OFF')}{Colors.ENDC}"
         )
 
         print(f"  {t('wgs_username', default='Username')}:    {username}")
@@ -64,7 +64,7 @@ def web_gui_security_menu(cm: ConfigManager) -> None:
             if new_user:
                 cm.config["web_gui"]["username"] = new_user
 
-            new_pass = safe_input(t("wgs_new_pass", default="New Password"), str, allow_cancel=True)
+            new_pass = safe_input(t("wgs_new_pass", default="New Password"), str, allow_cancel=True, hidden=True)
             if new_pass:
                 from src.config import hash_password
                 cm.config["web_gui"]["password"] = hash_password(new_pass)
@@ -99,9 +99,15 @@ def web_gui_security_menu(cm: ConfigManager) -> None:
                 if act == "A":
                     new_ip = safe_input(t("wgs_prompt_add_ip"), str, allow_cancel=True)
                     if new_ip:
-                        curr_ips.append(new_ip.strip())
-                        cm.config.setdefault("web_gui", {})["allowed_ips"] = curr_ips
-                        cm.save()
+                        from src.gui._helpers import _validate_allowed_ips
+                        normalized, invalid = _validate_allowed_ips([new_ip])
+                        if invalid:
+                            print(f"  {Colors.FAIL}{t('wgs_ip_invalid', entry=new_ip.strip())}{Colors.ENDC}")
+                            input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")
+                        else:
+                            curr_ips.extend(normalized)
+                            cm.config.setdefault("web_gui", {})["allowed_ips"] = curr_ips
+                            cm.save()
                 elif act == "D" and curr_ips:
                     idx = safe_input(t("wgs_prompt_del_ip_index"), int, range(1, len(curr_ips) + 1))
                     if idx is not None:
@@ -289,6 +295,6 @@ def _web_gui_tls_menu(cm: ConfigManager) -> None:
                 print(f"\n{Colors.GREEN}"
                       + t("wgs_tls_renewed", default="Certificate renewed. Restart the Web GUI to apply.")
                       + f" ({days} days){Colors.ENDC}")
-            except RuntimeError as exc:
+            except (RuntimeError, OSError) as exc:
                 print(f"\n{Colors.FAIL}{exc}{Colors.ENDC}")
             input(f"{t('press_enter_to_continue')} ")

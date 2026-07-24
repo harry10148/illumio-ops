@@ -51,8 +51,8 @@ def status_cmd(ctx: click.Context) -> None:
 
     console = Console()
     table = Table(title=t("cli_status_table_title"), show_header=True, header_style="cyan")
-    table.add_column("Item")
-    table.add_column("Value")
+    table.add_column(t("cli_status_col_item", default="Item"))
+    table.add_column(t("cli_status_col_value", default="Value"))
 
     table.add_row(t("cli_status_row_pce_url"), pce_url)
     table.add_row(t("cli_status_row_language"), language)

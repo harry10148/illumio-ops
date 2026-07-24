@@ -58,7 +58,7 @@ def manage_report_schedules_menu(cm: ConfigManager) -> None:
                     status = f"{Colors.FAIL}{t('sched_status_failed')}{Colors.ENDC}"
                 else:
                     status = Colors.DARK_GRAY + t("sched_status_never") + Colors.ENDC
-                enabled = f"{Colors.GREEN}ON{Colors.ENDC}" if s.get("enabled") else f"{Colors.FAIL}OFF{Colors.ENDC}"
+                enabled = f"{Colors.GREEN}{t('status_on', default='ON')}{Colors.ENDC}" if s.get("enabled") else f"{Colors.FAIL}{t('status_off', default='OFF')}{Colors.ENDC}"
 
                 freq_map = {"daily": t("freq_daily"), "weekly": t("freq_weekly", day=s.get('day_of_week','')[:3].capitalize()),
                             "monthly": t("freq_monthly", day=s.get('day_of_month', 1))}
@@ -105,7 +105,10 @@ def manage_report_schedules_menu(cm: ConfigManager) -> None:
                 print(f"{Colors.GREEN}{msg}{Colors.ENDC}")
                 input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")
             elif action == "D":
-                confirm = safe_input(t("confirm_delete_sched", name=sched.get('name', '')), str).strip().lower()
+                confirm = safe_input(t("confirm_delete_sched", name=sched.get('name', '')), str)
+                if confirm is None:
+                    continue
+                confirm = confirm.strip().lower()
                 if confirm in ("", "y", "yes"):
                     cm.remove_report_schedule(sched["id"])
                     print(f"{Colors.GREEN}{t('sched_deleted')}{Colors.ENDC}")
@@ -133,18 +136,20 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
 
     def _ask(prompt, default="", cast=str):
         hint = f" (default: {default})" if default != "" else ""
-        val = safe_input(f"{prompt}{hint}", str, allow_cancel=True)
-        if val is None:
-            return None
-        val = val.strip()
-        if val == "" and default != "":
-            val = str(default)
-        if val == "":
-            return None
-        try:
-            return cast(val)
-        except (ValueError, TypeError):
-            return default
+        while True:
+            val = safe_input(f"{prompt}{hint}", str, allow_cancel=True)
+            if val is None:
+                return None
+            val = val.strip()
+            if val == "" and default != "":
+                val = str(default)
+            if val == "":
+                return None
+            try:
+                return cast(val)
+            except (ValueError, TypeError):
+                print(f"{Colors.FAIL}{t('cli_invalid_number', value=val)}{Colors.ENDC}")
+                continue
 
     # Step 1: Name
     _wizard_step(1, 7, t("sched_name"))
@@ -213,6 +218,10 @@ def _add_report_schedule_wizard(cm: ConfigManager, edit_sched: dict = None) -> N
     if lookback_val is None:
         return
     lookback_days = int(lookback_val)
+    if not (1 <= lookback_days <= 3650):
+        print(f"{Colors.FAIL}{t('cli_lookback_out_of_range')}{Colors.ENDC}")
+        input(f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} ")
+        return
 
     # Step 6: Output format
     _wizard_step(6, 7, t("sched_format"))

@@ -17,6 +17,7 @@ from typing import Any
 import click
 
 from src.cli._global_flags import get_global_flags
+from src.i18n import t
 
 
 def echo_info(ctx: click.Context, message: str) -> None:
@@ -37,12 +38,12 @@ def echo_verbose(ctx: click.Context, message: str) -> None:
 
 def echo_warning(ctx: click.Context, message: str) -> None:
     """Print warning to stderr. Always shown (even in --quiet)."""
-    click.echo(f"warning: {message}", err=True)
+    click.echo(f"{t('cli_warning_prefix', default='warning: ')}{message}", err=True)
 
 
 def echo_error(ctx: click.Context, message: str) -> None:
     """Print error to stderr. Always shown."""
-    click.echo(f"error: {message}", err=True)
+    click.echo(f"{t('cli_error_prefix', default='error: ')}{message}", err=True)
 
 
 def echo_json(ctx: click.Context, data: Any, *, indent: int | None = None) -> None:

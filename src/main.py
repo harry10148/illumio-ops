@@ -264,8 +264,8 @@ def main_menu():
                 _last_activity_val = t("gui_no_log_activity", default="(no log activity)")
 
         lines = [
-            f"API: {cm.config['api']['url']} | Rules: {len(cm.config['rules'])}",
-            f"Language: {current_lang} | Theme: {current_theme} | {_last_activity_label}: {_last_activity_val}",
+            f"{t('cli_status_api', default='API')}: {cm.config['api']['url']} | {t('cli_status_rules', default='Rules')}: {len(cm.config['rules'])}",
+            f"{t('cli_status_language', default='Language')}: {current_lang} | {t('cli_status_theme', default='Theme')}: {current_theme} | {_last_activity_label}: {_last_activity_val}",
             f"{Colors.DARK_GRAY}{shortcuts_line}{Colors.ENDC}",
             "-",
             t("main_menu_root_1"),
@@ -299,15 +299,18 @@ def main_menu():
             if not HAS_FLASK:
                 print(f"{Colors.FAIL}{t('flask_not_available')}{Colors.ENDC}")
                 if FLASK_IMPORT_ERROR:
-                    print(f"Import error: {FLASK_IMPORT_ERROR}")
+                    print(f"{t('cli_import_error', default='Import error')}: {FLASK_IMPORT_ERROR}")
                 print(t("flask_install_hint"))
                 input(
                     f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} {Colors.GREEN}❯{Colors.ENDC} "
                 )
             else:
                 port_str = safe_input(t("gui_port_prompt"), str)
+                if port_str is None:
+                    # Cancel/back/EOF: return to the menu instead of launching.
+                    continue
                 try:
-                    port = int(port_str) if port_str and port_str.strip() else 5001
+                    port = int(port_str) if port_str.strip() else 5001
                 except (ValueError, TypeError):
                     port = 5001
                 launch_gui(cm, port=port)
@@ -581,6 +584,21 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # The run-mode flags are mutually exclusive; the dispatch chain below would
+    # otherwise silently honour only the highest-priority one. Fail loudly.
+    _mode_flags = [
+        ("--monitor", args.monitor),
+        ("--monitor-gui", args.monitor_gui),
+        ("--gui", args.gui),
+        ("--report", args.report),
+    ]
+    _active_modes = [name for name, on in _mode_flags if on]
+    if len(_active_modes) > 1:
+        parser.error(
+            "conflicting run-mode flags: " + ", ".join(_active_modes)
+            + " (choose only one)"
+        )
 
     # Setup logging early for all modes
     PKG_DIR = os.path.dirname(os.path.abspath(__file__))

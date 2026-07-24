@@ -182,12 +182,17 @@ def safe_input(
     allow_cancel=True,
     hint=None,
     help_text=None,
+    hidden=False,
 ):
     """Prompt for input with type + range validation.
 
     Backend uses questionary on interactive TTY for nicer prompts and
     ctrl-c handling. Non-TTY path (piped input, tests, CI) falls back
     to input() so unit tests with patch('builtins.input') continue to work.
+
+    Pass hidden=True for secret entry (passwords, API secrets, tokens): the
+    typed characters are not echoed to the terminal (questionary.password /
+    getpass on the fallback path).
 
     Return semantics:
       - str: returns stripped string, or "" if empty (go-back from str context)
@@ -244,10 +249,12 @@ def safe_input(
         try:
             if use_questionary:
                 try:
-                    answer = _q.text(
+                    _def_text = t("def_val_prefix", default="Default")
+                    _prompt_fn = _q.password if hidden else _q.text
+                    answer = _prompt_fn(
                         prompt + range_hint,
                         style=_QUESTIONARY_STYLE,
-                        **({} if hint is None else {"instruction": f"(Default: {hint})"}),
+                        **({} if hint is None else {"instruction": f"({_def_text}: {hint})"}),
                     ).unsafe_ask()
                     if answer is None:
                         _set_last_input_action("back")
@@ -256,6 +263,9 @@ def safe_input(
                 except KeyboardInterrupt:
                     _set_last_input_action("back")
                     return None
+            elif hidden:
+                import getpass
+                raw = getpass.getpass(_console_safe_text(full_prompt)).strip()
             else:
                 try:
                     raw = input(full_prompt).strip()
@@ -300,7 +310,7 @@ def safe_input(
             return None
         except ValueError:
             _set_last_input_action("invalid")
-            expected = "number" if value_type in (int, float) else str(value_type.__name__)
+            expected = t("cli_type_number", default="number") if value_type in (int, float) else str(value_type.__name__)
             message = t("error_format", default="Invalid format.")
             print(_console_safe_text(f"{Colors.FAIL}'{raw}' - {message} ({expected}){Colors.ENDC}"))
 

@@ -7,7 +7,7 @@ import os
 import click
 from rich.console import Console
 
-from src.cli._output import is_json, is_quiet, echo_error, echo_json
+from src.cli._output import is_json, is_quiet, echo_error, echo_json, echo_warning
 from src.cli._exit_codes import EXIT_NOINPUT, EXIT_DATAERR, EXIT_CONFIG, EXIT_USAGE
 from src.i18n import t
 
@@ -94,7 +94,7 @@ def show(ctx: click.Context, section: str | None) -> None:
         return
     else:
         data = cm.config[section]
-    echo_json(ctx, data)
+    echo_json(ctx, _mask_secrets(data))
 
 
 # ---------------------------------------------------------------------------
@@ -113,6 +113,23 @@ _SECTION_MODELS = {
 }
 
 _SECRET_TOKENS = {"key", "secret", "password", "token"}
+
+
+def _mask_secrets(obj):
+    """Recursively redact secret-named fields so `config show` never prints
+    credentials in plaintext. Empty values are preserved so an unset secret
+    stays visible as such."""
+    if isinstance(obj, dict):
+        return {
+            k: ("[REDACTED]"
+                if (isinstance(v, str) and v
+                    and any(tok in k.lower() for tok in _SECRET_TOKENS))
+                else _mask_secrets(v))
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_mask_secrets(x) for x in obj]
+    return obj
 
 
 def _coerce_value(raw: str, current) -> object:
@@ -222,6 +239,11 @@ def login_cmd(ctx: click.Context, url, key, secret, org_id, no_interactive) -> N
     from pydantic import ValidationError
     from src.config import ConfigManager
     from src import config_models
+
+    if secret is not None and not is_json(ctx):
+        # --secret on the command line lands in `ps` output and shell history.
+        # Suppress in --json mode so machine-readable stdout stays clean.
+        echo_warning(ctx, t("cli_config_secret_cli_warning"))
 
     if no_interactive:
         missing = [f for f, v in [("--url", url), ("--key", key), ("--secret", secret)]

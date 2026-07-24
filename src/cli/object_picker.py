@@ -101,7 +101,11 @@ def _pick_non_tty(api, cats, result, lang):
             "cli_pick_manual_input", lang=lang, cat=cat, current=", ".join(current),
             default="{cat} (comma-separated, current: {current}): ",
         )
-        raw = input(prompt)
+        try:
+            raw = input(prompt)
+        except EOFError:
+            # Input stream ended (piped/non-TTY): stop prompting, keep what we have.
+            break
         if not raw.strip():
             continue
         values = _split_values(raw)
@@ -171,9 +175,15 @@ def _pick_tty(api, cats, result, title, lang, label_key_filter=None):
         else:
             try:
                 candidates = _load_candidates(api, cat, label_key_filter=label_key_filter)
-            except Exception:
+            except (ConnectionError, TimeoutError, OSError):
                 print(t("cli_pick_offline_hint", lang=lang, cat=cat,
                         default="PCE unreachable while loading '{cat}' candidates; falling back to manual input."))
+                _manual_text_entry(cat, key, result, lang)
+            except Exception as exc:
+                # Not a connectivity failure — surface the real error instead of
+                # mislabelling it "PCE unreachable", then still allow manual entry.
+                print(t("cli_pick_load_error", lang=lang, cat=cat, error=exc,
+                        default="Failed to load '{cat}' candidates: {error}. Falling back to manual input."))
                 _manual_text_entry(cat, key, result, lang)
             else:
                 if not candidates:

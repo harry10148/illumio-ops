@@ -54,10 +54,12 @@ def cli(ctx: click.Context) -> None:
     """
     if ctx.invoked_subcommand is None:
         from src.cli._output import echo_warning
+        from src.i18n import t
         echo_warning(
             ctx,
-            "Bare 'illumio-ops' invocation is deprecated; use 'illumio-ops shell' "
-            "to launch the interactive menu explicitly.",
+            t("cli_bare_invocation_deprecated",
+              default="Bare 'illumio-ops' invocation is deprecated; use 'illumio-ops shell' "
+                      "to launch the interactive menu explicitly."),
         )
         from src.main import main_menu
         main_menu()
