@@ -465,7 +465,15 @@ class PolicyUsageHtmlExporter:
         hit_df = mod02.get("hit_df")
         top_ports_df = mod02.get("top_ports_df")
         count = mod02.get("record_count", 0)
-        note = f'<p style="color:#718096;font-size:12px;">{count} rows</p>' if count else ""
+        shown = 0 if hit_df is None or getattr(hit_df, "empty", True) else len(hit_df)
+        if count and shown and count > shown:
+            # Full hit-rule count exceeds the display cap — disclose the truncation
+            # rather than printing "{count} rows" over a 500-row table.
+            _msg = t("rpt_table_truncated_note", lang=self._lang).replace(
+                "{shown}", str(shown)).replace("{total}", str(count))
+            note = f'<p class="note">{_msg}</p>'
+        else:
+            note = f'<p style="color:#718096;font-size:12px;">{count} rows</p>' if count else ""
         top_ports_html = ""
         if top_ports_df is not None and not getattr(top_ports_df, "empty", True):
             top_ports_html = (

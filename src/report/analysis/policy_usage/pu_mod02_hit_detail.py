@@ -39,7 +39,8 @@ def pu_hit_detail(
         )
 
     rows.sort(key=lambda r: (r.get("Ruleset", ""), r.get("No", 0)))
-    rows = rows[:_MAX_ROWS]
+    total_hit_rows = len(rows)  # full count BEFORE the display cap
+    display_rows = rows[:_MAX_ROWS]
 
     columns = [
         "Ruleset",
@@ -54,7 +55,7 @@ def pu_hit_detail(
         "Top Hit Ports",
         "Enabled",
     ]
-    hit_df = pd.DataFrame(rows, columns=columns) if rows else pd.DataFrame(columns=columns)
+    hit_df = pd.DataFrame(display_rows, columns=columns) if display_rows else pd.DataFrame(columns=columns)
 
     top_ports = execution_stats.get("top_hit_ports", []) or []
     top_port_rows = [
@@ -66,7 +67,8 @@ def pu_hit_detail(
     ]
     top_ports_df = pd.DataFrame(top_port_rows, columns=["Port / Proto", "Flow Count"])
 
-    # Chart: Top hit rules bar
+    # Chart: Top hit rules bar — built from the FULL rows, not the display-capped
+    # slice, so the true highest-hit rules appear even if they sort past row 500.
     chart_spec = None
     if rows:
         top_rows = sorted(rows, key=lambda r: r.get("Hit Count", 0), reverse=True)[:10]

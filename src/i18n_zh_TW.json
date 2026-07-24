@@ -3495,6 +3495,7 @@
   "rpt_pu_unused_caveat": "此處列出的 Rules 在所選回溯區間內沒有觀測到流量命中。這不代表可以直接安全移除，因為 PCE 流量 retention 區間、低頻 Workload 或例外 failover 路徑可能隱藏了實際使用紀錄。",
   "rpt_pu_unused_rules": "未使用 Rules",
   "rpt_pu_unused_truncated": "顯示前 50 筆（共 {count} 筆），完整清單見 CSV/XLSX 匯出。",
+  "rpt_table_truncated_note": "顯示前 {shown} 筆（共 {total} 筆），完整資料見 CSV/XLSX 匯出。",
   "rpt_querying_traffic": "正在查詢流量（{start} 至 {end}）...",
   "rpt_r_enforcement": "Enforcement",
   "rpt_r_policy": "Policy",

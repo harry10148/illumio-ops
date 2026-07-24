@@ -279,7 +279,10 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
         factor_scores['remote_app_coverage'],
     ]
 
-    total_pb_uncovered = int(app_env_scores["pb_uncovered_count"].sum())
+    # Estate-wide PB total must come from the deduped flow frame: summing the
+    # per-app column double-counts every cross-app flow (each such flow lands in
+    # both its src_key and dst_key group). Count each flow row exactly once.
+    total_pb_uncovered = int((work["policy_decision"] == "potentially_blocked").sum())
 
     result = {
         "total_score": total_score,

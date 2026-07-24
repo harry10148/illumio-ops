@@ -39,6 +39,24 @@ def _gen(monkeypatch, df, workloads):
     return gen
 
 
+def test_estate_pb_uncovered_not_double_counted():
+    """Estate PB total must count each cross-app flow ONCE, not once per endpoint
+    group. A single appA->appB PB flow lands in both appA's and appB's per-app
+    group; summing the per-app column would report 2 for a 1-flow estate."""
+    from src.report.analysis.mod13_readiness import enforcement_readiness
+    df = pd.DataFrame([
+        {"src_app": "appA", "src_env": "prod", "dst_app": "appB", "dst_env": "prod",
+         "policy_decision": "potentially_blocked", "port": 443, "num_connections": 1,
+         "src_managed": True, "dst_managed": True},
+        {"src_app": "appA", "src_env": "prod", "dst_app": "appC", "dst_env": "prod",
+         "policy_decision": "potentially_blocked", "port": 443, "num_connections": 1,
+         "src_managed": True, "dst_managed": True},
+    ])
+    result = enforcement_readiness(df)
+    assert result["pb_uncovered_count"] == 2, (
+        f"expected 2 PB flows counted once each, got {result['pb_uncovered_count']}")
+
+
 def test_empty_flows_returns_zero_records(monkeypatch, tmp_path):
     gen = _gen(monkeypatch, pd.DataFrame(), None)
     result = gen.generate_from_api(output_dir=str(tmp_path))
