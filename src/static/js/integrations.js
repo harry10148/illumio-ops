@@ -286,25 +286,34 @@ async function cacheSave() {
     traffic_sampling: (typeof window.collectTrafficSampling === 'function')
       ? window.collectTrafficSampling() : existing.traffic_sampling,
   });
-  var resp = await fetch('/api/cache/settings', {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
-    body: JSON.stringify(payload),
-  });
-  var body = await resp.json();
   var banner = document.getElementById('cache-banner');
-  if (body.ok) {
-    showRestartBanner(banner);
-  } else {
-    banner.style.display = 'block';
-    banner.textContent = _t('gui_it_validation_error');
-    var ul = document.createElement('ul');
-    Object.entries(body.errors || {}).forEach(function(entry) {
-      var li = document.createElement('li');
-      li.textContent = entry[0] + ': ' + entry[1];
-      ul.appendChild(li);
+  var saveBtn = document.querySelector('[data-action="cacheSave"]');
+  if (saveBtn) saveBtn.disabled = true;
+  try {
+    var resp = await fetch('/api/cache/settings', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
+      body: JSON.stringify(payload),
     });
-    banner.appendChild(ul);
+    var body = resp.ok ? await resp.json() : { ok: false };
+    if (resp.ok && body.ok) {
+      showRestartBanner(banner);
+    } else {
+      banner.style.display = 'block';
+      banner.textContent = _t('gui_it_validation_error');
+      var ul = document.createElement('ul');
+      Object.entries(body.errors || {}).forEach(function(entry) {
+        var li = document.createElement('li');
+        li.textContent = entry[0] + ': ' + entry[1];
+        ul.appendChild(li);
+      });
+      banner.appendChild(ul);
+    }
+  } catch (e) {
+    banner.style.display = 'block';
+    banner.textContent = _t('gui_it_validation_error') + ': ' + e.message;
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
   }
 }
 
@@ -636,7 +645,7 @@ window._integrations.setRender('siem', async function renderSiem() {
     + '<div class="it-kpi-value">' + kpiSent.toLocaleString() + '</div></div>'
     + '<div class="it-kpi-cell"><div class="it-kpi-label" data-i18n="gui_ov_siem_success_1h">\u6210\u529f\u7387 (1h)</div>'
     + '<div class="it-kpi-value" style="color:' + kpiRate1hColor + ';">' + kpiRate1h + '</div></div>'
-    + '<div class="it-kpi-cell"><div class="it-kpi-label">DLQ \u7d2f\u7a4d</div>'
+    + '<div class="it-kpi-cell"><div class="it-kpi-label" data-i18n="gui_ov_dlq_total">DLQ \u7d2f\u7a4d</div>'
     + '<div class="it-kpi-value" style="color:' + kpiDlqColor + ';">' + kpiDlq + '</div></div>'
     + '<div class="it-kpi-cell"><div class="it-kpi-label" data-i18n="gui_ov_siem_latency">\u5e73\u5747\u5ef6\u9072</div>'
     + '<div class="it-kpi-value it-kpi-muted">' + kpiLatencyStr + '</div></div>'
@@ -745,17 +754,21 @@ async function siemSaveForwarder() {
     dispatch_tick_seconds: Number(document.getElementById('siem-tick').value),
     dlq_max_per_dest: Number(document.getElementById('siem-dlq-max').value),
   };
-  var resp = await fetch('/api/siem/forwarder', {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
-    body: JSON.stringify(payload),
-  });
-  var body = await resp.json();
   var banner = document.getElementById('siem-banner');
-  if (body.ok) {
-    showRestartBanner(banner);
-  } else {
-    banner.textContent = _t('gui_it_validation_error') + ' ' + JSON.stringify(body.errors || body.error || '');
+  try {
+    var resp = await fetch('/api/siem/forwarder', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json', 'X-CSRF-Token': _csrfToken()},
+      body: JSON.stringify(payload),
+    });
+    var body = resp.ok ? await resp.json() : { ok: false };
+    if (resp.ok && body.ok) {
+      showRestartBanner(banner);
+    } else {
+      banner.textContent = _t('gui_it_validation_error') + ' ' + JSON.stringify(body.errors || body.error || '');
+    }
+  } catch (e) {
+    banner.textContent = _t('gui_it_validation_error') + ': ' + e.message;
   }
 }
 
@@ -1689,7 +1702,7 @@ function _buildAlertChannelCards(settings) {
     + '<div class="integ-card-h">'
     + '<div class="integ-card-logo">L</div>'
     + '<div><div class="integ-card-name" data-i18n="gui_ov_ch_line_push">LINE Push</div>'
-    + '<div class="integ-card-sub">Channel access token</div></div>'
+    + '<div class="integ-card-sub" data-i18n="gui_it_sub_channel_token">Channel access token</div></div>'
     + chip(lineStatus, lineStatusLabel)
     + '</div>';
   if (lineConfigured && lineTarget) {
@@ -1703,7 +1716,7 @@ function _buildAlertChannelCards(settings) {
     + '<div class="integ-card-h">'
     + '<div class="integ-card-logo">T</div>'
     + '<div><div class="integ-card-name">Telegram</div>'
-    + '<div class="integ-card-sub">Bot token · HTML parse_mode</div></div>'
+    + '<div class="integ-card-sub" data-i18n="gui_it_sub_bot_token">Bot token · HTML parse_mode</div></div>'
     + chip(tgStatus, tgStatusLabel)
     + '</div>';
   if (tgChatId) {
@@ -1716,7 +1729,7 @@ function _buildAlertChannelCards(settings) {
     + '<div class="integ-card-h">'
     + '<div class="integ-card-logo">W</div>'
     + '<div><div class="integ-card-name">Webhook</div>'
-    + '<div class="integ-card-sub">POST JSON · https only</div></div>'
+    + '<div class="integ-card-sub" data-i18n="gui_it_sub_webhook">POST JSON · https only</div></div>'
     + chip(whStatus, whStatusLabel)
     + '</div>';
   cards += '</div>';
