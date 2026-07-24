@@ -56,6 +56,7 @@ def make_actions_blueprint(
     @bp.route('/api/quarantine/search', methods=['POST'])
     def api_quarantine_search():
         d = request.json or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         try:
             from src.api_client import ApiClient
             from src.analyzer import Analyzer
@@ -80,11 +81,18 @@ def make_actions_blueprint(
                     # 只讀 review DB，不 fallback 打即時 PCE API。review 空則直接回空。
                     earliest = cache_reader.earliest_data_timestamp("traffic") if cache_reader else None
                     if earliest is None:
-                        return jsonify({"ok": True, "data": []})
+                        # not_loaded 旗標讓前端區分「未載入 review DB」與「查無流量」
+                        return jsonify({"ok": True, "data": [], "not_loaded": True})
                     start_time = earliest.strftime("%Y-%m-%dT%H:%M:%SZ")
                     end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
                 else:
-                    mins = int(d.get("mins", 30))
+                    try:
+                        mins = int(d.get("mins", 30))
+                    except (TypeError, ValueError):
+                        return _err(t("gui_err_invalid_number", lang=lang), 400)
+                    # 同 debug/events 端點基線夾限：避免超大/負數 mins 觸發
+                    # 超大 PCE 查詢或時間窗反轉（2026-07-24 審查 F1）
+                    mins = max(5, min(mins, 10080))
                     start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
                     end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -178,7 +186,6 @@ def make_actions_blueprint(
                     "cap": int(stats.get("cap", QUERY_RESULT_CAP)),
                 })
         except TrafficQueryError as e:
-            lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
             return jsonify({"ok": False, "error": t(
                 "gui_err_traffic_query_failed", detail=str(e), lang=lang)}), 502
         except Exception as e:

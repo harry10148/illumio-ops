@@ -444,3 +444,91 @@ class TestStrictWindow(unittest.TestCase):
         win = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=10)
         self.assertFalse(az.check_flow_match(rule, flow, win, strict_window=True))
         self.assertTrue(az.check_flow_match(rule, flow, win))
+
+
+def _spec(report_only=None, requires_draft=False):
+    return MagicMock(
+        report_only_filters=report_only or {},
+        requires_draft_pd=requires_draft,
+        native_filters={}, fallback_filters={},
+    )
+
+
+class TestQueryFlowsCacheBypass(unittest.TestCase):
+    """2026-07-24 流量調閱審查 H1/M4：cache 無法評估的 filter（draft PD、
+    actor groups/ams）必須強制走 API，否則 cache 全覆蓋時靜默回未過濾/空。"""
+
+    def _analyzer_full_cache(self, api_flow):
+        az = _make_analyzer()
+        cr = _make_cache_reader_for_flows(cover_state="full")
+        cr.read_flows_raw.return_value = [{"policy_decision": "allowed",
+                                           "src": {}, "dst": {}, "service": {}}]
+        az._cache_reader = cr
+        az.api.last_fetch_error = None
+        az.api.execute_traffic_query_stream.return_value = iter([api_flow])
+        return az, cr
+
+    def test_draft_filter_bypasses_cache(self):
+        api_flow = {"policy_decision": "allowed", "draft_policy_decision": "deny",
+                    "src": {}, "dst": {}, "service": {}}
+        az, cr = self._analyzer_full_cache(api_flow)
+        az.api.build_traffic_query_spec = MagicMock(
+            return_value=_spec(report_only={"draft_policy_decision": "deny"}))
+        az.query_flows({"start_time": _START, "end_time": _END,
+                        "draft_policy_decision": "deny"})
+        self.assertEqual(az.last_query_source, "api")
+        az.api.execute_traffic_query_stream.assert_called()
+
+    def test_ams_filter_bypasses_cache(self):
+        api_flow = {"policy_decision": "allowed", "src": {}, "dst": {}, "service": {}}
+        az, cr = self._analyzer_full_cache(api_flow)
+        az.api.build_traffic_query_spec = MagicMock(return_value=_spec())
+        az.query_flows({"start_time": _START, "end_time": _END,
+                        "src_ams": ["/orgs/1/labels/ams"]})
+        self.assertEqual(az.last_query_source, "api")
+
+
+class TestHybridGapFailure(unittest.TestCase):
+    """H2：hybrid gap API 靜默失敗（yield 0 + last_fetch_error）不得標成
+    cache 成功吞掉歷史段遺失——退 full API 讓契約檢查生效。"""
+
+    def test_gap_silent_failure_falls_back_to_api(self):
+        az = _make_analyzer()
+        az._cache_reader = _make_cache_reader_for_flows(
+            cover_state="partial", cache_start=_CACHE_START)
+        call = {"n": 0}
+
+        def _side(*a, **kw):
+            call["n"] += 1
+            if call["n"] == 1:
+                az.api.last_fetch_error = "submit failed: 406"
+                return iter([])
+            return iter([{"policy_decision": "blocked"}])
+
+        az.api.last_fetch_error = None
+        az.api.execute_traffic_query_stream.side_effect = _side
+        _flows, source = az._fetch_query_flows(
+            _START, _END, ["allowed"], _spec(), False)
+        self.assertEqual(source, "api")
+        self.assertEqual(az.api.execute_traffic_query_stream.call_count, 2)
+
+
+class TestHybridDedup(unittest.TestCase):
+    """M3：gap 與 cache 跨界 flow 各算一次——按 flow 身分去重。"""
+
+    def test_boundary_flow_deduped(self):
+        shared = {"policy_decision": "allowed",
+                  "src": {"ip": "10.0.0.1"}, "dst": {"ip": "10.0.0.2"},
+                  "service": {"port": 443, "proto": 6},
+                  "first_detected": "2026-01-02T00:00:00Z",
+                  "last_detected": "2026-01-05T00:00:00Z"}
+        az = _make_analyzer()
+        cr = _make_cache_reader_for_flows(
+            cover_state="partial", cache_start=_CACHE_START)
+        cr.read_flows_raw.return_value = [dict(shared)]
+        az._cache_reader = cr
+        az.api.last_fetch_error = None
+        az.api.execute_traffic_query_stream.return_value = iter([dict(shared)])
+        flows, _source = az._fetch_query_flows(
+            _START, _END, ["allowed"], _spec(), False)
+        self.assertEqual(len(flows), 1)

@@ -263,3 +263,19 @@ def test_ex_ports_scalar_string_excludes():
     out = apply_df_traffic_filters(_ports_df(), {"ex_ports": "443/tcp"})
     assert 443 not in out["port"].tolist()
     assert sorted(out["port"].tolist()) == [80, 1500]
+
+
+def test_illegal_exclude_cidr_does_not_empty_table():
+    """L6（2026-07-24 審查）：排除欄帶非法 CIDR/range 不得清空整表——
+    fail-open 在 exclude 側（mask &= ~Series(True)）會反轉成清空所有列。"""
+    out = apply_df_traffic_filters(_df(), {"ex_src_ip": "10.0.0.0/99"})
+    assert len(out) == 3  # 非法排除不排任何列（不是清空）
+    out2 = apply_df_traffic_filters(_df(), {"ex_src_ip": "not-an-ip-range-x"})
+    assert len(out2) == 3
+
+
+def test_valid_exclude_cidr_still_excludes():
+    out = apply_df_traffic_filters(_df(), {"ex_src_ip": "10.0.0.0/24"})
+    # 10.0.0.1 被排除，剩 10.0.1.5 與 192.168.1.1
+    assert len(out) == 2
+    assert "10.0.0.1" not in set(out["src_ip"])

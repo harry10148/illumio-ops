@@ -160,10 +160,15 @@ def test_picker_keys_accepted_by_rules_store():
     assert not lost, f"picker 產出 key 不被規則存檔接受：{sorted(lost)}"
 
 
-def test_cache_unevaluable_keys_match_rules_rejected_keys():
-    """[8] label_group 家族兩處聯動：cache-bypass 集合（analyzer）與規則
-    拒收集合（rules）必須相等——只改一邊代表另一邊靜默漏。"""
+def test_rules_rejected_keys_are_cache_unevaluable():
+    """[8] 規則拒收集合（label_group 家族）必須全部落在 cache-bypass 集合內
+    ——規則拒收的 key 都是 client 端無法評估的（成員展開只在 PCE 端），
+    改一邊漏另一邊即靜默 bug。
+
+    註：反向不成立——cache-bypass 是超集，另含 actor groups/ams 這類
+    native-only 且非規則 filter 選項的 key（2026-07-24 審查 M4 加入）。"""
     from src.analyzer import _CACHE_UNEVALUABLE_FILTER_KEYS
     from src.gui.routes.rules import _RULE_REJECTED_KEYS
-    diff = set(_CACHE_UNEVALUABLE_FILTER_KEYS) ^ set(_RULE_REJECTED_KEYS)
-    assert not diff, f"cache-bypass 與規則拒收集合不同步：{sorted(diff)}"
+    unevaluable = set(_CACHE_UNEVALUABLE_FILTER_KEYS)
+    leaked = set(_RULE_REJECTED_KEYS) - unevaluable
+    assert not leaked, f"規則拒收但 cache 未 bypass（會靜默回未過濾）：{sorted(leaked)}"

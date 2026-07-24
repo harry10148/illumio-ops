@@ -11,6 +11,26 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Traffic-query review remediation (2026-07-24): the traffic analyzer
+  no longer returns silently empty or under-counted results when a draft
+  policy-decision filter is set on a cache-covered window (cache flows
+  carry no draft PD, so the client-side filter dropped every row — the
+  query now bypasses the cache to the API). A silently-failed hybrid gap
+  fetch (0 rows plus last_fetch_error) is no longer mislabelled as a
+  successful cache read; it falls back to the full API so the failure
+  surfaces. Hybrid gap+cache results are deduped by flow identity to
+  avoid double-counting a flow straddling the cache boundary; cache
+  bypass now also covers native-only actor-group/ams filter keys. The
+  residual scalar port/proto include filter fails closed on an
+  unparseable value. The live query window (`mins`) is clamped to
+  5..10080 minutes with a typed 400 on non-numeric input; archive
+  queries against an unloaded review DB return a not_loaded flag so the
+  UI shows "import a review DB first" instead of "no traffic". A
+  malformed exclude CIDR/range no longer empties the cache-served report
+  table, and the workload checkbox href is escaped.
+
+### Fixed
+
 - Alert-chain review remediation (2026-07-24 audit): cache-deployment
   traffic/volume rules now evaluate the full threshold window instead of
   the per-poll increment (a 30s-cycle deployment effectively watched a

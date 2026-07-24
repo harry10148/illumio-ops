@@ -91,16 +91,23 @@ def _label_mask(df: pd.DataFrame, side: str, specs: list[str]) -> pd.Series:
     return m
 
 
-def _ip_mask(df: pd.DataFrame, col: str, value: str) -> pd.Series:
+def _ip_mask(df: pd.DataFrame, col: str, value: str, *, for_exclude: bool = False) -> pd.Series:
     """Exact IP match, CIDR containment when value has a '/', or IP range
     containment ('a.b.c.d-a.b.c.d', from>to auto-swapped) when value has a '-'.
-    Illegal CIDR/range values match everything (existing fail-open convention
-    for this cache-display path)."""
+
+    Illegal CIDR/range values fail open on the INCLUDE side (match everything —
+    existing cache-display convention). On the EXCLUDE side (for_exclude=True)
+    they must match NOTHING instead: the caller does `mask &= ~_ip_mask(...)`,
+    so a fail-open Series(True) inverts to Series(False) and silently empties
+    the whole table (2026-07-24 review L6). Returning the empty match keeps an
+    illegal exclude from removing any rows.
+    """
+    illegal = pd.Series(for_exclude is False, index=df.index)
     if "/" in value:
         try:
             net = ipaddress.ip_network(value, strict=False)
         except ValueError:
-            return pd.Series(True, index=df.index)
+            return illegal
 
         def _in(ip):
             try:
@@ -115,7 +122,7 @@ def _ip_mask(df: pd.DataFrame, col: str, value: str) -> pd.Series:
             frm = ipaddress.IPv4Address(left.strip())
             to = ipaddress.IPv4Address(right.strip())
         except ValueError:
-            return pd.Series(True, index=df.index)
+            return illegal
         if frm > to:
             frm, to = to, frm
 
@@ -179,7 +186,7 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
             # ex_src_ip/ex_dst_ip：FilterBar 送 list、舊前端送 scalar，皆需支援；
             # 語意同 ex_{side}_ip_in（逐值 AND-exclude）
             for exv in _list_or_scalar(filters, f"ex_{key}"):
-                mask &= ~_ip_mask(df, col, exv)
+                mask &= ~_ip_mask(df, col, exv, for_exclude=True)
 
     def _cidrs_mask(col: str, values: list) -> pd.Series:
         gm = pd.Series(False, index=df.index)
@@ -274,7 +281,7 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
         exi = [s for s in (filters.get(f"ex_{side}_ip_in") or []) if s]
         if exi and f"{side}_ip" in df.columns:
             for v in exi:
-                mask &= ~_ip_mask(df, f"{side}_ip", v)
+                mask &= ~_ip_mask(df, f"{side}_ip", v, for_exclude=True)
 
     # any_label / ex_any_label（either-side label：src 或 dst 命中）。用既有 _label_mask 單值。
     any_lbl = _scalar(filters, "any_label")
@@ -291,7 +298,7 @@ def apply_df_traffic_filters(df: pd.DataFrame, filters: dict | None) -> pd.DataF
         mask &= (_ip_mask(df, "src_ip", any_ip) | _ip_mask(df, "dst_ip", any_ip))
     ex_any_ip = _scalar(filters, "ex_any_ip")
     if ex_any_ip and "src_ip" in df.columns and "dst_ip" in df.columns:
-        mask &= ~(_ip_mask(df, "src_ip", ex_any_ip) | _ip_mask(df, "dst_ip", ex_any_ip))
+        mask &= ~(_ip_mask(df, "src_ip", ex_any_ip, for_exclude=True) | _ip_mask(df, "dst_ip", ex_any_ip, for_exclude=True))
 
     proto = _scalar(filters, "proto")
     if proto and "proto" in df.columns:

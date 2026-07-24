@@ -1741,6 +1741,7 @@
   "gui_no_rules_add_one": "No rules yet — add one",
   "gui_no_rules_title": "No rules",
   "gui_no_snapshot": "No dashboard snapshot available.",
+  "gui_archive_not_loaded": "No archive data loaded yet - import a review DB from the data source selector first.",
   "gui_no_traffic": "No traffic data",
   "gui_no_traffic_data": "No traffic data returned from API.",
   "gui_no_ven_data": "No VEN or managed workload data returned from API.",
