@@ -1379,8 +1379,10 @@ async function testConn() {
 }
 
 async function loadDashboardQueries() {
-  const rt = await window.fetch('/api/dashboard/queries');
-  _dashboardQueries = await rt.json() || [];
+  // Route through the api() wrapper: safe JSON parse + 423 must-change-password
+  // bounce, and never throw on a non-JSON error page.
+  const data = await api('/api/dashboard/queries');
+  _dashboardQueries = Array.isArray(data) ? data : [];
   renderDashboardQueries();
   // Load cached results (no auto-query)
   for (let i = 0; i < _dashboardQueries.length; i++) _restoreCachedTop10(i);
@@ -1785,6 +1787,15 @@ document.addEventListener('click', function (e) {
   if (tab && window.switchTab) window.switchTab(tab);
   if (qtab && window.switchQTab) window.switchQTab(qtab);
 });
+// Keyboard activation for the interactive (data-tab) overview tiles, which are
+// exposed as role=button tabindex=0 in the template.
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var tile = e.target.closest && e.target.closest('.ov-tile[data-tab]');
+  if (!tile) return;
+  e.preventDefault();
+  tile.click();
+});
 
 // FilterBar 實例（Phase 4b）：延遲初始化，理由同 _ensureRptFilterBar；
 // 存於此變數供 openQueryModal、saveDashboardQuery 取用。
@@ -1992,7 +2003,7 @@ function _renderTop10Body(idx, data, total, ts, source) {
       <tr>
         <td>${i + 1}</td>
         <td style="font-weight:bold;color:#6f42c1;">${m.val_fmt}</td>
-        <td style="font-size:10px;white-space:nowrap;">${formatDateZ(m.first_seen)}<br>${formatDateZ(m.last_seen)}</td>
+        <td style="font-size:10px;white-space:nowrap;">${escapeHtml(formatDateZ(m.first_seen))}<br>${escapeHtml(formatDateZ(m.last_seen))}</td>
         <td>${formatActor(m.s_name, m.s_ip, m.s_href, sLabels, m.s_process, m.s_user)}</td>
         <td>${formatActor(m.d_name, m.d_ip, m.d_href, dLabels, m.d_process, m.d_user)}</td>
         <td>${svc_str}</td>

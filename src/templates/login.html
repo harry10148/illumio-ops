@@ -234,12 +234,12 @@
       <div>
         <label for="username">{{ t('login_username') }}</label>
         <input class="input" type="text" id="username" name="username" required autocomplete="username" placeholder="{{ t('login_username_placeholder') }}">
-        <div class="err" id="err-username"></div>
+        <div class="err" role="alert" aria-live="assertive" id="err-username"></div>
       </div>
       <div>
         <label for="password">{{ t('login_password') }}</label>
         <input class="input" type="password" id="password" name="password" required autocomplete="current-password" placeholder="{{ t('login_password_placeholder') }}">
-        <div class="err" id="err-password"></div>
+        <div class="err" role="alert" aria-live="assertive" id="err-password"></div>
       </div>
       <button type="submit" class="submit" id="login-btn">{{ t('login_btn') }}</button>
     </form>
@@ -249,12 +249,12 @@
       <div>
         <label for="new-password">{{ t('login_new_password') }}</label>
         <input class="input" type="password" id="new-password" name="new-password" required autocomplete="new-password" minlength="12">
-        <div class="err" id="err-new-password"></div>
+        <div class="err" role="alert" aria-live="assertive" id="err-new-password"></div>
       </div>
       <div>
         <label for="confirm-password">{{ t('login_confirm_password') }}</label>
         <input class="input" type="password" id="confirm-password" name="confirm-password" required autocomplete="new-password" minlength="12">
-        <div class="err" id="err-confirm-password"></div>
+        <div class="err" role="alert" aria-live="assertive" id="err-confirm-password"></div>
       </div>
       <button type="submit" class="submit" id="change-pw-btn">{{ t('login_change_pw_btn') }}</button>
     </form>

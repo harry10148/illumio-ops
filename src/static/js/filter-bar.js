@@ -447,7 +447,7 @@ function _objfbBuildZone(state, col, neg) {
   input.autocomplete = 'off';
   input.setAttribute('data-i18n-placeholder', col === 'svc' ? 'gui_fb_svc_placeholder' : 'gui_fb_placeholder');
   input.placeholder = 'Search…';
-  input.setAttribute('aria-label', 'Filter search');
+  input.setAttribute('aria-label', (window._INIT_TRANSLATIONS && window._INIT_TRANSLATIONS['gui_fb_search']) || 'Filter search');
   input.setAttribute('data-on-input', '_objfbInput');
   input.dataset.args = JSON.stringify([state.id, col, neg]);
   input.setAttribute('data-on-keydown', '_objfbKeydown');
@@ -493,6 +493,14 @@ function _objfbBuildPill(state, p, idx) {
   el.dataset.args = JSON.stringify([state.id, idx]);
   el.setAttribute('data-pass-event', '1');
   el.dataset.pillIdx = String(idx);
+  // Keyboard access: the pill body opens an edit popover on click — expose it as
+  // a focusable button and open on Enter/Space too.
+  el.setAttribute('role', 'button');
+  el.setAttribute('tabindex', '0');
+  el.setAttribute('aria-label', (p.neg ? '! ' : '') + _objfbPillLabel(p));
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+  });
 
   const dot = document.createElement('i');
   const meta = _OBJFB_CATS[p.cat];
@@ -507,7 +515,7 @@ function _objfbBuildPill(state, p, idx) {
   const x = document.createElement('button');
   x.type = 'button';
   x.className = 'objfb-pill-x';
-  x.setAttribute('aria-label', 'remove');
+  x.setAttribute('aria-label', (window._INIT_TRANSLATIONS && window._INIT_TRANSLATIONS['gui_fb_remove']) || 'remove');
   x.setAttribute('data-i18n-title', 'gui_fb_remove');
   x.textContent = '×';
   x.setAttribute('data-on-click', '_objfbRemovePill');

@@ -4439,6 +4439,7 @@
   "gui_fb_include": "Include",
   "gui_fb_exclude": "Exclude",
   "gui_fb_remove": "Remove",
+  "gui_fb_search": "Filter search",
   "gui_fb_or": "or",
   "gui_fb_any_label_group_unsupported": "Label groups are not supported for the S/D (any) direction. Add separate source and destination Label Group conditions instead.",
   "gui_fb_any_slow": "includes either-side condition — query is slower",

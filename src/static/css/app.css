@@ -474,7 +474,7 @@
     }
 
     .ui-pref select {
-      background: transparent;
+      background-color: transparent;
       color: var(--fg);
       border: none;
       font-size: var(--text-xs);
@@ -711,12 +711,6 @@
       transform: translateY(-1px);
     }
 
-    .btn:disabled {
-      opacity: .72;
-      cursor: wait;
-      transform: none;
-      box-shadow: none;
-    }
 
     .btn-loading-dot {
       width: 10px;
@@ -780,7 +774,7 @@
     .form-group input,
     .form-group select {
       width: 100%;
-      background: var(--bg2);
+      background-color: var(--bg2);
       border: 1px solid var(--border);
       color: var(--fg);
       padding: 12px 14px;
@@ -1413,6 +1407,9 @@
       z-index: 40;
     }
     .s-save-bar[hidden] { display: none; }
+    /* Reserve bottom space while the fixed save-bar is shown, so it doesn't
+       overlay the last settings control. */
+    #p-settings:has(#s-save-bar:not([hidden])) { padding-bottom: 76px; }
     .s-save-status {
       font-size: 12px;
       color: var(--warn, #d97706);
@@ -1534,7 +1531,7 @@
 
     /* Dropdown */
     .severity-select {
-      background: var(--bg);
+      background-color: var(--bg);
       border: 1px solid var(--border);
       color: var(--fg);
       padding: var(--space-3);

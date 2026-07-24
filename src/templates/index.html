@@ -724,7 +724,7 @@
         <div class="ov-tile-h"><span data-i18n="gui_ov_risk_feed_title">Top Risk Findings</span></div>
         <div id="ov-risk-feed-body" class="ov-risk-feed"></div>
       </div>
-      <a class="ov-tile" id="ov-alerts" data-tab="events">
+      <a class="ov-tile" id="ov-alerts" data-tab="events" role="button" tabindex="0">
         <div class="ov-tile-h"><span data-i18n="gui_ov_alerts_title">Alerts</span><i class="ov-mark" id="ov-alerts-mark"></i></div>
         <div class="ov-tile-body" id="ov-alerts-body"></div></a>
     </div>
@@ -732,10 +732,10 @@
     <!-- ── Section 2: Operations & Estate ── -->
     <div class="ov-eyebrow" data-i18n="gui_ov_eyebrow_ops">Operations &amp; Estate</div>
     <div class="ov-grid-4">
-      <a class="ov-tile" id="ov-ven" data-tab="traffic-workload" data-qtab="workloads">
+      <a class="ov-tile" id="ov-ven" data-tab="traffic-workload" data-qtab="workloads" role="button" tabindex="0">
         <div class="ov-tile-h"><span data-i18n="gui_ov_ven_title">VEN Health</span><i class="ov-mark" id="ov-ven-mark"></i></div>
         <div class="ov-tile-body" id="ov-ven-body"></div></a>
-      <a class="ov-tile" id="ov-pipeline" data-tab="integrations">
+      <a class="ov-tile" id="ov-pipeline" data-tab="integrations" role="button" tabindex="0">
         <div class="ov-tile-h"><span data-i18n="gui_ov_pipeline_title">Pipeline</span><i class="ov-mark" id="ov-pipeline-mark"></i></div>
         <div class="ov-tile-body" id="ov-pipeline-body"></div></a>
       <div class="ov-tile" id="ov-os-dist">
@@ -2295,7 +2295,7 @@
         <select id="ml-module-select" class="form-control" style="width:auto;min-width:150px;" data-on-change="mlLoadLogs"></select>
         <button class="btn btn-sm" data-action="mlLoadLogs" data-i18n="gui_rs_refresh">Ruleset Refresh</button>
         <span style="flex:1"></span>
-        <button class="btn btn-sm" data-action="mlClose" style="padding:2px 10px;">??/button>
+        <button class="btn btn-sm" data-action="mlClose" style="padding:2px 10px;" aria-label="Close" data-i18n-title="gui_close">&times;</button>
       </div>
       <div id="ml-log-output" class="log-box" style="flex:1;overflow:auto;padding:14px 16px;font-family:'Courier New',Consolas,monospace;font-size:.8rem;white-space:pre-wrap;min-height:320px;" data-i18n="gui_rs_log_ready">Ready.</div>
     </div>

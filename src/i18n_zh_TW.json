@@ -4340,6 +4340,7 @@
   "gui_fb_include": "包含",
   "gui_fb_exclude": "排除",
   "gui_fb_remove": "移除",
+  "gui_fb_search": "篩選搜尋",
   "gui_fb_or": "或",
   "gui_fb_any_slow": "含任一側條件——查詢較慢",
   "gui_fb_offline": "PCE 無法連線——物件搜尋暫不可用（手動輸入仍可用）",
