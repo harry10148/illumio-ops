@@ -245,3 +245,36 @@ def test_schedules_list_enriches_last_state(client, monkeypatch, tmp_path):
     assert entry["last_action"] == "enable"
     assert entry["last_result"] == "error"
     assert entry["last_error"] == "HTTP 500"
+
+
+def test_one_time_expiry_disable_failure_keeps_schedule(tmp_path):
+    """BUG-1（2026-07-24 審查）：one_time 到期但 PCE disable 失敗
+    （toggle_and_provision 回 False，如 ruleset 有 pending draft）→ 排程**不**得
+    被刪除，否則規則留在 PCE enabled、scheduler 忘記它、永不重試。"""
+    db_path = tmp_path / "rule_schedules.json"
+    href = "/orgs/1/sec_policy/active/rule_sets/1"
+    db = ScheduleDB(str(db_path))
+    db.put(href, {"type": "one_time", "name": "expiring", "action": "allow",
+                  "expire_at": "2000-01-01T00:00:00", "timezone": "local",
+                  "is_ruleset": True})
+    api = MagicMock()
+    api.has_draft_changes.return_value = False
+    api.toggle_and_provision.return_value = False   # disable 失敗
+    engine = ScheduleEngine(db, api)
+    engine.check(silent=True, tz_str="local")
+    assert db.get(href) is not None, "disable 失敗的到期排程必須保留下 tick 重試"
+
+
+def test_one_time_expiry_disable_success_removes_schedule(tmp_path):
+    db_path = tmp_path / "rule_schedules.json"
+    href = "/orgs/1/sec_policy/active/rule_sets/2"
+    db = ScheduleDB(str(db_path))
+    db.put(href, {"type": "one_time", "name": "expiring", "action": "allow",
+                  "expire_at": "2000-01-01T00:00:00", "timezone": "local",
+                  "is_ruleset": True})
+    api = MagicMock()
+    api.has_draft_changes.return_value = False
+    api.toggle_and_provision.return_value = True    # disable 成功
+    engine = ScheduleEngine(db, api)
+    engine.check(silent=True, tz_str="local")
+    assert db.get(href) is None
