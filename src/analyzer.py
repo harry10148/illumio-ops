@@ -85,6 +85,11 @@ _CACHE_UNEVALUABLE_FILTER_KEYS = (
     "src_label_group", "src_label_groups", "dst_label_group", "dst_label_groups",
     "ex_src_label_group", "ex_src_label_groups",
     "ex_dst_label_group", "ex_dst_label_groups",
+    # actor groups / ams 為 PCE native-only：兩套 client 比對器
+    # （check_flow_match、_flow_matches_filters）都不評估——帶這些 key 時
+    # cache 命中會靜默回未過濾資料（2026-07-24 審查 M4）
+    "src_include_groups", "dst_include_groups",
+    "src_ams", "dst_ams", "ex_src_ams", "ex_dst_ams",
 )
 
 # ─── Standalone Calculators (shared by Analyzer and Report modules) ──────────
@@ -1398,7 +1403,17 @@ class Analyzer:
                             start_time, gap_end, query_pds,
                             filters=query_spec, compute_draft=needs_draft,
                         )
-                        gap_list = list(gap_stream) if gap_stream is not None else []
+                        gap_list: list | None = list(gap_stream) if gap_stream is not None else []
+                        # gap API 靜默失敗（yield 0 + last_fetch_error）不可標成
+                        # cache 成功吞掉歷史段遺失（審查 H2）——退 full API，其
+                        # source="api" 讓 _raise_if_query_fetch_failed 生效。
+                        # isinstance(str) 防 MagicMock 測試 stub 誤觸。
+                        _gap_err = getattr(self.api, "last_fetch_error", None)
+                        if isinstance(_gap_err, str) and _gap_err:
+                            logger.warning(
+                                "query_flows hybrid: gap fetch reported error ({}); "
+                                "falling back to full API", _gap_err)
+                            gap_list = None
                     else:
                         # 次秒級 gap：回退 1 秒後已無有意義的窗口
                         # 可向 API 查詢。
@@ -1416,7 +1431,11 @@ class Analyzer:
                             "query_flows hybrid: {} — falling back to full API path", exc)
                     else:
                         source = "mixed" if gap_list else "cache"
-                        return gap_list + cached, source
+                        # 跨界 flow（first_detected<cache_start<=last_detected）若
+                        # PCE 以 overlap 語意回，會同時落在 gap 與 cache——按 flow
+                        # 身分去重，cache 端優先保留（審查 M3）
+                        merged = self._merge_dedup_flows(gap_list, cached)
+                        return merged, source
 
         # miss / partial-with-conflict / hybrid-failure: fall through to API
         stream = self.api.execute_traffic_query_stream(
@@ -1424,6 +1443,23 @@ class Analyzer:
             filters=query_spec, compute_draft=needs_draft,
         )
         return stream, "api"
+
+    @staticmethod
+    def _flow_identity(f: dict) -> tuple:
+        """hybrid 合併去重用的 flow 身分：src/dst IP＋service＋活動區間。"""
+        src = f.get("src") or {}
+        dst = f.get("dst") or {}
+        svc = f.get("service") or {}
+        return (
+            src.get("ip"), dst.get("ip"),
+            svc.get("port"), svc.get("proto"),
+            f.get("first_detected"), f.get("last_detected"),
+        )
+
+    def _merge_dedup_flows(self, gap: list, cached: list) -> list:
+        """cached 端優先（較完整），gap 只補 cache 未見的 flow。"""
+        seen = {self._flow_identity(f) for f in cached}
+        return cached + [f for f in gap if self._flow_identity(f) not in seen]
 
     def _raise_if_query_fetch_failed(self) -> None:
         """互動查詢失敗須可分辨（spec §B）：API/混合來源在串流耗盡後，
@@ -1553,6 +1589,11 @@ class Analyzer:
         cache_bypass_keys = [
             k for k in _CACHE_UNEVALUABLE_FILTER_KEYS if query_filters.get(k)
         ]
+        if needs_draft:
+            # draft_policy_decision 只在 compute_draft async 查詢的 flow 上存在；
+            # cache 從不算 draft，client 端無從評估——強制走 API，否則 cache
+            # 全覆蓋時 :1586 的 draft 過濾把每筆都丟掉→靜默空結果（審查 H1）
+            cache_bypass_keys = cache_bypass_keys + ["draft_policy_decision"]
         traffic_stream, self.last_query_source = self._fetch_query_flows(
             start_time, end_time, query_pds, query_spec, needs_draft,
             cache_bypass_keys=cache_bypass_keys,
