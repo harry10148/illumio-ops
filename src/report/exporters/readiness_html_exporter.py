@@ -31,6 +31,19 @@ _QUEUE_COL_I18N = {
     "flow_count": "rpt_readiness_col_flows",
     "pb_uncovered_count": "rpt_readiness_col_pb",
 }
+_REC_COL_I18N = {
+    "Priority": "rpt_col_priority",
+    "App (Env)": "rpt_col_app_env",
+    "Issue": "rpt_col_issue",
+    "Action": "rpt_col_action",
+    "Severity": "rpt_col_severity",
+}
+_FACTOR_COL_I18N = {
+    "Factor": "rpt_col_factor",
+    "Weight": "rpt_col_weight",
+    "Score": "rpt_col_score",
+    "Ratio %": "rpt_col_ratio_pct",
+}
 _TRUNC_COLS = {"app_display", "current_mode", "recommended_action", "Action"}
 _DIR_ARROW = {"up": "↑", "down": "↓", "flat": "→"}
 
@@ -102,7 +115,8 @@ class ReadinessHtmlExporter:
                           t("rpt_readiness_rollup_apps", lang=lang)]
         rollup_html = self._table(rollup, list(rollup.columns), lambda c: c)
         detail_cols = ["Priority", "App (Env)", "Issue", "Action", "Severity"]
-        detail_html = self._table(recs, detail_cols, lambda c: c)
+        detail_html = self._table(recs, detail_cols,
+                                  lambda c: t(_REC_COL_I18N.get(c, c), lang=lang))
         return rollup_html + detail_html
 
     def _trend(self, deltas) -> str:
@@ -143,7 +157,7 @@ class ReadinessHtmlExporter:
              self._factor_legend()
              + self._table(readiness.get("factor_table"),
                            list(getattr(readiness.get("factor_table"), "columns", [])),
-                           lambda c: c)),
+                           lambda c: t(_FACTOR_COL_I18N.get(c, c), lang=lang))),
             ("readiness-recommendations", t("rpt_readiness_sec_recommendations", lang=lang),
              self._recommendations(readiness.get("recommendations"))),
             ("readiness-trend", t("rpt_readiness_sec_trend", lang=lang),

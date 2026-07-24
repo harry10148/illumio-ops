@@ -1375,7 +1375,13 @@ class _TrafficReportBase:
                 )
                 if rule_how:
                     how_key = f'rpt_rule_{f.rule_id}_how'
-                    how_text = _s(how_key) if how_key in _S else rule_how
+                    # For English use the rich _RULE_DESCRIPTIONS text directly:
+                    # the STRINGS en value is the placeholder 'Rule detail', so
+                    # _s(how_key) would shadow the real description in EN reports.
+                    if self._lang == "en":
+                        how_text = rule_how
+                    else:
+                        how_text = _s(how_key) if how_key in _S else rule_how
                     cards_html += (
                         f'<p style="font-size:11px;color:var(--slate-50);margin-bottom:8px;">'
                         f'<b>{_s("rpt_rule_check_label")}</b>'
@@ -1538,10 +1544,22 @@ class _TrafficReportBase:
         # Value-i18n maps: source DataFrames carry stable English values
         # ("Tier-1 Critical", "Identity", ...) — translation happens here at the
         # render boundary so mod14_infrastructure.py can stay locale-agnostic.
+        # Rename the internal snake_case fields to display labels so the header
+        # i18n (COL_I18N, keyed by English display value) resolves; value maps
+        # key on the same display names.
+        _mod14_labels = {
+            "app_env_key": "App (Env)", "infrastructure_score": "Infra Score",
+            "tier": "Tier", "role": "Role", "asset_type": "Asset Type",
+            "provider_score": "Provider Score", "consumer_score": "Consumer Score",
+            "betweenness_score": "Betweenness", "mixed_traffic_ratio": "Mixed Traffic %",
+            "dampening_factor": "Dampening", "non_prod_penalty": "Non-Prod Penalty",
+            "in_degree": "In-Degree", "out_degree": "Out-Degree",
+            "connections_in": "Connections In", "connections_out": "Connections Out",
+        }
         _scored_value_maps = {
-            "tier": TIER_VALUE_I18N,
-            "role": ROLE_VALUE_I18N,
-            "asset_type": ASSET_TYPE_VALUE_I18N,
+            "Tier": TIER_VALUE_I18N,
+            "Role": ROLE_VALUE_I18N,
+            "Asset Type": ASSET_TYPE_VALUE_I18N,
         }
         role_summary = m.get('role_summary')
         if role_summary is not None and not role_summary.empty:
@@ -1554,7 +1572,7 @@ class _TrafficReportBase:
         hub_apps = m.get('hub_apps')
         if hub_apps is not None and not hub_apps.empty:
             def _ha_sub(cols):
-                sub = hub_apps[[c for c in cols if c in hub_apps.columns]]
+                sub = hub_apps[[c for c in cols if c in hub_apps.columns]].rename(columns=_mod14_labels)
                 return _df_to_html(sub, lang=_lang, value_i18n_maps=_scored_value_maps) if len(sub.columns) > 1 else ''
 
             html += (
@@ -1569,7 +1587,7 @@ class _TrafficReportBase:
         top_apps = m.get('top_apps')
         if top_apps is not None and not top_apps.empty:
             def _ta_sub(cols):
-                sub = top_apps[[c for c in cols if c in top_apps.columns]]
+                sub = top_apps[[c for c in cols if c in top_apps.columns]].rename(columns=_mod14_labels)
                 return _df_to_html(sub, lang=_lang, value_i18n_maps=_scored_value_maps) if len(sub.columns) > 1 else ''
 
             html += (
