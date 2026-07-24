@@ -86,7 +86,8 @@ def test_backfill_then_cache_hit(session_factory):
         }
     ]
     api = MagicMock()
-    api.get_events.return_value = events
+    # run_events 現走 fetch_events（帶明確 end_time_str + 大 max_results）
+    api.fetch_events.return_value = events
     runner = BackfillRunner(api, session_factory)
     result = runner.run_events(now - timedelta(days=7), now)
     assert result.inserted == 1

@@ -349,17 +349,21 @@ class TestRunPostureSummaryJob:
         s = json.load(open(state_file))
         assert s["posture_summary"] == {"available": False}
 
-    def test_job_does_not_raise_on_bad_snapshot(self, tmp_path):
+    def test_job_marks_unavailable_and_reraises_on_bad_snapshot(self, tmp_path):
         from src.scheduler.jobs import run_posture_summary
         state_file = str(tmp_path / "state.json")
         cm = MagicMock()
         cm.config = {}
 
-        # Simulate read_latest raising
+        # Simulate read_latest raising: the fallback state write must land,
+        # then the exception must re-raise so _instrument records
+        # job_health status=error.
         with patch("src.scheduler.jobs.read_latest", side_effect=RuntimeError("disk error")), \
              patch("src.scheduler.jobs._resolve_state_file", return_value=state_file):
-            # Must NOT raise
-            run_posture_summary(cm)
+            with pytest.raises(RuntimeError):
+                run_posture_summary(cm)
+        state = json.load(open(state_file))
+        assert state["posture_summary"] == {"available": False}
 
     def test_source_date_comes_from_snapshot_generated_at(self, tmp_path):
         from src.scheduler.jobs import run_posture_summary

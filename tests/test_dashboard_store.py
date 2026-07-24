@@ -162,7 +162,9 @@ def test_run_ven_summary_error_writes_last_error_to_dashboard_store(tmp_path, mo
 
     with patch("src.scheduler.jobs.ApiClient", return_value=api), \
          patch("src.scheduler.jobs._resolve_state_file", return_value=state_path):
-        run_ven_summary(cm)
+        # 寫完 last_error 後必須 re-raise 給 _instrument 記 job_health error
+        with pytest.raises(RuntimeError):
+            run_ven_summary(cm)
 
     ds = read_dashboard_summary()
     vs = ds["ven_summary"]

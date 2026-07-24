@@ -159,7 +159,8 @@ def test_since_cursor_normalises_naive_watermark_to_utc(session_factory):
                          async_threshold=10000)
     ing.run_once()
 
-    assert api.since_seen == "2026-05-01T12:00:00+00:00"
+    # watermark 12:00 − 5 分鐘 grace（晚到事件 re-pull，比照 traffic ingestor）
+    assert api.since_seen == "2026-05-01T11:55:00+00:00"
 
 
 def test_since_cursor_preserves_aware_watermark(session_factory):
@@ -180,7 +181,8 @@ def test_since_cursor_preserves_aware_watermark(session_factory):
 
     parsed = datetime.fromisoformat(api.since_seen)
     assert parsed.tzinfo is not None
-    assert parsed.astimezone(timezone.utc) == aware_ts
+    # aware watermark 減 5 分鐘 grace 後仍為 aware（不被剝除 tz）
+    assert parsed.astimezone(timezone.utc) == aware_ts - timedelta(minutes=5)
 
 
 def test_async_threshold_stub_does_not_discard_sync_batch(session_factory):

@@ -6,7 +6,15 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import sessionmaker
 
-from src.pce_cache.models import PceTrafficFlowAgg, PceTrafficFlowRaw
+from src.pce_cache.models import (
+    IngestionCursor, PceTrafficFlowAgg, PceTrafficFlowRaw,
+)
+
+# aggregator 自身的 raw 消費游標（IngestionCursor 既有模式，同 archiver/
+# subscriber）：記錄上一輪 run_once 已看過的 max(ingested_at)，用來偵測
+# 「新進但屬於舊日期」的 backfill 列（見 run_once 的 backfill_floor）。
+_AGG_CONSUMER = "aggregator"
+_AGG_SOURCE = "pce_traffic_flows_raw"
 
 
 class TrafficAggregator:
@@ -40,6 +48,9 @@ class TrafficAggregator:
         would re-insert them, ballooning the table. '' is a single value that
         dedups correctly.
         """
+        # 先快照 raw 目前的 max(ingested_at)：聚合期間新 commit 的列留給
+        # 下一輪（游標推進不得越過本輪實際看得到的範圍）。
+        max_ingested = self._max_raw_ingested_at()
         src_wl = func.coalesce(PceTrafficFlowRaw.src_workload, "")
         dst_wl = func.coalesce(PceTrafficFlowRaw.dst_workload, "")
         # bucket_day 是 TEXT 欄位，SQLite 用字串比較做 range query，格式必須跟
@@ -72,6 +83,16 @@ class TrafficAggregator:
         if not full and self._has_agg_rows():
             window_cutoff = datetime.now(timezone.utc) - timedelta(days=self._WINDOW_DAYS)
             cutoff = min(window_cutoff, self._max_agg_day() - timedelta(days=1))
+            # Backfill 防護：backfill 灌入的列 ingested_at=now 但 last_detected
+            # 在數週/數月前——牆鐘視窗與 max_agg_day 錨點都照不到（max_agg_day
+            # 穩態在「今天」），這些 bucket 永遠不會被聚合，raw retention 到期
+            # 後永久遺失。改用 aggregator 自身游標找出「上輪之後新進」的列，
+            # 把 cutoff 擴到它們的最早 last_detected；重疊日重算由 MAX-merge
+            # upsert 保證冪等。不再依賴呼叫端記得帶 full=True（web.py 有帶、
+            # CLI backfill 沒帶——2026-07-25 審查）。
+            backfill_floor = self._min_new_last_detected()
+            if backfill_floor is not None:
+                cutoff = min(cutoff, backfill_floor)
             sel = sel.where(PceTrafficFlowRaw.last_detected >= cutoff)
         stmt = sqlite_insert(PceTrafficFlowAgg.__table__).from_select(
             ["bucket_day", "src_workload", "dst_workload", "port",
@@ -99,7 +120,41 @@ class TrafficAggregator:
         )
         with self._sf.begin() as s:
             result = s.execute(stmt)
-            return result.rowcount or 0
+            rowcount = result.rowcount or 0
+        self._advance_cursor(max_ingested)
+        return rowcount
+
+    def _max_raw_ingested_at(self) -> datetime | None:
+        with self._sf() as s:
+            return s.execute(
+                select(func.max(PceTrafficFlowRaw.ingested_at))).scalar()
+
+    def _min_new_last_detected(self) -> datetime | None:
+        """上輪游標之後新進（ingested_at 較新）的 raw 列中最早的 last_detected；
+        無游標（首次跑此版程式碼）時看整表——一次性把既有未聚合的舊日期補齊。"""
+        with self._sf() as s:
+            cur = s.get(IngestionCursor, (_AGG_CONSUMER, _AGG_SOURCE))
+            cur_ts = cur.last_ingested_at if cur else None
+            q = select(func.min(PceTrafficFlowRaw.last_detected))
+            if cur_ts is not None:
+                q = q.where(PceTrafficFlowRaw.ingested_at > cur_ts)
+            floor = s.execute(q).scalar()
+        if floor is not None and floor.tzinfo is None:
+            floor = floor.replace(tzinfo=timezone.utc)
+        return floor
+
+    def _advance_cursor(self, ts: datetime | None) -> None:
+        if ts is None:      # raw 表為空：沒有可推進的位置，游標維持原狀
+            return
+        now = datetime.now(timezone.utc)
+        with self._sf.begin() as s:
+            cur = s.get(IngestionCursor, (_AGG_CONSUMER, _AGG_SOURCE))
+            if cur is None:
+                cur = IngestionCursor(consumer=_AGG_CONSUMER,
+                                      source_table=_AGG_SOURCE, updated_at=now)
+                s.add(cur)
+            cur.last_ingested_at = ts
+            cur.updated_at = now
 
     def _has_agg_rows(self) -> bool:
         with self._sf() as s:

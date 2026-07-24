@@ -11,11 +11,14 @@ import threading
 from typing import Any
 
 from cachetools import TTLCache
+from loguru import logger
 
 _CACHE_TTL_SECONDS = 300
 _lock = threading.RLock()
-# key: "labels"/"ip_lists"/"label_groups" → 完整物件清單
-_cache: TTLCache = TTLCache(maxsize=8, ttl=_CACHE_TTL_SECONDS)
+# key: "<PCE identity>::labels" 等 → 完整物件清單。key 帶 PCE 身分
+# （ApiClient.base_url，含 url+org），切換 active profile 後不會吃到前一個
+# PCE 的物件/href。maxsize 32 = 4 類 × 8 個 profile 的餘裕。
+_cache: TTLCache = TTLCache(maxsize=32, ttl=_CACHE_TTL_SECONDS)
 # 不過期的「最後成功值」store，供 TTL 過期後 refetch 失敗時 stale-serving 用。
 # 注意：TTLCache 對過期 key 視同不存在，_cache.get() 在過期後永遠拿不到舊值，
 # 故 stale-serving 不能依賴 _cache，需另外維護此 dict。
@@ -29,23 +32,37 @@ def invalidate_object_cache() -> None:
         _last_good.clear()
 
 
+def _scoped_key(api, key: str) -> str:
+    """以 PCE 身分（base_url = url+org）為快取 key 前綴。"""
+    return f"{getattr(api, 'base_url', '') or ''}::{key}"
+
+
 def _get_or_fill(api, key: str, fetch):
-    """TTL 內走 _cache；過期後重抓。抓成功同時更新 _cache（TTL 計時）與
-    _last_good（不過期）；抓失敗或空結果則回 _last_good（真正的
-    stale-serving，而非依賴 TTLCache 對過期 key 的感知，因為過期後
-    TTLCache 會直接視為不存在）。皆無舊值時回 []。
+    """TTL 內走 _cache；過期後重抓。抓成功（含合法空集合）同時更新 _cache
+    （TTL 計時）與 _last_good（不過期）；抓失敗（fetcher raise，見
+    _TYPE_FETCHERS 的 raise_on_error=True）則回 _last_good（真正的
+    stale-serving）。失敗且無舊值時 re-raise，讓端點回報 pce_unreachable，
+    不可誤報成「空集合」。
     """
+    skey = _scoped_key(api, key)
     with _lock:
-        if key in _cache:
-            return _cache[key]
-    data = fetch(api) or []
+        if skey in _cache:
+            return _cache[skey]
+    try:
+        data = fetch(api) or []
+    except Exception as exc:
+        with _lock:
+            if skey in _last_good:
+                # 抓失敗：回最後一次成功值（stale 勝於無）
+                logger.warning("filter_object_cache: fetch {} failed ({}); serving stale", key, exc)
+                return _last_good[skey]
+        raise
     with _lock:
-        if data:
-            _cache[key] = data
-            _last_good[key] = data
-            return data
-        # 抓到空/失敗：回最後一次成功值（stale 勝於無）
-        return _last_good.get(key, [])
+        # 合法空集合照樣快取：空 org 不必每個 keystroke 都打 PCE，且
+        # 「物件已全刪」不會被舊 _last_good 永久蓋住。
+        _cache[skey] = data
+        _last_good[skey] = data
+        return data
 
 
 def _ip_list_summary(ipl: dict) -> str:
@@ -110,11 +127,13 @@ def _match_named(objs, q, limit, summary_fn=None):
     return hits[:limit], len(hits) > limit
 
 
+# raise_on_error=True：非 200 raise APIError，讓 _get_or_fill 分得出
+# 「PCE 故障」（stale-serve / re-raise）與「合法空集合」（照樣快取）。
 _TYPE_FETCHERS = {
-    "label": ("labels", lambda a: a.get_all_labels()),
-    "iplist": ("ip_lists", lambda a: a.get_ip_lists()),
-    "label_group": ("label_groups", lambda a: a.get_label_groups()),
-    "service": ("services", lambda a: a.get_services()),
+    "label": ("labels", lambda a: a.get_all_labels(raise_on_error=True)),
+    "iplist": ("ip_lists", lambda a: a.get_ip_lists(raise_on_error=True)),
+    "label_group": ("label_groups", lambda a: a.get_label_groups(raise_on_error=True)),
+    "service": ("services", lambda a: a.get_services(raise_on_error=True)),
 }
 
 
@@ -156,19 +175,23 @@ def search_cached_objects(api, q: str, types: list[str], limit: int) -> dict[str
     """
     out: dict[str, Any] = {}
     if "label" in types:
-        objs = _get_or_fill(api, "labels", lambda a: a.get_all_labels())
+        key, fn = _TYPE_FETCHERS["label"]
+        objs = _get_or_fill(api, key, fn)
         items, trunc = _match_labels(objs, q, limit)
         out["label"] = {"items": items, "truncated": trunc}
     if "iplist" in types:
-        objs = _get_or_fill(api, "ip_lists", lambda a: a.get_ip_lists())
+        key, fn = _TYPE_FETCHERS["iplist"]
+        objs = _get_or_fill(api, key, fn)
         items, trunc = _match_named(objs, q, limit, summary_fn=_ip_list_summary)
         out["iplist"] = {"items": items, "truncated": trunc}
     if "label_group" in types:
-        objs = _get_or_fill(api, "label_groups", lambda a: a.get_label_groups())
+        key, fn = _TYPE_FETCHERS["label_group"]
+        objs = _get_or_fill(api, key, fn)
         items, trunc = _match_named(objs, q, limit)
         out["label_group"] = {"items": items, "truncated": trunc}
     if "service" in types:
-        objs = _get_or_fill(api, "services", lambda a: a.get_services())
+        key, fn = _TYPE_FETCHERS["service"]
+        objs = _get_or_fill(api, key, fn)
         items, trunc = _match_named(objs, q, limit, summary_fn=_service_summary)
         out["service"] = {"items": items, "truncated": trunc}
     return out

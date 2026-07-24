@@ -222,8 +222,15 @@ def test_schedules_list_enriches_last_state(client, monkeypatch, tmp_path):
                         lambda: str(config_dir))
     monkeypatch.setattr("src.rule_scheduler._resolve_rule_state_file",
                         lambda: str(state_file))
-    monkeypatch.setattr("src.api_client.ApiClient.get_live_item",
-                        lambda self, h: (200, {"enabled": True, "name": "rs"}))
+    # 2026-07-25 N+1 修正後：list 端點改為單次 get_all_rulesets（draft 視圖）
+    # 本地解析 live 狀態，不再逐 schedule 呼叫 get_live_item。
+    monkeypatch.setattr(
+        "src.api_client.ApiClient.get_all_rulesets",
+        lambda self, force_refresh=False, raise_on_error=False: [{
+            "href": href.replace("/active/", "/draft/"),
+            "enabled": True, "name": "rs",
+            "rules": [], "sec_rules": [], "deny_rules": [],
+        }])
 
     login = client.post(
         "/api/login",

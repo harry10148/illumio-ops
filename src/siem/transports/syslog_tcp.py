@@ -16,7 +16,16 @@ class SyslogTCPTransport(Transport):
     def _connect(self) -> None:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(self._timeout)
-        s.connect((self._host, self._port))
+        try:
+            s.connect((self._host, self._port))
+        except Exception:
+            # Don't leak the socket fd if connect fails; only publish
+            # self._sock after a successful connect (mirrors syslog_tls).
+            try:
+                s.close()
+            except Exception:
+                pass
+            raise
         self._sock = s
 
     def send(self, payload: str) -> None:

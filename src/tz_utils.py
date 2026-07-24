@@ -44,7 +44,13 @@ def resolve_tz(tz_str: str | None) -> datetime.tzinfo:
         return datetime.timezone.utc
     m = _UTC_OFFSET_RE.match(tz_str)
     if m:
-        return datetime.timezone(datetime.timedelta(hours=float(m.group(1) + m.group(2))))
+        try:
+            return datetime.timezone(datetime.timedelta(hours=float(m.group(1) + m.group(2))))
+        except ValueError:
+            # 偏移量超出 ±24h（例如 'UTC+24'、'UTC+100'）：timezone() 會丟
+            # ValueError，依模組契約退回 UTC 並記 warning，不能炸掉呼叫端。
+            logger.warning("Unknown timezone {!r}, falling back to UTC", tz_str)
+            return datetime.timezone.utc
     try:
         return zoneinfo.ZoneInfo(tz_str)
     except (KeyError, ValueError, zoneinfo.ZoneInfoNotFoundError):

@@ -58,7 +58,10 @@ def make_events_blueprint(
         # When filters are active the PCE can't filter by category/group, so we
         # must fetch the full window and filter locally. Use max (5000) to avoid
         # silently missing matching events that fall outside a smaller batch.
-        any_filter = bool(category_filter or type_group_filter or event_type_filter)
+        # search 也是本地過濾（PCE 沒有全文查詢參數），同樣需要全窗抓取——
+        # 漏掉它會讓「只打搜尋字」的請求用小額啟發式 fetch_limit（預設頁僅
+        # 200 筆），matched_count/has_more 隨之失真，操作者誤以為事件不存在。
+        any_filter = bool(category_filter or type_group_filter or event_type_filter or search)
         fetch_limit = 5000 if any_filter else min(max((offset + limit) * 4, 100), 5000)
         pce_event_type = event_type_filter if event_type_filter else None
 

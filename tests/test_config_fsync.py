@@ -4,6 +4,8 @@ fsync 再 os.replace（比照 src/state_store.py 既有做法），異常時清�
 import json
 import os
 
+import pytest
+
 
 def _make_cm(tmp_path):
     from src.config import ConfigManager
@@ -42,9 +44,10 @@ def test_save_unlinks_tmp_file_on_write_error(tmp_path, monkeypatch):
 
     monkeypatch.setattr(os, "fsync", boom)
 
-    # save() 內部把 IOError/OSError 吞掉並記錄，不會往外拋——用暫存檔是否
-    # 殘留來驗證孤兒清理是否真的執行。
-    cm.save()
+    # save() 現在會把 IOError/OSError 往外拋（fail-loud，讓 GUI 不會誤報成功）；
+    # 但拋出前必須先清掉孤兒暫存檔。
+    with pytest.raises(OSError):
+        cm.save()
 
     leftover = [f for f in os.listdir(config_dir) if f.endswith(".tmp")]
     assert leftover == [], f"orphan tmp file(s) left behind: {leftover}"

@@ -90,18 +90,55 @@ def test_siem_status_has_1h_window_and_latency(app_cm):
         dict(source_table="pce_events", source_id=1, destination="d1", status="sent",
              retries=0, queued_at=now - dt.timedelta(minutes=10),
              sent_at=now - dt.timedelta(minutes=9)),           # latency ~60s, in 1h
+        # 真實斷線形狀：3 小時前 queued、5 分鐘前才 quarantine。failed_1h 必須
+        # 錨定失敗時間（DeadLetter.quarantined_at），錨在 queued_at 會讓整段
+        # 斷線期間回報 100% 成功。
         dict(source_table="pce_events", source_id=2, destination="d1", status="failed",
-             retries=3, queued_at=now - dt.timedelta(minutes=5), sent_at=None),  # failed in 1h
+             retries=10, queued_at=now - dt.timedelta(hours=3), sent_at=None),
         dict(source_table="pce_events", source_id=3, destination="d1", status="sent",
              retries=0, queued_at=now - dt.timedelta(hours=3),
              sent_at=now - dt.timedelta(hours=3)),             # old, outside 1h
     ])
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.models import DeadLetter
+    eng = create_engine(f"sqlite:///{tmp / 'c.sqlite'}")
+    with sessionmaker(eng)() as s:
+        s.add(DeadLetter(source_table="pce_events", source_id=2, destination="d1",
+                         retries=10, last_error="connrefused", payload_preview="{}",
+                         quarantined_at=now - dt.timedelta(minutes=5)))
+        s.commit()
     c = _client(cm)
     body = c.get("/api/siem/status", environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
     d1 = next(x for x in body["status"] if x["destination"] == "d1")
     assert d1["sent_1h"] == 1 and d1["failed_1h"] == 1
     assert d1["success_1h"] == 50.0
     assert d1["avg_latency_ms"] is not None and d1["avg_latency_ms"] > 0
+
+
+def test_siem_status_counts_retrying_rows_and_null_success_when_idle(app_cm):
+    """斷線初期（尚未 quarantine）retry backoff 中的列要算進 failed_1h，
+    視窗內無任何嘗試時 success_1h 必須是 null（unknown），不得假報 100。"""
+    cm, tmp = app_cm
+    now = dt.datetime.now(dt.timezone.utc)
+    _seed_dispatch(str(tmp / "c.sqlite"), [
+        # d2：目的地掛掉、列還在 backoff（pending + retries>0 + next_attempt_at 未來）
+        dict(source_table="pce_events", source_id=1, destination="d2", status="pending",
+             retries=3, queued_at=now - dt.timedelta(minutes=30),
+             next_attempt_at=now + dt.timedelta(minutes=2), sent_at=None),
+        # d3：只有 1h 視窗外的活動 → 成功率未知
+        dict(source_table="pce_events", source_id=2, destination="d3", status="sent",
+             retries=0, queued_at=now - dt.timedelta(hours=3),
+             sent_at=now - dt.timedelta(hours=3)),
+    ])
+    c = _client(cm)
+    body = c.get("/api/siem/status", environ_overrides={"REMOTE_ADDR": "127.0.0.1"}).get_json()
+    d2 = next(x for x in body["status"] if x["destination"] == "d2")
+    assert d2["failed_1h"] == 1
+    assert d2["success_1h"] == 0.0
+    d3 = next(x for x in body["status"] if x["destination"] == "d3")
+    assert d3["sent_1h"] == 0 and d3["failed_1h"] == 0
+    assert d3["success_1h"] is None
 
 
 def test_dlq_item_rebuilds_full_payload(app_cm):

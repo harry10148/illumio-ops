@@ -69,7 +69,9 @@ class ModuleLog:
         self._file_logger = lg
 
     def _append(self, level: str, message: str) -> None:
-        ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        # Local time (unmarked) to match the main loguru log's convention,
+        # so operators correlate the two logs without a hidden UTC offset.
+        ts = datetime.datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S")
         clean = _ANSI_RE.sub("", str(message))
         entry = {"ts": ts, "level": level, "msg": clean}
         line = f"{ts} [{level:5s}] {clean}"
@@ -77,7 +79,9 @@ class ModuleLog:
             self._buffer.append(entry)
             if len(self._buffer) > self.MAX_BUFFER:
                 del self._buffer[: -self.MAX_BUFFER]
-        self._ensure_file_logger()
+            # Inside the lock: concurrent first writes must not both attach
+            # a handler to the shared logging.getLogger object.
+            self._ensure_file_logger()
         if self._file_logger:
             self._file_logger.info(line)
 

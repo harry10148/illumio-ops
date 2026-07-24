@@ -18,6 +18,15 @@ _PCE_VERSION = "3.11"
 _PROTO_MAP = {6: "tcp", 17: "udp", 1: "icmp"}
 
 
+def _first_not_none(*values):
+    """First value that is not None. Unlike an `or` chain this keeps
+    legitimate falsy values (flat-format pd=0 'allowed', zero counters)."""
+    for v in values:
+        if v is not None:
+            return v
+    return None
+
+
 def _proto_to_str(proto) -> str:
     if proto is None:
         return ""
@@ -133,7 +142,9 @@ class CEFFormatter(Formatter):
         port   = flow.get("dst_port") or flow.get("port") or svc.get("port") or 0
         proto_raw = flow.get("proto") or flow.get("protocol") or svc.get("proto")
         proto  = _proto_to_str(proto_raw)
-        pd     = flow.get("pd") or flow.get("policy_decision") or "unknown"
+        # is-not-None selection: flat-format pd is numeric (0=allowed) and
+        # must not fall through to "unknown".
+        pd     = _first_not_none(flow.get("pd"), flow.get("policy_decision"), "unknown")
         ts     = (flow.get("timestamp")
                   or flow.get("first_detected")
                   or (flow.get("timestamp_range") or {}).get("first_detected", ""))
@@ -191,12 +202,13 @@ class CEFFormatter(Formatter):
         if un:
             ext.append(f"un={_cef_escape(un)}")
 
-        # count, bytes
-        count = flow.get("count") or flow.get("num_connections") or flow.get("flow_count")
+        # count, bytes — is-not-None selection so zero values are emitted
+        count = _first_not_none(flow.get("count"), flow.get("num_connections"),
+                                flow.get("flow_count"))
         if count is not None:
             ext.append(f"count={count}")
-        dst_dbi = flow.get("dst_dbi") or flow.get("dst_bi")
-        dst_dbo = flow.get("dst_dbo") or flow.get("dst_bo")
+        dst_dbi = _first_not_none(flow.get("dst_dbi"), flow.get("dst_bi"))
+        dst_dbo = _first_not_none(flow.get("dst_dbo"), flow.get("dst_bo"))
         if dst_dbi is not None:
             ext.append(f"dst_dbi={dst_dbi}")
         if dst_dbo is not None:

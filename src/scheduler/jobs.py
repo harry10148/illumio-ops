@@ -34,6 +34,9 @@ def run_monitor_cycle(cm) -> None:
     except Exception as exc:
         logger.exception("Monitor cycle failed: {}", exc)
         mlog.error(f"Monitor cycle failed: {exc}")
+        # Re-raise so the _instrument wrapper records job_health status=error
+        # (swallowing here made the job-health panel report perpetual 'ok').
+        raise
 
 def tick_report_schedules(cm) -> None:
     """Check and fire any due report schedules."""
@@ -45,6 +48,7 @@ def tick_report_schedules(cm) -> None:
         scheduler.tick()
     except Exception as exc:
         logger.exception("Report schedule tick failed: {}", exc)
+        raise  # surface to _instrument → job_health status=error
 
 def tick_rule_schedules(cm) -> None:
     """Check and fire any due rule schedules."""
@@ -75,6 +79,7 @@ def tick_rule_schedules(cm) -> None:
     except Exception as exc:
         logger.exception("Rule schedule tick failed: {}", exc)
         mlog.error(f"Rule schedule tick failed: {exc}")
+        raise  # surface to _instrument → job_health status=error
 
 
 def _record_ingest_pce_result(source: str, wm=None, fallback_error: str | None = None) -> None:
@@ -207,6 +212,7 @@ def run_events_ingest(cm) -> None:
     except Exception as exc:
         logger.exception("run_events_ingest failed: {}", exc)
         _record_ingest_pce_result("events", wm, fallback_error=str(exc))
+        raise  # surface to _instrument → job_health status=error
 
 
 def run_traffic_ingest(cm) -> None:
@@ -233,6 +239,7 @@ def run_traffic_ingest(cm) -> None:
     except Exception as exc:
         logger.exception("run_traffic_ingest failed: {}", exc)
         _record_ingest_pce_result("traffic", wm, fallback_error=str(exc))
+        raise  # surface to _instrument → job_health status=error
 
 
 def run_traffic_aggregate(cm) -> None:
@@ -246,6 +253,7 @@ def run_traffic_aggregate(cm) -> None:
         logger.info("Traffic aggregate: {} buckets updated", count)
     except Exception as exc:
         logger.exception("run_traffic_aggregate failed: {}", exc)
+        raise  # surface to _instrument → job_health status=error
 
 
 def run_cache_retention(cm) -> None:
@@ -264,6 +272,7 @@ def run_cache_retention(cm) -> None:
         logger.info("Cache retention purged: {}", result)
     except Exception as exc:
         logger.exception("run_cache_retention failed: {}", exc)
+        raise  # surface to _instrument → job_health status=error
 
 
 def run_cache_archive(cm) -> None:
@@ -279,6 +288,7 @@ def run_cache_archive(cm) -> None:
         logger.info("Cache archive exported: {}", result)
     except Exception as exc:
         logger.exception("run_cache_archive failed: {}", exc)
+        raise  # surface to _instrument → job_health status=error
 
 
 def run_ven_summary(cm) -> None:
@@ -360,6 +370,7 @@ def run_ven_summary(cm) -> None:
             write_dashboard_summary(_mark_err)
         except Exception:
             pass
+        raise  # surface to _instrument → job_health status=error
 
 
 def run_posture_summary(cm) -> None:
@@ -395,6 +406,7 @@ def run_posture_summary(cm) -> None:
                               lambda s: {**s, "posture_summary": {"available": False}})
         except Exception:
             pass
+        raise  # surface to _instrument → job_health status=error
 
 
 def run_capacity_monitor(cm) -> None:
@@ -417,6 +429,7 @@ def run_capacity_monitor(cm) -> None:
             logger.warning(msg)
     except Exception:
         logger.exception("Capacity monitor failed")
+        raise  # surface to _instrument → job_health status=error
 
 
 def run_siem_dispatch(cm) -> None:
@@ -450,6 +463,7 @@ def run_siem_dispatch(cm) -> None:
                 logger.exception("run_siem_dispatch destination {!r} failed: {}", dest_cfg.name, exc)
     except Exception as exc:
         logger.exception("run_siem_dispatch failed: {}", exc)
+        raise  # surface to _instrument → job_health status=error
 
 
 def run_tls_renew_check(cm) -> None:
@@ -478,3 +492,4 @@ def run_tls_renew_check(cm) -> None:
             logger.info("TLS cert check: {} days remaining", days)
     except Exception as exc:
         logger.exception("run_tls_renew_check failed: {}", exc)
+        raise  # surface to _instrument → job_health status=error

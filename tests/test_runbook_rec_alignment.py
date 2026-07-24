@@ -27,9 +27,14 @@ def test_every_runbook_pattern_is_a_known_event_type():
 
 
 def test_capacity_category_exists_with_valid_severity():
+    # temp_table_autocleanup is routine DB maintenance per the vendor Events
+    # Guide — must NOT carry critical event-storage-limit guidance (that
+    # belongs to system_task.prune_old_log_events in 'system-tasks').
     cat = RUNBOOK_CATEGORIES["pce-capacity"]
-    assert cat["severity_hint"] == "critical"
+    assert cat["severity_hint"] == "info"
     assert "database.temp_table_autocleanup_started" in cat["patterns"]
+    assert "routine" in cat["response"].lower()
+    assert "prune_old_log_events" in cat["response"]
 
 
 def test_prune_response_mentions_limit_semantics():

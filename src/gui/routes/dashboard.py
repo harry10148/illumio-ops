@@ -59,7 +59,10 @@ def _cache_session(cm):
     return sessionmaker(_get_cache_engine(cm.models.pce_cache.db_path))
 
 
-_BLOCKED_KEYS = {"allowed": "allowed", "potentially_blocked": "potential", "blocked": "blocked"}
+# vendor 值域四值：unknown（idle/快照模式 VEN、Flowlink 流量）必須獨立成桶，
+# 不可折進 blocked——否則 blocked KPI 與 warn verdict 會被從未被阻擋的流量灌爆。
+_BLOCKED_KEYS = {"allowed": "allowed", "potentially_blocked": "potential",
+                 "blocked": "blocked", "unknown": "unknown"}
 
 
 def _overview_blocked(cm, window_days=7):
@@ -69,27 +72,36 @@ def _overview_blocked(cm, window_days=7):
     from sqlalchemy import func, select
     from src.pce_cache.models import PceTrafficFlowAgg
     now = dt.datetime.now(dt.timezone.utc)
-    cur_start = now - dt.timedelta(days=window_days)
-    prev_start = now - dt.timedelta(days=2 * window_days)
+    # bucket_day 一律是 UTC 午夜（見 aggregator）：切點必須對齊日界，否則
+    # 「本期」會把起點那個部分覆蓋的桶整桶排除（~少一天）而「前期」永遠是
+    # 7 個完整桶，vs_prev_pct 系統性低估、>50% 的 warn 門檻可能被吃掉。
+    # 對齊後本期＝7 個完整桶＋今日部分桶（偏保守、不漏警）。
+    today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    cur_start = today_midnight - dt.timedelta(days=window_days)
+    prev_start = today_midnight - dt.timedelta(days=2 * window_days)
     try:
         sf = _cache_session(cm)
 
         def _sum(s, lo, hi):
-            out = {"allowed": 0, "potential": 0, "blocked": 0}
+            out = {"allowed": 0, "potential": 0, "blocked": 0, "unknown": 0}
             rows = s.execute(
                 select(PceTrafficFlowAgg.action, func.sum(PceTrafficFlowAgg.flow_count))
                 .where(PceTrafficFlowAgg.bucket_day >= lo)
                 .where(PceTrafficFlowAgg.bucket_day < hi)
                 .group_by(PceTrafficFlowAgg.action)).all()
             for action, n in rows:
-                out[_BLOCKED_KEYS.get((action or "").lower(), "blocked")] += int(n or 0)
+                out[_BLOCKED_KEYS.get((action or "").lower(), "unknown")] += int(n or 0)
             return out
 
         with sf() as s:
             cur = _sum(s, cur_start, now)
             prev = _sum(s, prev_start, cur_start)
     except Exception as e:
-        return {"verdict": "unknown", "note": str(e)[:120]}
+        # H3 慣例：完整例外進 server log，client 只拿粗粒度類名——SQL 例外
+        # 字串可能含快取 DB 路徑/SQL 片段，且不記 log 會讓 unknown verdict
+        # 無從診斷。
+        logger.exception("dashboard overview blocked panel failed")
+        return {"verdict": "unknown", "note": type(e).__name__}
     cur_flag = cur["blocked"] + cur["potential"]
     prev_flag = prev["blocked"] + prev["potential"]
     vs_prev = int(round((cur_flag - prev_flag) / prev_flag * 100)) if prev_flag else 0
@@ -153,7 +165,9 @@ def _overview_pipeline(cm):
         return {"cache_lag": cache_lag, "siem_success_1h": success_1h,
                 "dlq": int(dlq), "verdict": verdict, "siem_idle": siem_idle}
     except Exception as e:
-        return {"verdict": "unknown", "note": str(e)[:120]}
+        # 同 _overview_blocked：log 完整例外、client 只拿類名（H3 慣例）。
+        logger.exception("dashboard overview pipeline panel failed")
+        return {"verdict": "unknown", "note": type(e).__name__}
 
 
 def _overview_alerts(state):
@@ -386,9 +400,12 @@ def make_dashboard_blueprint(
                 alert_history = state.get("alert_history", {})
 
                 for rule in cm.config['rules']:
-                    rid = str(rule['id'])
+                    # 手改 alerts.json 的 rule 可能缺 id（Rule schema 只要求
+                    # type）——直接下標會讓整個 /api/status 500（同 rules.py
+                    # 列表路由的防護）。
+                    rid = str(rule.get('id') or '')
                     rem_mins = 0
-                    if rid in alert_history:
+                    if rid and rid in alert_history:
                         try:
                             last_alert_str = alert_history[rid]
                             last_ts = datetime.datetime.strptime(last_alert_str, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
@@ -402,7 +419,7 @@ def make_dashboard_blueprint(
                             logger.error(f"Error parsing cooldown for rule {rid}: {e}")
 
                     cooldowns.append({
-                        "id": rule['id'],
+                        "id": rule.get('id'),
                         "name": rule.get('name', 'Unknown Rule'),
                         "remaining_mins": rem_mins
                     })
@@ -559,13 +576,18 @@ def make_dashboard_blueprint(
 
     @bp.route('/api/dashboard/queries/<int:idx>', methods=['DELETE'])
     def api_delete_dashboard_query(idx):
-        cm.load()
-        lang = cm.config.get('settings', {}).get('language', 'en')
-        if 'settings' in cm.config and 'dashboard_queries' in cm.config['settings']:
-            if 0 <= idx < len(cm.config['settings']['dashboard_queries']):
-                cm.config['settings']['dashboard_queries'].pop(idx)
-                cm.save()
-                return jsonify({"ok": True})
+        # Serialize load→mutate→save under the shared config lock, matching the
+        # POST route above — an unlocked delete can interleave inside another
+        # writer's critical section and be silently undone (or pop the wrong
+        # query after the list shifted).
+        with cm.write_lock:
+            cm.load()
+            lang = cm.config.get('settings', {}).get('language', 'en')
+            if 'settings' in cm.config and 'dashboard_queries' in cm.config['settings']:
+                if 0 <= idx < len(cm.config['settings']['dashboard_queries']):
+                    cm.config['settings']['dashboard_queries'].pop(idx)
+                    cm.save()
+                    return jsonify({"ok": True})
         return _err(t("gui_not_found", lang=lang), 404)
 
     @bp.route('/api/dashboard/snapshot', methods=['GET'])
@@ -640,7 +662,13 @@ def make_dashboard_blueprint(
                 base_ana = Analyzer(cm, api, Reporter(cm),
                                     cache_reader=_make_cache_reader(cm))
 
-                mins = int(d.get("mins", 30))
+                # clamp 同 events/actions 端點基線：避免惡意或誤填的超大 mins
+                # 讓 PCE 跑任意長的 explorer 查詢（rate limit 只限頻率不限成本）。
+                try:
+                    mins = int(d.get("mins", 30))
+                except (TypeError, ValueError):
+                    mins = 30
+                mins = max(5, min(mins, 10080))
                 now = datetime.datetime.now(datetime.timezone.utc)
                 start_time = (now - datetime.timedelta(minutes=mins)).strftime("%Y-%m-%dT%H:%M:%SZ")
                 end_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")

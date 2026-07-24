@@ -149,7 +149,9 @@ def test_run_tls_renew_check_invokes_helper(tmp_path, monkeypatch):
     assert kwargs.get("threshold_days") == 30
 
 
-def test_run_tls_renew_check_swallows_exceptions():
+def test_run_tls_renew_check_logs_and_reraises():
+    # job 失敗必須 re-raise 讓 _instrument 記 job_health status=error，
+    # 但 re-raise 前仍要先 logger.exception（維運可讀的完整 traceback）。
     from unittest.mock import MagicMock, patch
     from src.scheduler.jobs import run_tls_renew_check
     cm = MagicMock()
@@ -158,5 +160,6 @@ def test_run_tls_renew_check_swallows_exceptions():
     with patch("src.gui._helpers._maybe_auto_renew_self_signed",
                side_effect=RuntimeError("boom")), \
          patch("src.scheduler.jobs.logger") as mock_logger:
-        run_tls_renew_check(cm)
+        with pytest.raises(RuntimeError):
+            run_tls_renew_check(cm)
     assert mock_logger.exception.called

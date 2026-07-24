@@ -179,6 +179,25 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
     app.config['SESSION_COOKIE_SECURE'] = use_https
     app.jinja_env.globals.update(t=t)
 
+    # ── IP allowlist gate — MUST stay the FIRST before_request hook ──────────
+    # Flask runs before_request hooks in registration order, so this is
+    # registered before CSRFProtect / Limiter / Talisman are instantiated
+    # below. Otherwise their hooks (csrf_protect, _check_request_limit,
+    # _force_https) run first and can emit an HTTP response — a CSRF 400
+    # with a fresh token + session cookie, a 429 JSON body, or an HTTPS
+    # redirect — to a non-allowlisted IP, defeating the RST-drop stealth
+    # invariant (untrusted IPs must never receive any HTTP response).
+    @app.before_request
+    def ip_allowlist_gate():
+        # Silently drop with TCP RST (no HTTP response) so port scanners
+        # cannot detect an HTTP service on this port. Applied to ALL paths,
+        # including /static/, to prevent IP-enumeration of static assets
+        # by untrusted hosts.
+        allowed_ips = cm.config.get("web_gui", {}).get("allowed_ips", [])
+        if not _check_ip_allowed(allowed_ips, request.remote_addr):
+            logger.warning(f"[GUI] Blocked untrusted IP: {_safe_log(request.remote_addr)}")
+            _rst_drop()  # closes socket with RST, raises _RstDrop
+
     # ── pygments CSS — generated once at startup ───────────────────────────────
     from src.report.exporters.code_highlighter import get_highlight_css as _ghcss
     from pathlib import Path as _Path
@@ -513,18 +532,12 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
 
     @app.before_request
     def security_check():
+        # NOTE: the IP allowlist / RST-drop check lives in ip_allowlist_gate
+        # (registered first, before any extension hook) — by the time this
+        # hook runs the remote IP is already trusted.
         is_static = request.endpoint == 'static' or request.path.startswith('/static/')
 
-        # IP Allowlist check — silently drop with TCP RST (no HTTP response)
-        # so port scanners cannot detect an HTTP service on this port.
-        # Applied to ALL paths, including /static/, to prevent IP-enumeration
-        # of static assets by untrusted hosts.
-        allowed_ips = cm.config.get("web_gui", {}).get("allowed_ips", [])
-        if not _check_ip_allowed(allowed_ips, request.remote_addr):
-            logger.warning(f"[GUI] Blocked untrusted IP: {_safe_log(request.remote_addr)}")
-            _rst_drop()  # closes socket with RST, raises _RstDrop
-
-        # Static files pass IP allowlist above but do not require session auth
+        # Static files pass the IP allowlist gate but do not require session auth
         if is_static:
             return
 
@@ -602,12 +615,13 @@ def _create_app(cm: ConfigManager, persistent_mode: bool = False, use_https: boo
 # effectively "set and forget" for internal deployments while still giving
 # the auto-renew path meaningful runway before expiry.
 def _run_server(app, host: str, port: int, ssl_context,
-                cert_file: str = "", key_file: str = "") -> None:
+                cert_file: str = "", key_file: str = "",
+                tls_cfg: dict | None = None) -> None:
     """HTTP and HTTPS both served by cheroot (thread pool, native SSL)."""
     if ssl_context is None:
         _run_http(app, host, port)
     else:
-        _run_https(app, host, port, cert_file, key_file)
+        _run_https(app, host, port, cert_file, key_file, tls_cfg)
 
 
 def _run_http(app, host: str, port: int) -> None:
@@ -635,19 +649,19 @@ def _run_http(app, host: str, port: int) -> None:
         server.stop()
 
 
-def _run_https(app, host: str, port: int, cert_file: str, key_file: str) -> None:
-    """HTTPS via cheroot — production-grade WSGI server with hardened TLS."""
+def _run_https(app, host: str, port: int, cert_file: str, key_file: str,
+               tls_cfg: dict | None = None) -> None:
+    """HTTPS via cheroot — production-grade WSGI server with hardened TLS.
+
+    ``tls_cfg`` is the web_gui.tls dict from the caller's ConfigManager —
+    the same cm launch_gui used for every other TLS decision. Do NOT
+    re-read it from a fresh default-path ConfigManager here: callers with a
+    non-default config_file would get their min_version/ciphers ignored.
+    """
     from cheroot import wsgi as _cheroot_wsgi
     from cheroot.ssl.builtin import BuiltinSSLAdapter as _SSLAdapter
 
-    # Read TLS hardening config
-    try:
-        from src.config import ConfigManager as _CM
-        _tls_cfg = _CM().config.get("web_gui", {}).get("tls", {})
-    except Exception:
-        _tls_cfg = {}
-
-    ctx = _build_ssl_context(_tls_cfg)
+    ctx = _build_ssl_context(tls_cfg or {})
     ctx.load_cert_chain(cert_file, key_file)
 
     # M3: avoid cheroot's default-context creation by skipping BuiltinSSLAdapter.__init__
@@ -756,7 +770,9 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
                 if tls_cfg.get("auto_renew", True):
                     threshold = int(tls_cfg.get("auto_renew_days", 30))
                     renewed, days_after = _maybe_auto_renew_self_signed(
-                        cert_dir, threshold_days=threshold
+                        cert_dir, threshold_days=threshold,
+                        days=int(tls_cfg.get("validity_days", _SELF_SIGNED_VALIDITY_DAYS)),
+                        key_algorithm=tls_cfg.get("key_algorithm", "ecdsa-p256"),
                     )
                     if renewed:
                         print(f"  TLS: Self-signed cert auto-renewed ({days_after} days remaining).")
@@ -793,4 +809,4 @@ def launch_gui(cm: ConfigManager = None, host='0.0.0.0', port=5001, persistent_m
         import webbrowser
         threading.Timer(1.5, lambda: webbrowser.open(f'{scheme}://127.0.0.1:{port}')).start()
 
-    _run_server(app, host, port, ssl_context, cert_file, key_file)
+    _run_server(app, host, port, ssl_context, cert_file, key_file, tls_cfg)

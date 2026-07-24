@@ -104,10 +104,14 @@ def make_rules_blueprint(
         now = datetime.datetime.now(datetime.timezone.utc)
         rules = []
         for i, r in enumerate(cm.config['rules']):
-            rule_out = {"index": i, **r}
+            # index 放在 spread 之後：歷史上被 round-trip PUT 持久化進 rule 的
+            # 過期 index 不得蓋掉每次計算的真實位置（GUI 以 index 定址編輯/刪除）。
+            rule_out = {**r, "index": i}
             rem_mins = 0
-            rid = str(r['id'])
-            if rid in alert_history:
+            # 手改 alerts.json 的 rule 可能缺 id（Rule schema 只要求 type）——
+            # 直接下標會讓整個列表 500。
+            rid = str(r.get('id') or '')
+            if rid and rid in alert_history:
                 try:
                     last_alert_str = alert_history[rid]
                     last_ts = datetime.datetime.strptime(last_alert_str, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc)
@@ -149,23 +153,27 @@ def make_rules_blueprint(
         except (TypeError, ValueError) as exc:
             msg = str(exc) or t("gui_err_invalid_number", lang=lang)
             return _err(msg, 400)
-        cm.add_or_update_rule({
-            "id": gen_rule_id(),
-            "type": "event",
-            "filter_key": "event_type",
-            "name": d.get('name', ''),
-            "filter_value": filter_value,
-            "filter_status": d.get('filter_status', 'all'),
-            "filter_severity": d.get('filter_severity', 'all'),
-            "desc": d.get('name', ''),
-            "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
-            "threshold_type": d.get('threshold_type', 'immediate'),
-            "threshold_count": threshold_count,
-            "threshold_window": threshold_window,
-            "cooldown_minutes": cooldown_minutes,
-            "throttle": throttle,
-            "match_fields": match_fields,
-        })
+        # 比照 PUT/DELETE：load→mutate→save 以共用鎖序列化，否則與併發寫入者
+        # （或背景 scheduler 的 cm.load()）交錯時新規則會靜默丟失。
+        with cm.write_lock:
+            cm.load()
+            cm.add_or_update_rule({
+                "id": gen_rule_id(),
+                "type": "event",
+                "filter_key": "event_type",
+                "name": d.get('name', ''),
+                "filter_value": filter_value,
+                "filter_status": d.get('filter_status', 'all'),
+                "filter_severity": d.get('filter_severity', 'all'),
+                "desc": d.get('name', ''),
+                "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
+                "threshold_type": d.get('threshold_type', 'immediate'),
+                "threshold_count": threshold_count,
+                "threshold_window": threshold_window,
+                "cooldown_minutes": cooldown_minutes,
+                "throttle": throttle,
+                "match_fields": match_fields,
+            })
         return jsonify({"ok": True})
 
     @bp.route('/api/rules/system', methods=['POST'])
@@ -179,20 +187,28 @@ def make_rules_blueprint(
         filter_value = str(d.get('filter_value') or 'pce_health').strip() or 'pce_health'
         if filter_value != 'pce_health':
             return _err(t("gui_err_unsupported_system_rule_type", lang=lang), 400)
-        cm.add_or_update_rule({
-            "id": gen_rule_id(),
-            "type": "system",
-            "name": d.get('name') or t('rule_pce_health', lang=lang),
-            "filter_value": "pce_health",
-            "desc": t('rule_pce_health_desc', lang=lang, default='PCE health check failed.'),
-            "rec": t('rule_pce_health_rec', lang=lang, default='Check PCE service status and network connectivity.'),
-            "threshold_type": "immediate",
-            "threshold_count": 1,
-            "threshold_window": 10,
-            "cooldown_minutes": int(d.get('cooldown_minutes', 30)),
-            "throttle": throttle,
-            "match_fields": {},
-        })
+        # 同 event 端點：非數字輸入回 i18n 400，而非裸 ValueError 變 500。
+        try:
+            cooldown_minutes = int(d.get('cooldown_minutes', 30))
+        except (TypeError, ValueError):
+            return _err(t("gui_err_invalid_number", lang=lang), 400)
+        # 比照 PUT/DELETE：load→mutate→save 以共用鎖序列化（見 event 端點註解）。
+        with cm.write_lock:
+            cm.load()
+            cm.add_or_update_rule({
+                "id": gen_rule_id(),
+                "type": "system",
+                "name": d.get('name') or t('rule_pce_health', lang=lang),
+                "filter_value": "pce_health",
+                "desc": t('rule_pce_health_desc', lang=lang, default='PCE health check failed.'),
+                "rec": t('rule_pce_health_rec', lang=lang, default='Check PCE service status and network connectivity.'),
+                "threshold_type": "immediate",
+                "threshold_count": 1,
+                "threshold_window": 10,
+                "cooldown_minutes": cooldown_minutes,
+                "throttle": throttle,
+                "match_fields": {},
+            })
         return jsonify({"ok": True})
 
     @bp.route('/api/rules/traffic', methods=['POST'])
@@ -224,6 +240,13 @@ def make_rules_blueprint(
         if proto:
             try: proto = int(proto)
             except (ValueError, TypeError): proto = None
+        # 同 event 端點：非數字輸入回 i18n 400，而非裸 ValueError 變 500。
+        try:
+            pd_val = int(d.get('pd', 2))
+            threshold_count = int(d.get('threshold_count', 10))
+            cooldown_minutes = int(d.get('cooldown_minutes', 10))
+        except (TypeError, ValueError):
+            return _err(t("gui_err_invalid_number", lang=lang), 400)
 
         f = d.get('filters')
         if isinstance(f, dict):
@@ -232,40 +255,45 @@ def make_rules_blueprint(
             flat, err_resp = _extract_rule_filters(f, lang)
             if err_resp is not None:
                 return err_resp
-            cm.add_or_update_rule({
-                "id": gen_rule_id(),
-                "type": "traffic",
-                "name": d.get('name', ''),
-                "pd": int(d.get('pd', 2)),
-                "port": port, "proto": proto,
-                "ex_port": ex_port,
-                "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_policy", lang=lang, default="Check Policy"),
-                "threshold_type": "count",
-                "threshold_count": int(d.get('threshold_count', 10)),
-                "threshold_window": _win,
-                "cooldown_minutes": int(d.get('cooldown_minutes', 10)),
-                "throttle": throttle,
-                **flat,
-            })
+            # 比照 PUT/DELETE：load→mutate→save 以共用鎖序列化（見 event 端點註解）。
+            with cm.write_lock:
+                cm.load()
+                cm.add_or_update_rule({
+                    "id": gen_rule_id(),
+                    "type": "traffic",
+                    "name": d.get('name', ''),
+                    "pd": pd_val,
+                    "port": port, "proto": proto,
+                    "ex_port": ex_port,
+                    "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_policy", lang=lang, default="Check Policy"),
+                    "threshold_type": "count",
+                    "threshold_count": threshold_count,
+                    "threshold_window": _win,
+                    "cooldown_minutes": cooldown_minutes,
+                    "throttle": throttle,
+                    **flat,
+                })
         else:
-            cm.add_or_update_rule({
-                "id": gen_rule_id(),
-                "type": "traffic",
-                "name": d.get('name', ''),
-                "pd": int(d.get('pd', 2)),
-                "port": port, "proto": proto,
-                "src_label": src_label, "dst_label": dst_label,
-                "src_ip_in": src_ip, "dst_ip_in": dst_ip,
-                "ex_port": ex_port,
-                "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
-                "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip,
-                "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_policy", lang=lang, default="Check Policy"),
-                "threshold_type": "count",
-                "threshold_count": int(d.get('threshold_count', 10)),
-                "threshold_window": _win,
-                "cooldown_minutes": int(d.get('cooldown_minutes', 10)),
-                "throttle": throttle,
-            })
+            with cm.write_lock:
+                cm.load()
+                cm.add_or_update_rule({
+                    "id": gen_rule_id(),
+                    "type": "traffic",
+                    "name": d.get('name', ''),
+                    "pd": pd_val,
+                    "port": port, "proto": proto,
+                    "src_label": src_label, "dst_label": dst_label,
+                    "src_ip_in": src_ip, "dst_ip_in": dst_ip,
+                    "ex_port": ex_port,
+                    "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
+                    "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip,
+                    "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_policy", lang=lang, default="Check Policy"),
+                    "threshold_type": "count",
+                    "threshold_count": threshold_count,
+                    "threshold_window": _win,
+                    "cooldown_minutes": cooldown_minutes,
+                    "throttle": throttle,
+                })
         return jsonify({"ok": True})
 
     @bp.route('/api/rules/bandwidth', methods=['POST'])
@@ -293,6 +321,13 @@ def make_rules_blueprint(
         if ex_port:
             try: ex_port = int(ex_port)
             except (ValueError, TypeError): ex_port = None
+        # 同 event 端點：非數字輸入回 i18n 400，而非裸 ValueError 變 500。
+        try:
+            pd_val = int(d.get('pd', -1))
+            threshold_count = float(d.get('threshold_count', 100))
+            cooldown_minutes = int(d.get('cooldown_minutes', 30))
+        except (TypeError, ValueError):
+            return _err(t("gui_err_invalid_number", lang=lang), 400)
 
         f = d.get('filters')
         if isinstance(f, dict):
@@ -301,40 +336,45 @@ def make_rules_blueprint(
             flat, err_resp = _extract_rule_filters(f, lang)
             if err_resp is not None:
                 return err_resp
-            cm.add_or_update_rule({
-                "id": gen_rule_id(),
-                "type": d.get('rule_type', 'bandwidth'),
-                "name": d.get('name', ''),
-                "pd": int(d.get('pd', -1)),
-                "port": port, "proto": None,
-                "ex_port": ex_port,
-                "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
-                "threshold_type": "count",
-                "threshold_count": float(d.get('threshold_count', 100)),
-                "threshold_window": _win,
-                "cooldown_minutes": int(d.get('cooldown_minutes', 30)),
-                "throttle": throttle,
-                **flat,
-            })
+            # 比照 PUT/DELETE：load→mutate→save 以共用鎖序列化（見 event 端點註解）。
+            with cm.write_lock:
+                cm.load()
+                cm.add_or_update_rule({
+                    "id": gen_rule_id(),
+                    "type": d.get('rule_type', 'bandwidth'),
+                    "name": d.get('name', ''),
+                    "pd": pd_val,
+                    "port": port, "proto": None,
+                    "ex_port": ex_port,
+                    "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
+                    "threshold_type": "count",
+                    "threshold_count": threshold_count,
+                    "threshold_window": _win,
+                    "cooldown_minutes": cooldown_minutes,
+                    "throttle": throttle,
+                    **flat,
+                })
         else:
-            cm.add_or_update_rule({
-                "id": gen_rule_id(),
-                "type": d.get('rule_type', 'bandwidth'),
-                "name": d.get('name', ''),
-                "pd": int(d.get('pd', -1)),
-                "port": port, "proto": None,
-                "src_label": src_label, "dst_label": dst_label,
-                "src_ip_in": src_ip, "dst_ip_in": dst_ip,
-                "ex_port": ex_port,
-                "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
-                "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip,
-                "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
-                "threshold_type": "count",
-                "threshold_count": float(d.get('threshold_count', 100)),
-                "threshold_window": _win,
-                "cooldown_minutes": int(d.get('cooldown_minutes', 30)),
-                "throttle": throttle,
-            })
+            with cm.write_lock:
+                cm.load()
+                cm.add_or_update_rule({
+                    "id": gen_rule_id(),
+                    "type": d.get('rule_type', 'bandwidth'),
+                    "name": d.get('name', ''),
+                    "pd": pd_val,
+                    "port": port, "proto": None,
+                    "src_label": src_label, "dst_label": dst_label,
+                    "src_ip_in": src_ip, "dst_ip_in": dst_ip,
+                    "ex_port": ex_port,
+                    "ex_src_label": ex_src_label, "ex_dst_label": ex_dst_label,
+                    "ex_src_ip": ex_src_ip, "ex_dst_ip": ex_dst_ip,
+                    "desc": d.get('name', ''), "rec": t("gui_rule_default_rec_check_logs", lang=lang, default="Check Logs"),
+                    "threshold_type": "count",
+                    "threshold_count": threshold_count,
+                    "threshold_window": _win,
+                    "cooldown_minutes": cooldown_minutes,
+                    "throttle": throttle,
+                })
         return jsonify({"ok": True})
 
     @bp.route('/api/rules/<int:idx>')
@@ -342,7 +382,8 @@ def make_rules_blueprint(
         lang = (request.get_json(silent=True) or {}).get('lang') or cm.config.get('settings', {}).get('language', 'en')
         cm.load()
         if 0 <= idx < len(cm.config['rules']):
-            return jsonify({"index": idx, **cm.config['rules'][idx]})
+            # index 放在 spread 之後，理由同列表路由。
+            return jsonify({**cm.config['rules'][idx], "index": idx})
         return _err(t("gui_not_found", lang=lang), 404)
 
     @bp.route('/api/rules/<int:idx>', methods=['PUT'])
@@ -383,6 +424,22 @@ def make_rules_blueprint(
                     flat, err_resp = _extract_rule_filters(f, lang)
                     if err_resp is not None:
                         return err_resp
+                # 不可 mass-assign 的 key 先剝除：index/cooldown_remaining/
+                # throttle_state 是 GET 端計算欄位、id 不可覆寫（會孤兒化
+                # alert_history/throttle_state cooldown）、lang 是傳輸欄位。
+                # round-trip 一份 GET 回來的 rule 物件不得把它們持久化。
+                for _k in ('index', 'id', 'lang', 'cooldown_remaining', 'throttle_state'):
+                    d.pop(_k, None)
+                # threshold_window 驗證必須在動到 old 之前完成（同上方
+                # label_group 檢查的不變量：400 時 old 完全未被動過），且非
+                # 數值一律拒絕、不可保留原始值——一條壞 rule 會讓 analyzer
+                # 的 _max_win 保留期計算整批 fallback，count 視窗靜默低估
+                # （2026-07-24 審查 A3 迴歸）。
+                if d.get('threshold_window') is not None:
+                    try:
+                        d['threshold_window'] = _parse_threshold_window(d, lang)
+                    except ValueError as exc:
+                        return _err(str(exc), 400)
                 old.update(d)
                 # Re-parse label/ip fields for traffic and bw/vol. Only touch a
                 # side that is actually present in the PUT body: a partial update
@@ -411,18 +468,12 @@ def make_rules_blueprint(
                     for k in _RULE_FB_KEYS + _RULE_LEGACY_SCALAR_KEYS + _RULE_REJECTED_KEYS:
                         old.pop(k, None)
                     old.update(flat)
-                # Cast numeric fields
-                for k in ('port', 'ex_port', 'proto', 'threshold_count', 'threshold_window', 'cooldown_minutes', 'pd'):
+                # Cast numeric fields（threshold_window 已在 old.update 前經
+                # _parse_threshold_window 驗證＋轉型，這裡不再重複檢查）
+                for k in ('port', 'ex_port', 'proto', 'threshold_count', 'cooldown_minutes', 'pd'):
                     if k in old and old[k] is not None:
                         try: old[k] = int(old[k]) if k != 'threshold_count' else float(old[k])
                         except (ValueError, TypeError): pass  # intentional fallback: keep raw value if numeric cast fails
-                # 視窗上限同建立路徑（2026-07-24 審查 A3）
-                _tw = old.get('threshold_window')
-                if isinstance(_tw, int):
-                    from src.analyzer import MAX_THRESHOLD_WINDOW_MINUTES
-                    if not (1 <= _tw <= MAX_THRESHOLD_WINDOW_MINUTES):
-                        return _err(t("gui_err_window_too_large", lang=lang,
-                                      max=MAX_THRESHOLD_WINDOW_MINUTES), 400)
                 cm.save()
                 return jsonify({"ok": True})
             return _err(t("gui_not_found", lang=lang), 404)

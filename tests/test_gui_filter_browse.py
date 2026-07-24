@@ -36,10 +36,10 @@ SERVICES = [
 
 
 def _mock_fetchers(monkeypatch):
-    monkeypatch.setattr("src.api_client.ApiClient.get_all_labels", lambda self: LABELS)
-    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self: IP_LISTS)
-    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.get_services", lambda self: SERVICES)
+    monkeypatch.setattr("src.api_client.ApiClient.get_all_labels", lambda self, **kw: LABELS)
+    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self, **kw: IP_LISTS)
+    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self, **kw: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_services", lambda self, **kw: SERVICES)
 
 
 def test_browse_totals(app_persistent, monkeypatch):
@@ -110,12 +110,12 @@ def test_browse_pce_unreachable_502(app_persistent, monkeypatch):
     from src.gui.filter_object_cache import invalidate_object_cache
     invalidate_object_cache()
 
-    def _boom(self):
+    def _boom(self, **kw):
         raise RuntimeError("pce down")
     monkeypatch.setattr("src.api_client.ApiClient.get_all_labels", _boom)
-    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self: [])
-    monkeypatch.setattr("src.api_client.ApiClient.get_services", lambda self: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_ip_lists", lambda self, **kw: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_label_groups", lambda self, **kw: [])
+    monkeypatch.setattr("src.api_client.ApiClient.get_services", lambda self, **kw: [])
 
     r = client.get('/api/filter-objects/browse?type=label',
                   environ_overrides={'REMOTE_ADDR': '127.0.0.1'})

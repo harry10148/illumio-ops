@@ -89,11 +89,25 @@ def _save_adhoc_job(job_id: str, record: dict) -> None:
         jobs = dict(data.get(_ADHOC_JOBS_KEY, {}) or {})
         jobs[job_id] = record
         if len(jobs) > _ADHOC_JOBS_MAX:
+            # status=running 豁免修剪：長工作進行中被較新 job 擠掉會讓輪詢
+            # /api/reports/jobs/<id> 404「unknown job」，前端誤報工作消失。
+            # 超過 24h 的 running 視為殭屍（worker 早已死亡）照常可修剪。
+            cutoff = (datetime.datetime.now(datetime.timezone.utc)
+                      - datetime.timedelta(hours=24)).isoformat()
+
+            def _protected(rec):
+                rec = rec or {}
+                return (rec.get("status") == "running"
+                        and (rec.get("started_at") or "") >= cutoff)
+
+            protected = {k: v for k, v in jobs.items() if _protected(v)}
+            prunable = {k: v for k, v in jobs.items() if k not in protected}
+            keep = max(0, _ADHOC_JOBS_MAX - len(protected))
             # Keep newest by started_at; missing/blank started_at sorts oldest.
-            ordered = sorted(jobs.items(),
+            ordered = sorted(prunable.items(),
                              key=lambda kv: kv[1].get("started_at") or "",
                              reverse=True)
-            jobs = dict(ordered[:_ADHOC_JOBS_MAX])
+            jobs = {**protected, **dict(ordered[:keep])}
         data[_ADHOC_JOBS_KEY] = jobs
         return data
 
@@ -167,7 +181,12 @@ def make_reports_blueprint(
         for f in os.listdir(reports_dir):
             if f.endswith(('.html', '.zip', '.pdf', '.xlsx')):
                 report_path = os.path.join(reports_dir, f)
-                stat = os.stat(report_path)
+                try:
+                    stat = os.stat(report_path)
+                except OSError:
+                    # 併發刪除（單/批次刪除端點或排程保留期清理）在 listdir 與
+                    # stat 之間移走檔案——略過該筆，不讓整個列表 500。
+                    continue
                 metadata = {}
                 metadata_path = report_path + ".metadata.json"
                 if os.path.isfile(metadata_path):
@@ -339,9 +358,14 @@ def make_reports_blueprint(
                 "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             })
             if export_errors or not filenames:
+                # H3 慣例：例外字串（可能含檔案系統路徑/PCE URL）只進 server
+                # log，job record 存泛用訊息＋request_id 供對照。
+                req_id = uuid.uuid4().hex[:8]
+                logger.error(f"[GUI:report_traffic_job] req={req_id} job={job_id} "
+                             f"export errors: {export_errors or 'no files produced'}")
                 record["status"] = "error"
-                record["errors"] = export_errors
-                record["error"] = "; ".join(f"{k}: {v}" for k, v in export_errors.items()) or "export produced no files"
+                record["error"] = t("gui_err_internal", default="Internal server error", lang=lang)
+                record["request_id"] = req_id
             else:
                 record["status"] = "done"
             _save_adhoc_job(job_id, record)
@@ -351,8 +375,14 @@ def make_reports_blueprint(
                     _rlog.error(f"Traffic report failed: {e}")
             except Exception:
                 pass  # intentional fallback: ModuleLog write is best-effort
-            logger.exception(f"Ad-hoc traffic report job {job_id} failed: {e}")
-            record.update({"status": "error", "error": str(e),
+            # H3 慣例：完整 traceback 進 server log，job record 只存泛用 i18n
+            # 訊息＋request_id（str(e) 可能含報表目錄路徑/PCE 端點細節，會被
+            # /api/reports/jobs/<id> 原樣回給瀏覽器）。
+            req_id = uuid.uuid4().hex[:8]
+            logger.exception(f"[GUI:report_traffic_job] req={req_id} job={job_id} failed: {e}")
+            record.update({"status": "error",
+                           "error": t("gui_err_internal", default="Internal server error", lang=lang),
+                           "request_id": req_id,
                            "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
             try:
                 _save_adhoc_job(job_id, record)
@@ -702,8 +732,13 @@ def make_reports_blueprint(
                                "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
                 _save_adhoc_job(jid, record)
             except Exception as e:  # noqa: BLE001
-                logger.exception(f"App summary job {jid} failed: {e}")
-                record.update({"status": "error", "error": str(e),
+                # H3 慣例：同 _run_adhoc——str(e) 不落 job record，存泛用訊息
+                # ＋request_id。
+                req_id = uuid.uuid4().hex[:8]
+                logger.exception(f"[GUI:report_app_summary_job] req={req_id} job={jid} failed: {e}")
+                record.update({"status": "error",
+                               "error": t("gui_err_internal", default="Internal server error", lang=p["lang"]),
+                               "request_id": req_id,
                                "finished_at": datetime.datetime.now(datetime.timezone.utc).isoformat()})
                 try:
                     _save_adhoc_job(jid, record)

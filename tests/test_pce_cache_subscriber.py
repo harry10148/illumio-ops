@@ -157,3 +157,25 @@ def test_fetch_window_rows_filters_by_time_and_keeps_cursor(session_factory):
     assert len(sub.poll_new_rows()) == 3
     rows2 = sub.fetch_window_rows(now - timedelta(minutes=6))
     assert len(rows2) == 2
+
+
+def test_fetch_window_rows_truncation_keeps_newest_and_warns(session_factory, caplog):
+    """視窗列數超過 limit 時：(1) 被丟掉的必須是最舊的列（threshold 規則
+    最關心近期），(2) 必須發 warning——不可靜默截斷（專案鐵則），
+    (3) 回傳順序仍為時間升冪。"""
+    import logging
+    from loguru import logger as _loguru
+    from src.pce_cache.subscriber import CacheSubscriber
+    now = datetime.now(timezone.utc)
+    for i in range(5):
+        _seed(session_factory, f"t{i}", now - timedelta(minutes=10 - i))
+    sub = CacheSubscriber(session_factory, "rule_engine", "pce_events")
+    handler_id = _loguru.add(caplog.handler, level="WARNING", format="{message}")
+    try:
+        rows = sub.fetch_window_rows(now - timedelta(minutes=20), limit=3)
+    finally:
+        _loguru.remove(handler_id)
+    assert len(rows) == 3
+    # 保住最新三筆（t2, t3, t4），且升冪回傳
+    assert [r["pce_event_id"] for r in rows] == ["t2", "t3", "t4"]
+    assert any("truncated" in r.message for r in caplog.records)

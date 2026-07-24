@@ -31,6 +31,9 @@ class _I18nState:
         if lang in self._VALID:
             with self._lock:
                 self._lang = lang
+        else:
+            logger.warning(
+                f"i18n: ignoring invalid language {lang!r}; staying on {self._lang}")
 
 
 _I18N_STATE = _I18nState("en")
@@ -62,14 +65,18 @@ def get_language() -> str:
 def _load_en_messages() -> dict[str, str]:
     try:
         return json.loads(_EN_MESSAGES_PATH.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as exc:
+        # Missing/truncated/corrupt message file degrades every t() call to
+        # [MISSING:key] markers — must be loudly diagnosable, never silent.
+        logger.error(f"i18n: failed to load {_EN_MESSAGES_PATH}: {exc}")
         return {}
 
 
 def _load_zh_messages() -> dict[str, str]:
     try:
         return json.loads(_ZH_MESSAGES_PATH.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as exc:
+        logger.error(f"i18n: failed to load {_ZH_MESSAGES_PATH}: {exc}")
         return {}
 
 EN_MESSAGES = _load_en_messages()
@@ -350,7 +357,9 @@ def t(key: str, *, lang: str | None = None, default: str | None = None, **kwargs
         Translated string with format substitutions applied.
     """
     _lang = lang if lang in {"en", "zh_TW"} else get_language()
-    text = get_messages(_lang).get(key)
+    # Read-only lookup on the cached table — get_messages() would copy the
+    # whole 4600-entry dict per call, which is pure overhead on hot loops.
+    text = _build_messages(_lang).get(key)
     if text is None:
         text = _normalized_en_messages().get(key)
     if text is None and _is_strict_surface_key(key):
@@ -362,6 +371,8 @@ def t(key: str, *, lang: str | None = None, default: str | None = None, **kwargs
     if kwargs:
         try:
             return text.format(**kwargs)
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                f"i18n: format failed for key {key!r} ({exc}); returning raw template")
             return text
     return text

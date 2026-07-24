@@ -89,7 +89,8 @@ class CacheReader:
             return result
 
     def count_flows(self, start: datetime, end: datetime,
-                    workload_hrefs: list[str] | None = None) -> int:
+                    workload_hrefs: list[str] | None = None,
+                    policy_decisions: list[str] | None = None) -> int:
         with self._sf() as s:
             q = (select(func.count()).select_from(PceTrafficFlowRaw)
                  .where(PceTrafficFlowRaw.last_detected >= start,
@@ -98,17 +99,38 @@ class CacheReader:
                 hrefs = list(workload_hrefs)
                 q = q.where(or_(PceTrafficFlowRaw.src_workload.in_(hrefs),
                                 PceTrafficFlowRaw.dst_workload.in_(hrefs)))
+            if policy_decisions:
+                # 與 read_flows_df 實際下推的 action 過濾一致（ix_raw_last_action
+                # 支援）：guard 必須數「真正會被讀出的列」，否則過濾後遠低於
+                # 上限的查詢也會被誤判超限、白白 fallback 到 200k 硬上限的
+                # live API 路徑造成截斷。
+                q = q.where(PceTrafficFlowRaw.action.in_(list(policy_decisions)))
+            return s.execute(q).scalar() or 0
+
+    def count_events(self, start: datetime, end: datetime) -> int:
+        with self._sf() as s:
+            q = (select(func.count()).select_from(PceEvent)
+                 .where(PceEvent.timestamp >= start, PceEvent.timestamp <= end))
             return s.execute(q).scalar() or 0
 
     def _guard_window(self, start: datetime, end: datetime,
-                      workload_hrefs: list[str] | None = None) -> None:
+                      workload_hrefs: list[str] | None = None,
+                      policy_decisions: list[str] | None = None) -> None:
         if self._read_max_rows is None:
             return
-        n = self.count_flows(start, end, workload_hrefs)
+        n = self.count_flows(start, end, workload_hrefs, policy_decisions)
         if n > self._read_max_rows:
             raise CacheReadTooLarge(n, self._read_max_rows)
 
     def read_events(self, start: datetime, end: datetime) -> list[dict]:
+        # 事件版讀取護欄（flow 讀取皆有 _guard_window，events 先前沒有）：
+        # 90 天 retention 的全窗 audit 查詢可能把數百萬列一次 materialize
+        # 進長駐 process。超限就 fail-closed 拋 CacheReadTooLarge，而非讓
+        # daemon 走向 OOM。
+        if self._read_max_rows is not None:
+            n = self.count_events(start, end)
+            if n > self._read_max_rows:
+                raise CacheReadTooLarge(n, self._read_max_rows)
         # Column-only select: only raw_json is used, so avoid materializing
         # the full ORM entity (and its other columns) per row — same fast-path
         # pattern as read_flows_df below.
@@ -164,7 +186,7 @@ class CacheReader:
         values in SQL — both correctness (cache must honour the report's decision
         filter like the live API does) and perf (read only matching rows).
         """
-        self._guard_window(start, end, workload_hrefs)
+        self._guard_window(start, end, workload_hrefs, policy_decisions)
         from src.report.parsers.api_parser import flatten_flow_record, build_unified_df
 
         def _window(col):

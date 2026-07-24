@@ -11,7 +11,7 @@ from src.i18n import t, set_language
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 
-_SECRET_FIELD_TOKENS = {"key", "secret", "password", "secret_key", "token"}
+_SECRET_FIELD_TOKENS = {"key", "secret", "password", "secret_key", "token", "webhook"}
 
 _PH = PasswordHasher(time_cost=4, memory_cost=131072, parallelism=4)
 
@@ -181,7 +181,17 @@ class ConfigManager:
         return self._rw_lock
 
     def load(self):
-        """Load and validate config.json via pydantic ConfigSchema."""
+        """Load and validate config.json (serialized on the re-entrant lock).
+
+        Acquiring _rw_lock here means a bare ``cm.load()`` from a read-only GUI
+        handler can no longer reassign self.config mid-way through another
+        thread's ``with cm.write_lock: load(); mutate; save()`` section. The lock
+        is re-entrant, so existing write_lock holders are unaffected.
+        """
+        with self._rw_lock:
+            self._load_impl()
+
+    def _load_impl(self):
         from pydantic import ValidationError
         from src.config_models import ConfigSchema
         from src.exceptions import ConfigError
@@ -194,7 +204,17 @@ class ConfigManager:
             except (json.JSONDecodeError, IOError, OSError) as e:
                 logger.error(f"Error reading config file: {e}")
                 print(f"{Colors.FAIL}{t('error_loading_config', error=e)}{Colors.ENDC}")
-                # Fall through with raw_data={} to use defaults
+                # Fail closed: the file EXISTS but is unreadable/corrupt. Falling
+                # through to defaults here would let _ensure_web_gui_secret's
+                # auto-save immediately overwrite the real config.json with a
+                # defaults-only dict, permanently wiping the operator's PCE
+                # credentials, profiles and settings. Refuse to start instead
+                # (mirrors the api-block validation-failure path below).
+                raise ConfigError(
+                    f"Refusing to start: config.json exists but could not be read "
+                    f"({e}). Fix or restore the file (or delete it to regenerate "
+                    f"defaults) and restart."
+                ) from e
 
         # alerts.json holds RULES (new layout). If the file is the previous
         # layout — a dict of channel settings (active / line_* / webhook_url
@@ -400,6 +420,11 @@ class ConfigManager:
             self.save()
 
     def save(self):
+        """Persist config (serialized on the re-entrant lock)."""
+        with self._rw_lock:
+            self._save_impl()
+
+    def _save_impl(self):
         try:
             # Persist rules to alerts.json first so an interruption between
             # the two writes never leaves stale rules in config.json.
@@ -438,6 +463,11 @@ class ConfigManager:
         except (IOError, OSError) as e:
             logger.error(f"Error saving config: {e}")
             print(f"{Colors.FAIL}{t('error_saving_config', error=e)}{Colors.ENDC}")
+            # Fail loud: swallowing this returned {"ok": true} to the GUI while
+            # nothing reached disk, so in-memory config silently diverged until
+            # the next load() reverted the operator's change. Re-raise so callers
+            # (GUI handlers) can surface a real error.
+            raise
 
     def _read_alerts_file(self):
         """Return the parsed alerts.json dict, or None if file is missing.
@@ -448,8 +478,12 @@ class ConfigManager:
             — load() migrates this back into config.json's ``alerts`` block.
 
         Missing file → None (callers use whatever's in config.json plus
-        defaults). JSON / I/O errors return {} (empty) and log loudly.
+        defaults). JSON / I/O errors fail closed (ConfigError) so a corrupt
+        alerts.json never silently collapses to an empty rule set that the
+        next save() would then persist over the recoverable original.
         """
+        from src.exceptions import ConfigError
+
         if not os.path.exists(self.alerts_file):
             return None
         try:
@@ -457,7 +491,13 @@ class ConfigManager:
                 return json.load(f)
         except (json.JSONDecodeError, IOError, OSError) as e:
             logger.error(f"Error reading alerts file: {e}")
-            return {}
+            # Fail closed: returning {} here would drop every alert rule from
+            # memory and the next save() would overwrite alerts.json with the
+            # empty set, destroying the recoverable original. Refuse instead.
+            raise ConfigError(
+                f"Refusing to start: alerts.json exists but could not be read "
+                f"({e}). Fix or restore the file (or delete it) and restart."
+            ) from e
 
     def _write_alerts_file(self):
         """Atomically write ``{"rules": self.config['rules']}`` to alerts.json
@@ -558,7 +598,11 @@ class ConfigManager:
             if p.get("id") == profile_id:
                 self.config["pce_profiles"][i].update(updates)
                 if self.config.get("active_pce_id") == profile_id:
-                    self.sync_api_to_active_profile()
+                    # Editing the ACTIVE profile must propagate profile→api (the
+                    # direction activate uses) and re-validate. The old
+                    # sync_api_to_active_profile() copied api→profile, clobbering
+                    # the updates just applied above.
+                    return self.activate_pce_profile(profile_id)
                 self.save()
                 return True
         return False
@@ -577,13 +621,31 @@ class ConfigManager:
         return False
 
     def activate_pce_profile(self, profile_id: int) -> bool:
+        from pydantic import ValidationError
+        from src.config_models import ApiSettings
+
         for p in self.config.get("pce_profiles", []):
             if p.get("id") == profile_id:
-                self.config["active_pce_id"] = profile_id
-                api = self.config.setdefault("api", {})
+                api = dict(self.config.get("api", {}))
                 for k in ("url", "org_id", "key", "secret", "verify_ssl"):
                     if k in p:
                         api[k] = p[k]
+                # Derive the profile mode so a verify_ssl=False profile validates
+                # as 'dev' instead of tripping the production TLS guard (which
+                # activate previously ignored, then persisted an api block that
+                # bricked the next load()). Validate BEFORE saving; reject on
+                # failure so we never write an unloadable config.
+                api["profile"] = "dev" if api.get("verify_ssl") is False else "production"
+                try:
+                    ApiSettings.model_validate(api)
+                except ValidationError as e:
+                    logger.error(
+                        "Refusing to activate PCE profile {}: resulting api block "
+                        "is invalid ({} error(s))", profile_id, e.error_count()
+                    )
+                    return False
+                self.config["active_pce_id"] = profile_id
+                self.config["api"] = api
                 self.save()
                 return True
         return False

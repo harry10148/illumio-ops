@@ -236,8 +236,12 @@ RUNBOOK_CATEGORIES: dict[str, dict] = {
             "database.temp_table_autocleanup_completed",
         ],
         "runbook_url": "https://docs.illumio.com/core/24.2/Content/Guides/events-administration/events-monitoring.htm",
-        "severity_hint": "critical",
-        "response": "Check PCE event database disk usage immediately. The PCE prunes events aggressively once event storage reaches 20 percent of disk (soft limit) and stops recording new events at 25 percent (hard limit), which silently breaks event-based alerting. Review Troubleshooting > Events for prune_old_log_events entries whose notifications carry soft_limit.exceeded or hard_limit.exceeded, reduce event retention, or expand disk. Confirm system_task.hard_limit_recovery_completed appears after cleanup.",
+        # Vendor Events Guide documents these only as routine DB temp table
+        # cleanup — no operator action, no relationship to the event-storage
+        # 20%/25% limits (that signal is system_task.prune_old_log_events,
+        # covered by the 'system-tasks' category above).
+        "severity_hint": "info",
+        "response": "DB temp table autocleanup is routine PCE database maintenance that removes temporary tables left by traffic queries and internal operations; on its own it requires no operator action. Investigate only if these events fire continuously over a short window or coincide with disk-pressure symptoms — in that case check PCE database disk usage and review Troubleshooting > Events for system_task.prune_old_log_events entries whose notifications carry soft_limit.exceeded or hard_limit.exceeded, which are the actual event-storage limit signals.",
     },
     "server-errors": {
         "patterns": [

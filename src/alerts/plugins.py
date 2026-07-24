@@ -165,7 +165,12 @@ class LineAlertPlugin(AlertOutputPlugin):
                 print(f"{Colors.FAIL}{t('line_alert_failed', lang=lang, error='', status=response.status)}{Colors.ENDC}")
                 return {"channel": "line", "status": "failed", "target": target_id, "error": f"status={response.status}"}
         except urllib.error.HTTPError as exc:
-            error_body = exc.read().decode("utf-8")
+            try:
+                error_body = exc.read().decode("utf-8")
+            except Exception:
+                # 非 UTF-8 error page（proxy 502 等）不得讓例外逃出 send()——
+                # 否則下方的 3-strike 冷卻計數永遠不會累加
+                error_body = "Could not read error body"
             self._consecutive_failures += 1
             if self._consecutive_failures >= 3:
                 self._cooldown_until = time.monotonic() + 300
@@ -225,6 +230,14 @@ class WebhookAlertPlugin(AlertOutputPlugin):
 class TelegramAlertPlugin(AlertOutputPlugin):
     name = "telegram"
 
+    @staticmethod
+    def _redact_token(text: str, token: str) -> str:
+        """L-12: bot token 藏在 URL path 裡；例外訊息（例如 http.client.InvalidURL
+        會原文引用整個 URL）一旦含 token，絕不可進 console/logs/state/GUI。"""
+        if token and text:
+            return text.replace(token, "...")
+        return text
+
     def send(self, reporter, subject: str, *, lang: str = "en") -> dict:
         alerts_cfg = self.cm.config.get("alerts", {})
         token = alerts_cfg.get("telegram_bot_token", "")
@@ -257,14 +270,18 @@ class TelegramAlertPlugin(AlertOutputPlugin):
                 error_body = exc.read().decode("utf-8")
             except Exception:
                 error_body = ""
-            print(f"{Colors.FAIL}{t('telegram_alert_failed', lang=lang, error=f'{exc} - {error_body}', status=exc.code)}{Colors.ENDC}")
-            return {"channel": "telegram", "status": "failed", "target": chat_id, "error": f"{exc} - {error_body}"}
+            err = self._redact_token(f"{exc} - {error_body}", token)
+            print(f"{Colors.FAIL}{t('telegram_alert_failed', lang=lang, error=err, status=exc.code)}{Colors.ENDC}")
+            return {"channel": "telegram", "status": "failed", "target": chat_id, "error": err}
         except (urllib.error.URLError, TimeoutError) as exc:
-            print(f"{Colors.FAIL}{t('telegram_alert_failed', lang=lang, error=f'Connection Error/Timeout: {exc}', status='')}{Colors.ENDC}")
-            return {"channel": "telegram", "status": "failed", "target": chat_id, "error": f"Connection Error/Timeout: {exc}"}
+            err = self._redact_token(f"Connection Error/Timeout: {exc}", token)
+            print(f"{Colors.FAIL}{t('telegram_alert_failed', lang=lang, error=err, status='')}{Colors.ENDC}")
+            return {"channel": "telegram", "status": "failed", "target": chat_id, "error": err}
         except Exception as exc:
-            print(f"{Colors.FAIL}{t('telegram_alert_failed', lang=lang, error=exc, status='')}{Colors.ENDC}")
-            return {"channel": "telegram", "status": "failed", "target": chat_id, "error": str(exc)}
+            # http.client.InvalidURL 等例外會把含 token 的完整 URL 塞進訊息
+            err = self._redact_token(str(exc), token)
+            print(f"{Colors.FAIL}{t('telegram_alert_failed', lang=lang, error=err, status='')}{Colors.ENDC}")
+            return {"channel": "telegram", "status": "failed", "target": chat_id, "error": err}
 
 
 class TeamsAlertPlugin(AlertOutputPlugin):

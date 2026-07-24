@@ -1173,6 +1173,7 @@ class Reporter:
 
         message = render_alert_template(
             "line_digest.txt.tmpl",
+            lang=_lang,
             subject=self._compact_text(subj),
             generated_at=self._now_str(),
             total_issues=str(total_issues),
@@ -1220,8 +1221,6 @@ class Reporter:
         sev_crit = t("alert_sev_critical")
         sev_warn = t("alert_sev_warning")
 
-        kept_total = 0
-
         health_lines = []
         if self.health_alerts:
             health_lines.append(section_header(t("alert_sec_health"), len(self.health_alerts)))
@@ -1232,7 +1231,6 @@ class Reporter:
                 health_lines.append(f"{time_lbl}：{esc(alert.get('time', ''))}")
                 health_lines.append(f"{summary_lbl}：{esc(alert.get('details', ''))}")
                 health_lines.append("")
-                kept_total += 1
 
         event_lines = []
         if self.event_alerts:
@@ -1245,14 +1243,12 @@ class Reporter:
                 if first.get("pce_link"):
                     event_lines.append(f"<a href=\"{html.escape(first['pce_link'], quote=True)}\">PCE</a>")
                 event_lines.append("")
-                kept_total += 1
 
         traffic_lines = []
         if self.traffic_alerts:
             traffic_lines.append(section_header(t("alert_sec_traffic"), len(self.traffic_alerts)))
             for alert in self.traffic_alerts:
                 traffic_lines.append(f"• {esc(alert.get('summary', ''))}")
-                kept_total += 1
             traffic_lines.append("")
 
         metric_lines = []
@@ -1260,11 +1256,11 @@ class Reporter:
             metric_lines.append(section_header(t("alert_sec_metric"), len(self.metric_alerts)))
             for alert in self.metric_alerts:
                 metric_lines.append(f"• {esc(alert.get('summary', ''))}")
-                kept_total += 1
             metric_lines.append("")
 
         body = render_alert_template(
             "telegram_digest.html.tmpl",
+            lang=_lang,
             subject=html.escape(subj),
             generated_at=html.escape(self._now_str()),
             total_issues=total_issues,
@@ -1289,7 +1285,15 @@ class Reporter:
             if nl != -1:
                 cut = cut[:nl]
             cut = cut.rstrip()
-            more = total_issues - kept_total
+            # 從實際留下的內容數倖存條目：health/event 的條目行以 [<b> 開頭
+            # （health 前面多個 "N. "），traffic/metric 以 "• " 開頭。用建構
+            # 期的計數會恆等於 total_issues，footer 永遠回報 0 筆被截斷。
+            entry_re = re.compile(r"^(?:\d+\. )?\[<b>")
+            kept = sum(
+                1 for ln in cut.split("\n")
+                if entry_re.match(ln) or ln.startswith("• ")
+            )
+            more = total_issues - kept
             footer = t("telegram_truncated_footer").format(more=max(more, 0))
             body = f"{cut}\n\n{footer}"
         return body
@@ -1719,6 +1723,7 @@ class Reporter:
         from email import encoders
 
         _MAX_ATTACH_BYTES = 10 * 1024 * 1024  # 10 MB per attachment
+        _MAX_TOTAL_BYTES = 20 * 1024 * 1024   # 20 MB 全信總量預算（以 base64 後估算）
 
         cfg = self.cm.config["email"]
         recipients = (
@@ -1733,6 +1738,7 @@ class Reporter:
         # Zip non-.zip files in-memory; skip files that exceed the size limit
         attach_parts = []
         skipped = []
+        total_est = 0  # 累計附件（base64 後）估算大小
         for path in (attachment_paths or []):
             if not path or not os.path.exists(path):
                 continue
@@ -1758,6 +1764,19 @@ class Reporter:
                     )
                     continue
 
+                # 多附件時單檔各自過關仍可能超過 SMTP 訊息上限（552）而整封
+                # 被退：以 base64 膨脹率 ~1.37x 估算累計總量，超過預算的
+                # 後續檔案改列 skipped，讓信件本體仍能送達並附上警示。
+                encoded_est = int(len(data) * 1.37)
+                if total_est + encoded_est > _MAX_TOTAL_BYTES:
+                    skipped.append(fname)
+                    logger.warning(
+                        f"[Email] Skipping {fname}: total attachment budget "
+                        f"{_MAX_TOTAL_BYTES // 1024 // 1024} MB would be exceeded"
+                    )
+                    continue
+                total_est += encoded_est
+
                 part = MIMEBase("application", "zip")
                 part.set_payload(data)
                 encoders.encode_base64(part)
@@ -1777,7 +1796,11 @@ class Reporter:
             )
             html_body = html_body.replace('</body></html>', warning_html + '</body></html>', 1)
 
-        plain_body = self._build_line_message(subject)
+        # text/plain 替代部位必須來自報表信自身的內容——_build_line_message
+        # 是告警摘要（此處 Reporter 無告警，會渲染成 0 筆的空骨架），與
+        # HTML 部位內容完全無關。改用去標籤後的報表本文。
+        plain_body = re.sub(r'<[^>]+>', '', html_body)
+        plain_body = re.sub(r'\s+', ' ', plain_body).strip()
 
         if attach_parts:
             msg = MIMEMultipart('mixed')
@@ -1792,6 +1815,10 @@ class Reporter:
             msg.attach(MIMEText(plain_body, 'plain', _charset='utf-8'))
             msg.attach(MIMEText(html_body, 'html', _charset='utf-8'))
 
+        # CR/LF 進標頭會讓 as_string() 丟 HeaderParseError（非 SMTPException，
+        # 破壞本函式的 bool 回傳契約），先清洗再賦值。
+        subject = subject.replace("\r", " ").replace("\n", " ")
+        recipients = [r.replace("\r", " ").replace("\n", " ").strip() for r in recipients]
         msg["Subject"] = subject
         msg["From"] = cfg["sender"]
         msg["To"] = ",".join(recipients)
@@ -1809,7 +1836,15 @@ class Reporter:
                     s.ehlo()
                 if smtp_conf.get("enable_auth"):
                     s.login(smtp_conf.get("user"), smtp_conf.get("password"))
-                s.sendmail(cfg["sender"], recipients, msg.as_string())
+                # sendmail 只有「全部收件人被拒」才 raise；部分被拒時回傳
+                # {refused: (code, resp)} 並照常投遞其餘收件人——不可默默當成
+                # 全成功。
+                refused = s.sendmail(cfg["sender"], recipients, msg.as_string())
+            if refused:
+                logger.warning(
+                    f"[Email] Some recipients refused by SMTP server: {refused}"
+                )
+                return False
             logger.info(t('mail_sent', host=host, port=port))
             return True
         except smtplib.SMTPAuthenticationError as e:
@@ -1839,10 +1874,40 @@ class Reporter:
         from email.mime.base import MIMEBase
         from email import encoders
 
+        _MAX_ATTACH_BYTES = 10 * 1024 * 1024  # 10 MB，與 send_scheduled_report_email 一致
+
         cfg = self.cm.config["email"]
         if not cfg["recipients"]:
             logger.warning(t('no_recipients'))
             return False
+
+        # 與排程路徑一致的附件大小護欄：超限時跳過附件、信件本體照送並附
+        # 警示，而不是整封被 SMTP 552 退掉。
+        if attachment_path and os.path.exists(attachment_path):
+            try:
+                attach_size = os.path.getsize(attachment_path)
+            except OSError:
+                attach_size = 0
+            if attach_size > _MAX_ATTACH_BYTES:
+                limit_mb = _MAX_ATTACH_BYTES // 1024 // 1024
+                fname = os.path.basename(attachment_path)
+                logger.warning(
+                    f"[Email] Skipping {fname}: "
+                    f"{attach_size / 1024 / 1024:.1f} MB exceeds {limit_mb} MB limit"
+                )
+                warning_text = t("rpt_email_attach_too_large",
+                                 limit_mb=limit_mb, files=fname)
+                warning_html = (
+                    "<div style='background:#FFF3CD;border:1px solid #F0AD4E;border-radius:8px;"
+                    "padding:12px;margin:8px 16px;font-family:Arial,sans-serif;"
+                    f"font-size:12px;color:#856404;'>⚠ {html.escape(warning_text)}</div>"
+                )
+                if '</body></html>' in html_body:
+                    html_body = html_body.replace(
+                        '</body></html>', warning_html + '</body></html>', 1)
+                else:
+                    html_body += warning_html
+                attachment_path = None
 
         import re as _re
         plain_body = _re.sub(r'<[^>]+>', '', html_body)
@@ -1871,9 +1936,16 @@ class Reporter:
             msg.attach(MIMEText(plain_body, 'plain', _charset='utf-8'))
             msg.attach(MIMEText(html_body, 'html', _charset='utf-8'))
 
+        # CR/LF 進標頭會讓 as_string() 丟 HeaderParseError（非 SMTPException，
+        # 破壞本函式的 bool 回傳契約），先清洗再賦值。
+        subject = subject.replace("\r", " ").replace("\n", " ")
+        recipients = [
+            r.replace("\r", " ").replace("\n", " ").strip()
+            for r in cfg["recipients"]
+        ]
         msg["Subject"] = subject
         msg["From"] = cfg["sender"]
-        msg["To"] = ",".join(cfg["recipients"])
+        msg["To"] = ",".join(recipients)
 
         try:
             smtp_conf = self.cm.config.get("smtp", {})
@@ -1888,7 +1960,14 @@ class Reporter:
                     s.ehlo()
                 if smtp_conf.get("enable_auth"):
                     s.login(smtp_conf.get("user"), smtp_conf.get("password"))
-                s.sendmail(cfg["sender"], cfg["recipients"], msg.as_string())
+                # 部分收件人被拒時 sendmail 不 raise，回傳 refused dict——不可
+                # 默默當成全成功。
+                refused = s.sendmail(cfg["sender"], recipients, msg.as_string())
+            if refused:
+                logger.warning(
+                    f"[Email] Some recipients refused by SMTP server: {refused}"
+                )
+                return False
             logger.info(t('mail_sent', host=host, port=port))
             return True
         except smtplib.SMTPAuthenticationError as e:

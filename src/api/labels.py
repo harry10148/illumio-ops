@@ -192,14 +192,23 @@ class LabelResolver:
     def _ensure_query_lookup_cache(self, force_refresh=False):
         """Populate label/service/IP-list lookup caches used by native query building."""
         c = self._client
-        cache_ready = (
-            c._label_href_cache
-            and c._label_group_href_cache
-            and c._iplist_href_cache
-        )
+        # ready 以「成功刷新過的時間戳」判定，不看個別 cache 的 truthiness——
+        # 空集合（org 沒有 label group / IP list）是合法快取狀態，用 truthiness
+        # 會讓每次 resolver 呼叫都退化成四集合全量重抓。
+        cache_ready = bool(getattr(c, "_query_lookup_cache_refreshed_at", 0.0))
         if cache_ready and not force_refresh and not self._query_lookup_cache_is_stale():
             return
-        self._client.update_label_cache(silent=True, force_refresh=True)
+        # 失敗退避：update_label_cache 回 False（PCE 抓取失敗）後短時間內不再
+        # 重打全量抓取，避免同一請求內每個 resolver miss 都觸發一次註定失敗
+        # 的四集合 fetch（tight refetch loop）。
+        now = time.time()
+        failed_at = getattr(self, "_lookup_refresh_failed_at", 0.0)
+        if failed_at and (now - failed_at) < 30:
+            return
+        if self._client.update_label_cache(silent=True, force_refresh=True):
+            self._lookup_refresh_failed_at = 0.0
+        else:
+            self._lookup_refresh_failed_at = now
         if not c._label_href_cache:
             for href, display in c.label_cache.items():
                 if display and ":" in display and not display.startswith("[IPList] ") and not display.startswith("[LabelGroup] "):
@@ -655,6 +664,18 @@ class LabelResolver:
                 inc_nets = remaining
             return passthrough + [str(n) for n in inc_nets]
 
+        # 整個 expand 呼叫只抓一次 ip_lists 集合（lazy）：每個 iplist filter
+        # 值都全量重抓是 N+1，多個 iplist 條件會連發相同的全集合下載。
+        iplist_collection_memo = []
+        iplist_collection_fetched = False
+
+        def _all_iplists():
+            nonlocal iplist_collection_memo, iplist_collection_fetched
+            if not iplist_collection_fetched:
+                iplist_collection_memo = c.get_ip_lists(raise_on_error=True) or []
+                iplist_collection_fetched = True
+            return iplist_collection_memo
+
         def _iplist_cidrs(value):
             """IP List → 有效 CIDR 清單（inclusion 聯集 − exclusion；PCE 語意）。
             修正前 exclusion:true 條目被一併展開成 inclusion，cache df 路徑
@@ -666,7 +687,7 @@ class LabelResolver:
             fetch 成功但名稱/href 找不到匹配才是合法的「查無」，回 [] 但留
             warning log 供除錯。"""
             value = str(value).strip()
-            for ipl in (c.get_ip_lists(raise_on_error=True) or []):
+            for ipl in _all_iplists():
                 if ipl.get("name") == value or ipl.get("href") == value:
                     include, exclude = [], []
                     for r in ipl.get("ip_ranges", []) or []:

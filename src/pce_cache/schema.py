@@ -39,6 +39,14 @@ def _ensure_schema_once(engine: Engine, db_path: str) -> None:
     """
     with _schema_ensured_lock:
         if db_path in _schema_ensured_paths:
+            # 只有 DDL/遷移可略過。PRAGMA listener 掛在「特定 engine 物件」
+            # 的 connect 事件上（見 _enable_wal_pragma），而呼叫端
+            # （src/main.py 的 _make_cache_reader/_make_subscribers）每次都
+            # create_engine 新物件——若不補掛，第一個 engine 之後的所有
+            # engine 連線都退回 SQLite 預設（無 busy_timeout=30000、無
+            # cache_size/mmap 調校），重演已修復的 "database is locked"
+            # 失敗類與慢讀取。
+            _enable_wal_pragma(engine)
             return
         init_schema(engine)
         _schema_ensured_paths.add(db_path)

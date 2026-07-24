@@ -309,6 +309,11 @@ OBSERVED_EXTENSION_EVENT_TYPES = frozenset({
     "system_task.delete_expired_service_account_api_keys",
     "system_task.delete_old_cached_perspectives",
     "system_task.endpoint_offline_check",
+    # Event-storage pruning lifecycle events (vendor Events Guide): the
+    # pce-capacity runbook tells operators to look for
+    # hard_limit_recovery_completed — it must not land in unknown_events.
+    "system_task.event_pruning_completed",
+    "system_task.hard_limit_recovery_completed",
     "system_task.provision_container_cluster_services",
     "system_task.remove_stale_zone_subsets",
     "system_task.set_server_sync_check",

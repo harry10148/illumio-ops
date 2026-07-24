@@ -16,6 +16,7 @@ from src.gui._helpers import (
     _err_with_log,
     _redact_secrets,
     _strip_redaction_placeholders,
+    _check_ip_allowed,
     _validate_allowed_ips,
     _is_forbidden_report_output_dir,
     _SETTINGS_ALLOWLISTS,
@@ -67,7 +68,16 @@ def make_config_blueprint(
             gui_scratch = dict(cm.config.get("web_gui", {}))
 
             if "username" in d:
-                gui_scratch["username"] = d["username"]
+                # 型別/內容驗證：非字串（int/null/list）或空/超長 username 存檔
+                # 後，下次登入 auth.py 的 saved_username.strip() 會 AttributeError
+                # → 全域 500 鎖死登入，且 load() 不會修復 web_gui 欄位。
+                u = d["username"]
+                if not isinstance(u, str) or not (1 <= len(u.strip()) <= 128):
+                    logger.warning("api_security_post rejected invalid username "
+                                   "(type={}, len={})", type(u).__name__,
+                                   len(u) if isinstance(u, str) else "-")
+                    return jsonify({"ok": False, "error": t("gui_err_generic", lang=lang)}), 400
+                gui_scratch["username"] = u.strip()
 
             if "allowed_ips" in d:
                 allowed_ips, invalid_ips = _validate_allowed_ips(d["allowed_ips"])
@@ -76,6 +86,13 @@ def make_config_blueprint(
                         "ok": False,
                         "error": t("gui_err_invalid_allowlist_entries", lang=lang, entries=', '.join(invalid_ips))
                     }), 400
+                # 自鎖防護：非空清單必須涵蓋當前請求來源 IP。security_check 對
+                # 非清單 IP 直接 TCP RST（無任何 HTTP 回應），typo 清單一旦存檔
+                # GUI 立即無聲斷線，只能上主機改 config.json 復原。
+                if allowed_ips and not _check_ip_allowed(allowed_ips, request.remote_addr):
+                    logger.warning("api_security_post rejected allowed_ips not covering "
+                                   "requester {}", request.remote_addr)
+                    return jsonify({"ok": False, "error": t("gui_err_ip_not_allowed", lang=lang)}), 400
                 gui_scratch["allowed_ips"] = allowed_ips
 
             if d.get("new_password"):
@@ -93,6 +110,16 @@ def make_config_blueprint(
                 gui_scratch["password"] = hash_password(new_pw)
                 gui_scratch.pop("_initial_password", None)
                 gui_scratch.pop("must_change_password", None)
+                # 密碼變更即撤銷所有既存 session：輪替 session 簽章 secret，讓
+                # 舊 cookie（可能已外洩、正是改密碼的動機）立即失效。標記本請求
+                # session 已修改，回應時以新 key 重簽 cookie，改密碼的操作者
+                # 自己保持登入；其他先前簽發的 session 全數作廢。
+                import secrets as _secrets
+                from flask import current_app, session as _session
+                _new_secret = _secrets.token_hex(32)
+                gui_scratch["secret_key"] = _new_secret
+                current_app.secret_key = _new_secret
+                _session.modified = True
 
             cm.config["web_gui"] = gui_scratch
             cm.save()
@@ -394,7 +421,10 @@ def make_config_blueprint(
 
     @bp.route('/api/pce-profiles', methods=['POST'])
     def api_pce_profiles_action():
-        d = request.json or {}
+        # GET /api/pce-profiles 以 _redact_secrets 遮罩 key/secret；round-trip
+        # 回來的 "********" 必須剝掉（同 api_save_settings），否則 update/add
+        # 會用遮罩值靜默覆蓋真憑證。
+        d = _strip_redaction_placeholders(request.json or {})
         action = d.get("action")
         lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         # Serialize load→mutate→save under the shared config lock (profile CRUD
@@ -413,7 +443,9 @@ def make_config_blueprint(
                 if not profile["name"] or not profile["url"]:
                     return _err(t("gui_err_pce_name_url_required", lang=lang))
                 p = cm.add_pce_profile(profile)
-                return jsonify({"ok": True, "profile": p})
+                # 憑證輸出一律遮罩（同 GET /api/pce-profiles）——明文 secret
+                # 不得殘留在瀏覽器 devtools/HAR 的回應紀錄裡。
+                return jsonify({"ok": True, "profile": _redact_secrets(p)})
             elif action == "update":
                 pid = d.get("id")
                 if not pid:

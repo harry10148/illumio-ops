@@ -83,11 +83,20 @@ class CacheSubscriber:
         """
         col = getattr(self._model, _TIME_COL[self._source])
         with self._sf() as s:
+            # desc + reverse：若視窗列數超過 limit，被丟掉的是「最舊」而非
+            # 「最新」的列（threshold/window 規則最關心近期）；回傳仍升冪。
             rows = s.execute(
                 select(self._model).where(col >= since)
-                .order_by(col.asc()).limit(limit)
+                .order_by(col.desc()).limit(limit)
             ).scalars().all()
-        return [_row_to_dict(r) for r in rows]
+        if len(rows) >= limit:
+            # 不可靜默截斷（專案鐵則）：視窗加總會低估，門檻告警可能漏發。
+            logger.warning(
+                "fetch_window_rows truncated: {} window since={} hit limit={}; "
+                "oldest in-window rows dropped — threshold sums may undercount",
+                self._source, since, limit,
+            )
+        return [_row_to_dict(r) for r in reversed(rows)]
 
     def _write_cursor(self, ts: datetime, row_id: int) -> None:
         now = datetime.now(timezone.utc)

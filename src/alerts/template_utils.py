@@ -13,14 +13,17 @@ _TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templa
 _ALERT_TPL_KEY_RE = re.compile(r'\$(?:\{)?(alert_tpl_[a-zA-Z0-9_]+)')
 
 
-def render_alert_template(template_name: str, **values) -> str:
+def render_alert_template(template_name: str, *, lang: str | None = None, **values) -> str:
     path = os.path.join(_TEMPLATE_DIR, template_name)
     with open(path, "r", encoding="utf-8") as handle:
         text = handle.read()
 
     # Auto-merge alert_tpl_* translations so callers don't need to pass them.
+    # `lang` must follow the caller's dispatch language (send_alerts(lang=...))
+    # or the digest scaffold renders in the process-global language while the
+    # section bodies render in the dispatch language — a mixed-language digest.
     for key in set(_ALERT_TPL_KEY_RE.findall(text)):
-        values.setdefault(key, t(key))
+        values.setdefault(key, t(key, lang=lang))
 
     return Template(text).safe_substitute(values)
 

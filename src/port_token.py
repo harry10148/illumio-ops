@@ -15,9 +15,12 @@ def _coerce_proto(proto):
     if isinstance(proto, str) and proto.strip().lower() in PROTO_NAME_TO_NUM:
         return PROTO_NAME_TO_NUM[proto.strip().lower()], True
     try:
-        return int(proto), True
+        num = int(proto)
     except (TypeError, ValueError):
         return None, False
+    if not (0 <= num <= 255):  # IP protocol number 界限
+        return None, False
+    return num, True
 
 
 def parse_port_token(value, default_proto=None):

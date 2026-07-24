@@ -4,6 +4,7 @@ import gzip
 import os
 import re
 import threading
+import time
 from datetime import date, datetime, timezone
 
 import orjson
@@ -341,8 +342,20 @@ def _load_archive_review_locked(cfg, start: date, end: date) -> dict:
     # 已空，防禦性再清一次），以及目標檔案的舊 -wal/-shm（換了主檔後，
     # 舊 sidecar 對新主檔無效，留著會被下個連線誤讀）。
     _remove_sqlite_sidecars(tmp)
-    _remove_sqlite_sidecars(db)
-    os.replace(tmp, db)
+    # Windows：os.replace / 刪 sidecar 撞上仍持有舊 DB 開啟 handle 的讀取端
+    # （archive review 查詢的 NullPool 短命連線；SQLite 開檔不帶
+    # FILE_SHARE_DELETE）會拋 PermissionError，讓整個已成功的 load 在最後
+    # 一步被判定失敗、匯入結果被丟棄。讀取端壽命短，短暫退避重試即可。
+    # Linux 讀取端持有舊 inode，首次就會成功。
+    for _attempt in range(10):
+        try:
+            _remove_sqlite_sidecars(db)
+            os.replace(tmp, db)
+            break
+        except PermissionError:
+            if _attempt == 9:
+                raise
+            time.sleep(0.5)
     meta = {"loaded": True, "rows": result["rows"], "files": result["files"],
             "skipped": result["skipped"], "start": result["start"], "end": result["end"]}
     _write_meta(cfg, meta)

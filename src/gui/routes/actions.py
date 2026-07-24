@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import io
 import ipaddress
+import threading
 from contextlib import redirect_stdout
 
 from flask import Blueprint, jsonify, request
@@ -20,6 +21,17 @@ from src.gui._helpers import (
 )
 from src.i18n import t
 from src.state_store import update_state_file
+
+# GUI 觸發的分析／debug 執行序列化：
+# - api_run_once：Analyzer.save_state 的 _merge 假設同時只有一個分析 cycle
+#   在跑（analyzer 自有 key 是整包覆蓋）——併發 GUI 觸發互相蓋掉
+#   alert_history/history 會造成重複告警或計數錯亂。
+# - api_debug：contextlib.redirect_stdout 換的是 process 全域 stdout，兩個
+#   debug 同時跑會互相污染輸出緩衝；共用同一把鎖也讓 GUI 觸發的分析 print
+#   不會被併發 debug 擷取走。
+# 注意：與排程器的 monitor cycle（scheduler/jobs.py）之間仍無互斥——那屬於
+# 排程器側的變更範圍，此鎖只序列化 GUI 端的觸發。
+_analysis_lock = threading.Lock()
 
 
 def make_actions_blueprint(
@@ -226,12 +238,22 @@ def make_actions_blueprint(
                     else:
                         params["ip_address"] = ip_query
 
+                # PCE 同步集合 GET 硬上限 500 且靜默截斷（api_client
+                # _get_collection 的真機驗證事實）：帶 >500 沒有意義還會掩蓋
+                # 截斷。錨定 500 讓「拿滿 500」成為可偵測的截斷訊號，並夾限
+                # 使用者自帶的 max_results。
                 if "max_results" in d:
-                    params["max_results"] = d["max_results"]
+                    try:
+                        params["max_results"] = max(1, min(int(d["max_results"]), 500))
+                    except (TypeError, ValueError):
+                        params["max_results"] = 500
                 else:
-                    params["max_results"] = 100000 if local_ip_filter else 500
+                    params["max_results"] = 500
 
                 workloads = api.search_workloads(params)
+                # 拿滿上限＝可能截斷；CIDR/多 IP 本地過濾是對「截斷後子集」
+                # 過濾，結果可能靜默缺漏——把旗標交給前端呈現。
+                truncated = len(workloads) >= 500
 
                 if local_ip_filter and target_networks:
                     filtered_workloads = []
@@ -260,7 +282,7 @@ def make_actions_blueprint(
                             filtered_workloads.append(wl)
                     workloads = filtered_workloads
 
-                return jsonify({"ok": True, "data": workloads})
+                return jsonify({"ok": True, "data": workloads, "truncated": truncated})
         except Exception as e:
             lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
             return _err_with_log("workloads_search", e, lang=lang)
@@ -318,6 +340,12 @@ def make_actions_blueprint(
             with ApiClient(cm) as api:
                 q_hrefs = api.check_and_create_quarantine_labels()
                 target_label_href = q_hrefs.get(level)
+                # 同單筆 apply 的防護：level 無效或標籤建立失敗（create_label
+                # 對非 201 靜默回 {}，如 API key 只有唯讀權限）時 href 為
+                # None——不擋下去會對每個 workload PUT {"href": None}，全數
+                # 失敗卻回 ok:True，操作者看到成功 toast 而 0 台被隔離。
+                if not target_label_href:
+                    return jsonify({"ok": False, "error": t("gui_label_fetch_failed", lang=lang, level=level)})
 
                 invalid_count = sum(1 for h in (raw_hrefs or []) if str(h or "").strip() and not _is_workload_href(h))
                 results = {"success": 0, "failed": [], "skipped_invalid": invalid_count}
@@ -466,9 +494,12 @@ def make_actions_blueprint(
         from src.main import _make_cache_reader
         with ApiClient(cm) as api:
             rep = Reporter(cm)
-            ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
-            ana.run_analysis()
-            rep.send_alerts(lang=lang)
+            # 見 _analysis_lock 註解：序列化 GUI 觸發的分析，避免併發 cycle
+            # 的 save_state 互相覆蓋 analyzer 自有 state key。
+            with _analysis_lock:
+                ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
+                ana.run_analysis()
+                rep.send_alerts(lang=lang)
             return jsonify({"ok": True, "output": t("gui_action_run_completed", lang=lang)})
 
     @bp.route('/api/actions/debug', methods=['POST'])
@@ -492,8 +523,14 @@ def make_actions_blueprint(
             rep = Reporter(cm)
             ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
             buf = io.StringIO()
-            with redirect_stdout(buf):
-                ana.run_debug_mode(mins=mins, pd_sel=pd_sel, interactive=False)
+            # redirect_stdout 換的是 process 全域 stdout（非 thread-local）：
+            # 以 _analysis_lock 序列化，避免併發 debug run 互相污染輸出、或
+            # 擷取到 GUI 觸發分析的 print。其他執行緒（scheduler 等）的
+            # print 在 debug 期間仍可能被吸進來——根治需 run_debug_mode 改收
+            # 明確 output stream（analyzer 側變更）。
+            with _analysis_lock:
+                with redirect_stdout(buf):
+                    ana.run_debug_mode(mins=mins, pd_sel=pd_sel, interactive=False)
             return jsonify({"ok": True, "output": _strip_ansi(buf.getvalue()).strip() or t("gui_action_debug_completed", lang=lang)})
 
     @bp.route('/api/actions/test-alert', methods=['POST'])
@@ -567,7 +604,12 @@ def make_actions_blueprint(
         data = request.json or {}
         lang = data.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         mode = str(data.get("mode", "append_missing") or "append_missing")
-        result = cm.apply_best_practices(mode=mode)
+        # 比照 rules.py 各寫入端點：load→mutate→save 以共用鎖序列化——
+        # apply_best_practices 可能改寫整份 rules list，無鎖時與併發寫入者
+        # 交錯會丟失更新。
+        with cm.write_lock:
+            cm.load()
+            result = cm.apply_best_practices(mode=mode)
         output = t(
             'best_practice_loaded_summary',
             lang=lang,

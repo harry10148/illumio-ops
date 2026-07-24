@@ -28,13 +28,16 @@ def test_run_cache_archive_invokes_exporter(tmp_path):
     mock_exp.return_value.run_once.assert_called_once()
 
 
-def test_run_cache_archive_swallows_exceptions(tmp_path):
+def test_run_cache_archive_logs_and_reraises(tmp_path):
+    import pytest
     from src.scheduler.jobs import run_cache_archive
     cm = _cm(tmp_path)
     with patch("src.scheduler.jobs._get_cache_engine", side_effect=RuntimeError("boom")), \
          patch("src.scheduler.jobs.logger") as mock_logger:
-        run_cache_archive(cm)  # 不得拋出
-    # 例外必須被收斂到 logger.exception（讓維運看得到），而非靜默吞掉
+        # 失敗必須 re-raise 給 _instrument 記 job_health status=error
+        with pytest.raises(RuntimeError):
+            run_cache_archive(cm)
+    # re-raise 前仍要先 logger.exception（讓維運看得到完整 traceback）
     assert mock_logger.exception.called
 
 

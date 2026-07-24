@@ -4,6 +4,7 @@ TLS 日更 job 與 dashboard overview）。"""
 from __future__ import annotations
 
 import subprocess
+import sys
 
 from src.gui import _helpers
 
@@ -29,8 +30,20 @@ def test_get_cert_info_survives_openssl_hang(tmp_path, monkeypatch):
     assert "error" in info
 
 
-def test_cert_has_san_survives_openssl_hang(tmp_path, monkeypatch):
+def test_cert_has_san_corrupt_cert_is_false(tmp_path, monkeypatch):
+    # cryptography 讀不出的憑證＝壞檔，回 False（重簽是正確行為）
     cert = tmp_path / "x.pem"
     cert.write_text("dummy")
     monkeypatch.setattr(subprocess, "run", _hang_run)
     assert _helpers._cert_has_san(str(cert)) is False
+
+
+def test_cert_has_san_openssl_fallback_hang_returns_unknown(tmp_path, monkeypatch):
+    """openssl fallback 路徑（cryptography 不可用）逾時/缺 CLI 時必須回
+    None（無法判斷），不得回 False——False 會逼 _generate_self_signed_cert
+    在每次啟動時重簽一張本來完全有效的憑證。"""
+    cert = tmp_path / "x.pem"
+    cert.write_text("dummy")
+    monkeypatch.setattr(subprocess, "run", _hang_run)
+    monkeypatch.setitem(sys.modules, "cryptography", None)  # 強制走 openssl fallback
+    assert _helpers._cert_has_san(str(cert)) is None

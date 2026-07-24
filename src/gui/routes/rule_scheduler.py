@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import os
+import threading
 
 from contextlib import contextmanager
 
@@ -17,6 +18,26 @@ from src.gui._helpers import (
 )
 from src.href_utils import extract_id as _extract_id_href
 from src.i18n import t
+
+# ScheduleDB 寫入序列化：ScheduleDB 是「整檔覆寫」（load→改記憶體 dict→save
+# 全量重寫 rule_schedules.json），本身無任何跨 instance 鎖，而每個 GUI route
+# 都各自新建 instance——任何兩個寫入者交錯，後存檔的一方會用自己「請求開始
+# 時」的過期快照整檔蓋掉前者（新建的 schedule 憑空消失、到期已刪的 one_time
+# 復活）。所有 GUI 端寫入一律：持這把 module 級鎖 → 鎖內 db.load() 重讀 →
+# 改動 → save。（APScheduler tick 的 engine.check 在排程器行程側，不在此鎖
+# 範圍；GUI 的 /check 端點有納入。）
+_rs_db_lock = threading.Lock()
+
+
+def _rs_db_set_status(db, href, status):
+    """pce_status 對帳寫回：鎖內 re-load 後只改該 entry 的 pce_status。
+    條目已被併發刪除時直接略過——不得用過期快照把它復活。"""
+    with _rs_db_lock:
+        db.load()
+        fresh = db.db.get(href)
+        if fresh is not None and fresh.get('pce_status') != status:
+            fresh['pce_status'] = status
+            db.save()
 
 
 def make_rule_scheduler_blueprint(
@@ -245,6 +266,23 @@ def make_rule_scheduler_blueprint(
             from src.state_store import load_state_file
             from src.rule_scheduler import _resolve_rule_state_file, _RULE_STATE_KEY
             states = load_state_file(_resolve_rule_state_file()).get(_RULE_STATE_KEY, {})
+            # N+1 修正：原本每個 schedule 各打 1-2 個 15s-timeout 的
+            # get_live_item PCE GET（串行），慢速/不通的 PCE 下整個 GET 分鐘級
+            # 卡死 worker（cheroot 只有 10 條 thread），也拉長 ScheduleDB 的
+            # 過期快照窗口。改為單次 get_all_rulesets（draft 視圖含全部
+            # ruleset 與 inline rules），本地解析 live enabled/name。
+            live_map = None  # None = 抓取失敗 → live 狀態未知，不做 pce_status 對帳
+            try:
+                live_map = {}
+                for rs in api.get_all_rulesets(raise_on_error=True):
+                    live_map[rs['href']] = rs
+                    for r in (rs.get('sec_rules', []) + rs.get('rules', [])
+                              + rs.get('deny_rules', [])):
+                        live_map[r['href']] = r
+            except Exception as e:
+                logger.warning(f"[GUI:rs_schedules_live] rulesets fetch failed, "
+                               f"live status unknown: {e}")
+                live_map = None
             result = []
             for href, conf in db_data.items():
                 entry = dict(conf)
@@ -255,29 +293,24 @@ def make_rule_scheduler_blueprint(
                 entry['last_action'] = st.get('last_action')
                 entry['last_result'] = st.get('last_result')
                 entry['last_error'] = st.get('error')
-                # Live status check
-                try:
-                    status, data = api.get_live_item(href)
-                    if status == 200 and data:
-                        entry['live_enabled'] = data.get('enabled')
-                        entry['live_name'] = data.get('name', conf.get('name', ''))
+                # Live status resolution（來源見上方單次抓取）
+                if live_map is None:
+                    entry['live_enabled'] = None
+                    entry['live_name'] = conf.get('name', '')
+                else:
+                    item = live_map.get(href.replace('/active/', '/draft/'))
+                    if item is not None:
+                        entry['live_enabled'] = item.get('enabled')
+                        entry['live_name'] = item.get('name', conf.get('name', ''))
                         if conf.get('pce_status') == 'deleted':
-                            conf['pce_status'] = 'active'
-                            db.put(href, conf)
+                            _rs_db_set_status(db, href, 'active')
                             entry['pce_status'] = 'active'
-                    elif status == 404:
-                        entry['live_enabled'] = None
-                        entry['live_name'] = conf.get('name', '')
-                        if conf.get('pce_status') != 'deleted':
-                            conf['pce_status'] = 'deleted'
-                            db.put(href, conf)
-                        entry['pce_status'] = 'deleted'
                     else:
                         entry['live_enabled'] = None
                         entry['live_name'] = conf.get('name', '')
-                except Exception:
-                    entry['live_enabled'] = None
-                    entry['live_name'] = conf.get('name', '')
+                        if conf.get('pce_status') != 'deleted':
+                            _rs_db_set_status(db, href, 'deleted')
+                        entry['pce_status'] = 'deleted'
                 result.append(entry)
             return jsonify(result)
 
@@ -346,8 +379,25 @@ def make_rule_scheduler_blueprint(
                 db_entry['timezone'] = data.get('timezone', 'local')
                 note = f"[⏰ {t('rs_sch_tag_expire', lang='en')}: {data['expire_at'].replace('T', ' ')}]"
 
-            db.put(href, db_entry)
-            api.update_rule_note(href, note)
+            with _rs_db_lock:
+                db.load()
+                prev = db.db.get(href)
+                db.put(href, db_entry)
+            # PCE 註記寫入失敗（update_rule_note 以回傳 False 表示，不 raise）
+            # 不得靜默：規則會被排程器悄悄開關，但 PCE 上其他管理者看不到任何
+            # 註記。回滾剛寫入的 schedule 並回報錯誤，讓操作者重試。
+            if not api.update_rule_note(href, note):
+                logger.warning(f"[GUI:rs_schedule_create] PCE note write failed for {href}; "
+                               "rolling back schedule entry")
+                with _rs_db_lock:
+                    db.load()
+                    if prev is None:
+                        if href in db.db:
+                            del db.db[href]
+                            db.save()
+                    else:
+                        db.put(href, prev)
+                return _err(t("gui_api_update_failed", lang=lang), 502)
             return jsonify({"ok": True, "id": _extract_id_href(href)})
 
     @bp.route('/api/rule_scheduler/schedules/<path:href>')
@@ -369,20 +419,33 @@ def make_rule_scheduler_blueprint(
             data = request.get_json(silent=True) or {}
             hrefs = data.get('hrefs', [])
             deleted = []
+            # 註記清除失敗（回 False 或 raise）要記 warning 並回報 href 清單：
+            # 本地 entry 刪掉後不會再有人清這個 PCE 註記，靜默吞掉＝永久殘留。
+            note_clear_failed = []
             for href in hrefs:
                 try:
-                    api.update_rule_note(href, "", remove=True)
+                    if not api.update_rule_note(href, "", remove=True):
+                        note_clear_failed.append(href)
+                        logger.warning(f"[GUI:rule_note_clear] PCE note clear failed for {href}")
                 except Exception as _e:
-                    logger.debug(f"[GUI:rule_note_clear] swallowed: {_e}")  # best-effort note removal
-                if db.delete(href):
-                    deleted.append(_extract_id_href(href))
-            return jsonify({"ok": True, "deleted": deleted})
+                    note_clear_failed.append(href)
+                    logger.warning(f"[GUI:rule_note_clear] PCE note clear raised for {href}: {_e}")
+                with _rs_db_lock:
+                    db.load()
+                    if db.delete(href):
+                        deleted.append(_extract_id_href(href))
+            return jsonify({"ok": True, "deleted": deleted,
+                            "note_clear_failed": note_clear_failed})
 
     @bp.route('/api/rule_scheduler/check', methods=['POST'])
     def rs_check():
-        with _get_rs_components() as (_, _, engine):
+        with _get_rs_components() as (db, _, engine):
             tz_str = cm.config.get('settings', {}).get('timezone', 'local')
-            logs = engine.check(silent=True, tz_str=tz_str)
+            # engine.check 內部會 db.put/db.delete：納入同一把寫入鎖並先重讀，
+            # 避免與其他 GUI 寫入路由的整檔覆寫互相清掉。
+            with _rs_db_lock:
+                db.load()
+                logs = engine.check(silent=True, tz_str=tz_str)
             import src.gui as _gui_module
             _gui_module._append_rs_logs(logs)
             cleaned = [_strip_ansi(l) for l in logs]

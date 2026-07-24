@@ -4610,5 +4610,9 @@
   "rsc_commands": "指令",
   "rsc_refresh": "重新整理",
   "rsc_toggle_result": "[+] Rule Scheduler → {status}",
-  "rsc_interval_result": "[+] 間隔 → {raw}s"
+  "rsc_interval_result": "[+] 間隔 → {raw}s",
+  "event_label_system_task_event_pruning_completed": "系統任務 事件清理完成",
+  "event_label_system_task_hard_limit_recovery_completed": "系統任務 硬上限恢復完成",
+  "event_desc_system_task_event_pruning_completed": "事件資料庫的舊記錄例行清理已完成。",
+  "event_desc_system_task_hard_limit_recovery_completed": "事件資料庫達到硬儲存上限後的恢復已完成。"
 }

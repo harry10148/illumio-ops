@@ -6,6 +6,7 @@ from src.siem.formatters.base import Formatter
 from src.siem.formatters.cef import (
     _PROTO_MAP,
     _extract_actor,
+    _first_not_none,
     _format_labels,
     _format_resource_changes,
     _proto_to_str,
@@ -72,7 +73,9 @@ class NormalizedJSONFormatter(Formatter):
         proto  = _proto_to_str(
             flow.get("proto") or flow.get("protocol") or svc.get("proto")
         )
-        pd     = flow.get("pd") or flow.get("policy_decision") or "unknown"
+        # is-not-None selection: flat-format pd is numeric (0=allowed) and
+        # must not fall through to "unknown".
+        pd     = _first_not_none(flow.get("pd"), flow.get("policy_decision"), "unknown")
         ts     = (flow.get("timestamp")
                   or flow.get("first_detected")
                   or (flow.get("timestamp_range") or {}).get("first_detected", ""))
@@ -121,12 +124,14 @@ class NormalizedJSONFormatter(Formatter):
         if un:
             out["un"] = un
 
-        count = flow.get("count") or flow.get("num_connections") or flow.get("flow_count")
+        # is-not-None selection so zero counters/byte deltas are emitted
+        count = _first_not_none(flow.get("count"), flow.get("num_connections"),
+                                flow.get("flow_count"))
         if count is not None:
             out["count"] = count
 
-        dst_dbi = flow.get("dst_dbi") or flow.get("dst_bi")
-        dst_dbo = flow.get("dst_dbo") or flow.get("dst_bo")
+        dst_dbi = _first_not_none(flow.get("dst_dbi"), flow.get("dst_bi"))
+        dst_dbo = _first_not_none(flow.get("dst_dbo"), flow.get("dst_bo"))
         if dst_dbi is not None:
             out["dst_dbi"] = dst_dbi
         if dst_dbo is not None:

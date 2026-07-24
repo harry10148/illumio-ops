@@ -7,7 +7,7 @@ from flask_login import login_required
 
 from src.i18n import t
 from src.siem.tester import send_test_event
-from src.gui._helpers import _err_with_log
+from src.gui._helpers import _err_with_log, _redact_secrets, _strip_redaction_placeholders
 
 bp = Blueprint("siem", __name__, url_prefix="/api/siem")
 
@@ -33,7 +33,10 @@ def list_destinations():
     lang = current_app.config["CM"].config.get('settings', {}).get('language', 'en')
     try:
         cfg = _get_siem_cfg()
-        dests = [d.model_dump() for d in cfg.destinations]
+        # Credentials must be masked in any output: hec_token becomes
+        # asterisks plus hec_token__set/__length (same convention as
+        # /api/settings). The write paths strip the placeholder back out.
+        dests = [_redact_secrets(d.model_dump()) for d in cfg.destinations]
         return jsonify({"destinations": dests})
     except Exception as exc:
         return _err_with_log("siem_list_destinations", exc, lang=lang)
@@ -48,6 +51,9 @@ def add_destination():
         cm = current_app.config['CM']
         data = request.get_json(force=True) or {}
         lang = data.get('lang') or cm.config.get('settings', {}).get('language', 'en')
+        # A round-tripped redaction placeholder ("****...") must not be stored
+        # as a literal token value.
+        data = _strip_redaction_placeholders(data)
         SiemDestinationSettings(**data)  # validate first
         current = cm.models.siem.model_dump(mode="json")
         if any(d["name"] == data.get("name") for d in current.get("destinations", [])):
@@ -70,14 +76,19 @@ def update_destination(name: str):
         cm = current_app.config['CM']
         data = request.get_json(force=True) or {}
         lang = data.get('lang') or cm.config.get('settings', {}).get('language', 'en')
-        data["name"] = name
-        SiemDestinationSettings(**data)  # validate
         current = cm.models.siem.model_dump(mode="json")
         dests = current.get("destinations", [])
         idx = next((i for i, d in enumerate(dests) if d["name"] == name), None)
         if idx is None:
             return jsonify({"ok": False, "error": t("gui_err_siem_dest_not_found", lang=lang)}), 404
-        dests[idx] = data
+        # Merge into the stored destination instead of replacing it: a partial
+        # PUT must not silently reset omitted fields to pydantic defaults
+        # (hec_token wiped, mask_pii disabled). Redaction placeholders from a
+        # round-tripped GET are stripped first so the stored token survives.
+        merged = {**dests[idx], **_strip_redaction_placeholders(data)}
+        merged["name"] = name
+        SiemDestinationSettings(**merged)  # validate merged result
+        dests[idx] = merged
         result = save_section(cm, "siem", current, SiemForwarderSettings)
         if result["ok"]:
             cm.load()
@@ -112,6 +123,11 @@ def _siem_window_totals(s):
 
     Intended for consumers that need a fleet-wide health signal rather than
     per-destination breakdown (e.g. /api/cache/health).
+    failed_1h counts terminal failures anchored on the failure time (DLQ
+    quarantined_at within the window) plus rows currently in retry backoff
+    — NOT status='failed' rows anchored on queued_at, which missed every
+    outage (quarantine happens >1h after queueing at default backoff, and
+    retrying rows stay 'pending').
     Returns a dict with keys: sent_1h, failed_1h, denom, dlq.
     Must be called inside an open SQLAlchemy session context.
     """
@@ -126,11 +142,17 @@ def _siem_window_totals(s):
         .where(SiemDispatch.status == "sent")
         .where(SiemDispatch.sent_at >= hr)
     ).scalar() or 0
-    failed_1h = s.execute(
+    failed_1h = (s.execute(
+        select(func.count()).select_from(DeadLetter)
+        .where(DeadLetter.quarantined_at >= hr)
+    ).scalar() or 0) + (s.execute(
+        # in retry backoff right now = a send attempt failed within the last
+        # backoff period (capped at 1h), so it belongs in this window
         select(func.count()).select_from(SiemDispatch)
-        .where(SiemDispatch.status == "failed")
-        .where(SiemDispatch.queued_at >= hr)
-    ).scalar() or 0
+        .where(SiemDispatch.status == "pending")
+        .where(SiemDispatch.retries > 0)
+        .where(SiemDispatch.next_attempt_at > now)
+    ).scalar() or 0)
     dlq = s.execute(select(func.count()).select_from(DeadLetter)).scalar() or 0
     return {"sent_1h": sent_1h, "failed_1h": failed_1h, "denom": sent_1h + failed_1h, "dlq": dlq}
 
@@ -176,9 +198,17 @@ def dispatch_status():
                 sent_1h = s.execute(select(func.count()).select_from(SiemDispatch)
                     .where(SiemDispatch.destination == dest)
                     .where(SiemDispatch.status == "sent").where(SiemDispatch.sent_at >= hr)).scalar() or 0
-                failed_1h = s.execute(select(func.count()).select_from(SiemDispatch)
+                # Anchor failures on failure time, not queued_at (see
+                # _siem_window_totals): DLQ quarantines in-window plus rows
+                # currently in retry backoff.
+                failed_1h = (s.execute(select(func.count()).select_from(DeadLetter)
+                    .where(DeadLetter.destination == dest)
+                    .where(DeadLetter.quarantined_at >= hr)).scalar() or 0) \
+                    + (s.execute(select(func.count()).select_from(SiemDispatch)
                     .where(SiemDispatch.destination == dest)
-                    .where(SiemDispatch.status == "failed").where(SiemDispatch.queued_at >= hr)).scalar() or 0
+                    .where(SiemDispatch.status == "pending")
+                    .where(SiemDispatch.retries > 0)
+                    .where(SiemDispatch.next_attempt_at > now)).scalar() or 0)
                 denom = sent_1h + failed_1h
                 lat = s.execute(select(func.avg(
                         func.julianday(SiemDispatch.sent_at) - func.julianday(SiemDispatch.queued_at)))
@@ -186,7 +216,8 @@ def dispatch_status():
                     .where(SiemDispatch.status == "sent").where(SiemDispatch.sent_at >= hr)).scalar()
                 entry["sent_1h"] = sent_1h
                 entry["failed_1h"] = failed_1h
-                entry["success_1h"] = round(sent_1h / denom * 100, 1) if denom else 100.0
+                # No attempts in the window → unknown (null), not a fake 100%.
+                entry["success_1h"] = round(sent_1h / denom * 100, 1) if denom else None
                 entry["avg_latency_ms"] = int(lat * 86400 * 1000) if lat else None
         return jsonify({"status": result})
     except Exception as exc:
@@ -308,23 +339,35 @@ def dlq_export():
     cfg = cm.models.pce_cache
     engine = _get_cache_engine(cfg.db_path)
     Session = sessionmaker(engine)
-    buf = io.StringIO()
-    w = csv.writer(buf)
-    w.writerow(["id", "destination", "source_table", "source_id",
-                "retries", "last_error", "payload_preview", "quarantined_at"])
-    with Session() as s:
-        q = select(DeadLetter)
-        if destination:
-            q = q.where(DeadLetter.destination == destination)
-        if reason:
-            q = q.where(DeadLetter.last_error.like(f"%{reason}%"))
-        for row in s.scalars(q):
-            w.writerow([
-                row.id, row.destination, row.source_table, row.source_id,
-                row.retries, row.last_error, row.payload_preview,
-                row.quarantined_at.isoformat() if row.quarantined_at else "",
-            ])
-    return Response(buf.getvalue(), mimetype="text/csv",
+    q = select(DeadLetter)
+    if destination:
+        q = q.where(DeadLetter.destination == destination)
+    if reason:
+        q = q.where(DeadLetter.last_error.like(f"%{reason}%"))
+
+    def _generate():
+        # Stream the CSV instead of materializing the whole table in one
+        # string: rows can carry 4000-char last_error + 512-char preview and
+        # the DLQ cap is per destination, so an unfiltered export could be
+        # hundreds of MB.
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["id", "destination", "source_table", "source_id",
+                    "retries", "last_error", "payload_preview", "quarantined_at"])
+        with Session() as s:
+            for row in s.scalars(q.execution_options(yield_per=500)):
+                w.writerow([
+                    row.id, row.destination, row.source_table, row.source_id,
+                    row.retries, row.last_error, row.payload_preview,
+                    row.quarantined_at.isoformat() if row.quarantined_at else "",
+                ])
+                if buf.tell() >= 65536:
+                    yield buf.getvalue()
+                    buf.seek(0)
+                    buf.truncate(0)
+        yield buf.getvalue()
+
+    return Response(_generate(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=dlq.csv"})
 
 

@@ -289,12 +289,19 @@ class TrafficIngestor:
 
 
 def _flow_hash(flow: dict) -> str:
+    """Compute flow_hash from available fields (handles both flat and nested
+    PCE API shapes). The fallback chain MUST mirror backfill.py's
+    _backfill_flow_hash — the live path delivers raw nested rows (src.ip, not
+    src_ip), so without the nested fallback the IP never entered the hash:
+    distinct unmanaged endpoints collapsed onto the same key, and live vs
+    backfill computed different hashes for the same flow (cross-path dedup
+    broke, duplicating rows on overlapping windows)."""
     src_wl = (flow.get("src") or {}).get("workload") or {}
     dst_wl = (flow.get("dst") or {}).get("workload") or {}
     svc = flow.get("service") or {}
     key = "|".join([
-        flow.get("src_ip", "") or src_wl.get("href", ""),
-        flow.get("dst_ip", "") or dst_wl.get("href", ""),
+        flow.get("src_ip", "") or (flow.get("src") or {}).get("ip", "") or src_wl.get("href", ""),
+        flow.get("dst_ip", "") or (flow.get("dst") or {}).get("ip", "") or dst_wl.get("href", ""),
         str(svc.get("port", "") or flow.get("port", "")),
         str(svc.get("proto", "") or flow.get("protocol", "")),
         _ts(flow, "first_detected"),
