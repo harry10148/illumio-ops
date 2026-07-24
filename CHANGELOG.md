@@ -11,6 +11,27 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Frontend review remediation (2026-07-24 audit, all JS modules + SPA shell +
+  CSS): 32 verified findings plus 7 defensive follow-ups. Correctness/silent
+  failure: saveSettings no longer reports success or clears the unsaved-changes
+  flag when the settings/security/TLS POSTs are rejected; the rules enable/disable
+  switch now reflects its real state and persists (with the PUT endpoint fixed so
+  a partial {enabled} update no longer wipes the rule's filters); module-log,
+  cache/SIEM save, quarantine-lift, rule-scheduler delete, PCE-profile actions and
+  dashboard queries surface errors instead of showing empty/false-success; the
+  event viewer's load-more no longer duplicates rows on page overlap; several
+  handlers guard against double-submit. Security: PCE API key/secret, allowed-IPs,
+  rule-scheduler ids and Top10 date cells are now HTML-escaped. i18n: hardcoded
+  strings (DLQ label, alert-channel subtitles, rule-type badges, KPI/status
+  labels, error messages, aria-labels) routed through the translation layer; the
+  object browser pager uses ASCII parentheses. Accessibility: log/object-browser
+  modals manage focus and Escape; overview tiles, filter pills and rule-scheduler
+  cells are keyboard-operable (role/tabindex + Enter/Space); login errors announce
+  via role=alert; the module-log close button's broken markup is repaired. CSS:
+  custom select dropdown arrow restored (background-color instead of the
+  background shorthand); dead .btn:disabled rule removed; the fixed settings
+  save-bar reserves bottom space so it no longer overlays the last control.
+
 - Report subsystem review remediation (2026-07-24 audit, all 11 report types +
   shared pipeline): fixed 48 verified findings plus 7 defensive follow-ups.
   Data-correctness: the readiness estate "PB-uncovered" KPI no longer

@@ -287,13 +287,18 @@ async function loadEventViewer(reset = false) {
     }
 
     const items = response.items || [];
+    let _appendTail;
     if (reset) {
       _eventViewerItems = _mergeEventViewerItems([], items);
     } else {
+      const _prevLen = _eventViewerItems.length;
       _eventViewerItems = _mergeEventViewerItems(_eventViewerItems, items);
+      // Append only the genuinely-new deduped tail — rendering the raw server
+      // page duplicated rows whenever pages overlapped on offset.
+      _appendTail = _eventViewerItems.slice(_prevLen);
     }
 
-    _renderEventViewerRows(reset ? _eventViewerItems : items, !reset);
+    _renderEventViewerRows(reset ? _eventViewerItems : _appendTail, !reset);
     _setEventViewerMeta(response.summary || {});
     _setEventViewerLoadMore((response.summary || {}).has_more);
   } catch (error) {

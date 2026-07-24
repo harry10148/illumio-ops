@@ -33,6 +33,8 @@ window.openObjectBrowser = function (fbId) {
   _ob.selected = {};
   document.getElementById('modal-obj-browser').classList.add('show');
   _obRender();
+  // Move keyboard focus into the dialog (role=dialog aria-modal) on open.
+  document.getElementById('ob-search')?.focus();
   _obFetch();
 };
 
@@ -148,7 +150,7 @@ function _obRenderFoot() {
     info.setAttribute('data-i18n', 'gui_ob_page');
     info.textContent = 'Page';
     const nums = document.createElement('span');
-    nums.textContent = ` ${Math.floor(_ob.offset / _ob.limit) + 1} / ${Math.ceil(_ob.total / _ob.limit)}（${_ob.total}）`;
+    nums.textContent = ` ${Math.floor(_ob.offset / _ob.limit) + 1} / ${Math.ceil(_ob.total / _ob.limit)} (${_ob.total})`;
     pager.appendChild(prev); pager.appendChild(info); pager.appendChild(nums); pager.appendChild(next);
     foot.appendChild(pager);
   }

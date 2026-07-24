@@ -39,6 +39,32 @@ def test_add_traffic_rule_stores_filterbar_keys(client):
     assert rule["any_workload"] == "/orgs/1/workloads/xyz"
 
 
+def test_partial_put_enabled_only_preserves_filters(client):
+    """The enable/disable toggle PUTs just {enabled}; the endpoint must not run
+    the src/dst re-parse for absent fields (which would null the rule's filters).
+    Frontend review remediation 2026-07-24."""
+    csrf_token = _login(client)
+    r = client.post('/api/rules/traffic', json={
+        "name": "RToggle", "pd": -1, "threshold_count": 5, "threshold_window": 10,
+        "filters": {"src_labels": ["app=erp"], "src_ip_in": ["10.0.0.1"]},
+    }, environ_overrides={'REMOTE_ADDR': '127.0.0.1'}, headers={'X-CSRF-Token': csrf_token})
+    assert r.status_code == 200
+    rules = client.get('/api/rules', environ_overrides={'REMOTE_ADDR': '127.0.0.1'}).get_json()
+    idx = next(i for i, x in enumerate(rules) if x["name"] == "RToggle")
+
+    # Partial PUT: only toggle enabled.
+    pr = client.put(f'/api/rules/{idx}', json={"enabled": False},
+                    environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+                    headers={'X-CSRF-Token': csrf_token})
+    assert pr.status_code == 200
+
+    rule = client.get('/api/rules', environ_overrides={'REMOTE_ADDR': '127.0.0.1'}).get_json()[idx]
+    assert rule["enabled"] is False
+    # Filters must survive the partial update.
+    assert rule["src_labels"] == ["app=erp"]
+    assert rule["src_ip_in"] == ["10.0.0.1"]
+
+
 def test_add_traffic_rule_stores_service_port_keys(client):
     """Task 11 gap fix：_RULE_FB_KEYS 缺 services/ex_services/ports/ex_ports
     時，rules.js 規則 modal 的 Service/Port pill 存檔會被靜默丟棄。"""

@@ -1,16 +1,24 @@
 // ═══ Module Log Viewer ═══
 let _mlCurrentModule = null;
+let _mlPrevFocus = null;
+
+function _mlEscHandler(e) { if (e.key === 'Escape') mlClose(); }
 
 function mlOpen(moduleName) {
   hdrMenuClose();
   _mlCurrentModule = moduleName || null;
   const modal = $('ml-modal');
   if (!modal) return;
+  _mlPrevFocus = document.activeElement;
   modal.style.display = 'flex';
+  // Keyboard access: move focus into the dialog and allow Escape to close.
+  const sel = $('ml-module-select');
+  if (sel) sel.focus();
+  document.addEventListener('keydown', _mlEscHandler);
   mlLoadModules().then(() => {
     if (moduleName) {
-      const sel = $('ml-module-select');
-      if (sel) sel.value = moduleName;
+      const s = $('ml-module-select');
+      if (s) s.value = moduleName;
     }
     mlLoadLogs();
   });
@@ -19,6 +27,9 @@ function mlOpen(moduleName) {
 function mlClose() {
   const modal = $('ml-modal');
   if (modal) modal.style.display = 'none';
+  document.removeEventListener('keydown', _mlEscHandler);
+  if (_mlPrevFocus && typeof _mlPrevFocus.focus === 'function') _mlPrevFocus.focus();
+  _mlPrevFocus = null;
 }
 
 // Close on backdrop click
@@ -30,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
 async function mlLoadModules() {
   try {
     const res = await fetch('/api/logs');
+    if (!res.ok) return;
     const data = await res.json();
     const sel = $('ml-module-select');
     if (!sel) return;
@@ -59,6 +71,7 @@ async function mlLoadLogs() {
   out.textContent = _t('gui_ml_loading');
   try {
     const res = await fetch(`/api/logs/${mod}?n=200`);
+    if (!res.ok) { out.textContent = _t('gui_ml_error_prefix') + ': HTTP ' + res.status; return; }
     const data = await res.json();
     const entries = data.entries || [];
     if (!entries.length) {

@@ -197,16 +197,25 @@ async function applyQuarantine() {
 }
 
 // 解除隔離：移除單一 workload 的 Quarantine 標籤（data-action 綁定，CSP 不允許 inline handler）。
+const _liftInFlight = new Set();
 async function liftQuarantine(href) {
   if (!confirm(_qText('gui_lift_confirm'))) return;
-  const r = await post('/api/quarantine/lift', { hrefs: [href] });
-  if (r && r.ok && r.results && r.results.success > 0) {
-    toast(_qText('gui_lift_done'));
-    if (document.getElementById('qbtn-workloads').classList.contains('active')) {
-      runWorkloadSearch();
+  if (_liftInFlight.has(href)) return;  // guard double-submit of this PCE mutation
+  _liftInFlight.add(href);
+  try {
+    const r = await post('/api/quarantine/lift', { hrefs: [href] });
+    if (r && r.ok && r.results && r.results.success > 0) {
+      toast(_qText('gui_lift_done'));
+      if (document.getElementById('qbtn-workloads').classList.contains('active')) {
+        runWorkloadSearch();
+      }
+    } else {
+      toast((r && r.error) || _t('gui_q_apply_error'), 'err');
     }
-  } else {
-    toast((r && r.error) || _t('gui_q_apply_error'), 'err');
+  } catch (err) {
+    toast(_t('gui_q_apply_error') + ': ' + err.message, 'err');
+  } finally {
+    _liftInFlight.delete(href);
   }
 }
 window.liftQuarantine = liftQuarantine;

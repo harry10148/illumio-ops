@@ -182,7 +182,7 @@ function _renderPluginField(pluginName, field, settings) {
   const currentValue = _pluginFieldValue(pluginName, field.key, settings);
   const inputType = field.input_type || (field.secret ? 'password' : 'text');
   const helpHtml = field.help ? `<div style="color:var(--dim);font-size:0.82em;margin-top:6px;line-height:1.5;">${escapeHtml(field.help)}</div>` : '';
-  const requiredBadge = field.required ? '<span style="color:var(--danger);font-size:0.78em;margin-left:6px;">required</span>' : '';
+  const requiredBadge = field.required ? '<span style="color:var(--danger);font-size:0.78em;margin-left:6px;" data-i18n="gui_field_required">required</span>' : '';
 
   if (inputType === 'checkbox') {
     return `
@@ -249,7 +249,7 @@ function _renderAlertPluginCards(active, settings) {
             <div class="chk" style="margin:0;">
               <label>
                 <input type="checkbox" id="s-plugin-enabled-${pluginName}" ${active.includes(pluginName) ? 'checked' : ''}>
-                <span>Enabled</span>
+                <span data-i18n="gui_enabled">Enabled</span>
               </label>
             </div>
           </div>
@@ -385,7 +385,7 @@ function _renderPceSection(a, profiles, activePceId) {
 </fieldset>
 <fieldset><legend data-i18n="gui_api_conn">API Connection</legend>
   <div class="form-row"><div class="form-group"><label data-i18n="gui_url">URL</label><input id="s-url" value="${escapeHtml(a.url || '')}"><small class="form-text text-muted" data-i18n="gui_url_help"></small></div><div class="form-group"><label data-i18n="gui_org_id">Org ID</label><input id="s-org" value="${escapeHtml(a.org_id || '')}"><small class="form-text text-muted" data-i18n="gui_org_id_help"></small></div></div>
-  <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${a.key || ''}"><small class="form-text text-muted" data-i18n="gui_api_key_help"></small></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${a.secret || ''}"><small class="form-text text-muted" data-i18n="gui_api_secret_help"></small></div></div>
+  <div class="form-row"><div class="form-group"><label data-i18n="gui_api_key">API Key</label><input id="s-key" value="${escapeHtml(a.key || '')}"><small class="form-text text-muted" data-i18n="gui_api_key_help"></small></div><div class="form-group"><label data-i18n="gui_api_secret">API Secret</label><input id="s-sec" type="password" value="${escapeHtml(a.secret || '')}"><small class="form-text text-muted" data-i18n="gui_api_secret_help"></small></div></div>
   <div class="chk"><label><input type="checkbox" id="s-ssl" ${a.verify_ssl ? 'checked' : ''}> <span data-i18n="gui_verify_ssl">Verify SSL</span></label></div>
 </fieldset>`;
 }
@@ -535,7 +535,7 @@ function _renderSecuritySection(sec, _tlsStatus) {
 <fieldset><legend data-i18n="gui_web_security">Web GUI Security</legend>
   <div class="form-row">
     <div class="form-group"><label data-i18n="gui_username">Username</label><input id="s-sec-user" value="${escapeHtml(sec.username || 'admin')}"></div>
-    <div class="form-group"><label data-i18n="gui_allowed_ips">Allowed IPs (comma separated IP or CIDR)</label><input id="s-sec-ips" value="${(sec.allowed_ips || []).join(', ')}" placeholder="e.g. 192.168.1.100, 10.0.0.0/8"></div>
+    <div class="form-group"><label data-i18n="gui_allowed_ips">Allowed IPs (comma separated IP or CIDR)</label><input id="s-sec-ips" value="${escapeHtml((sec.allowed_ips || []).join(', '))}" placeholder="e.g. 192.168.1.100, 10.0.0.0/8"></div>
   </div>
   <p style="color:var(--dim); font-size:0.85em; margin-bottom:12px;" data-i18n="gui_leave_blank_pass">Leave password blank to keep current password.</p>
   <div class="form-row">
@@ -696,14 +696,19 @@ async function saveSettings() {
     settingsPayload[key] = value;
   });
   settingsPayload.alerts = { ...(settingsPayload.alerts || {}), active: pluginConfig.active };
-  await post('/api/settings', settingsPayload);
+  const _saveBtn = document.querySelector('[data-action="saveSettings"]');
+  if (_saveBtn) _saveBtn.disabled = true;
+  try {
+  const _rSettings = await post('/api/settings', settingsPayload);
+  if (!_rSettings || !_rSettings.ok) { toast((_rSettings && _rSettings.error) || _t('gui_err_generic'), 'err'); return; }
 
   const ips_raw = $('s-sec-ips').value.split(',').map(s => s.trim()).filter(Boolean);
-  await post('/api/security', {
+  const _rSec = await post('/api/security', {
     username: $('s-sec-user').value.trim(),
     new_password: $('s-sec-newpass').value,
     allowed_ips: ips_raw
   });
+  if (!_rSec || !_rSec.ok) { toast((_rSec && _rSec.error) || _t('gui_err_generic'), 'err'); return; }
 
   // Save TLS settings
   const tlsEnabled = $('s-tls-enabled')?.checked || false;
@@ -712,7 +717,7 @@ async function saveSettings() {
   const autoRenewEl = $('s-tls-auto-renew');
   const autoRenew = autoRenewEl ? autoRenewEl.checked : true;
   const autoRenewDays = parseInt($('s-tls-auto-renew-days')?.value, 10) || 30;
-  await post('/api/tls/config', {
+  const _rTls = await post('/api/tls/config', {
     enabled: tlsEnabled,
     self_signed: tlsSelfSigned,
     cert_file: $('s-tls-cert')?.value?.trim() || '',
@@ -720,6 +725,7 @@ async function saveSettings() {
     auto_renew: autoRenew,
     auto_renew_days: autoRenewDays,
   });
+  if (!_rTls || !_rTls.ok) { toast((_rTls && _rTls.error) || _t('gui_err_generic'), 'err'); return; }
 
   // Clear password fields after save
   $('s-sec-newpass').value = '';
@@ -737,6 +743,9 @@ async function saveSettings() {
   // leaves dynamically-rendered views in the previous language.
   if (lang && _prevLang && lang !== _prevLang) {
     location.reload();
+  }
+  } finally {
+    if (_saveBtn) _saveBtn.disabled = false;
   }
 }
 
@@ -760,6 +769,7 @@ async function addPceProfile() {
   };
   const r = await post('/api/pce-profiles', data);
   if (r && r.ok) { toast(_t('gui_pce_add')); await loadSettings(); }
+  else toast((r && r.error) || _t('gui_err_generic'), 'err');
 }
 
 async function activatePceProfile(id) {
@@ -769,12 +779,14 @@ async function activatePceProfile(id) {
     toast((_t('gui_pce_switched')).replace('{name}', name));
     await loadSettings();
   }
+  else toast((r && r.error) || _t('gui_err_generic'), 'err');
 }
 
 async function deletePceProfile(id) {
   if (!confirm(_t('gui_msg_confirm_delete'))) return;
   const r = await post('/api/pce-profiles', { action: 'delete', id });
   if (r && r.ok) { toast(_t('gui_pce_delete_profile')); await loadSettings(); }
+  else toast((r && r.error) || _t('gui_err_generic'), 'err');
 }
 
 // 通道送測試：複用 actions 的 test-alert 端點，依 results[].status 判定成敗並以 toast 呈現。

@@ -384,8 +384,13 @@ def make_rules_blueprint(
                     if err_resp is not None:
                         return err_resp
                 old.update(d)
-                # Re-parse label/ip fields for traffic and bw/vol
+                # Re-parse label/ip fields for traffic and bw/vol. Only touch a
+                # side that is actually present in the PUT body: a partial update
+                # (e.g. the enable/disable toggle sending just {enabled}) must not
+                # null out the rule's existing src/dst filters.
                 for prefix in ('src', 'dst', 'ex_src', 'ex_dst'):
+                    if prefix not in d:
+                        continue
                     raw = d.get(prefix, '')
                     if raw is not None:
                         raw = str(raw).strip()
