@@ -320,9 +320,14 @@ class VenStatusGenerator:
             if not ts:
                 return None
             try:
-                return datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
+                dt = datetime.datetime.fromisoformat(ts.replace('Z', '+00:00'))
             except Exception:
                 return None  # intentional fallback: return None for unparseable timestamps
+            # Assume UTC when the timestamp carries no offset, so downstream
+            # comparisons against tz-aware `now` don't raise (naive vs aware).
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=datetime.timezone.utc)
+            return dt
 
         def _bool_mask(series, predicate):
             """Apply predicate safely; always returns a proper boolean Series."""

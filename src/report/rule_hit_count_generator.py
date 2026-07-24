@@ -171,7 +171,10 @@ class RuleHitCountGenerator:
         # Native export carries the report window as Start/End Date columns.
         date_range = ('', '')
         if len(df) and 'start_date' in df.columns and 'end_date' in df.columns:
-            date_range = (str(df.iloc[0]['start_date'])[:10], str(df.iloc[0]['end_date'])[:10])
+            # Guard nulls: str(NaN) is 'nan', which would print on the cover page.
+            _sd, _ed = df.iloc[0]['start_date'], df.iloc[0]['end_date']
+            date_range = ('' if pd.isna(_sd) else str(_sd)[:10],
+                          '' if pd.isna(_ed) else str(_ed)[:10])
 
         enrich_failed = self._enrich_rows(rows)
         return self._finalize(rows, source='csv', date_range=date_range,

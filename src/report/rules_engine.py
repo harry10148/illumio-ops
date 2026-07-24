@@ -524,7 +524,10 @@ class RulesEngine:
 
     def _b009_cross_env_volume(self, df: pd.DataFrame) -> Optional[Finding]:
         threshold = self._thresholds.get('cross_env_connection_threshold', 100)
-        cross = df[(df['src_env'] != '') & (df['dst_env'] != '') & (df['src_env'] != df['dst_env'])]
+        # notna guards match B001/L004/L010: a NaN env is unknown, not a
+        # cross-environment endpoint (NaN != '' / NaN != x both eval True).
+        cross = df[df['src_env'].notna() & df['dst_env'].notna()
+                   & (df['src_env'] != '') & (df['dst_env'] != '') & (df['src_env'] != df['dst_env'])]
         if len(cross) > threshold:
             top_pairs = cross.groupby(['src_env', 'dst_env']).size().nlargest(5).to_dict()
             top_ports = cross['port'].value_counts().head(5).to_dict()

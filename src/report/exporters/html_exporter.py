@@ -104,6 +104,8 @@ def _fmt_bytes(b) -> str:
         b = float(b)
     except (TypeError, ValueError):
         return str(b) if b is not None else '—'
+    if b != b:  # NaN — int(nan) would raise and abort the whole export
+        return '—'
     if b < 0:
         return '—'
     if b >= 1024 ** 4:

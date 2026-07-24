@@ -74,7 +74,10 @@ class AppSummaryHtmlExporter:
             + _kpi(mod03.get("n_blocked", 0) + mod03.get("n_unknown", 0),
                    t("rpt_gap", default="Gap", lang=self._lang))
         )
-        top = render_df_table(mod03.get("top_flows"), col_i18n={}, lang=self._lang)
+        top_df = mod03.get("top_flows")
+        caption = (f'<h3>{_esc(t("rpt_app_top_uncovered", lang=self._lang))}</h3>'
+                   if top_df is not None and not getattr(top_df, "empty", True) else "")
+        top = caption + render_df_table(top_df, col_i18n={}, lang=self._lang)
         return f'<div class="kpi-grid">{cards}</div>{top}'
 
     def _policy_impact_section(self) -> str:

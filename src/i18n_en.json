@@ -3547,6 +3547,7 @@
   "rpt_rhc_actor_any": "Any",
   "rpt_rhc_service_all": "All Services",
   "rpt_tr_no_ransomware_config": "No ransomware risk port configuration found",
+  "rpt_app_top_uncovered": "Top 10 Uncovered Flows",
   "rpt_pu_no_description": "No description",
   "rpt_pu_no_dominant_port": "No dominant port",
   "rpt_readiness_report_title": "Enforcement Readiness Report",

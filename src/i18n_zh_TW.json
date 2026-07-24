@@ -3524,6 +3524,7 @@
   "rpt_rhc_actor_any": "任意",
   "rpt_rhc_service_all": "所有服務",
   "rpt_tr_no_ransomware_config": "找不到勒索軟體風險連接埠設定",
+  "rpt_app_top_uncovered": "前 10 大未涵蓋流量",
   "rpt_pu_no_description": "無描述",
   "rpt_pu_no_dominant_port": "無主要連接埠",
   "rpt_querying_traffic": "正在查詢流量（{start} 至 {end}）...",
