@@ -255,3 +255,32 @@ def test_tick_end_to_end_global_tz_fallback_taipei_0900(monkeypatch):
         scheduler.tick()
 
     assert ran == [1]
+
+
+# ─── C1（2026-07-24 審查）：cron 首跑不得永久推遲 ─────────────────────────────
+
+def test_cron_first_run_fires_when_tick_lands_off_second():
+    """last_run=None 且 tick 落在 cron 分鐘內的非整秒（真實 daemon tick 帶
+    亞秒漂移）→ 必須首跑。修前 get_next_fire_time(None, now) 恆回明日、永不觸發。"""
+    s = _make_scheduler()
+    sched = _sched(cron_expr="0 8 * * *")
+    # 08:00:23.4 — cron 分鐘內但非整秒
+    now = datetime.datetime(2026, 7, 24, 8, 0, 23, 400000)
+    assert s.should_run(sched, now, last_run_str=None) is True
+
+
+def test_cron_first_run_not_before_trigger():
+    """cron 點之前的 tick 不得誤觸首跑。"""
+    s = _make_scheduler()
+    sched = _sched(cron_expr="0 8 * * *")
+    now = datetime.datetime(2026, 7, 24, 7, 59, 23, 400000)
+    assert s.should_run(sched, now, last_run_str=None) is False
+
+
+def test_cron_first_run_does_not_replay_old_period():
+    """首查時距上一個 cron 點已久（超過補跑窗）→ 不補跑舊週期，等下一個點。"""
+    s = _make_scheduler()
+    sched = _sched(cron_expr="0 8 * * *")
+    # 距 08:00 已過 5 分鐘（> 90s 補跑窗）→ 不 replay
+    now = datetime.datetime(2026, 7, 24, 8, 5, 0)
+    assert s.should_run(sched, now, last_run_str=None) is False

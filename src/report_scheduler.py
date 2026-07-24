@@ -56,6 +56,12 @@ _STATE_KEY = "report_schedule_states"
 # sub-hourly cron (e.g. '*/15 * * * *') isn't collapsed to firing once/hour.
 _MIN_RERUN_GAP = 3600
 
+# cron 首跑補跑窗（秒）：last_run=None 時，get_next_fire_time(None, now) 恆回
+# ≥ceil(now)，next<=now 只在 tick 落整秒才成立→cron 排程永不首跑（2026-07-24
+# 審查 C1，archive「首跑無限推遲」事故重演）。給 prev 一個略大於 daemon 60s
+# tick 的下界，讓剛過的 cron 點能補跑一次，但不 replay 更舊的週期。
+_CRON_CATCHUP_WINDOW_SECONDS = 90
+
 # Sentinel for "not provided" — distinguishes None (never run) from missing arg
 _UNSET = object()
 
@@ -186,7 +192,11 @@ class ReportScheduler:
                 from apscheduler.triggers.cron import CronTrigger
                 trigger = CronTrigger.from_crontab(cron_expr, timezone=tz_obj)
                 now_aware = now_naive.replace(tzinfo=tz_obj)
-                prev = last_run_dt.replace(tzinfo=tz_obj) if last_run_dt else None
+                if last_run_dt:
+                    prev = last_run_dt.replace(tzinfo=tz_obj)
+                else:
+                    # 從未跑過：給補跑下界讓剛過的 cron 點能首跑（審查 C1）
+                    prev = now_aware - datetime.timedelta(seconds=_CRON_CATCHUP_WINDOW_SECONDS)
                 next_fire = trigger.get_next_fire_time(prev, now_aware)
                 return next_fire is not None and next_fire <= now_aware
             except Exception:
