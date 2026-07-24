@@ -3,35 +3,12 @@ from __future__ import annotations
 
 from src.config_models import SiemDestinationSettings, SiemForwarderSettings
 from src.gui.settings_helpers import save_section
-
-
-MENU = (
-    "SIEM Forwarder Menu:\n"
-    "  1. View status\n"
-    "  2. Edit forwarder config\n"
-    "  3. List destinations\n"
-    "  4. Add destination\n"
-    "  5. Edit destination\n"
-    "  6. Delete destination\n"
-    "  7. Test destination\n"
-    "  8. DLQ management\n"
-    "  0. Back\n"
-)
-
-DLQ_MENU = (
-    "  DLQ Management:\n"
-    "    a. List entries\n"
-    "    b. Replay selected\n"
-    "    c. Purge selected\n"
-    "    d. Purge ALL by destination\n"
-    "    e. Export to CSV\n"
-    "    0. Back\n"
-)
+from src.i18n import t
 
 
 def manage_siem_menu(cm) -> None:
     while True:
-        print(MENU)
+        print(t("sic_menu"))
         choice = input("> ").strip()
         if choice == "0":
             return
@@ -52,12 +29,12 @@ def manage_siem_menu(cm) -> None:
         elif choice == "8":
             _dlq_submenu(cm)
         else:
-            print("invalid choice")
+            print(t("sic_invalid_choice"))
 
 
 def _prompt(name, current, cast=str, secret=False):
     shown = ("*" * min(len(str(current)), 8)) if (secret and current) else current
-    raw = input(f"  {name} [{shown}]: ").strip()
+    raw = input(t("sic_prompt_fmt", name=name, shown=shown)).strip()
     if raw == "":
         return current
     if cast is bool:
@@ -65,28 +42,24 @@ def _prompt(name, current, cast=str, secret=False):
     try:
         return cast(raw)
     except ValueError:
-        print(f"  invalid {name}; keeping {current}")
+        print(t("sic_prompt_invalid_keeping", name=name, current=current))
         return current
 
 
 def _view_status(cm):
     s = cm.models.siem
-    print(f"  enabled: {s.enabled}")
-    print(f"  dispatch_tick_seconds: {s.dispatch_tick_seconds}")
-    print(f"  dlq_max_per_dest: {s.dlq_max_per_dest}")
-    print(f"  destinations: {len(s.destinations)}")
+    print(t("sic_status_enabled", value=s.enabled))
+    print(t("sic_status_tick", value=s.dispatch_tick_seconds))
+    print(t("sic_status_dlq_max", value=s.dlq_max_per_dest))
+    print(t("sic_status_destinations", value=len(s.destinations)))
 
 
 def _edit_forwarder(cm):
     print()
-    print("  SIEM Forwarder Settings")
-    print("  ─────────────────────────────────────────────────────────────────")
-    print("  enabled              : Enable/disable all SIEM forwarding.")
-    print("  dispatch_tick_seconds: How often (seconds) to send pending records.")
-    print("                         Lower = less latency, slightly higher CPU use.")
-    print("  dlq_max_per_dest     : Max dead-letter entries kept per destination.")
-    print("                         Records that exceed max_retries are moved here.")
-    print("  ─────────────────────────────────────────────────────────────────")
+    print(t("sic_fwd_title"))
+    print(t("sic_hr"))
+    print(t("sic_fwd_help"))
+    print(t("sic_hr"))
     print()
     c = cm.models.siem.model_dump(mode="json")
     c["enabled"] = _prompt("enabled", c["enabled"], bool)
@@ -98,35 +71,26 @@ def _edit_forwarder(cm):
 
 def _report(r):
     if r["ok"]:
-        print("[!] Settings saved. Restart monitor to apply.")
+        print(t("sic_saved"))
     else:
         for path, msg in r["errors"].items():
-            print(f"    {path}: {msg}")
+            print(t("sic_field_row", path=path, msg=msg))
 
 
 def _list_destinations(cm):
     for d in cm.models.siem.destinations:
-        status = "[enabled]" if d.enabled else "[disabled]"
-        print(f"  - {d.name} ({d.transport}/{d.format}) -> {d.endpoint} {status}")
-    input("  (press Enter)")
+        status = t("sic_dest_enabled") if d.enabled else t("sic_dest_disabled")
+        print(t("sic_dest_row", name=d.name, transport=d.transport, format=d.format,
+                endpoint=d.endpoint, status=status))
+    input(t("sic_press_enter"))
 
 
 def _prompt_destination(existing=None):
     print()
-    print("  Destination Configuration")
-    print("  ─────────────────────────────────────────────────────────────────")
-    print("  transport : udp | tcp | tls | hec")
-    print("              udp = simple, no delivery guarantee.")
-    print("              tcp = reliable ordered delivery.")
-    print("              tls = encrypted TCP (recommended for production).")
-    print("              hec = Splunk HTTP Event Collector (HTTPS).")
-    print("  format    : cef         = raw CEF line (most syslog servers).")
-    print("              json        = flat JSON (HEC / Elastic).")
-    print("              syslog_cef  = RFC5424 header + CEF.")
-    print("              syslog_json = RFC5424 header + flat JSON.")
-    print("  batch_size  : Records sent per dispatch cycle. Default 100.")
-    print("  max_retries : Retries before record moves to dead-letter queue.")
-    print("  ─────────────────────────────────────────────────────────────────")
+    print(t("sic_dest_config_title"))
+    print(t("sic_hr"))
+    print(t("sic_dest_config_help"))
+    print(t("sic_hr"))
     print()
     existing = existing or {}
     name = _prompt("name", existing.get("name", ""))
@@ -138,7 +102,8 @@ def _prompt_destination(existing=None):
     tls_ca_bundle = _prompt("tls_ca_bundle", existing.get("tls_ca_bundle") or "")
     hec_token = _prompt("hec_token", existing.get("hec_token") or "", secret=True)
     batch_size = _prompt("batch_size", existing.get("batch_size", 100), int)
-    raw = input(f"  source_types (comma, [{','.join(existing.get('source_types', ['audit', 'traffic']))}]): ").strip()
+    raw = input(t("sic_source_types_prompt",
+                  cur=','.join(existing.get('source_types', ['audit', 'traffic'])))).strip()
     source_types = (
         [x.strip() for x in raw.split(",") if x.strip()]
         if raw else existing.get("source_types", ["audit", "traffic"])
@@ -164,7 +129,7 @@ def _add_destination(cm):
     try:
         SiemDestinationSettings(**data)
     except Exception as exc:
-        print(f"  validation error: {exc}")
+        print(t("sic_validation_error", exc=exc))
         return
     siem = cm.models.siem.model_dump(mode="json")
     siem.setdefault("destinations", []).append(data)
@@ -172,7 +137,7 @@ def _add_destination(cm):
 
 
 def _edit_destination(cm):
-    name = input("  destination to edit: ").strip()
+    name = input(t("sic_edit_which")).strip()
     siem = cm.models.siem.model_dump(mode="json")
     dests = siem.get("destinations", [])
     for i, d in enumerate(dests):
@@ -181,13 +146,13 @@ def _edit_destination(cm):
             siem["destinations"] = dests
             _report(save_section(cm, "siem", siem, SiemForwarderSettings))
             return
-    print("  not found")
+    print(t("sic_not_found"))
 
 
 def _delete_destination(cm):
-    name = input("  destination to delete: ").strip()
-    if input(f"  confirm delete '{name}'? (yes/no): ").strip().lower() != "yes":
-        print("  cancelled")
+    name = input(t("sic_delete_which")).strip()
+    if input(t("sic_confirm_delete", name=name)).strip().lower() != "yes":
+        print(t("sic_cancelled"))
         return
     siem = cm.models.siem.model_dump(mode="json")
     siem["destinations"] = [d for d in siem.get("destinations", []) if d.get("name") != name]
@@ -196,22 +161,22 @@ def _delete_destination(cm):
 
 def _test_destination(cm):
     from src.siem.tester import send_test_event
-    name = input("  destination to test: ").strip()
+    name = input(t("sic_test_which")).strip()
     dest = next((d for d in cm.models.siem.destinations if d.name == name), None)
     if dest is None:
-        print("  not found")
+        print(t("sic_not_found"))
         return
     r = send_test_event(dest)
     if r.ok:
-        print(f"  succeeded ({r.latency_ms} ms)")
+        print(t("sic_test_ok", ms=r.latency_ms))
     else:
-        print(f"  failed: {r.error}")
+        print(t("sic_test_failed", error=r.error))
 
 
 def _dlq_submenu(cm):
     while True:
-        print(DLQ_MENU)
-        c = input("  > ").strip().lower()
+        print(t("sic_dlq_menu"))
+        c = input(t("sic_dlq_prompt")).strip().lower()
         if c == "0":
             return
         elif c == "a":
@@ -240,59 +205,61 @@ def _dlq_list(cm):
     from src.pce_cache.models import DeadLetter
     with _dlq_engine(cm)() as s:
         for row in s.scalars(select(DeadLetter).limit(50)):
-            print(f"  [{row.id}] {row.destination} ...")
+            print(t("sic_dlq_row", id=row.id, destination=row.destination))
 
 
 def _dlq_bulk(cm, action):
     from src.siem.dlq import DeadLetterQueue
 
-    raw = input(f"  DLQ ids to {action} (comma): ").strip()
+    action_label = t("sic_dlq_action_replay") if action == "replay" else t("sic_dlq_action_purge")
+    raw = input(t("sic_dlq_ids_prompt", action=action_label)).strip()
     if not raw:
         return
     try:
         ids = [int(x.strip()) for x in raw.split(",") if x.strip()]
     except ValueError:
-        print("  invalid id list")
+        print(t("sic_dlq_invalid_ids"))
         return
     sf = _dlq_engine(cm)
     if action == "replay":
         for r in DeadLetterQueue(sf).replay_ids(ids):
-            print(f"  [{r['id']}] " + ("replayed" if r["ok"] else r["error"]))
+            result = t("sic_dlq_replayed") if r["ok"] else r["error"]
+            print(t("sic_dlq_replay_row", id=r['id'], result=result))
     else:  # purge: 逐筆刪除選定的 DLQ id（dlq.py 的 purge() 只支援依 destination+
         # 天數批次刪除，選取特定 id 屬於獨立語意，直接刪除即可，不需擴充 dlq.py）。
         # 刪除不可逆，照本檔既有安全模式（_delete_destination 的 yes 確認）先確認。
         id_list = ", ".join(str(i) for i in ids)
         # 確認模式：選定 id 清單風險範圍明確（僅這批 id），用 yes 二字確認即可。
-        if input(f"  confirm purge {len(ids)} entries (ids: {id_list})? (yes/no): ").strip().lower() != "yes":
-            print("  cancelled")
+        if input(t("sic_dlq_confirm_purge", count=len(ids), ids=id_list)).strip().lower() != "yes":
+            print(t("sic_cancelled"))
             return
         from sqlalchemy import delete
         from src.pce_cache.models import DeadLetter
         with sf.begin() as s:
             result = s.execute(delete(DeadLetter).where(DeadLetter.id.in_(ids)))
         # 請求數與實刪數可能不同（部分 id 早已不存在），訊息同時呈現兩者避免誤解。
-        print(f"  requested {len(ids)}, purged {result.rowcount} entries")
+        print(t("sic_dlq_purged_count", requested=len(ids), purged=result.rowcount))
 
 
 def _dlq_purge_all(cm):
     from src.siem.dlq import DeadLetterQueue
 
-    name = input("  destination: ").strip()
+    name = input(t("sic_dlq_dest_prompt")).strip()
     # 確認模式：清空整個 destination 的 DLQ 影響範圍較大，要求輸入完整名稱以降低誤刪風險。
-    if input(f"  type '{name}' to confirm: ").strip() != name:
-        print("  cancelled")
+    if input(t("sic_dlq_type_confirm", name=name)).strip() != name:
+        print(t("sic_cancelled"))
         return
     # older_than_days=0：cutoff 等於現在，既有的 quarantined_at 一定早於現在，
     # 等同清空該 destination 的全部 DLQ 項目。
     removed = DeadLetterQueue(_dlq_engine(cm)).purge(name, older_than_days=0)
-    print(f"  purged {removed} entries for {name}")
+    print(t("sic_dlq_purged_dest", count=removed, name=name))
 
 
 def _dlq_export(cm):
     import csv
     from sqlalchemy import select
     from src.pce_cache.models import DeadLetter
-    path = input("  output path (e.g. dlq.csv): ").strip()
+    path = input(t("sic_dlq_export_path")).strip()
     if not path:
         return
     try:
@@ -306,7 +273,6 @@ def _dlq_export(cm):
                         row.quarantined_at.isoformat() if row.quarantined_at else "",
                     ])
     except OSError as exc:
-        print(f"  export failed: {exc}")
+        print(t("sic_dlq_export_failed", exc=exc))
         return
-    print(f"  exported to {path}")
-    print(f"  exported to {path}")
+    print(t("sic_dlq_exported", path=path))
