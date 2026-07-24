@@ -67,7 +67,9 @@ function rsInitResizer() {
     document.removeEventListener('mousemove', onMouseMove);
     document.removeEventListener('mouseup', onMouseUp);
   }
-  resizer.addEventListener('mousedown', onMouseDown);
+  // onX assignment (not addEventListener) so re-entering the tab replaces the
+  // handler instead of stacking a new mousedown listener each time.
+  resizer.onmousedown = onMouseDown;
 }
 
 /* ── Sub-tab switching ── */
@@ -151,10 +153,10 @@ async function rsFetchRulesBySearch(q, scope) {
       tr.style.cursor = 'pointer';
       tr.onclick = function() { rsViewRuleset(item.rs_id); };
       const ruleTypeBadge = item.rule_type === 'override_deny'
-        ? h('span', { class: 'rs-badge rs-badge-block', style: { fontSize: '.7rem' } }, 'Override Deny')
+        ? h('span', { class: 'rs-badge rs-badge-block', style: { fontSize: '.7rem' } }, _t('gui_rs_rule_type_override_deny'))
         : item.rule_type === 'deny'
-          ? h('span', { class: 'rs-badge rs-badge-off', style: { fontSize: '.7rem' } }, 'Deny')
-          : h('span', { class: 'rs-badge rs-badge-on', style: { fontSize: '.7rem' } }, 'Allow');
+          ? h('span', { class: 'rs-badge rs-badge-off', style: { fontSize: '.7rem' } }, _t('gui_rs_rule_type_deny'))
+          : h('span', { class: 'rs-badge rs-badge-on', style: { fontSize: '.7rem' } }, _t('gui_rs_rule_type_allow'));
       const stBadge = item.enabled
         ? h('span', { class: 'rs-badge rs-badge-on' }, 'ON')
         : h('span', { class: 'rs-badge rs-badge-off' }, 'OFF');
@@ -191,8 +193,9 @@ async function rsFetchRulesets() {
     tbody.innerHTML = '';
     if (data.error) {
       toast(_t('gui_rs_warn_prefix') + ': ' + data.error, true);
+      return;  // error body has no items — don't fall through to forEach(undefined)
     }
-    data.items.forEach(rs => {
+    (data.items || []).forEach(rs => {
       const schMark = rs.schedule_type === 1
         ? h('span', { class: 'rs-mark-rs', title: _t('gui_rs_sch_badge_sched') }, h('svg', { class: 'icon', 'aria-hidden': 'true', style: 'width:10px;height:10px;' }, h('use', { href: '#icon-star' })))
         : rs.schedule_type === 2
@@ -277,7 +280,7 @@ async function rsViewRuleset(rsId) {
       : '<span class="rs-badge rs-badge-off">OFF</span>';
     const schRsBadge = rsRow.is_scheduled ? ' &nbsp; <span class="rs-mark-rs" title="' + _t('gui_rs_sch_badge_sched') + '"><svg class="icon" aria-hidden="true" style="width:10px;height:10px;"><use href="#icon-star"></use></svg> ' + _t('gui_rs_sch_badge_sched') + '</span>' : '';
     const detailMeta = $('rs-detail-meta');
-    detailMeta.innerHTML = 'ID: ' + rsRow.id + ' &nbsp; ' + provBadge + ' &nbsp; ' + statusBadge + schRsBadge + ' &nbsp; ';
+    detailMeta.innerHTML = 'ID: ' + escapeHtml(String(rsRow.id)) + ' &nbsp; ' + provBadge + ' &nbsp; ' + statusBadge + schRsBadge + ' &nbsp; ';
     const schedBtn = document.createElement('button');
     schedBtn.className = 'btn btn-sm btn-primary';
     schedBtn.textContent = _t('gui_rs_schedule_rs_btn');
@@ -304,6 +307,13 @@ async function rsViewRuleset(rsId) {
         const td = h('td', { class: 'rs-clickable' }, rsTruncateNode(value, max));
         td.dataset.action = 'rsShowPopup';
         td.dataset.args = JSON.stringify([label, value == null ? '' : String(value)]);
+        // Keyboard access: the cell is interactive (opens a detail popup) but a
+        // bare <td> is not focusable/operable — expose it as a button.
+        td.setAttribute('role', 'button');
+        td.setAttribute('tabindex', '0');
+        td.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); td.click(); }
+        });
         return td;
       };
       const descTd = r.description
@@ -529,6 +539,11 @@ async function rsLoadSchedules() {
         const td = h('td', { class: 'rs-clickable' }, rsTruncateNode(displaySource, max));
         td.dataset.action = 'rsShowPopup';
         td.dataset.args = JSON.stringify([label, value == null ? '' : String(value)]);
+        td.setAttribute('role', 'button');
+        td.setAttribute('tabindex', '0');
+        td.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); td.click(); }
+        });
         return td;
       };
       const cb = h('input', { type: 'checkbox', class: 'rs-sch-cb', value: s.href || '' });
@@ -579,7 +594,7 @@ async function rsEditSchedule(id) {
     const res = await fetch('/api/rule_scheduler/schedules');
     const list = await res.json();
     const s = list.find(x => String(x.id) === String(id));
-    if (!s) return toast('Schedule not found', true);
+    if (!s) return toast(_t('gui_rs_schedule_not_found'), true);
     $('rs-sch-href').value = s.href || '';
     $('rs-sch-name').value = s.detail_name || s.name || '';
     $('rs-sch-is-rs').value = s.is_ruleset ? '1' : '0';
@@ -627,6 +642,8 @@ async function rsDeleteSelected() {
     if (data.ok) {
       toast(_t('gui_rs_deleted').replace('{count}', data.deleted.length));
       rsLoadSchedules();
+    } else {
+      toast(_t('gui_rs_error_delete_failed').replace('{error}', data.error || ''), true);
     }
   } catch (e) {
     toast(_t('gui_rs_error_delete_failed').replace('{error}', e.message), true);
@@ -798,10 +815,10 @@ async function rsRenderKpi() {
     if (hitsEl) hitsEl.textContent = todayHits;
     if (hitsSub) {
       if (todayErrors > 0) {
-        hitsSub.textContent = todayErrors + ' errors';
+        hitsSub.textContent = todayErrors + ' ' + _t('gui_rs_kpi_errors');
         hitsSub.className = 'rs-kpi-sub warn';
       } else if (todayHits > 0) {
-        hitsSub.textContent = 'ok';
+        hitsSub.textContent = _t('gui_rs_kpi_ok');
         hitsSub.className = 'rs-kpi-sub ok';
       } else {
         hitsSub.textContent = _t('gui_rs_kpi_none_today');

@@ -70,9 +70,11 @@ function _parseMatchFields(text) {
 
 let _catalog = {}, _actionEvents = [], _severityFilterEvents = [];
 let _catalogCategories = [], _eventMetaById = {};
+let _ruleSaveBusy = false;  // guards the save handlers against double-submit
 async function loadRules() {
   showSkeleton('r-body', 7);
   const rules = await api('/api/rules');
+  if (!Array.isArray(rules)) { toast((rules && rules.error) || _t('gui_msg_ui_error'), 'err'); return; }
   $('r-badge').textContent = rules.length;
   const pdm = { 2: 'Blocked', 1: 'Potential', 0: 'Allowed', '-1': 'All' };
 
@@ -124,9 +126,23 @@ async function loadRules() {
   if (typeof loadAlertTestActions === 'function') loadAlertTestActions();
 }
 // switch 外觀是 span，實際狀態由前一個 checkbox 控制；點 span 轉發 click 給 checkbox。
-function _rulesToggleSwitchClick(el) {
+async function _rulesToggleSwitchClick(el) {
   const cb = el.previousElementSibling;
-  if (cb) cb.click();
+  if (!cb) return;
+  const enabled = !cb.checked;  // clicking toggles it
+  cb.checked = enabled;
+  el.classList.toggle('on', enabled);
+  el.classList.toggle('off', !enabled);
+  el.title = enabled ? _t('gui_enabled') : _t('gui_disabled');
+  const res = await put('/api/rules/' + cb.dataset.idx, { enabled });
+  if (!res || !res.ok) {
+    // Revert the optimistic UI on failure so the switch reflects real state.
+    cb.checked = !enabled;
+    el.classList.toggle('on', !enabled);
+    el.classList.toggle('off', enabled);
+    el.title = !enabled ? _t('gui_enabled') : _t('gui_disabled');
+    toast((res && res.error) || _t('gui_err_generic'), 'err');
+  }
 }
 function toggleAll(el) {
   document.querySelectorAll('.r-chk').forEach(c => {
@@ -142,8 +158,11 @@ async function deleteSelected() {
   const ids = [...document.querySelectorAll('.r-chk:checked')].map(c => parseInt(c.dataset.idx)).sort((a, b) => b - a);
   if (!ids.length) { toast(_t('gui_msg_select_rules_first'), 'err'); return }
   if (!confirm((_t('gui_msg_confirm_delete')).replace('{count}', ids.length))) return;
-  for (const i of ids) await del('/api/rules/' + i);
-  toast(_t('gui_msg_deleted')); loadRules(); loadDashboard();
+  let failed = 0;
+  for (const i of ids) { const res = await del('/api/rules/' + i); if (res && res.error) failed++; }
+  if (failed) toast((_t('gui_msg_delete_partial_failed') || '{n} delete(s) failed').replace('{n}', failed), 'err');
+  else toast(_t('gui_msg_deleted'));
+  loadRules(); loadDashboard();
 }
 function openModal(id, isEdit) {
   _editIdx = isEdit ?? null; $(id).classList.add('show');
@@ -516,8 +535,11 @@ async function saveEvent() {
     threshold_window: $('ev-win').value,
     cooldown_minutes: $('ev-cd').value
   };
-  if (_editIdx !== null) await put('/api/rules/' + _editIdx, data); else await post('/api/rules/event', data);
-  closeModal('m-event'); toast(_t('gui_msg_event_rule_saved')); loadRules(); loadDashboard();
+  if (_ruleSaveBusy) return; _ruleSaveBusy = true;
+  try {
+    if (_editIdx !== null) await put('/api/rules/' + _editIdx, data); else await post('/api/rules/event', data);
+    closeModal('m-event'); toast(_t('gui_msg_event_rule_saved')); loadRules(); loadDashboard();
+  } finally { _ruleSaveBusy = false; }
 }
 async function saveSystemRule() {
   const name = $('sys-name').value.trim() || (_t('rule_pce_health'));
@@ -526,18 +548,24 @@ async function saveSystemRule() {
     filter_value: $('sys-type').value || 'pce_health',
     cooldown_minutes: $('sys-cd').value || 30
   };
-  if (_editIdx !== null) {
-    await put('/api/rules/' + _editIdx, data);
-  } else {
-    await post('/api/rules/system', data);
-  }
-  closeModal('m-system'); toast(_t('gui_msg_system_rule_saved')); loadRules(); loadDashboard();
+  if (_ruleSaveBusy) return; _ruleSaveBusy = true;
+  try {
+    if (_editIdx !== null) {
+      await put('/api/rules/' + _editIdx, data);
+    } else {
+      await post('/api/rules/system', data);
+    }
+    closeModal('m-system'); toast(_t('gui_msg_system_rule_saved')); loadRules(); loadDashboard();
+  } finally { _ruleSaveBusy = false; }
 }
 async function saveTraffic() {
   const name = $('tr-name').value.trim(); if (!name) { toast(_t('gui_msg_name_required'), 'err'); return }
   const data = { name, pd: rv('tr-pd'), threshold_count: $('tr-cnt').value, threshold_window: $('tr-win').value, cooldown_minutes: $('tr-cd').value, filters: _ensureTrFilterBar().getFilters() };
-  if (_editIdx !== null) await put('/api/rules/' + _editIdx, data); else await post('/api/rules/traffic', data);
-  closeModal('m-traffic'); toast(_t('gui_msg_traffic_rule_saved')); loadRules(); loadDashboard();
+  if (_ruleSaveBusy) return; _ruleSaveBusy = true;
+  try {
+    if (_editIdx !== null) await put('/api/rules/' + _editIdx, data); else await post('/api/rules/traffic', data);
+    closeModal('m-traffic'); toast(_t('gui_msg_traffic_rule_saved')); loadRules(); loadDashboard();
+  } finally { _ruleSaveBusy = false; }
 }
 async function saveBW() {
   const name = $('bw-name').value.trim(); if (!name) { toast(_t('gui_msg_name_required'), 'err'); return }
@@ -546,8 +574,11 @@ async function saveBW() {
     threshold_count: $('bw-val').value, threshold_window: $('bw-win').value, cooldown_minutes: $('bw-cd').value,
     filters: _ensureBwFilterBar().getFilters()
   };
-  if (_editIdx !== null) await put('/api/rules/' + _editIdx, { ...data, type: data.rule_type }); else await post('/api/rules/bandwidth', data);
-  closeModal('m-bw'); toast(_t('gui_msg_rule_saved')); loadRules(); loadDashboard();
+  if (_ruleSaveBusy) return; _ruleSaveBusy = true;
+  try {
+    if (_editIdx !== null) await put('/api/rules/' + _editIdx, { ...data, type: data.rule_type }); else await post('/api/rules/bandwidth', data);
+    closeModal('m-bw'); toast(_t('gui_msg_rule_saved')); loadRules(); loadDashboard();
+  } finally { _ruleSaveBusy = false; }
 }
 
 function confirmBestPractices() {
