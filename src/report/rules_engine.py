@@ -351,7 +351,9 @@ class RulesEngine:
             _port_names = {22: 'SSH', 2049: 'NFS', 20: 'FTP-data', 21: 'FTP', 80: 'HTTP',
                            8080: 'HTTP-alt', 8443: 'HTTPS-alt'}
             named = {_port_names.get(p, str(p)): c for p, c in top_ports.items()}
-            unique_wl = matched['src_ip'].nunique() + matched['dst_ip'].nunique()
+            # Distinct hosts across both ends: summing the two nunique() counts
+            # double-counts any IP that appears as both source and destination.
+            unique_wl = pd.concat([matched['src_ip'], matched['dst_ip']]).nunique()
             return Finding(
                 rule_id='B003', rule_name='Ransomware Risk Port (Medium) — Uncovered',
                 severity='MEDIUM', category='Ransomware',

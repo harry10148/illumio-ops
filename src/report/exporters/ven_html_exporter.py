@@ -32,12 +32,13 @@ def _policy_sync_badge(val: str) -> str:
     # PCE 實際值域是 applied/syncing/staged（vendor 查證）；applied＝健康（綠），
     # syncing/staged＝未收斂（黃），其他未知值才視為異常（紅）。
     v = str(val).lower().strip()
+    safe = html.escape(str(val))  # PCE-derived value — escape before embedding
     if v in ("applied", "synced"):
-        return f'<span class="badge-synced">{val}</span>'
+        return f'<span class="badge-synced">{safe}</span>'
     if v in ("syncing", "staged"):
-        return f'<span class="badge-staged">{val}</span>'
+        return f'<span class="badge-staged">{safe}</span>'
     if v and v not in ("none", "nan"):
-        return f'<span class="badge-unsynced">{val}</span>'
+        return f'<span class="badge-unsynced">{safe}</span>'
     return ""
 
 
@@ -135,15 +136,20 @@ class VenHtmlExporter:
         yest_count = len(df_yest) if df_yest is not None and not df_yest.empty else 0
 
         status_chart_html = ""
-        total_vens = online_count + offline_count + today_count + yest_count
+        # lost_24h / lost_48h are SUBSETS of offline (see ven_status_generator
+        # _analyze) — partition offline into long-term + the two lost buckets so
+        # the bars don't double-count, and total from the mutually-exclusive sets.
+        long_offline = max(0, offline_count - today_count - yest_count)
+        total_vens = online_count + offline_count
         if total_vens > 0:
             try:
                 spec = {
                     "type": "bar",
                     "title": "VEN Status Distribution",
+                    "title_key": "chart_ven_status_distribution",
                     "data": {
-                        "labels": [t("chart_ven_online", lang=self._lang), t("chart_ven_offline", lang=self._lang), t("chart_ven_lost_24h", lang=self._lang), t("chart_ven_lost_48h", lang=self._lang)],
-                        "values": [online_count, offline_count, today_count, yest_count],
+                        "labels": [t("chart_ven_online", lang=self._lang), t("chart_ven_offline_long", lang=self._lang), t("chart_ven_lost_24h", lang=self._lang), t("chart_ven_lost_48h", lang=self._lang)],
+                        "values": [online_count, long_offline, today_count, yest_count],
                     },
                 }
                 svg = render_matplotlib_svg(spec, lang=self._lang)

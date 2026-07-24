@@ -122,6 +122,8 @@ def _fmt_bw(mbps) -> str:
         mbps = float(mbps)
     except (TypeError, ValueError):
         return str(mbps) if mbps is not None else '—'
+    if mbps != mbps:  # NaN — render as unavailable, not literal 'nan Mbps'
+        return '—'
     if mbps < 0:
         return '—'
     if mbps >= 1_000_000:

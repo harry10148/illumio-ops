@@ -241,6 +241,9 @@ class VenStatusGenerator:
             rows.append({
                 'hostname':                   w.get('hostname', w.get('name', '')),
                 'ip':                         ip_str,
+                # OS platform (e.g. 'ubuntu-x86_64-16.04') for the OS-distribution
+                # chart; without it the chart's os_col lookup found nothing.
+                'os_id':                      w.get('os_id', '') or w.get('os_detail', ''),
                 'role':                       label_cols['role'],
                 'app':                        label_cols['app'],
                 'env':                        label_cols['env'],
@@ -447,7 +450,8 @@ class VenStatusGenerator:
             if len(os_counts) > 0:
                 os_chart_spec = {
                     "type": "bar",
-                    "title": "VEN by OS Platform",
+                    "title": "VEN by OS Platform (Top 10)",
+                    "title_key": "chart_ven_by_os",
                     "x_label": "OS",
                     "y_label": "VEN Count",
                     "data": {
