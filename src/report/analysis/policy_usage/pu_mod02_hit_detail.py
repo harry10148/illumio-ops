@@ -6,6 +6,8 @@ from __future__ import annotations
 from loguru import logger
 import pandas as pd
 
+from src.i18n import t
+
 _MAX_ROWS = 500
 
 def pu_hit_detail(
@@ -14,6 +16,7 @@ def pu_hit_detail(
     hit_counts: dict,
     execution_stats: dict | None = None,
     api_client=None,
+    lang: str = "en",
 ) -> dict:
     """Build hit-rule detail and top hit port distribution tables."""
     execution_stats = execution_stats or {}
@@ -35,11 +38,13 @@ def pu_hit_detail(
                 int(hit_counts.get(href, 0) or 0),
                 port_details.get(href, {}),
                 api_client,
+                lang,
             )
         )
 
     rows.sort(key=lambda r: (r.get("Ruleset", ""), r.get("No", 0)))
-    rows = rows[:_MAX_ROWS]
+    total_hit_rows = len(rows)  # full count BEFORE the display cap
+    display_rows = rows[:_MAX_ROWS]
 
     columns = [
         "Ruleset",
@@ -54,7 +59,7 @@ def pu_hit_detail(
         "Top Hit Ports",
         "Enabled",
     ]
-    hit_df = pd.DataFrame(rows, columns=columns) if rows else pd.DataFrame(columns=columns)
+    hit_df = pd.DataFrame(display_rows, columns=columns) if display_rows else pd.DataFrame(columns=columns)
 
     top_ports = execution_stats.get("top_hit_ports", []) or []
     top_port_rows = [
@@ -66,7 +71,8 @@ def pu_hit_detail(
     ]
     top_ports_df = pd.DataFrame(top_port_rows, columns=["Port / Proto", "Flow Count"])
 
-    # Chart: Top hit rules bar
+    # Chart: Top hit rules bar — built from the FULL rows, not the display-capped
+    # slice, so the true highest-hit rules appear even if they sort past row 500.
     chart_spec = None
     if rows:
         top_rows = sorted(rows, key=lambda r: r.get("Hit Count", 0), reverse=True)[:10]
@@ -92,7 +98,7 @@ def pu_hit_detail(
         "chart_spec": chart_spec,
     }
 
-def _build_row(rule: dict, ruleset_map: dict, hit_count: int, port_detail: dict, api_client) -> dict:
+def _build_row(rule: dict, ruleset_map: dict, hit_count: int, port_detail: dict, api_client, lang: str = "en") -> dict:
     rs_href = rule.get("_ruleset_href", "")
     rs_name = ruleset_map.get(rs_href, rule.get("_ruleset_name", rs_href))
     rs_id = rule.get("_ruleset_id", "")
@@ -103,11 +109,11 @@ def _build_row(rule: dict, ruleset_map: dict, hit_count: int, port_detail: dict,
     consumers = _resolve_actors(rule.get("consumers", []), api_client)
     services = _resolve_services(rule.get("ingress_services", []), api_client)
 
-    desc = rule.get("description", "") or "No description"
+    desc = rule.get("description", "") or t("rpt_pu_no_description", lang=lang)
     ruleset_label = f"{rs_name} ({rs_id})" if rs_id else rs_name
     top_hit_ports = str(port_detail.get("top_hit_ports", "") or "").strip()
     if not top_hit_ports:
-        top_hit_ports = str(rule.get("_csv_flows_by_port", "") or "").strip() or "No dominant port"
+        top_hit_ports = str(rule.get("_csv_flows_by_port", "") or "").strip() or t("rpt_pu_no_dominant_port", lang=lang)
 
     return {
         "No": rule_no,

@@ -509,7 +509,12 @@ class PolicyUsageGenerator:
             rows = list(self.api._traffic._submit_and_stream_async_query(
                 payload, compute_draft=True
             ))
-            return pu_draft_pd_summary(rows)
+            result = pu_draft_pd_summary(rows)
+            # The draft-PD counts are absolute; if the query hit its ceiling the
+            # totals are a floor, not the true count — flag it for disclosure.
+            if len(rows) >= payload["max_results"]:
+                result["truncated_at"] = payload["max_results"]
+            return result
         except Exception as exc:
             logger.warning("Draft PD analysis failed (non-fatal): {}", exc)
             return {"skipped": True, "reason": str(exc)}
@@ -534,7 +539,7 @@ class PolicyUsageGenerator:
 
         results = {}
         results['mod01'] = pu_overview(flat_rules, hit_hrefs)
-        results['mod02'] = pu_hit_detail(flat_rules, ruleset_map, hit_counts, execution_stats or {}, self.api)
+        results['mod02'] = pu_hit_detail(flat_rules, ruleset_map, hit_counts, execution_stats or {}, self.api, lang=self._lang)
         results['mod03'] = pu_unused_detail(flat_rules, ruleset_map, hit_hrefs, execution_stats or {}, self.api, lang=self._lang)
         results['mod04'] = pu_deny_effectiveness(flat_rules, hit_counts, ruleset_map)
         results['mod05'] = self._fetch_draft_pd_analysis(start_date, end_date)

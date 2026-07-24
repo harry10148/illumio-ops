@@ -33,7 +33,7 @@ _AGENT_SECURITY_EVENTS = frozenset({
     "agent.suspend",
 })
 
-_BUSINESS_HOURS = range(8, 19)  # 08:00–18:59 local time
+_BUSINESS_HOURS = range(8, 19)  # 08:00–18:59 UTC (the off-hours column is labelled "Hour (UTC)")
 
 def _parse_ts(df: pd.DataFrame) -> pd.DataFrame:
     """Ensure timestamp column is datetime and sorted."""
@@ -160,11 +160,15 @@ def audit_event_correlation(df: pd.DataFrame, window_minutes: int = 30) -> dict:
 
     # Pattern 4: Off-hours high-risk operations
     off_hours_rows: list[dict] = []
+    total_off_hours = 0
     high_risk_all = work[work["event_type"].isin(_HIGH_RISK_POLICY_EVENTS)].copy()
     if not high_risk_all.empty:
         high_risk_all["_hour"] = high_risk_all["_ts"].dt.hour
         off_hours = high_risk_all[~high_risk_all["_hour"].isin(_BUSINESS_HOURS)]
         if not off_hours.empty:
+            # Count the FULL off-hours set; only the display list is capped
+            # (mirrors correlated_sequences / brute_force totals).
+            total_off_hours = len(off_hours)
             for _, row in off_hours.head(20).iterrows():
                 off_hours_rows.append({
                     "Event Type": row["event_type"],
@@ -193,6 +197,6 @@ def audit_event_correlation(df: pd.DataFrame, window_minutes: int = 30) -> dict:
         "brute_force_detections": pd.DataFrame(brute_force_rows[:20]) if brute_force_rows else pd.DataFrame(),
         "total_brute_force": len(brute_force_rows),
         "off_hours_operations": pd.DataFrame(off_hours_rows[:20]) if off_hours_rows else pd.DataFrame(),
-        "total_off_hours": len(off_hours_rows),
+        "total_off_hours": total_off_hours,
         "window_minutes": window_minutes,
     }

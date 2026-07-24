@@ -126,7 +126,8 @@ def uncovered_flows(df: pd.DataFrame, top_n: int = 20, *, lang: str = "en") -> d
                  .reset_index()
                  .nlargest(top_n, 'connections')
                  .rename(columns={'flow_key': 'Flow', 'policy_decision': 'Decision',
-                                  'connections': 'Connections'}))
+                                  'connections': 'Connections', 'recommendation': 'Recommendation',
+                                  'unique_src': 'Unique Src', 'unique_dst': 'Unique Dst'}))
 
     by_rec = (uncovered.groupby('recommendation_type').size()
               .reset_index(name='Count')
@@ -189,10 +190,10 @@ def _port_gap_ranking(df: pd.DataFrame, uncovered: pd.DataFrame, top_n: int = 20
               .head(top_n)
               .reset_index()
               .rename(columns={'port': 'Port', 'proto': 'Proto',
-                               'Total': 'Total Flows', 'Uncovered': 'Uncovered Flows'}))
+                               'Total': 'Total Connections', 'Uncovered': 'Uncovered Connections'}))
     if 'Port' in result.columns:
         result['Port'] = result['Port'].astype('Int64')
-    for c in ('Total Flows', 'Uncovered Flows'):
+    for c in ('Total Connections', 'Uncovered Connections'):
         if c in result.columns:
             result[c] = result[c].astype('Int64')
     if 'Proto' in result.columns and result['Proto'].astype(str).str.strip().eq('').all():

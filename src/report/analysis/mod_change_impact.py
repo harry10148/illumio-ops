@@ -6,7 +6,11 @@ from typing import Optional
 # 方向名單對齊快照實際 key（原名單 key 全庫零生產者，屬過期殘留）。
 # staged_coverage_pct 語意雙向（staged→enforced 轉換使其下降是好事、
 # 新缺口使其上升是壞事）——刻意不列入任一名單，維持 neutral。
-LOWER_BETTER = ("true_gap_pct", "risk_flows_total")
+# risk_flows_total is an ABSOLUTE flow count: comparing it across snapshots with
+# different window lengths (or just busier periods) yields a misleading
+# better/worse verdict, and more flows is not inherently worse. Keep it neutral
+# (delta still shown, not scored) — same rationale as staged_coverage_pct above.
+LOWER_BETTER = ("true_gap_pct",)
 HIGHER_BETTER = ("enforced_coverage_pct", "maturity_score")
 
 _POSTURE_KEYS = ('enforced_coverage_pct', 'staged_coverage_pct', 'true_gap_pct',

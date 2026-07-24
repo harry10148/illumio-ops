@@ -45,6 +45,16 @@ class AppSummaryHtmlExporter:
     def _section(self, id_: str, title: str, content: str) -> str:
         return f'<section id="{id_}" class="card"><h2>{title}</h2>{content}</section>'
 
+    def _trunc_note(self, shown_df, total: int) -> str:
+        """Disclose truncation when a KPI counts the full set but the table shows
+        only the top N (the baseline tables cap at top_n)."""
+        shown = 0 if shown_df is None or getattr(shown_df, "empty", True) else len(shown_df)
+        if total and shown and total > shown:
+            msg = _esc(t("rpt_table_truncated_note", lang=self._lang)
+                       .replace("{shown}", str(shown)).replace("{total}", str(total)))
+            return f'<p class="note">{msg}</p>'
+        return ""
+
     def _kpi_row(self) -> str:
         base = self._r.get("baseline", {})
         mod03 = self._r.get("mod03", {})
@@ -64,7 +74,10 @@ class AppSummaryHtmlExporter:
             + _kpi(mod03.get("n_blocked", 0) + mod03.get("n_unknown", 0),
                    t("rpt_gap", default="Gap", lang=self._lang))
         )
-        top = render_df_table(mod03.get("top_flows"), col_i18n={}, lang=self._lang)
+        top_df = mod03.get("top_flows")
+        caption = (f'<h3>{_esc(t("rpt_app_top_uncovered", lang=self._lang))}</h3>'
+                   if top_df is not None and not getattr(top_df, "empty", True) else "")
+        top = caption + render_df_table(top_df, col_i18n={}, lang=self._lang)
         return f'<div class="kpi-grid">{cards}</div>{top}'
 
     def _policy_impact_section(self) -> str:
@@ -131,8 +144,10 @@ class AppSummaryHtmlExporter:
             )
         else:
             base = self._r.get("baseline", {})
-            inbound = render_df_table(base.get("inbound"), col_i18n={}, lang=lang)
-            outbound = render_df_table(base.get("outbound"), col_i18n={}, lang=lang)
+            inbound_df = base.get("inbound")
+            outbound_df = base.get("outbound")
+            inbound = render_df_table(inbound_df, col_i18n={}, lang=lang) + self._trunc_note(inbound_df, base.get("inbound_count", 0))
+            outbound = render_df_table(outbound_df, col_i18n={}, lang=lang) + self._trunc_note(outbound_df, base.get("outbound_count", 0))
             sections = (
                 f'<section class="card"><div class="kpi-grid">{self._kpi_row()}</div></section>'
                 + self._section("inbound", _esc(t("rpt_app_inbound", lang=lang)), inbound)

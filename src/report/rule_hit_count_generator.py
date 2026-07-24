@@ -171,7 +171,10 @@ class RuleHitCountGenerator:
         # Native export carries the report window as Start/End Date columns.
         date_range = ('', '')
         if len(df) and 'start_date' in df.columns and 'end_date' in df.columns:
-            date_range = (str(df.iloc[0]['start_date'])[:10], str(df.iloc[0]['end_date'])[:10])
+            # Guard nulls: str(NaN) is 'nan', which would print on the cover page.
+            _sd, _ed = df.iloc[0]['start_date'], df.iloc[0]['end_date']
+            date_range = ('' if pd.isna(_sd) else str(_sd)[:10],
+                          '' if pd.isna(_ed) else str(_ed)[:10])
 
         enrich_failed = self._enrich_rows(rows)
         return self._finalize(rows, source='csv', date_range=date_range,
@@ -235,7 +238,7 @@ class RuleHitCountGenerator:
 
     def _actor_str(self, actors) -> str:
         if not actors:
-            return 'Any'
+            return t("rpt_rhc_actor_any", lang=self._lang)
         try:
             return self.api.resolve_actor_str(actors)
         except Exception:
@@ -244,7 +247,7 @@ class RuleHitCountGenerator:
 
     def _service_str(self, services) -> str:
         if not services:
-            return 'All Services'
+            return t("rpt_rhc_service_all", lang=self._lang)
         try:
             return self.api.resolve_service_str(services)
         except Exception:
@@ -316,7 +319,11 @@ class RuleHitCountGenerator:
             hit_df = df[df['hit_count'] > 0].sort_values('hit_count', ascending=False)
             unused_df = df[df['hit_count'] == 0]
             days = pd.to_numeric(df['days_since_last_hit'], errors='coerce')
-            cleanup_df = df[df['enabled'].astype(bool) &
+            # Treat un-enriched rows (default enabled='') as unknown → keep them
+            # as cleanup candidates; bool('') is False and would silently drop
+            # every rule when enrichment failed.
+            enabled_mask = df['enabled'].map(lambda v: True if v == '' else bool(v))
+            cleanup_df = df[enabled_mask &
                             ((df['hit_count'] == 0) | (days >= CLEANUP_DAYS_THRESHOLD))]
             cleanup_df = cleanup_df.assign(_days=days[cleanup_df.index]) \
                                    .sort_values('_days', ascending=False, na_position='last') \

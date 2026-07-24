@@ -351,7 +351,9 @@ class RulesEngine:
             _port_names = {22: 'SSH', 2049: 'NFS', 20: 'FTP-data', 21: 'FTP', 80: 'HTTP',
                            8080: 'HTTP-alt', 8443: 'HTTPS-alt'}
             named = {_port_names.get(p, str(p)): c for p, c in top_ports.items()}
-            unique_wl = matched['src_ip'].nunique() + matched['dst_ip'].nunique()
+            # Distinct hosts across both ends: summing the two nunique() counts
+            # double-counts any IP that appears as both source and destination.
+            unique_wl = pd.concat([matched['src_ip'], matched['dst_ip']]).nunique()
             return Finding(
                 rule_id='B003', rule_name='Ransomware Risk Port (Medium) — Uncovered',
                 severity='MEDIUM', category='Ransomware',
@@ -522,7 +524,10 @@ class RulesEngine:
 
     def _b009_cross_env_volume(self, df: pd.DataFrame) -> Optional[Finding]:
         threshold = self._thresholds.get('cross_env_connection_threshold', 100)
-        cross = df[(df['src_env'] != '') & (df['dst_env'] != '') & (df['src_env'] != df['dst_env'])]
+        # notna guards match B001/L004/L010: a NaN env is unknown, not a
+        # cross-environment endpoint (NaN != '' / NaN != x both eval True).
+        cross = df[df['src_env'].notna() & df['dst_env'].notna()
+                   & (df['src_env'] != '') & (df['dst_env'] != '') & (df['src_env'] != df['dst_env'])]
         if len(cross) > threshold:
             top_pairs = cross.groupby(['src_env', 'dst_env']).size().nlargest(5).to_dict()
             top_ports = cross['port'].value_counts().head(5).to_dict()
@@ -822,8 +827,12 @@ class RulesEngine:
         top_ips = matched['src_ip'].value_counts().head(5).to_dict()
         top_ports = matched['port'].value_counts().head(5).to_dict()
         top_dst = matched['dst_app'].fillna('unknown').value_counts().head(5).to_dict()
-        _all_names = {1433: 'MSSQL', 3306: 'MySQL', 5432: 'PgSQL', 88: 'Kerberos',
-                      389: 'LDAP', 445: 'SMB', 135: 'RPC', 5985: 'WinRM', **{p: str(p) for p in self._DB_PORTS}}
+        # Numeric fallbacks FIRST so the explicit friendly names win the merge —
+        # otherwise the spread clobbers MSSQL/MySQL/PgSQL (1433/3306/5432 are in
+        # _DB_PORTS) back to bare numbers.
+        _all_names = {**{p: str(p) for p in self._DB_PORTS},
+                      1433: 'MSSQL', 3306: 'MySQL', 5432: 'PgSQL', 88: 'Kerberos',
+                      389: 'LDAP', 445: 'SMB', 135: 'RPC', 5985: 'WinRM'}
         named_ports = {_all_names.get(p, str(p)): c for p, c in top_ports.items()}
         return Finding(
             rule_id='L007', rule_name='Unmanaged Host Accessing Critical Services',

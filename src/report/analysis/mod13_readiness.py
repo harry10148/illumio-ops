@@ -59,7 +59,9 @@ def _build_recommendations(attack_items: list[dict], top_n: int, lang: str = "en
                 "Priority": priority.get(item.get("severity", "INFO"), "P5"),
                 "App (Env)": item.get("app_display"),
                 "App Env Key": item.get("app_env_key"),
-                "Issue": item.get("finding_kind", "").replace("_", " ").title(),
+                "Issue": t(f"rpt_finding_{item.get('finding_kind', '')}",
+                           default=item.get("finding_kind", "").replace("_", " ").title(),
+                           lang=lang),
                 "Action": resolve_recommendation(item.get("recommended_action_code", ""), lang),
                 "Action Code": item.get("recommended_action_code", ""),
                 "Severity": item.get("severity", "INFO"),
@@ -279,7 +281,10 @@ def enforcement_readiness(df: pd.DataFrame, workloads: list | None = None, top_n
         factor_scores['remote_app_coverage'],
     ]
 
-    total_pb_uncovered = int(app_env_scores["pb_uncovered_count"].sum())
+    # Estate-wide PB total must come from the deduped flow frame: summing the
+    # per-app column double-counts every cross-app flow (each such flow lands in
+    # both its src_key and dst_key group). Count each flow row exactly once.
+    total_pb_uncovered = int((work["policy_decision"] == "potentially_blocked").sum())
 
     result = {
         "total_score": total_score,

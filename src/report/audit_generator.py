@@ -503,8 +503,13 @@ class AuditGenerator:
                             start, end,
                         )
             # partial+earliest-conflict, stale cache, or miss: fall through to API
+        # Use the windowed, higher-capped fetch_events (same call the hybrid gap
+        # path uses) rather than get_events(since=...): the latter defaults to
+        # max_results=500 and ignores end, so a busy window silently analyzed
+        # only 500 events and pulled data past the requested end_date.
         start_str = start.isoformat().replace("+00:00", "Z")
-        return self.api.get_events(since=start_str), "api"
+        end_str = end.isoformat().replace("+00:00", "Z")
+        return self.api.fetch_events(start_str, end_str), "api"
 
     def generate_from_api(self, start_date: Optional[str] = None,
                           end_date: Optional[str] = None,

@@ -59,14 +59,15 @@ def test_audit_report_cache_miss_falls_back_to_api(session_factory):
     from src.report.audit_generator import AuditGenerator
     from src.pce_cache.reader import CacheReader
     api = MagicMock()
-    api.get_events.return_value = [{"event_type": "policy.update"}]
+    api.fetch_events.return_value = [{"event_type": "policy.update"}]
     rd = CacheReader(session_factory, events_retention_days=90, traffic_raw_retention_days=7)
     gen = AuditGenerator(api=api, cache_reader=rd)
     start = datetime.now(timezone.utc) - timedelta(days=150)
     end = datetime.now(timezone.utc) - timedelta(days=120)
     events, source = gen._fetch_events(start, end)
     assert source == "api"
-    api.get_events.assert_called_once()
+    api.fetch_events.assert_called_once()
+    api.get_events.assert_not_called()
 
 
 def test_backfill_then_cache_hit(session_factory):

@@ -77,13 +77,19 @@ def _build_group(rows: list[dict]) -> dict:
 
     pair_counter: Counter = Counter()
     for r in rows:
-        src_wl = r.get("src", {}).get("workload", {})
-        dst_wl = r.get("dst", {}).get("workload", {})
-        src_name = src_wl.get("name") or r.get("src", {}).get("ip", "?")
-        dst_name = dst_wl.get("name") or r.get("dst", {}).get("ip", "?")
-        port = r.get("service", {}).get("port", "?")
+        # Use `or {}` / `or 1`, not dict-get defaults: the PCE can return src /
+        # dst / service / num_connections present-but-null, and a null value
+        # would crash the whole draft-PD section (AttributeError / int(None)).
+        src = r.get("src") or {}
+        dst = r.get("dst") or {}
+        svc = r.get("service") or {}
+        src_wl = src.get("workload") or {}
+        dst_wl = dst.get("workload") or {}
+        src_name = src_wl.get("name") or src.get("ip") or "?"
+        dst_name = dst_wl.get("name") or dst.get("ip") or "?"
+        port = svc.get("port", "?")
         dpd = r["draft_policy_decision"]
-        pair_counter[(src_name, dst_name, port, dpd)] += int(r.get("num_connections", 1))
+        pair_counter[(src_name, dst_name, port, dpd)] += int(r.get("num_connections") or 1)
 
     top_pairs = pd.DataFrame([
         {"Src": src, "Dst": dst, "Port": port, "Draft Decision": dpd, "Connections": cnt}

@@ -459,8 +459,10 @@ class ReportGenerator:
             filters["requires_draft_pd"] = True
         df, _source = self._fetch_traffic_df(start_dt, end_dt, filters, use_cache=use_cache,
                                              compute_draft=draft_policy)
+        _truncated_from = None
         if max_results and not df.empty and len(df) > max_results:
             logger.info("[ReportGenerator] capping {} rows to max_results={}", len(df), max_results)
+            _truncated_from = len(df)
             df = self._cap_records(df, max_results, draft_policy)
 
         if df.empty:
@@ -482,7 +484,7 @@ class ReportGenerator:
         self._detail_level = _REPORT_DETAIL_LEVEL
         self._lang = lang
         self._vuln_csv_path = vuln_csv_path
-        return self._run_pipeline(
+        result = self._run_pipeline(
             df,
             source=_source,
             query_context={
@@ -494,6 +496,13 @@ class ReportGenerator:
             },
             traffic_report_profile=traffic_report_profile,
         )
+        if _truncated_from and result.module_results is not None:
+            # Surface the pre-cap count so the exporter can disclose that every
+            # total/finding reflects only the retained rows.
+            result.module_results["_analysis_truncation"] = {
+                "from": _truncated_from, "to": max_results,
+            }
+        return result
 
     def generate_from_csv(self, csv_path: str,
                           traffic_report_profile: str = "security_risk",
@@ -910,6 +919,8 @@ class ReportGenerator:
 
     def _build_email_body(self, mod12: dict, lang: str = "en") -> str:
         """Build a compact HTML email body from the executive summary."""
+        import html as _html
+        _e = lambda v: _html.escape(str(v)) if v is not None else ''
         kpis = mod12.get('kpis', [])
         findings = mod12.get('key_findings', [])
         boundary_breaches = mod12.get('boundary_breaches', [])
@@ -925,17 +936,17 @@ class ReportGenerator:
 
         kpi_rows = ''.join(
             f'<tr>'
-            f'<td style="font-weight:600;padding:5px 12px;color:#989A9B;font-size:11px;text-transform:uppercase;letter-spacing:.04em">{k["label"]}</td>'
-            f'<td style="padding:5px 12px;font-weight:700;font-size:16px;color:#1A2C32">{k["value"]}</td>'
+            f'<td style="font-weight:600;padding:5px 12px;color:#989A9B;font-size:11px;text-transform:uppercase;letter-spacing:.04em">{_e(k["label"])}</td>'
+            f'<td style="padding:5px 12px;font-weight:700;font-size:16px;color:#1A2C32">{_e(k["value"])}</td>'
             f'</tr>'
             for k in kpis
         )
         finding_rows = ''.join(
             f'<tr>'
             f'<td style="color:white;background:{_sev_bg(f.get("severity",""))};padding:4px 10px;font-weight:700;border-radius:4px;white-space:nowrap">'
-            f'{f.get("severity","")}</td>'
-            f'<td style="padding:4px 10px;color:#313638">{f.get("finding","")}</td>'
-            f'<td style="padding:4px 10px;color:#989A9B"><em>{f.get("action","")}</em></td>'
+            f'{_e(f.get("severity",""))}</td>'
+            f'<td style="padding:4px 10px;color:#313638">{_e(f.get("finding",""))}</td>'
+            f'<td style="padding:4px 10px;color:#989A9B"><em>{_e(f.get("action",""))}</em></td>'
             f'</tr>'
             for f in findings
         )
@@ -950,17 +961,17 @@ class ReportGenerator:
                 sample = items[0]
                 attack_rows.append(
                     f'<tr>'
-                    f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">{title}</td>'
-                    f'<td style="padding:4px 10px;color:#313638">{sample.get("finding","")}</td>'
-                    f'<td style="padding:4px 10px;color:#989A9B"><em>{sample.get("action","")}</em></td>'
+                    f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">{_e(title)}</td>'
+                    f'<td style="padding:4px 10px;color:#313638">{_e(sample.get("finding",""))}</td>'
+                    f'<td style="padding:4px 10px;color:#989A9B"><em>{_e(sample.get("action",""))}</em></td>'
                     f'</tr>'
                 )
         if action_matrix:
             top_action = action_matrix[0]
             attack_rows.append(
                 f'<tr>'
-                f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">{t("rpt_email_action_matrix", lang=lang)}</td>'
-                f'<td style="padding:4px 10px;color:#313638">{top_action.get("action","")}</td>'
+                f'<td style="padding:4px 10px;font-weight:700;color:#1A2C32">{_e(t("rpt_email_action_matrix", lang=lang))}</td>'
+                f'<td style="padding:4px 10px;color:#313638">{_e(top_action.get("action",""))}</td>'
                 f'<td style="padding:4px 10px;color:#989A9B"></td>'
                 f'</tr>'
             )

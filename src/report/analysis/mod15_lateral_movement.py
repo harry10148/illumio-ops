@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 
+import sys
+
 import pandas as pd
 
 from .attack_posture import build_app_display, make_posture_item, rank_posture_items, _enrich_app_display
@@ -64,12 +66,24 @@ def _articulation_points(nodes: list[str], graph: dict[str, set[str]]) -> set[st
             else:
                 low[at] = min(low[at], ids[to])
 
-    for node in nodes:
-        if node not in ids:
-            parent[node] = None
-            dfs(node)
-            if out_edges[node] > 1:
-                points.add(node)
+    # Tarjan DFS recurses to graph depth; bump the limit proportional to the
+    # node count (bounded) so a large lateral graph doesn't RecursionError, and
+    # degrade gracefully to a partial result rather than aborting the report.
+    _prev_limit = sys.getrecursionlimit()
+    _needed = len(nodes) + 100
+    if _needed > _prev_limit:
+        sys.setrecursionlimit(min(_needed, 50000))
+    try:
+        for node in nodes:
+            if node not in ids:
+                parent[node] = None
+                dfs(node)
+                if out_edges[node] > 1:
+                    points.add(node)
+    except RecursionError:
+        pass  # graph deeper than the bounded limit; return points found so far
+    finally:
+        sys.setrecursionlimit(_prev_limit)
     return points
 
 def _bfs_reachability(source: str, adjacency: dict[str, set[str]], max_depth: int) -> dict[str, list[str]]:

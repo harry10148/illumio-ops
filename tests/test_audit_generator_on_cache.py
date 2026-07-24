@@ -37,11 +37,13 @@ def test_audit_generator_bypasses_cache_when_none(tmp_path):
     """When cache_reader=None, AuditGenerator falls through to api.get_events."""
     from src.report.audit_generator import AuditGenerator
     api = _make_mock_api()
+    api.fetch_events.return_value = []
     gen = AuditGenerator(api=api, cache_reader=None)
     start = datetime.now(timezone.utc) - timedelta(days=1)
     end = datetime.now(timezone.utc)
     events, source = gen._fetch_events(start, end)
-    api.get_events.assert_called_once()
+    api.fetch_events.assert_called_once()
+    api.get_events.assert_not_called()
     assert source == "api"
 
 
@@ -51,12 +53,14 @@ def test_audit_generator_partial_no_earliest_falls_back(tmp_path):
     (no hybrid possible)."""
     from src.report.audit_generator import AuditGenerator
     api = _make_mock_api()
+    api.fetch_events.return_value = []
     cache = _make_cache_reader(cover_state="partial", earliest=None)
     gen = AuditGenerator(api=api, cache_reader=cache)
     start = datetime.now(timezone.utc) - timedelta(days=1)
     end = datetime.now(timezone.utc)
     events, source = gen._fetch_events(start, end)
-    api.get_events.assert_called_once()
+    api.fetch_events.assert_called_once()
+    api.get_events.assert_not_called()
     assert source == "api"
 
 
@@ -85,12 +89,14 @@ def test_audit_generator_falls_back_on_miss(tmp_path):
     """When cover_state=miss, AuditGenerator falls back to api.get_events."""
     from src.report.audit_generator import AuditGenerator
     api = _make_mock_api()
+    api.fetch_events.return_value = []
     cache = _make_cache_reader(cover_state="miss")
     gen = AuditGenerator(api=api, cache_reader=cache)
     start = datetime.now(timezone.utc) - timedelta(days=1)
     end = datetime.now(timezone.utc)
     events, source = gen._fetch_events(start, end)
-    api.get_events.assert_called_once()
+    api.fetch_events.assert_called_once()
+    api.get_events.assert_not_called()
     assert source == "api"
 
 
@@ -119,9 +125,11 @@ def test_fetch_events_partial_with_api_error_falls_back_to_api(tmp_path):
     transient PCE errors silently masquerade as full cache hits."""
     from src.report.audit_generator import AuditGenerator
     api = _make_mock_api()
-    # First call (gap fetch) raises; second call (full fallthrough) succeeds.
-    api.fetch_events.side_effect = Exception("PCE timeout")
-    api.get_events.return_value = [{"event_type": "user.login", "timestamp": "2026-01-01T00:00:00Z"}]
+    # First fetch_events call (gap) raises; second (full fallthrough) succeeds.
+    api.fetch_events.side_effect = [
+        Exception("PCE timeout"),
+        [{"event_type": "user.login", "timestamp": "2026-01-01T00:00:00Z"}],
+    ]
     start = datetime.now(timezone.utc) - timedelta(days=7)
     end = datetime.now(timezone.utc)
     cache_start = datetime.now(timezone.utc) - timedelta(days=3)
@@ -129,8 +137,9 @@ def test_fetch_events_partial_with_api_error_falls_back_to_api(tmp_path):
     cache.earliest_data_timestamp.return_value = cache_start
     gen = AuditGenerator(api=api, cache_reader=cache)
     events, source = gen._fetch_events(start, end)
-    # Must fall through to api.get_events, not silently return cache data.
-    api.get_events.assert_called_once()
+    # Must fall through to the full API window, not silently return cache data.
+    assert api.fetch_events.call_count == 2
+    api.get_events.assert_not_called()
     assert source == "api"
 
 

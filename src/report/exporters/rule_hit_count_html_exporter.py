@@ -85,7 +85,17 @@ class RuleHitCountHtmlExporter:
         self._pce_url = pce_url
         self._org_name = org_name
 
+    def _fmt_enabled(self, value) -> str:
+        s = str(value).strip().lower()
+        if s in ("true", "1"):
+            return t("rpt_rhc_enabled_true", lang=self._lang)
+        if s in ("false", "0"):
+            return t("rpt_rhc_enabled_false", lang=self._lang)
+        return "—" if s in ("", "none", "nan") else str(value)
+
     def _cell(self, col: str, value) -> str:
+        if col == "enabled":
+            return f"<td>{_esc(self._fmt_enabled(value))}</td>"
         text = _fmt_cell_value(col, value)
         if col in _TRUNC_COLS and len(text) > _CELL_MAX:
             shown = text[:_CELL_MAX - 1] + "…"

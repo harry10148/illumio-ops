@@ -24,7 +24,7 @@ def test_merged_table_present_with_top_apps():
     assert not merged.empty
     row = merged.iloc[0]
     assert int(row["Port"]) == 445
-    assert int(row["Uncovered Flows"]) == 40
+    assert int(row["Uncovered Connections"]) == 40
     # 依未覆蓋連線數排序：fileserver(30) 在 backup(10) 前
     assert row["Top Destination Apps"] == "fileserver, backup"
     # 原兩表照舊保留（供 XLSX 統一案使用）

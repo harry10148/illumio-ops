@@ -23,7 +23,9 @@ def test_stale_cache_falls_back_to_api():
     cache.read_events.return_value = []
 
     api = MagicMock()
-    api.get_events.return_value = [
+    # Fallback uses the windowed fetch_events(start, end) (not the 500-capped
+    # get_events(since=...)); it must honor both ends of the window.
+    api.fetch_events.return_value = [
         {"event_type": "policy.update", "href": "/orgs/1/events/a"},
         {"event_type": "policy.update", "href": "/orgs/1/events/b"},
         {"event_type": "policy.update", "href": "/orgs/1/events/c"},
@@ -34,7 +36,8 @@ def test_stale_cache_falls_back_to_api():
 
     assert len(events) == 3
     assert source == "api"
-    api.get_events.assert_called_once()
+    api.fetch_events.assert_called_once()
+    api.get_events.assert_not_called()
 
 
 def test_empty_partial_hybrid_falls_back_to_api():
@@ -49,11 +52,15 @@ def test_empty_partial_hybrid_falls_back_to_api():
     cache.read_events.return_value = []  # cache portion empty
 
     api = MagicMock()
-    api.fetch_events.return_value = []  # gap portion empty
-    api.get_events.return_value = [
-        {"event_type": "policy.update", "href": "/orgs/1/events/x"},
-        {"event_type": "policy.update", "href": "/orgs/1/events/y"},
-        {"event_type": "policy.update", "href": "/orgs/1/events/z"},
+    # First fetch_events call = the (empty) hybrid gap; second = the full-window
+    # fallback after both hybrid halves come back empty.
+    api.fetch_events.side_effect = [
+        [],
+        [
+            {"event_type": "policy.update", "href": "/orgs/1/events/x"},
+            {"event_type": "policy.update", "href": "/orgs/1/events/y"},
+            {"event_type": "policy.update", "href": "/orgs/1/events/z"},
+        ],
     ]
 
     gen = AuditGenerator(api=api, cache_reader=cache)
@@ -61,7 +68,8 @@ def test_empty_partial_hybrid_falls_back_to_api():
 
     assert len(events) == 3
     assert source == "api"
-    api.get_events.assert_called_once()
+    assert api.fetch_events.call_count == 2
+    api.get_events.assert_not_called()
 
 
 def test_cache_with_data_still_uses_cache():

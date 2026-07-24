@@ -195,11 +195,18 @@ def _exposed_ports_merged(unmanaged: pd.DataFrame, per_port: pd.DataFrame) -> pd
     base = unmanaged.assign(src_ip=src_series)
     per_src = (base[base['port'] > 0]
                .groupby(keys + ['src_ip'], dropna=False)['num_connections'].sum().reset_index())
+    if has_proto:
+        # per_port['Protocol'] is the display name (6→TCP etc, see
+        # _per_port_proto_unmanaged); per_src['proto'] is the raw numeric code.
+        # Map per_src to the same display name so the join actually matches —
+        # otherwise `6 == 'TCP'` is always False and the column renders blank.
+        per_src['proto_name'] = (per_src['proto'].map({6: 'TCP', 17: 'UDP', 1: 'ICMP'})
+                                 .fillna(per_src['proto'].astype(str)))
 
     def _top_sources(row) -> str:
         sel = per_src[per_src['port'] == row['Port']]
         if has_proto:
-            sel = sel[sel['proto'] == row['Protocol']]
+            sel = sel[sel['proto_name'] == row['Protocol']]
         sel = sel.sort_values('num_connections', ascending=False)
         ips = [str(s) for s in sel['src_ip']]
         shown = ips[:3]

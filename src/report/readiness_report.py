@@ -19,7 +19,7 @@ from loguru import logger
 from src.i18n import t
 # _score_to_grade is module-private in mod13 but intentionally imported here:
 # grade thresholds must stay a single source of truth with the Security chapter.
-from src.report.analysis.mod13_readiness import _score_to_grade, enforcement_readiness
+from src.report.analysis.mod13_readiness import _score_to_grade, enforcement_readiness, _WEIGHTS
 
 _QUEUE_FACTORS = [
     ("policy_coverage", "policy_coverage_ratio"),
@@ -167,7 +167,10 @@ class ReadinessReportGenerator:
         rows = []
         for _, s in scores.iterrows():
             ratios = {name: float(s.get(col, 0.0)) for name, col in _QUEUE_FACTORS}
-            blocking = min(ratios, key=ratios.get)
+            # Blocking factor = the one costing the most WEIGHTED points, not the
+            # lowest raw ratio: a small dip in a 35-pt factor outranks a large dip
+            # in a 10-pt one for directing the recommended action.
+            blocking = max(ratios, key=lambda n: _WEIGHTS.get(n, 0) * (1.0 - ratios[n]))
             key = str(s["app_env_key"])
             score = float(s["readiness_score"])
             modes = modes_by_key.get(key, {})

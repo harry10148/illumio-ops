@@ -275,7 +275,9 @@ class PolicyUsageHtmlExporter:
 
     def _summary_pills(self, mod00: dict) -> str:
         _s = self._s
-        hit_rate = mod00.get("hit_rate_pct", None)
+        # hit_rate_pct is produced by mod01 (overview), not mod00 (executive) —
+        # reading it off mod00 always yielded None and rendered '—'.
+        hit_rate = self._r.get("mod01", {}).get("hit_rate_pct", None)
         hit_rate_str = f"{hit_rate:.1f}%" if hit_rate is not None else "—"
         pills = [
             (_s("rpt_pill_lookback"), f"{self._lookback_days} days"),
@@ -301,6 +303,10 @@ class PolicyUsageHtmlExporter:
             return intro + f'<p class="note">{_s("rpt_pu_draft_pd_empty")}</p>'
 
         html = intro
+        if m.get("truncated_at"):
+            _cap = t("rpt_pu_draft_pd_truncated", lang=self._lang).replace(
+                "{n}", str(m["truncated_at"]))
+            html += f'<p class="note note-warn">{_cap}</p>'
 
         vis = m.get("visibility_risk", {})
         if vis.get("total", 0):
@@ -465,7 +471,15 @@ class PolicyUsageHtmlExporter:
         hit_df = mod02.get("hit_df")
         top_ports_df = mod02.get("top_ports_df")
         count = mod02.get("record_count", 0)
-        note = f'<p style="color:#718096;font-size:12px;">{count} rows</p>' if count else ""
+        shown = 0 if hit_df is None or getattr(hit_df, "empty", True) else len(hit_df)
+        if count and shown and count > shown:
+            # Full hit-rule count exceeds the display cap — disclose the truncation
+            # rather than printing "{count} rows" over a 500-row table.
+            _msg = t("rpt_table_truncated_note", lang=self._lang).replace(
+                "{shown}", str(shown)).replace("{total}", str(count))
+            note = f'<p class="note">{_msg}</p>'
+        else:
+            note = f'<p style="color:#718096;font-size:12px;">{count} rows</p>' if count else ""
         top_ports_html = ""
         if top_ports_df is not None and not getattr(top_ports_df, "empty", True):
             top_ports_html = (
@@ -507,10 +521,13 @@ class PolicyUsageHtmlExporter:
                 + f'<p class="note">{self._s("rpt_pu_no_unused_rules")}</p>'
             )
         else:
-            if count > 50:
-                note_text = t("rpt_pu_unused_truncated", lang=self._lang, count=count)
+            # Disclose against the TRUE unused total (before the 1000-row df cap),
+            # not the post-cap record_count.
+            total_unused = mod03.get("total_unused", count)
+            if total_unused > 50:
+                note_text = t("rpt_pu_unused_truncated", lang=self._lang, count=total_unused)
             else:
-                note_text = f"{count} rows" if count else ""
+                note_text = f"{total_unused} rows" if total_unused else ""
             note = f'<p style="color:#718096;font-size:12px;">{note_text}</p>' if note_text else ""
             html_parts.append(
                 caveat_html + note + _rule_cards_html(unused_df.head(50), mode="unused", lang=self._lang)

@@ -295,6 +295,7 @@ class AuditHtmlExporter:
                 spec = {
                     "type": "bar",
                     "title": "Event Severity Distribution",
+                    "title_key": "rpt_au_severity_dist",
                     "data": {"labels": labels, "values": values},
                 }
                 chart_html = _chart_html(spec, lang=self._lang)

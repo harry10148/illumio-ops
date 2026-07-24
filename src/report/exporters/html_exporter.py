@@ -104,6 +104,8 @@ def _fmt_bytes(b) -> str:
         b = float(b)
     except (TypeError, ValueError):
         return str(b) if b is not None else '—'
+    if b != b:  # NaN — int(nan) would raise and abort the whole export
+        return '—'
     if b < 0:
         return '—'
     if b >= 1024 ** 4:
@@ -122,6 +124,8 @@ def _fmt_bw(mbps) -> str:
         mbps = float(mbps)
     except (TypeError, ValueError):
         return str(mbps) if mbps is not None else '—'
+    if mbps != mbps:  # NaN — render as unavailable, not literal 'nan Mbps'
+        return '—'
     if mbps < 0:
         return '—'
     if mbps >= 1_000_000:
@@ -376,6 +380,21 @@ def _fmt_int_cell(val, group: bool = True) -> str:
         return f'{f:,.1f}'
     else:
         return f'{f:.1f}'
+
+def _trunc_note(shown_df, total, lang: str = "en") -> str:
+    """Disclose a capped table when a heading/count reflects the FULL set but the
+    rendered table only shows the top N rows."""
+    shown = 0 if shown_df is None or getattr(shown_df, "empty", True) else len(shown_df)
+    try:
+        total = int(total)
+    except (TypeError, ValueError):
+        return ""
+    if total and shown and total > shown:
+        msg = html.escape(t("rpt_table_truncated_note", lang=lang)
+                          .replace("{shown}", str(shown)).replace("{total}", str(total)))
+        return f'<p class="note">{msg}</p>'
+    return ""
+
 
 def _df_to_html(df: pd.DataFrame | None, severity_col: str | None = None,
                 no_data_key: str = "rpt_no_data", lang: str = "en",
@@ -676,6 +695,14 @@ class _TrafficReportBase:
         }[self.REPORT_KIND or "SecurityRisk"]
         _findings_block = ((f'<h2>{_s("rpt_key_findings")}</h2>' + key_findings_html)
                            if self._hero_includes_findings() else '')
+        # Disclose when the raw flow set was capped before analysis: every total
+        # and finding below reflects only the retained rows.
+        _cap = self._r.get('_analysis_truncation') or {}
+        _cap_banner = ''
+        if _cap.get('from') and _cap.get('to') and _cap['from'] > _cap['to']:
+            _cap_banner = ('<p class="note note-warn">' + html.escape(
+                t("rpt_analysis_truncated", lang=_sl)
+                .replace("{shown}", f"{_cap['to']:,}").replace("{total}", f"{_cap['from']:,}")) + '</p>')
         _hero = (
             '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
@@ -683,6 +710,7 @@ class _TrafficReportBase:
             + _badge_html
             + f'<h1>{_s(_title_key)}</h1>'
             f'<p class="report-subtitle">{_s("rpt_generated")} ' + generated_at + '</p></div>'
+            + _cap_banner
             + summary_pills + _maturity_block + trend_html
             + _findings_block + '</section>\n'
         )
@@ -845,7 +873,7 @@ class _TrafficReportBase:
         )
         return render_df_table(
             df,
-            col_i18n={},
+            col_i18n={"Metric": "rpt_col_metric", "Value": "rpt_col_value"},
             value_i18n_maps={"Metric": MOD01_METRIC_VALUE_I18N},
             lang=self._lang,
         )
@@ -957,6 +985,7 @@ class _TrafficReportBase:
                 self._subnote('rpt_tr_audit_flags_subnote')
                 + f'<h3>{_s("rpt_tr_audit_flags")} ({m.get("audit_flag_count", 0)})</h3>'
                 + _df_to_html(flags, lang=_lang)
+                + _trunc_note(flags, m.get("audit_flag_count", 0), _lang)
             )
         return (
             '<div class="section-top">'
@@ -1029,6 +1058,7 @@ class _TrafficReportBase:
                 f'<span style="font-size:12px">{_s("rpt_tr_investigation_desc")}</span>'
                 '</div>'
                 + _df_to_html(part_e, 'Risk Level', lang=_lang)
+                + _trunc_note(part_e, m.get('part_e_total_hosts', 0), _lang)
             )
         else:
             out += (
@@ -1059,6 +1089,7 @@ class _TrafficReportBase:
             f'<h3>{_s("rpt_tr_host_exposure")}</h3>'
             + f'<p class="note" style="font-size:11px">{_s("rpt_tr_host_exposure_note")}</p>'
             + _df_to_html(m.get('part_d_host_exposure'), lang=_lang)
+            + _trunc_note(m.get('part_d_host_exposure'), m.get('part_d_total_hosts', 0), _lang)
         )
         return out
 
@@ -1174,9 +1205,11 @@ class _TrafficReportBase:
             + f'<h3>{t("rpt_drift_new_pairs", lang=_lang)} ({m.get("new_count", 0)})</h3>'
             + new_collapsed_note
             + _df_to_html(m.get('new_pairs'), lang=_lang)
+            + _trunc_note(m.get('new_pairs'), m.get("new_count", 0), _lang)
             + f'<h3>{t("rpt_drift_disappeared", lang=_lang)} ({m.get("disappeared_count", 0)})</h3>'
             + disappeared_collapsed_note
             + _df_to_html(m.get('disappeared_pairs'), lang=_lang)
+            + _trunc_note(m.get('disappeared_pairs'), m.get("disappeared_count", 0), _lang)
         )
 
     def _mod_vuln_html(self):
@@ -1192,6 +1225,7 @@ class _TrafficReportBase:
             + _render_chart_for_html(m.get('chart_spec'), lang=_lang)
             + f'<h3>{t("rpt_vuln_exposed_table", lang=_lang)} ({exposed})</h3>'
             + _df_to_html(m.get('exposed'), severity_col='Severity', lang=_lang)
+            + _trunc_note(m.get('exposed'), exposed, _lang)
         )
 
     def _mod_labels_html(self):
@@ -1207,6 +1241,7 @@ class _TrafficReportBase:
             parts.append(f'<h3>{t("rpt_labels_unlabeled_workloads", lang=_lang)} '
                          f'({m.get("unlabeled_workload_count", 0)})</h3>')
             parts.append(_df_to_html(m.get('unlabeled_workloads'), lang=_lang))
+            parts.append(_trunc_note(m.get('unlabeled_workloads'), m.get("unlabeled_workload_count", 0), _lang))
         else:
             parts.append(f'<p class="note">{t("rpt_labels_no_inventory", lang=_lang)}</p>')
         parts.append(f'<h3>{t("rpt_labels_flow_gap", lang=_lang)}: '
@@ -1375,7 +1410,13 @@ class _TrafficReportBase:
                 )
                 if rule_how:
                     how_key = f'rpt_rule_{f.rule_id}_how'
-                    how_text = _s(how_key) if how_key in _S else rule_how
+                    # For English use the rich _RULE_DESCRIPTIONS text directly:
+                    # the STRINGS en value is the placeholder 'Rule detail', so
+                    # _s(how_key) would shadow the real description in EN reports.
+                    if self._lang == "en":
+                        how_text = rule_how
+                    else:
+                        how_text = _s(how_key) if how_key in _S else rule_how
                     cards_html += (
                         f'<p style="font-size:11px;color:var(--slate-50);margin-bottom:8px;">'
                         f'<b>{_s("rpt_rule_check_label")}</b>'
@@ -1538,21 +1579,35 @@ class _TrafficReportBase:
         # Value-i18n maps: source DataFrames carry stable English values
         # ("Tier-1 Critical", "Identity", ...) — translation happens here at the
         # render boundary so mod14_infrastructure.py can stay locale-agnostic.
+        # Rename the internal snake_case fields to display labels so the header
+        # i18n (COL_I18N, keyed by English display value) resolves; value maps
+        # key on the same display names.
+        _mod14_labels = {
+            "app_env_key": "App (Env)", "infrastructure_score": "Infra Score",
+            "tier": "Tier", "role": "Role", "asset_type": "Asset Type",
+            "provider_score": "Provider Score", "consumer_score": "Consumer Score",
+            "betweenness_score": "Betweenness", "mixed_traffic_ratio": "Mixed Traffic %",
+            "dampening_factor": "Dampening", "non_prod_penalty": "Non-Prod Penalty",
+            "in_degree": "In-Degree", "out_degree": "Out-Degree",
+            "connections_in": "Connections In", "connections_out": "Connections Out",
+        }
         _scored_value_maps = {
-            "tier": TIER_VALUE_I18N,
-            "role": ROLE_VALUE_I18N,
-            "asset_type": ASSET_TYPE_VALUE_I18N,
+            "Tier": TIER_VALUE_I18N,
+            "Role": ROLE_VALUE_I18N,
+            "Asset Type": ASSET_TYPE_VALUE_I18N,
         }
         role_summary = m.get('role_summary')
         if role_summary is not None and not role_summary.empty:
-            html += f'<h4>{_s("rpt_tr_role_distribution")}</h4>' + _df_to_html(
+            # role_summary is grouped by tier (column 'Tier', TIER_VALUE_I18N) —
+            # the heading was mislabelled 'Role Distribution'.
+            html += f'<h4>{_s("rpt_tr_tier_distribution")}</h4>' + _df_to_html(
                 role_summary, lang=_lang,
                 value_i18n_maps={"Tier": TIER_VALUE_I18N},
             )
         hub_apps = m.get('hub_apps')
         if hub_apps is not None and not hub_apps.empty:
             def _ha_sub(cols):
-                sub = hub_apps[[c for c in cols if c in hub_apps.columns]]
+                sub = hub_apps[[c for c in cols if c in hub_apps.columns]].rename(columns=_mod14_labels)
                 return _df_to_html(sub, lang=_lang, value_i18n_maps=_scored_value_maps) if len(sub.columns) > 1 else ''
 
             html += (
@@ -1567,7 +1622,7 @@ class _TrafficReportBase:
         top_apps = m.get('top_apps')
         if top_apps is not None and not top_apps.empty:
             def _ta_sub(cols):
-                sub = top_apps[[c for c in cols if c in top_apps.columns]]
+                sub = top_apps[[c for c in cols if c in top_apps.columns]].rename(columns=_mod14_labels)
                 return _df_to_html(sub, lang=_lang, value_i18n_maps=_scored_value_maps) if len(sub.columns) > 1 else ''
 
             html += (

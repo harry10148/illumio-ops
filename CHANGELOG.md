@@ -11,6 +11,33 @@ a plain `<major>.<minor>.<patch>` scheme. (Tags through v4.0.0 carried a
 
 ### Fixed
 
+- Report subsystem review remediation (2026-07-24 audit, all 11 report types +
+  shared pipeline): fixed 48 verified findings plus 7 defensive follow-ups.
+  Data-correctness: the readiness estate "PB-uncovered" KPI no longer
+  double-counts cross-app flows; the audit report's API fallback no longer caps
+  silently at 500 events or ignores end_date (uses the windowed fetch_events);
+  the unmanaged-hosts "Top Sources" column no longer renders blank from a
+  numeric-vs-string protocol mismatch; policy-resolver protocol names map
+  ICMP/GRE/ANY correctly (were all labelled TCP) and proto-only services are no
+  longer dropped; the L007 port-name map no longer clobbers DB service names;
+  the policy-usage Hit Rate pill now reads the module that actually produces it;
+  rule-hit-count cleanup no longer silently drops un-enriched rows; the B003
+  distinct-host count and B009 cross-env NaN handling are corrected; mod03
+  connection sums are labelled Connections (not Flows). Truncation disclosure
+  (the project's recurring class): every silently capped table — traffic Audit
+  Flags, Baseline Drift, exposed vulns, unlabeled workloads, ransomware host /
+  investigation lists, policy-usage hit/unused rules and draft-PD counts,
+  app-summary baselines, and the max_results raw-flow cap — now discloses "top N
+  of M" or a floor/limited-analysis caveat instead of implying completeness.
+  i18n: untranslated headers and hardcoded English (mod14 infra tables, readiness
+  recommendation/factor headers, findings "how to read" text, VEN chart titles,
+  RHC enabled/Any/All-Services cells, policy-diff KPI units, ransomware error
+  strings) are routed through the translation layer. Security: report-email and
+  VEN policy-sync HTML now escape PCE-derived values. Robustness: NaN byte/
+  bandwidth cells, naive VEN heartbeats, null RHC date ranges, and deep
+  lateral-graph recursion no longer crash or misrender; ransomware workloads
+  dropped by the enrichment cap are marked data-unavailable rather than clean.
+
 - Scheduler review remediation (2026-07-24 audit): cron report schedules
   now fire on their first evaluation — previously `get_next_fire_time`
   was seeded with no previous run, so any tick landing past the trigger

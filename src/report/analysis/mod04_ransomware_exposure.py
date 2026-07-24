@@ -9,7 +9,7 @@ def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20, 
     port classification (20 high-risk ports across 4 levels).
     """
     if df.empty:
-        return {'error': 'No data'}
+        return {'error': t("rpt_mod_err_no_data", lang=lang)}
 
     # Build port → level mapping
     port_to_level: dict[int, dict] = {}
@@ -26,7 +26,7 @@ def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20, 
                 }
 
     if not port_to_level:
-        return {'error': 'No ransomware risk port configuration found'}
+        return {'error': t("rpt_tr_no_ransomware_config", lang=lang)}
 
     # Tag each flow
     df2 = df.copy()
@@ -140,6 +140,10 @@ def ransomware_exposure(df: pd.DataFrame, report_config: dict, top_n: int = 20, 
         'part_b_per_port': part_b,
         'part_c_by_decision': part_c,
         'part_d_host_exposure': part_d,
+        # Full host counts BEFORE the top_n cap, so the exporter can disclose
+        # "top N of M" instead of implying the table is complete.
+        'part_d_total_hosts': int(risk_df['dst_ip'].nunique()),
         'part_e_investigation': part_e,
+        'part_e_total_hosts': int(allowed_high['dst_ip'].nunique()) if not allowed_high.empty else 0,
         'chart_spec': chart_spec if level_counts else None,
     }

@@ -99,13 +99,15 @@ class PolicyDiffHtmlExporter:
 
     def _kpi_row(self) -> str:
         s = self._r.get("summary", {})
+        _rs = t("rpt_pd_unit_rs", lang=self._lang)
+        _rule = t("rpt_pd_unit_rule", lang=self._lang)
         return (
-            _kpi(s.get("rulesets_added", 0), t("rpt_policy_diff_added", lang=self._lang) + " RS")
-            + _kpi(s.get("rulesets_removed", 0), t("rpt_policy_diff_removed", lang=self._lang) + " RS")
-            + _kpi(s.get("rulesets_modified", 0), t("rpt_policy_diff_modified", lang=self._lang) + " RS")
-            + _kpi(s.get("rules_added", 0), t("rpt_policy_diff_added", lang=self._lang) + " Rule")
-            + _kpi(s.get("rules_removed", 0), t("rpt_policy_diff_removed", lang=self._lang) + " Rule")
-            + _kpi(s.get("rules_modified", 0), t("rpt_policy_diff_modified", lang=self._lang) + " Rule")
+            _kpi(s.get("rulesets_added", 0), t("rpt_policy_diff_added", lang=self._lang) + " " + _rs)
+            + _kpi(s.get("rulesets_removed", 0), t("rpt_policy_diff_removed", lang=self._lang) + " " + _rs)
+            + _kpi(s.get("rulesets_modified", 0), t("rpt_policy_diff_modified", lang=self._lang) + " " + _rs)
+            + _kpi(s.get("rules_added", 0), t("rpt_policy_diff_added", lang=self._lang) + " " + _rule)
+            + _kpi(s.get("rules_removed", 0), t("rpt_policy_diff_removed", lang=self._lang) + " " + _rule)
+            + _kpi(s.get("rules_modified", 0), t("rpt_policy_diff_modified", lang=self._lang) + " " + _rule)
         )
 
     def _render_html(self) -> str:
