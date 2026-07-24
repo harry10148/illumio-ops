@@ -266,10 +266,12 @@ def test_alerts_file_missing_falls_back_to_defaults(tmp_path):
     assert cm.config["rules"] == []
 
 
-def test_alerts_corrupt_file_keeps_app_running(tmp_path, caplog):
-    """A corrupt alerts.json must not crash startup — it's logged and treated as empty."""
-    import logging
+def test_alerts_corrupt_file_fails_closed(tmp_path):
+    """A corrupt alerts.json must FAIL CLOSED (ConfigError), not silently collapse
+    to an empty rule set that the next save() would then persist over the
+    recoverable original (backend review High finding)."""
     from src.config import ConfigManager
+    from src.exceptions import ConfigError
     cfg = tmp_path / "config.json"
     alerts = tmp_path / "alerts.json"
     cfg.write_text(json.dumps({
@@ -277,12 +279,10 @@ def test_alerts_corrupt_file_keeps_app_running(tmp_path, caplog):
     }), encoding="utf-8")
     alerts.write_text("{ this is not valid json", encoding="utf-8")
 
-    caplog.set_level(logging.ERROR)
-    cm = ConfigManager(str(cfg), alerts_file=str(alerts))
-    # rules list still exists (empty/defaults), no exception
-    assert isinstance(cm.config.get("rules"), list)
-    combined = " ".join(r.message for r in caplog.records)
-    assert "alerts" in combined.lower() or "Error reading alerts" in combined
+    with pytest.raises(ConfigError):
+        ConfigManager(str(cfg), alerts_file=str(alerts))
+    # The corrupt file must be left intact for the operator to recover.
+    assert alerts.read_text(encoding="utf-8") == "{ this is not valid json"
 
 
 def test_first_run_uses_illumio_default_password_no_forced_change(tmp_path):
