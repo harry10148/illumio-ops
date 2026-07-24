@@ -176,10 +176,10 @@ class _RuleSchedulerCLI:
         while True:
             self._list_grouped()
 
-            print(f"\n{Colors.HEADER}╭── {Colors.BOLD}Commands{Colors.ENDC}")
+            print(f"\n{Colors.HEADER}╭── {Colors.BOLD}{t('rsc_commands', default='Commands')}{Colors.ENDC}")
             print(f"{Colors.HEADER}│{Colors.ENDC} {Colors.BOLD}{t('rs_sch_hint')}{Colors.ENDC}: {Colors.WARNING}★{Colors.ENDC}={t('rs_sch_hint_rs')}, {Colors.CYAN}●{Colors.ENDC}={t('rs_sch_hint_child')}")
             print(f"{Colors.HEADER}│{Colors.ENDC} {Colors.GREEN}a{Colors.ENDC}={t('rs_sch_browse')}  |  {Colors.CYAN}e <ID>{Colors.ENDC}={t('rs_sch_edit')}  |  {Colors.FAIL}d <ID,ID,...>{Colors.ENDC}={t('rs_sch_delete')}")
-            print(f"{Colors.HEADER}│{Colors.ENDC} {Colors.CYAN}r{Colors.ENDC}=Refresh  |  {Colors.CYAN}q{Colors.ENDC}={t('rs_sch_back')}")
+            print(f"{Colors.HEADER}│{Colors.ENDC} {Colors.CYAN}r{Colors.ENDC}={t('rsc_refresh', default='Refresh')}  |  {Colors.CYAN}q{Colors.ENDC}={t('rs_sch_back')}")
             print(f"{Colors.HEADER}╰{'─' * 40}{Colors.ENDC}")
 
             ans = clean_input(input(f"{Colors.CYAN}❯{Colors.ENDC} ")).strip()
@@ -523,8 +523,8 @@ class _RuleSchedulerCLI:
                         c['pce_status'] = 'active'
                         self.db.put(h, c)
                     dest_field = live_data.get('destinations', live_data.get('consumers', []))
-                    src = truncate(self.api.resolve_actor_str(dest_field), 15)
-                    dst = truncate(self.api.resolve_actor_str(live_data.get('providers', [])), 15)
+                    src = truncate(self.api.resolve_actor_str(dest_field), 12)
+                    dst = truncate(self.api.resolve_actor_str(live_data.get('providers', [])), 12)
                     svc = truncate(self.api.resolve_service_str(live_data.get('ingress_services', [])), 16)
 
                     rule_action = live_data.get('action', 'allow')
@@ -663,7 +663,7 @@ class _RuleSchedulerCLI:
         interval = rs_cfg.get("check_interval_seconds", 300)
 
         print(f"\n{Colors.HEADER}╭── {Colors.BOLD}{t('rs_menu_settings')}{Colors.ENDC}")
-        status_str = f"{Colors.GREEN}ON{Colors.ENDC}" if enabled else f"{Colors.FAIL}OFF{Colors.ENDC}"
+        status_str = f"{Colors.GREEN}{t('status_on', default='ON')}{Colors.ENDC}" if enabled else f"{Colors.FAIL}{t('status_off', default='OFF')}{Colors.ENDC}"
         print(f"{Colors.HEADER}│{Colors.ENDC} {t('rs_cfg_enabled', default='Enabled')}: {status_str}")
         print(f"{Colors.HEADER}│{Colors.ENDC} {t('rs_cfg_interval', default='Check Interval')}: {interval}s")
         print(f"{Colors.HEADER}├{'─' * 40}{Colors.ENDC}")
@@ -676,13 +676,13 @@ class _RuleSchedulerCLI:
         if ans == '1':
             rs_cfg["enabled"] = not enabled
             self.cm.save()
-            new_status = f"{Colors.GREEN}ON{Colors.ENDC}" if rs_cfg["enabled"] else f"{Colors.FAIL}OFF{Colors.ENDC}"
-            print(f"{Colors.GREEN}[+] Rule Scheduler → {new_status}{Colors.ENDC}")
+            new_status = f"{Colors.GREEN}{t('status_on', default='ON')}{Colors.ENDC}" if rs_cfg["enabled"] else f"{Colors.FAIL}{t('status_off', default='OFF')}{Colors.ENDC}"
+            print(f"{Colors.GREEN}{t('rsc_toggle_result', status=new_status, default='[+] Rule Scheduler → {status}')}{Colors.ENDC}")
         elif ans == '2':
             raw = clean_input(input(f"{t('rs_cfg_interval_prompt', default='New interval (seconds)')}: "))
             if raw.isdigit() and int(raw) > 0:
                 rs_cfg["check_interval_seconds"] = int(raw)
                 self.cm.save()
-                print(f"{Colors.GREEN}[+] Interval → {raw}s{Colors.ENDC}")
+                print(f"{Colors.GREEN}{t('rsc_interval_result', raw=raw, default='[+] Interval → {raw}s')}{Colors.ENDC}")
             else:
                 print(f"{Colors.FAIL}[-] {t('rs_invalid_input')}{Colors.ENDC}")
