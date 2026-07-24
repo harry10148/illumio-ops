@@ -284,3 +284,31 @@ def test_cron_first_run_does_not_replay_old_period():
     # 距 08:00 已過 5 分鐘（> 90s 補跑窗）→ 不 replay
     now = datetime.datetime(2026, 7, 24, 8, 5, 0)
     assert s.should_run(sched, now, last_run_str=None) is False
+
+
+# ─── M5（2026-07-24 審查）：monthly day_of_month 短月月底夾取 ────────────────
+
+def test_monthly_day31_clamps_to_last_day_of_short_month():
+    """day_of_month=31、2 月 → 夾到當月最後一天（28）觸發；非最後一天不觸發。"""
+    s = _make_scheduler()
+    sched = _sched(schedule_type="monthly", day_of_month=31, hour=8, minute=0)
+    feb28 = datetime.datetime(2026, 2, 28, 8, 30, 0)  # 2026-02 last day
+    assert s.should_run(sched, feb28, last_run_str=None) is True
+    feb27 = datetime.datetime(2026, 2, 27, 8, 30, 0)
+    assert s.should_run(sched, feb27, last_run_str=None) is False
+
+
+def test_monthly_day31_fires_on_31_in_long_month():
+    s = _make_scheduler()
+    sched = _sched(schedule_type="monthly", day_of_month=31, hour=8, minute=0)
+    jan31 = datetime.datetime(2026, 1, 31, 8, 30, 0)
+    assert s.should_run(sched, jan31, last_run_str=None) is True
+    jan28 = datetime.datetime(2026, 1, 28, 8, 30, 0)
+    assert s.should_run(sched, jan28, last_run_str=None) is False
+
+
+def test_monthly_mid_month_not_clamped():
+    s = _make_scheduler()
+    sched = _sched(schedule_type="monthly", day_of_month=15, hour=8, minute=0)
+    feb28 = datetime.datetime(2026, 2, 28, 8, 30, 0)
+    assert s.should_run(sched, feb28, last_run_str=None) is False

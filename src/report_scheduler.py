@@ -260,7 +260,12 @@ class ReportScheduler:
             day_matches = now_naive.strftime("%A").lower() == dow
         elif stype == "monthly":
             dom = int(schedule.get("day_of_month", 1))
-            day_matches = now_naive.day == dom
+            # 月底夾取：day_of_month=29/30/31 在短月夾到當月最後一天，否則短月
+            # 靜默 0 次（2026-07-24 審查 M5）
+            import calendar
+            last_day = calendar.monthrange(now_naive.year, now_naive.month)[1]
+            effective_dom = min(dom, last_day)
+            day_matches = now_naive.day == effective_dom
         else:
             return False
 
