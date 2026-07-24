@@ -101,12 +101,15 @@ def test_app_summary_schedule_missing_app_records_error(monkeypatch):
 
     saved = {}
 
-    def _fake_save(schedule_id, last_run, status, error=""):
+    # A failed scheduled run is recorded via _record_failure (审查 H): the
+    # failure must NOT advance last_run, and status is fixed to "failed" with
+    # the underlying error preserved.
+    def _fake_record_failure(schedule_id, error, attempt_iso=""):
         saved["id"] = schedule_id
-        saved["status"] = status
+        saved["status"] = "failed"
         saved["error"] = error
 
-    monkeypatch.setattr(sched, "_save_state", _fake_save)
+    monkeypatch.setattr(sched, "_record_failure", _fake_record_failure)
 
     # Must not raise out of tick()
     sched.tick()
