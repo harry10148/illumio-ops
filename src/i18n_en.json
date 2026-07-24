@@ -1504,6 +1504,7 @@
   "gui_err_invalid_auth": "Invalid username or password.",
   "gui_err_invalid_cron": "Invalid cron expression",
   "gui_err_invalid_expire_fmt": "Invalid expiration format",
+  "gui_err_invalid_rule_sched_type": "Rule schedule type must be recurring or one_time",
   "gui_err_invalid_schedule_time": "Invalid schedule time (hour 0-23, minute 0-59, day-of-month 1-31)",
   "gui_err_invalid_schedule_type": "Schedule type must be daily, weekly, or monthly",
   "gui_err_invalid_file_type": "Invalid file type",

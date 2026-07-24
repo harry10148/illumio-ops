@@ -1502,6 +1502,7 @@
   "gui_err_invalid_auth": "帳號或密碼錯誤。",
   "gui_err_invalid_cron": "cron 運算式不合法",
   "gui_err_invalid_expire_fmt": "失效時間格式不合法",
+  "gui_err_invalid_rule_sched_type": "規則排程類型須為 recurring 或 one_time",
   "gui_err_invalid_schedule_time": "排程時間不合法（時 0-23、分 0-59、日 1-31）",
   "gui_err_invalid_schedule_type": "排程類型須為 daily、weekly 或 monthly",
   "gui_err_invalid_file_type": "檔案類型無效",
