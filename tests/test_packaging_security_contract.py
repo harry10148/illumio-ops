@@ -391,3 +391,38 @@ def test_lock_gate_fails_closed(tmp_path, lock_body, expected):
     r = _run_lock_gate(tmp_path, lock_body)
     assert r.returncode != 0, "the build must not proceed on a missing/stale lock"
     assert expected in r.stderr, r.stderr
+
+
+# ── CI: the offline-lock audit must not resolve dependencies ─────────────────
+# requirements-offline.lock pins versions that only install on the bundle's
+# py3.12 target (matplotlib==3.11.1 requires Python >= 3.11), but the CI matrix
+# runs 3.10/3.11. Without --no-deps, pip-audit shells out to
+# `pip install --dry-run` and the job dies with "No matching distribution
+# found" — this actually happened (run 30155030182). The lock is already a
+# closed set, so resolving it again buys nothing.
+
+def _ci_yml() -> str:
+    return (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+
+
+def test_offline_lock_audit_skips_dependency_resolution():
+    ci = _ci_yml()
+    audit_lines = [ln for ln in ci.splitlines()
+                   if "pip-audit" in ln and "requirements-offline.lock" in ln]
+    assert audit_lines, "CI no longer audits requirements-offline.lock"
+    for ln in audit_lines:
+        assert "--no-deps" in ln, (
+            "pip-audit on the offline lock must pass --no-deps; without it the "
+            "py3.10 matrix entry fails resolving py3.12-only pins.\n" + ln)
+
+
+def test_runtime_lock_audit_still_resolves():
+    """The runtime lock IS installed on the CI interpreter, so it must keep the
+    full resolution check — --no-deps there would weaken the audit."""
+    ci = _ci_yml()
+    runtime = [ln for ln in ci.splitlines()
+               if "pip-audit" in ln and "requirements.lock" in ln
+               and "offline" not in ln]
+    assert runtime, "CI no longer audits requirements.lock"
+    for ln in runtime:
+        assert "--no-deps" not in ln, ln
