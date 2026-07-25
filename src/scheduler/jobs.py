@@ -23,7 +23,10 @@ def run_monitor_cycle(cm) -> None:
     from src.reporter import Reporter
     from src.module_log import ModuleLog
     from src.file_lock import file_lock
-    from src.main import _make_subscribers, _make_cache_reader, analysis_lock_path
+    from src.main import (
+        _make_subscribers, _make_cache_reader, _make_flow_delta_reader,
+        analysis_lock_path,
+    )
 
     mlog = ModuleLog.get("monitor")
     try:
@@ -43,7 +46,8 @@ def run_monitor_cycle(cm) -> None:
                 with analysis_lock:
                     ana = Analyzer(cm, api, rep,
                                    subscriber_events=sub_events, subscriber_flows=sub_flows,
-                                   cache_reader=_make_cache_reader(cm))
+                                   cache_reader=_make_cache_reader(cm),
+                                   flow_delta_reader=_make_flow_delta_reader(cm))
                     ana.run_analysis()
                     rep.send_alerts()
         mlog.info("Monitor cycle complete")
@@ -263,7 +267,9 @@ def run_traffic_ingest(cm) -> None:
             ing = TrafficIngestor(api=api, session_factory=sf,
                                    watermark=wm,
                                    max_results=cfg.traffic_sampling.max_rows_per_batch,
-                                   siem_destinations=_enabled_siem_destinations(cm, "traffic"))
+                                   siem_destinations=_enabled_siem_destinations(cm, "traffic"),
+                                   record_observations=getattr(cfg, "flow_delta_enabled", True),
+                                   obs_retention_hours=getattr(cfg, "flow_obs_retention_hours", 6))
             count = ing.run_once()
         logger.info("Traffic ingest: {} rows inserted", count)
         _record_ingest_pce_result("traffic", wm)
@@ -302,6 +308,7 @@ def run_cache_retention(cm) -> None:
             traffic_raw_days=cfg.traffic_raw_retention_days,
             traffic_agg_days=cfg.traffic_agg_retention_days,
             archive_enabled=cfg.archive_enabled,
+            flow_obs_hours=getattr(cfg, "flow_obs_retention_hours", 6),
         )
         logger.info("Cache retention purged: {}", result)
     except Exception as exc:

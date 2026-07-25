@@ -27,6 +27,8 @@ class TrafficIngestor:
         sample_ratio_allowed: int = 1,
         max_results: int = 200000,
         siem_destinations: Optional[list[str]] = None,
+        record_observations: bool = True,
+        obs_retention_hours: int = 6,
     ):
         self._api = api
         self._sf = session_factory
@@ -35,6 +37,11 @@ class TrafficIngestor:
         self._sampler = TrafficSampler(ratio_allowed=sample_ratio_allowed)
         self._max_results = max_results
         self._siem_dests = list(siem_destinations or [])
+        # 視窗增量觀測（phase 2，見 src/pce_cache/flow_deltas.py）：每跑一次
+        # ingest 就替每筆 flow 記一列「當下累計值」，規則引擎才有前一次觀測
+        # 可相減。關掉就等於整個部署退回 phase 1 的守門（規則被抑制而非誤報）。
+        self._record_obs = record_observations
+        self._obs_retention_hours = max(1, int(obs_retention_hours))
         # Set by run_once() when a window's bisection hit the 1-min floor
         # (_MIN_BISECT_SPAN) or the max depth without resolving the
         # max_results cap — that window's flow data may be incomplete. Shape
@@ -80,6 +87,11 @@ class TrafficIngestor:
                 if last:
                     self._wm.advance(self.SOURCE, last_timestamp=_parse_iso(last))
                     watermark_advanced = True
+            # 觀測表修剪跟著 ingest 節奏跑（而非只靠 24h 的 retention job）：
+            # 每筆 flow 每次 poll 記一列，等一天才刪的話 60 秒輪詢的部署會囤
+            # 上千倍的列。放在 watermark 前進之後、且不讓失敗污染 ingest 狀態
+            # ——修剪失敗不代表這次 ingest 失敗（retention job 仍是後備）。
+            self._prune_observations()
             return inserted
         except Exception as exc:
             # insert/advance 失敗（如 database is locked）：記 error 讓 last_status
@@ -207,8 +219,11 @@ class TrafficIngestor:
             合理，活躍 flow 不該被當成陳舊資料清掉。
         """
         from src.report.parsers.api_parser import flatten_flow_record
+        from src.pce_cache.flow_deltas import build_observations, insert_observations
         now = datetime.now(timezone.utc)
         rows: list[dict] = []
+        # obs_pairs 與 rows 同序、同長度：分塊時兩者用同一組索引切片。
+        obs_pairs: list[tuple[str, dict]] = []
         seen: set[str] = set()
         for flow in flows:
             flat = _flatten_flow(flow)
@@ -255,6 +270,7 @@ class TrafficIngestor:
                 "report_json": report_json,
                 "ingested_at": now,
             })
+            obs_pairs.append((fh, flow))
         raw_cols = PceTrafficFlowRaw.__table__.c
         inserted = 0
         for i in range(0, len(rows), self._CHUNK):
@@ -301,7 +317,33 @@ class TrafficIngestor:
                             for rid in new_ids for dest in self._siem_dests
                         ],
                     )
+                if self._record_obs:
+                    # 與 upsert 同一個交易：raw 列刷新了卻沒留下對應觀測時，
+                    # 下一個 cycle 的基準會跳過這次 poll、增量涵蓋更長的區間。
+                    # 觀測值取自「本次 payload」，與 raw_json 同一份快照——
+                    # analyzer 之後就是從那份 payload 算當下值。
+                    insert_observations(
+                        s, build_observations(obs_pairs[i:i + self._CHUNK], now))
         return inserted
+
+    def _prune_observations(self) -> None:
+        """依 obs_retention_hours 修剪 pce_traffic_flow_obs。
+
+        修剪失敗不得讓整次 ingest 被標成 error（資料已成功寫入，watermark 也
+        已前進）——記 WARNING 讓操作者看得見，daily 的 run_cache_retention
+        仍會再刪一次。
+        """
+        if not self._record_obs:
+            return
+        from src.pce_cache.flow_deltas import prune_flow_observations
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=self._obs_retention_hours)
+        try:
+            deleted = prune_flow_observations(self._sf, cutoff)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Flow observation prune failed (retention job will retry): {}", exc)
+            return
+        if deleted:
+            logger.info("Flow observations pruned: {} rows older than {}", deleted, cutoff)
 
 
 def _flow_hash(flow: dict) -> str:
@@ -323,6 +365,12 @@ def _flow_hash(flow: dict) -> str:
         _ts(flow, "first_detected"),
     ])
     return hashlib.sha1(key.encode("utf-8"), usedforsecurity=False).hexdigest()
+
+
+# 公開別名：規則引擎要用「與 ingest 逐字相同」的方式算出 flow_hash，才能
+# 對上 pce_traffic_flow_obs 的鍵。任何一邊改了 fallback 鏈就會全面對不上，
+# 因此只准有這一份實作（見 tests/test_flow_window_delta.py 的守門）。
+flow_hash = _flow_hash
 
 
 def _ts(flow: dict, key: str) -> str:

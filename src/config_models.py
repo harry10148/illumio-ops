@@ -263,6 +263,15 @@ class PceCacheSettings(_Base):
     disk_free_warn_gb: int = Field(default=10, ge=1)        # 磁碟剩餘低於此 GB 數告警
     siem_pending_warn_rows: int = Field(default=50000, ge=1000)  # SIEM 佇列積壓告警門檻
     cache_read_max_rows: int = Field(default=500000, ge=10000)  # cache 讀取單次視窗列數護欄
+    # ── 視窗增量（window delta）──────────────────────────────────────────────
+    # 本 PCE 回傳的是整個聚合 bucket 的累計值，不裁切到查詢視窗。開啟後
+    # traffic ingest 會每次替每筆 flow 記一列「當下累計值」（pce_traffic_flow_obs），
+    # 規則引擎再以「視窗起點前最近一筆觀測」相減得到真正的視窗增量；推導
+    # 不出來時退回 phase-1 的聚合基準守門（規則不評估並告知操作者）。
+    flow_delta_enabled: bool = True
+    # 觀測保留時數。穩態列數 ≈ 活躍 flow 數 × 時數 × (3600 / traffic_poll_interval_seconds)，
+    # 每列約 50 bytes。必須 ≥ 最長 threshold_window，否則該規則永遠取不到基準。
+    flow_obs_retention_hours: int = Field(default=6, ge=1, le=168)
 
 
 class SiemDestinationSettings(_Base):

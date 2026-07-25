@@ -6,6 +6,7 @@ from loguru import logger
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from src.pce_cache.flow_deltas import prune_flow_observations
 from src.pce_cache.models import (
     DeadLetter, IngestionCursor, PceEvent, PceTrafficFlowAgg,
     PceTrafficFlowRaw, SiemDispatch,
@@ -48,6 +49,7 @@ class RetentionWorker:
         dlq_days: int = 30,
         dispatch_days: int = 14,
         archive_enabled: bool = False,
+        flow_obs_hours: int = 6,
     ) -> dict[str, int]:
         """刪除依 ingested_at 早於保留期限的列（見下方 delete）。
 
@@ -99,6 +101,14 @@ class RetentionWorker:
             SiemDispatch,
             SiemDispatch.status == "sent",
             SiemDispatch.sent_at < now - timedelta(days=dispatch_days))
+
+        # 視窗增量觀測（pce_traffic_flow_obs）：以小時計的工作資料，主修剪點
+        # 在 traffic ingest 之後（TrafficIngestor._prune_observations，跟著
+        # poll 節奏跑）；這裡是後備，涵蓋「ingest 端修剪失敗」與「只靠
+        # backfill 灌資料、ingest job 沒在跑」的部署。
+        # 不套 archive 守門的理由見 flow_deltas.prune_flow_observations。
+        results["flow_obs"] = prune_flow_observations(
+            self._sf, now - timedelta(hours=max(1, int(flow_obs_hours))))
 
         return results
 

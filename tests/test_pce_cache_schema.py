@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import create_engine, inspect
 
 
-def test_schema_creates_all_seven_tables():
+def test_schema_creates_all_expected_tables():
     from src.pce_cache.schema import init_schema
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -21,6 +21,9 @@ def test_schema_creates_all_seven_tables():
             "ingestion_cursors",
             "siem_dispatch",
             "dead_letter",
+            # 視窗增量觀測（phase 2）：ingest 每輪記一列，規則引擎據此推導
+            # 落在視窗內的增量（src/pce_cache/flow_deltas.py）
+            "pce_traffic_flow_obs",
         }
 
 
@@ -211,13 +214,18 @@ def test_schema_agg_bucket_day_migration_guard_skips_completed_migration(tmp_pat
     init_schema 後 user_version 已設；此時塞一筆舊格式列再跑 init_schema，
     該列保持原樣（證明掃描被守衛跳過，而非又執行了一次）。"""
     from sqlalchemy import text
-    from src.pce_cache.schema import _MIGRATION_AGG_BUCKET_DAY, init_schema
+    from src.pce_cache.schema import (
+        _MIGRATION_AGG_BUCKET_DAY, _SCHEMA_VERSION, init_schema,
+    )
 
     engine = create_engine(f"sqlite:///{tmp_path / 'cache.sqlite'}")
     init_schema(engine)  # 全新 DB 也要走過遷移並設下完成標記
     with engine.connect() as conn:
         version = conn.execute(text("PRAGMA user_version")).scalar()
-    assert version == _MIGRATION_AGG_BUCKET_DAY
+    # 遷移鏈跑完會把版本推到本 build 的最高版；bucket_day 這一步的標記
+    # （>= _MIGRATION_AGG_BUCKET_DAY）即代表之後的呼叫會跳過全表掃描。
+    assert version == _SCHEMA_VERSION
+    assert version >= _MIGRATION_AGG_BUCKET_DAY
 
     # 標記已設：插入舊格式列後重跑 init_schema，正規化應被守衛跳過
     # （正常運行下 aggregator 已不會再寫出舊格式，這只是探測守衛用）。

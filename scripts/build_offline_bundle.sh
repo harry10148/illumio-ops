@@ -192,11 +192,17 @@ build_linux() {
     tar xzf "$PBS_TAR" -C "$BUILD"
     rm -f "$PBS_TAR"
 
-    echo "==> [Linux] Downloading manylinux_2_17_x86_64 wheels"
+    echo "==> [Linux] Downloading manylinux_2_28_x86_64 wheels"
     mkdir -p "$BUILD/wheels"
+    # --platform 是精確標籤比對，不是「這個版本以上」：只給 manylinux_2_28 時，
+    # 仍只發舊標籤的套件（例如 cffi 只發 manylinux_2_17）會直接 "No matching
+    # distribution found"。舊標籤在 glibc 2.28 上本來就裝得起來，所以把可接受的
+    # 標籤全部列出——順序不代表偏好，pip 會挑最合適的那個。
     "$BUILD/python/bin/python3" -m pip download \
         --only-binary=:all: \
+        --platform manylinux_2_28_x86_64 \
         --platform manylinux_2_17_x86_64 \
+        --platform manylinux2014_x86_64 \
         --python-version 3.12 \
         --implementation cp \
         --require-hashes \

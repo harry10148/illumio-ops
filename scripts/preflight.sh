@@ -33,14 +33,14 @@ ARCH=$(uname -m)
 if [ "$ARCH" = "x86_64" ]; then pass "Architecture: $ARCH"
 else fail "Architecture: $ARCH — bundle requires x86_64"; fi
 
-# 2. glibc >= 2.17 (required by manylinux_2_17 wheels)
+# 2. glibc >= 2.28 (required by manylinux_2_28 wheels)
 GLIBC_VER=$({ ldd --version 2>&1 || true; } | head -1 | grep -oP '\d+\.\d+' | head -1 || echo "0.0")
 GLIBC_MAJOR=$(echo "$GLIBC_VER" | cut -d. -f1)
 GLIBC_MINOR=$(echo "$GLIBC_VER" | cut -d. -f2)
-if [ "$GLIBC_MAJOR" -gt 2 ] || { [ "$GLIBC_MAJOR" -eq 2 ] && [ "$GLIBC_MINOR" -ge 17 ]; }; then
-    pass "glibc: $GLIBC_VER (>= 2.17 required)"
+if [ "$GLIBC_MAJOR" -gt 2 ] || { [ "$GLIBC_MAJOR" -eq 2 ] && [ "$GLIBC_MINOR" -ge 28 ]; }; then
+    pass "glibc: $GLIBC_VER (>= 2.28 required)"
 else
-    fail "glibc: $GLIBC_VER — requires >= 2.17 (RHEL 7+)"
+    fail "glibc: $GLIBC_VER — requires >= 2.28 (RHEL/Rocky 8+, Ubuntu 22.04+, Debian 12+)"
 fi
 
 # 3. systemd
