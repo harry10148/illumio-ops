@@ -4,9 +4,16 @@
 .DESCRIPTION
     Run BEFORE install.ps1 to validate the target host.
     Exit 0 = all PASS/WARN only.  Exit 1 = at least one FAIL.
+.PARAMETER InstallRoot
+    Installation directory to validate against. Must match the -InstallRoot
+    later passed to install.ps1. Default: C:\illumio-ops
 .EXAMPLE
     .\preflight.ps1
+    .\preflight.ps1 -InstallRoot D:\illumio-ops
 #>
+param(
+    [string]$InstallRoot = "C:\illumio-ops"
+)
 
 $BundleDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $FailCount = 0
@@ -50,14 +57,18 @@ if ($nssmCmd) { Pass "NSSM: found at $($nssmCmd.Source)" }
 elseif (Test-Path $nssmBundle) { Pass "NSSM: found in bundle at $nssmBundle" }
 else { Fail "NSSM: not found — bundle should ship deploy\nssm.exe; re-extract the bundle or place nssm.exe in PATH" }
 
-# 6. Disk space >= 500 MB on C:\
-$drive = (Get-PSDrive C -ErrorAction SilentlyContinue)
+# 6. Disk space >= 500 MB on the install root's drive
+# Parity with preflight.sh, which measures the install root (or its closest
+# existing ancestor) rather than a hardcoded path: with -InstallRoot D:\... a
+# C:-only check would pass a host whose actual target drive is full.
+$driveName = (Split-Path -Qualifier $InstallRoot).TrimEnd(":")
+$drive = (Get-PSDrive $driveName -ErrorAction SilentlyContinue)
 if ($drive -and $drive.Free -ge 524288000) {
-    Pass "Disk on C:\: $([int]($drive.Free / 1MB)) MB available (>= 500 MB required)"
+    Pass "Disk on ${driveName}:\: $([int]($drive.Free / 1MB)) MB available (>= 500 MB required)"
 } elseif ($drive) {
-    Fail "Disk on C:\: $([int]($drive.Free / 1MB)) MB — need >= 500 MB"
+    Fail "Disk on ${driveName}:\: $([int]($drive.Free / 1MB)) MB — need >= 500 MB"
 } else {
-    Warn "Disk space: unable to determine"
+    Warn "Disk space: unable to determine for ${driveName}:\ (install root: $InstallRoot)"
 }
 
 # 7. Bundle integrity
@@ -84,12 +95,11 @@ if (Test-Path $bundledPython) {
 }
 
 # 8. Upgrade detection
-$installRoot = "C:\illumio-ops"
-if (Test-Path (Join-Path $installRoot "config\config.json")) {
-    Warn "Existing installation at $installRoot — this is an UPGRADE"
+if (Test-Path (Join-Path $InstallRoot "config\config.json")) {
+    Warn "Existing installation at $InstallRoot — this is an UPGRADE"
     Warn "config.json, alerts.json (rules), and rule_schedules.json will be preserved"
 } else {
-    Pass "No existing installation at $installRoot — fresh install"
+    Pass "No existing installation at $InstallRoot — fresh install"
 }
 
 Write-Host ""

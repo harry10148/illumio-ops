@@ -11,6 +11,10 @@ Storage layout:
 
 Each snapshot is a flat dict of scalar KPI values (numbers or strings).
 Only numeric values participate in delta computation.
+
+保留策略：每次寫入後只留最新 _KEEP 個檔（與 flow_history 同目錄、同作法）。
+排程器的兩個清理掃描都只看 output_dir 下的扁平檔名，不會遞迴進 history/，
+沒有這裡的 prune 就沒有任何機制會清這批檔。
 """
 from __future__ import annotations
 
@@ -23,6 +27,10 @@ from pathlib import Path
 from typing import Any
 
 _NUMERIC_RE = re.compile(r"^-?[\d,]+\.?\d*%?$")
+
+# 只有最新一個快照會被讀取（load_previous），保留 12 個與 flow_history 一致，
+# 足夠人工回溯又不會無限累積。
+_KEEP = 12
 
 def _to_numeric(val: Any) -> float | None:
     """Best-effort conversion of a KPI value to a float."""
@@ -71,6 +79,12 @@ def save_snapshot(
     path = hdir / f"{safe_ts}.json"
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2, default=str)
+    for old in sorted(hdir.glob("*.json"))[:-_KEEP]:
+        try:
+            old.unlink(missing_ok=True)
+        except OSError as e:
+            # 清不掉舊檔不影響本次快照，別讓保留失敗炸掉整份報表。
+            logger.warning("[TrendStore] Failed to prune {}: {}", old, e)
     logger.info("[TrendStore] Saved {} snapshot → {}", report_type, path)
     return str(path)
 

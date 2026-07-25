@@ -41,7 +41,8 @@ Rule Scheduler 讓操作者為 PCE 上**已佈署（Active）**的 Ruleset 或�
   逐一比對排程與 PCE 目前狀態並觸發切換）。
 - GUI：`src/gui/routes/rule_scheduler.py`（`/api/rule_scheduler/*`），對應 [gui-tour.md](gui-tour.md)
   「Rule Scheduler」分頁的 Browse／Schedules／Logs 三個子頁。
-- CLI：`src/rule_scheduler_cli.py`（`illumio-ops rule`，互動選單），提供與 GUI 對等的
+- CLI：`src/rule_scheduler_cli.py`（`illumio-ops shell` → `3. Rule Scheduler`，互動選單；
+  `rule-scheduler` 不是頂層子命令，`illumio-ops rule` 是告警規則檢視命令群），提供與 GUI 對等的
   瀏覽、建立、編輯、刪除功能，另外多一個「立即執行一次 check」的除錯選項。
 
 ### 1.2 排程資料儲存
@@ -111,7 +112,7 @@ GUI 建立的一次性註記刪除／到期都清不掉；已修復（守門測�
 - **GUI**（Browse 子頁）：搜尋或瀏覽 Ruleset → 選擇整個 Ruleset 或其中一條 Rule → 選
   Recurring（星期＋起訖時間＋時區）或 One-time（到期時間）→ 選 Action（`allow` 或
   `disable`）→ 送出 `POST /api/rule_scheduler/schedules`。
-- **CLI**（`illumio-ops rule` → Schedule Management → `a` Browse）：流程與 GUI 對等，多一層
+- **CLI**（`illumio-ops shell` → `3. Rule Scheduler` → `Browse and create schedules` → `a` Browse）：流程與 GUI 對等，多一層
   文字選單導覽；輸入格式錯誤（時間非 `HH:MM`、`start >= end`、到期時間非 ISO 格式）在送出前
   就地擋下並提示重新輸入。
 - 兩者建立前都會呼叫 `has_draft_changes` / `is_provisioned` 擋下**未佈署（Draft）**的目標，

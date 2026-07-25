@@ -22,6 +22,25 @@ from src.i18n import t, get_language
 
 LOG_FILE = ""  # To be set in main() or main_menu()
 
+# 互動式選單等跨行程分析鎖的秒數。等不到就直接告訴操作者「服務正在跑分析」，
+# 不要排隊卡住整個選單。
+_ANALYSIS_LOCK_WAIT_S = 5.0
+
+
+def analysis_lock_path() -> str:
+    """``<root>/logs/analysis.lock`` —— 分析週期的**跨行程**鎖檔。
+
+    src/analyzer.py 的 ``analysis_lock`` 是 threading.Lock，只序列化同一行程的
+    thread（``--monitor-gui`` 下的 APScheduler thread 與 Flask thread）。互動式
+    選單／CLI 是**另一個行程**：兩邊的 Analyzer 各自在 __init__ 就取走整份
+    state 快照，cycle 結束時再 ``merged.update(self.state)`` 寫回，後結束的一方
+    會把對方剛寫的 alert_history（告警冷卻）、event_seen、event_watermark 整組
+    還原——結果是同一則告警重寄、已處理過的事件再次觸發。凡是會跑完整分析
+    cycle 的進入點都要在這把鎖內執行。
+    """
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(root, "logs", "analysis.lock")
+
 
 def _make_subscribers(cm):
     """Return (subscriber_events, subscriber_flows) when pce_cache is enabled, else (None, None)."""
@@ -163,19 +182,31 @@ def rule_management_menu(cm):
                     f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('operation_cancelled', default='Operation cancelled. Press Enter to continue...')} {Colors.GREEN}❯{Colors.ENDC} "
                 )
         elif sel == 6:
-            Reporter(cm).send_alerts(force_test=True)
+            from src.file_lock import file_lock as _file_lock
+            try:
+                with _file_lock(analysis_lock_path(), timeout=_ANALYSIS_LOCK_WAIT_S):
+                    Reporter(cm).send_alerts(force_test=True)
+            except TimeoutError:
+                print(f"{Colors.WARNING}{t('cli_analysis_in_progress')}{Colors.ENDC}")
             input(
                 f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('done_msg')} {Colors.GREEN}❯{Colors.ENDC} "
             )
         elif sel == 7:
-            api = ApiClient(cm)
-            rep = Reporter(cm)
-            sub_events, sub_flows = _make_subscribers(cm)
-            ana = Analyzer(cm, api, rep,
-                           subscriber_events=sub_events, subscriber_flows=sub_flows,
-                           cache_reader=_make_cache_reader(cm))
-            ana.run_analysis()
-            rep.send_alerts()
+            # 見 analysis_lock_path()：跑完整 cycle 前先取跨行程鎖，避免與常駐
+            # 服務的 monitor cycle 互相用過期 state 快照覆寫（告警冷卻被抹掉）。
+            from src.file_lock import file_lock as _file_lock
+            try:
+                with _file_lock(analysis_lock_path(), timeout=_ANALYSIS_LOCK_WAIT_S):
+                    api = ApiClient(cm)
+                    rep = Reporter(cm)
+                    sub_events, sub_flows = _make_subscribers(cm)
+                    ana = Analyzer(cm, api, rep,
+                                   subscriber_events=sub_events, subscriber_flows=sub_flows,
+                                   cache_reader=_make_cache_reader(cm))
+                    ana.run_analysis()
+                    rep.send_alerts()
+            except TimeoutError:
+                print(f"{Colors.WARNING}{t('cli_analysis_in_progress')}{Colors.ENDC}")
             input(
                 f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} {Colors.GREEN}❯{Colors.ENDC} "
             )

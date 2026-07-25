@@ -290,7 +290,7 @@ curl -s -b <session-cookie> https://<host>:5001/api/cache/health | python3 -m js
 
 Settings → Channels 頁面每張通道卡片有各自的 **Send test** 按鈕（`POST /api/actions/test-alert`，帶
 `channel` 參數，會真的送出一則測試訊息），或對 `alerts.active` 全部通道各發一次（省略 `channel`）。此端點
-掛 `10 per hour` 限流，避免誤觸洗版；沒有對應的 CLI 子命令，只能透過 GUI／API 觸發。若測試都送不出去，先排除
+掛 `30 per hour` 限流，避免誤觸洗版；沒有對應的 CLI 子命令，只能透過 GUI／API 觸發。若測試都送不出去，先排除
 通道本身設定錯誤（收件人、webhook URL、bot token 等，鍵值見 [monitoring-alerts.md](monitoring-alerts.md)
 §4.1），再往下查可靠性機制是否卡住了正常告警。
 
@@ -408,7 +408,7 @@ git stash && git pull && git stash pop
 ### 10.2 回報問題時請附上
 
 ```bash
-illumio-ops --version
+illumio-ops version
 git -C /opt/illumio-ops rev-parse HEAD
 grep -n "ERROR\|Exception\|Traceback" /opt/illumio-ops/logs/illumio_ops.log | tail -30
 ```

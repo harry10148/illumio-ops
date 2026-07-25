@@ -293,6 +293,9 @@ class PolicyUsageGenerator:
         lang = lang or getattr(self, '_lang', 'en')
         os.makedirs(output_dir, exist_ok=True)
         paths = []
+        # 與 ReportGenerator 同契約：每種格式的失敗原因要能被 GUI 讀到，
+        # 而不是只留一行 log、然後回報「成功但少一個檔」。
+        self.last_export_errors: dict[str, str] = {}
 
         if fmt in ('html', 'all'):
             path = PolicyUsageHtmlExporter(
@@ -310,15 +313,24 @@ class PolicyUsageGenerator:
             print(t("rpt_pu_html_saved", path=path, lang=lang))
 
         if fmt in ('xlsx', 'all'):
+            xlsx_path = None
             try:
                 import datetime as _dt
+                from src.report.exporters._output_paths import reserve_unique_path
                 ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
-                xlsx_path = os.path.join(output_dir, f'Illumio_PolicyUsage_Report_{ts_str}.xlsx')
+                # 同分鐘併發產出會撞名（見 _output_paths）；先搶下唯一路徑。
+                xlsx_path = reserve_unique_path(
+                    os.path.join(output_dir, f'Illumio_PolicyUsage_Report_{ts_str}.xlsx'))
                 generate_policy_usage_xlsx(result.module_results or {}, xlsx_path, lang=lang)
                 paths.append(xlsx_path)
                 print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}", lang=lang))
             except Exception as exc:
-                logger.warning('XLSX export failed: {}', exc)
+                logger.exception('XLSX export failed: {}', exc)
+                self.last_export_errors['xlsx'] = str(exc) or exc.__class__.__name__
+                # 半寫的活頁簿不在 paths 裡，但 GUI 報表列表只看副檔名照樣列出。
+                if xlsx_path:
+                    from src.report.exporters._output_paths import discard_reserved
+                    discard_reserved(xlsx_path)
 
         if fmt in ('csv', 'all'):
             mod02 = result.module_results.get('mod02', {})
@@ -509,6 +521,15 @@ class PolicyUsageGenerator:
             rows = list(self.api._traffic._submit_and_stream_async_query(
                 payload, compute_draft=True
             ))
+            # _submit_and_stream_async_query 把 PCE 側失敗（submit 非 2xx、缺
+            # href、job 失敗、poll 逾時、下載失敗）吞成「不 yield 任何列」並記到
+            # api.last_fetch_error，不會 raise——同 ReportGenerator.
+            # _raise_if_traffic_fetch_failed 的契約。少了這個檢查，查詢失敗會和
+            # 「真的沒有 draft 阻擋風險」同形，報表會渲染成一片乾淨。
+            err = getattr(self.api, "last_fetch_error", None)
+            if isinstance(err, str) and err.strip():
+                logger.error("Draft PD query failed on the PCE: {}", err)
+                return {"skipped": True, "failed": True, "reason": err}
             result = pu_draft_pd_summary(rows)
             # The draft-PD counts are absolute; if the query hit its ceiling the
             # totals are a floor, not the true count — flag it for disclosure.
@@ -517,7 +538,7 @@ class PolicyUsageGenerator:
             return result
         except Exception as exc:
             logger.warning("Draft PD analysis failed (non-fatal): {}", exc)
-            return {"skipped": True, "reason": str(exc)}
+            return {"skipped": True, "failed": True, "reason": str(exc)}
 
     def _run_pipeline(
         self,
@@ -538,7 +559,10 @@ class PolicyUsageGenerator:
         from src.report.analysis.policy_usage.pu_mod00_executive import pu_executive_summary
 
         results = {}
-        results['mod01'] = pu_overview(flat_rules, hit_hrefs)
+        # execution_stats 必須傳進 mod01：否則 unused_count 會把「流量查詢失敗／
+        # 未完成」的規則算成未使用，xlsx 的 Unused Count 與 CSV mod01 摘要表都會
+        # 印出灌水的數字（HTML 端已由 exporter 對帳，但這兩個匯出格式沒有）。
+        results['mod01'] = pu_overview(flat_rules, hit_hrefs, execution_stats or {})
         results['mod02'] = pu_hit_detail(flat_rules, ruleset_map, hit_counts, execution_stats or {}, self.api, lang=self._lang)
         results['mod03'] = pu_unused_detail(flat_rules, ruleset_map, hit_hrefs, execution_stats or {}, self.api, lang=self._lang)
         results['mod04'] = pu_deny_effectiveness(flat_rules, hit_counts, ruleset_map)

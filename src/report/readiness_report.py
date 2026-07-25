@@ -140,6 +140,10 @@ class ReadinessReportGenerator:
         enforcement_mode 阻塞再依現況分兩型：已有 selective/full 的往 full
         推進；否則從 visibility/testing 起步。其他因素各有對應動作鍵。
         """
+        if blocking == "none":
+            return t("rpt_qact_none", lang=self._lang,
+                     default="No blocking factor: every readiness factor scores 100% — "
+                             "this app(env) is ready to advance to full enforcement.")
         if blocking == "enforcement_mode":
             has_enforcing = any(m in ("selective", "full") for m in modes)
             key = ("rpt_qact_enforcement_full" if has_enforcing
@@ -171,6 +175,11 @@ class ReadinessReportGenerator:
             # lowest raw ratio: a small dip in a 35-pt factor outranks a large dip
             # in a 10-pt one for directing the recommended action.
             blocking = max(ratios, key=lambda n: _WEIGHTS.get(n, 0) * (1.0 - ratios[n]))
+            # 五個因素全部 1.0 時每個候選的加權損失都是 0，max() 會回插入順序的
+            # 第一個（policy_coverage），讓滿分的 app 頂在佇列第一列卻掛著一句
+            # 「先補未涵蓋流量的允許規則」。此時明確標為「無阻塞因素」。
+            if _WEIGHTS.get(blocking, 0) * (1.0 - ratios[blocking]) <= 1e-9:
+                blocking = "none"
             key = str(s["app_env_key"])
             score = float(s["readiness_score"])
             modes = modes_by_key.get(key, {})
@@ -180,7 +189,8 @@ class ReadinessReportGenerator:
                 "readiness_score": score,
                 "grade": _score_to_grade(score),
                 "current_mode": _mode_summary(modes),
-                "blocking_factor": t(f"rpt_factor_{blocking}", lang=self._lang),
+                "blocking_factor": t(f"rpt_factor_{blocking}", lang=self._lang,
+                                     default="None" if blocking == "none" else blocking),
                 "blocking_factor_key": blocking,
                 # 依該列 blocking factor 給對應動作——原本一律取全域 P1
                 # 建議（多為 MOVE_TO_ENFORCEMENT），整欄同句且與阻塞因素

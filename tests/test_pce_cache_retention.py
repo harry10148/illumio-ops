@@ -309,3 +309,42 @@ def test_retention_deletes_raw_once_dispatch_sent(session_factory):
             queued_at=_old(), sent_at=_old()))
     deleted = RetentionWorker(session_factory).run_once(traffic_raw_days=7)
     assert deleted["traffic_raw"] == 2  # sent 引用不擋刪
+
+
+def test_retention_guard_applies_at_delete_time_not_only_select(session_factory, monkeypatch):
+    """守門條件必須同時掛在 DELETE 上（2026-07-25 審查 Medium）。
+
+    pysqlite 不為 SELECT 開讀交易，選出 id 到執行 DELETE 之間別的執行緒
+    （SIEM enqueue_new_records）可能剛 commit 一筆 pending dispatch。這裡在
+    那個窗口精準插入該筆 dispatch：只要 DELETE 仍只帶 id 條件，來源列就會被
+    刪掉、SIEM 補送永久失敗。
+    """
+    import src.pce_cache.retention as retention_mod
+    from src.pce_cache.retention import RetentionWorker
+
+    _seed_raw_flows(session_factory, old_count=3, new_count=0)
+    with session_factory() as s:
+        ids = sorted(r.id for r in s.execute(select(PceTrafficFlowRaw)).scalars())
+    victim = ids[0]
+
+    real_delete = retention_mod.delete
+    state = {"injected": False}
+
+    def racing_delete(model):
+        if not state["injected"]:
+            state["injected"] = True
+            # 另一個連線（獨立 session）在 SELECT 之後、DELETE 之前 commit
+            with session_factory.begin() as s2:
+                s2.add(SiemDispatch(
+                    source_table="pce_traffic_flows_raw", source_id=victim,
+                    destination="splunk", status="pending", retries=0,
+                    queued_at=_now()))
+        return real_delete(model)
+
+    monkeypatch.setattr(retention_mod, "delete", racing_delete)
+    RetentionWorker(session_factory).run_once(traffic_raw_days=7)
+
+    assert state["injected"], "測試未觸發競態注入，守門測試失去意義"
+    with session_factory() as s:
+        remaining = [r.id for r in s.execute(select(PceTrafficFlowRaw)).scalars()]
+    assert victim in remaining, "窗口內被 SIEM 引用的來源列仍被刪除（fail-open）"

@@ -20,6 +20,16 @@ from src.utils import Colors
 from .base import AlertOutputPlugin
 
 
+def _sanitize_header(value: str) -> str:
+    """CR/LF 進標頭會讓 as_string() 丟 HeaderParseError（非 SMTPException，
+    會穿透本外掛的錯誤分類、破壞 dict 回傳契約），也是標頭注入的入口。
+
+    與 src/reporter.py::_sanitize_header 同語意；不 import 過來是因為
+    reporter.py 在 module 層 import src.alerts，反向 import 會成環。
+    """
+    return str(value or '').replace("\r", " ").replace("\n", " ")
+
+
 def redact_webhook_url(url: str) -> str:
     """Redact a Teams/Power-Automate webhook URL for safe logging/storage.
 
@@ -54,9 +64,13 @@ class MailAlertPlugin(AlertOutputPlugin):
 
         body = reporter._build_mail_html(subject)
         msg = MIMEMultipart('alternative')
-        msg["Subject"] = subject
-        msg["From"] = cfg["sender"]
-        msg["To"] = ",".join(cfg["recipients"])
+        # subject / sender / recipients 都可能來自 GUI 設定頁的自由文字，夾帶
+        # CR/LF 即可注入額外標頭，先清洗再賦值（信封收件人一併用清洗後的值）。
+        sender = _sanitize_header(cfg["sender"])
+        recipients = [_sanitize_header(r).strip() for r in cfg["recipients"]]
+        msg["Subject"] = _sanitize_header(subject)
+        msg["From"] = sender
+        msg["To"] = ",".join(recipients)
         # Plain text fallback FIRST (RFC 2046: client picks last that it can render)
         plain_body = reporter._build_mail_plain(subject)
         msg.attach(MIMEText(plain_body, "plain", _charset='utf-8'))
@@ -77,10 +91,10 @@ class MailAlertPlugin(AlertOutputPlugin):
                     smtp_password = os.environ.get("ILLUMIO_SMTP_PASSWORD") or smtp_conf.get("password", "")
                     smtp.login(smtp_conf.get("user"), smtp_password)
 
-                smtp.sendmail(cfg["sender"], cfg["recipients"], msg.as_string())
+                smtp.sendmail(sender, recipients, msg.as_string())
 
             print(f"{Colors.GREEN}{t('mail_sent', lang=lang, host=host, port=port)}{Colors.ENDC}")
-            return {"channel": "mail", "status": "success", "target": ",".join(cfg["recipients"])}
+            return {"channel": "mail", "status": "success", "target": ",".join(recipients)}
         except smtplib.SMTPAuthenticationError as exc:
             print(f"{Colors.FAIL}{t('mail_failed', lang=lang, error=exc)}{Colors.ENDC}")
             from loguru import logger

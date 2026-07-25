@@ -29,7 +29,7 @@ illumio-ops 內部有**兩套獨立的規則判斷引擎**，加上一條**事�
 
 | 系統 | 程式位置 | 觸發時機 | 判斷對象 | 輸出 |
 |------|----------|----------|----------|------|
-| 即時監控規則引擎 | `src/analyzer.py` | 每個監控週期（`rule_scheduler.check_interval_seconds`，預設 300 秒，觸發 `Analyzer.run_analysis()`）| PCE audit events ＋ 即時 traffic flows | 派送告警（event／traffic／metric／health）到各通道 |
+| 即時監控規則引擎 | `src/analyzer.py` | 每個監控週期（cache 啟用時 30 秒，否則 `--interval` 分鐘、預設 10 分；觸發 `Analyzer.run_analysis()`，見 [automation.md](automation.md) §3 的 `monitor_cycle`）| PCE audit events ＋ 即時 traffic flows | 派送告警（event／traffic／metric／health）到各通道 |
 | 報表安全規則引擎 | `src/report/rules_engine.py` ＋ `src/report/rules/` | 產生報表時（`ReportGenerator._run_pipeline`）| 彙整後的 unified flow DataFrame | 一組 `Finding`（規則命中清單），供 Module 12 摘要與 HTML/Excel 匯出 |
 | 事件管線 | `src/events/` | 即時監控引擎的事件階段呼叫 | 原始 PCE events | 正規化、去重、節流、分類（已知/未知）、影子比對、統計、runbook 對應 |
 
@@ -231,9 +231,9 @@ R 系列只在 unified DataFrame 帶有 **`draft_policy_decision`** 欄時才會
 
 ### 3.4 Classify 已知／未知（`catalog.py`）— vendor event catalog
 
-- `KNOWN_EVENT_TYPES = VENDOR_DOCUMENTED_EVENT_TYPES | OBSERVED_EXTENSION_EVENT_TYPES`：**239** 個 vendor 文件記載型別 ＋ **54** 個實測觀察到的擴充型別 ＝ **293 個已知型別**（實際清點；`vendor 239 / observed_extension 54`，總數與坊間流傳的舊數字 285/288 不同，以本文清點為準）。
+- `KNOWN_EVENT_TYPES = VENDOR_DOCUMENTED_EVENT_TYPES | OBSERVED_EXTENSION_EVENT_TYPES`：**239** 個 vendor 文件記載型別 ＋ **56** 個實測觀察到的擴充型別 ＝ **295 個已知型別**（實際清點；`vendor 239 / observed_extension 56`，總數與坊間流傳的舊數字 285/288 不同，以本文清點為準）。
 - `KNOWN_RESOURCE_PREFIXES`（**69** 個 resource 家族前綴）為第二道防線：對既有 resource 的新動作可被寬鬆視為已知。
-- `is_known_event_type(event_type, lenient=False, *, resource_type=None)`：normalizer 以非寬鬆模式呼叫，凡不在 293 集合者一律標 `known_event_type=False` 並打 `unknown_event_type` 標籤。
+- `is_known_event_type(event_type, lenient=False, *, resource_type=None)`：normalizer 以非寬鬆模式呼叫，凡不在 295 集合者一律標 `known_event_type=False` 並打 `unknown_event_type` 標籤。
 - `classify_unknown_event_type(...)`：將未知型別歸入 resource 家族或標 `unclassified`。
 - 即時引擎 `_update_parser_observability` 把未知型別累積到 `state["unknown_events"]`（上限 100 筆）。
 
@@ -243,7 +243,7 @@ R 系列只在 unified DataFrame 帶有 **`draft_policy_decision`** 欄時才會
 
 ### 3.6 Runbooks（`runbooks.py`）
 
-`RUNBOOK_CATEGORIES` 把 event type 對應到操作指引，共 **17 個分類**，每個含 `patterns`（涵蓋的 event types）、`runbook_url`（docs.illumio.com 連結）、`severity_hint`、多行 `response` 處置劇本。`severity_hint=critical` 的分類共 5 個：`security-auth-failure`、`agent-tampering`、`auth-config`、`pce-capacity`、`server-errors`。`runbook_for(event_type)` 查回對應分類。
+`RUNBOOK_CATEGORIES` 把 event type 對應到操作指引，共 **17 個分類**，每個含 `patterns`（涵蓋的 event types）、`runbook_url`（docs.illumio.com 連結）、`severity_hint`、多行 `response` 處置劇本。`severity_hint=critical` 的分類共 4 個：`security-auth-failure`、`agent-tampering`、`auth-config`、`server-errors`（`pce-capacity` 的 `severity_hint` 是 `info`）。`runbook_for(event_type)` 查回對應分類。
 
 ---
 
@@ -267,7 +267,7 @@ GUI 操作路徑（Settings → Channels 各通道卡片；Rules → Actions 全
 
 - **端點**：`POST /api/actions/test-alert`，body 可帶 `channel`（省略則對 `alerts.active` 全部通道各發一次）。呼叫 `Reporter.send_alerts(force_test=True, channels=channels)`，會**真的發送**測試訊息，正式環境使用前請先確認收件者。
 - **每通道版本**：Settings → Channels 頁面每張通道卡片有各自的 Send test 按鈕，走同一端點但只帶該通道名稱。
-- **限流**：端點掛 `10 per hour` rate limit（`@limiter.limit("10 per hour")`），避免誤觸洗版。
+- **限流**：端點掛 `30 per hour` rate limit（`@limiter.limit("30 per hour")`），避免誤觸洗版。
 - `force_test=True` 時**略過** DLQ 補送與空告警短路判斷，一定會嘗試對指定通道送出一則測試訊息。
 
 ---
@@ -327,5 +327,5 @@ if len(message) > self._LINE_MESSAGE_CAP:
 - **「24 條規則」**：**仍成立**。逐檔清點 `src/report/rules_engine.py` 的 `_b001`–`_b009`（9 個）、`_l001`–`_l010`（10 個），加上 `src/report/rules/` 的 `r01`–`r05`（5 個檔案）＝ 24，與原始碼一致。
 - **R 系列按需啟用**：**仍成立**。`ReportGenerator.generate_from_api()` 的 `draft_policy` 參數預設 `False`，標準/cache 報表路徑不帶 `compute_draft`；需透過獨立命令 `illumio-ops report draft-policy` 才會觸發（見 §2.4）。
 - **mod04 風險 port 數（文件字串 vs 設定檔）**：**仍成立**。`src/report/analysis/mod04_ransomware_exposure.py` 的模組 docstring 仍寫「20 high-risk ports」，但 `config/report_config.yaml` 實際列出 **24** 個 distinct port（critical 5 ＋ high 5 ＋ medium 10 ＋ low 4，見 §2.1）。本文以設定檔實際內容為準。
-- **vendor catalog 已知型別總數（舊文件誤差已修正）**：舊版文件曾記為 285/288，實際清點 `src/events/catalog.py` 為 `VENDOR_DOCUMENTED_EVENT_TYPES`（239）＋ `OBSERVED_EXTENSION_EVENT_TYPES`（54）＝ **293**；本文採實際清點數字。
-- **runbook 分類數（舊文件誤差已修正）**：舊版文件記為 16 個分類、4 個 critical severity_hint；實際清點 `RUNBOOK_CATEGORIES` 為 **17** 個分類、**5** 個 critical（新增 `pce-capacity`）。本文採實際清點數字。
+- **vendor catalog 已知型別總數（舊文件誤差已修正）**：舊版文件曾記為 285/288，實際清點 `src/events/catalog.py` 為 `VENDOR_DOCUMENTED_EVENT_TYPES`（239）＋ `OBSERVED_EXTENSION_EVENT_TYPES`（56）＝ **295**；本文採實際清點數字。
+- **runbook 分類數（舊文件誤差已修正）**：舊版文件記為 16 個分類；實際清點 `RUNBOOK_CATEGORIES` 為 **17** 個分類、**4** 個 critical（`pce-capacity` 曾短暫列為 critical，現為 `info`，不計入）。本文採實際清點數字。

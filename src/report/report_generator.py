@@ -621,10 +621,14 @@ class ReportGenerator:
             print(t("rpt_html_saved", path=path, lang=lang))
 
         if fmt in ('xlsx', 'all'):
+            xlsx_path = None
             try:
                 import datetime as _dt
+                from src.report.exporters._output_paths import reserve_unique_path
                 ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
-                xlsx_path = os.path.join(output_dir, f'Illumio_Traffic_Report_{ts_str}.xlsx')
+                # 同分鐘併發產出會撞名（見 _output_paths）；先搶下唯一路徑。
+                xlsx_path = reserve_unique_path(
+                    os.path.join(output_dir, f'Illumio_Traffic_Report_{ts_str}.xlsx'))
                 meta = self._build_report_metadata(result, file_format="xlsx")
                 xlsx_metadata = {
                     'title': 'Traffic Flow Report',
@@ -642,6 +646,11 @@ class ReportGenerator:
             except Exception as exc:
                 logger.exception('XLSX export failed: {}', exc)
                 self.last_export_errors['xlsx'] = str(exc) or exc.__class__.__name__
+                # 失敗時 openpyxl 可能已建出（可能半寫的）檔；它不在 paths 裡，
+                # 但 GUI 的報表列表只看副檔名，會被下載成壞掉的活頁簿。
+                if xlsx_path:
+                    from src.report.exporters._output_paths import discard_reserved
+                    discard_reserved(xlsx_path)
 
         if fmt in ('csv', 'all', 'all_raw'):
             export_data = dict(result.module_results)
@@ -883,6 +892,14 @@ class ReportGenerator:
             module_errors.append({'module': 'mod12', 'error': str(e)})
 
         results['_module_errors'] = module_errors
+        # 之前只寫進 results 卻沒有任何消費端，失敗模組的缺值會被下游當成真 0
+        # 渲染。HTML hero 現在會列出失敗模組；同時掛在 generator 上供呼叫端
+        # （GUI/排程）判斷這份報表是否不完整。
+        self.last_module_errors = module_errors
+        if module_errors:
+            logger.error("[ReportGenerator] {} analysis module(s) failed: {}",
+                         len(module_errors),
+                         ", ".join(e['module'] for e in module_errors))
         print(t("rpt_modules_complete", lang=lang) + "             ")
 
         return results

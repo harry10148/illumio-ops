@@ -91,3 +91,8 @@ docs/ux-review-*/screenshots/
 # Limiter runtime snapshot state (auto-created by GUI rate limiter)
 config/limiter/
 docs/ux-review-2026-05-14/
+
+# Cross-process advisory lock files (src/file_lock.py). Content is a single
+# placeholder byte — Windows byte-range locks need a lockable byte. The OS
+# releases the lock on process death, so these are never unlinked.
+*.lock

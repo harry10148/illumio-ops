@@ -11,6 +11,11 @@ import os
 
 from loguru import logger
 
+from src.report.exporters._output_paths import (
+    discard_reserved,
+    reserve_unique_path,
+    write_text_atomic,
+)
 from src.report.exporters.csv_exporter import CsvExporter
 
 
@@ -24,9 +29,17 @@ class PolicyResolverExporter:
     def export_json(self, output_dir: str = "reports") -> str:
         os.makedirs(output_dir, exist_ok=True)
         ts = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
-        path = os.path.join(output_dir, f"Illumio_Policy_Resolver_{ts}.json")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(self._r, f, ensure_ascii=False, indent=2)
+        # 先序列化完成再碰檔案系統：舊寫法是 open(...,'w') 之後才 json.dump()，
+        # 序列化中途拋錯就留下半截／0-byte 的 JSON（GUI 照樣列出並可下載）。
+        # 再以 O_EXCL 搶下唯一檔名（同分鐘併發產出會撞名）＋暫存檔 os.replace。
+        body = json.dumps(self._r, ensure_ascii=False, indent=2)
+        path = reserve_unique_path(
+            os.path.join(output_dir, f"Illumio_Policy_Resolver_{ts}.json"))
+        try:
+            write_text_atomic(path, body)
+        except BaseException:
+            discard_reserved(path)
+            raise
         logger.info(f"[PolicyResolverExporter] Wrote JSON -> {path}")
         return path
 

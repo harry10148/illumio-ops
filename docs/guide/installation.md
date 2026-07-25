@@ -2,7 +2,7 @@
 title: 安裝與部署
 audience: [operator]
 version: 4.1.0
-last_verified: 2026-07-17
+last_verified: 2026-07-25
 verified_against:
   - scripts/install.sh
   - scripts/install.ps1
@@ -138,9 +138,11 @@ Get-Service IllumioOps                # 應顯示：Running
 
 `preflight.ps1` 檢查項目與 Linux 版對應：OS 版本（Windows 10 / Server 2019+）、
 架構（AMD64）、PowerShell 版本（5.1+）、是否以系統管理員執行、NSSM 是否可用、
-`C:\` 磁碟空間、安裝包完整性。`install.ps1` 會在註冊服務前先驗證安裝——所有正式
-相依必須可 import（`scripts\verify_deps.py --offline-bundle`）；pip 或驗證失敗即
-中止並回傳非零 exit code。
+安裝根目錄所在磁碟的可用空間（以 `-InstallRoot` 指定的路徑判斷磁碟機代號，預設
+`C:\illumio-ops`；需 >= 500 MB）、安裝包完整性。`install.ps1` 會在註冊服務前先
+驗證安裝——所有正式相依必須可 import（`scripts\verify_deps.py --offline-bundle`），
+且 app 能回應 `illumio-ops.py --help`；註冊服務後再確認 `IllumioOps` 服務確實存在。
+pip、相依驗證、smoke check 或服務註冊任一失敗即中止並回傳非零 exit code。
 
 ### systemd / NSSM 服務
 
@@ -229,14 +231,19 @@ Get-Service IllumioOps
 2. **服務停機行為**：若服務正在執行中，安裝腳本會自動停止服務再覆寫檔案，避免
    新舊程序與新舊 site-packages 混用造成 torn state；安裝完成後需由操作者自行
    重新啟動（`sudo systemctl restart illumio-ops` 或 `Restart-Service IllumioOps`）。
-3. Linux 端會還原 pristine 的 bundle 內建 Python runtime 並全量重裝 bundle 內的
-   wheel（`rsync --delete`）——升級後機器上的相依版本必定與 bundle 一致，新版已
-   移除的檔案也會被清掉。Windows 端以 Robocopy 排除 `config.json`、
-   `alerts.json`、`rule_schedules.json` 三個操作者檔案後同步應用程式檔案。
-4. 完成前自動驗證：所有正式相依必須可 import
-   （`scripts/verify_deps.py --offline-bundle`），且 app 能回應
-   `illumio-ops.py --help`（Linux）／pip 安裝與相依驗證成功（Windows）。任一
-   檢查失敗即中止並回傳非零 exit code。
+3. **pristine runtime 與全量重裝**：Linux 與 Windows 行為一致。Linux 以
+   `rsync --delete` 還原 bundle 內建 Python runtime 並全量重裝 bundle 內的 wheel；
+   Windows 以 `Robocopy /MIR` 同步 `python\`，應用程式檔案則用 `Robocopy /E /PURGE`
+   並以錨定在安裝根目錄的 `/XD` 排除 `config\`、`data\`、`logs\`、`reports\`、
+   `python\`（另以 `/XF` 排除 `config.json`、`alerts.json`、`rule_schedules.json`
+   與遷移標記 `MIGRATED_FROM`），
+   升級後只更新 `*.example` 範本。兩邊升級後機器上的相依版本都必定與 bundle 一致，
+   新版已移除的檔案（含被重新命名或刪除的 `src` 模組）也會被清掉。
+4. 完成前自動驗證：Linux 與 Windows 都要求所有正式相依可 import
+   （`scripts/verify_deps.py --offline-bundle`）且 app 能回應
+   `illumio-ops.py --help`；Windows 另外在註冊服務後確認 `IllumioOps` 服務確實
+   存在（未進入 Running 只發出警告，因為全新安裝在填入 PCE 憑證前本來就不會啟動）。
+   任一檢查失敗即中止並回傳非零 exit code。
 
 ### 升級後保留的檔案
 

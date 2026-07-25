@@ -29,6 +29,7 @@ from .report_i18n import (
     MOD01_METRIC_VALUE_I18N,
 )
 from .report_css import build_css, TABLE_JS
+from ._output_paths import discard_reserved, reserve_unique_path, write_text_atomic
 from src.report.exporters._exec_summary import render_exec_summary_html
 from .table_renderer import render_df_table
 from .chart_renderer import render_matplotlib_svg
@@ -495,10 +496,16 @@ class _TrafficReportBase:
         os.makedirs(output_dir, exist_ok=True)
         ts = datetime.datetime.now().strftime('%Y-%m-%d_%H%M')
         filename = self._filename(ts)
-        filepath = os.path.join(output_dir, filename)
-
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(self._build())
+        # 先把文件建置完成再碰檔案系統：舊寫法是 open(...,'w') 之後才呼叫
+        # _build()，建置中途拋錯就留下 0-byte 報表（GUI 照樣列出並可下載）。
+        # 再以 O_EXCL 搶下唯一檔名（同分鐘併發產出會撞名）＋暫存檔 os.replace。
+        body = self._build()
+        filepath = reserve_unique_path(os.path.join(output_dir, filename))
+        try:
+            write_text_atomic(filepath, body)
+        except BaseException:
+            discard_reserved(filepath)
+            raise
         logger.info(f"[HtmlExporter] Saved: {filepath}")
         return filepath
 
@@ -703,6 +710,22 @@ class _TrafficReportBase:
             _cap_banner = ('<p class="note note-warn">' + html.escape(
                 t("rpt_analysis_truncated", lang=_sl)
                 .replace("{shown}", f"{_cap['to']:,}").replace("{total}", f"{_cap['from']:,}")) + '</p>')
+        # Disclose analysis modules that threw: without this the sections below
+        # render their missing metrics as real zeros (0% coverage, 0 flows) and
+        # the reader cannot tell a healthy estate from a failed module.
+        _mod_errs = [e for e in (self._r.get('_module_errors') or [])
+                     if isinstance(e, dict) and e.get('module')]
+        _moderr_banner = ''
+        if _mod_errs:
+            # 模組清單放在翻譯字串之外，缺翻譯時仍看得到是哪幾個模組失敗。
+            _moderr_names = ", ".join(sorted(str(e['module']) for e in _mod_errs))
+            _moderr_banner = (
+                '<p class="note note-warn">'
+                + html.escape(t("rpt_module_errors_warning", lang=_sl,
+                                default="Some analysis modules failed to run; the figures "
+                                        "in the affected sections are incomplete and must "
+                                        "not be read as zero. Failed modules:"))
+                + ' ' + html.escape(_moderr_names) + '</p>')
         _hero = (
             '<section id="summary" class="card report-hero">'
             '<div class="report-hero-top">'
@@ -710,7 +733,7 @@ class _TrafficReportBase:
             + _badge_html
             + f'<h1>{_s(_title_key)}</h1>'
             f'<p class="report-subtitle">{_s("rpt_generated")} ' + generated_at + '</p></div>'
-            + _cap_banner
+            + _cap_banner + _moderr_banner
             + summary_pills + _maturity_block + trend_html
             + _findings_block + '</section>\n'
         )

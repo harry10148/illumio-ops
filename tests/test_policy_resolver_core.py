@@ -396,3 +396,43 @@ def test_scoped_ams_with_exclusion():
     rows = resolve_ruleset(rs, **_scoped_lookups())
     # scope prod={10.0.1.5,10.0.2.7} − web={10.0.1.5,10.0.1.6} = {10.0.2.7}
     assert {r["dst_ip"] for r in rows} == {"10.0.2.7"}
+
+
+# ── Cartesian-product cap ────────────────────────────────────────────────────
+
+def test_oversized_rule_is_capped_and_marked():
+    """scoped ruleset 內 ams → ams：兩側各 5,000 IP 會是 2,500 萬列，必須收斂。"""
+    big = [f"10.{i // 250}.{i % 250}.1" for i in range(5000)]
+    lookups = dict(
+        label_to_ips={"/labels/prod": big},
+        iplist_to_cidrs={},
+        label_group_to_labels={},
+        workload_to_ips={},
+    )
+    rs = {
+        "name": "Prod-Intra",
+        "scopes": [[{"label": {"href": "/labels/prod"}}]],
+        "rules": [{
+            "href": "/sec_rules/big",
+            "consumers": [{"actors": "ams"}],
+            "providers": [{"actors": "ams"}],
+            "ingress_services": [{"port": 445, "proto": 6}],
+        }],
+    }
+    rows = resolve_ruleset(rs, **lookups)
+    assert len(rows) <= 100_000
+    assert all(r.get("truncated") for r in rows)
+    assert any("hosts: expansion capped" in str(r["src_ip"]) for r in rows)
+    # 收斂 token 不可是可套用的位址，也不可退化成全域 ANY（會比實際更寬）
+    assert not any(r["src_ip"] == "ANY" for r in rows)
+
+
+def test_normal_sized_rule_is_not_capped():
+    rs = _ruleset([{
+        "href": "/sec_rules/1",
+        "consumers": [{"label": {"href": "/labels/web"}}],
+        "providers": [{"label": {"href": "/labels/db"}}],
+        "ingress_services": [{"port": 443, "proto": 6}],
+    }])
+    rows = resolve_ruleset(rs, **_lookups())
+    assert all("truncated" not in r for r in rows)

@@ -23,11 +23,41 @@ class TestAnalyzer(unittest.TestCase):
         self.assertEqual(note, "(Interval)")
 
     def test_calculate_mbps_fallback(self):
+        # No tdms → the denominator is an assumed sampling interval, so the
+        # basis must say so ('(Avg est.)') rather than pass as a measured avg.
         flow = {"dst_dbo": 0, "dst_tbo": 500000, "dst_tbi": 500000, "interval_sec": 1}
         val, note, _, _ = self.analyzer.calculate_mbps(flow)
         self.assertAlmostEqual(val, 8.0)
+        self.assertEqual(note, "(Avg est.)")
+
+    def test_calculate_mbps_uses_real_tdms(self):
+        """A real tdms is a measured duration → basis is '(Avg)'."""
+        flow = {"dst_tbo": 500000, "dst_tbi": 500000, "tdms": 1000}
+        val, note, _, tdms = self.analyzer.calculate_mbps(flow)
+        self.assertAlmostEqual(val, 8.0)
         self.assertEqual(note, "(Avg)")
-        
+        self.assertEqual(tdms, 1000)
+
+    def test_calculate_mbps_subsecond_tdms_is_clamped_not_replaced(self):
+        """A genuine sub-second duration must be clamped up to 1000 ms (as the
+        delta branch does), never swapped for the 600 s sampling-interval
+        default — that under-reported a real 80 Mbps burst as 0.07 Mbps."""
+        flow = {"dst_tbo": 5_000_000, "tdms": 500}
+        val, note, _, tdms = self.analyzer.calculate_mbps(flow)
+        self.assertEqual(tdms, 1000.0)
+        self.assertAlmostEqual(val, 40.0)
+        self.assertEqual(note, "(Avg)")
+
+    def test_calculate_metrics_tolerate_malformed_byte_fields(self):
+        """A non-numeric byte field must not raise out of the per-flow hot loop
+        (it would abort the whole monitor cycle)."""
+        flow = {"dst_tbo": "1,234", "dst_tbi": None, "tdms": "abc"}
+        val, _note, _, _ = self.analyzer.calculate_mbps(flow)
+        self.assertEqual(val, 0.0)
+        vol, _ = self.analyzer.calculate_volume_mb(flow)
+        self.assertEqual(vol, 0.0)
+
+
     def test_calculate_volume_mb(self):
         flow = {"dst_dbo": 1048576, "dst_dbi": 1048576} # 2 MB total
         val, note = self.analyzer.calculate_volume_mb(flow)

@@ -61,6 +61,53 @@ WATCHDOG_COOLDOWN_MINUTES = 60
 # to one alert per hour instead of one per cycle.
 OVERFLOW_ALERT_COOLDOWN_MINUTES = 60
 
+# cache 路徑單次視窗查詢的列數上限。超過即代表視窗內「最舊」的列被丟掉
+# （CacheSubscriber.fetch_window_rows 是 last_detected DESC + LIMIT），
+# threshold 加總會低估——不可只留一行 log，必須升級成 meta-alert（同
+# event_overflow / traffic_overflow 的處理方式）。
+TRAFFIC_WINDOW_ROW_LIMIT = 10000
+
+# save_state() 的白名單：只有這些 key 由 Analyzer 自己的 cycle 擁有，才可以
+# 用 self.state（cycle 起始時的快照）覆蓋磁碟。state.json 是多寫入者共用的
+# 單一檔案（report_scheduler / rule_scheduler / GUI adhoc jobs / async_query
+# jobs / Reporter DLQ 與 dispatch 記錄 / ingest jobs 各自 update_state_file），
+# 舊版用「黑名單」列舉少數共用 key、其餘整包覆蓋，等於每新增一個外部 key
+# 就靜默回滾它在本 cycle 期間的寫入（重複寄出排程報表、adhoc job 消失、
+# dispatch 稽核列不見）。白名單讓未知的新 key 預設安全。
+# event_timeline 不在此列：它由 Analyzer 與 Reporter 同時附加，走 append 合併
+# （見 _merge）。pce_stats / watchdog_last_alert_at / event_overflow 亦另行處理
+# （dirty flag）。
+_ANALYZER_OWNED_STATE_KEYS = (
+    "last_check",
+    "event_watermark",
+    "history",
+    "alert_history",
+    "event_seen",
+    "unknown_events",
+    "event_parser_stats",
+    "event_parser_samples",
+    "throttle_state",
+    "overflow_last_alert_at",
+    "traffic_overflow_last_alert_at",
+    "window_truncation",
+    "window_truncation_last_alert_at",
+)
+
+# record_local_read()/record_event_batch() 在純 cache-read cycle 寫入的
+# pce_stats 欄位。這些欄位的擁有者是本 cycle（dashboard 顯示用），必須逐欄
+# 覆蓋到磁碟；其餘欄位（consecutive_failures/last_success/health_*）在沒有
+# 真正 PCE 探測時屬於排程 ingest job，要讓給磁碟值。
+_PCE_STATS_LOCAL_FIELDS = (
+    "event_poll_status",
+    "last_event_poll",
+    "last_error",
+    "last_error_stage",
+    "last_batch_total",
+    "last_batch_unknown",
+    "last_batch_notes",
+    "last_batch_overflow",
+)
+
 # query_flows 殘餘比對的委派範圍：check_flow_match 只認 legacy scalar key，
 # 下列物件/複數 key（Phase 3 FilterBar）委派給報表路徑同一套比對器
 # TrafficQueryBuilder._flow_matches_filters 評估——cache 命中時 client 端
@@ -106,19 +153,58 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _safe_float(value: Any, default: float = 0.0) -> float:
+    """Best-effort ``float()``: mirror of _safe_int for the byte/duration
+    fields. A non-numeric value (e.g. dst_tbi='1,234' from a hand-edited
+    archive or an odd PCE build) must not raise out of the per-flow hot loop
+    and abort the whole monitor cycle.
+    """
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def rule_enabled(rule: dict[str, Any]) -> bool:
+    """規則的啟用旗標。GUI/CLI 會寫入 ``enabled=False`` 代表停用；缺欄位
+    （既有規則）一律視為啟用。語意對齊前端 rules.js 的 ``r.enabled !== false``。
+
+    **所有規則挑選點都必須經過這裡過濾**——少一處，操作者關掉的規則就照樣
+    告警，而 UI/CLI 仍顯示為停用。
+    """
+    return rule.get("enabled", True) is not False
+
+
+# 任一 byte 遙測欄位存在與否：PCE 未開 Enhanced Data Collection 時 flow 完全
+# 不帶 byte 欄，volume/bandwidth 一律算出 0——與「真的沒有流量」無法區分。
+_BYTE_FIELD_KEYS = (
+    "dst_dbo", "dbo", "dst_dbi", "dbi",
+    "dst_tbo", "tbo", "dst_bo", "dst_tbi", "tbi", "dst_bi",
+)
+
+
+def flow_has_byte_fields(flow: dict[str, Any]) -> bool:
+    """該 flow 是否帶有任何 byte 遙測欄位（見 _BYTE_FIELD_KEYS）。呼叫端據此
+    在 cycle 層級（非逐 flow）記一次警告，避免「量測到 0」與「沒有量測」被
+    當成同一件事。"""
+    return any(flow.get(k) is not None for k in _BYTE_FIELD_KEYS)
+
+
 def calculate_mbps(flow: dict[str, Any]) -> tuple[float, str, float, float]:
     """
     Compute bandwidth in Mbps from a PCE traffic flow record.
     Priority 1: delta bytes (dst_dbo+dst_dbi) / ddms  → Mbps (Interval)
     Priority 2: total bytes (dst_tbo+dst_tbi) / tdms   → Mbps (Avg)
+                — when tdms is absent the denominator is an assumed sampling
+                  interval, so the basis is reported as (Avg est.)
     Fallback:   returns (0.0, '', 0.0, 0.0)
 
     Importable independently:
         from src.analyzer import calculate_mbps
     """
-    delta_bytes = float(flow.get("dst_dbo") or flow.get("dbo") or 0) + \
-                  float(flow.get("dst_dbi") or flow.get("dbi") or 0)
-    ddms = float(flow.get("ddms") or 0)
+    delta_bytes = _safe_float(flow.get("dst_dbo") or flow.get("dbo") or 0) + \
+                  _safe_float(flow.get("dst_dbi") or flow.get("dbi") or 0)
+    ddms = _safe_float(flow.get("ddms") or 0)
 
     if delta_bytes > 0 and ddms > 0:
         if ddms < 1000:
@@ -126,15 +212,24 @@ def calculate_mbps(flow: dict[str, Any]) -> tuple[float, str, float, float]:
         val = (delta_bytes * 8.0) / (ddms / 1000.0) / 1000000.0
         return val, "(Interval)", delta_bytes, ddms
 
-    tbo = float(flow.get("dst_tbo") or flow.get("tbo") or flow.get("dst_bo") or 0)
-    tbi = float(flow.get("dst_tbi") or flow.get("tbi") or flow.get("dst_bi") or 0)
+    tbo = _safe_float(flow.get("dst_tbo") or flow.get("tbo") or flow.get("dst_bo") or 0)
+    tbi = _safe_float(flow.get("dst_tbi") or flow.get("tbi") or flow.get("dst_bi") or 0)
     total_bytes = tbo + tbi
-    tdms = float(flow.get("tdms") or 0)
-    if tdms < 1000:
-        tdms = float(flow.get("interval_sec", 600)) * 1000
+    tdms = _safe_float(flow.get("tdms") or 0)
+    note = "(Avg)"
+    if tdms <= 0:
+        # 缺 tdms：只能用 PCE 提供的取樣間隔（無則假設 600s）當分母。分子是
+        # 「flow 存活至今的累積量」、分母是「一個取樣間隔」，算出來的速率並非
+        # 真實發生過的速率——note 標為 (Avg est.) 讓操作者看得出分母是推估的。
+        tdms = _safe_float(flow.get("interval_sec", 600)) * 1000
+        note = "(Avg est.)"
+    elif tdms < 1000:
+        # 真實但不足 1 秒的持續時間：比照 delta 分支往上夾到 1000ms，不可
+        # 換成 600 秒——那會把 80 Mbps 的短連線報成 0.07 Mbps（1200 倍低估）
+        tdms = 1000.0
     if total_bytes > 0 and tdms > 0:
         val = (total_bytes * 8.0) / (tdms / 1000.0) / 1000000.0
-        return val, "(Avg)", total_bytes, tdms
+        return val, note, total_bytes, tdms
     return 0.0, "", 0.0, 0.0
 
 def calculate_volume_mb(flow: dict[str, Any]) -> tuple[float, str]:
@@ -146,12 +241,12 @@ def calculate_volume_mb(flow: dict[str, Any]) -> tuple[float, str]:
     Importable independently:
         from src.analyzer import calculate_volume_mb
     """
-    delta_bytes = float(flow.get("dst_dbo") or flow.get("dbo") or 0) + \
-                  float(flow.get("dst_dbi") or flow.get("dbi") or 0)
+    delta_bytes = _safe_float(flow.get("dst_dbo") or flow.get("dbo") or 0) + \
+                  _safe_float(flow.get("dst_dbi") or flow.get("dbi") or 0)
     if delta_bytes > 0:
         return delta_bytes / 1024 / 1024, "(Interval)"
-    tbo = float(flow.get("dst_tbo") or flow.get("tbo") or flow.get("dst_bo") or 0)
-    tbi = float(flow.get("dst_tbi") or flow.get("tbi") or flow.get("dst_bi") or 0)
+    tbo = _safe_float(flow.get("dst_tbo") or flow.get("tbo") or flow.get("dst_bo") or 0)
+    tbi = _safe_float(flow.get("dst_tbi") or flow.get("tbi") or flow.get("dst_bi") or 0)
     return (tbo + tbi) / 1024 / 1024, "(Total)"
 
 QUERY_RESULT_CAP = 500  # query_flows 單次回傳上限（截斷需回報，不可無聲）
@@ -242,6 +337,27 @@ class Analyzer:
         # disk and immediately erase the timestamp this cycle just wrote,
         # causing a re-alert every cycle. See H-Task 3 scheduler-side finding.
         self._watchdog_dirty = False
+        # Set True when this cycle wrote the dashboard-facing pce_stats fields
+        # through StatsTracker.record_local_read/record_event_batch (a pure
+        # cache read). Those fields must reach disk even when _pce_stats_dirty
+        # stays False, otherwise a failed cache event poll is recorded and then
+        # thrown away by the merge, leaving the dashboard "Event Poll" card
+        # green while event analysis is dead.
+        self._pce_stats_local_dirty = False
+        # event_overflow 與排程器的 events ingest job 共同擁有（cache 部署上
+        # 只有 run_events_ingest 看得到 PCE 端的截斷，見 jobs._record_event_overflow）。
+        # 只有本 cycle 真的寫過這個 key（legacy pull 的 _fetch_event_batch，或
+        # cache 分支清掉 legacy 殘留）才可以把記憶體值落盤；否則整包覆蓋會把
+        # ingest job 剛寫的訊號用 cycle 起始快照靜默回滾（＝訊號永遠不發告警）。
+        self._event_overflow_dirty = False
+        # event_timeline is co-owned: the Reporter appends dispatch rows from
+        # its own update_state_file call. Keep the load-time entries (and their
+        # identities) so save_state can append ONLY this cycle's new entries on
+        # top of whatever is on disk now, instead of overlaying a stale list.
+        # The list reference is retained deliberately: it keeps the baseline
+        # entry objects alive so their id() values cannot be recycled.
+        self._timeline_baseline: list = self.state.get("event_timeline") or []
+        self._timeline_baseline_ids = {id(e) for e in self._timeline_baseline}
 
     def load_state(self) -> None:
         try:
@@ -328,6 +444,20 @@ class Analyzer:
         self.stats.prune(now)
         self.alert_throttler.prune(now)
 
+        # alert_history 只對「還存在的規則」有意義。刪除規則後殘留的冷卻時戳
+        # 會永久累積，並在 id 被回收時（載入最佳實踐規則用連號整數 id）誤壓
+        # 新規則的第一則告警。規則清單讀不到／為空時完全不清——設定載入異常
+        # 時把冷卻狀態整包清掉會造成告警風暴。
+        try:
+            _live_rule_ids = {str(r.get("id")) for r in self.cm.config.get("rules", [])
+                              if r.get("id") is not None}
+        except (AttributeError, TypeError):
+            _live_rule_ids = set()
+        alert_history = self.state.get("alert_history")
+        if _live_rule_ids and isinstance(alert_history, dict):
+            for _stale_rid in [k for k in alert_history if k not in _live_rule_ids]:
+                alert_history.pop(_stale_rid, None)
+
         unknown_events = self.state.get("unknown_events", {})
         if isinstance(unknown_events, dict) and len(unknown_events) > 100:
             ranked = sorted(
@@ -339,54 +469,63 @@ class Analyzer:
 
         try:
             def _merge(existing: dict[str, Any]) -> dict[str, Any]:
-                # externally co-owned keys: self.state is a snapshot loaded at
-                # cycle start (or, for pce_stats, only reliable when this
-                # cycle actually performed a real PCE probe — see
-                # self._pce_stats_dirty). Other processes/background jobs may
-                # write these same keys between this cycle's load_state() and
-                # this save_state() call, so blindly overlaying self.state
-                # would stomp their freshest on-disk values. Add new co-owned
-                # keys here (never to the merged.update(self.state) overlay
-                # below) whenever a key is written by code outside this
-                # Analyzer instance's own cycle. See
-                # .superpowers/sdd/watchdog-overflow-fix-report.md (C1/C2).
+                # 白名單覆蓋（不是黑名單）：self.state 是 cycle 起始時載入的
+                # 快照，state.json 卻是八個以上寫入者共用的單一檔案
+                # （report_scheduler 的 report_schedule_states、rule_scheduler
+                # 的 rule_schedule_states、GUI 的 adhoc_report_jobs、
+                # api/async_jobs 的 async_query_jobs、Reporter 的 alert_dlq /
+                # dispatch_history、ingest jobs 的 traffic_overflow / pce_stats、
+                # dashboard 的 ven_summary / posture_summary…）。舊版
+                # `merged.update(self.state)` 會把整份載入時的快照蓋回磁碟，
+                # 只豁免少數列舉過的 key——任何沒被列舉到的外部 key（含未來
+                # 新增的）都會被靜默回滾成 cycle 起始值，實測後果包含：排程
+                # 報表的 last_run 倒退而重複寄送、adhoc job 記錄消失導致
+                # /api/reports/jobs/<id> 回 404、dispatch 稽核列不見。
+                # 因此改成只覆蓋 Analyzer 自己擁有的 key，未知的 key 預設安全。
                 merged = dict(existing)
-                merged.update(self.state)
-                # ven_summary/posture_summary: written by other background
-                # jobs (dashboard summary refreshers) — always defer to disk.
-                for _k in ("ven_summary", "posture_summary"):
-                    if _k in existing:
-                        merged[_k] = existing[_k]
-                # traffic_overflow: Analyzer only ever reads this (via
-                # _maybe_alert_overflow); it is written exclusively by the
-                # scheduler's run_traffic_ingest job
-                # (src/scheduler/jobs.py:_record_traffic_overflow). Always
-                # defer to disk so a stale in-memory snapshot never wipes a
-                # value the ingest job wrote mid-cycle (C2).
-                if "traffic_overflow" in existing:
-                    merged["traffic_overflow"] = existing["traffic_overflow"]
-                # alert_dlq: Analyzer never reads or writes this; it is
-                # written exclusively by the Reporter's DLQ push/pop (see
-                # Reporter._push_alert_dlq/_pop_alert_dlq in
-                # src/reporter.py, both via update_state_file). Always defer
-                # to disk so a stale in-memory snapshot never resurrects
-                # entries the Reporter already drained mid-cycle.
-                if "alert_dlq" in existing:
-                    merged["alert_dlq"] = existing["alert_dlq"]
+                for _k in _ANALYZER_OWNED_STATE_KEYS:
+                    if _k in self.state:
+                        merged[_k] = self.state[_k]
+                # event_timeline: Analyzer（record_timeline）與 Reporter
+                # （persist_dispatch_results）都會附加。整包覆蓋會吃掉本 cycle
+                # 期間 Reporter 寫入的派送稽核列，整包讓給磁碟又會丟掉本 cycle
+                # 自己記的 pce_error/rule_trigger——故採 append 合併：以磁碟值
+                # 為底，只補上本 cycle 新增的項目，再套用同一個上限裁剪。
+                _new_timeline = [e for e in self.state.get("event_timeline", [])
+                                 if id(e) not in self._timeline_baseline_ids]
+                if _new_timeline:
+                    _timeline = list(existing.get("event_timeline", []))
+                    _timeline.extend(_new_timeline)
+                    merged["event_timeline"] = _timeline[-self.stats.timeline_limit:]
+                # dispatch_history 完全由 Reporter 擁有（Analyzer 只在 prune
+                # 時動到記憶體副本），一律讓給磁碟；磁碟上還沒有這兩個 key 時
+                # 才用記憶體值建立初值，避免全新的 state.json 缺欄。
+                for _k in ("event_timeline", "dispatch_history"):
+                    if _k not in merged and _k in self.state:
+                        merged[_k] = self.state[_k]
                 # pce_stats: co-owned with the scheduler's ingest jobs, which
                 # maintain pce_stats.consecutive_failures (the watchdog
                 # counter) via the same StatsTracker shape on cache-ingest
                 # deployments (jobs.py:_record_ingest_pce_result). This
-                # cycle's in-memory pce_stats is only trustworthy when this
-                # instance performed a real PCE probe this cycle
+                # cycle's in-memory pce_stats is only trustworthy as a whole
+                # when this instance performed a real PCE probe this cycle
                 # (record_pce_success/record_pce_error — health check or
-                # legacy event pull, marked via self._pce_stats_dirty); a
-                # pure cache-read cycle never legitimately touches it (see
-                # StatsTracker.record_local_read) and must defer to disk,
-                # else it clobbers counts the ingest jobs accumulated between
-                # this cycle's load_state() and now (C1).
-                if not self._pce_stats_dirty and "pce_stats" in existing:
-                    merged["pce_stats"] = existing["pce_stats"]
+                # legacy event pull, marked via self._pce_stats_dirty).
+                # 否則逐欄合併：本 cycle 透過 record_local_read /
+                # record_event_batch 寫的是「dashboard 顯示欄」，必須落盤
+                # （否則 cache event poll 失敗被整包丟棄，面板永遠是綠的），
+                # 其餘欄位讓給磁碟上 ingest job 累積的值（C1）。
+                if self._pce_stats_dirty or "pce_stats" not in existing:
+                    merged["pce_stats"] = self.state.get("pce_stats", {})
+                else:
+                    _disk_stats = existing["pce_stats"]
+                    if self._pce_stats_local_dirty and isinstance(_disk_stats, dict):
+                        _mem_stats = self.state.get("pce_stats", {}) or {}
+                        _disk_stats = dict(_disk_stats)
+                        for _f in _PCE_STATS_LOCAL_FIELDS:
+                            if _f in _mem_stats:
+                                _disk_stats[_f] = _mem_stats[_f]
+                    merged["pce_stats"] = _disk_stats
                 # watchdog_last_alert_at: co-owned with the scheduler's
                 # cache-ingest jobs, whose _record_ingest_pce_result ->
                 # StatsTracker.record_pce_success clears this key to None on
@@ -405,13 +544,28 @@ class Analyzer:
                 # incident's first alert can be suppressed for up to
                 # WATCHDOG_COOLDOWN_MINUTES by the previous incident's
                 # timestamp (H-Task 3 scheduler-side finding).
-                if not self._watchdog_dirty and "watchdog_last_alert_at" in existing:
-                    merged["watchdog_last_alert_at"] = existing["watchdog_last_alert_at"]
+                if self._watchdog_dirty or "watchdog_last_alert_at" not in existing:
+                    if "watchdog_last_alert_at" in self.state:
+                        merged["watchdog_last_alert_at"] = self.state["watchdog_last_alert_at"]
+                # event_overflow: co-owned with the scheduler's events ingest
+                # job (jobs._record_event_overflow). 同 watchdog 的判準——只有
+                # 本 cycle 自己寫過才落盤，否則讓給磁碟，避免把 ingest job 在
+                # 本 cycle 期間寫入的截斷訊號用載入時的快照蓋回去。
+                if self._event_overflow_dirty or "event_overflow" not in existing:
+                    if "event_overflow" in self.state:
+                        merged["event_overflow"] = self.state["event_overflow"]
                 return merged
 
             self.state = update_state_file(STATE_FILE, _merge)
         except (IOError, OSError) as e:
+            # fail-loud：alert_history（冷卻時戳）只活在這個檔案裡，而呼叫端
+            # 在 run_analysis() 返回後才 send_alerts()。若在這裡吞掉錯誤，
+            # 告警照送但冷卻沒落盤，下個 cycle 會用全新 Analyzer 重讀舊檔、
+            # 判定沒冷卻過，於是同一則告警每個 cycle（cache 部署 30 秒）重送
+            # 一次。往上拋讓 run_monitor_cycle 略過 send_alerts 並把 job_health
+            # 標成 error——抑制狀態必須 fail-closed。
             logger.error(f"Error saving state: {e}")
+            raise
 
     def calculate_mbps(self, flow: dict[str, Any]) -> tuple[float, str, float, float]:
         """Delegate to module-level calculate_mbps(). See src.analyzer.calculate_mbps."""
@@ -681,9 +835,13 @@ class Analyzer:
                 "query_until": batch.query_until,
                 "raw_count": batch.raw_count,
                 "max_results": self.event_poller.max_results,
+                # 來源標記：cache 分支只清掉這一種（legacy/ad-hoc pull 的殘留），
+                # 不可連 events ingest job 寫的訊號一起清（見 _run_event_analysis）。
+                "source": "legacy_pull",
             }
         else:
             self.state["event_overflow"] = {}
+        self._event_overflow_dirty = True
         return batch
 
     def _update_parser_observability(self, normalized_events: list[dict[str, Any]]) -> None:
@@ -763,6 +921,41 @@ class Analyzer:
             }
             unknown_events[event_type] = entry
 
+    def _select_rules(self, predicate: Any) -> list:
+        """規則挑選的唯一入口——所有派送路徑都必須經過這裡。
+
+        兩道共用的把關：
+        1. ``enabled=False`` 的規則不得進入任何派送路徑。GUI 的每列開關與
+           CLI 的 Enabled? 都寫得進這個欄位，引擎卻從來沒讀過，等於「關不掉」
+           ——操作者以為靜音了，告警照樣送。
+        2. 缺 ``id`` 的規則（手改 alerts.json 就會出現，Rule schema 只要求
+           ``type``）以前會讓 ``{r['id']: ...}`` 直接 KeyError，連帶讓整個
+           cycle（含已算好的事件告警、watermark 與 state 落盤）一起陣亡。改成
+           略過並記一次 warning，比照 GUI 規則列表既有的防禦。
+        """
+        selected: list = []
+        skipped_no_id = 0
+        try:
+            all_rules = self.cm.config.get("rules", []) or []
+        except AttributeError:
+            all_rules = []
+        for r in all_rules:
+            if not predicate(r):
+                continue
+            if not rule_enabled(r):
+                continue
+            if not r.get("id"):
+                skipped_no_id += 1
+                continue
+            selected.append(r)
+        if skipped_no_id:
+            logger.warning(
+                "Skipped {} alert rule(s) with no 'id' (hand-edited alerts.json?) — "
+                "such a rule cannot be cooldown-tracked and would abort the whole cycle",
+                skipped_no_id,
+            )
+        return selected
+
     def _run_health_check(self) -> bool:
         """Run the PCE health check if any system/pce_health rules are configured.
 
@@ -774,7 +967,8 @@ class Analyzer:
             True always — no health-check rules configured (skipped) or check
             completed (passed or failed). False is reserved for future use.
         """
-        pce_health_rules = [r for r in self.cm.config["rules"] if r.get("type") == "system" and r.get("filter_value") == "pce_health"]
+        pce_health_rules = self._select_rules(
+            lambda r: r.get("type") == "system" and r.get("filter_value") == "pce_health")
 
         if not pce_health_rules:
             return True
@@ -893,12 +1087,29 @@ class Analyzer:
             details_key="alert_traffic_overflow_details",
             log_label="Traffic ingest overflow",
         )
+        # cache 視窗查詢截斷：fetch_window_rows 撞到列數上限時丟掉的是視窗內
+        # 「最舊」的列，threshold 加總會低估、門檻告警可能漏發。原本只有一行
+        # WARNING，操作者無從把「沒收到告警」與這件事連起來——升級成同一套
+        # meta-alert 機制（自有 state key 與 cooldown key）。
+        self._maybe_alert_single_overflow(
+            state_key="window_truncation",
+            cooldown_key="window_truncation_last_alert_at",
+            rule_key="alert_window_truncation_rule",
+            details_key="alert_window_truncation_details",
+            log_label="Traffic window truncation",
+        )
 
     def _maybe_alert_single_overflow(
         self, *, state_key: str, cooldown_key: str, rule_key: str, details_key: str, log_label: str
     ) -> None:
         overflow = self.state.get(state_key) or {}
         if not overflow:
+            # 事件已解除：清掉冷卻時戳，否則下一次「不同的」資料遺失事件會被
+            # 前一次的時戳壓制到最多 OVERFLOW_ALERT_COOLDOWN_MINUTES 之久而
+            # 完全不通知。與 watchdog 的作法一致（StatsTracker.record_pce_success
+            # 在 PCE 復原時把 watchdog_last_alert_at 清成 None）。
+            if self.state.get(cooldown_key):
+                self.state[cooldown_key] = None
             return
         now_utc = datetime.datetime.now(datetime.timezone.utc)
         last = parse_event_timestamp(self.state.get(cooldown_key))
@@ -975,12 +1186,34 @@ class Analyzer:
         with the existing reporter.add_event_alert() call site.
         """
         logger.info(t('checking_events'))
-        event_triggers = []
-        events = []
+        event_triggers: list = []
+        events: list = []
         event_batch = None
         if self._sub_events is not None:
+            # event_overflow 有兩個寫入者：legacy pull（_fetch_event_batch，
+            # source=legacy_pull）與 cache 部署的 events ingest job
+            # （jobs._record_event_overflow，source=cache_ingest）。GUI 的
+            # 「立即執行」/debug 端點是不帶 subscriber 建構 Analyzer 的，因此在
+            # cache 部署上也會走 legacy pull 而留下 event_overflow；沒有人清它
+            # 的話，之後每個 cache cycle 都會依那筆陳舊紀錄每小時重發一次
+            # 「事件永久漏失」告警。此處只清 legacy 來源（等同「本 cycle 的
+            # cache 路徑沒有觀察到截斷」）——ingest 寫的訊號是 PCE 端真實的
+            # 截斷觀測，清掉就等於把剛偵測到的資料遺失靜默吃掉。
+            _ovf = self.state.get("event_overflow") or {}
+            if _ovf and _ovf.get("source") != "cache_ingest":
+                logger.info("Clearing stale event_overflow left by a legacy/ad-hoc event pull")
+                self.state["event_overflow"] = {}
+                self._event_overflow_dirty = True
             try:
-                events = self._sub_events.poll_new_rows(limit=5000)
+                # processor=：at-least-once。cursor 只有在 batch 完成比對／
+                # 告警建構後才前進；中途丟例外時 cursor 留在原地，下個 cycle
+                # 重送這批列，而不是靜默跳過（cache 的 events ingestor 用
+                # on_conflict_do_nothing，被跳過的列永遠不會再出現）。
+                def _process(rows: list) -> None:
+                    events.extend(rows)
+                    event_triggers.extend(self._analyze_event_batch(rows, None))
+
+                self._sub_events.poll_new_rows(limit=5000, processor=_process)
                 logger.info("Analyzer event path: cache ({} rows)", len(events))
                 # Record poll health like the legacy path does — the dashboard
                 # "Event Poll" card reads pce_stats.event_poll_status, which would
@@ -992,19 +1225,33 @@ class Analyzer:
                 # scheduler's ingest jobs (see _check_watchdog docstring and
                 # .superpowers/sdd/watchdog-overflow-fix-report.md, C1).
                 self.stats.record_local_read("events", success=True, message=f"cache rows={len(events)}")
+                self._pce_stats_local_dirty = True
             except Exception as e:
                 logger.error(f"Cache event poll failed: {e}")
                 logger.error(t('api_fetch_events_error', error=str(e)))
                 self.stats.record_local_read("events", success=False, error=str(e))
-        else:
-            try:
-                events, event_batch = self._legacy_event_pull()
-            except Exception as e:
-                logger.error(f"Event polling failed; watermark preserved at {self.state.get('event_watermark')}: {e}")
-                logger.error(t('api_fetch_events_error', error=str(e)))
-                self.stats.record_pce_error("events", str(e))
-                self._pce_stats_dirty = True
+                self._pce_stats_local_dirty = True
+            return event_triggers
 
+        try:
+            events, event_batch = self._legacy_event_pull()
+        except Exception as e:
+            logger.error(f"Event polling failed; watermark preserved at {self.state.get('event_watermark')}: {e}")
+            logger.error(t('api_fetch_events_error', error=str(e)))
+            self.stats.record_pce_error("events", str(e))
+            self._pce_stats_dirty = True
+
+        return self._analyze_event_batch(events, event_batch)
+
+    def _analyze_event_batch(self, events: list, event_batch: Any) -> list:
+        """Normalise one batch of events, match every enabled event rule and
+        dispatch the resulting alerts. Returns the trigger dicts.
+
+        Split out of _run_event_analysis so the cache path can hand it to
+        CacheSubscriber.poll_new_rows(processor=...) — the subscriber only
+        advances its cursor after this returns without raising.
+        """
+        event_triggers: list = []
         if events:
             logger.info(t('found_events', count=len(events)))
             logger.info(f"Found {len(events)} events.")
@@ -1022,16 +1269,24 @@ class Analyzer:
                 query_since=event_batch.query_since if event_batch is not None else "",
                 query_until=event_batch.query_until if event_batch is not None else "",
             )
+            self._pce_stats_local_dirty = True
 
-            for rule in [r for r in self.cm.config["rules"] if r["type"] == "event"]:
+            for rule in self._select_rules(lambda r: r.get("type") == "event"):
                 matches = [e for e in events if matches_event_rule(rule, e)]
 
-                if matches:
+                is_count_rule = rule.get("threshold_type") == "count"
+                # history 只有 count 型規則會讀回（_event_count_in_window）。
+                # 以前每條 event 規則（含 immediate 型，佔最佳實踐目錄多數）
+                # 都逐筆寫入，那些紀錄沒有任何讀者，卻要在每個 cycle 被
+                # strptime 重新解析、跟著整份 state.json 重新序列化＋fsync，
+                # 而 state.json 的鎖是全域共用的。改成只有 count 型才記錄。
+                # 代價：規則從 immediate 改成 count 後視窗要重新累積。
+                if matches and is_count_rule:
                     self._record_event_matches(rule["id"], matches, now_utc)
 
                 # Check Threshold
                 count_val = len(matches)
-                if rule["threshold_type"] == "count":
+                if is_count_rule:
                     win_minutes = rule.get("threshold_window", 10)
                     win_start = now_utc - datetime.timedelta(minutes=win_minutes)
                     count_val = self._event_count_in_window(rule["id"], win_start)
@@ -1039,7 +1294,7 @@ class Analyzer:
                 # count 型須有本 cycle 新事件（matches 非空）才告警：視窗計數
                 # 只作門檻；無新證據時發出的告警必然是 time=N/A 的空殼
                 # （2026-07-24 審查 A2）
-                if count_val >= rule["threshold_count"] and count_val > 0 and matches:
+                if count_val >= _safe_float(rule.get("threshold_count", 1)) and count_val > 0 and matches:
                     if self._check_cooldown(rule):
                         self.stats.record_rule_trigger(rule, match_count=count_val, metric_value=count_val)
                         first = matches[0] if matches else {}
@@ -1066,15 +1321,21 @@ class Analyzer:
 
         return event_triggers
 
-    def _legacy_fetch_traffic(self) -> tuple[Any, datetime.datetime]:
-        """Fetch traffic from the PCE API (legacy path used when no cache subscriber)."""
+    def _legacy_fetch_traffic(self, tr_rules: list | None = None) -> tuple[Any, datetime.datetime]:
+        """Fetch traffic from the PCE API (legacy path used when no cache subscriber).
+
+        tr_rules 由 _fetch_traffic 傳入（已套用啟用旗標與 id 把關）——不可在
+        這裡重新掃 cm.config['rules']，否則停用的規則仍會撐大查詢視窗。
+        """
         logger.warning(
             "[deprecated] _legacy_fetch_traffic called — pce_cache path should be "
             "preferred; remove after pce_cache.enabled becomes the default."
         )
         now_utc = datetime.datetime.now(datetime.timezone.utc)
-        max_win = max([r.get('threshold_window', 10) for r in self.cm.config["rules"]
-                       if r["type"] in ["traffic", "bandwidth", "volume"]])
+        if tr_rules is None:
+            tr_rules = self._select_rules(
+                lambda r: r.get("type") in ("traffic", "bandwidth", "volume"))
+        max_win = max((r.get('threshold_window', 10) for r in tr_rules), default=10)
         start_dt = now_utc - datetime.timedelta(minutes=max_win + 2)
         traffic_stream = self.api.execute_traffic_query_stream(
             start_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
@@ -1093,23 +1354,80 @@ class Analyzer:
             tr_rules is the filtered list of traffic/bandwidth/volume rules, and
             now_utc is the datetime used as the query end boundary.
         """
-        tr_rules = [r for r in self.cm.config["rules"] if r["type"] in ["traffic", "bandwidth", "volume"]]
+        # 每個 cycle 先歸零截斷訊號（下方 cache 分支才會重新設定）——否則
+        # 規則全部停用或改走 legacy 路徑後，舊訊號會永遠留著每小時重發一次。
+        self.state["window_truncation"] = {}
+        tr_rules = self._select_rules(
+            lambda r: r.get("type") in ("traffic", "bandwidth", "volume"))
         if not tr_rules:
             return None, tr_rules, datetime.datetime.now(datetime.timezone.utc)
 
         now_utc = datetime.datetime.now(datetime.timezone.utc)
+        self._warm_service_lookup_cache(tr_rules)
 
         if self._sub_flows is not None:
             # 全視窗查詢（同 legacy API 語意：max_win + 2 分鐘）——cursor 增量
             # 會把 count/volume 規則的視窗退化成輪詢間隔（2026-07-24 審查 A1）
             max_win = max(r.get('threshold_window', 10) for r in tr_rules)
             since = now_utc - datetime.timedelta(minutes=max_win + 2)
-            flows = self._sub_flows.fetch_window_rows(since, limit=10000)
+            flows = self._sub_flows.fetch_window_rows(since, limit=TRAFFIC_WINDOW_ROW_LIMIT)
             logger.info("Analyzer flow path: cache window ({} rows)", len(flows))
+            # 撞到列數上限＝視窗內最舊的列被丟掉，加總必然低估。寫進 state 讓
+            # _maybe_alert_overflow 發 meta-alert；未截斷時清成 {} 讓訊號自癒。
+            if len(flows) >= TRAFFIC_WINDOW_ROW_LIMIT:
+                self.state["window_truncation"] = {
+                    "detected_at": format_utc(now_utc),
+                    "query_since": format_utc(since),
+                    "query_until": format_utc(now_utc),
+                    "raw_count": len(flows),
+                    "max_results": TRAFFIC_WINDOW_ROW_LIMIT,
+                }
             return flows, tr_rules, now_utc
 
-        traffic_stream, now_utc = self._legacy_fetch_traffic()
+        traffic_stream, now_utc = self._legacy_fetch_traffic(tr_rules)
         return traffic_stream, tr_rules, now_utc
+
+    def _warm_service_lookup_cache(self, tr_rules: list) -> None:
+        """規則帶 services/ex_services 時，先把 service_ports_cache 暖起來。
+
+        規則引擎用 LabelResolver.resolve_service_entries 把 service href 展開
+        成 port/proto 條目，而那個函式是「純查表、查不到就回 None」——不像
+        label/IP 的 resolver 會自己觸發 lazy refresh。監控 cycle 每輪都新建
+        ApiClient（快取是 instance 層級的空 TTLCache），且整個 cycle 沒有任何
+        地方會去填它，於是 include 側每一筆 flow 都不命中（規則永遠不告警）、
+        exclude 側則等於排除條件沒生效——兩邊都是靜默的。
+        """
+        svc_rules = [r for r in tr_rules if r.get("services") or r.get("ex_services")]
+        if not svc_rules:
+            return
+        labels = getattr(self.api, "_labels", None)
+        ensure = getattr(self.api, "_ensure_query_lookup_cache", None)
+        if callable(ensure):
+            try:
+                ensure()
+            except Exception as exc:  # PCE 不可達時不得中斷整個 cycle
+                logger.warning("Service lookup cache warm-up failed: {}", exc)
+        resolve = getattr(labels, "resolve_service_entries", None)
+        if not callable(resolve):
+            return
+        # 展開失敗要吵一次（每規則每 cycle 一次，不在 per-flow 熱迴圈裡）：
+        # 永遠不會觸發的規則不可以看起來像「這段時間沒有符合的流量」。
+        for rule in svc_rules:
+            unresolved = []
+            for key in ("services", "ex_services"):
+                for href in (rule.get(key) or []):
+                    try:
+                        if not resolve(href):
+                            unresolved.append(href)
+                    except Exception:
+                        unresolved.append(href)
+            if unresolved:
+                logger.warning(
+                    "Rule '{}': {} service reference(s) could not be resolved ({}) — "
+                    "an unresolvable services filter never matches and an "
+                    "ex_services filter never excludes",
+                    rule.get("name", rule.get("id")), len(unresolved), unresolved[:3],
+                )
 
     @staticmethod
     def _push_bounded_top_match(heap: list, metric_val: float, idx: int, item: dict, limit: int) -> None:
@@ -1149,8 +1467,11 @@ class Analyzer:
         top_heaps: dict[Any, list] = {r['id']: [] for r in tr_rules}
 
         count_processed = 0
+        no_byte_fields = 0
         for f in traffic_stream:
             count_processed += 1
+            if not flow_has_byte_fields(f):
+                no_byte_fields += 1
 
             bw_val, bw_note, _, _ = self.calculate_mbps(f)
             vol_val, vol_note = self.calculate_volume_mb(f)
@@ -1192,6 +1513,19 @@ class Analyzer:
 
         logger.info(t('found_traffic', count=count_processed))
 
+        # 「量測到 0」與「根本沒有量測」必須分得出來：PCE 未啟用 Enhanced
+        # Data Collection 時 flow 完全不帶 byte 欄位，volume/bandwidth 規則
+        # 一律算出 0、永遠不會觸發，而畫面上只會看到 0.00 MB——像是沒有流量。
+        # 每 cycle 記一次（不在 per-flow 熱迴圈內）。
+        if (count_processed and no_byte_fields == count_processed
+                and any(r.get("type") in ("bandwidth", "volume") for r in tr_rules)):
+            logger.warning(
+                "All {} flows in this window carry no byte telemetry (dst_db*/dst_tb*) — "
+                "volume/bandwidth rules will evaluate to 0 and can never fire. "
+                "Check that the PCE visibility level is Enhanced Data Collection.",
+                count_processed,
+            )
+
         # 將每條規則的有界集合還原為原始 append 順序（idx 升冪），
         # 使下游（_dispatch_alerts 自己的 stable sort）看到的 tie-break
         # 行為與原始無界累積完全相同。
@@ -1220,7 +1554,11 @@ class Analyzer:
                 if len(res['top_matches']) > 0:
                     is_trigger = True
             else:
-                if val >= threshold:
+                # 與 event 路徑同一道守門（2026-07-24 審查 A2）：門檻達標還
+                # 不夠，必須真的有匹配的 flow 當證據。threshold_count 被填成
+                # 0（GUI 的 Count 欄沒有 min、端點也不擋）時 0.0 >= 0.0 恆真，
+                # 舊版每個冷卻週期就送出一則 count=0、details 空白的空殼告警。
+                if val >= threshold and res['top_matches']:
                     is_trigger = True
 
             if is_trigger and self._check_cooldown(rule):
@@ -1773,8 +2111,12 @@ class Analyzer:
         print(f"\n{Colors.HEADER}{t('debug_mode_title')}{Colors.ENDC}")
 
         # Auto-detect minutes if not provided
+        # 模擬必須與引擎看到的規則集合一致：停用的規則不參與（既不撐大查詢
+        # 視窗，也不出現在模擬報告裡），否則 debug 會宣稱一條關掉的規則
+        # 「Would Trigger」。
+        sim_rules = self._select_rules(lambda r: True)
         max_win = 10
-        for r in self.cm.config['rules']:
+        for r in sim_rules:
             w = r.get('threshold_window', 10)
             if w > max_win:
                 max_win = w
@@ -1824,8 +2166,12 @@ class Analyzer:
         print(f"  -> {t('fetched_records', count=len(traffic), mins=mins)}")
 
         print(f"\n{Colors.HEADER}{t('simulation_report')}{Colors.ENDC}")
+        _skipped = len([r for r in (self.cm.config.get('rules') or []) if not rule_enabled(r)])
+        if _skipped:
+            # 停用的規則不參與模擬，但要說出來——否則操作者會以為規則不見了
+            print(f"  ({t('gui_disabled')}: {_skipped})")
 
-        for rule in self.cm.config["rules"]:
+        for rule in sim_rules:
             rtype = rule.get("type", "event")
             if rtype == "event":
                 r_label = t('event_rule')

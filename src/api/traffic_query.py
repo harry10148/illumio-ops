@@ -144,10 +144,13 @@ def group_label_specs_by_key(values):
     for i, raw in enumerate(values):
         text = str(raw).strip()
         key = None
-        for sep in ("=", ":"):
-            if sep in text:
-                key = text.split(sep, 1)[0].strip().lower()
-                break
+        # 分隔符取「先出現者」（min-index），與 _flow_matches_filters._label_match
+        # 及 labels._normalize_label_filter 一致。固定先試某一個分隔符時，值裡含
+        # 另一個分隔符（如 Role:a=b）會切出不同的 key，兩邊對同一條 spec 認出不同
+        # 維度，分組（同 key OR）就會跟實際比對錯開。
+        idx = min((i for i in (text.find("="), text.find(":")) if i != -1), default=-1)
+        if idx > 0:
+            key = text[:idx].strip().lower()
         if not key:
             key = f"__pos{i}"
         grouped.setdefault(key, []).append(text)
@@ -947,14 +950,22 @@ class TrafficQueryBuilder:
         svc = flow.get('service', {})
 
         def _label_match(side: dict, label_str: str) -> bool:
-            for sep in (':', '='):
-                if sep in label_str:
-                    fk, fv = label_str.split(sep, 1)
-                    fk, fv = fk.strip(), fv.strip()
-                    for lbl in side.get('workload', {}).get('labels', []):
-                        if lbl.get('key') == fk and lbl.get('value') == fv:
-                            return True
-                    return False
+            # 分隔符取「先出現者」而非固定先試 ':'：GUI filter bar 送的是
+            # `key=value`，若值本身含 ':'（例如 Loc=TW:TPE），先試 ':' 會切出
+            # key='Loc=TW'，永遠對不上任何 workload label，結果是靜默空集合。
+            # 與 labels._normalize_label_filter 及 df_filter._label_mask.split_spec
+            # 的 min-index 慣例一致。
+            text = str(label_str or '')
+            idx = min((i for i in (text.find(':'), text.find('=')) if i != -1), default=-1)
+            if idx == -1:
+                return False
+            fk = text[:idx].strip()
+            fv = text[idx + 1:].strip()
+            if not fk or not fv:
+                return False
+            for lbl in side.get('workload', {}).get('labels', []):
+                if lbl.get('key') == fk and lbl.get('value') == fv:
+                    return True
             return False
 
         def _ip_match(side: dict, ip_str: str) -> bool:
@@ -1480,10 +1491,23 @@ class TrafficQueryBuilder:
         pending_rules = []
         reused_rule_details = []
         rule_port_summaries = {}
+        # 建不出 query payload／送不出 job 的規則從沒被查過。若不記錄，它們既不在
+        # hit 名單也不在 failed/pending 名單，Policy Usage 報表會把它們當成
+        # 「Unused」列出，操作者可能照著刪掉實際仍在承載流量的規則。歸入
+        # failed_rule_details（報表顯示 Query Failed）而非 pending——這批不會再有
+        # 後續結果。
+        skipped_rule_details = []
 
         for rule in rules:
             payload = self._build_rule_query_payload(rule, start_date, end_date)
             if payload is None:
+                skipped_rule_details.append(self._rule_usage_detail(
+                    rule,
+                    status="failed",
+                    job_href="",
+                    query_name="",
+                    error="query payload could not be built",
+                ))
                 continue
             cached = jobs_mgr.find_cached_async_summary(payload, query_type="rule_usage")
             if cached:
@@ -1553,6 +1577,16 @@ class TrafficQueryBuilder:
                 submitted_count += 1
                 if job_href:
                     job_map[job_href] = {"rule": rule, "payload": payload}
+                else:
+                    # submit 回 None（PCE 拒收／非 2xx）：同樣是「沒查過」而非
+                    # 「查過沒命中」，不記錄就會被報表誤標成 Unused。
+                    skipped_rule_details.append(self._rule_usage_detail(
+                        rule,
+                        status="failed",
+                        job_href="",
+                        query_name=payload.get("query_name", "") if payload else "",
+                        error="async query submit failed",
+                    ))
                 _progress(t("pu_progress_submitting", done=submitted_count, total=len(pending_rules)))
 
         if not job_map:
@@ -1584,7 +1618,9 @@ class TrafficQueryBuilder:
                 "cached_rules": cached_hits,
                 "submitted_rules": 0,
                 "completed_jobs": 0,
-                "failed_jobs": 0,
+                # 沒建成 payload／沒送出的規則也算 blind spot，計入 failed_jobs
+                # 才會觸發 executive 的 RESOLVE_QUERY_FAILURES 告警。
+                "failed_jobs": len(skipped_rule_details),
                 "pending_jobs": 0,
                 "downloaded_jobs": 0,
                 "hit_rules": len(hit_hrefs),
@@ -1594,7 +1630,7 @@ class TrafficQueryBuilder:
                 "hit_rule_port_details": hit_rule_port_details,
                 "reused_rule_details": reused_rule_details,
                 "pending_rule_details": [],
-                "failed_rule_details": [],
+                "failed_rule_details": list(skipped_rule_details),
                 "resumed_jobs": resumed_jobs,
                 "retried_jobs": retried_jobs,
             }
@@ -1663,7 +1699,7 @@ class TrafficQueryBuilder:
             _progress(t("pu_progress_polling", done=len(completed), total=len(job_map), pending=len(pending)))
 
         downloaded = 0
-        failed_rule_details = []
+        failed_rule_details = list(skipped_rule_details)
         pending_rule_details = []
 
         download_failed = set()
@@ -1747,7 +1783,9 @@ class TrafficQueryBuilder:
             "cached_rules": cached_hits,
             "submitted_rules": len(pending_rules),
             "completed_jobs": len(completed),
-            "failed_jobs": len(failed) + len(download_failed),
+            # 同上：payload/submit 階段就掉隊的規則計入 failed_jobs，與
+            # failed_rule_details 的長度一致。
+            "failed_jobs": len(failed) + len(download_failed) + len(skipped_rule_details),
             "pending_jobs": len(pending),
             "downloaded_jobs": downloaded,
             "hit_rules": len(hit_hrefs),

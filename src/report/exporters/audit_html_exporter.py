@@ -9,6 +9,7 @@ import os
 
 import pandas as pd
 
+from ._output_paths import discard_reserved, reserve_unique_path, write_text_atomic
 from .html_exporter import _trend_deltas_section, render_section_guidance
 from src.i18n import t
 from src.report.section_guidance import visible_in
@@ -160,9 +161,16 @@ class AuditHtmlExporter:
         os.makedirs(output_dir, exist_ok=True)
         ts = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
         filename = f"illumio_audit_report_{ts}.html"
-        filepath = os.path.join(output_dir, filename)
-        with open(filepath, "w", encoding="utf-8") as f:
-            f.write(self._build())
+        # 先把文件建置完成再碰檔案系統：舊寫法是 open(...,'w') 之後才呼叫
+        # _build()，建置中途拋錯就留下 0-byte 報表（GUI 照樣列出並可下載）。
+        # 再以 O_EXCL 搶下唯一檔名（同分鐘併發產出會撞名）＋暫存檔 os.replace。
+        body = self._build()
+        filepath = reserve_unique_path(os.path.join(output_dir, filename))
+        try:
+            write_text_atomic(filepath, body)
+        except BaseException:
+            discard_reserved(filepath)
+            raise
         logger.info("[AuditHtmlExporter] Saved: {}", filepath)
         return filepath
 

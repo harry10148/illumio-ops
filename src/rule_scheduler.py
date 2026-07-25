@@ -6,8 +6,10 @@ import os
 import re
 import json
 import datetime
+import tempfile
 import threading
 from loguru import logger
+from src.file_lock import file_lock
 from src.utils import Colors
 from src.i18n import t
 from src.href_utils import extract_id  # canonical — also re-exported for rule_scheduler_cli.py
@@ -137,13 +139,19 @@ def truncate(text, width):
 # 改動 → save。
 #
 # 用 RLock：GUI 端有「持鎖後再呼叫下面 helper」的巢狀用法。
+#
+# 這把鎖只擋得住同一行程的 thread。真正的第三個寫入者是**獨立行程**的
+# src/rule_scheduler_cli.py（互動式選單，快照可留數分鐘）——它連 _rs_db_lock
+# 都拿不到。因此 ScheduleDB 自己再上一層跨行程檔案鎖（file_lock），且
+# put()/delete() 一律「鎖內重讀 → 只套用這一筆 → 寫回」，讓任何寫入者的
+# 過期快照都不可能整檔蓋掉別人的變更。
 _rs_db_lock = threading.RLock()
 
 
 def _rs_db_set_status(db, href, status):
     """pce_status 對帳寫回：鎖內 re-load 後只改該 entry 的 pce_status。
     條目已被併發刪除時直接略過——不得用過期快照把它復活。"""
-    with _rs_db_lock:
+    with _rs_db_lock, file_lock(db.lock_path):
         db.load()
         fresh = db.db.get(href)
         if fresh is not None and fresh.get('pce_status') != status:
@@ -152,14 +160,9 @@ def _rs_db_set_status(db, href, status):
 
 
 def _rs_db_delete(db, href):
-    """鎖內 re-load 後刪除單一條目，避免用過期快照整檔覆寫掉併發新增的排程。"""
-    with _rs_db_lock:
-        db.load()
-        if href in db.db:
-            del db.db[href]
-            db.save()
-            return True
-        return False
+    """鎖內 re-load 後刪除單一條目，避免用過期快照整檔覆寫掉併發新增的排程。
+    實作已下沉到 ScheduleDB.delete()（同時涵蓋 CLI 這個獨立行程的寫入者）。"""
+    return db.delete(href)
 
 
 class ScheduleDB:
@@ -168,18 +171,35 @@ class ScheduleDB:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.db = {}
+        # 跨行程鎖檔：GUI/排程器（同一行程）與 rule_scheduler_cli（另一行程）
+        # 都寫這個檔案，只靠 _rs_db_lock 擋不到後者。
+        self.lock_path = os.path.abspath(db_path) + ".lock"
 
     def load(self):
+        with file_lock(self.lock_path):
+            return self._load_unlocked()
+
+    def _load_unlocked(self):
         if not os.path.exists(self.db_path):
             self.db = {}
             return self.db
         try:
             with open(self.db_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
+                raw = f.read()
+        except OSError as e:
+            # 讀取失敗（EACCES / EMFILE / EIO …）不等於「內容壞掉」：位元組根本
+            # 沒被讀進來。若比照 parse 失敗把檔案 rename 走，之後每次 load 都會
+            # 走「檔案不存在 → {}」，所有排程永久消失（到期的 one_time 規則留在
+            # PCE 上 enabled、註記還掛著）。比照 ConfigManager._load_impl：
+            # fail closed，檔案原封不動。
+            logger.error(f"ScheduleDB read failed ({e}); file left untouched")
+            raise
+        try:
+            data = json.loads(raw)
             if not isinstance(data, dict):
                 raise ValueError(f"ScheduleDB root must be dict, got {type(data).__name__}")
             self.db = data
-        except (json.JSONDecodeError, ValueError, OSError) as e:
+        except (json.JSONDecodeError, ValueError) as e:
             import time as _time
             corrupt_path = f"{self.db_path}.corrupt.{int(_time.time())}"
             try:
@@ -192,20 +212,27 @@ class ScheduleDB:
         return self.db
 
     def save(self):
-        """Atomic write via tmp + os.replace. Failure raises — no fallback."""
-        tmp_path = self.db_path + ".tmp"
-        try:
-            with open(tmp_path, 'w', encoding='utf-8') as f:
-                json.dump(self.db, f, indent=4, ensure_ascii=False)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp_path, self.db_path)
-        except Exception:
+        """Atomic write via unique tmp + os.replace. Failure raises — no fallback."""
+        with file_lock(self.lock_path):
+            # mkstemp：固定的 "<db>.tmp" 是**共用檔名**，兩個行程同時存檔時後者
+            # 的 'w' 會截斷前者正在寫的同一個 inode，兩份輸出交錯後被 os.replace
+            # 裝進正式路徑，下次 load() 就把它當 corrupt 隔離掉（＝全部排程遺失）。
+            # 比照 config.py / state_store.py 改用每個寫入者專屬的暫存檔。
+            db_dir = os.path.dirname(os.path.abspath(self.db_path)) or "."
+            os.makedirs(db_dir, exist_ok=True)
+            fd, tmp_path = tempfile.mkstemp(dir=db_dir, suffix=".tmp")
             try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-            raise  # NO fallback — atomic failure must surface to caller
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    json.dump(self.db, f, indent=4, ensure_ascii=False)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp_path, self.db_path)
+            except Exception:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+                raise  # NO fallback — atomic failure must surface to caller
 
     def get_all(self):
         if not self.db:
@@ -216,16 +243,25 @@ class ScheduleDB:
         return self.get_all().get(href)
 
     def put(self, href, data):
-        self.get_all()[href] = data
-        self.save()
+        """單筆寫入：鎖內重讀磁碟後只套用這一筆。
+
+        呼叫端（GUI route、rule_scheduler_cli 互動式選單）手上的 self.db 可能是
+        數分鐘前的快照；直接整檔覆寫會刪掉這期間其他寫入者新增的排程。
+        """
+        with _rs_db_lock, file_lock(self.lock_path):
+            self._load_unlocked()
+            self.db[href] = data
+            self.save()
 
     def delete(self, href):
-        db = self.get_all()
-        if href in db:
-            del db[href]
-            self.save()
-            return True
-        return False
+        """單筆刪除：同 put()，鎖內重讀後只移除這一筆。"""
+        with _rs_db_lock, file_lock(self.lock_path):
+            self._load_unlocked()
+            if href in self.db:
+                del self.db[href]
+                self.save()
+                return True
+            return False
 
     def get_schedule_type(self, rs):
         """0=no schedule, 1=self (ruleset only), 2=child rule scheduled (takes display priority)"""

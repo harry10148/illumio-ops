@@ -186,3 +186,52 @@ def test_fetch_traffic_df_applies_filters_to_cache():
     df, src = gen._fetch_traffic_df(s, e, {"src_labels": ["app=Web"]}, use_cache=True)
     assert src == "cache"
     assert df["src_app"].tolist() == ["Web"]  # ERP row filtered out post-read
+
+
+def test_read_flows_df_reads_the_window_in_one_statement(tmp_path):
+    """視窗必須以單一 SELECT 讀完（2026-07-25 審查 Low）。
+
+    pysqlite 不為 SELECT 開讀交易，拆成 report_json IS NOT NULL / IS NULL 兩次
+    查詢時兩者看到不同快照：ingest 在中間把某列的 report_json 由 NULL 改成非
+    NULL，該列兩邊都落空（漏算）；反向（flatten 失敗寫回 None）則被算兩次。
+    以「對來源表只發一次 SELECT」釘住這個不變量。
+    """
+    from sqlalchemy import create_engine, event
+    from sqlalchemy.orm import sessionmaker
+    from src.pce_cache.schema import init_schema
+    from src.pce_cache.models import PceTrafficFlowRaw
+    from src.pce_cache.reader import CacheReader
+
+    eng = create_engine(f"sqlite:///{tmp_path/'c.sqlite'}")
+    init_schema(eng); sf = sessionmaker(eng)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    f1 = _flow("DB", "DB", 3306, "allowed")
+    f2 = _flow("Web", "DB", 443, "allowed")
+    with sf.begin() as s:
+        s.add(PceTrafficFlowRaw(
+            flow_hash="s1", first_detected=now, last_detected=now,
+            src_ip="10.0.0.1", dst_ip="10.0.0.2", port=3306, protocol="TCP",
+            action="allowed", flow_count=1, bytes_in=0, bytes_out=0,
+            raw_json=orjson.dumps(f1).decode(),
+            report_json=orjson.dumps(flatten_flow_record(f1)).decode(), ingested_at=now))
+        s.add(PceTrafficFlowRaw(
+            flow_hash="s2", first_detected=now, last_detected=now,
+            src_ip="10.0.0.1", dst_ip="10.0.0.2", port=443, protocol="TCP",
+            action="allowed", flow_count=1, bytes_in=0, bytes_out=0,
+            raw_json=orjson.dumps(f2).decode(), report_json=None, ingested_at=now))
+
+    selects = []
+
+    @event.listens_for(eng, "before_cursor_execute")
+    def _record(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT") and \
+                "pce_traffic_flows_raw" in statement:
+            selects.append(statement)
+
+    rd = CacheReader(sf, 30, 30)
+    start = now - datetime.timedelta(hours=1); end = now + datetime.timedelta(hours=1)
+    df = rd.read_flows_df(start, end)
+    assert len(df) == 2
+    # _guard_window 的 COUNT 亦計入，故以「非 COUNT 的資料 SELECT 恰一次」判定
+    data_selects = [s for s in selects if "count(" not in s.lower()]
+    assert len(data_selects) == 1, f"視窗被拆成 {len(data_selects)} 次 SELECT: {data_selects}"

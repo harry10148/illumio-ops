@@ -7,6 +7,12 @@ of scope for v1). Diff semantics are "DRAFT relative to ACTIVE":
   - added    = id present only in draft (will be created on provision)
   - removed  = id present only in active (will be deleted on provision)
   - modified = id in both, but a whitelisted field differs
+
+Rule collections: allow rules live in rs["sec_rules"] / rs["rules"] (two API
+shapes for the same collection), deny rules in the separate rs["deny_rules"]
+(override=true 為 Override Deny，優先於所有 allow 規則)。三者都必須 diff——
+只讀 rules 會讓 Deny / Override Deny 的新增、刪除、修改在報表上完全消失。
+規則以「集合/id」為鍵（sec_rules/3 與 deny_rules/3 是不同規則，不可對齊）。
 """
 from __future__ import annotations
 
@@ -61,17 +67,53 @@ def _summarize_actors(items: list, names: dict[str, str] | None = None) -> str:
     return ", ".join(sorted(tokens))
 
 
+_ALLOW_KEYS = ("sec_rules", "rules")
+
+
+def _iter_rules(rs: dict):
+    """Yield (rule, rule_type) for every rule of a ruleset, allow and deny.
+
+    sec_rules / rules 是同一集合的兩種 API 形狀，同時出現時以 href 去重，
+    避免 rule_count 重複計數。
+    """
+    seen_hrefs: set[str] = set()
+
+    def _emit(rule, rule_type):
+        if not isinstance(rule, dict):
+            return None
+        href = str(rule.get("href") or "")
+        if href:
+            if href in seen_hrefs:
+                return None
+            seen_hrefs.add(href)
+        return rule, rule_type
+
+    for key in _ALLOW_KEYS:
+        for rule in rs.get(key) or []:
+            item = _emit(rule, "Allow")
+            if item:
+                yield item
+    for rule in rs.get("deny_rules") or []:
+        if not isinstance(rule, dict):
+            continue
+        item = _emit(rule, "Override Deny" if rule.get("override") else "Deny")
+        if item:
+            yield item
+
+
 def _ruleset_fields(rs: dict) -> dict:
     return {
         "name": str(rs.get("name", "")),
         "enabled": str(rs.get("enabled", True)),
         "description": str(rs.get("description", "") or ""),
-        "rule_count": str(len(rs.get("rules", []) or [])),
+        "rule_count": str(sum(1 for _ in _iter_rules(rs))),
     }
 
 
-def _rule_fields(rule: dict, names: dict[str, str] | None = None) -> dict:
+def _rule_fields(rule: dict, rule_type: str = "Allow",
+                 names: dict[str, str] | None = None) -> dict:
     return {
+        "rule_type": rule_type,
         "enabled": str(rule.get("enabled", True)),
         "providers": _summarize_actors(rule.get("providers", []) or [], names=names),
         "consumers": _summarize_actors(rule.get("consumers", []) or [], names=names),
@@ -83,11 +125,25 @@ def _index_by_id(rulesets: list) -> dict:
     return {_id_from_href(rs.get("href", "")): rs for rs in (rulesets or []) if rs.get("href")}
 
 
+def _rule_key(rule: dict, rule_type: str) -> str:
+    """Collection-namespaced rule id, e.g. ``sec_rules/3`` / ``deny_rules/3``.
+
+    兩個集合的 id 各自編號，不加命名空間會把不同規則誤判為同一條。
+    """
+    href = str(rule.get("href") or "").rstrip("/")
+    parts = href.split("/")
+    if len(parts) >= 2 and parts[-2]:
+        return f"{parts[-2]}/{parts[-1]}"
+    collection = "sec_rules" if rule_type == "Allow" else "deny_rules"
+    return f"{collection}/{_id_from_href(href)}"
+
+
 def _index_rules(rs: dict) -> dict:
+    """key -> (rule, rule_type)，key 為 collection-namespaced id。"""
     out = {}
-    for rule in rs.get("rules", []) or []:
+    for rule, rule_type in _iter_rules(rs):
         if rule.get("href"):
-            out[_id_from_href(rule["href"])] = rule
+            out[_rule_key(rule, rule_type)] = (rule, rule_type)
     return out
 
 
@@ -141,15 +197,15 @@ def diff_rulesets(draft: list[dict], active: list[dict],
             s["rules_added"] += 1
             rule_rows.append({"change_type": "added", "ruleset_name": rs_name,
                               "rule_id": rid, "field": "*",
-                              "draft_value": "rule", "active_value": "", **_blank()})
+                              "draft_value": d_rules[rid][1], "active_value": "", **_blank()})
         for rid in a_rules.keys() - d_rules.keys():
             s["rules_removed"] += 1
             rule_rows.append({"change_type": "removed", "ruleset_name": rs_name,
                               "rule_id": rid, "field": "*",
-                              "draft_value": "", "active_value": "rule", **_blank()})
+                              "draft_value": "", "active_value": a_rules[rid][1], **_blank()})
         for rid in d_rules.keys() & a_rules.keys():
-            df_r, af_r = (_rule_fields(d_rules[rid], names=names),
-                          _rule_fields(a_rules[rid], names=names))
+            df_r, af_r = (_rule_fields(d_rules[rid][0], d_rules[rid][1], names=names),
+                          _rule_fields(a_rules[rid][0], a_rules[rid][1], names=names))
             rule_modified = False
             for field in df_r:
                 if df_r[field] != af_r[field]:

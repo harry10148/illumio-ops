@@ -4614,5 +4614,21 @@
   "event_label_system_task_event_pruning_completed": "System Task Event Pruning Completed",
   "event_label_system_task_hard_limit_recovery_completed": "System Task Hard Limit Recovery Completed",
   "event_desc_system_task_event_pruning_completed": "Routine pruning of old records from the event database completed.",
-  "event_desc_system_task_hard_limit_recovery_completed": "Recovery completed after the event database reached its hard storage limit."
+  "event_desc_system_task_hard_limit_recovery_completed": "Recovery completed after the event database reached its hard storage limit.",
+  "alert_window_truncation_rule": "Traffic window truncation",
+  "alert_window_truncation_details": "The cached traffic window query for {since} to {until} returned {raw} rows and hit the {cap}-row cap; the OLDEST in-window flows were dropped. Threshold sums for traffic/bandwidth/volume rules undercount for this window, so an alert may have been missed. Consider shortening threshold_window or narrowing the rules' filters.",
+  "cli_analysis_in_progress": "Another analysis cycle is already running (the monitoring service or the Web GUI). Try again in a moment.",
+  "gui_err_analysis_in_progress": "Another analysis cycle is already running. Try again in a moment.",
+  "rpt_module_errors_warning": "Some analysis modules failed to run; the figures in the affected sections are incomplete and must not be read as zero. Failed modules:",
+  "rpt_factor_none": "None",
+  "rpt_qact_none": "No blocking factor: every readiness factor scores 100% — this app (env) is ready to advance to full enforcement.",
+  "rpt_email_body_too_large": "The report is too large to include in the message body (over {limit_mb} MB). Open the attached or generated report file for the full content.",
+  "rpt_rule_ENG01_desc": "{n_failed} security rule(s) failed to evaluate and their findings are missing from this report: {failed_rules}. Treat the findings list as INCOMPLETE — the absence of a finding here is not evidence that the estate is clean.",
+  "rule_eng01_rec": "Re-run the report and check the run log for the per-rule error detail. Fix the input data (or report the bug) before using this report as evidence of exposure coverage.",
+  "rpt_rule_B001_risk_unknown_decision": "Policy decision is inconclusive for these flows ({n_allowed} allowed, {n_pb} test-mode, the rest unknown) — {n_cross_subnet} of {n_total} cross subnet boundaries, {n_same_subnet} stay within the same /24. Unknown decisions mean the PCE did not evaluate policy for this data, so exposure cannot be ruled out.",
+  "rule_b001_rec_unknown_decision": "Re-run the report against live PCE traffic (or a source that carries policy decisions) before drawing conclusions — unknown decisions usually come from snapshot/idle-mode data, a CSV export without a policy_decision column, or unmanaged endpoints. Then verify whether {named_ports} should cross subnet boundaries at all, and scope allow rules to authorised admin sources.",
+  "rpt_pu_unused_indeterminate_note": "{n} rule(s) in this table are marked Query Failed / Query Pending: their traffic query did not complete, so their usage is unknown — do not decommission them based on this table.",
+  "rs_sch_pce_unreachable": "Cannot verify provisioning state: the PCE did not respond (check connectivity and credentials).",
+  "rpt_pu_draft_pd_failed": "The draft policy-decision check could not be completed: the traffic query failed, so this section is not a clean result. Re-run the report before acting on it.",
+  "rpt_pu_overview_indeterminate": "{n} rule(s) could not be evaluated because their traffic query failed or never completed. They are counted separately and are NOT included in the unused total — do not decommission them based on this report."
 }

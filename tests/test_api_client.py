@@ -214,7 +214,7 @@ class TestApiClientNativeTrafficBuilder(unittest.TestCase):
         self.assertEqual(summary["flows_by_port"]["443/tcp"], 2)
         self.assertEqual(summary["flows_by_port"]["53/udp"], 1)
 
-        with open(self.client._state_file, "r", encoding="utf-8") as fh:
+        with open(self.client._jobs._async_state_file(), "r", encoding="utf-8") as fh:
             state = json.load(fh)
         job_state = state["async_query_jobs"]["/orgs/1/traffic_flows/async_queries/99"]
         self.assertEqual(job_state["flow_count"], 3)
@@ -234,7 +234,7 @@ class TestApiClientNativeTrafficBuilder(unittest.TestCase):
         job_href = self.client.submit_async_query(payload)
 
         self.assertEqual(job_href, "/orgs/1/traffic_flows/async_queries/123")
-        with open(self.client._state_file, "r", encoding="utf-8") as fh:
+        with open(self.client._jobs._async_state_file(), "r", encoding="utf-8") as fh:
             state = json.load(fh)
         job_state = state["async_query_jobs"][job_href]
         self.assertEqual(job_state["query_type"], "rule_usage")
@@ -295,7 +295,7 @@ class TestApiClientNativeTrafficBuilder(unittest.TestCase):
         self.assertEqual(stats["reused_rule_details"][0]["status"], "reused")
         self.assertEqual(stats["pending_rule_details"], [])
         self.assertEqual(stats["failed_rule_details"], [])
-        with open(self.client._state_file, "r", encoding="utf-8") as fh:
+        with open(self.client._jobs._async_state_file(), "r", encoding="utf-8") as fh:
             state = json.load(fh)
         self.assertIn("reused_at", state["async_query_jobs"][job_href])
 

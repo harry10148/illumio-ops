@@ -12,6 +12,36 @@ import json
 import time
 from loguru import logger
 
+# 剛成功全量刷新過就不必再為 lookup miss 強制重抓一次四集合：第二次抓到的是
+# 同一份資料，註定再 miss（negative lookup 的 tight refetch loop）。窗口與下方
+# 失敗退避同為 30s。
+_LOOKUP_MIN_REFRESH_INTERVAL_SECONDS = 30
+
+# 物件 filter 無法展開成任何 IP 時放進展開結果的哨兵值（見
+# expand_object_filters_for_df）。df_filter 的 _ip_mask 對不含 '/'、'-' 的值走
+# 完全相等比較，任何 IP 都不會等於它：include 側 mask 全 False（fail-closed，
+# 不會靜默放行整批流量），exclude 側 ~False 全 True（不排除任何列，對齊
+# traffic_query residual 比對的排除語意）。
+UNRESOLVED_OBJECT_CIDR = "__unresolved_object_filter__"
+# 服務條目版本的哨兵：_port_entries_mask 對既無 port 也無 proto 的條目直接
+# continue（不命中），語意與上面的 CIDR 哨兵一致。
+UNRESOLVED_SERVICE_ENTRY = {"unresolved_service_filter": True}
+
+# protocol number → 顯示名。未知編號回 str(proto)，不可把非 UDP 一律當 TCP
+# （ICMP=1/ICMPv6=58 會被標成 TCP，操作者在規則清單看到錯誤協定）。
+_PROTO_NAMES = {6: "TCP", 17: "UDP", 1: "ICMP", 58: "ICMPv6", 47: "GRE", 50: "ESP", -1: "ANY"}
+
+
+def _proto_name(proto):
+    """protocol number → 顯示名。缺值回 "TCP"（PCE service_ports 省略 proto
+    時的既有預設），未知編號回 str(proto)。"""
+    if proto is None or proto == "":
+        return "TCP"
+    try:
+        return _PROTO_NAMES.get(int(proto), str(proto))
+    except (TypeError, ValueError):
+        return str(proto)
+
 
 def _readable_ref(actor: dict) -> str:
     """未知 actor 形狀的可讀 fallback：型別:href 尾段，絕不印 raw dict（spec F1）。"""
@@ -36,16 +66,24 @@ class LabelResolver:
 
     @staticmethod
     def _normalize_label_filter(label_str):
-        """Normalize a label filter string to `key:value`, or return empty string."""
+        """Normalize a label filter string to `key:value`, or return empty string.
+
+        分隔符取「先出現者」而非固定先試 ':'：GUI filter bar 送的是
+        `key=value`，若值本身含 ':'（例如 Loc=TW:TPE），先試 ':' 會切出
+        key='Loc=TW'，永遠對不上快取鍵、又在 client-side fallback 重犯同樣的
+        切法，結果是報表靜默空集合。此處與 df_filter._label_mask.split_spec
+        的 min-index 慣例一致。
+        """
         if not label_str:
             return ""
-        for sep in (":", "="):
-            if sep in str(label_str):
-                key, value = str(label_str).split(sep, 1)
-                key = key.strip()
-                value = value.strip()
-                if key and value:
-                    return f"{key}:{value}"
+        text = str(label_str)
+        idx = min((i for i in (text.find(":"), text.find("=")) if i != -1), default=-1)
+        if idx == -1:
+            return ""
+        key = text[:idx].strip()
+        value = text[idx + 1:].strip()
+        if key and value:
+            return f"{key}:{value}"
         return ""
 
     @staticmethod
@@ -195,13 +233,19 @@ class LabelResolver:
         # ready 以「成功刷新過的時間戳」判定，不看個別 cache 的 truthiness——
         # 空集合（org 沒有 label group / IP list）是合法快取狀態，用 truthiness
         # 會讓每次 resolver 呼叫都退化成四集合全量重抓。
-        cache_ready = bool(getattr(c, "_query_lookup_cache_refreshed_at", 0.0))
+        refreshed_at = getattr(c, "_query_lookup_cache_refreshed_at", 0.0) or 0.0
+        cache_ready = bool(refreshed_at)
         if cache_ready and not force_refresh and not self._query_lookup_cache_is_stale():
+            return
+        now = time.time()
+        # negative lookup 退避：resolver 查無時會帶 force_refresh=True 再抓一次，
+        # 但剛全量刷新成功過的話那次重抓拿到的是同一份資料、註定再 miss——
+        # 每個查不到的 filter 值都會白打四個集合 GET（一次查詢可累積數十個）。
+        if force_refresh and refreshed_at and (now - refreshed_at) < _LOOKUP_MIN_REFRESH_INTERVAL_SECONDS:
             return
         # 失敗退避：update_label_cache 回 False（PCE 抓取失敗）後短時間內不再
         # 重打全量抓取，避免同一請求內每個 resolver miss 都觸發一次註定失敗
         # 的四集合 fetch（tight refetch loop）。
-        now = time.time()
         failed_at = getattr(self, "_lookup_refresh_failed_at", 0.0)
         if failed_at and (now - failed_at) < 30:
             return
@@ -295,7 +339,7 @@ class LabelResolver:
                 for svc in i.get('service_ports', []):
                     p = svc.get('port')
                     if p:
-                        proto = "UDP" if svc.get('proto') == 17 else "TCP"
+                        proto = _proto_name(svc.get('proto'))
                         top = f"-{svc['to_port']}" if svc.get('to_port') else ""
                         ports.append(f"{proto}/{p}{top}")
                 port_str = f" ({','.join(ports)})" if ports else ""
@@ -345,6 +389,10 @@ class LabelResolver:
             c.label_cache.clear()
             c._label_href_cache.clear()
             c._label_group_href_cache.clear()
+            # 一併歸零刷新時間戳，否則 negative-lookup 退避
+            # （_ensure_query_lookup_cache）會在 30 秒內擋掉重新填充，
+            # 與本方法「下次查詢必須打 PCE」的契約相牴觸。
+            c._query_lookup_cache_refreshed_at = 0.0
         logger.debug("Label caches cleared (invalidate_labels)")
 
     # ── Actor / filter resolution ─────────────────────────────────────────
@@ -577,7 +625,7 @@ class LabelResolver:
         svcs = []
         for s in services:
             if 'port' in s:
-                p, proto = s.get('port'), "UDP" if s.get('proto') == 17 else "TCP"
+                p, proto = s.get('port'), _proto_name(s.get('proto'))
                 top = f"-{s['to_port']}" if s.get('to_port') else ""
                 svcs.append(f"{proto}/{p}{top}")
             elif 'href' in s:
@@ -718,7 +766,20 @@ class LabelResolver:
                 for v in vals:
                     if not v:
                         continue
-                    cidrs.extend(_iplist_cidrs(v) if "iplist" in k else _workload_ips(v))
+                    expanded = _iplist_cidrs(v) if "iplist" in k else _workload_ips(v)
+                    if expanded:
+                        cidrs.extend(expanded)
+                    else:
+                        # 展開不出任何 IP 的物件條件不得靜默消失。df_filter 只讀
+                        # out[dest]，原始 key（src_iplist 等）在 cache df 路徑沒有
+                        # 任何消費端——不放哨兵就等於整個條件被拿掉，報表變成
+                        # 「完全未過濾」卻仍掛著該物件的標題（fail-open，
+                        # over-inclusive）。哨兵讓 include 側比對不到任何列
+                        # （fail-closed），exclude 側則維持不排除。
+                        logger.warning(
+                            "Object filter {}={} expanded to no IP/CIDR; applying "
+                            "fail-closed sentinel on the cache DataFrame path", k, v)
+                        cidrs.append(UNRESOLVED_OBJECT_CIDR)
             if cidrs:
                 out[dest] = cidrs
 
@@ -729,12 +790,21 @@ class LabelResolver:
             vals = vals if isinstance(vals, list) else [vals]
             entries = []
             for href in vals:
+                usable = 0
                 for e in (self.resolve_service_entries(href) or []):
                     if "port" in e or "proto" in e or e.get("wildcard"):
                         entries.append(e)
+                        usable += 1
                     else:
                         logger.warning(
                             "Cache path cannot match name-based service entry {}; skipped", e)
+                if not usable:
+                    # 同上：service 條件展不出任何可比對條目時 fail-closed，
+                    # 不可讓整個 services 限制無聲消失。
+                    logger.warning(
+                        "Service filter {}={} expanded to no matchable port entry; "
+                        "applying fail-closed sentinel on the cache DataFrame path", key, href)
+                    entries.append(dict(UNRESOLVED_SERVICE_ENTRY))
             if entries:
                 out[internal] = entries
         return out

@@ -9,8 +9,16 @@ from __future__ import annotations
 
 from typing import Any
 
+from loguru import logger
+
 from src.report.analysis.policy_resolver import resolve_ruleset
 from src.report.exporters.policy_resolver_exporter import PolicyResolverExporter
+
+# 每條規則已有 _MAX_RULE_PAIRS 上限（見 analysis/policy_resolver.py），但跨 ruleset
+# 的總列數仍無上限：幾百個 ruleset 各自貼著上限，就會把整個展開結果拉進記憶體再
+# 寫成一份沒人能開的 JSON/CSV。這裡加總量上限，並沿用同一套揭露方式——被砍掉的
+# 部分一定會在輸出裡寫明，不做靜默截斷。
+_MAX_TOTAL_ROWS = 500_000
 
 
 def build_workload_to_ips(workloads: list[dict]) -> dict[str, list[str]]:
@@ -114,6 +122,28 @@ def build_service_to_names(services: list[dict]) -> dict[str, str]:
     return out
 
 
+def _cap_notice_row(ruleset_name: str, omitted: int) -> dict:
+    """Sentinel row stating the total-row cap dropped `omitted` rows.
+
+    刻意不是合法 IP／port，下游（第三方防火牆匯入）不會把它誤當成可套用的規則，
+    但讀者在 JSON／CSV 裡一定看得到這一列。
+    """
+    token = f"<report row cap {_MAX_TOTAL_ROWS} reached: {omitted} rows omitted>"
+    return {
+        "ruleset_name": ruleset_name,
+        "rule_href": "",
+        "action": "",
+        "src_ip": token,
+        "dst_ip": token,
+        "port": "",
+        "protocol": "",
+        "src_kind": "",
+        "dst_kind": "",
+        "service_name": "",
+        "truncated": "total_row_cap",
+    }
+
+
 class PolicyResolverReport:
     def __init__(self, cm, api_client=None, config_dir: str = "config",
                  cache_reader=None):
@@ -146,11 +176,33 @@ class PolicyResolverReport:
 
         per_ruleset: dict[str, list[dict]] = {}
         total = 0
+        rows_omitted = 0
+        truncated_rulesets: list[str] = []
         for rs in rulesets:
+            name = rs.get("name", rs.get("href", "ruleset"))
             rows = resolve_ruleset(rs, **lookups)
-            per_ruleset[rs.get("name", rs.get("href", "ruleset"))] = rows
-            total += len(rows)
-        return {"rulesets": per_ruleset, "record_count": total}
+            remaining = max(_MAX_TOTAL_ROWS - total, 0)
+            kept = rows[:remaining]
+            total += len(kept)
+            if len(kept) < len(rows):
+                omitted = len(rows) - len(kept)
+                rows_omitted += omitted
+                truncated_rulesets.append(name)
+                kept = kept + [_cap_notice_row(name, omitted)]
+            per_ruleset[name] = kept
+
+        result: dict[str, Any] = {"rulesets": per_ruleset, "record_count": total}
+        if rows_omitted:
+            # 揭露欄位跟著結果一起進 JSON；CSV 端則靠上面每個 ruleset 尾端的
+            # notice row，兩種輸出都不會讓截斷變成看不見的事。
+            result["truncated"] = True
+            result["row_cap"] = _MAX_TOTAL_ROWS
+            result["rows_omitted"] = rows_omitted
+            result["truncated_rulesets"] = truncated_rulesets
+            logger.warning(
+                "Policy Resolver hit the {} row cap: {} rows omitted across {} ruleset(s)",
+                _MAX_TOTAL_ROWS, rows_omitted, len(truncated_rulesets))
+        return result
 
     def run(self, output_dir: str = "reports", lang: str = "en",
             fmt: str = "all") -> list[str]:

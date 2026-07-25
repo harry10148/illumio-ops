@@ -201,8 +201,30 @@ def test_system_health_rule_uses_dedicated_endpoint(client):
     assert system_rule["throttle"] == "1/30m"
 
 
-def test_report_endpoint_rejects_path_traversal_format(client):
-    """Security: report format field must be allowlisted, not passed through raw."""
+def test_report_endpoint_rejects_path_traversal_format(client, monkeypatch):
+    """Security: report format field must be allowlisted, not passed through raw.
+
+    Asserts the normalized value handed to the worker, not the status code:
+    /api/reports/generate validates synchronously but always answers 200 once a
+    job is created, so a status-code assertion stays green even if the
+    allowlist at src/gui/routes/reports.py is deleted.
+    """
+    import types
+    from src.gui.routes import reports as reports_mod
+
+    captured = {}
+
+    class _FakeThread:
+        def __init__(self, target=None, args=(), kwargs=None, daemon=None):
+            captured['args'] = args
+
+        def start(self):
+            pass  # never run the real report worker from a test
+
+    monkeypatch.setattr(
+        reports_mod, 'threading', types.SimpleNamespace(Thread=_FakeThread)
+    )
+
     # Log in first
     login_resp = client.post(
         '/api/login',
@@ -218,10 +240,25 @@ def test_report_endpoint_rejects_path_traversal_format(client):
         headers={'X-CSRF-Token': csrf},
         environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
     )
-    # Must not be 500 — either 200 (silent fallback to 'all') or 400 (explicit reject)
-    assert resp.status_code in (200, 400, 422), (
-        f"Path-traversal format should be allowlisted; got {resp.status_code}"
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert resp.get_json().get("ok") is True
+    payload = captured['args'][1]
+    assert payload['fmt'] == 'all', (
+        "format outside the allowlist must be normalized to 'all', "
+        f"got {payload['fmt']!r}"
     )
+
+    # …and an allowlisted value must survive, so the test cannot be satisfied
+    # by hardcoding 'all'.
+    captured.clear()
+    resp = client.post(
+        '/api/reports/generate',
+        json={'format': 'csv', 'source': 'api'},
+        headers={'X-CSRF-Token': csrf},
+        environ_overrides={'REMOTE_ADDR': '127.0.0.1'},
+    )
+    assert resp.status_code == 200, resp.get_data(as_text=True)
+    assert captured['args'][1]['fmt'] == 'csv'
 
 
 def test_top10_reports_truncation_flag(app_persistent, monkeypatch):

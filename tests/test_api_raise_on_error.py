@@ -159,13 +159,17 @@ class TestIplistCidrsFetchFailure(unittest.TestCase):
             self.client.expand_object_filters_for_df({"src_iplist": "prod-subnets"})
         self.client.get_ip_lists.assert_called_once_with(raise_on_error=True)
 
-    def test_iplist_cidrs_name_mismatch_returns_empty(self):
+    def test_iplist_cidrs_name_mismatch_is_fail_closed(self):
+        """fetch 成功但查無此名＝合法的「查無」，不 raise；但條件不得消失，
+        改放 fail-closed 哨兵（2026-07-25 審查 High：靜默丟掉條件會讓報表
+        掛著物件標題卻輸出全部流量）。"""
+        from src.api.labels import UNRESOLVED_OBJECT_CIDR
         self.client.get_ip_lists = MagicMock(return_value=[
             {"name": "prod-subnets", "href": "/orgs/1/sec_policy/active/ip_lists/7",
              "ip_ranges": [{"from_ip": "10.10.0.0/16"}]},
         ])
         out = self.client.expand_object_filters_for_df({"src_iplist": "nosuch"})
-        self.assertNotIn("_src_object_cidrs", out)
+        self.assertEqual(out["_src_object_cidrs"], [UNRESOLVED_OBJECT_CIDR])
 
 
 def test_iplist_cidrs_name_mismatch_logs_warning(caplog):

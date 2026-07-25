@@ -385,3 +385,97 @@ def test_ingest_bisect_depth_bounded(session_factory):
     ing.run_once()  # 不應 RecursionError / 無限迴圈
     # 深度 6 的完整二元樹：1 + 2 + ... + 64 = 127 次呼叫為上限
     assert fake.calls <= 127
+
+
+class NestedLongLivedApi:
+    """真實 PCE async query 形狀（巢狀 timestamp_range / dst_tb*）的長壽 flow：
+    每次輪詢回同一筆（first_detected 相同 → flow_hash 相同），但 last_detected
+    往後、位元組往上長。第 3 次刻意回一份「較舊」的快照（亂序重拉）。"""
+
+    _FIRST = "2026-05-01T12:00:00.000Z"
+    _SNAPSHOTS = [
+        ("2026-05-01T12:01:00.000Z", 1000, 2000, 1),
+        ("2026-05-01T12:06:00.000Z", 5000, 6000, 5),
+        ("2026-05-01T12:02:00.000Z", 10, 20, 1),      # 亂序：較舊的快照
+    ]
+
+    def __init__(self):
+        self.calls = 0
+
+    def get_traffic_flows_async(self, max_results=200000, rate_limit=False, **kw):
+        last, tbi, tbo, num = self._SNAPSHOTS[min(self.calls, len(self._SNAPSHOTS) - 1)]
+        self.calls += 1
+        return [{
+            "src": {"ip": "10.0.0.1"}, "dst": {"ip": "10.0.0.2"},
+            "service": {"port": 443, "proto": 6},
+            "policy_decision": "blocked",
+            "timestamp_range": {"first_detected": self._FIRST, "last_detected": last},
+            "dst_tbi": tbi, "dst_tbo": tbo, "num_connections": num,
+        }]
+
+
+def _window_payload(session_factory, since):
+    from src.pce_cache.subscriber import CacheSubscriber
+    sub = CacheSubscriber(session_factory, consumer="analyzer",
+                          source_table="pce_traffic_flows_raw")
+    rows = sub.fetch_window_rows(since)
+    assert len(rows) == 1
+    return rows[0]
+
+
+def test_repulled_flow_refreshes_cached_payload(session_factory):
+    """R1 gate：re-pull 必須連 raw_json 一起刷新。
+
+    Analyzer 只看得到 _row_to_dict 解出的 payload：視窗過濾讀
+    timestamp_range.last_detected、bandwidth/volume 讀 dst_tb*。欄位刷新但
+    payload 凍在初見值時，SQL 用新的 last_detected 選出這列、Analyzer 卻用舊
+    時戳判定「不在視窗內」而丟掉——長壽 flow 在每個視窗被靜默漏掉。"""
+    from src.analyzer import calculate_volume_mb
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    ing = TrafficIngestor(api=NestedLongLivedApi(), session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory))
+    ing.run_once()
+    ing.run_once()
+
+    # 視窗起點落在兩次 last_detected 之間：SQL 選得到（欄位已刷新），
+    # payload 也必須說得出同一個新時戳，否則規則引擎會 fail-closed 丟掉。
+    since = datetime(2026, 5, 1, 12, 3, 0, tzinfo=timezone.utc)
+    payload = _window_payload(session_factory, since)
+    assert payload["timestamp_range"]["last_detected"] == "2026-05-01T12:06:00.000Z"
+    assert calculate_volume_mb(payload)[0] == pytest.approx(11000 / 1024 / 1024)
+    assert payload["num_connections"] == 5
+
+    with session_factory() as s:
+        row = s.execute(select(PceTrafficFlowRaw)).scalar_one()
+    # payload 與權威欄位不得互相打架（同一次判斷的兩邊資料來源）
+    assert row.last_detected.replace(tzinfo=timezone.utc) == \
+        datetime(2026, 5, 1, 12, 6, 0, tzinfo=timezone.utc)
+
+
+def test_out_of_order_repull_does_not_roll_back_payload(session_factory):
+    """亂序重拉（較舊的快照）不得把新 payload 蓋回舊的——欄位是 GREATEST，
+    raw_json/report_json 則取 last_detected 較新的那一側。"""
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+    from src.pce_cache.watermark import WatermarkStore
+
+    ing = TrafficIngestor(api=NestedLongLivedApi(), session_factory=session_factory,
+                          watermark=WatermarkStore(session_factory))
+    ing.run_once()
+    ing.run_once()
+    ing.run_once()   # 第 3 次回較舊的快照
+
+    since = datetime(2026, 5, 1, 12, 3, 0, tzinfo=timezone.utc)
+    payload = _window_payload(session_factory, since)
+    assert payload["timestamp_range"]["last_detected"] == "2026-05-01T12:06:00.000Z"
+    assert payload["dst_tbi"] == 5000 and payload["dst_tbo"] == 6000
+
+
+def test_volatile_tuple_excludes_json_blobs():
+    """_VOLATILE 的每一欄都會被包進 func.max()——JSON 文字做 MAX 是字典序
+    比大小（會挑錯邊）。raw_json/report_json 必須走 CASE，不得列在這裡。"""
+    from src.pce_cache.ingestor_traffic import TrafficIngestor
+
+    assert "raw_json" not in TrafficIngestor._VOLATILE
+    assert "report_json" not in TrafficIngestor._VOLATILE

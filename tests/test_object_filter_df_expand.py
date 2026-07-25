@@ -45,9 +45,11 @@ class TestExpandObjectFiltersForDf(unittest.TestCase):
         assert "10.1.2.3" in out["_dst_object_cidrs"]
         assert "203.0.113.5" in out["_dst_object_cidrs"]
 
-    def test_unknown_iplist_yields_no_key(self):
+    def test_unknown_iplist_yields_fail_closed_sentinel(self):
+        """查無的 IP List 不得讓條件消失（舊行為：不產生 key ＝ 完全不過濾）。"""
+        from src.api.labels import UNRESOLVED_OBJECT_CIDR
         out = self.client.expand_object_filters_for_df({"src_iplist": "nosuch"})
-        assert "_src_object_cidrs" not in out
+        assert out["_src_object_cidrs"] == [UNRESOLVED_OBJECT_CIDR]
 
     def test_no_object_keys_passthrough(self):
         f = {"src_labels": ["app=erp"]}
@@ -126,14 +128,16 @@ class TestExpandObjectFiltersForDf(unittest.TestCase):
         out = self.client.expand_object_filters_for_df({"src_iplists": ["corp"]})
         assert sorted(out["_src_object_cidrs"]) == ["10.0.0.0/25"]
 
-    def test_iplist_exclusion_only_yields_empty(self):
-        """ip_ranges 只有 exclusion 條目 → 展開為空，key 不產生。"""
+    def test_iplist_exclusion_only_yields_fail_closed_sentinel(self):
+        """ip_ranges 只有 exclusion 條目 → 展開為空 → 放 fail-closed 哨兵，
+        不可讓條件靜默消失。"""
+        from src.api.labels import UNRESOLVED_OBJECT_CIDR
         self.client.get_ip_lists = MagicMock(return_value=[
             {"name": "excl-only", "href": "/orgs/1/sec_policy/active/ip_lists/2",
              "ip_ranges": [{"from_ip": "10.0.0.0/24", "exclusion": True}]},
         ])
         out = self.client.expand_object_filters_for_df({"src_iplists": ["excl-only"]})
-        assert "_src_object_cidrs" not in out
+        assert out["_src_object_cidrs"] == [UNRESOLVED_OBJECT_CIDR]
 
     def test_iplist_exclusion_range_form(self):
         """exclusion 用 from-to range 形也須正確扣除。"""

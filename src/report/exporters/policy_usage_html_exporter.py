@@ -9,6 +9,7 @@ import os
 
 import pandas as pd
 
+from ._output_paths import discard_reserved, reserve_unique_path, write_text_atomic
 from .report_css import TABLE_JS, build_css
 from .report_i18n import COL_I18N as _COL_I18N
 from .report_i18n import STRINGS
@@ -18,6 +19,7 @@ from .chart_renderer import render_matplotlib_svg
 from .code_highlighter import get_highlight_css
 from .html_exporter import render_section_guidance
 from src.i18n import t
+from src.report.analysis.policy_usage.pu_mod01_overview import build_summary_df
 from src.report.section_guidance import visible_in
 from src.humanize_ext import human_number
 from src.report.exporters._exec_summary import render_exec_summary_html
@@ -154,9 +156,16 @@ class PolicyUsageHtmlExporter:
         os.makedirs(output_dir, exist_ok=True)
         ts = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
         filename = f"illumio_policy_usage_report_{ts}.html"
-        filepath = os.path.join(output_dir, filename)
-        with open(filepath, "w", encoding="utf-8") as fh:
-            fh.write(self._build())
+        # 先把文件建置完成再碰檔案系統：舊寫法是 open(...,'w') 之後才呼叫
+        # _build()，建置中途拋錯就留下 0-byte 報表（GUI 照樣列出並可下載）。
+        # 再以 O_EXCL 搶下唯一檔名（同分鐘併發產出會撞名）＋暫存檔 os.replace。
+        body = self._build()
+        filepath = reserve_unique_path(os.path.join(output_dir, filename))
+        try:
+            write_text_atomic(filepath, body)
+        except BaseException:
+            discard_reserved(filepath)
+            raise
         logger.info("[PolicyUsageHtmlExporter] Saved: {}", filepath)
         return filepath
 
@@ -191,7 +200,9 @@ class PolicyUsageHtmlExporter:
             '</aside>'
         )
 
-        exec_html = render_exec_summary_html(mod00, report_name=t('gui_btn_pu_report', lang=self._lang), lang=self._lang)
+        exec_html = render_exec_summary_html(self._reconciled_mod00(mod00),
+                                             report_name=t('gui_btn_pu_report', lang=self._lang),
+                                             lang=self._lang)
         body = (
             exec_html
             + '<section id="summary" class="card report-hero">'
@@ -273,6 +284,39 @@ class PolicyUsageHtmlExporter:
             f"{content}</section>"
         )
 
+    def _unused_split(self) -> tuple[int, int]:
+        """Return (confirmed_unused, indeterminate) for this run.
+
+        查詢失敗／未完成的規則不是「未使用」。mod01 若是在沒有 execution_stats 的
+        情況下算出來的（舊呼叫形狀），這些規則還混在 unused_count 裡；此時改用
+        mod03 的分流數字，讓整份報表只有一種未使用口徑。
+        """
+        mod01 = self._r.get("mod01", {}) or {}
+        unused = int(mod01.get("unused_count", 0) or 0)
+        indeterminate = int(mod01.get("indeterminate_count") or 0)
+        if not indeterminate:
+            fallback = int((self._r.get("mod03", {}) or {}).get("indeterminate_count") or 0)
+            if fallback:
+                indeterminate = fallback
+                unused = max(unused - fallback, 0)
+        return unused, indeterminate
+
+    def _reconciled_mod00(self, mod00: dict) -> dict:
+        """mod00 的 Unused Rules KPI 若還含未判定規則，改成已確認未使用的數字。
+
+        同一頁不可出現兩個「未使用」數字：執行摘要的 KPI 與 overview 區塊必須一致。
+        """
+        unused, indeterminate = self._unused_split()
+        if not indeterminate or not mod00:
+            return mod00
+        kpis = mod00.get("kpis") or []
+        patched = [
+            dict(k, value=str(unused))
+            if k.get("label_key") == "rpt_pu_unused_rules" else k
+            for k in kpis
+        ]
+        return dict(mod00, kpis=patched)
+
     def _summary_pills(self, mod00: dict) -> str:
         _s = self._s
         # hit_rate_pct is produced by mod01 (overview), not mod00 (executive) —
@@ -299,6 +343,14 @@ class PolicyUsageHtmlExporter:
         _s = self._s
         m = self._r.get("mod05", {})
         intro = f'<p class="section-intro">{_s("rpt_pu_draft_pd_intro")}</p>'
+        if m.get("failed"):
+            # 查詢失敗和「真的沒有 draft 阻擋風險」同樣是「沒有結果」，但語意相反：
+            # 渲染成 empty 會讓操作者把一次失敗的檢查讀成乾淨的結果。
+            reason = str(m.get("reason") or "").strip()
+            warn = t("rpt_pu_draft_pd_failed", lang=self._lang)
+            if reason:
+                warn += f" ({_e(reason)})"
+            return intro + f'<p class="note note-warn">{warn}</p>'
         if m.get("skipped") or m.get("total", 0) == 0:
             return intro + f'<p class="note">{_s("rpt_pu_draft_pd_empty")}</p>'
 
@@ -428,9 +480,12 @@ class PolicyUsageHtmlExporter:
         mod01 = self._r.get("mod01", {})
         total = mod01.get("total_rules", 0)
         hit = mod01.get("hit_count", 0)
-        unused = mod01.get("unused_count", 0)
         rate = mod01.get("hit_rate_pct", 0.0)
         summary_df = mod01.get("summary_df")
+        unused, indeterminate = self._unused_split()
+        if indeterminate and not mod01.get("indeterminate_count"):
+            # mod01 的摘要表是用舊口徑建的，依對齊後的數字重建。
+            summary_df = build_summary_df(total, hit, unused, indeterminate)
         _s = self._s
 
         stats = (
@@ -441,6 +496,12 @@ class PolicyUsageHtmlExporter:
             f'{_s("rpt_pu_hit_rate")}: <strong>{rate}%</strong>'
             "</p>"
         )
+        if indeterminate:
+            stats += (
+                '<p class="note note-warn">'
+                + t("rpt_pu_overview_indeterminate", lang=self._lang, n=indeterminate)
+                + "</p>"
+            )
         chart_html = ""
         if hit + unused > 0:
             try:

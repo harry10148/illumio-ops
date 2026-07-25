@@ -90,6 +90,7 @@ def test_events_ingest_success_resets_consecutive_failures(tmp_path):
         wm.get.return_value = MagicMock(last_status="ok", last_error=None)
         with patch("src.pce_cache.ingestor_events.EventsIngestor") as mock_ing:
             mock_ing.return_value.run_once.return_value = 3
+            mock_ing.return_value.last_run_overflow = None
             run_events_ingest(cm)
 
     state = _load_state(tmp_path)
@@ -240,6 +241,7 @@ def test_partial_failure_across_jobs_does_not_falsely_trigger_watchdog(tmp_path)
             wm.get.return_value = MagicMock(last_status="ok", last_error=None)
             with patch("src.pce_cache.ingestor_events.EventsIngestor") as mock_ing:
                 mock_ing.return_value.run_once.return_value = 2
+                mock_ing.return_value.last_run_overflow = None
                 run_events_ingest(cm)
 
         state = _load_state(tmp_path)

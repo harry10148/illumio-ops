@@ -18,6 +18,11 @@ import os
 
 from src.i18n import t
 from src.report.app_summary_report import _safe_filename_token
+from src.report.exporters._output_paths import (
+    discard_reserved,
+    reserve_unique_path,
+    write_text_atomic,
+)
 from src.report.exporters.cover_page import build_cover_page as _build_cover_page
 from src.report.exporters.report_css import TABLE_JS, build_css
 from src.report.exporters.table_renderer import render_df_table
@@ -187,7 +192,13 @@ class AppSummaryHtmlExporter:
         html = self._render_html()
         ts = datetime.datetime.now().strftime("%Y-%m-%d_%H%M")
         token = _safe_filename_token(self._r.get("app", "app"))
-        path = os.path.join(output_dir, f"Illumio_App_Summary_{token}_{ts}.html")
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write(html)
+        # 以 O_EXCL 搶下唯一檔名（同分鐘、同 app 併發產出會撞名）＋暫存檔
+        # os.replace，避免兩張同型報表互相截斷、或半寫檔被 GUI 列出。
+        path = reserve_unique_path(
+            os.path.join(output_dir, f"Illumio_App_Summary_{token}_{ts}.html"))
+        try:
+            write_text_atomic(path, html)
+        except BaseException:
+            discard_reserved(path)
+            raise
         return path

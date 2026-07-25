@@ -156,3 +156,17 @@ def test_enforcement_blocking_full_mode_variant(monkeypatch, tmp_path):
     assert "full" in txt.lower()
     txt2 = gen._action_for_blocking("enforcement_mode", {"visibility_only": 2})
     assert "visibility" in txt2.lower() or "selective" in txt2.lower()
+
+
+def test_perfect_app_has_no_blocking_factor(monkeypatch, tmp_path):
+    """五個因素全 1.0 時，max() 的加權損失全為 0，會回傳插入順序的第一個
+    (policy_coverage)，讓滿分 app 頂在佇列第一列卻掛著「先補未涵蓋流量的允許
+    規則」。滿分列必須標成無阻塞因素。"""
+    gen = _gen(monkeypatch, _flows_df(), _workloads())
+    q = gen.generate_from_api(output_dir=str(tmp_path)).module_results["queue_df"]
+    row_a = q[q["app_env_key"] == "appa|prod"].iloc[0]
+    assert row_a["readiness_score"] == 100.0
+    assert row_a["blocking_factor_key"] == "none"
+    # 動作也不能再是 policy_coverage 的補規則建議
+    assert row_a["recommended_action"] != gen._action_for_blocking(
+        "policy_coverage", {})

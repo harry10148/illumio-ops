@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime
 import gzip
 import json
+import os
 import time
 from io import BytesIO
 
@@ -59,10 +60,48 @@ class AsyncJobManager:
 
     # ── State persistence ────────────────────────────────────────────────
 
+    def _async_state_file(self):
+        """async job 快取的專屬檔（logs/async_query_jobs.json），刻意不與
+        state.json 共用。
+
+        state.json 由 Analyzer 以「cycle 開頭整份載入、cycle 結尾整份覆寫」的
+        方式維護，任何在 cycle 中途由別的執行緒寫進去的 key 都會被那次覆寫還原
+        （Analyzer 只對少數列名的 co-owned key 做 defer）。async job 記錄正是這
+        種跨執行緒共寫的 key——報表執行緒寫入的新 job 會消失、已 prune 的舊
+        job 會復活，快取因此永遠命中不了，還可能弄丟 retry 需要的 query_body。
+        """
+        c = self._client
+        return os.path.join(os.path.dirname(c._state_file) or ".", "async_query_jobs.json")
+
+    def _migrate_legacy_async_state(self):
+        """一次性搬遷：舊版把 async job 記錄寫在 state.json。把殘留條目併進
+        專屬檔並從 state.json 移除，否則那份資料永遠不會再被 prune。"""
+        c = self._client
+        legacy = load_state_file(c._state_file)
+        if _ASYNC_JOB_STATE_KEY not in legacy and "_last_async_prune" not in legacy:
+            return
+        jobs = legacy.get(_ASYNC_JOB_STATE_KEY) or {}
+        if isinstance(jobs, dict) and jobs:
+            def _merge(existing):
+                data = dict(existing)
+                merged = dict(jobs)
+                merged.update(data.get(_ASYNC_JOB_STATE_KEY) or {})  # 新檔的值較新，勝出
+                data[_ASYNC_JOB_STATE_KEY] = merged
+                return data
+
+            update_state_file(self._async_state_file(), _merge)
+
+        def _strip(existing):
+            data = dict(existing)
+            data.pop(_ASYNC_JOB_STATE_KEY, None)
+            data.pop("_last_async_prune", None)
+            return data
+
+        update_state_file(c._state_file, _strip)
+
     def _save_async_job_state(self, job_href, **fields):
         if not job_href:
             return
-        c = self._client
 
         def _merge(existing):
             data = dict(existing)
@@ -77,15 +116,14 @@ class AsyncJobManager:
             return data
 
         try:
-            update_state_file(c._state_file, _merge)
+            update_state_file(self._async_state_file(), _merge)
         except Exception as exc:
             logger.debug("Failed to persist async job state for {}: {}", job_href, exc)
 
     def _load_async_job_states(self):
-        c = self._client
         try:
             self._maybe_prune_async_job_states()
-            data = load_state_file(c._state_file)
+            data = load_state_file(self._async_state_file())
             jobs = data.get(_ASYNC_JOB_STATE_KEY, {})
             return jobs if isinstance(jobs, dict) else {}
         except Exception as exc:
@@ -111,6 +149,7 @@ class AsyncJobManager:
             return
         c._last_async_job_prune_at = now
         try:
+            self._migrate_legacy_async_state()
             self.prune_async_job_states(max_age_days=c._async_job_cache_max_age_days)
         except Exception as exc:
             logger.debug("Async job state prune skipped: {}", exc)
@@ -205,7 +244,6 @@ class AsyncJobManager:
         return new_job_href
 
     def prune_async_job_states(self, max_age_days=7, keep_recent_completed=200):
-        c = self._client
         cutoff = time.time() - (max_age_days * 86400)
 
         def _prune(existing):
@@ -240,7 +278,7 @@ class AsyncJobManager:
             }
             return data
 
-        updated = update_state_file(c._state_file, _prune)
+        updated = update_state_file(self._async_state_file(), _prune)
         meta = updated.get("_last_async_prune", {})
         return {
             "removed": int(meta.get("removed", 0) or 0),

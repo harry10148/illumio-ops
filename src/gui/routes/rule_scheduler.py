@@ -308,8 +308,17 @@ def make_rule_scheduler_blueprint(
             if not href:
                 return _err("href required", 400)
 
-            # Block draft-only scheduling natively for GUI
-            if api.has_draft_changes(href) or not api.is_provisioned(href):
+            # Block draft-only scheduling natively for GUI.
+            # get_provision_state 是三態：'unknown' 代表 PCE 根本沒回答（連線
+            # 失敗／憑證被拒／5xx），不是「規則只有 draft」。兩者一樣擋下不建
+            # 排程（fail-closed 不變），但訊息必須講真正的原因，否則操作者會
+            # 跑去 PCE 找一個不存在的 draft 問題。
+            if api.has_draft_changes(href):
+                return jsonify({"ok": False, "error": t("rs_sch_draft_block", lang=lang)}), 400
+            prov_state = api.get_provision_state(href)
+            if prov_state == 'unknown':
+                return jsonify({"ok": False, "error": t("rs_sch_pce_unreachable", lang=lang)}), 502
+            if prov_state != 'active':
                 return jsonify({"ok": False, "error": t("rs_sch_draft_block", lang=lang)}), 400
 
             # type 前置驗證：預設 'recurring' 與精確比對的組裝分支不一致，缺/畸形
@@ -374,14 +383,12 @@ def make_rule_scheduler_blueprint(
             if not api.update_rule_note(href, note):
                 logger.warning(f"[GUI:rs_schedule_create] PCE note write failed for {href}; "
                                "rolling back schedule entry")
-                with _rs_db_lock:
-                    db.load()
-                    if prev is None:
-                        if href in db.db:
-                            del db.db[href]
-                            db.save()
-                    else:
-                        db.put(href, prev)
+                # 回滾也要走單筆的 put/delete：直接 del + save() 是整檔覆寫，
+                # 會把這期間其他寫入者新增的排程一併抹掉。
+                if prev is None:
+                    db.delete(href)
+                else:
+                    db.put(href, prev)
                 return _err(t("gui_api_update_failed", lang=lang), 502)
             return jsonify({"ok": True, "id": _extract_id_href(href)})
 

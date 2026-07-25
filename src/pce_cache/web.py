@@ -17,6 +17,13 @@ bp = Blueprint("pce_cache", __name__, url_prefix="/api/cache")
 # SQLite 寫鎖並重複灌同一批列。第二個請求立即回 409，不排隊。
 _BACKFILL_LOCK = threading.Lock()
 
+# 同時只允許一個手動 retention purge（同 _BACKFILL_LOCK 模式）：purge 是一連串
+# 不設上限的 10k 列 DELETE 交易，端點又是同步執行在 cheroot 請求執行緒上，看起來
+# 像卡住。操作者重按或瀏覽器重送就會有兩個請求同時跑重疊的刪除迴圈，與排程的
+# pce_cache_retention（cache_writer 單工執行緒）互搶 SQLite 寫鎖。第二個請求直接
+# 回 409，不排隊。
+_RETENTION_LOCK = threading.Lock()
+
 
 def _get_sf():
     """cache DB 的 sessionmaker。引擎走 _get_cache_engine：per-db_path
@@ -103,6 +110,8 @@ def api_cache_retention_run():
         # 記 server-side traceback、回通用訊息 + request_id（H3 慣例）。
         return _err_with_log("cache_retention_run", e, status=503, lang=lang)
     cfg = current_app.config["CM"].models.pce_cache
+    if not _RETENTION_LOCK.acquire(blocking=False):
+        return jsonify({"error": "retention already in progress"}), 409
     try:
         from src.pce_cache.retention import RetentionWorker
         result = RetentionWorker(sf).run_once(
@@ -114,6 +123,8 @@ def api_cache_retention_run():
         return jsonify(result)
     except Exception as e:
         return _err_with_log("cache_retention_run", e, lang=lang)
+    finally:
+        _RETENTION_LOCK.release()
 
 
 @bp.route("/status", methods=["GET"])

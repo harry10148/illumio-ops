@@ -39,6 +39,29 @@ def _make_analyzer(rules=None, subscriber_events=None, subscriber_flows=None):
     return analyzer
 
 
+def _cache_sub(rows=None, error=None):
+    """Event-subscriber double that honours poll_new_rows' `processor` hook.
+
+    The analyzer relies on at-least-once semantics: it hands the batch to the
+    subscriber as a processor callback so the cursor only advances after the
+    events have been matched and turned into alerts. A double that ignores
+    `processor` would let the analyzer look correct here while dropping every
+    batch in production.
+    """
+    sub = MagicMock()
+
+    def _poll(limit=1000, processor=None):
+        if error is not None:
+            raise error
+        batch = list(rows or [])
+        if processor is not None:
+            processor(batch)
+        return batch
+
+    sub.poll_new_rows.side_effect = _poll
+    return sub
+
+
 def _make_cache_reader_for_flows(cover_state="partial", cache_start=None, flows=None):
     """Build a cache reader mock suitable for _fetch_query_flows tests."""
     cr = MagicMock()
@@ -83,8 +106,7 @@ class TestAnalyzerOnCache(unittest.TestCase):
     def test_analyzer_uses_subscriber_when_enabled(self):
         """When subscriber_events is set, _run_event_analysis calls poll_new_rows,
         not _fetch_event_batch (the legacy API path)."""
-        mock_sub = MagicMock()
-        mock_sub.poll_new_rows.return_value = []
+        mock_sub = _cache_sub([])
 
         az = _make_analyzer(rules=[_event_rule()], subscriber_events=mock_sub)
         az._fetch_event_batch = MagicMock()
@@ -117,8 +139,7 @@ class TestAnalyzerOnCache(unittest.TestCase):
     def test_analyzer_processes_empty_poll_without_dispatching(self):
         """When subscriber returns [], _run_event_analysis completes without
         dispatching any alert and returns an empty list."""
-        mock_sub = MagicMock()
-        mock_sub.poll_new_rows.return_value = []
+        mock_sub = _cache_sub([])
 
         az = _make_analyzer(rules=[_event_rule(threshold=1)], subscriber_events=mock_sub)
 
@@ -131,8 +152,7 @@ class TestAnalyzerOnCache(unittest.TestCase):
         """When subscriber returns event dicts, the events pass through the
         normalizer/matcher pipeline and trigger reporter.add_event_alert when
         the rule threshold is met."""
-        mock_sub = MagicMock()
-        mock_sub.poll_new_rows.return_value = [_raw_event()]
+        mock_sub = _cache_sub([_raw_event()])
 
         rule = _event_rule(threshold=1)
         az = _make_analyzer(rules=[rule], subscriber_events=mock_sub)
@@ -148,8 +168,7 @@ class TestAnalyzerOnCache(unittest.TestCase):
         """The cache event path must record event_poll_status='ok' — the dashboard
         'Event Poll' card reads pce_stats.event_poll_status. The legacy path set it;
         the cache path must too, else the card is stuck 'unknown' despite live polls."""
-        mock_sub = MagicMock()
-        mock_sub.poll_new_rows.return_value = []  # successful poll, no new rows
+        mock_sub = _cache_sub([])  # successful poll, no new rows
 
         az = _make_analyzer(rules=[_event_rule()], subscriber_events=mock_sub)
         # clean baseline — don't depend on any state file the ctor may have loaded
@@ -163,8 +182,7 @@ class TestAnalyzerOnCache(unittest.TestCase):
     def test_cache_poll_failure_records_event_poll_status_error(self):
         """When the cache poll raises, event_poll_status must flip to 'error' with
         the reason captured (parity with the legacy path's record_pce_error)."""
-        mock_sub = MagicMock()
-        mock_sub.poll_new_rows.side_effect = Exception("cache db locked")
+        mock_sub = _cache_sub(error=Exception("cache db locked"))
 
         az = _make_analyzer(rules=[_event_rule()], subscriber_events=mock_sub)
         # clean baseline — don't depend on any state file the ctor may have loaded
@@ -379,8 +397,7 @@ class TestCountRuleEdges(unittest.TestCase):
         # 非空輪詢（其他事件到達）但無一匹配本規則 → matches=[] 而視窗計數達標
         other = _raw_event(event_type="user.login")
         other["timestamp"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        mock_sub = MagicMock()
-        mock_sub.poll_new_rows.return_value = [other]
+        mock_sub = _cache_sub([other])
         az = _make_analyzer(rules=[self._count_rule(threshold=1)],
                             subscriber_events=mock_sub)
         recent = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=2)
@@ -392,10 +409,9 @@ class TestCountRuleEdges(unittest.TestCase):
 
     def test_new_match_alerts_with_window_count(self):
         import datetime as dt
-        mock_sub = MagicMock()
         ev = _raw_event()
         ev["timestamp"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-        mock_sub.poll_new_rows.return_value = [ev]
+        mock_sub = _cache_sub([ev])
         az = _make_analyzer(rules=[self._count_rule(threshold=1)],
                             subscriber_events=mock_sub)
         az.state["history"] = {}

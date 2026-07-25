@@ -4614,5 +4614,21 @@
   "event_label_system_task_event_pruning_completed": "系統任務 事件清理完成",
   "event_label_system_task_hard_limit_recovery_completed": "系統任務 硬上限恢復完成",
   "event_desc_system_task_event_pruning_completed": "事件資料庫的舊記錄例行清理已完成。",
-  "event_desc_system_task_hard_limit_recovery_completed": "事件資料庫達到硬儲存上限後的恢復已完成。"
+  "event_desc_system_task_hard_limit_recovery_completed": "事件資料庫達到硬儲存上限後的恢復已完成。",
+  "alert_window_truncation_rule": "流量視窗截斷",
+  "alert_window_truncation_details": "{since} 至 {until} 的快取流量視窗查詢回傳 {raw} 筆，撞到 {cap} 筆上限；視窗內最舊的流量已被丟棄。此視窗的 traffic/bandwidth/volume 規則加總會低估，可能因此漏發告警。請縮短 threshold_window 或收斂規則的過濾條件。",
+  "cli_analysis_in_progress": "另一個分析週期正在執行中（監控服務或 Web GUI），請稍後再試。",
+  "gui_err_analysis_in_progress": "另一個分析週期正在執行中，請稍後再試。",
+  "rpt_module_errors_warning": "部分分析模組執行失敗，相關章節的數字並不完整，不可視為 0。失敗模組：",
+  "rpt_factor_none": "無",
+  "rpt_qact_none": "無阻塞因素：五項就緒度因素皆為 100%，此 App（Env）已可推進到 full Enforcement。",
+  "rpt_email_body_too_large": "報表內容過大，無法內嵌於信件本體（超過 {limit_mb} MB）。完整內容請開啟附件或伺服器上產出的報表檔案。",
+  "rpt_rule_ENG01_desc": "{n_failed} 條安全規則評估失敗，其發現未包含在本報表中：{failed_rules}。findings 清單為不完整——此處沒有發現不代表環境沒有暴露。",
+  "rule_eng01_rec": "請重跑報表並檢查 run log 中各規則的錯誤細節；在把本報表當成暴露面覆蓋率的證據之前，先修正輸入資料或回報此問題。",
+  "rpt_rule_B001_risk_unknown_decision": "這些流量的 Policy 判定並不明確（{n_allowed} 筆 Allowed、{n_pb} 筆 test 模式，其餘為 unknown）——{n_total} 筆中有 {n_cross_subnet} 筆跨子網路，{n_same_subnet} 筆位於同一個 /24。unknown 代表 PCE 未對這批資料做 Policy 評估，因此無法排除暴露風險。",
+  "rule_b001_rec_unknown_decision": "在下結論前，請改用即時 PCE 流量（或帶有 policy decision 的來源）重跑報表——unknown 通常來自快照／idle 模式資料、缺少 policy_decision 欄位的 CSV 匯出，或未納管的端點。接著確認 {named_ports} 是否真的需要跨子網路，並將 allow 規則收斂到授權的管理來源。",
+  "rpt_pu_unused_indeterminate_note": "本表中有 {n} 條規則標示為 Query Failed / Query Pending：其流量查詢未完成，使用狀況為未知——請勿依本表將這些規則下線。",
+  "rs_sch_pce_unreachable": "無法確認佈署狀態：PCE 沒有回應（請檢查連線與憑證）。",
+  "rpt_pu_draft_pd_failed": "草稿政策決策檢查未能完成：流量查詢失敗，本節不代表沒有風險。請重新產出報表後再據以行動。",
+  "rpt_pu_overview_indeterminate": "有 {n} 條規則因流量查詢失敗或未完成而無法判定，已單獨計數且未列入未使用總數，請勿依本報表下架這些規則。"
 }

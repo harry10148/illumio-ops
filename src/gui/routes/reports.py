@@ -35,6 +35,10 @@ from src.report.rule_hit_count_enablement import (
 # state.json key holding ad-hoc traffic-report job records (most recent 20 kept).
 _ADHOC_JOBS_KEY = "adhoc_report_jobs"
 _ADHOC_JOBS_MAX = 20
+# status=running 的修剪豁免上限。必須明顯小於 _ADHOC_JOBS_MAX：worker 行程被
+# kill 留下的 running 紀錄在 24h 內不算殭屍，無上限地豁免會把可修剪額度整個
+# 吃光，之後每一筆新 job 一寫入就被修掉（/api/reports/jobs/<id> 立刻 404）。
+_ADHOC_RUNNING_PROTECTED_MAX = 10
 
 # CSV upload mimetype whitelist — single source for the traffic, policy_usage
 # and rule_hit_count upload routes (traffic route established the set).
@@ -95,19 +99,28 @@ def _save_adhoc_job(job_id: str, record: dict) -> None:
             cutoff = (datetime.datetime.now(datetime.timezone.utc)
                       - datetime.timedelta(hours=24)).isoformat()
 
-            def _protected(rec):
+            def _running(rec):
                 rec = rec or {}
                 return (rec.get("status") == "running"
                         and (rec.get("started_at") or "") >= cutoff)
 
-            protected = {k: v for k, v in jobs.items() if _protected(v)}
-            prunable = {k: v for k, v in jobs.items() if k not in protected}
-            keep = max(0, _ADHOC_JOBS_MAX - len(protected))
-            # Keep newest by started_at; missing/blank started_at sorts oldest.
-            ordered = sorted(prunable.items(),
-                             key=lambda kv: kv[1].get("started_at") or "",
-                             reverse=True)
-            jobs = {**protected, **dict(ordered[:keep])}
+            def _started_at(kv):
+                # Newest by started_at; missing/blank started_at sorts oldest.
+                return kv[1].get("started_at") or ""
+
+            # 剛寫入的這一筆一律保留。少了這個豁免，只要豁免集合把額度用滿，
+            # 這次寫入的紀錄會在同一次 merge 裡被自己修掉，呼叫端隨即拿到
+            # KeyError / 404（R4）。
+            current = {job_id: jobs[job_id]}
+            rest = {k: v for k, v in jobs.items() if k != job_id}
+            running = sorted((kv for kv in rest.items() if _running(kv[1])),
+                             key=_started_at, reverse=True)
+            # running 豁免自身也要封頂，其餘 running 回到一般修剪佇列排隊。
+            protected = dict(running[:_ADHOC_RUNNING_PROTECTED_MAX])
+            prunable = {k: v for k, v in rest.items() if k not in protected}
+            keep = max(0, _ADHOC_JOBS_MAX - len(protected) - len(current))
+            ordered = sorted(prunable.items(), key=_started_at, reverse=True)
+            jobs = {**current, **protected, **dict(ordered[:keep])}
         data[_ADHOC_JOBS_KEY] = jobs
         return data
 
@@ -570,13 +583,31 @@ def make_reports_blueprint(
                 fmt = d.get('format', 'html')
                 fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
                 paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
+                # 匯出器不再吞掉失敗（xlsx 等格式的原因記在 last_export_errors）。
+                # 舊版產生器可能沒有這個屬性，故用 getattr 取。
+                export_errors = getattr(gen, 'last_export_errors', {}) or {}
                 _write_audit_dashboard_summary(output_dir, result)
                 filenames = [os.path.basename(p) for p in paths]
                 try:
                     if _arlog:
-                        _arlog.info(f"Saved: {filenames}")
+                        _arlog.info(f"Saved: {filenames}"
+                                    + (f" errors={export_errors}" if export_errors else ""))
                 except Exception:
                     pass  # intentional fallback: ModuleLog write is best-effort
+                if export_errors:
+                    # 比照 traffic job 的 H3 慣例：例外字串（可能含檔案系統路徑）
+                    # 只進 server log，回應給泛用訊息＋request_id。已產出的檔案
+                    # 照樣回，操作者才知道是「少了 xlsx」而不是整份沒產出。
+                    req_id = uuid.uuid4().hex[:8]
+                    logger.error(f"[GUI:report_audit_generate] req={req_id} "
+                                 f"export errors: {export_errors}")
+                    return jsonify({
+                        "ok": False, "partial": True, "files": filenames,
+                        "record_count": result.record_count,
+                        "failed_formats": sorted(export_errors),
+                        "error": t("gui_err_internal", default="Internal server error", lang=lang),
+                        "request_id": req_id,
+                    })
                 return jsonify({"ok": True, "files": filenames, "record_count": result.record_count})
         except Exception as e:
             try:
@@ -855,6 +886,8 @@ def make_reports_blueprint(
                 fmt = d.get('format', 'html')
                 fmt = fmt if fmt in _ALLOWED_REPORT_FORMATS else 'html'
                 paths = gen.export(result, fmt=fmt, output_dir=output_dir, lang=lang)
+                # 同 audit：匯出失敗記在 last_export_errors，不可回報成功。
+                export_errors = getattr(gen, 'last_export_errors', {}) or {}
                 _write_policy_usage_dashboard_summary(output_dir, result)
                 filenames = [os.path.basename(p) for p in paths]
                 mod00 = result.module_results.get('mod00', {})
@@ -864,9 +897,22 @@ def make_reports_blueprint(
 
                 try:
                     if _pulog:
-                        _pulog.info(f"Saved: {filenames}")
+                        _pulog.info(f"Saved: {filenames}"
+                                    + (f" errors={export_errors}" if export_errors else ""))
                 except Exception:
                     pass  # intentional fallback: ModuleLog write is best-effort
+                if export_errors:
+                    # 見 audit 端點註解（H3 慣例：細節進 log，回應帶 request_id）。
+                    req_id = uuid.uuid4().hex[:8]
+                    logger.error(f"[GUI:report_policy_usage_generate] req={req_id} "
+                                 f"export errors: {export_errors}")
+                    return jsonify({
+                        "ok": False, "partial": True, "files": filenames,
+                        "record_count": result.record_count,
+                        "failed_formats": sorted(export_errors),
+                        "error": t("gui_err_internal", default="Internal server error", lang=lang),
+                        "request_id": req_id,
+                    })
                 return jsonify({"ok": True, "files": filenames,
                                 "record_count": result.record_count, "kpis": kpis,
                                 "execution_stats": execution_stats, "execution_notes": execution_notes,

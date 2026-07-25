@@ -38,6 +38,27 @@ SIGNAL_HEX = {
 # cache does not pin a ConfigManager alive.
 _PLUGIN_CACHE: "weakref.WeakKeyDictionary[Any, dict[str, Any]]" = weakref.WeakKeyDictionary()
 
+# 報表 HTML 內嵌了三個 base64 woff2 字型（約 184 KB）與表格排序 JS。單純用
+# 「移除標籤」推導 text/plain 只會拿掉角括號，<style>/<script> 的「內文」會原封
+# 留下，收件端的純文字部位變成一大片 base64。先整段刪掉這兩種區塊再去標籤。
+_SCRIPT_STYLE_RE = re.compile(r'(?is)<(script|style)\b[^>]*>.*?</\1\s*>')
+_TAG_RE = re.compile(r'<[^>]+>')
+
+
+def _html_to_plain(html_body: str) -> str:
+    """Derive the text/plain alternative from an HTML body."""
+    text = _SCRIPT_STYLE_RE.sub(' ', html_body or '')
+    text = _TAG_RE.sub(' ', text)
+    text = html.unescape(text)
+    return re.sub(r'\s+', ' ', text).strip()
+
+
+def _sanitize_header(value: str) -> str:
+    """CR/LF 進標頭會讓 as_string() 丟 HeaderParseError（非 SMTPException，
+    破壞寄信函式的 bool 回傳契約），也是標頭注入的入口。"""
+    return str(value or '').replace("\r", " ").replace("\n", " ")
+
+
 class Reporter:
     def __init__(self, config_manager: Any) -> None:
         self.cm = config_manager
@@ -1799,8 +1820,7 @@ class Reporter:
         # text/plain 替代部位必須來自報表信自身的內容——_build_line_message
         # 是告警摘要（此處 Reporter 無告警，會渲染成 0 筆的空骨架），與
         # HTML 部位內容完全無關。改用去標籤後的報表本文。
-        plain_body = re.sub(r'<[^>]+>', '', html_body)
-        plain_body = re.sub(r'\s+', ' ', plain_body).strip()
+        plain_body = _html_to_plain(html_body)
 
         if attach_parts:
             msg = MIMEMultipart('mixed')
@@ -1816,11 +1836,12 @@ class Reporter:
             msg.attach(MIMEText(html_body, 'html', _charset='utf-8'))
 
         # CR/LF 進標頭會讓 as_string() 丟 HeaderParseError（非 SMTPException，
-        # 破壞本函式的 bool 回傳契約），先清洗再賦值。
-        subject = subject.replace("\r", " ").replace("\n", " ")
-        recipients = [r.replace("\r", " ").replace("\n", " ").strip() for r in recipients]
+        # 破壞本函式的 bool 回傳契約），先清洗再賦值。sender 是 GUI 設定頁可
+        # 自由填寫的字串，同樣要清洗。
+        subject = _sanitize_header(subject)
+        recipients = [_sanitize_header(r).strip() for r in recipients]
         msg["Subject"] = subject
-        msg["From"] = cfg["sender"]
+        msg["From"] = _sanitize_header(cfg["sender"])
         msg["To"] = ",".join(recipients)
 
         try:
@@ -1875,11 +1896,15 @@ class Reporter:
         from email import encoders
 
         _MAX_ATTACH_BYTES = 10 * 1024 * 1024  # 10 MB，與 send_scheduled_report_email 一致
+        _MAX_BODY_BYTES = 2 * 1024 * 1024     # 內嵌本體上限（text/plain 部位由它推導）
 
         cfg = self.cm.config["email"]
         if not cfg["recipients"]:
             logger.warning(t('no_recipients'))
             return False
+
+        # 本體超限時要指名報表檔；附件護欄可能稍後把 attachment_path 清成 None。
+        _report_ref = os.path.basename(attachment_path) if attachment_path else ''
 
         # 與排程路徑一致的附件大小護欄：超限時跳過附件、信件本體照送並附
         # 警示，而不是整封被 SMTP 552 退掉。
@@ -1909,9 +1934,29 @@ class Reporter:
                     html_body += warning_html
                 attachment_path = None
 
-        import re as _re
-        plain_body = _re.sub(r'<[^>]+>', '', html_body)
-        plain_body = _re.sub(r'\s+', ' ', plain_body).strip()
+        # 附件護欄只擋附件，但 CLI 的 report --email 是把「整份報表 HTML 檔」
+        # 當本體傳進來的，超大報表照樣讓整封信破表被 SMTP 退掉。本體超限時不
+        # 做無聲截斷，改為整段換成一則明確說明（附件仍帶完整報表；附件也被
+        # 略過時，訊息會指出報表檔仍在伺服器上）。
+        if len(html_body.encode('utf-8', 'replace')) > _MAX_BODY_BYTES:
+            limit_mb = _MAX_BODY_BYTES // 1024 // 1024
+            ref = _report_ref
+            logger.warning(
+                f"[Email] Report body {len(html_body) / 1024 / 1024:.1f} MB exceeds "
+                f"{limit_mb} MB; replacing the inline body with a notice"
+            )
+            notice = t("rpt_email_body_too_large", limit_mb=limit_mb,
+                       default=("The report is too large to include in the message body "
+                                "(over {limit_mb} MB). Open the attached or generated "
+                                "report file for the full content."))
+            # 檔名放在翻譯字串之外，缺翻譯時仍看得到指向哪一份報表。
+            ref_html = f" <code>{html.escape(ref)}</code>" if ref else ""
+            html_body = (
+                "<html><body><div style='font-family:Arial,sans-serif;font-size:13px;'>"
+                f"{html.escape(notice)}{ref_html}</div></body></html>"
+            )
+
+        plain_body = _html_to_plain(html_body)
 
         if attachment_path and os.path.exists(attachment_path):
             msg = MIMEMultipart('mixed')
@@ -1937,14 +1982,12 @@ class Reporter:
             msg.attach(MIMEText(html_body, 'html', _charset='utf-8'))
 
         # CR/LF 進標頭會讓 as_string() 丟 HeaderParseError（非 SMTPException，
-        # 破壞本函式的 bool 回傳契約），先清洗再賦值。
-        subject = subject.replace("\r", " ").replace("\n", " ")
-        recipients = [
-            r.replace("\r", " ").replace("\n", " ").strip()
-            for r in cfg["recipients"]
-        ]
+        # 破壞本函式的 bool 回傳契約），先清洗再賦值。sender 是 GUI 設定頁可
+        # 自由填寫的字串，同樣要清洗。
+        subject = _sanitize_header(subject)
+        recipients = [_sanitize_header(r).strip() for r in cfg["recipients"]]
         msg["Subject"] = subject
-        msg["From"] = cfg["sender"]
+        msg["From"] = _sanitize_header(cfg["sender"])
         msg["To"] = ",".join(recipients)
 
         try:
