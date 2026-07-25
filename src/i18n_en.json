@@ -4631,5 +4631,7 @@
   "rs_sch_pce_unreachable": "Cannot verify provisioning state: the PCE did not respond (check connectivity and credentials).",
   "rpt_pu_draft_pd_failed": "The draft policy-decision check could not be completed: the traffic query failed, so this section is not a clean result. Re-run the report before acting on it.",
   "rpt_pu_overview_indeterminate": "{n} rule(s) could not be evaluated because their traffic query failed or never completed. They are counted separately and are NOT included in the unused total — do not decommission them based on this report.",
-  "gui_toast_report_partial": "Report only partly generated — these formats failed: {formats}. The files that did succeed are listed under Reports."
+  "gui_toast_report_partial": "Report only partly generated — these formats failed: {formats}. The files that did succeed are listed under Reports.",
+  "alert_aggregation_basis_rule": "Traffic aggregation basis mismatch",
+  "alert_aggregation_basis_details": "This PCE returns whole-bucket traffic aggregates: the byte and connection totals on a flow cover that flow's entire aggregation span and are NOT clipped to the query window. {rule_count} traffic rule(s) — {rule_names} — have a threshold_window shorter than the aggregation span of the flows they matched (worst case: a {worst_window_minutes}-minute window against {worst_span_minutes} minutes of accumulated traffic). Evaluating them would compare bucket-wide totals against a short-window threshold and raise a false alert, so THOSE RULES WERE NOT EVALUATED THIS CYCLE and cannot fire. Widen threshold_window to cover the aggregation span, or enable Enhanced Data Collection so the PCE reports interval deltas."
 }
