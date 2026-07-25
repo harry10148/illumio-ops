@@ -48,6 +48,41 @@ verify_sha256() {
 
 mkdir -p "$DIST_DIR"
 
+# ── Gate: the wheel lock must exist and match its source spec ─────────────────
+# 離線 bundle 的 wheels 過去是照 requirements-offline.txt 的「範圍」即時解析下載
+# 的：同一版原始碼在不同日子建置會裝到不同的套件版本，而且沒有任何雜湊驗證，
+# 被掉包的 wheel 會靜靜地裝進每一台離線機器。改成一律從 requirements-offline.lock
+# （--generate-hashes 逐檔釘選）下載，並在這裡確認鎖檔沒有落後於來源規格。
+# 新鮮度用鎖檔尾端的 sha256 標記判定；標記由產生鎖檔的第二道指令寫入，忘了跑
+# 就等同「鎖檔可能過期」，一律擋下（fail closed）。
+LOCK_FILE="$REPO_ROOT/requirements-offline.lock"
+require_fresh_lock() {
+    local src="$REPO_ROOT/requirements-offline.txt" expected actual
+    if [[ ! -f "$LOCK_FILE" ]]; then
+        echo "ERROR: requirements-offline.lock is missing — the offline bundle must" >&2
+        echo "  install hash-pinned wheels, not a live range resolution." >&2
+        echo "  Generate it (see the header of requirements-offline.txt)." >&2
+        exit 1
+    fi
+    expected=$(sha256sum "$src" | awk '{print $1}')
+    actual=$(sed -n 's/^# requirements-offline\.txt sha256: *//p' "$LOCK_FILE" | tail -n 1)
+    if [[ -z "$actual" ]]; then
+        echo "ERROR: requirements-offline.lock has no source sha256 marker — cannot" >&2
+        echo "  prove it matches requirements-offline.txt. Regenerate it (see the" >&2
+        echo "  header of requirements-offline.txt)." >&2
+        exit 1
+    fi
+    if [[ "$expected" != "$actual" ]]; then
+        echo "ERROR: requirements-offline.lock is stale — it was generated from a" >&2
+        echo "  different requirements-offline.txt." >&2
+        echo "  requirements-offline.txt: $expected" >&2
+        echo "  lock marker:              $actual" >&2
+        echo "  Regenerate it (see the header of requirements-offline.txt)." >&2
+        exit 1
+    fi
+    echo "==> requirements-offline.lock is in sync with requirements-offline.txt"
+}
+
 # ── Shared helper: assert no secrets were staged ──────────────────────────────
 # The excludes in stage_app are the control; this is the gate that proves they
 # held. The build host normally runs the app, so config/ accumulates real
@@ -101,6 +136,8 @@ stage_app() {
     assert_no_secrets_staged "$dest"
     rsync -a "$REPO_ROOT/scripts/" "$dest/app/scripts/"
     cp "$REPO_ROOT/requirements-offline.txt" "$dest/app/"
+    # 鎖檔一定要進 bundle：install.sh / install.ps1 就是拿它配 --require-hashes 安裝。
+    cp "$LOCK_FILE" "$dest/app/"
     # Runtime data read from outside src/: src/events/reference.py loads
     # docs/_meta/illumio-event-reference.json (path resolved relative to repo
     # root). It MUST be bundled or the Event Viewer 500s with FileNotFoundError
@@ -162,8 +199,9 @@ build_linux() {
         --platform manylinux_2_17_x86_64 \
         --python-version 3.12 \
         --implementation cp \
+        --require-hashes \
         -d "$BUILD/wheels" \
-        -r "$REPO_ROOT/requirements-offline.txt"
+        -r "$LOCK_FILE"
 
     stage_app "$BUILD"
 
@@ -211,12 +249,14 @@ build_windows() {
         --platform win_amd64 \
         --python-version 3.12 \
         --implementation cp \
+        --require-hashes \
         -d "$BUILD/wheels" \
-        -r "$REPO_ROOT/requirements-offline.txt"
+        -r "$LOCK_FILE"
 
     # Cross-platform marker guard: pip download evaluates environment markers
     # on this (Linux) host, so Windows-only wheels vanish silently if they
-    # ever drop out of requirements-offline.txt. Fail the build instead.
+    # ever drop out of requirements-offline.txt (and therefore out of the lock).
+    # Fail the build instead.
     for w in colorama win32_setctime; do
         ls "$BUILD/wheels/${w}"-*.whl >/dev/null 2>&1 || {
             echo "ERROR: missing Windows-only wheel: $w (see requirements-offline.txt)" >&2
@@ -245,6 +285,7 @@ build_windows() {
     echo "    Size: $(du -sh "$DIST_DIR/$ARCHIVE" | cut -f1)"
 }
 
+require_fresh_lock
 build_linux
 build_windows
 
