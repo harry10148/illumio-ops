@@ -625,6 +625,20 @@ function _hideGenProgress(success, msg) {
   }
 }
 
+// Partial report failure: the endpoint replies {ok:false, partial:true, files,
+// failed_formats} when some formats exported and others did not (e.g. HTML
+// rendered but the xlsx export failed). Treating that as a total failure hid
+// the files that DID land and made operators re-run the whole report, so warn
+// with the failed format names and still refresh the report list.
+function _handlePartialReport(r) {
+  const formats = (r.failed_formats || []).join(', ');
+  const msg = _t('gui_toast_report_partial').replace('{formats}', formats);
+  _hideGenProgress(false, msg);
+  toast(msg, 'warn');
+  loadReports();
+  if (typeof loadRcardMeta === 'function') loadRcardMeta();
+}
+
 /* ─── Report Generation Modal ──────────────────────────────────────── */
 let _genReportType = null;
 
@@ -990,6 +1004,8 @@ async function _doGenerateAudit() {
       toast((_t('gui_toast_audit_done')).replace('{msg}', msg));
       loadReports();
       if (typeof loadRcardMeta === 'function') loadRcardMeta();
+    } else if (r.partial) {
+      _handlePartialReport(r);
     } else {
       const fail = _t('gui_toast_audit_fail');
       _hideGenProgress(false, r.error || fail);
@@ -1165,6 +1181,8 @@ async function _doGeneratePolicyUsage() {
       toast((_t('gui_toast_pu_done')).replace('{count}', r.record_count));
       loadReports();
       if (typeof loadRcardMeta === 'function') loadRcardMeta();
+    } else if (r.partial) {
+      _handlePartialReport(r);
     } else {
       const fail = _t('gui_toast_pu_fail');
       _hideGenProgress(false, r.error || fail);
@@ -1224,6 +1242,8 @@ async function _doGeneratePolicyUsageClean() {
       toast(doneMsg);
       loadReports();
       if (typeof loadRcardMeta === 'function') loadRcardMeta();
+    } else if (r.partial) {
+      _handlePartialReport(r);
     } else {
       const fail = _t('gui_toast_pu_fail');
       _hideGenProgress(false, r.error || fail);
