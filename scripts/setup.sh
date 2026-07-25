@@ -62,6 +62,28 @@ chmod 0640 \
     2>/dev/null || true
 chmod 0640 "$REPO_ROOT"/config/limiter/*.json 2>/dev/null || true
 
+# ProtectSystem=strict makes the whole filesystem read-only except ReadWritePaths,
+# and systemd refuses to start a unit whose ReadWritePaths target does not exist.
+mkdir -p "$REPO_ROOT"/logs "$REPO_ROOT"/config "$REPO_ROOT"/data "$REPO_ROOT"/reports
+chown -R "$SVC_USER:$SVC_USER" \
+    "$REPO_ROOT"/logs "$REPO_ROOT"/config "$REPO_ROOT"/data "$REPO_ROOT"/reports
+
+# ProtectHome=true makes /home, /root and /run/user inaccessible inside the
+# service's mount namespace. A clone under either one would then have neither a
+# usable WorkingDirectory nor a mountable ReadWritePaths target, and the unit
+# would fail at every start with 226/NAMESPACE or 200/CHDIR. Drop the directive
+# in that case rather than emitting a unit that can never run.
+PROTECT_HOME=true
+case "$REPO_ROOT" in
+    /home/*|/root|/root/*)
+        PROTECT_HOME=false
+        echo "==> WARNING: repository is at $REPO_ROOT (under /home or /root)."
+        echo "    ProtectHome is disabled in the generated unit, because it would"
+        echo "    otherwise hide the very directory the service must run from."
+        echo "    For full hardening, install to /opt instead (see scripts/install.sh)."
+        ;;
+esac
+
 cat > "$SERVICE_FILE" << EOF
 [Unit]
 Description=Illumio PCE Ops
@@ -72,17 +94,42 @@ Wants=network-online.target
 Type=simple
 User=$SVC_USER
 WorkingDirectory=$REPO_ROOT
-ExecStart=$VENV_PYTHON $REPO_ROOT/illumio-ops.py --monitor --interval $INTERVAL
+ExecStart=$VENV_PYTHON $REPO_ROOT/illumio-ops.py --monitor-gui --interval $INTERVAL
 Restart=always
 RestartSec=10
+TimeoutStopSec=30
+KillSignal=SIGTERM
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=illumio-ops
-# Security hardening
+# Security hardening (kept in step with deploy/illumio-ops.service)
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=$REPO_ROOT
+ProtectHome=$PROTECT_HOME
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# MemoryDenyWriteExecute intentionally omitted: CPython 3.12 memory allocator
+# uses mprotect(PROT_WRITE|PROT_EXEC) during thread init on RHEL/Rocky 9,
+# causing "can't start new thread" failures under this restriction.
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+CapabilityBoundingSet=
+AmbientCapabilities=
+# Narrow to the runtime dirs only: with ReadWritePaths=$REPO_ROOT the service
+# account could rewrite its own Python source (the clone is chowned to it above).
+ReadWritePaths=$REPO_ROOT/logs $REPO_ROOT/config $REPO_ROOT/data $REPO_ROOT/reports
 
 [Install]
 WantedBy=multi-user.target

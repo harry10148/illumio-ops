@@ -6,10 +6,12 @@ import ipaddress
 from contextlib import redirect_stdout
 
 from flask import Blueprint, jsonify, request
+from loguru import logger
 
 from src.alerts import PLUGIN_METADATA
 from src.analyzer import QUERY_RESULT_CAP, analysis_lock as _analysis_lock
 from src.config import ConfigManager
+from src.file_lock import file_lock as _file_lock
 from src.gui._helpers import (
     _err,
     _err_with_log,
@@ -24,6 +26,11 @@ from src.state_store import update_state_file
 # _analysis_lock（= analyzer.analysis_lock，於 import 區取得）由 GUI 觸發的
 # api_run_once / api_debug 與排程器的 run_monitor_cycle 共用——`--monitor-gui`
 # 下兩者是同一行程的不同 thread，只鎖 GUI 側防不到排程器。詳見該處註解。
+#
+# 外面再包一層跨行程檔案鎖（src.main.analysis_lock_path）：互動式 CLI 選單是
+# **另一個行程**，也會跑完整分析 cycle，兩邊的 state 快照會互相覆寫（告警冷卻
+# 被抹掉 → 同一則告警重寄）。取鎖順序固定為 file_lock → _analysis_lock。
+_ANALYSIS_LOCK_WAIT_S = 600.0
 
 
 def make_actions_blueprint(
@@ -52,9 +59,21 @@ def make_actions_blueprint(
     def api_init_quarantine():
         """Ensure Quarantine labels exist on the PCE upon loading the new UI module."""
         cm.load()
+        d = request.get_json(silent=True) or {}
+        lang = d.get('lang') or cm.config.get('settings', {}).get('language', 'en')
         from src.api_client import ApiClient
+        from src.exceptions import APIError
         with ApiClient(cm) as api:
-            api.check_and_create_quarantine_labels()
+            # check_and_create_quarantine_labels 對非 200 的標籤查詢改以 APIError
+            # 表達（不再退化成空 dict）。這裡只是開啟 UI 模組時的預備動作，PCE
+            # 一次抽風不該讓整頁載入變成 500——回可讀的錯誤，讓實際的隔離操作
+            # （apply/lift）自己再判一次。
+            try:
+                api.check_and_create_quarantine_labels()
+            except APIError as exc:
+                logger.warning(f"[GUI:init_quarantine] Quarantine label lookup failed: {exc}")
+                return jsonify({"ok": False, "error": t(
+                    "gui_label_fetch_failed", lang=lang, level="Quarantine")})
             return jsonify({"ok": True})
 
     @bp.route('/api/quarantine/search', methods=['POST'])
@@ -289,10 +308,17 @@ def make_actions_blueprint(
             if not _is_workload_href(href):
                 return jsonify({"ok": False, "error": t("gui_q_invalid_target", lang=lang)})
             from src.api_client import ApiClient
+            from src.exceptions import APIError
             with ApiClient(cm) as api:
 
                 # 1. Fetch labels to get target Href
-                q_hrefs = api.check_and_create_quarantine_labels()
+                # 標籤查詢失敗（非 200）以 APIError 表達；就地攔下換成
+                # gui_label_fetch_failed，別讓操作者只看到泛用 500＋request_id。
+                try:
+                    q_hrefs = api.check_and_create_quarantine_labels()
+                except APIError as exc:
+                    logger.warning(f"[GUI:quarantine_apply] label lookup failed: {exc}")
+                    return jsonify({"ok": False, "error": t("gui_label_fetch_failed", lang=lang, level=level)})
                 target_label_href = q_hrefs.get(level)
                 if not target_label_href:
                     return jsonify({"ok": False, "error": t("gui_label_fetch_failed", lang=lang, level=level)})
@@ -329,8 +355,14 @@ def make_actions_blueprint(
             if not hrefs:
                 return jsonify({"ok": False, "error": t("gui_q_no_targets", lang=lang)})
             from src.api_client import ApiClient
+            from src.exceptions import APIError
             with ApiClient(cm) as api:
-                q_hrefs = api.check_and_create_quarantine_labels()
+                # 同單筆 apply：標籤查詢失敗以 APIError 表達，就地換成可讀訊息。
+                try:
+                    q_hrefs = api.check_and_create_quarantine_labels()
+                except APIError as exc:
+                    logger.warning(f"[GUI:quarantine_bulk_apply] label lookup failed: {exc}")
+                    return jsonify({"ok": False, "error": t("gui_label_fetch_failed", lang=lang, level=level)})
                 target_label_href = q_hrefs.get(level)
                 # 同單筆 apply 的防護：level 無效或標籤建立失敗（create_label
                 # 對非 201 靜默回 {}，如 API key 只有唯讀權限）時 href 為
@@ -483,15 +515,19 @@ def make_actions_blueprint(
         from src.api_client import ApiClient
         from src.reporter import Reporter
         from src.analyzer import Analyzer
-        from src.main import _make_cache_reader
+        from src.main import _make_cache_reader, analysis_lock_path
         with ApiClient(cm) as api:
             rep = Reporter(cm)
             # 見 _analysis_lock 註解：序列化 GUI 觸發的分析，避免併發 cycle
             # 的 save_state 互相覆蓋 analyzer 自有 state key。
-            with _analysis_lock:
-                ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
-                ana.run_analysis()
-                rep.send_alerts(lang=lang)
+            try:
+                with _file_lock(analysis_lock_path(), timeout=_ANALYSIS_LOCK_WAIT_S):
+                    with _analysis_lock:
+                        ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
+                        ana.run_analysis()
+                        rep.send_alerts(lang=lang)
+            except TimeoutError:
+                return _err(t("gui_err_analysis_in_progress", lang=lang), 409)
             return jsonify({"ok": True, "output": t("gui_action_run_completed", lang=lang)})
 
     @bp.route('/api/actions/debug', methods=['POST'])
@@ -510,7 +546,7 @@ def make_actions_blueprint(
         from src.api_client import ApiClient
         from src.reporter import Reporter
         from src.analyzer import Analyzer
-        from src.main import _make_cache_reader
+        from src.main import _make_cache_reader, analysis_lock_path
         with ApiClient(cm) as api:
             rep = Reporter(cm)
             ana = Analyzer(cm, api, rep, cache_reader=_make_cache_reader(cm))
@@ -520,9 +556,13 @@ def make_actions_blueprint(
             # 擷取到 GUI 觸發分析的 print。其他執行緒（scheduler 等）的
             # print 在 debug 期間仍可能被吸進來——根治需 run_debug_mode 改收
             # 明確 output stream（analyzer 側變更）。
-            with _analysis_lock:
-                with redirect_stdout(buf):
-                    ana.run_debug_mode(mins=mins, pd_sel=pd_sel, interactive=False)
+            try:
+                with _file_lock(analysis_lock_path(), timeout=_ANALYSIS_LOCK_WAIT_S):
+                    with _analysis_lock:
+                        with redirect_stdout(buf):
+                            ana.run_debug_mode(mins=mins, pd_sel=pd_sel, interactive=False)
+            except TimeoutError:
+                return _err(t("gui_err_analysis_in_progress", lang=lang), 409)
             return jsonify({"ok": True, "output": _strip_ansi(buf.getvalue()).strip() or t("gui_action_debug_completed", lang=lang)})
 
     @bp.route('/api/actions/test-alert', methods=['POST'])
@@ -576,7 +616,14 @@ def make_actions_blueprint(
             return state
 
         try:
-            update_state_file(_resolve_state_file(), _clear)
+            # 必須在 _analysis_lock 內清除：monitor cycle 的 Analyzer 在
+            # load_state() 時取整份 state 快照，save_state() 再以
+            # merged.update(self.state) 把 event_watermark / alert_history /
+            # event_seen 從快照寫回。若這裡的 pop 落在別人 cycle 的
+            # load→save 窗口內，端點會回報成功但實際被原樣還原（alert 冷卻
+            # 仍在、已看過的事件仍被跳過），操作者只會看到「debug 工具沒用」。
+            with _analysis_lock:
+                update_state_file(_resolve_state_file(), _clear)
         except Exception as exc:
             return _err_with_log("reset_watermark", exc, lang=lang)
         return jsonify({

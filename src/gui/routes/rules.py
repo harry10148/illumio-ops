@@ -153,6 +153,9 @@ def make_rules_blueprint(
         except (TypeError, ValueError) as exc:
             msg = str(exc) or t("gui_err_invalid_number", lang=lang)
             return _err(msg, 400)
+        # 同 traffic/bandwidth 端點：count 型門檻 <1 永遠達標，在輸入邊界擋掉。
+        if threshold_count < 1:
+            return _err(t("gui_err_invalid_number", lang=lang), 400)
         # 比照 PUT/DELETE：load→mutate→save 以共用鎖序列化，否則與併發寫入者
         # （或背景 scheduler 的 cm.load()）交錯時新規則會靜默丟失。
         with cm.write_lock:
@@ -247,6 +250,11 @@ def make_rules_blueprint(
             cooldown_minutes = int(d.get('cooldown_minutes', 10))
         except (TypeError, ValueError):
             return _err(t("gui_err_invalid_number", lang=lang), 400)
+        # threshold_count < 1 是無意義門檻：規則永遠處於「已達標」狀態。
+        # analyzer 已改成「沒有證據列就不派送」擋掉空告警的症狀，這裡是輸入
+        # 邊界的第二道防線——壞值不該先被存進 alerts.json。
+        if threshold_count < 1:
+            return _err(t("gui_err_invalid_number", lang=lang), 400)
 
         f = d.get('filters')
         if isinstance(f, dict):
@@ -327,6 +335,11 @@ def make_rules_blueprint(
             threshold_count = float(d.get('threshold_count', 100))
             cooldown_minutes = int(d.get('cooldown_minutes', 30))
         except (TypeError, ValueError):
+            return _err(t("gui_err_invalid_number", lang=lang), 400)
+        # 同 traffic 端點在輸入邊界擋掉無意義門檻，但 bandwidth/volume 的
+        # threshold_count 是浮點 Mbps/MB，0.5 Mbps 是合法設定——這裡只能擋
+        # <=0（永遠達標），不可比照 count 型規則用 <1。
+        if threshold_count <= 0:
             return _err(t("gui_err_invalid_number", lang=lang), 400)
 
         f = d.get('filters')
@@ -440,6 +453,18 @@ def make_rules_blueprint(
                         d['threshold_window'] = _parse_threshold_window(d, lang)
                     except ValueError as exc:
                         return _err(str(exc), 400)
+                # threshold_count 同理：無意義門檻讓規則永遠處於「已達標」
+                # 狀態，必須在動到 old 之前擋下（見 POST 端點註解）。門檻語意
+                # 依規則型別而異——count 型（event/traffic）是次數，最小 1；
+                # bandwidth/volume 是浮點 Mbps/MB，0.5 合法，只能擋 <=0。
+                if d.get('threshold_count') is not None:
+                    try:
+                        _tc = float(d['threshold_count'])
+                    except (TypeError, ValueError):
+                        return _err(t("gui_err_invalid_number", lang=lang), 400)
+                    _is_rate = old.get('type') in ('bandwidth', 'volume')
+                    if (_tc <= 0) if _is_rate else (_tc < 1):
+                        return _err(t("gui_err_invalid_number", lang=lang), 400)
                 old.update(d)
                 # Re-parse label/ip fields for traffic and bw/vol. Only touch a
                 # side that is actually present in the PUT body: a partial update

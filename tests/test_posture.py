@@ -73,15 +73,16 @@ class TestComputePostureFull:
 
     def test_score_formula_manual(self):
         """Manually verify the formula with known inputs."""
-        # coverage=70, readiness=65, risk signals: ransomware=4 apps, lateral=0.667, uncovered=20%
-        # ransomware_pts = min(40, 4*5) = 20
+        # coverage=70, readiness=65, risk signals: risk_port_control ratio=0.60,
+        # lateral=0.667, uncovered=20%
+        # ransomware_pts = round((1 - 0.60) * 40) = 16
         # lateral_pts = round((1 - 0.667) * 30) = round(9.99) = 10
         # uncovered_pts = min(30, 20 * 0.5) = 10
-        # penalty = 20+10+10 = 40
-        # risk_health = 60
-        # score = round(70*0.3 + 65*0.3 + 60*0.4) = round(21 + 19.5 + 24) = round(64.5) = 64 or 65
+        # penalty = 16+10+10 = 36
+        # risk_health = 64
+        # score = round(70*0.3 + 65*0.3 + 64*0.4) = round(21 + 19.5 + 25.6) = 66
         result = compute_posture(_full_kpis())
-        assert result["score"] in (64, 65)
+        assert result["score"] == 66
 
     def test_component_keys_present(self):
         result = compute_posture(_full_kpis())
@@ -109,8 +110,10 @@ class TestComputePostureFull:
 
     def test_risk_health_value_at_zero_risk(self):
         kpis = _full_kpis(risk_flows_total=0, true_gap_pct=0.0)
-        # Remove lateral risk by setting ratio=1.0
+        # Remove lateral risk by setting ratio=1.0; zero risk flows means mod12
+        # would also emit risk_port_control ratio=1.0 (keep the fixture consistent).
         kpis["maturity_dimensions"]["lateral_movement_control"]["ratio"] = 1.0
+        kpis["maturity_dimensions"]["risk_port_control"]["ratio"] = 1.0
         result = compute_posture(kpis)
         rh = next(c for c in result["components"] if c["key"] == "risk_health")
         assert rh["value"] == pytest.approx(100.0, abs=0.1)
@@ -195,6 +198,7 @@ class TestRiskPenaltyBounds:
 
     def test_extreme_ransomware_penalty_capped(self):
         kpis = _full_kpis(risk_flows_total=1000)
+        kpis["maturity_dimensions"]["risk_port_control"]["ratio"] = 0.0
         result = compute_posture(kpis)
         rh = next(c for c in result["components"] if c["key"] == "risk_health")
         # ransomware_pts capped at 40, so penalty <= 100, risk_health >= 0
@@ -203,9 +207,38 @@ class TestRiskPenaltyBounds:
     def test_zero_risk_full_risk_health(self):
         kpis = _full_kpis(risk_flows_total=0, true_gap_pct=0.0)
         kpis["maturity_dimensions"]["lateral_movement_control"]["ratio"] = 1.0
+        kpis["maturity_dimensions"]["risk_port_control"]["ratio"] = 1.0
         result = compute_posture(kpis)
         rh = next(c for c in result["components"] if c["key"] == "risk_health")
         assert rh["value"] == 100.0
+
+    def test_ransomware_penalty_follows_risk_port_control_not_flow_count(self):
+        """risk_flows_total 是流量筆數，不是 app 數：以前 count*5 讓任何真實環境
+        （>= 8 筆風險流量）永遠頂在 40 分上限，Ransomware Containment 恆為 0%。
+        罰分現在跟著 mod12 已正規化的 risk_port_control ratio 走。"""
+        clean = _full_kpis(risk_flows_total=5000)
+        clean["maturity_dimensions"]["risk_port_control"]["ratio"] = 1.0
+        dirty = _full_kpis(risk_flows_total=5000)
+        dirty["maturity_dimensions"]["risk_port_control"]["ratio"] = 0.0
+
+        def _sub(kpis):
+            rh = next(c for c in compute_posture(kpis)["components"]
+                      if c["key"] == "risk_health")
+            return {s["key"]: s for s in rh["risk_subscores"]}["ransomware_containment"]
+
+        assert _sub(clean)["penalty_points"] == 0
+        assert _sub(clean)["value"] == 100
+        assert _sub(dirty)["penalty_points"] == 40
+        assert _sub(dirty)["value"] == 0
+
+    def test_ransomware_penalty_normalizes_by_total_flows_when_ratio_absent(self):
+        """沒有 maturity_dimensions 時，用 total_flows 自行正規化（同 mod12 斜率）。"""
+        kpis = {"enforced_coverage_pct": 80.0, "maturity_score": 70.0,
+                "risk_flows_total": 100, "total_flows": 10000}  # 1% → ratio 0.95
+        rh = next(c for c in compute_posture(kpis)["components"]
+                  if c["key"] == "risk_health")
+        sub = {s["key"]: s for s in rh["risk_subscores"]}["ransomware_containment"]
+        assert sub["penalty_points"] == 2
 
     def test_score_clamp_upper(self):
         kpis = {

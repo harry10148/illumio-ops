@@ -22,17 +22,22 @@ def reset():
     _reset_singleton()
 
 
-def test_console_no_color_when_NO_COLOR_env_set():
+def test_console_no_color_when_NO_COLOR_env_set(monkeypatch):
+    # Force the TTY path: under pytest stdout is not a TTY, and rich then
+    # reports color_system is None regardless of NO_COLOR — an assertion that
+    # tolerated that would pass even with the NO_COLOR branch deleted.
+    monkeypatch.setattr(_render, '_stdout_is_tty', lambda: True)
     os.environ['NO_COLOR'] = '1'
     c = _render._get_console()
-    assert c.no_color is True or c.color_system is None
+    assert c.no_color is True
 
 
-def test_console_no_color_when_term_dumb():
+def test_console_no_color_when_term_dumb(monkeypatch):
+    monkeypatch.setattr(_render, '_stdout_is_tty', lambda: True)
     os.environ.pop('NO_COLOR', None)
     os.environ['TERM'] = 'dumb'
     c = _render._get_console()
-    assert c.no_color is True or c.color_system is None
+    assert c.no_color is True
 
 
 def test_console_not_terminal_when_stdout_not_tty(monkeypatch):

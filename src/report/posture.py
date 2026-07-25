@@ -14,14 +14,22 @@ The traffic snapshot written by ReportGenerator contains top-level keys from
                          → risk_control_ratio (fallback for penalty)
 
 Risk penalty is derived from risk signals embedded in the snapshot:
-  - ransomware_apps   : snapshot.get("risk_flows_total") or kpis dict
+  - ransomware risk   : maturity_dimensions.risk_port_control.ratio (0-1, higher
+                        = better), falling back to risk_flows_total / total_flows
   - lateral_risk      : snapshot.get("lateral_movement_control") ratio from
                         maturity_dimensions (0-1; higher = better control)
   - uncovered_flows   : snapshot.get("true_gap_pct") or pb_uncovered_exposure
 
 Risk penalty formula (bounded 0-100):
-  ransomware_pts = min(40, ransomware_apps * 5)
-      → each ransomware-exposed app costs 5 pts; cap at 40
+  ransomware_pts = round((1 - risk_port_control_ratio) * 40)
+      → risk_port_control 是 mod12 已正規化的比例（1 = 無風險埠曝險，
+        0 = 風險流量佔比 >= 20%）。舊版直接以 risk_flows_total（流量「筆數」）
+        乘 5 計分，但那是筆數不是 app 數，任何真實環境都 >= 8 筆，罰分永遠
+        頂在 40 分上限，Ransomware Containment 永遠顯示 0%、分數也不會因為
+        實際改善而變動。
+      → 沒有 risk_port_control 時退回自行正規化（risk_flows_total /
+        total_flows，同 mod12 的 *5 斜率）；兩者皆無、只有一個沒有分母的計數
+        時，才沿用舊的 min(40, count * 5) 粗略尺度。
   lateral_pts    = round((1 - lateral_control_ratio) * 30)
       → fully uncontrolled lateral movement costs 30 pts; 0 if fully controlled
   uncovered_pts  = min(30, uncovered_pct * 0.5)
@@ -116,12 +124,30 @@ def compute_posture(kpis: dict) -> dict:
     # ransomware_apps: count of risk/ransomware-exposed flows (risk_flows_total)
     ransomware_apps = 0
     rft = _get_float(kpis, "risk_flows_total")
+    # rft 的單位決定它能不能直接當罰分尺度：risk_flows_total 是「流量筆數」
+    # （需要分母正規化），high_risk_lateral_paths 是路徑計數（原尺度可用）。
+    rft_is_flow_count = rft is not None
     if rft is None:
         flat_kpis = kpis.get("kpis") or {}
         if isinstance(flat_kpis, dict):
             rft = _get_float(flat_kpis, "high_risk_lateral_paths")
     if rft is not None:
         ransomware_apps = int(rft)
+
+    # risk_port_control ratio：mod12 已把風險埠曝險正規化為 0-1（1 = 乾淨）
+    dims_for_risk = kpis.get("maturity_dimensions") or {}
+    rpc = dims_for_risk.get("risk_port_control") or {}
+    risk_control_ratio: Optional[float] = None
+    if rpc.get("ratio") is not None:
+        try:
+            risk_control_ratio = float(rpc["ratio"])
+        except (TypeError, ValueError):
+            pass
+    if risk_control_ratio is None and rft_is_flow_count:
+        total_flows = _get_float(kpis, "total_flows")
+        if total_flows and total_flows > 0:
+            # 與 mod12 的 risk_port_control 同斜率：20% 風險流量 = 0 分
+            risk_control_ratio = max(0.0, 1.0 - min(rft / total_flows * 5.0, 1.0))
 
     # lateral_control_ratio: from maturity_dimensions (0=bad, 1=fully controlled)
     lateral_control_ratio: float = 1.0  # assume best if unknown
@@ -151,14 +177,20 @@ def compute_posture(kpis: dict) -> dict:
                 uncovered_avail = True
 
     # Risk penalty (documented in module docstring)
-    ransomware_pts = min(40, ransomware_apps * 5)
+    if risk_control_ratio is not None:
+        ransomware_pts = round((1.0 - min(1.0, max(0.0, risk_control_ratio))) * 40)
+    else:
+        # 沒有分母可正規化：只有 high_risk_lateral_paths 這種原尺度計數，或
+        # 舊格式快照（無 maturity_dimensions / total_flows）才會走到這裡。
+        ransomware_pts = min(40, ransomware_apps * 5)
     lateral_pts = round((1.0 - min(1.0, max(0.0, lateral_control_ratio))) * 30)
     uncovered_pts = min(30, uncovered_pct * 0.5)
     penalty = min(100.0, ransomware_pts + lateral_pts + uncovered_pts)
     risk_health = max(0.0, 100.0 - penalty)
 
     # Determine whether risk component is "available" (at least one signal present)
-    has_risk = (rft is not None or tgp is not None
+    ransomware_avail = risk_control_ratio is not None or rft is not None
+    has_risk = (ransomware_avail or tgp is not None
                 or lm.get("ratio") is not None)
 
     # ── Score computation with weight renormalization ──────────────────────────
@@ -216,7 +248,7 @@ def compute_posture(kpis: dict) -> dict:
     if has_risk:
         rh_points = round(eff_rsk * risk_health, 2)
         risk_subscores = []
-        if rft is not None:
+        if ransomware_avail:
             risk_subscores.append({
                 "key": "ransomware_containment",
                 "label_key": "gui_posture_sub_ransomware",
@@ -254,6 +286,8 @@ def compute_posture(kpis: dict) -> dict:
             "note_key": "gui_posture_risk_health_note",
             "risk_subscores": risk_subscores,
             "detail": {
+                # key 名沿用（dashboard.js 以此顯示原始計數，標籤已改為
+                # 「Ransomware risk flows」）；罰分本身已改由 risk_port_control 換算。
                 "ransomware_apps": ransomware_apps,
                 "lateral_control_ratio": round(lateral_control_ratio, 4),
                 "uncovered_pct": round(uncovered_pct, 2),

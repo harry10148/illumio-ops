@@ -16,6 +16,13 @@ from typing import Any
 
 _ANY = "ANY"
 
+# 單一 rule 的 src×dst 上限。scoped ruleset 內「ams → ams」是常見寫法，兩側
+# 都會展開成 scope 內全部 workload IP：5,000 台就是 2,500 萬列（每列一個
+# dict，數 GB 記憶體），足以讓報表行程 OOM。超過上限時把較大的一側收斂成一
+# 個摘要 token，並在列上標記 truncated，讓「被收斂」看得出來（不是靜默截斷，
+# 也不是用 ANY 假裝成全域——那會比實際更寬）。
+_MAX_RULE_PAIRS = 100_000
+
 
 _PROTO_NAMES = {6: "TCP", 17: "UDP", 1: "ICMP", 58: "ICMPv6", 47: "GRE", 50: "ESP", -1: "ANY"}
 
@@ -210,6 +217,31 @@ def _services(rule: dict, service_to_ports: dict[str, list[dict]],
     return out
 
 
+def _summary_token(n: int) -> str:
+    """被收斂那一側的替代值——刻意不是合法 IP，讀者/下游不會誤當成可套用位址。"""
+    return f"<{n} hosts: expansion capped>"
+
+
+def _cap_sides(srcs: list[str], dsts: list[str]) -> tuple[list[str], list[str], str]:
+    """回傳 (srcs, dsts, truncated)；truncated 為 ""/"src"/"dst"/"src,dst"。"""
+    if len(srcs) * len(dsts) <= _MAX_RULE_PAIRS:
+        return srcs, dsts, ""
+    capped: list[str] = []
+    # 先收斂較大的一側；若仍超過上限，兩側都收斂。
+    if len(srcs) >= len(dsts):
+        srcs, first, other = [_summary_token(len(srcs))], "src", "dst"
+    else:
+        dsts, first, other = [_summary_token(len(dsts))], "dst", "src"
+    capped.append(first)
+    if len(srcs) * len(dsts) > _MAX_RULE_PAIRS:
+        if other == "dst":
+            dsts = [_summary_token(len(dsts))]
+        else:
+            srcs = [_summary_token(len(srcs))]
+        capped.append(other)
+    return srcs, dsts, ",".join(capped)
+
+
 def resolve_ruleset(
     ruleset: dict,
     *,
@@ -266,6 +298,7 @@ def resolve_ruleset(
             # scoped out, or empty after scope filtering).
             if not srcs or not dsts:
                 continue
+            srcs, dsts, truncated = _cap_sides(srcs, dsts)
             for svc in _services(rule, service_to_ports, service_to_names):
                 for s_ip in srcs:
                     for d_ip in dsts:
@@ -288,5 +321,7 @@ def resolve_ruleset(
                         }
                         if "port_to" in svc:
                             row["port_to"] = svc["port_to"]
+                        if truncated:
+                            row["truncated"] = truncated
                         rows.append(row)
     return rows

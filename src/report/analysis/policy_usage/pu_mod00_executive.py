@@ -43,12 +43,21 @@ def pu_executive_summary(results: dict, lookback_days: int, *, lang: str = "en")
         {"label_key": "rpt_pu_kpi_top_hit_port", "label": t("rpt_pu_kpi_top_hit_port", default="Top Hit Port", lang=lang), "value": top_port_label},
     ]
 
+    # Top rulesets by unused rules 必須用 mod03 未截斷的計數。改從 unused_df
+    # 重數會落在 _MAX_ROWS 截斷後、且按 Ruleset 字母序排過的表格上：字母序在
+    # 後、未使用規則最多的 ruleset 會整個消失，排名因此指向錯的補救目標。
     attention_items = []
-    unused_df = mod03.get("unused_df")
-    if unused_df is not None and not unused_df.empty and "Ruleset" in unused_df.columns:
-        counts = Counter(unused_df["Ruleset"].tolist())
-        for rs_name, cnt in counts.most_common(5):
-            attention_items.append({"ruleset": rs_name, "unused_count": cnt})
+    by_ruleset = mod03.get("unused_by_ruleset")
+    if by_ruleset is None:
+        # 只有舊的 mod03 形狀（沒有這個鍵）才退回從表格重數。
+        unused_df = mod03.get("unused_df")
+        by_ruleset = (
+            Counter(unused_df["Ruleset"].tolist())
+            if unused_df is not None and not unused_df.empty
+            and "Ruleset" in unused_df.columns else {}
+        )
+    for rs_name, cnt in Counter(by_ruleset).most_common(5):
+        attention_items.append({"ruleset": rs_name, "unused_count": cnt})
 
     execution_notes = []
     if cached:

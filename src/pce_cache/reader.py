@@ -189,8 +189,8 @@ class CacheReader:
         self._guard_window(start, end, workload_hrefs, policy_decisions)
         from src.report.parsers.api_parser import flatten_flow_record, build_unified_df
 
-        def _window(col):
-            q = select(col).where(
+        def _window(*cols):
+            q = select(*cols).where(
                 PceTrafficFlowRaw.last_detected >= start,
                 PceTrafficFlowRaw.last_detected <= end,
             )
@@ -206,19 +206,20 @@ class CacheReader:
 
         rows = []
         with self._sf() as s:
-            # Fast path: only read report_json (avoids transferring the ~1.2KB
-            # raw_json blob per row when the flatten is already cached).
-            for (rj,) in s.execute(
-                _window(PceTrafficFlowRaw.report_json).where(
-                    PceTrafficFlowRaw.report_json.is_not(None))
-            ):
-                rows.append(orjson.loads(rj))
-            # Fallback: pre-Tier-2a rows without report_json → flatten raw_json.
-            for (raw,) in s.execute(
-                _window(PceTrafficFlowRaw.raw_json).where(
-                    PceTrafficFlowRaw.report_json.is_(None))
-            ):
-                rows.append(flatten_flow_record(orjson.loads(raw)))
+            # 單一 statement 讀完整個視窗。拆成 report_json IS NOT NULL /
+            # IS NULL 兩次 SELECT 會分別看到不同快照（pysqlite 不為 SELECT 開
+            # 讀交易），ingest 若在兩者之間把某列的 report_json 由 NULL 改成
+            # 非 NULL 該列就兩邊都落空、被漏算；反向（flatten 失敗寫回 None）
+            # 則被算兩次。coalesce 只回傳一個欄位，仍保有「有 report_json 就
+            # 不搬 ~1.2KB raw_json」的傳輸量優勢；旗標欄指出該不該再 flatten。
+            for payload, needs_flatten in s.execute(_window(
+                func.coalesce(PceTrafficFlowRaw.report_json, PceTrafficFlowRaw.raw_json),
+                PceTrafficFlowRaw.report_json.is_(None),
+            )):
+                if payload is None:
+                    continue
+                record = orjson.loads(payload)
+                rows.append(flatten_flow_record(record) if needs_flatten else record)
         return build_unified_df(rows, "cache")
 
     def read_flows_agg(self, start: datetime, end: datetime) -> list[dict]:

@@ -125,8 +125,10 @@ def test_rs_schedule_create_missing_type_rejected(client):
     """BUG-3（2026-07-24 審查）：缺 type 不得存成畸形 recurring（無 days）
     導致 check() 每 tick KeyError；直接 400。"""
     csrf = _login(client)
+    # 端點改用三態的 get_provision_state（'unknown' 要能與 'draft' 區分），
+    # is_provisioned 已不在這條路徑上。
     with patch("src.api_client.ApiClient.has_draft_changes", lambda self, h: False), \
-         patch("src.api_client.ApiClient.is_provisioned", lambda self, h: True):
+         patch("src.api_client.ApiClient.get_provision_state", lambda self, h: 'active'):
         r = client.post(
             "/api/rule_scheduler/schedules",
             json={"href": "/orgs/1/sec_policy/active/rule_sets/1", "name": "x"},
@@ -139,7 +141,7 @@ def test_rs_schedule_create_missing_type_rejected(client):
 def test_rs_schedule_create_unknown_type_rejected(client):
     csrf = _login(client)
     with patch("src.api_client.ApiClient.has_draft_changes", lambda self, h: False), \
-         patch("src.api_client.ApiClient.is_provisioned", lambda self, h: True):
+         patch("src.api_client.ApiClient.get_provision_state", lambda self, h: 'active'):
         r = client.post(
             "/api/rule_scheduler/schedules",
             json={"href": "/orgs/1/sec_policy/active/rule_sets/1", "name": "x", "type": "weird"},

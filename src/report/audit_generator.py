@@ -704,6 +704,7 @@ class AuditGenerator:
             ('mod04', lambda: audit_event_correlation(df)),
         ]
 
+        module_errors: list = []
         for mod_id, fn in _MODS:
             try:
                 results[mod_id] = fn()
@@ -711,7 +712,16 @@ class AuditGenerator:
             except Exception as e:
                 logger.warning(f"{mod_id} failed: {e}")
                 results[mod_id] = {'error': str(e)}
+                module_errors.append({'module': mod_id, 'error': str(e)})
 
+        # 失敗模組的 KPI 會被 audit_executive_summary 以 .get(key, 0) 讀成真 0；
+        # 記下來讓匯出端／儀表板快照能判斷這份結果不完整（見 export()）。
+        results['_module_errors'] = module_errors
+        self.last_module_errors = module_errors
+        if module_errors:
+            logger.error("[AuditGenerator] {} analysis module(s) failed: {}",
+                         len(module_errors),
+                         ", ".join(e['module'] for e in module_errors))
         results['mod00'] = audit_executive_summary(results, df, lang=self._lang)
         print(t("rpt_audit_complete", lang=self._lang) + "             ")
 
@@ -732,6 +742,9 @@ class AuditGenerator:
         # Inherit the generation language when caller omits lang (see ReportGenerator.export).
         lang = lang or getattr(self, '_lang', 'en')
         paths = []
+        # 與 ReportGenerator 同契約：每種格式的失敗原因要能被 GUI 讀到，
+        # 而不是只留一行 log、然後回報「成功但少一個檔」。
+        self.last_export_errors: dict[str, str] = {}
         if fmt in ('html', 'all'):
             path = AuditHtmlExporter(
                 result.module_results, df=result.dataframe,
@@ -745,15 +758,24 @@ class AuditGenerator:
             print(t("rpt_audit_html_saved", path=path, lang=lang))
 
         if fmt in ('xlsx', 'all'):
+            xlsx_path = None
             try:
                 import datetime as _dt
+                from src.report.exporters._output_paths import reserve_unique_path
                 ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
-                xlsx_path = os.path.join(output_dir, f'Illumio_Audit_Report_{ts_str}.xlsx')
+                # 同分鐘併發產出會撞名（見 _output_paths）；先搶下唯一路徑。
+                xlsx_path = reserve_unique_path(
+                    os.path.join(output_dir, f'Illumio_Audit_Report_{ts_str}.xlsx'))
                 generate_audit_xlsx(result.module_results or {}, xlsx_path, lang=lang)
                 paths.append(xlsx_path)
                 print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}", lang=lang))
             except Exception as exc:
-                logger.warning('XLSX export failed: {}', exc)
+                logger.exception('XLSX export failed: {}', exc)
+                self.last_export_errors['xlsx'] = str(exc) or exc.__class__.__name__
+                # 半寫的活頁簿不在 paths 裡，但 GUI 報表列表只看副檔名照樣列出。
+                if xlsx_path:
+                    from src.report.exporters._output_paths import discard_reserved
+                    discard_reserved(xlsx_path)
 
         if fmt in ('csv', 'all'):
             # Include full raw event data alongside module results
@@ -764,6 +786,17 @@ class AuditGenerator:
             paths.append(path)
             self._write_report_metadata(path, result, file_format='csv')
             print(t("rpt_audit_csv_saved", path=path, lang=lang))
+        # 有模組失敗時，mod00 的 KPI 是 .get(key, 0) 讀出來的假 0。把假 0 寫進
+        # 儀表板摘要與趨勢基準，下一次執行的 delta 會顯示一次不存在的「歸零」，
+        # 而且錯誤值會留存在報表結束之後。寧可保留上一輪（有時間戳）的資料。
+        _mod_errs = (result.module_results or {}).get('_module_errors') or []
+        if _mod_errs:
+            logger.warning(
+                "[AuditGenerator] Skipping dashboard summary + trend snapshot: "
+                "module(s) failed ({})",
+                ", ".join(str(e.get('module')) for e in _mod_errs))
+            return paths
+
         try:
             write_audit_dashboard_summary(output_dir, result)
         except Exception as exc:

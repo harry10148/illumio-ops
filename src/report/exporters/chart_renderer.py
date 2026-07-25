@@ -174,7 +174,18 @@ def _build_matplotlib_figure(spec: dict[str, Any], *, lang: str = "en"):
     y_label = _resolve_chart_text(spec, "y_label", lang=lang)
 
     fig, ax = plt.subplots(figsize=(8, 5), dpi=100)
+    try:
+        _draw_chart(fig, ax, chart_type, data, title, x_label, y_label)
+    except BaseException:
+        # pyplot 的 Gcf 對 Figure 持強參考，畫失敗若不 close 就永遠回收不掉；
+        # 兩個呼叫端都會吞掉例外（壞圖不可弄死整份報表），在長駐的 GUI/排程
+        # 行程裡會隨每次報表累積。
+        plt.close(fig)
+        raise
+    return fig
 
+
+def _draw_chart(fig, ax, chart_type, data, title, x_label, y_label) -> None:
     if chart_type == "bar":
         labels = data.get("labels", [])
         ax.bar(labels, data.get("values", []), color="#375379")
@@ -259,30 +270,32 @@ def _build_matplotlib_figure(spec: dict[str, Any], *, lang: str = "en"):
         ax.set_ylim(-1.5, 1.5)
         ax.axis("off")
     else:
-        plt.close(fig)
         raise ValueError(f"unsupported chart type: {chart_type!r}")
 
     ax.set_title(title)
     fig.tight_layout()
-    return fig
 
 
 def render_matplotlib_png(spec: dict[str, Any], *, lang: str = "en") -> bytes:
     """Render chart spec as a PNG byte string (for Excel embedding)."""
     fig = _build_matplotlib_figure(spec, lang=lang)
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=100)
-    plt.close(fig)
+    try:
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", dpi=100)
+    finally:
+        plt.close(fig)
     return buf.getvalue()
 
 
 def render_matplotlib_svg(spec: dict[str, Any], *, lang: str = "en") -> str:
     """Render chart spec as inline-embeddable SVG markup (for HTML reports)."""
     fig = _build_matplotlib_figure(spec, lang=lang)
-    buf = io.BytesIO()
-    # Omit metadata fields (Date, Creator) to reduce SVG size for embedded reports.
-    fig.savefig(buf, format="svg", metadata={"Date": None, "Creator": None})
-    plt.close(fig)
+    try:
+        buf = io.BytesIO()
+        # Omit metadata fields (Date, Creator) to reduce SVG size for embedded reports.
+        fig.savefig(buf, format="svg", metadata={"Date": None, "Creator": None})
+    finally:
+        plt.close(fig)
     svg = buf.getvalue().decode("utf-8")
     # Strip XML declaration / DOCTYPE so the markup embeds directly in HTML.
     idx = svg.find("<svg")

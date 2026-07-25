@@ -426,8 +426,17 @@ class _RuleSchedulerCLI:
         else:
             return
 
-        # Block draft-only scheduling natively to protect rulesets
-        if self.api.has_draft_changes(target_href) or not self.api.is_provisioned(target_href):
+        # Block draft-only scheduling natively to protect rulesets.
+        # get_provision_state 三態：'unknown' 是「PCE 沒回答」而非「只有
+        # draft」——一樣擋下（fail-closed 不變），但訊息要講真正的原因。
+        if self.api.has_draft_changes(target_href):
+            print(f"{Colors.FAIL}[!] {t('rs_sch_draft_block')}{Colors.ENDC}")
+            return
+        prov_state = self.api.get_provision_state(target_href)
+        if prov_state == 'unknown':
+            print(f"{Colors.FAIL}[!] {t('rs_sch_pce_unreachable')}{Colors.ENDC}")
+            return
+        if prov_state != 'active':
             print(f"{Colors.FAIL}[!] {t('rs_sch_draft_block')}{Colors.ENDC}")
             return
 

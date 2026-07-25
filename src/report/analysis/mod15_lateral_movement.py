@@ -87,6 +87,12 @@ def _articulation_points(nodes: list[str], graph: dict[str, set[str]]) -> set[st
     return points
 
 def _bfs_reachability(source: str, adjacency: dict[str, set[str]], max_depth: int) -> dict[str, list[str]]:
+    """source 在 max_depth 步內可達的節點 → 最短路徑。
+
+    只在「首次抵達」時入列（真 BFS）。舊版無條件把每個鄰居入列，等於枚舉所有
+    simple path：在密集的橫向圖上（out-degree 40+）會膨脹成數百萬條 path，報表
+    卡住數十分鐘。BFS 先到即最短，節點集合與記錄的路徑與舊版一致。
+    """
     paths: dict[str, list[str]] = {}
     q: deque[tuple[str, list[str]]] = deque([(source, [source])])
     while q:
@@ -94,11 +100,10 @@ def _bfs_reachability(source: str, adjacency: dict[str, set[str]], max_depth: in
         if len(path) - 1 >= max_depth:
             continue
         for nxt in sorted(adjacency.get(node, set())):
-            if nxt in path:
+            if nxt in path or nxt in paths:
                 continue
             new_path = path + [nxt]
-            if nxt not in paths:
-                paths[nxt] = new_path
+            paths[nxt] = new_path
             q.append((nxt, new_path))
     return paths
 
@@ -214,16 +219,26 @@ def lateral_movement_risk(df: pd.DataFrame, top_n: int = 20, max_depth: int = 4,
     nodes = sorted(set(undirected.keys()) | {n for neigh in undirected.values() for n in neigh})
     articulation = _articulation_points(nodes, undirected)
 
-    # Build node_key → unique IPs for fallback display when labels are absent
+    # Build node_key → unique IPs for fallback display when labels are absent.
+    # 去重用 set，不用 list membership：未標記端點全部落在同一個
+    # "unlabeled|unlabeled" key，list 掃描是 rows × distinct-IP 的平方成本
+    # （實測 200k 列 / 20k IP 多花約 40 秒）。順序與原實作相同（首次出現序）。
     node_ips: dict[str, list[str]] = {}
-    for _, _row in traversable.iterrows():
-        for key_col, ip_col in (("src_key", "src_ip"), ("dst_key", "dst_ip")):
-            k = str(_row.get(key_col, ""))
-            ip = str(_row.get(ip_col, ""))
-            if k and ip:
-                bucket = node_ips.setdefault(k, [])
-                if ip not in bucket:
-                    bucket.append(ip)
+    _seen_ips: dict[str, set[str]] = {}
+    _cols = ("src_key", "src_ip", "dst_key", "dst_ip")
+    _vals = [
+        traversable[c].astype(str).tolist() if c in traversable.columns
+        else [""] * len(traversable)
+        for c in _cols
+    ]
+    for s_key, s_ip, d_key, d_ip in zip(*_vals):
+        for k, ip in ((s_key, s_ip), (d_key, d_ip)):
+            if not k or not ip:
+                continue
+            seen = _seen_ips.setdefault(k, set())
+            if ip not in seen:
+                seen.add(ip)
+                node_ips.setdefault(k, []).append(ip)
 
     reach_rows: list[dict] = []
     path_rows: list[dict] = []

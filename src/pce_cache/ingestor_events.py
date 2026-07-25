@@ -28,9 +28,17 @@ class EventsIngestor:
         self._wm = watermark
         self._async_threshold = async_threshold
         self._siem_dests = list(siem_destinations or [])
+        # Set by run_once() when the sync events pull hit max_results and the
+        # async fallback did not drain the window — the PCE returns only the
+        # NEWEST rows at the cap, so older events in that window are lost for
+        # good. Shape mirrors TrafficIngestor.last_run_overflow /
+        # Analyzer.state["event_overflow"] so run_events_ingest can persist it
+        # and Analyzer._maybe_alert_overflow can alert on it unchanged.
+        self.last_run_overflow: Optional[dict] = None
 
     def run_once(self, *, force_async: bool = False) -> int:
         since = self._since_cursor()
+        self.last_run_overflow = None
         try:
             if force_async:
                 events = self._api.get_events_async(since=since, rate_limit=True)
@@ -41,10 +49,25 @@ class EventsIngestor:
                     rate_limit=True,
                 )
                 if len(events) >= self._async_threshold:
-                    logger.info(
-                        "Events sync pull hit cap ({}), switching to async",
-                        self._async_threshold,
+                    # WARNING（非 INFO）：碰頂代表「比回傳批次更舊的事件」已經
+                    # 被 PCE 丟掉，除非下面的 async 補抓真的把整個視窗抽乾。
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    logger.warning(
+                        "Events sync pull hit cap ({}) for window since={} — the PCE "
+                        "returns only the newest rows at the cap, so older events in "
+                        "this window are permanently lost; switching to async",
+                        self._async_threshold, since,
                     )
+                    self.last_run_overflow = {
+                        "detected_at": now_iso,
+                        "query_since": since,
+                        "query_until": now_iso,
+                        "raw_count": len(events),
+                        "max_results": self._async_threshold,
+                        # 來源標記：Analyzer 的 cache 分支只清「legacy pull 留下的」
+                        # 陳舊紀錄，看到這個來源就不清（見 _run_event_analysis）。
+                        "source": "cache_ingest",
+                    }
                     events_async = self._api.get_events_async(since=since, rate_limit=True)
                     # get_events_async is an unimplemented stub returning [] (Phase
                     # 13). Never let its empty result clobber the already-fetched
@@ -55,6 +78,9 @@ class EventsIngestor:
                     # advance below pages forward to its max timestamp.
                     if events_async:
                         events = events_async
+                        # async 查詢沒有 max_results 上限：整個視窗真的抽乾了，
+                        # 這一輪就不算資料遺失，撤回 overflow 訊號。
+                        self.last_run_overflow = None
         except Exception as exc:
             logger.exception("Events ingest failed: {}", exc)
             self._wm.record_error(self.SOURCE, str(exc))

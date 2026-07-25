@@ -181,7 +181,7 @@ stale 灰化邏輯，僅在資料不可用（`verdict === 'unknown'` 或 `no_cac
 - **Traffic Analyzer**：依 Policy Decision（Blocked／Potentially
   Blocked／Allowed／All，含 unknown 語意）、以及 FilterBar 物件選擇器
   （見上節）篩選流量，KPI 條顯示 flows／connections／目的 IP 數／尖峰頻
-  寬，並有 7 天趨勢圖（可切換「僅顯示已標記」）。查詢工具列的「Data source」
+  寬。查詢工具列的「Data source」
   下拉可切換至 Archive 模式，輸入日期區間並點擊「Load archive」按鈕即可
   載入已從主 cache 清除但仍保存在歸檔 JSONL 中的舊流量記錄，詳見 
   [cache-maintenance.md](cache-maintenance.md) §3.4。
@@ -378,5 +378,5 @@ last-run 狀態）、**Logs**。
 | Report 產生／刪除 | `/api/reports/*`、`/api/*_report/generate` | 查 PCE、寫檔／刪檔；勾 Email 會寄信 |
 | Cache backfill／retention | `/api/cache/backfill`、`/retention/run` | 查 PCE 寫入／永久刪除快取列 |
 | SIEM test／DLQ replay／purge | `/api/siem/*` | 送測試事件／重送／永久刪除 |
-| TLS Renew／Import／Generate CSR | `/api/security`（TLS 區塊） | 產生或覆寫憑證／金鑰檔，需重啟服務才套用 |
+| TLS Renew／Import／Generate CSR | `/api/tls/renew`、`/api/tls/import-cert`、`/api/tls/generate-csr` | 產生或覆寫憑證／金鑰檔，需重啟服務才套用 |
 | Stop（頁首 Operations 選單） | `/api/shutdown` | 停止 Web 服務（僅非持久模式可用） |

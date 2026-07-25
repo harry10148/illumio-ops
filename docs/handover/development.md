@@ -215,7 +215,7 @@ def t(key: str, *, lang: str | None = None, default: str | None = None, **kwargs
 | 儲存資料（`config/alerts.json` 的規則描述／建議、稽核日誌） | 寫入時的語言凍結，切換語言後不重新翻譯 |
 | Report HTML | 產生時的語言凍結 |
 
-**Dashboard 快照重譯**：快照 JSON 的 `kpis` 條目可帶 `label_key`（如 `{"label": "Hit Rules", "value": "42", "label_key": "rpt_pu_hit_rules"}`）。`src/gui/routes/dashboard.py` 的 `_retranslate_kpi_labels(data, lang)` 在三個端點（`/api/dashboard`、`/api/dashboard/story`、`/api/dashboard/policy-usage`）遍歷 `kpis`，有 `label_key` 就用 `t(label_key, lang=lang)` 覆寫 `label`，讓 Dashboard 顯示跟隨當前 UI 語言而非快照寫入時的語言。沒有 `label_key` 的舊快照維持原樣，隨新快照產生自然淘汰。
+**Dashboard 快照重譯**：快照 JSON 的 `kpis` 條目可帶 `label_key`（如 `{"label": "Hit Rules", "value": "42", "label_key": "rpt_pu_hit_rules"}`）。`src/gui/routes/dashboard.py` 的 `_retranslate_kpi_labels(data, lang)` 在三個端點（`/api/dashboard/snapshot`、`/api/dashboard/audit_summary`、`/api/dashboard/policy_usage_summary`）遍歷 `kpis`，有 `label_key` 就用 `t(label_key, lang=lang)` 覆寫 `label`，讓 Dashboard 顯示跟隨當前 UI 語言而非快照寫入時的語言。沒有 `label_key` 的舊快照維持原樣，隨新快照產生自然淘汰。
 
 **前端規則：一律存 `label_key`，`label` 只作顯示用**。這不只適用於 Dashboard 快照——任何帶 `label_key` 欄位的物件（快照 KPI、FieldMeta、chart spec）都遵守同一原則：`label_key` 是權威值，`label` 是目前語言的渲染結果，不應被當作資料來源使用。`_retranslate_kpi_labels()` 與 `FieldMeta.render(lang=)` 都依賴 `label_key` 存在才能重新翻譯；新增前端程式碼時，只要物件會被跨語言重用，就必須連帶存 `label_key`。
 

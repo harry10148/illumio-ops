@@ -53,6 +53,38 @@ function Resolve-Nssm {
     exit 1
 }
 
+# ── ACL hardening (parity with install.sh's chown/chmod block) ────────────────
+# $InstallRoot is created under C:\ by default, and C:\'s default DACL grants
+# BUILTIN\Users Read & Execute — so without this every interactive/domain user
+# could read config\config.json (PCE api.key/api.secret, smtp.password,
+# LINE/Telegram tokens, web_gui.secret_key + the Argon2 hash) and the TLS
+# private key under config\tls\. install.sh keeps exactly those files 0600 and
+# config\/logs\ 0750, so the Windows path must not be looser. The app's own
+# os.chmod(0o600) cannot compensate: on Windows it only toggles the read-only
+# attribute and never touches the DACL.
+# The service runs as LocalSystem (deploy\install_service.ps1 sets no
+# ObjectName, which is NSSM's default), so SYSTEM + Administrators is the
+# complete access list — there is no separate service account to grant.
+# SIDs are used instead of names because the built-in group names are localized
+# on non-English Windows.
+$script:SID_SYSTEM = "*S-1-5-18"          # NT AUTHORITY\SYSTEM
+$script:SID_ADMINS = "*S-1-5-32-544"      # BUILTIN\Administrators
+
+function Set-SecureAcl {
+    param([string]$Path, [switch]$Recurse)
+    if (-not (Test-Path $Path)) { return }
+    $extra = @()
+    if ($Recurse) { $extra = @("/T", "/C") }
+    & icacls.exe $Path /inheritance:r `
+        /grant:r "$($script:SID_SYSTEM):(OI)(CI)F" "$($script:SID_ADMINS):(OI)(CI)F" `
+        @extra /Q | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: failed to restrict ACLs on $Path (icacls exit $LASTEXITCODE)." -ForegroundColor Red
+        Write-Host "       Refusing to continue — config\config.json would stay readable by BUILTIN\Users." -ForegroundColor Red
+        exit 1
+    }
+}
+
 function Invoke-NssmSet {
     param([string[]]$NssmArgs)
     & $script:NSSM set @NssmArgs
@@ -70,7 +102,12 @@ function Get-MigratedAppParameters {
     param([string]$OldRoot, [string]$NewRoot)
     $current = ((& $script:NSSM get IllumioOps AppParameters 2>$null) -join "").Trim()
     if ([string]::IsNullOrWhiteSpace($current)) {
-        return "$NewRoot\illumio-ops.py --monitor --interval 10"
+        # Must match deploy\install_service.ps1's registration flag: plain
+        # --monitor runs the headless daemon with no Web GUI (src/main.py gates
+        # the GUI on --monitor-gui), and Install-Service never rewrites
+        # AppParameters for an already-registered service, so a wrong value
+        # written here would silently persist.
+        return "$NewRoot\illumio-ops.py --monitor-gui --interval 10"
     }
     return $current.Replace($OldRoot, $NewRoot)
 }
@@ -276,6 +313,11 @@ if ($IsUpgrade) {
 
 Write-Host "==> Installing to $InstallRoot  (upgrade=$IsUpgrade)" -ForegroundColor Cyan
 New-Item -ItemType Directory -Path $InstallRoot -Force | Out-Null
+# Lock the install root down BEFORE anything is copied into it: Robocopy's
+# default /COPY:DAT carries no security descriptor, so every file it writes
+# inherits the ACL set here. Doing it first also means config\config.json is
+# never briefly world-readable.
+Set-SecureAcl -Path $InstallRoot
 # Runtime dirs (parity with install.sh): sqlite creates the cache DB file
 # but not its parent directory, so data\ must exist before first use.
 foreach ($d in @("logs", "data", "reports")) {
@@ -283,7 +325,14 @@ foreach ($d in @("logs", "data", "reports")) {
 }
 
 Write-Host "==> Copying Python runtime"
-Robocopy "$SRC\python" "$InstallRoot\python" /E /NP /NFL /NDL | Out-Null
+# /MIR (= /E /PURGE) restores a pristine bundled runtime on every install and
+# upgrade, exactly like install.sh's `rsync -a --delete`. Without the purge the
+# old site-packages survives, and because requirements-offline.txt uses range
+# specs the pip install below finds every requirement "already satisfied" and
+# upgrades nothing — the host would keep running a dependency set that neither
+# matches the bundle nor anything CI tested, and dropped packages would linger
+# forever. python\ is entirely bundle-owned, so nothing operator-owned is at risk.
+Robocopy "$SRC\python" "$InstallRoot\python" /MIR /NP /NFL /NDL | Out-Null
 if ($LASTEXITCODE -ge 8) {
     Write-Host "ERROR: Robocopy failed copying Python runtime (exit $LASTEXITCODE)" -ForegroundColor Red
     exit 1
@@ -291,11 +340,29 @@ if ($LASTEXITCODE -ge 8) {
 
 Write-Host "==> Copying application files"
 if ($IsUpgrade) {
-    # Preserve operator-owned files on upgrade
-    Robocopy "$SRC\app" "$InstallRoot" /E /NP /NFL /NDL `
-        /XF "config.json" "alerts.json" "rule_schedules.json" | Out-Null
+    # Preserve operator-owned files on upgrade. /PURGE removes app files that no
+    # longer exist in the new release (renamed/deleted src modules would
+    # otherwise linger as importable zombie .py files). The /XD list anchors the
+    # exclusions to the install root — bare directory names would match at any
+    # depth and freeze app-tree dirs such as src\i18n\data out of the upgrade.
+    # config\ is excluded wholesale (it holds config.json, alerts.json,
+    # rule_schedules.json, the runtime TLS material under config\tls\ and the
+    # limiter state); only *.example templates are refreshed afterwards, which
+    # is what install.sh does.
+    # Both the source and destination config\ paths are listed so the exclusion
+    # holds in the copy phase and in the purge phase.
+    Robocopy "$SRC\app" "$InstallRoot" /E /PURGE /NP /NFL /NDL `
+        /XF "config.json" "alerts.json" "rule_schedules.json" "MIGRATED_FROM" `
+        /XD "$SRC\app\config" "$InstallRoot\config" "$InstallRoot\data" `
+            "$InstallRoot\logs" "$InstallRoot\reports" "$InstallRoot\python" | Out-Null
     if ($LASTEXITCODE -ge 8) {
         Write-Host "ERROR: Robocopy failed copying application files (exit $LASTEXITCODE)" -ForegroundColor Red
+        exit 1
+    }
+    # Only update *.example templates so operators can diff for new config keys
+    Robocopy "$SRC\app\config" "$InstallRoot\config" "*.example" /NP /NFL /NDL | Out-Null
+    if ($LASTEXITCODE -ge 8) {
+        Write-Host "ERROR: Robocopy failed refreshing config templates (exit $LASTEXITCODE)" -ForegroundColor Red
         exit 1
     }
 } else {
@@ -306,6 +373,15 @@ if ($IsUpgrade) {
     }
     Copy-Item "$InstallRoot\config\config.json.example" `
               "$InstallRoot\config\config.json" -Force
+}
+
+# Re-assert the secret-bearing subtrees explicitly. On an upgrade the pre-existing
+# config\ and logs\ may still carry ACEs inherited from an install made before
+# this hardening existed, and those are not fixed by the root grant alone.
+# config\tls\ is created by the app on first start, so it may not exist yet — it
+# then inherits from config\, which this call has just restricted.
+foreach ($d in @("config", "logs")) {
+    Set-SecureAcl -Path (Join-Path $InstallRoot $d) -Recurse
 }
 
 Write-Host "==> Installing Python packages (offline)"
@@ -327,8 +403,40 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# App smoke check (parity with install.sh): prove the interpreter can actually
+# import and start the app before a service is pointed at it. Run from
+# $InstallRoot because relative paths in config resolve against the cwd.
+Write-Host "==> Running app smoke check"
+Push-Location $InstallRoot
+try {
+    & "$InstallRoot\python\python.exe" "$InstallRoot\illumio-ops.py" --help | Out-Null
+} finally {
+    Pop-Location
+}
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: app smoke check failed (illumio-ops.py --help, exit $LASTEXITCODE) - installation is incomplete." -ForegroundColor Red
+    exit 1
+}
+
 Write-Host "==> Registering Windows service"
 & "$SRC\deploy\install_service.ps1" -Action install -InstallRoot $InstallRoot
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: service registration failed (exit $LASTEXITCODE) - installation is incomplete." -ForegroundColor Red
+    exit 1
+}
+# install_service.ps1 prints its own success banner unconditionally, so verify
+# the observable result rather than trusting it: the service must exist.
+$svcAfter = Get-Service IllumioOps -ErrorAction SilentlyContinue
+if (-not $svcAfter) {
+    Write-Host "ERROR: service registration reported success but IllumioOps is not registered." -ForegroundColor Red
+    Write-Host "       Diagnose: deploy\nssm.exe status IllumioOps" -ForegroundColor Red
+    exit 1
+}
+if ($svcAfter.Status -ne "Running") {
+    Write-Host "WARNING: IllumioOps is registered but not running (status=$($svcAfter.Status))." -ForegroundColor Yellow
+    Write-Host "         On a fresh install this is expected until config\config.json holds PCE credentials." -ForegroundColor Yellow
+    Write-Host "         Otherwise check $InstallRoot\logs\service_stderr.log, then: Start-Service IllumioOps" -ForegroundColor Yellow
+}
 
 if ($IsUpgrade) {
     Write-Host "==> Upgrade complete. Restart: Restart-Service IllumioOps" -ForegroundColor Green

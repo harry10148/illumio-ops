@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
 import threading
 import time
 from loguru import logger
+from src.file_lock import file_lock
 from src.utils import Colors
 from src.i18n import t, set_language
 from argon2 import PasswordHasher
@@ -163,7 +165,26 @@ class ConfigManager:
         # an update (last writer wins). Re-entrant because load() can itself call
         # save() (web_gui secret/password backfill) inside a held section.
         self._rw_lock = threading.RLock()
+        # 跨行程鎖：_rw_lock 只擋得住同一行程的 thread。常駐的 --monitor-gui
+        # 服務與操作者手動跑的 CLI 是**兩個行程**，各自持有自己的 RLock，整檔
+        # 覆寫會互相蓋掉（密碼/secret_key 輪替被還原、規則憑空消失）。config.json
+        # 與 alerts.json 一律成對寫入，共用同一把鎖檔即可。
+        self._lock_path = os.path.abspath(self.config_file) + ".lock"
+        # load()/save() 當下的磁碟**內容**指紋。save() 在鎖內比對，不一致代表
+        # 「載入之後有別的寫入者改過內容」——此時整檔覆寫必然靜默毀掉對方的
+        # 變更，改為 fail loud。用內容雜湊而非 mtime/inode：另一個寫入者把
+        # 完全相同的內容重寫一次（os.replace 必換 inode）不算衝突，不該誤擋。
+        self._disk_stamp: tuple | None = None
         self.load()
+
+    def _disk_signature(self) -> tuple:
+        def _sig(path: str):
+            try:
+                with open(path, "rb") as f:
+                    return hashlib.sha256(f.read()).hexdigest()
+            except OSError:
+                return None
+        return (_sig(self.config_file), _sig(self.alerts_file))
 
     @property
     def last_loaded_at(self) -> float | None:
@@ -187,9 +208,13 @@ class ConfigManager:
         handler can no longer reassign self.config mid-way through another
         thread's ``with cm.write_lock: load(); mutate; save()`` section. The lock
         is re-entrant, so existing write_lock holders are unaffected.
+
+        外層再加一圈跨行程檔案鎖：讀取與「記錄磁碟指紋」必須在同一個鎖內完成，
+        否則指紋可能對應到另一個行程剛寫入、但我們沒讀到的內容。
         """
         with self._rw_lock:
-            self._load_impl()
+            with file_lock(self._lock_path):
+                self._load_impl()
 
     def _load_impl(self):
         from pydantic import ValidationError
@@ -222,6 +247,9 @@ class ConfigManager:
         # block back into config.json on next save(). Rules in config.json
         # then move out to alerts.json on next save().
         external = self._read_alerts_file()
+        # 兩個檔案都讀完後才記指紋（仍在 load() 的檔案鎖內）：之後 save() 用它
+        # 判斷「我載入之後磁碟是否被別的行程改過」。
+        self._disk_stamp = self._disk_signature()
         if external is not None:
             if isinstance(external, dict) and "rules" in external:
                 raw_data["rules"] = external.get("rules") or []
@@ -420,11 +448,28 @@ class ConfigManager:
             self.save()
 
     def save(self):
-        """Persist config (serialized on the re-entrant lock)."""
+        """Persist config (serialized on the re-entrant lock + cross-process file lock)."""
         with self._rw_lock:
-            self._save_impl()
+            with file_lock(self._lock_path):
+                self._save_impl()
 
     def _save_impl(self):
+        from src.exceptions import ConfigError
+
+        # 陳舊快照守門（必須在檔案鎖內執行——由 save() 持有）。config.json /
+        # alerts.json 是整檔覆寫：若載入之後有別的行程寫過，這次寫入必然把對方
+        # 的變更靜默還原（最糟的情況是把已輪替掉的舊密碼 hash 與舊 secret_key
+        # 寫回，讓退役的密碼與舊 session 重新生效）。fail loud 讓操作者重讀後
+        # 再改一次，而不是無聲毀掉別人的資料。
+        if self._disk_stamp is not None and self._disk_signature() != self._disk_stamp:
+            raise ConfigError(
+                "Refusing to save: config.json/alerts.json changed on disk after "
+                "this session loaded them (another process — the running service, "
+                "the Web GUI, or another CLI — wrote them meanwhile). Saving now "
+                "would silently revert those changes. Reload (re-open the menu or "
+                "re-run the command) and re-apply your edit."
+            )
+
         try:
             # Persist rules to alerts.json first so an interruption between
             # the two writes never leaves stale rules in config.json.
@@ -456,6 +501,9 @@ class ConfigManager:
                 os.chmod(self.config_file, 0o600)
             except OSError:
                 pass
+            # 寫入成功後更新指紋，否則同一 session 連續兩次 save() 會被自己的
+            # 第一次寫入判成「陳舊」。
+            self._disk_stamp = self._disk_signature()
             lang = self.config.get("settings", {}).get("language", "en")
             set_language(lang)
             print(f"{Colors.GREEN}{t('config_saved')}{Colors.ENDC}")

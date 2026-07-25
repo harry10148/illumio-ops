@@ -19,8 +19,55 @@ import zipfile
 
 import pandas as pd
 
+from src.report.exporters._output_paths import discard_reserved, reserve_unique_path
+
 # Module keys whose values should not be walked for DataFrames
 _SKIP_KEYS = {'findings', 'error', 'note'}
+
+# Rows serialised per to_csv() call. Streaming into the ZIP entry keeps peak
+# memory at one chunk instead of three full copies of the whole CSV text
+# (StringIO buffer + getvalue() str + writestr()'s encoded bytes).
+_CHUNK_ROWS = 5000
+
+# 與 xlsx_exporter._neutralize 同契約：Excel/LibreOffice 會把開頭為 = + - @ 的
+# 儲存格當公式執行（DDE/HYPERLINK），而這些值可能來自 PCE 上的 process/host/
+# label 名稱。前綴單引號使其一律以文字讀入；不截斷、不改動其餘內容。
+_FORMULA_PREFIXES = ('=', '+', '-', '@')
+
+def _neutralize(val):
+    if isinstance(val, str) and val[:1] in _FORMULA_PREFIXES:
+        return "'" + val
+    return val
+
+def _is_text_column(series: pd.Series) -> bool:
+    """文字欄判定（pandas 3 的字串欄不再是 object dtype，不能只比 == object）。"""
+    from pandas.api import types as _pt
+    return not (_pt.is_numeric_dtype(series) or _pt.is_bool_dtype(series)
+                or _pt.is_datetime64_any_dtype(series)
+                or _pt.is_timedelta64_dtype(series))
+
+def _neutralize_frame(chunk: pd.DataFrame) -> pd.DataFrame:
+    """Return a copy with formula-leading strings (headers + text cells) defused."""
+    text_cols = [c for c in chunk.columns if _is_text_column(chunk[c])]
+    out = chunk.copy() if text_cols else chunk
+    for col in text_cols:
+        out[col] = out[col].map(_neutralize)
+    renames = {c: _neutralize(c) for c in out.columns if _neutralize(c) != c}
+    return out.rename(columns=renames) if renames else out
+
+def _write_df_entry(zf: zipfile.ZipFile, csv_name: str, df: pd.DataFrame) -> None:
+    """Stream one DataFrame into the archive as a UTF-8-with-BOM CSV entry.
+
+    BOM: Excel 在 Windows 用系統 ANSI code page（正體中文為 cp950）讀無 BOM 的
+    檔案，繁中報表內容會整片變亂碼；本專案讀入 CSV 一律用 utf-8-sig，輸出端跟齊。
+    """
+    with zf.open(csv_name, 'w') as raw:
+        with io.TextIOWrapper(raw, encoding='utf-8-sig', newline='') as text:
+            header = True
+            for start in range(0, len(df), _CHUNK_ROWS):
+                chunk = _neutralize_frame(df.iloc[start:start + _CHUNK_ROWS])
+                chunk.to_csv(text, index=False, header=header)
+                header = False
 
 def _iter_dataframes(data, prefix: str):
     """
@@ -64,18 +111,25 @@ class CsvExporter:
         ts = datetime.datetime.now().strftime('%Y-%m-%d_%H%M')
         label = self._label.replace(' ', '_')
         zip_name = f'Illumio_{label}_Report_{ts}_raw.zip'
-        zip_path = os.path.join(output_dir, zip_name)
+        # 同一分鐘內的併發產出（GUI 臨時報表 thread + 排程）會撞同一個檔名；
+        # 先以 O_EXCL 搶下唯一路徑，再由暫存檔 os.replace 進去。
+        zip_path = reserve_unique_path(os.path.join(output_dir, zip_name))
+        tmp_path = f'{zip_path}.{os.getpid()}.tmp'
 
         written = 0
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-            for mod_key, mod_data in self._r.items():
-                if mod_key in _SKIP_KEYS:
-                    continue
-                for csv_name, df in _iter_dataframes(mod_data, mod_key):
-                    buf = io.StringIO()
-                    df.to_csv(buf, index=False)
-                    zf.writestr(csv_name, buf.getvalue())
-                    written += 1
+        try:
+            with zipfile.ZipFile(tmp_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for mod_key, mod_data in self._r.items():
+                    if mod_key in _SKIP_KEYS:
+                        continue
+                    for csv_name, df in _iter_dataframes(mod_data, mod_key):
+                        _write_df_entry(zf, csv_name, df)
+                        written += 1
+            os.replace(tmp_path, zip_path)
+        except BaseException:
+            discard_reserved(tmp_path)
+            discard_reserved(zip_path)
+            raise
 
         logger.info(f'[CsvExporter] Wrote {written} CSV files → {zip_path}')
         return zip_path

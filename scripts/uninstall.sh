@@ -44,7 +44,15 @@ if [ "$PURGE" = true ]; then
 else
     echo "==> Removing $INSTALL_ROOT (preserving config/ and data/)"
     find "$INSTALL_ROOT" -mindepth 1 -maxdepth 1 ! -name 'config' ! -name 'data' -exec rm -rf {} +
-    echo "    Config preserved at: $INSTALL_ROOT/config/"
+    # The illumio-ops account is deleted below, which would leave these files
+    # owned by an unallocated UID/GID. useradd --system reuses freed IDs, so the
+    # next system daemon packaged on this host could inherit the UID and read
+    # config.json (PCE api key/secret, SMTP password, LINE/Telegram tokens,
+    # web_gui.secret_key) and config/tls/*key*.pem. Re-home the survivors to
+    # root and take the group bit off the directories before that can happen.
+    chown -R root:root "$INSTALL_ROOT/config" "$INSTALL_ROOT/data" 2>/dev/null || true
+    chmod 0700 "$INSTALL_ROOT/config" "$INSTALL_ROOT/data" 2>/dev/null || true
+    echo "    Config preserved at: $INSTALL_ROOT/config/  (now root-owned, mode 0700)"
     echo "    Data preserved at:   $INSTALL_ROOT/data/  (cache DB; reinstall picks it up)"
     echo "    To fully remove:     sudo rm -rf $INSTALL_ROOT"
 fi

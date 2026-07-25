@@ -26,7 +26,7 @@ verified_against:
 
 本篇涵蓋 illumio-ops Web GUI 的完整 JSON API 端點清單，全部由 Flask 應用（`src/gui/`
 + 兩個獨立掛載的藍圖 `src/siem/web.py`、`src/pce_cache/web.py`）提供。實數為
-**117 個路由**（`@*.route(...)` 宣告數，含頁面路由），其中 113 個是 `/api/` JSON
+**116 個路由**（`@*.route(...)` 宣告數，含頁面路由），其中 112 個是 `/api/` JSON
 端點；每個端點依 GUI 分頁分區列出，欄位為方法｜路徑｜用途｜關鍵參數。各分頁的操作情境與畫面說明見
 [guide/gui-tour.md](../guide/gui-tour.md)；本篇只列端點語法。
 
@@ -165,7 +165,6 @@ never-ran／overdue）見 [gui-tour.md](../guide/gui-tour.md) 「7) Integrations
 | POST | `/api/quarantine/bulk_apply` | **真實副作用**：批次隔離（最多 5 個平行 worker） | `hrefs[]`, `level` |
 | POST | `/api/quarantine/lift` | **真實副作用**：解除隔離（移除 Quarantine label、保留其餘 label） | `hrefs[]` |
 | POST | `/api/workloads/accelerate` | **真實副作用**：提高受管 Workload 的流量回報頻率 | `hrefs[]`, `duration_minutes` |
-| GET | `/api/traffic/trend` | 近 7 天（或 archive 全範圍）逐日流量，依 policy decision 分桶 | `source`(live/archive) |
 | GET | `/api/filter-objects/suggest` | FilterBar pill 輸入即時建議；label／label_group／iplist／service 走快取，workload 即時查 PCE | `q`, `types`, `limit`(≤25)；**240/hour** |
 | GET | `/api/filter-objects/browse` | FilterBar pill 分頁瀏覽（不支援 `type=workload`） | `type`, `offset`, `limit`(≤100)；**240/hour** |
 
@@ -209,7 +208,7 @@ never-ran／overdue）見 [gui-tour.md](../guide/gui-tour.md) 「7) Integrations
 |---|---|---|---|
 | POST | `/api/actions/run` | 手動觸發一次完整監控分析＋寄送告警 | **10/hour** |
 | POST | `/api/actions/debug` | 除錯模式跑分析，回傳文字輸出 | `mins`, `pd_sel`；**10/hour** |
-| POST | `/api/actions/test-alert` | **真實副作用**：發送測試告警（全部通道或單一 `channel`） | `channel`；**10/hour** |
+| POST | `/api/actions/test-alert` | **真實副作用**：發送測試告警（全部通道或單一 `channel`） | `channel`；**30/hour** |
 | POST | `/api/actions/reset-watermark` | 除錯用：清除事件 watermark＋告警冷卻歷史＋事件去重狀態 | **10/hour** |
 | POST | `/api/actions/best-practices` | 套用內建最佳實務規則組（16 條 event + 1 條 traffic） | `mode`(append_missing/replace)；**5/hour** |
 | POST | `/api/actions/test-connection` | 測試 PCE 連線 | **20/hour** |
@@ -365,7 +364,7 @@ TLS 相關端點存檔後都需要**重啟服務**才會套用；自簽憑證每
 |---|---|---|
 | 認證與 session | `auth.py` | 5 |
 | Dashboard | `dashboard.py` | 10 |
-| Traffic & Workloads | `actions.py`（部分）＋ `filter_objects.py` | 10 |
+| Traffic & Workloads | `actions.py`（部分）＋ `filter_objects.py` | 9 |
 | Event Viewer | `events.py` | 4 |
 | Rules（Alerts） | `rules.py` ＋ `actions.py`（部分） | 15 |
 | Reports | `reports.py` | 24 |
@@ -373,11 +372,11 @@ TLS 相關端點存檔後都需要**重啟服務**才會套用；自簽憑證每
 | Integrations（Cache／SIEM／DLQ／daemon） | `pce_cache/web.py` ＋ `siem/web.py` ＋ `__init__.py` | 24 |
 | Settings | `config.py` | 12 |
 | 系統／除錯 | `admin.py` | 3 |
-| **合計** | | **117** |
+| **合計** | | **116** |
 
-此數字為 `grep -c "@[a-z_]*\.route(" src/gui/routes/*.py src/gui/__init__.py`（94）
+此數字為 `grep -c "@[a-z_]*\.route(" src/gui/routes/*.py src/gui/__init__.py`（93）
 加上另外掛載的 `src/siem/web.py`（13）與 `src/pce_cache/web.py`（10）。其中 4 個是頁面
-路由（`/`、`/login`、`/logout`、`/reports/<filename>`），其餘 113 個是 `/api/` JSON
+路由（`/`、`/login`、`/logout`、`/reports/<filename>`），其餘 112 個是 `/api/` JSON
 端點。[gui-tour.md](../guide/gui-tour.md) 的『約 85 條』是較早盤點的粗略數字（僅計 src/gui/routes
 與 gui/__init__ 的 /api 路由），非逐條稽核；本檔的對帳表才是權威清單。
 
@@ -462,12 +461,12 @@ TLS 相關端點存檔後都需要**重啟服務**才會套用；自簽憑證每
 | `POST /api/actions/best-practices`、`POST /api/rule_hit_count/enable` | 5/小時 |
 | `POST /api/security`、`POST /api/tls/config`、`POST /api/tls/renew` | 10/小時 |
 | 報表產生端點（audit／policy_diff／policy_resolver／app_report／ven_status／policy_usage／rule_hit_count_report／readiness） | 10/小時 |
-| `POST /api/actions/run`、`POST /api/actions/debug`、`POST /api/actions/test-alert`、`POST /api/actions/reset-watermark` | 10/小時 |
+| `POST /api/actions/run`、`POST /api/actions/debug`、`POST /api/actions/reset-watermark` | 10/小時 |
 | `POST /api/tls/generate-csr`、`POST /api/tls/import-cert` | 20/小時 |
 | `POST /api/actions/test-connection` | 20/小時 |
 | `POST /api/report-schedules/<id>/run` | 20/小時 |
 | `POST /api/dashboard/top10`、`POST /api/settings` | 30/小時 |
-| `POST /api/reports/generate` | 30/小時 |
+| `POST /api/reports/generate`、`POST /api/actions/test-alert` | 30/小時 |
 | `GET /api/labels` | 60/小時 |
 | `GET /api/filter-objects/suggest`、`GET /api/filter-objects/browse` | 240/小時 |
 

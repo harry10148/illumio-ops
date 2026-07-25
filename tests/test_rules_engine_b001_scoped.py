@@ -66,3 +66,21 @@ def test_rules_engine_b001_same_subnet_all_pb_is_info():
     assert b001, "B001 should fire"
     assert b001[0].severity == "INFO", (
         f"same-subnet-all-PB must be INFO, got {b001[0].severity}")
+
+def test_rules_engine_b001_unknown_decision_does_not_claim_same_subnet():
+    """跨子網路 + policy_decision=unknown 不得落入「全部同子網路」敘事。"""
+    rows = [_row("10.1.1.1", f"10.2.2.{10 + i}", "unknown") for i in range(5)]
+    b001 = _b001(pd.DataFrame(rows))
+    assert b001, "B001 should fire"
+    desc = b001[0].description
+    assert "same /24 subnet" not in desc, (
+        f"cross-subnet unknown flows must not be described as same-subnet: {desc}")
+
+
+def test_rules_engine_b001_same_subnet_allowed_still_medium():
+    """同子網路 allowed 的既有敘事不受影響。"""
+    rows = [_row("10.0.0.1", f"10.0.0.{10 + i}", "allowed") for i in range(3)]
+    b001 = _b001(pd.DataFrame(rows))
+    assert b001, "B001 should fire"
+    assert b001[0].severity == "MEDIUM"
+    assert "same /24 subnet" in b001[0].description

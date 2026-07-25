@@ -48,6 +48,28 @@ verify_sha256() {
 
 mkdir -p "$DIST_DIR"
 
+# ── Shared helper: assert no secrets were staged ──────────────────────────────
+# The excludes in stage_app are the control; this is the gate that proves they
+# held. The build host normally runs the app, so config/ accumulates real
+# secrets (config.json with the PCE api key/secret, alerts.json, and the
+# runtime-generated TLS private key under config/tls/). Anything that slips
+# through lands in a customer-distributed archive, so fail the build loudly
+# rather than shipping it.
+assert_no_secrets_staged() {
+    local dest="$1" bad
+    bad=$(find "$dest/app/config" -type f \
+            \( -name '*.pem' -o -name '*.key' -o -name '*.p12' -o -name '*.pfx' \
+               -o -name '*.crt' -o -name '*.csr' -o -name '*.json' \) 2>/dev/null || true)
+    if [[ -n "$bad" ]] || [[ -d "$dest/app/config/tls" ]]; then
+        echo "ERROR: key material or operator-owned files staged into the bundle:" >&2
+        [[ -n "$bad" ]] && echo "$bad" >&2
+        [[ -d "$dest/app/config/tls" ]] && echo "$dest/app/config/tls" >&2
+        echo "  Only *.example templates and report_config.yaml belong in the bundle's" >&2
+        echo "  config/. Update the excludes in stage_app() before re-running." >&2
+        exit 1
+    fi
+}
+
 # ── Shared helper: stage app files (no credentials) ───────────────────────────
 stage_app() {
     local dest="$1"
@@ -57,12 +79,26 @@ stage_app() {
         "$REPO_ROOT/src" \
         "$dest/app/"
     # config templates only — NEVER bundle config.json (API credentials),
-    # alerts.json (operator rules + previously LINE/webhook secrets), or runtime data
+    # alerts.json (operator rules + previously LINE/webhook secrets), runtime
+    # data, or key material.
+    # config/tls/ is runtime-generated on the BUILD host (self_signed.pem +
+    # self_signed_key.pem, csr_key.pem, ca_signed.pem). Bundling it would ship
+    # one private key to every customer, and each install would then serve
+    # HTTPS with that shared key instead of minting its own — the fresh-install
+    # path in _generate_self_signed_cert() (src/gui/_helpers.py) short-circuits
+    # whenever both PEMs already exist. config/limiter/ is rate-limiter state.
     rsync -a \
         --exclude='config.json' \
         --exclude='alerts.json' \
         --exclude='rule_schedules.json' \
+        --exclude='tls/' \
+        --exclude='limiter/' \
+        --exclude='*.pem' \
+        --exclude='*.key' \
+        --exclude='*.p12' \
+        --exclude='*.pfx' \
         "$REPO_ROOT/config/" "$dest/app/config/"
+    assert_no_secrets_staged "$dest"
     rsync -a "$REPO_ROOT/scripts/" "$dest/app/scripts/"
     cp "$REPO_ROOT/requirements-offline.txt" "$dest/app/"
     # Runtime data read from outside src/: src/events/reference.py loads

@@ -30,7 +30,12 @@ class RetentionWorker:
                 ).scalars().all()
                 if not ids:
                     return total
-                r = s.execute(delete(model).where(model.id.in_(ids)))
+                # 守門條件必須同時掛在 DELETE 上：pysqlite 不為 SELECT 開讀交易，
+                # 選 id 與刪除之間別的執行緒（SIEM enqueue_new_records）可能剛
+                # commit 一筆 pending dispatch，只憑 id 刪就會把仍被引用的來源列
+                # 一併刪掉（_siem_unreferenced_clauses 正是要防這件事）。單一
+                # DELETE 在 SQLite 寫鎖下原子求值，剛被引用的列自然留到下一輪。
+                r = s.execute(delete(model).where(model.id.in_(ids), *where_clauses))
                 total += r.rowcount
             if len(ids) < self._DELETE_BATCH:
                 return total

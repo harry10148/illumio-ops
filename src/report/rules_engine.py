@@ -82,17 +82,45 @@ class RulesEngine:
         self._risk_ports = self._build_risk_port_map(report_config)
         self._lateral_ports = set(report_config.get('lateral_movement_ports', []))
         self._lang = lang
+        # 本次 evaluate() 中拋例外而被跳過的規則名稱；由 evaluate() 轉成一筆
+        # 「規則評估未完成」finding，讓報表上「沒有發現」與「沒跑完」可區分。
+        self.rule_errors: list[str] = []
 
     # ── public ───────────────────────────────────────────────────────────────
 
     def evaluate(self, df: pd.DataFrame) -> list[Finding]:
         """Run all rules and return sorted findings list."""
+        self.rule_errors = []
         findings: list[Finding] = []
         findings.extend(self._eval_builtin(df))
         findings.extend(self._eval_draft_pd(df))
+        incomplete = self._incomplete_run_finding()
+        if incomplete is not None:
+            findings.append(incomplete)
         findings.sort(key=lambda f: f.severity_rank)
         logger.info(f"[RulesEngine] {len(findings)} findings generated")
         return annotate_techniques(findings)
+
+    def _incomplete_run_finding(self) -> Optional[Finding]:
+        """Surface swallowed rule failures as a finding.
+
+        沒有這筆 finding 時，一條規則拋例外只會留下一行 log warning，報表上
+        看起來就跟「乾淨、沒有發現」一模一樣——操作者會把不完整的評估當成
+        證據。這裡把失敗的規則名稱寫進 findings 清單，讓不完整可被看見。
+        """
+        if not self.rule_errors:
+            return None
+        failed = ", ".join(self.rule_errors)
+        return Finding(
+            rule_id='ENG01',
+            rule_name='Rule Evaluation Incomplete',
+            severity='MEDIUM',
+            category='Policy',
+            description=t("rpt_rule_ENG01_desc", lang=self._lang,
+                          n_failed=len(self.rule_errors), failed_rules=failed),
+            recommendation=t("rule_eng01_rec", lang=self._lang),
+            evidence={'failed_rules': self.rule_errors},
+        )
 
     # ── draft-policy rules (R01–R05) ─────────────────────────────────────────
 
@@ -114,6 +142,7 @@ class RulesEngine:
                 findings.extend(rule_cls().evaluate(df, ctx, self._lang) or [])
             except Exception as e:
                 logger.warning(f"[RulesEngine] Draft rule {rule_cls.__name__} failed: {e}")
+                self.rule_errors.append(rule_cls.__name__)
         return findings
 
     # ── built-in rules ───────────────────────────────────────────────────────
@@ -158,6 +187,7 @@ class RulesEngine:
                     findings.append(result)
             except Exception as e:
                 logger.warning(f"[RulesEngine] Rule {rule.__name__} failed: {e}")
+                self.rule_errors.append(rule.__name__)
         return findings
 
     def _b001_ransomware_critical(self, df: pd.DataFrame) -> Optional[Finding]:
@@ -263,7 +293,7 @@ class RulesEngine:
                 n_total=n_total,
             )
             recommendation = t("rule_b001_rec_same_subnet_pb", lang=self._lang)
-        else:
+        elif n_same_subnet == n_total:
             # Same-subnet, allowed — MEDIUM (legitimate admin but worth documenting)
             severity = 'MEDIUM'
             risk_summary = t(
@@ -273,6 +303,22 @@ class RulesEngine:
                 n_pb=n_pb,
             )
             recommendation = t("rule_b001_rec_same_subnet_allowed", lang=self._lang)
+        else:
+            # 殘餘情境：流量既非 allowed 也非 potentially_blocked（policy_decision
+            # 為 unknown——快照/idle 模式、無 policy_decision 欄的 CSV、Flowlink
+            # 未納管流量）。此時絕不可套用同子網路敘事：那會寫出與資料相反的
+            # 結論（「全部位於同一子網路」，實際卻 100% 跨子網路）。
+            severity = 'MEDIUM'
+            risk_summary = t(
+                "rpt_rule_B001_risk_unknown_decision", lang=self._lang,
+                n_total=n_total,
+                n_allowed=n_allowed,
+                n_pb=n_pb,
+                n_same_subnet=n_same_subnet,
+                n_cross_subnet=n_cross_subnet,
+            )
+            recommendation = t("rule_b001_rec_unknown_decision", lang=self._lang,
+                               named_ports=list(named_ports.keys()))
 
         # Top suspicious flows (cross-subnet or cross-env, allowed)
         suspicious = matched[

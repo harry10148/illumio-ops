@@ -397,12 +397,18 @@ def make_config_blueprint(
         cert_dir = os.path.join(_ROOT_DIR, "config", "tls")
         try:
             cert_info = _import_signed_cert(cert_dir, cert_pem)
-            gui_cfg = cm.config.setdefault("web_gui", {})
-            tls = gui_cfg.setdefault("tls", {})
-            tls["self_signed"] = False
-            tls["cert_file"] = os.path.join(cert_dir, "ca_signed.pem")
-            tls["key_file"] = os.path.join(cert_dir, "csr_key.pem")
-            cm.save()
+            # 以共用 config 鎖序列化 load→mutate→save（比照 api_tls_config）：
+            # cm.load() 會整個換掉 cm.config 物件，鎖外抓到的 gui_cfg/tls 可能
+            # 已是孤兒 dict——那樣這裡回 {"ok": true, cert_file...} 但磁碟上仍是
+            # self_signed，操作者重啟後還是舊憑證且毫無錯誤訊息。
+            with cm.write_lock:
+                cm.load()
+                gui_cfg = cm.config.setdefault("web_gui", {})
+                tls = gui_cfg.setdefault("tls", {})
+                tls["self_signed"] = False
+                tls["cert_file"] = os.path.join(cert_dir, "ca_signed.pem")
+                tls["key_file"] = os.path.join(cert_dir, "csr_key.pem")
+                cm.save()
             return jsonify({
                 "ok": True,
                 "cert_info": cert_info,

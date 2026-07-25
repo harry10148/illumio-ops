@@ -50,6 +50,7 @@ from src.utils import Colors
 MAX_RETRIES = 3
 _ASYNC_JOB_STATE_KEY = "async_query_jobs"
 _QUERY_LOOKUP_CACHE_TTL_SECONDS = 300
+_RULESET_CACHE_TTL_SECONDS = 300
 # 截斷 async fallback 的 process 級 memo/退避：GUI 路由每請求建新 ApiClient，
 # per-instance 狀態擋不住「集合真 >500 時每請求都對 PCE 提交一個 async job」
 # 的放大效應（最終 review finding 1）。成功結果 memo 5 分鐘、失敗退避 10 分鐘。
@@ -121,6 +122,11 @@ class ApiClient:
         self._cache_lock = threading.RLock()  # RLock: re-entrant (update_label_cache calls invalidate_*)
         self.label_cache: Any = TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
         self.ruleset_cache: list[dict[str, Any]] = []
+        # ruleset_cache 是純 list（非 TTLCache），需自帶取得時間才能過期：
+        # rule_scheduler CLI 的互動選單整段 session 共用同一個 ApiClient，
+        # 沒有 TTL 就會一直供應舊的 ruleset 清單（新建/改名的 ruleset 搜不到、
+        # 剛被 toggle 的 enabled 值仍顯示舊值）。
+        self._ruleset_cache_at = 0.0
         self.service_ports_cache: Any = TTLCache(maxsize=5000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
         self._label_href_cache: Any = TTLCache(maxsize=10000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
         self._label_group_href_cache: Any = TTLCache(maxsize=1000, ttl=_LABEL_CACHE_TTL_SECONDS, timer=time.time)
@@ -648,17 +654,29 @@ class ApiClient:
     # Quarantine Feature: Labels and Workloads
     # ═══════════════════════════════════════════════════════════════════════
 
-    def get_labels(self, key: str) -> list:
+    def get_labels(self, key: str, raise_on_error: bool = False) -> list:
+        """Labels of one dimension. Returns [] on error.
+
+        raise_on_error=True：非 200（含 status 0 連線層失敗）或解析例外時
+        raise APIError，供必須區分「org 真的沒有該維度標籤」與「查詢失敗」
+        的消費端使用（quarantine 解除流程）。預設 False 維持既有呼叫者行為。
+        """
         try:
             params = urllib.parse.urlencode({"key": key})
             url = f"{self.base_url}/labels?{params}"
             status, body = self._request(url, timeout=10)
             if status != 200:
                 logger.error(f"Get Labels Failed: {status}")
+                if raise_on_error:
+                    raise APIError(f"get_labels({key}) failed: HTTP {status}")
                 return []
             return orjson.loads(body)
+        except APIError:
+            raise
         except Exception as e:
             logger.error(f"Fetch Labels Error: {e}")
+            if raise_on_error:
+                raise APIError(f"get_labels({key}) failed: {e}") from e
             return []
 
     def get_all_labels(self, raise_on_error: bool = False) -> list[dict[str, Any]]:
@@ -698,8 +716,17 @@ class ApiClient:
             return {}
 
     def check_and_create_quarantine_labels(self) -> dict[str, str]:
-        """Ensure Quarantine labels (Mild, Moderate, Severe) exist in the PCE. Returns list of their hrefs."""
-        existing_labels = self.get_labels("Quarantine")
+        """Ensure Quarantine labels (Mild, Moderate, Severe) exist in the PCE.
+
+        Returns {level: href}. Raises APIError when the initial label lookup did
+        not return HTTP 200.
+
+        查詢失敗必須以例外表達，不可退化成空 dict：空 dict 與「org 尚無
+        Quarantine 標籤」完全同形，解除隔離流程（/api/quarantine/lift）會因此
+        把仍掛著 Quarantine 標籤、實際仍被隔離的 workload 全部記成
+        not_quarantined 並回 ok:true，操作者與稽核紀錄同時被誤導。
+        """
+        existing_labels = self.get_labels("Quarantine", raise_on_error=True)
         existing_values = {lbl.get("value"): lbl.get("href") for lbl in existing_labels if lbl.get("value")}
 
         target_levels = ["Mild", "Moderate", "Severe"]
@@ -1100,7 +1127,8 @@ class ApiClient:
         real-PCE verified 2026-07-11). Default False keeps the legacy
         empty-list contract for all existing callers.
         """
-        if self.ruleset_cache and not force_refresh:
+        if (self.ruleset_cache and not force_refresh
+                and (time.time() - self._ruleset_cache_at) < _RULESET_CACHE_TTL_SECONDS):
             return self.ruleset_cache
         org = self.api_cfg['org_id']
         path = f"/orgs/{org}/sec_policy/draft/rule_sets"
@@ -1109,10 +1137,16 @@ class ApiClient:
             if raise_on_error:
                 self._raise_if_truncated(path, "get_all_rulesets")
             self.ruleset_cache = data
+            self._ruleset_cache_at = time.time()
             return self.ruleset_cache
         if raise_on_error and status != 200:
             raise RuntimeError(f"get_all_rulesets failed: HTTP {status}")
         return []
+
+    def _invalidate_ruleset_cache(self) -> None:
+        """本 client 剛改動 policy 後清掉 ruleset 快取，避免續供改動前的快照。"""
+        self.ruleset_cache = []
+        self._ruleset_cache_at = 0.0
 
     def get_active_rulesets(self, raise_on_error: bool = False) -> list[dict[str, Any]]:
         """Get all active (provisioned) rulesets with their rules.
@@ -1278,6 +1312,8 @@ class ApiClient:
         if put_status != 204:
             logger.error(f"Toggle failed for {_extract_id(href)}: status {put_status}")
             return False
+        # 剛改動 policy，快取中的 ruleset 物件（enabled/description）已過時
+        self._invalidate_ruleset_cache()
         rs_href = draft_href if is_ruleset else "/".join(draft_href.split("/")[:7])
         return self.provision_changes(rs_href)
 
@@ -1310,6 +1346,7 @@ class ApiClient:
 
         put_status = self._api_put(draft_href, {"description": new_desc})
         if put_status == 204:
+            self._invalidate_ruleset_cache()
             if not has_pending_draft:
                 rs_href = "/".join(draft_href.split("/")[:7])
                 return self.provision_changes(rs_href)
@@ -1330,14 +1367,28 @@ class ApiClient:
         return status, data
 
     def get_provision_state(self, href: str) -> str:
-        """Check provision state: 'active' if provisioned, 'draft' if draft-only, 'unknown' on error."""
+        """Check provision state: 'active' if provisioned, 'draft' if the active
+        href genuinely does not exist (404), 'unknown' when the PCE could not
+        answer (connection failure, auth rejection, server error).
+
+        錯誤狀態不可歸成 'draft'：_request 契約上不對連線層失敗 raise，而是回
+        status 0（api_client `_request`），401/403/5xx 也只是狀態碼——全部當成
+        'draft' 會讓 PCE 連不上/憑證失效被講成「規則尚未佈署」，把操作者導向
+        錯誤方向。'unknown' 與 'draft' 一樣不算已佈署（is_provisioned 仍回
+        False，維持 fail-closed），差別只在呼叫端可據以說出真正的原因。
+        """
         active_href = href.replace("/draft/", "/active/")
         url = f"{self.api_cfg['url']}/api/v2{active_href}"
         try:
             status, body = self._request(url, timeout=10)
             if status == 200:
                 return 'active'
-            return 'draft'
+            if status == 404:
+                return 'draft'
+            logger.warning(
+                "Provision state for {} is indeterminate (HTTP {}); reporting 'unknown'",
+                href, status)
+            return 'unknown'
         except Exception as exc:
             logger.debug("Could not determine provision state for {}: {}", href, exc)
             return 'unknown'

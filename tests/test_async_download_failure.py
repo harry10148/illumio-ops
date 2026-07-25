@@ -51,7 +51,7 @@ class TestIterAsyncQueryResultsRaisesOnDownloadFailure(_ClientHarness):
         with self.assertRaises(AsyncDownloadError):
             list(self.client.iter_async_query_results(job_href))
 
-        with open(self.client._state_file, "r", encoding="utf-8") as fh:
+        with open(self.client._jobs._async_state_file(), "r", encoding="utf-8") as fh:
             state = json.load(fh)
         job_state = state["async_query_jobs"][job_href]
         self.assertEqual(job_state["download_status"], "failed:500")
@@ -71,7 +71,7 @@ class TestSummarizeAsyncQuerySuccessStillMarksCompleted(_ClientHarness):
         summary = self.client.summarize_async_query(job_href)
 
         self.assertEqual(summary["count"], 2)
-        with open(self.client._state_file, "r", encoding="utf-8") as fh:
+        with open(self.client._jobs._async_state_file(), "r", encoding="utf-8") as fh:
             state = json.load(fh)
         job_state = state["async_query_jobs"][job_href]
         self.assertEqual(job_state["download_status"], "completed")
@@ -85,7 +85,7 @@ class TestSummarizeAsyncQuerySuccessStillMarksCompleted(_ClientHarness):
         with self.assertRaises(AsyncDownloadError):
             self.client.summarize_async_query(job_href)
 
-        with open(self.client._state_file, "r", encoding="utf-8") as fh:
+        with open(self.client._jobs._async_state_file(), "r", encoding="utf-8") as fh:
             state = json.load(fh)
         job_state = state["async_query_jobs"][job_href]
         self.assertEqual(job_state["download_status"], "failed:500")

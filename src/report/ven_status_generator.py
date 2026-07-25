@@ -181,6 +181,9 @@ class VenStatusGenerator:
         # Inherit the generation language when caller omits lang (see ReportGenerator.export).
         lang = lang or getattr(self, '_lang', 'en')
         os.makedirs(output_dir, exist_ok=True)
+        # 與 audit / policy_usage generator 同契約：GUI 讀這個 dict 才知道某個
+        # 格式其實沒產出來（見 src/gui/routes/reports.py）。
+        self.last_export_errors: dict[str, str] = {}
         paths = []
         if fmt in ('html', 'all'):
             path = VenHtmlExporter(result.module_results, df=result.dataframe, lang=lang,
@@ -189,15 +192,24 @@ class VenStatusGenerator:
             print(t("rpt_ven_html_saved", path=path, lang=lang))
 
         if fmt in ('xlsx', 'all'):
+            xlsx_path = None
             try:
                 import datetime as _dt
+                from src.report.exporters._output_paths import reserve_unique_path
                 ts_str = _dt.datetime.now().strftime('%Y-%m-%d_%H%M')
-                xlsx_path = os.path.join(output_dir, f'Illumio_VEN_Report_{ts_str}.xlsx')
+                # 同分鐘併發產出會撞名（見 _output_paths）；先搶下唯一路徑。
+                xlsx_path = reserve_unique_path(
+                    os.path.join(output_dir, f'Illumio_VEN_Report_{ts_str}.xlsx'))
                 generate_ven_xlsx(result.module_results or {}, xlsx_path, lang=lang)
                 paths.append(xlsx_path)
                 print(t("rpt_xlsx_saved", path=xlsx_path, default=f"XLSX saved: {xlsx_path}", lang=lang))
             except Exception as exc:
-                logger.warning('XLSX export failed: {}', exc)
+                logger.exception('XLSX export failed: {}', exc)
+                self.last_export_errors['xlsx'] = str(exc) or exc.__class__.__name__
+                # 半寫的活頁簿不在 paths 裡，但 GUI 報表列表只看副檔名照樣列出。
+                if xlsx_path:
+                    from src.report.exporters._output_paths import discard_reserved
+                    discard_reserved(xlsx_path)
 
         if fmt in ('csv', 'all'):
             path = CsvExporter(result.module_results, report_label='VEN_Status').export(output_dir)

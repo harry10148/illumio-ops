@@ -10,6 +10,11 @@ from src.api_client import ApiClient
 from src.gui._helpers import _resolve_state_file, _get_cache_engine
 from src.report.snapshot_store import read_latest
 
+# 排程器等跨行程分析鎖的秒數。比互動式選單（main._ANALYSIS_LOCK_WAIT_S=5s）長
+# 得多：背景 job 沒有人在等畫面回應，寧可等 CLI 那邊跑完也不要整個 cycle 被
+# 丟掉；真的逾時就讓 TimeoutError 往上拋，job_health 記成 error（可觀測）。
+_ANALYSIS_LOCK_WAIT_S = 600.0
+
 
 def run_monitor_cycle(cm) -> None:
     """Execute one monitoring analysis + alert dispatch."""
@@ -17,7 +22,8 @@ def run_monitor_cycle(cm) -> None:
     from src.analyzer import Analyzer, analysis_lock
     from src.reporter import Reporter
     from src.module_log import ModuleLog
-    from src.main import _make_subscribers, _make_cache_reader
+    from src.file_lock import file_lock
+    from src.main import _make_subscribers, _make_cache_reader, analysis_lock_path
 
     mlog = ModuleLog.get("monitor")
     try:
@@ -25,14 +31,21 @@ def run_monitor_cycle(cm) -> None:
         with ApiClient(cm) as api:
             rep = Reporter(cm)
             sub_events, sub_flows = _make_subscribers(cm)
-            ana = Analyzer(cm, api, rep,
-                           subscriber_events=sub_events, subscriber_flows=sub_flows,
-                           cache_reader=_make_cache_reader(cm))
-            # 見 analyzer.analysis_lock：與 GUI 觸發的 run/debug 互斥，
-            # 避免併發 cycle 的 save_state 互相覆蓋 analyzer 自有 state key。
-            with analysis_lock:
-                ana.run_analysis()
-                rep.send_alerts()
+            # 兩層鎖，順序與 GUI 的 /api/actions/run 一致：
+            #   外層 file_lock（見 main.analysis_lock_path）——序列化「另一個
+            #     行程」的完整 cycle（互動式選單／CLI）；只有行程內鎖時，CLI
+            #     與常駐服務會互相用過期 state 快照覆寫 alert_history。
+            #   內層 analysis_lock（見 analyzer.analysis_lock）——序列化同行程的
+            #     GUI run/debug thread。
+            # Analyzer 的建構要放在鎖內：__init__ 會 load_state()，在鎖外取快照
+            # 等於沒序列化（併發的 reset watermark 會被本 cycle 的舊快照還原）。
+            with file_lock(analysis_lock_path(), timeout=_ANALYSIS_LOCK_WAIT_S):
+                with analysis_lock:
+                    ana = Analyzer(cm, api, rep,
+                                   subscriber_events=sub_events, subscriber_flows=sub_flows,
+                                   cache_reader=_make_cache_reader(cm))
+                    ana.run_analysis()
+                    rep.send_alerts()
         mlog.info("Monitor cycle complete")
     except Exception as exc:
         logger.exception("Monitor cycle failed: {}", exc)
@@ -150,9 +163,8 @@ def _record_ingest_pce_result(source: str, wm=None, fallback_error: str | None =
         logger.exception("Failed to persist ingest PCE stats for {}: {}", source, exc)
 
 
-def _record_traffic_overflow(overflow: dict | None) -> None:
-    """Mirror Analyzer's event_overflow bookkeeping for the traffic cache-
-    ingest path.
+def _record_overflow_state(state_key: str, overflow: dict | None) -> None:
+    """Mirror Analyzer's event_overflow bookkeeping for the cache-ingest jobs.
 
     Background: TrafficIngestor's 1-min bisection floor (capacity-hardening
     Task 1, ingestor_traffic._fetch_window) can still hit max_results with no
@@ -163,7 +175,13 @@ def _record_traffic_overflow(overflow: dict | None) -> None:
     Analyzer._maybe_alert_overflow, now generalized to check both keys, can
     fire a distinct meta-alert for it.
 
-    Always overwrites traffic_overflow with `overflow or {}` — mirrors
+    The events side is the same story one layer up: EventsIngestor's sync pull
+    hits async_threshold and the PCE keeps only the newest rows, so older events
+    in that window are lost — on a pce_cache deployment nobody wrote
+    event_overflow (Analyzer._fetch_event_batch, the only writer, belongs to the
+    legacy no-subscriber path), leaving the meta-alert dead code.
+
+    Always overwrites the key with `overflow or {}` — mirrors
     Analyzer._fetch_event_batch, which clears event_overflow to {} on every
     poll that did NOT hit the cap, so a resolved overflow episode stops
     alerting on the next cycle. Callers must only invoke this after a
@@ -174,13 +192,21 @@ def _record_traffic_overflow(overflow: dict | None) -> None:
 
     def _update(existing: dict) -> dict:
         existing = dict(existing)
-        existing["traffic_overflow"] = overflow or {}
+        existing[state_key] = overflow or {}
         return existing
 
     try:
         update_state_file(_resolve_state_file(), _update)
     except Exception as exc:
-        logger.exception("Failed to persist traffic_overflow state: {}", exc)
+        logger.exception("Failed to persist {} state: {}", state_key, exc)
+
+
+def _record_traffic_overflow(overflow: dict | None) -> None:
+    _record_overflow_state("traffic_overflow", overflow)
+
+
+def _record_event_overflow(overflow: dict | None) -> None:
+    _record_overflow_state("event_overflow", overflow)
 
 
 def _enabled_siem_destinations(cm, source_type: str) -> list[str]:
@@ -212,6 +238,11 @@ def run_events_ingest(cm) -> None:
             count = ing.run_once()
         logger.info("Events ingest: {} rows inserted", count)
         _record_ingest_pce_result("events", wm)
+        # 同 run_traffic_ingest：只有「這次真的抓到了」才可覆寫 overflow 訊號，
+        # 抓取失敗對截斷與否毫無資訊，不得把未解除的紀錄清掉。
+        row = wm.get(EventsIngestor.SOURCE)
+        if row is None or row.last_status != "error":
+            _record_event_overflow(ing.last_run_overflow)
     except Exception as exc:
         logger.exception("run_events_ingest failed: {}", exc)
         _record_ingest_pce_result("events", wm, fallback_error=str(exc))

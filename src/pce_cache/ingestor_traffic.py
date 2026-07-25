@@ -6,7 +6,7 @@ from typing import Optional
 
 import orjson
 from loguru import logger
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import sessionmaker
 
@@ -160,7 +160,10 @@ class TrafficIngestor:
 
     _CHUNK = 500
 
-    # Volatile columns refreshed when a re-pulled flow conflicts on flow_hash.
+    # Volatile columns refreshed (GREATEST) when a re-pulled flow conflicts on
+    # flow_hash. raw_json/report_json 也是 volatile，但**不可**列在這裡：本 tuple
+    # 的每一欄都會被包進 func.max()，對 JSON 文字做 MAX 等於字典序比大小（無
+    # 意義且會挑錯邊）。那兩欄改以 last_detected 較新的一側取代，見 _insert_batch。
     _VOLATILE = ("last_detected", "bytes_in", "bytes_out", "flow_count")
 
     def _insert_batch(self, flows: list[dict]) -> int:
@@ -179,6 +182,15 @@ class TrafficIngestor:
         idempotent). The SIEM enqueue must still fire ONLY for genuinely new
         rows, so a pre-upsert snapshot of existing flow_hashes splits new inserts
         from refreshed re-pulls (an upsert's RETURNING covers both).
+
+        raw_json 也必須一起刷新（不只欄位）：CacheSubscriber._row_to_dict 解出
+        raw_json 當成 flow payload 回傳，Analyzer 從頭到尾只看得到那份 payload
+        （視窗過濾讀 timestamp_range.last_detected、頻寬/流量讀 dst_dbi/dst_tbi…）。
+        欄位刷新但 payload 凍在初見值時：SQL 用新的 last_detected 選出這列，
+        Analyzer 卻用舊時戳判定「不在視窗內」而丟掉——長壽 flow 在每一個
+        traffic/bandwidth/volume 視窗裡被靜默漏掉，加總同時低估。
+        （欄位投影不足以補救：bytes_in/bytes_out 取自 bytes_in/dst_bi，而 async
+        query 回的是 dst_dbi/dst_tbi 這組欄名，那兩欄在真實部署上多半是 0。）
 
         conflict 時也把 ingested_at bump 到本次 ingest 時間（excluded.ingested_at）
         ——archiver（archive.py 的 ArchiveExporter）的匯出游標依 (ingested_at, id)
@@ -257,8 +269,12 @@ class TrafficIngestor:
                 ).scalars())
                 base = sqlite_insert(PceTrafficFlowRaw).values(chunk)
                 set_ = {c: func.max(raw_cols[c], base.excluded[c]) for c in self._VOLATILE}
-                # report_json reflects the (refreshed) counters; take the latest.
-                set_["report_json"] = base.excluded.report_json
+                # raw_json/report_json 取「last_detected 較新的那一側」（與
+                # archive_import._flush 同一套語意）——亂序重拉不得把新快照蓋回舊的。
+                newer = base.excluded.last_detected >= raw_cols.last_detected
+                set_["raw_json"] = case((newer, base.excluded.raw_json), else_=raw_cols.raw_json)
+                set_["report_json"] = case(
+                    (newer, base.excluded.report_json), else_=raw_cols.report_json)
                 # re-pull 一律 bump 到本次 ingest 時間，讓 archiver 游標重新看到本列。
                 set_["ingested_at"] = base.excluded.ingested_at
                 stmt = (
