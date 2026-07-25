@@ -9,6 +9,7 @@ import gc
 import os
 import sys
 import threading
+from dataclasses import dataclass
 from typing import Any, Iterator
 from loguru import logger
 from collections import Counter
@@ -33,6 +34,10 @@ from src.state_store import load_state_file, update_state_file
 from src.interfaces import IApiClient, IReporter
 from src.api.traffic_query import TrafficQueryBuilder
 from src.pce_cache.reader import CacheReadTooLarge
+# flow 上的三個累計計數器 (bytes_out, bytes_in, conn_count)。ingest 端存進
+# 觀測表的值必須與 analyzer 算出的當下值取自同一組欄位，否則相減毫無意義
+# ——因此只准有一份實作。
+from src.pce_cache.flow_deltas import cumulative_metrics as _cumulative_metrics
 
 # Refine Root Dir for State File
 PKG_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -204,11 +209,62 @@ def flow_has_byte_fields(flow: dict[str, Any]) -> bool:
 # 等於拿 8.5 小時的累計量去比 10 分鐘的門檻——誤報幅度隨當日時間推移放大、
 # 午夜歸零。traffic（num_connections）、bandwidth、volume 三型全中。
 #
-# Phase 1（本守門）的處置：偵測到「flow 的聚合區間起點早於規則視窗起點」時，
+# Phase 1（守門）的處置：偵測到「flow 的聚合區間起點早於規則視窗起點」時，
 # 該規則本 cycle 不告警，並以 WARNING + meta-alert 讓操作者知道規則沒被評估
 # ——沉默比誤報更糟，操作者絕不可以以為規則還在保護他。
-# Phase 2（另案）：從連續兩次 pce_cache 觀測推導真正的視窗增量，屆時本守門
-# 只需保留在「推導不出增量」的殘餘情況。
+#
+# Phase 2（視窗增量）：traffic ingest 每跑一次就把每筆 flow 當下的三個累計
+# 計數器記進 pce_traffic_flow_obs（src/pce_cache/flow_deltas.py）。規則評估
+# 時取「視窗起點之前最近的一筆觀測」當基準，value(now) - value(baseline)
+# 就是真正落在視窗內的量，於是短視窗規則可以正常評估。守門只保留在推導不
+# 出增量的殘餘情況：沒有 cache／沒有基準（flow 第一次出現）／基準太舊
+# （ingest 間隔遠大於視窗）／計數器歸零。
+#
+# 兩個必然的近似，都是刻意選擇：
+#   1. 基準只能落在「視窗起點之前最近的一次 ingest」，所以增量涵蓋的區間
+#      是視窗的**超集**（多算 window_start - baseline_at 這段）。多算會讓
+#      告警偏積極而非偏沉默，但不能無上限——超出 DELTA_BASELINE_TOLERANCE
+#      就判定推導不出、退回守門，並在 log 裡指出要調小 ingest 間隔。
+#   2. 增量算不出負數：計數器歸零（PCE 換 bucket）時 t2 - t1 為負，那是
+#      歸零不是負流量。無法得知歸零落在視窗內或視窗前，因此不猜——退回守門
+#      （下一次 ingest 就會在新 bucket 內留下基準，訊號自癒）。
+
+# 視窗增量的量測基準註記（比照 calculate_mbps/calculate_volume_mb 的
+# "(Interval)"/"(Total)"/"(Avg)"）：值來自兩次 cache 觀測相減。
+DELTA_BASIS_NOTE = "(Window)"
+
+# 基準時間可以早於視窗起點多久：取 max(視窗長度 × 比例, 下限秒數)。
+# 超過就代表增量涵蓋的區間比視窗長太多、失去「短視窗」的意義。
+DELTA_BASELINE_TOLERANCE_RATIO = 0.25
+DELTA_BASELINE_MIN_TOLERANCE_SECONDS = 60.0
+
+
+@dataclass(frozen=True)
+class WindowDelta:
+    """一筆 flow 在規則視窗內的實際增量（由兩次 cache 觀測相減得出）。
+
+    span_seconds 是增量真正涵蓋的秒數（now - baseline_at），一定 >= 視窗長度；
+    bandwidth 用它當分母才不會把「多算的那段」算成更高的速率。
+    """
+    bytes_total: float
+    conn: int
+    span_seconds: float
+    baseline_at: datetime.datetime
+
+    @property
+    def mbps(self) -> float:
+        return (self.bytes_total * 8.0) / self.span_seconds / 1_000_000.0
+
+    @property
+    def volume_mb(self) -> float:
+        return self.bytes_total / 1024 / 1024
+
+
+
+def _format_delta_reasons(reasons: Counter) -> str:
+    """把「推導不出視窗增量」的原因計數整理成一行可讀字串。"""
+    return ", ".join(f"{k}={v}" for k, v in sorted(reasons.items()))
+
 
 def flow_aggregation_start(flow: dict[str, Any]) -> datetime.datetime | None:
     """flow 聚合區間的起點（PCE ``timestamp_range.first_detected``）。
@@ -301,7 +357,7 @@ analysis_lock = threading.Lock()
 class Analyzer:
     def __init__(self, config_manager: Any, api_client: IApiClient, reporter: IReporter,
                  subscriber_events: Any = None, subscriber_flows: Any = None,
-                 cache_reader: Any = None) -> None:
+                 cache_reader: Any = None, flow_delta_reader: Any = None) -> None:
         self.cm = config_manager
         # Resolve the configured UI language once so alert criteria text (which
         # is built here and dispatched verbatim through the reporter) localizes
@@ -321,6 +377,9 @@ class Analyzer:
         # and the requested window is fully covered, reads from cache instead
         # — same hybrid pattern as ReportGenerator._fetch_traffic.
         self._cache_reader: Any = cache_reader
+        # 視窗增量（phase 2，見模組上方「Bucket-basis guard」與
+        # src/pce_cache/flow_deltas.py）。None 時規則引擎完全退回 phase-1 守門。
+        self._delta_reader: Any = flow_delta_reader
         # Records the data origin of the most recent query_flows() call:
         # "cache" | "mixed" | "api". Useful for dashboard UI badges.
         self.last_query_source: str = "api"
@@ -1503,6 +1562,128 @@ class Analyzer:
         elif entry > heap[0]:
             heapq.heapreplace(heap, entry)
 
+    def _prefetch_window_baselines(
+        self, traffic_stream: Any, tr_rules: list, now_utc: datetime.datetime
+    ) -> tuple[list[str | None] | None, dict[Any, dict[str, Any]]]:
+        """替本批 flow 取得每個規則視窗起點的基準觀測。
+
+        回傳 ``(flow_keys, {threshold_window: {flow_hash: FlowObservation}})``。
+        flow_keys 與 traffic_stream 同序；為 None 代表本 cycle 不走增量路徑
+        （沒有 delta reader、或串流不可重複走訪）——呼叫端一律退回守門。
+
+        只在 traffic_stream 已是 list 時啟用：增量要先掃過整批算出 flow_hash
+        才能一次查完基準，而 legacy API 路徑給的是 generator（且那條路徑的
+        flow 本來就沒有對應的 cache 觀測）。查詢按「不同的 threshold_window」
+        各做一次，而非每條規則一次——同長度的視窗共用同一份基準。
+        """
+        if self._delta_reader is None or not tr_rules:
+            return None, {}
+        if not isinstance(traffic_stream, list):
+            return None, {}
+        try:
+            from src.pce_cache.ingestor_traffic import flow_hash as _flow_key
+
+            def _key(flow: Any) -> str | None:
+                # 單筆畸形 payload（例如 raw_json 損毀後退化成欄位投影的列，
+                # 其 first_detected 是 datetime 而非字串）不得讓整批失去增量
+                # ——該筆自己退回守門即可。
+                try:
+                    return _flow_key(flow)
+                except Exception:  # noqa: BLE001
+                    return None
+
+            keys = [_key(f) for f in traffic_stream]
+            present = [k for k in keys if k is not None]
+            baselines: dict[Any, dict[str, Any]] = {}
+            for r_win in {r.get("threshold_window", 10) for r in tr_rules}:
+                r_start = now_utc - datetime.timedelta(minutes=r_win)
+                baselines[r_win] = self._delta_reader.baselines(present, r_start)
+            return keys, baselines
+        except Exception as exc:  # noqa: BLE001
+            # 查不到基準不是致命錯誤：整個 cycle 退回 phase-1 守門（規則不評估
+            # 但操作者會收到 meta-alert），比讓 monitor cycle 整個掛掉好。
+            logger.warning(
+                "Window-delta baselines unavailable ({}); falling back to the "
+                "aggregation-basis guard for this cycle", exc,
+            )
+            return None, {}
+
+    def _basis_decision(
+        self,
+        rule: dict,
+        r_win: float,
+        r_start: datetime.datetime,
+        now_utc: datetime.datetime,
+        f_span_start: datetime.datetime | None,
+        bw_note: str,
+        vol_note: str,
+        f_key: str | None,
+        f_cum: tuple[int, int, int] | None,
+        baselines_by_window: dict[Any, dict[str, Any]],
+    ) -> tuple[WindowDelta | None, str | None]:
+        """一筆 flow 對一條規則的量測基準判定（規則引擎與 debug 模擬共用）。
+
+        回傳 ``(delta, reason)``：
+          * ``(None, None)``  —— flow 的聚合區間本來就落在視窗內（或值本身
+            就是 EDC 區間增量），直接用 flow 上的原始值。
+          * ``(delta, None)`` —— 用連續觀測推導出的視窗增量取代原始值。
+          * ``(None, reason)``—— 兩者皆不可行，退回聚合基準守門（不評估）。
+        """
+        if f_span_start is None or f_span_start >= r_start:
+            return None, None
+        if rule["type"] == "bandwidth":
+            interval_scoped = bw_note == "(Interval)"
+        elif rule["type"] == "volume":
+            interval_scoped = vol_note == "(Interval)"
+        else:
+            # traffic count：PCE 沒有「增量連線數」欄位，num_connections
+            # 一律是整個 bucket 的累計值。
+            interval_scoped = False
+        if interval_scoped:
+            return None, None
+        delta, reason = self._window_delta(
+            f_key, f_cum, r_win, r_start, now_utc, baselines_by_window)
+        if delta is None:
+            return None, reason
+        return delta, None
+
+    def _window_delta(
+        self,
+        f_key: str | None,
+        f_cum: tuple[int, int, int] | None,
+        r_win: float,
+        r_start: datetime.datetime,
+        now_utc: datetime.datetime,
+        baselines_by_window: dict[Any, dict[str, Any]],
+    ) -> tuple[WindowDelta | None, str]:
+        """由基準觀測推導視窗增量。回傳 ``(delta, reason)``；delta 為 None 時
+        reason 說明為什麼推導不出來（呼叫端據此退回守門並計數）。"""
+        if f_key is None or f_cum is None:
+            return None, "no_cache"
+        base = (baselines_by_window.get(r_win) or {}).get(f_key)
+        if base is None:
+            # 視窗起點之前沒有任何觀測：flow 是這個視窗內才第一次被看到的，
+            # 或觀測已被 flow_obs_retention_hours 修剪掉。
+            return None, "no_baseline"
+        lag = (r_start - base.observed_at).total_seconds()
+        tolerance = max(DELTA_BASELINE_MIN_TOLERANCE_SECONDS,
+                        float(r_win) * 60.0 * DELTA_BASELINE_TOLERANCE_RATIO)
+        if lag > tolerance:
+            # 基準太舊＝增量涵蓋的區間比視窗長太多，還原不出「短視窗」語意。
+            # 解法是把 traffic_poll_interval_seconds 調到遠小於視窗長度。
+            return None, "stale_baseline"
+        d_out = f_cum[0] - base.bytes_out
+        d_in = f_cum[1] - base.bytes_in
+        d_conn = f_cum[2] - base.conn_count
+        if d_out < 0 or d_in < 0 or d_conn < 0:
+            # 計數器歸零（PCE 換 bucket，或亂序重拉回報了較小的累計值）。
+            # 負增量不是負流量——但歸零發生在視窗內或視窗前無從得知，
+            # 猜哪一種都可能誤報／漏報，因此退回守門。下一次 ingest 就會在
+            # 新 bucket 內留下基準，訊號自癒。
+            return None, "counter_reset"
+        span = max((now_utc - base.observed_at).total_seconds(), 1.0)
+        return WindowDelta(float(d_out + d_in), int(d_conn), span, base.observed_at), ""
+
     def _run_rule_engine(self, traffic_stream: Any, tr_rules: list, now_utc: datetime.datetime) -> list:
         """Iterate over traffic flows and accumulate per-rule match results.
 
@@ -1527,6 +1708,12 @@ class Analyzer:
         # per-flow 迴圈是熱路徑，因此這裡只累積數字，log 與 meta-alert 一律
         # 放到迴圈外——每條規則每 cycle 最多吵一次。
         basis_mismatch: dict[Any, dict[str, Any]] = {}
+        # 本 cycle 有多少「flow × 規則」實際採用了視窗增量（供操作者確認
+        # phase 2 真的在運作，而不是全靠守門硬撐）。
+        delta_applied = 0
+
+        flow_keys, baselines_by_window = self._prefetch_window_baselines(
+            traffic_stream, tr_rules, now_utc)
 
         count_processed = 0
         no_byte_fields = 0
@@ -1540,6 +1727,9 @@ class Analyzer:
             conn_val = _safe_int(f.get("num_connections") or f.get("count", 1))
             # 每 flow 解析一次（規則迴圈內重複解析同一個字串是白工）
             f_span_start = flow_aggregation_start(f)
+            # 同理：flow_hash 與累計計數器每 flow 只取一次
+            f_key = flow_keys[count_processed - 1] if flow_keys is not None else None
+            f_cum = _cumulative_metrics(f) if f_key is not None else None
 
             for rule in tr_rules:
                 rid = rule['id']
@@ -1549,60 +1739,74 @@ class Analyzer:
                 if not self._match_flow_filters(rule, f, r_start, strict_window=True):
                     continue
 
+                # 本規則實際採用的量測值：預設就是 flow 上的原始（bucket 累計）
+                # 值；下面的守門若能用視窗增量取代，就換成增量值。
+                m_bw, m_bw_note = bw_val, bw_note
+                m_vol, m_vol_note = vol_val, vol_note
+                m_conn = conn_val
+
                 # bucket-basis 守門：flow 的聚合區間起點早於本規則視窗起點時，
                 # 它帶的 byte/連線數涵蓋視窗外的流量，拿來比門檻必然高估。
-                # 唯一例外是 EDC 增量欄位（dst_db*）算出的 (Interval) 值——那
-                # 本來就是區間增量，不含 bucket 累計；traffic count 沒有對應的
-                # 增量欄位，故一律受影響。
-                if f_span_start is not None and f_span_start < r_start:
-                    if rule["type"] == "bandwidth":
-                        interval_scoped = bw_note == "(Interval)"
-                    elif rule["type"] == "volume":
-                        interval_scoped = vol_note == "(Interval)"
+                # phase 2 先試著用連續觀測推導視窗增量，推導不出來才守門。
+                delta, reason = self._basis_decision(
+                    rule, r_win, r_start, now_utc, f_span_start, bw_note, vol_note,
+                    f_key, f_cum, baselines_by_window)
+                if reason:
+                    # reason 只會在 f_span_start 已知且早於視窗起點時產生
+                    # （見 _basis_decision 的第一個分支）；None 分支只是給
+                    # 型別檢查器的保底，實際不會走到。
+                    span_min = (0.0 if f_span_start is None
+                                else (now_utc - f_span_start).total_seconds() / 60.0)
+                    info = basis_mismatch.get(rid)
+                    if info is None:
+                        basis_mismatch[rid] = {
+                            "rule_id": rid,
+                            "rule_name": rule.get("name", str(rid)),
+                            "window_minutes": r_win,
+                            "span_minutes": span_min,
+                            "flows": 1,
+                            "reasons": Counter([reason]),
+                        }
                     else:
-                        interval_scoped = False
-                    if not interval_scoped:
-                        span_min = (now_utc - f_span_start).total_seconds() / 60.0
-                        info = basis_mismatch.get(rid)
-                        if info is None:
-                            basis_mismatch[rid] = {
-                                "rule_id": rid,
-                                "rule_name": rule.get("name", str(rid)),
-                                "window_minutes": r_win,
-                                "span_minutes": span_min,
-                                "flows": 1,
-                            }
-                        else:
-                            info["flows"] += 1
-                            if span_min > info["span_minutes"]:
-                                info["span_minutes"] = span_min
-                        continue
+                        info["flows"] += 1
+                        info["reasons"][reason] += 1
+                        if span_min > info["span_minutes"]:
+                            info["span_minutes"] = span_min
+                    continue
+                if delta is not None:
+                    delta_applied += 1
+                    if rule["type"] == "bandwidth":
+                        m_bw, m_bw_note = delta.mbps, DELTA_BASIS_NOTE
+                    elif rule["type"] == "volume":
+                        m_vol, m_vol_note = delta.volume_mb, DELTA_BASIS_NOTE
+                    else:
+                        m_conn = delta.conn
 
                 res = rule_results[rid]
                 heap = top_heaps[rid]
 
                 if rule["type"] == "bandwidth":
-                    if bw_val > res['max_val']:
-                        res['max_val'] = bw_val
-                    if bw_val > float(rule.get("threshold_count", 0)):
+                    if m_bw > res['max_val']:
+                        res['max_val'] = m_bw
+                    if m_bw > float(rule.get("threshold_count", 0)):
                         f_copy = f.copy()
-                        f_copy['_metric_val'] = bw_val
-                        f_copy['_metric_fmt'] = f"{format_unit(bw_val, 'bandwidth')} {bw_note}"
-                        self._push_bounded_top_match(heap, bw_val, count_processed, f_copy, TOP_MATCHES_LIMIT)
+                        f_copy['_metric_val'] = m_bw
+                        f_copy['_metric_fmt'] = f"{format_unit(m_bw, 'bandwidth')} {m_bw_note}"
+                        self._push_bounded_top_match(heap, m_bw, count_processed, f_copy, TOP_MATCHES_LIMIT)
 
                 elif rule["type"] == "volume":
-                    res['max_val'] += vol_val
+                    res['max_val'] += m_vol
                     f_copy = f.copy()
-                    f_copy['_metric_val'] = vol_val
-                    f_copy['_metric_fmt'] = f"{format_unit(vol_val, 'volume')} {vol_note}"
-                    self._push_bounded_top_match(heap, vol_val, count_processed, f_copy, TOP_MATCHES_LIMIT)
+                    f_copy['_metric_val'] = m_vol
+                    f_copy['_metric_fmt'] = f"{format_unit(m_vol, 'volume')} {m_vol_note}"
+                    self._push_bounded_top_match(heap, m_vol, count_processed, f_copy, TOP_MATCHES_LIMIT)
 
                 else:  # Traffic Count
-                    res['max_val'] += conn_val
+                    res['max_val'] += m_conn
                     f_copy = f.copy()
-                    f_copy['_metric_val'] = conn_val
-                    f_copy['_metric_fmt'] = str(conn_val)
-                    self._push_bounded_top_match(heap, conn_val, count_processed, f_copy, TOP_MATCHES_LIMIT)
+                    f_copy['_metric_val'] = m_conn
+                    f_copy['_metric_fmt'] = str(m_conn)
+                    self._push_bounded_top_match(heap, m_conn, count_processed, f_copy, TOP_MATCHES_LIMIT)
 
         logger.info(t('found_traffic', count=count_processed))
 
@@ -1623,7 +1827,14 @@ class Analyzer:
         # 把結果掛回 rule_results 讓 _dispatch_alerts 擋掉告警，並寫進 state
         # 讓 _maybe_alert_overflow 發 meta-alert。三者缺一不可：只 suppress 不
         # 出聲＝操作者以為規則還在保護他，那比誤報更糟。
+        if delta_applied:
+            logger.info(
+                "Window-delta basis applied to {} flow/rule pair(s) this cycle "
+                "(cache observations differenced across each rule's window)",
+                delta_applied,
+            )
         for rid, info in basis_mismatch.items():
+            info["reason_summary"] = _format_delta_reasons(info["reasons"])
             rule_results[rid]['basis_mismatch'] = info
             logger.warning(
                 "Rule '{}' NOT evaluated this cycle (aggregation-basis guard): {} matched "
@@ -1631,9 +1842,14 @@ class Analyzer:
                 "threshold_window is only {} min. This PCE returns whole-bucket byte and "
                 "connection totals that are NOT clipped to the query window, so evaluating "
                 "the rule would compare bucket-wide traffic against a short-window threshold "
-                "and raise a false alert. Alerting for this rule is suppressed until its "
-                "window covers the aggregation span (or the PCE reports interval deltas).",
+                "and raise a false alert. The per-window delta could not be derived from "
+                "cache observations either ({}). Fix by: keeping pce_cache enabled with "
+                "flow_delta_enabled=true, setting traffic_poll_interval_seconds well below "
+                "this rule's threshold_window, widening threshold_window to cover the "
+                "aggregation span, or enabling Enhanced Data Collection so the PCE reports "
+                "interval deltas.",
                 info["rule_name"], info["flows"], info["span_minutes"], info["window_minutes"],
+                info["reason_summary"],
             )
         if basis_mismatch:
             worst = max(basis_mismatch.values(), key=lambda i: i["span_minutes"])
@@ -1646,6 +1862,7 @@ class Analyzer:
                         "window_minutes": i["window_minutes"],
                         "span_minutes": round(i["span_minutes"], 1),
                         "flows": i["flows"],
+                        "reasons": i["reason_summary"],
                     }
                     for i in basis_mismatch.values()
                 ],
@@ -1655,6 +1872,10 @@ class Analyzer:
                 "rule_names": ", ".join(i["rule_name"] for i in basis_mismatch.values()),
                 "worst_window_minutes": worst["window_minutes"],
                 "worst_span_minutes": round(worst["span_minutes"], 1),
+                # 為何推導不出視窗增量（no_cache / no_baseline / stale_baseline /
+                # counter_reset）——決定操作者該調哪一個旋鈕
+                "delta_reasons": _format_delta_reasons(
+                    sum((i["reasons"] for i in basis_mismatch.values()), Counter())),
             }
 
         # 將每條規則的有界集合還原為原始 append 順序（idx 升冪），
@@ -2310,6 +2531,16 @@ class Analyzer:
         traffic = list(traffic_gen) if traffic_gen else []
         print(f"  -> {t('fetched_records', count=len(traffic), mins=mins)}")
 
+        # 模擬與引擎共用視窗增量基準（見 _basis_decision）：debug 只是「不派送
+        # 的一次評估」，量測基準必須逐字相同，否則畫面上的 Would Trigger 與
+        # 真實 cycle 的行為會分岔。
+        flow_keys, baselines_by_window = self._prefetch_window_baselines(
+            traffic, [r for r in sim_rules if r.get("type") in ("traffic", "bandwidth", "volume")],
+            now)
+        flow_key_by_id: dict[int, str] = (
+            {id(f): k for f, k in zip(traffic, flow_keys) if k is not None}
+            if flow_keys is not None else {})
+
         print(f"\n{Colors.HEADER}{t('simulation_report')}{Colors.ENDC}")
         _skipped = len([r for r in (self.cm.config.get('rules') or []) if not rule_enabled(r)])
         if _skipped:
@@ -2389,24 +2620,67 @@ class Analyzer:
 
             else:
                 # Traffic / BW / Vol Logic
+                # 模擬必須跟引擎用同一套量測基準（_basis_decision）：以前這裡
+                # 直接拿 bucket 累計值算 "Would Trigger"，而引擎其實根本沒評估
+                # 那條規則——畫面對操作者說謊。
+                guarded: Counter = Counter()
+                delta_used = 0
                 for f in traffic:
                     if self._match_flow_filters(rule, f, rule_start):
+                        f_key = flow_key_by_id.get(id(f))
+                        f_cum = _cumulative_metrics(f) if f_key is not None else None
+                        bw_v, bw_n, _, _ = self.calculate_mbps(f)
+                        vol_v, vol_n = self.calculate_volume_mb(f)
+                        delta, reason = self._basis_decision(
+                            rule, rule_win, rule_start, now, flow_aggregation_start(f),
+                            bw_n, vol_n, f_key, f_cum, baselines_by_window)
+                        if reason:
+                            guarded[reason] += 1
+                            continue
+                        if delta is not None:
+                            delta_used += 1
                         f_copy = f.copy()
                         if rtype == "bandwidth":
-                            v, note, _, _ = self.calculate_mbps(f)
+                            v = delta.mbps if delta is not None else bw_v
+                            note = DELTA_BASIS_NOTE if delta is not None else bw_n
                             f_copy['_metric_val'] = v
                             f_copy['_metric_fmt'] = f"{format_unit(v, 'bandwidth')} {note}"
                         elif rtype == "volume":
-                            v, note = self.calculate_volume_mb(f)
+                            v = delta.volume_mb if delta is not None else vol_v
+                            note = DELTA_BASIS_NOTE if delta is not None else vol_n
                             f_copy['_metric_val'] = v
                             f_copy['_metric_fmt'] = f"{format_unit(v, 'volume')} {note}"
                         else:
-                            c = _safe_int(f.get("num_connections") or f.get("count", 1))
+                            c = (delta.conn if delta is not None
+                                 else _safe_int(f.get("num_connections") or f.get("count", 1)))
                             f_copy['_metric_val'] = c
                             f_copy['_metric_fmt'] = str(c)
                         matches.append(f_copy)
 
                 print(t('time_filter_results', total=len(traffic), win=rule_win, rem=len(matches)))
+                if delta_used:
+                    print("  -> " + t(
+                        'debug_basis_window_delta',
+                        default="Basis: per-window delta derived from cache observations "
+                                "({n} flow(s)) — the same basis the rule engine uses.",
+                        n=delta_used))
+                if guarded:
+                    # 引擎會因此**完全不評估**這條規則；模擬不可以照樣印
+                    # "Would Trigger"，否則操作者會以為規則有在保護他。
+                    print("  -> " + t(
+                        'debug_basis_guard_suppressed',
+                        default="Aggregation-basis guard: {n} matched flow(s) excluded "
+                                "({reasons}). This PCE returns whole-bucket totals that are "
+                                "NOT clipped to the query window and no per-window delta "
+                                "could be derived, so the rule engine SUPPRESSES this rule "
+                                "instead of alerting.",
+                        n=sum(guarded.values()), reasons=_format_delta_reasons(guarded)))
+                    if not matches:
+                        print("  -> " + t(
+                            'debug_basis_rule_not_evaluated',
+                            default="Rule NOT evaluated this cycle — the result below is "
+                                    "what the engine would report (no alert), not a "
+                                    "measurement of the traffic."))
                 val = 0.0
                 if rtype == "bandwidth":
                     val = max([m['_metric_val'] for m in matches]) if matches else 0.0

@@ -16,7 +16,7 @@ def init_schema(engine: Engine) -> None:
     _ensure_added_columns(engine)
     _ensure_added_indexes(engine)
     _drop_deprecated_indexes(engine)
-    _normalize_agg_bucket_day(engine)
+    _run_migrations(engine)
 
 
 # init_schema 本身雖然冪等，但每次呼叫仍要跑完整套 PRAGMA + create_all 反射
@@ -142,16 +142,65 @@ def _drop_deprecated_indexes(engine: Engine) -> None:
 # 升級鏈裡其他步驟都是便宜的 metadata 檢查，但 bucket_day 正規化的
 # NOT LIKE '%.%' 是 leading-wildcard、無法用索引，會全表掃描 agg 表——
 # 用 PRAGMA user_version 守衛，遷移完成後穩態成本降回 O(1)。
-# （repo 內 user_version 無其他用途；日後要加新的一次性遷移時把此值 +1，
-# 並在對應遷移函式比對新值。）
+# （repo 內 user_version 無其他用途；日後要加新的一次性遷移時新增一個常數
+# 並把 _SCHEMA_VERSION 指向它，再於 _run_migrations 加一段 version < N 的分支。）
 _MIGRATION_AGG_BUCKET_DAY = 1
+# 視窗增量觀測表（pce_traffic_flow_obs）。既有部署的升級動作見
+# _create_flow_obs_table：建表 + 索引，無資料搬遷。
+_MIGRATION_FLOW_OBS = 2
+# 本 build 認得的最高 schema 版本（降級偵測的門檻）
+_SCHEMA_VERSION = _MIGRATION_FLOW_OBS
+
+
+def _run_migrations(engine: Engine) -> None:
+    """依 PRAGMA user_version 逐步套用一次性遷移，最後把版本推到 _SCHEMA_VERSION。
+
+    每一步都必須冪等：兩執行緒併發時可能都通過版本守衛、各跑一次。
+    """
+    with engine.begin() as conn:
+        version = conn.execute(text("PRAGMA user_version")).scalar()
+        if version > _SCHEMA_VERSION:
+            # DB 曾被更新版程式碼遷移過（downgrade 情境）。repo 不支援
+            # downgrade——不動資料、只警示，讓 operator 有跡可循。
+            logger.warning(
+                "pce_cache db user_version={} is newer than this build "
+                "understands (max {}); the DB was migrated by newer code and "
+                "downgrade is unsupported — upgrade this installation",
+                version, _SCHEMA_VERSION,
+            )
+            return
+        if version < _MIGRATION_AGG_BUCKET_DAY:
+            _normalize_agg_bucket_day_conn(conn)
+        if version < _MIGRATION_FLOW_OBS:
+            _create_flow_obs_table(conn)
+        if version < _SCHEMA_VERSION:
+            # PRAGMA 不吃 bind 參數；值來自模組常數（int），無注入疑慮。
+            conn.execute(text(f"PRAGMA user_version = {_SCHEMA_VERSION}"))
+
+
+def _create_flow_obs_table(conn) -> None:
+    """既有 DB 補建 pce_traffic_flow_obs（含索引）。
+
+    init_schema 的 Base.metadata.create_all 對「本 build 啟動後才建立的
+    engine」已會建表，但升級路徑不得依賴呼叫順序——遷移步驟自己保證表存在，
+    這樣「先前版本建的 DB → 本版程式」在任何入口點都能乾淨升級。
+    checkfirst=True 使其冪等。
+    """
+    from src.pce_cache.models import PceTrafficFlowObs
+
+    PceTrafficFlowObs.__table__.create(bind=conn, checkfirst=True)
+
+
+def _normalize_agg_bucket_day(engine: Engine) -> None:
+    """相容入口：以 engine 呼叫整條遷移鏈（步驟排程現由 _run_migrations 負責）。"""
+    _run_migrations(engine)
 
 
 # bucket_day 舊格式（aggregator 以前用 SQL 'start of day' 產出，無微秒，例如
 # "2026-06-30 00:00:00"）跟 reader 端 SQLAlchemy 綁的 datetime（含微秒，例如
 # "2026-06-30 00:00:00.000000"）字串比較不一致，導致午夜 start 漏讀當日 bucket
 # （aggregator.py 已改成輸出跟 bind 一致的格式，這裡是既有資料的一次性遷移）。
-def _normalize_agg_bucket_day(engine: Engine) -> None:
+def _normalize_agg_bucket_day_conn(conn) -> None:
     """把 pce_traffic_flows_agg 既有的舊格式 bucket_day 正規化成新格式。
 
     冪等：只挑 bucket_day 不含 '.' 的舊格式列處理，處理完就不再命中。
@@ -160,64 +209,49 @@ def _normalize_agg_bucket_day(engine: Engine) -> None:
     因此改用 MAX 合併（與 aggregator 的 conflict-MAX 冪等語意一致）後刪除
     舊格式列；沒有碰撞則單純 UPDATE 成新格式。
 
-    守衛：user_version 已達標就直接返回，省掉每次 init_schema 的全表掃描
-    （穩態 O(1)）。兩執行緒併發時可能都通過守衛、各跑一次正規化——
-    正規化本身冪等，守衛只是省成本，競態下多跑一次無害。
+    版本守衛與交易由 _run_migrations 負責（此處只做遷移本身）：user_version
+    已達標就不會被呼叫，省掉每次 init_schema 的全表掃描（穩態 O(1)）。
+    兩執行緒併發時可能都通過守衛、各跑一次正規化——正規化本身冪等，
+    守衛只是省成本，競態下多跑一次無害。
     """
-    with engine.begin() as conn:
-        version = conn.execute(text("PRAGMA user_version")).scalar()
-        if version > _MIGRATION_AGG_BUCKET_DAY:
-            # DB 曾被更新版程式碼遷移過（downgrade 情境）。repo 不支援
-            # downgrade——不動資料、只警示，讓 operator 有跡可循。
-            logger.warning(
-                "pce_cache db user_version={} is newer than this build "
-                "understands (max {}); the DB was migrated by newer code and "
-                "downgrade is unsupported — upgrade this installation",
-                version, _MIGRATION_AGG_BUCKET_DAY,
-            )
-            return
-        if version >= _MIGRATION_AGG_BUCKET_DAY:
-            return
-        old_rows = conn.execute(text(
-            "SELECT id, bucket_day, src_workload, dst_workload, port, protocol, "
-            "action, flow_count, bytes_total FROM pce_traffic_flows_agg "
-            "WHERE bucket_day NOT LIKE '%.%'"
-        )).fetchall()
-        for row in old_rows:
-            new_bucket_day = row.bucket_day + ".000000"
-            existing = conn.execute(text(
-                "SELECT id, flow_count, bytes_total FROM pce_traffic_flows_agg "
-                "WHERE bucket_day = :bucket_day AND src_workload IS :src_workload "
-                "AND dst_workload IS :dst_workload AND port = :port "
-                "AND protocol = :protocol AND action = :action AND id != :id"
+    old_rows = conn.execute(text(
+        "SELECT id, bucket_day, src_workload, dst_workload, port, protocol, "
+        "action, flow_count, bytes_total FROM pce_traffic_flows_agg "
+        "WHERE bucket_day NOT LIKE '%.%'"
+    )).fetchall()
+    for row in old_rows:
+        new_bucket_day = row.bucket_day + ".000000"
+        existing = conn.execute(text(
+            "SELECT id, flow_count, bytes_total FROM pce_traffic_flows_agg "
+            "WHERE bucket_day = :bucket_day AND src_workload IS :src_workload "
+            "AND dst_workload IS :dst_workload AND port = :port "
+            "AND protocol = :protocol AND action = :action AND id != :id"
+        ), {
+            "bucket_day": new_bucket_day,
+            "src_workload": row.src_workload,
+            "dst_workload": row.dst_workload,
+            "port": row.port,
+            "protocol": row.protocol,
+            "action": row.action,
+            "id": row.id,
+        }).fetchone()
+        if existing is not None:
+            conn.execute(text(
+                "UPDATE pce_traffic_flows_agg SET flow_count = :flow_count, "
+                "bytes_total = :bytes_total WHERE id = :id"
             ), {
-                "bucket_day": new_bucket_day,
-                "src_workload": row.src_workload,
-                "dst_workload": row.dst_workload,
-                "port": row.port,
-                "protocol": row.protocol,
-                "action": row.action,
-                "id": row.id,
-            }).fetchone()
-            if existing is not None:
-                conn.execute(text(
-                    "UPDATE pce_traffic_flows_agg SET flow_count = :flow_count, "
-                    "bytes_total = :bytes_total WHERE id = :id"
-                ), {
-                    "flow_count": max(existing.flow_count, row.flow_count),
-                    "bytes_total": max(existing.bytes_total, row.bytes_total),
-                    "id": existing.id,
-                })
-                conn.execute(text(
-                    "DELETE FROM pce_traffic_flows_agg WHERE id = :id"
-                ), {"id": row.id})
-            else:
-                conn.execute(text(
-                    "UPDATE pce_traffic_flows_agg SET bucket_day = :bucket_day "
-                    "WHERE id = :id"
-                ), {"bucket_day": new_bucket_day, "id": row.id})
-        # PRAGMA 不吃 bind 參數；值來自模組常數（int），無注入疑慮。
-        conn.execute(text(f"PRAGMA user_version = {_MIGRATION_AGG_BUCKET_DAY}"))
+                "flow_count": max(existing.flow_count, row.flow_count),
+                "bytes_total": max(existing.bytes_total, row.bytes_total),
+                "id": existing.id,
+            })
+            conn.execute(text(
+                "DELETE FROM pce_traffic_flows_agg WHERE id = :id"
+            ), {"id": row.id})
+        else:
+            conn.execute(text(
+                "UPDATE pce_traffic_flows_agg SET bucket_day = :bucket_day "
+                "WHERE id = :id"
+            ), {"bucket_day": new_bucket_day, "id": row.id})
 
 
 def _enable_wal_pragma(engine: Engine) -> None:

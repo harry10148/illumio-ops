@@ -64,6 +64,32 @@ def _make_subscribers(cm):
         return None, None
 
 
+def _make_flow_delta_reader(cm):
+    """Return a FlowDeltaReader when pce_cache + flow deltas are enabled, else None.
+
+    規則引擎靠它把「整個 bucket 的累計值」還原成「視窗內的增量」；拿不到
+    （cache 沒開、關掉 flow_delta_enabled、建不起來）時，引擎自動退回
+    phase-1 的聚合基準守門——不會誤報，但短視窗規則不會評估。
+    """
+    try:
+        if not cm.models.pce_cache.enabled:
+            return None
+        cfg = cm.models.pce_cache
+        if not getattr(cfg, "flow_delta_enabled", True):
+            return None
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy.pool import NullPool
+        from src.pce_cache.flow_deltas import FlowDeltaReader
+        from src.pce_cache.schema import _ensure_schema_once
+        engine = create_engine(f"sqlite:///{cfg.db_path}", poolclass=NullPool)
+        _ensure_schema_once(engine, cfg.db_path)
+        return FlowDeltaReader(sessionmaker(engine))
+    except Exception as exc:
+        logger.warning("Could not create flow delta reader: {}", exc)
+        return None
+
+
 def _make_cache_reader(cm, db_path: str | None = None):
     """Return a CacheReader for the pce_cache DB (or an explicit db_path).
 
@@ -202,7 +228,8 @@ def rule_management_menu(cm):
                     sub_events, sub_flows = _make_subscribers(cm)
                     ana = Analyzer(cm, api, rep,
                                    subscriber_events=sub_events, subscriber_flows=sub_flows,
-                                   cache_reader=_make_cache_reader(cm))
+                                   cache_reader=_make_cache_reader(cm),
+                                   flow_delta_reader=_make_flow_delta_reader(cm))
                     ana.run_analysis()
                     rep.send_alerts()
             except TimeoutError:
@@ -216,7 +243,8 @@ def rule_management_menu(cm):
             sub_events, sub_flows = _make_subscribers(cm)
             ana = Analyzer(cm, api, rep,
                            subscriber_events=sub_events, subscriber_flows=sub_flows,
-                           cache_reader=_make_cache_reader(cm))
+                           cache_reader=_make_cache_reader(cm),
+                           flow_delta_reader=_make_flow_delta_reader(cm))
             ana.run_debug_mode()
             input(
                 f"\n{Colors.CYAN}[?]{Colors.ENDC} {t('press_enter_to_continue')} {Colors.GREEN}❯{Colors.ENDC} "
