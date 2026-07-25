@@ -447,3 +447,62 @@ def test_offline_audit_still_blocks_the_build():
             assert step.get("continue-on-error") is not True, (
                 "the offline audit must fail the build, not warn")
             assert "--strict" in step["run"]
+
+
+# ── glibc floor must agree across build script / preflight / docs ────────────
+# These three drifted before the manylinux_2_28 bump: the docs table listed
+# RHEL/Rocky 8+ (glibc 2.28) while the same line's parenthetical said
+# "glibc >= 2.17", and preflight.sh gated on 2.17 with a message naming
+# RHEL 7+. Whichever is loosest is what an operator actually gets past, so a
+# mismatch means preflight waves through a host the wheels will not run on.
+
+def _linux_wheel_platform_floor() -> tuple[int, int]:
+    """Highest manylinux_x_y tag the build script downloads for."""
+    body = (ROOT / "scripts" / "build_offline_bundle.sh").read_text(encoding="utf-8")
+    tags = re.findall(r"--platform\s+manylinux_(\d+)_(\d+)_x86_64", body)
+    assert tags, "build_offline_bundle.sh declares no manylinux platform"
+    return max((int(a), int(b)) for a, b in tags)
+
+
+def _preflight_glibc_floor() -> tuple[int, int]:
+    body = (ROOT / "scripts" / "preflight.sh").read_text(encoding="utf-8")
+    m = re.search(r'GLIBC_MINOR"\s+-ge\s+(\d+)', body)
+    assert m, "could not read the glibc minor threshold from preflight.sh"
+    return (2, int(m.group(1)))
+
+
+def test_preflight_glibc_floor_matches_the_wheel_platform():
+    wheel = _linux_wheel_platform_floor()
+    pre = _preflight_glibc_floor()
+    assert pre == wheel, (
+        f"preflight.sh gates on glibc {pre[0]}.{pre[1]} but the bundle's wheels "
+        f"need {wheel[0]}.{wheel[1]} — preflight would pass a host the bundle "
+        f"cannot run on")
+
+
+def test_installation_doc_states_the_same_glibc_floor():
+    doc = (ROOT / "docs" / "guide" / "installation.md").read_text(encoding="utf-8")
+    wheel = _linux_wheel_platform_floor()
+    expected = f"glibc >= {wheel[0]}.{wheel[1]}"
+    assert expected in doc, (
+        f"installation.md must state {expected!r} to match the wheel platform")
+    stale = re.findall(r"glibc >= (\d+)\.(\d+)", doc)
+    assert all((int(a), int(b)) == wheel for a, b in stale), (
+        f"installation.md still names a different glibc floor: {stale}")
+
+
+def test_offline_audit_needs_no_vulnerability_waivers():
+    """The 2_28 bump exists to remove the pillow waivers — keep them gone.
+
+    A reappearing --ignore-vuln means something is shipping with a known
+    unpatched CVE; that should be a deliberate, reviewed change, not a quiet
+    line in CI.
+    """
+    job = _offline_audit_job()
+    for step in job["steps"]:
+        run = str(step.get("run", ""))
+        if "requirements-offline.lock" in run:
+            assert "--ignore-vuln" not in run, (
+                "the offline lock audit must not waive vulnerabilities; if a "
+                "waiver is genuinely unavoidable, document why here and update "
+                "this test deliberately")

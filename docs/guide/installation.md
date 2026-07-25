@@ -31,7 +31,7 @@ illumio-ops 是針對 Illumio PCE 的無代理（agentless）監控與自動化�
 |---|---|
 | **Python** | 從原始碼安裝時，需要 Python 3.10 以上（建議 3.12）。離線安裝包不需要系統 Python — 安裝包內建可攜式 **CPython 3.12**（python-build-standalone 發行版）。 |
 | **PCE 存取** | 可透過 HTTPS 連線至 PCE（預設埠 `8443`），並持有 PCE API 金鑰（監控最低需 `read_only`；隔離操作需 `owner`）。 |
-| **作業系統** | RHEL / Rocky Linux 8+、Ubuntu 22.04+、Debian 12+（glibc >= 2.17）；Windows Server 2019+ / Windows 11（PowerShell 5.1+）。 |
+| **作業系統** | RHEL / Rocky Linux 8+、Ubuntu 22.04+、Debian 12+（glibc >= 2.28）；Windows Server 2019+ / Windows 11（PowerShell 5.1+）。 |
 | **磁碟** | 離線安裝包：安裝根目錄所在磁碟至少 2 GB（Linux）／500 MB（Windows）可用空間。 |
 
 > **如何建立 PCE API 金鑰**：PCE Web Console → **使用者選單 → My API Keys → Add**。

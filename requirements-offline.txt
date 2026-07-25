@@ -15,7 +15,7 @@
 #
 # Build command (Linux/WSL) — run by scripts/build_offline_bundle.sh:
 #   pip download -r requirements-offline.lock --require-hashes \
-#       --platform manylinux_2_17_x86_64 --python-version 3.12 \
+#       --platform manylinux_2_28_x86_64 --python-version 3.12 \
 #       --only-binary=:all: -d dist/wheels/linux/
 #
 #   pip download -r requirements-offline.lock --require-hashes \
@@ -67,29 +67,6 @@ SQLAlchemy>=2.0,<3.0
 
 # ── Phase 7: Logging ─────────────────────────────────────────────────────────
 loguru>=0.7,<0.8
-
-# ── manylinux_2_17 相容性上界（transitive deps，非直接使用）────────────────────
-# Linux wheels 是以 --platform manylinux_2_17_x86_64（glibc 2.17）下載的。下列
-# 套件的新版只發 manylinux_2_28 wheel，鎖檔若釘到那些版本，pip download 會直接
-# 失敗——釘了雜湊以後就不能再像以前那樣自動回退到舊版。
-#
-# Linux 這邊不是降版：現行未釘版的建置本來就是靠 pip 回退拿到同樣這幾個版本，
-# 這裡只是把「實際會裝到什麼」寫死、寫明。Windows 這邊則是被 Linux 拖著一起釘
-# （同一份鎖檔要同時供兩個平台下載，版本只能取交集）。
-#
-# 代價：這幾個套件實質凍結在最後一版有 manylinux_2_17 wheel 的版本，上游不會再
-# 回頭發 2_17。pillow 12.2.0 目前就帶著 13 個已知漏洞（修正版 12.3.0 起只發
-# manylinux_2_28）；本專案不解析外部影像（pillow 只是 matplotlib 產圖的相依），
-# 觸及不到，CI 的 pip-audit 以具名 ID 放行、有新漏洞照樣擋。
-# 真正的解法是把 Linux 目標平台提升到 manylinux_2_28（docs/guide/installation.md
-# 列的 RHEL/Rocky 8+、Ubuntu 22.04+、Debian 12+ 其實都 >= 2.28，只有文件裡那句
-# glibc >= 2.17 和 preflight.sh 的門檻更寬），做完這整段上界就能刪掉——那是產品
-# 決定，不在這裡順手改。
-argon2-cffi-bindings<=21.2.0
-contourpy<=1.3.2
-greenlet<=3.2.4
-pandas<=2.3.2
-pillow<=12.2.0
 
 # ── Windows-only transitive deps (explicit) ──────────────────────────────────
 # pip download evaluates environment markers on the BUILD host (Linux), so
