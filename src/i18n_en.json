@@ -4630,5 +4630,6 @@
   "rpt_pu_unused_indeterminate_note": "{n} rule(s) in this table are marked Query Failed / Query Pending: their traffic query did not complete, so their usage is unknown — do not decommission them based on this table.",
   "rs_sch_pce_unreachable": "Cannot verify provisioning state: the PCE did not respond (check connectivity and credentials).",
   "rpt_pu_draft_pd_failed": "The draft policy-decision check could not be completed: the traffic query failed, so this section is not a clean result. Re-run the report before acting on it.",
-  "rpt_pu_overview_indeterminate": "{n} rule(s) could not be evaluated because their traffic query failed or never completed. They are counted separately and are NOT included in the unused total — do not decommission them based on this report."
+  "rpt_pu_overview_indeterminate": "{n} rule(s) could not be evaluated because their traffic query failed or never completed. They are counted separately and are NOT included in the unused total — do not decommission them based on this report.",
+  "gui_toast_report_partial": "Report only partly generated — these formats failed: {formats}. The files that did succeed are listed under Reports."
 }

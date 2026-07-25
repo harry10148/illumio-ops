@@ -4630,5 +4630,6 @@
   "rpt_pu_unused_indeterminate_note": "本表中有 {n} 條規則標示為 Query Failed / Query Pending：其流量查詢未完成，使用狀況為未知——請勿依本表將這些規則下線。",
   "rs_sch_pce_unreachable": "無法確認佈署狀態：PCE 沒有回應（請檢查連線與憑證）。",
   "rpt_pu_draft_pd_failed": "草稿政策決策檢查未能完成：流量查詢失敗，本節不代表沒有風險。請重新產出報表後再據以行動。",
-  "rpt_pu_overview_indeterminate": "有 {n} 條規則因流量查詢失敗或未完成而無法判定，已單獨計數且未列入未使用總數，請勿依本報表下架這些規則。"
+  "rpt_pu_overview_indeterminate": "有 {n} 條規則因流量查詢失敗或未完成而無法判定，已單獨計數且未列入未使用總數，請勿依本報表下架這些規則。",
+  "gui_toast_report_partial": "報表僅部分產出——下列格式失敗：{formats}。已成功產出的檔案仍列在報表清單中。"
 }
