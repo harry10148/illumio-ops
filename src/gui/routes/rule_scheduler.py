@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import datetime
 import os
-import threading
 
 from contextlib import contextmanager
 
@@ -19,25 +18,11 @@ from src.gui._helpers import (
 from src.href_utils import extract_id as _extract_id_href
 from src.i18n import t
 
-# ScheduleDB 寫入序列化：ScheduleDB 是「整檔覆寫」（load→改記憶體 dict→save
-# 全量重寫 rule_schedules.json），本身無任何跨 instance 鎖，而每個 GUI route
-# 都各自新建 instance——任何兩個寫入者交錯，後存檔的一方會用自己「請求開始
-# 時」的過期快照整檔蓋掉前者（新建的 schedule 憑空消失、到期已刪的 one_time
-# 復活）。所有 GUI 端寫入一律：持這把 module 級鎖 → 鎖內 db.load() 重讀 →
-# 改動 → save。（APScheduler tick 的 engine.check 在排程器行程側，不在此鎖
-# 範圍；GUI 的 /check 端點有納入。）
-_rs_db_lock = threading.Lock()
-
-
-def _rs_db_set_status(db, href, status):
-    """pce_status 對帳寫回：鎖內 re-load 後只改該 entry 的 pce_status。
-    條目已被併發刪除時直接略過——不得用過期快照把它復活。"""
-    with _rs_db_lock:
-        db.load()
-        fresh = db.db.get(href)
-        if fresh is not None and fresh.get('pce_status') != status:
-            fresh['pce_status'] = status
-            db.save()
+# ScheduleDB 寫入序列化的鎖與 helper 住在 src/rule_scheduler.py（ScheduleDB
+# 所在模組）：`--monitor-gui` 下 APScheduler tick 與 Flask 在同一行程的不同
+# thread，排程器側的 engine.check 與這裡的 GUI route 是真正的併發寫入者，
+# 必須共用同一把鎖。用法不變：持鎖 → 鎖內 db.load() 重讀 → 改動 → save。
+from src.rule_scheduler import _rs_db_lock, _rs_db_set_status  # noqa: E402
 
 
 def make_rule_scheduler_blueprint(

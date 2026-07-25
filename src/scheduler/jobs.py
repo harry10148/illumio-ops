@@ -14,7 +14,7 @@ from src.report.snapshot_store import read_latest
 def run_monitor_cycle(cm) -> None:
     """Execute one monitoring analysis + alert dispatch."""
     from src.api_client import ApiClient
-    from src.analyzer import Analyzer
+    from src.analyzer import Analyzer, analysis_lock
     from src.reporter import Reporter
     from src.module_log import ModuleLog
     from src.main import _make_subscribers, _make_cache_reader
@@ -28,8 +28,11 @@ def run_monitor_cycle(cm) -> None:
             ana = Analyzer(cm, api, rep,
                            subscriber_events=sub_events, subscriber_flows=sub_flows,
                            cache_reader=_make_cache_reader(cm))
-            ana.run_analysis()
-            rep.send_alerts()
+            # 見 analyzer.analysis_lock：與 GUI 觸發的 run/debug 互斥，
+            # 避免併發 cycle 的 save_state 互相覆蓋 analyzer 自有 state key。
+            with analysis_lock:
+                ana.run_analysis()
+                rep.send_alerts()
         mlog.info("Monitor cycle complete")
     except Exception as exc:
         logger.exception("Monitor cycle failed: {}", exc)
@@ -473,7 +476,8 @@ def run_tls_renew_check(cm) -> None:
     warning 提示重啟套用。到期天數的常態可視性由 overview 的 tls 卡涵蓋。
     """
     try:
-        from src.gui._helpers import _maybe_auto_renew_self_signed, _ROOT_DIR
+        from src.gui._helpers import (_maybe_auto_renew_self_signed, _ROOT_DIR,
+                                      _SELF_SIGNED_VALIDITY_DAYS)
         tls_cfg = (cm.config.get("web_gui") or {}).get("tls") or {}
         cert_file = tls_cfg.get("cert_file")
         key_file = tls_cfg.get("key_file")
@@ -482,8 +486,15 @@ def run_tls_renew_check(cm) -> None:
             return
         cert_dir = os.path.join(_ROOT_DIR, "config", "tls")
         threshold = int(tls_cfg.get("auto_renew_days", 30))
-        renewed, days = _maybe_auto_renew_self_signed(cert_dir,
-                                                      threshold_days=threshold)
+        # validity_days / key_algorithm 必須帶進去：不帶的話續期會悄悄退回
+        # 函式預設值，把 operator 設定的憑證效期與金鑰演算法洗掉（啟動路徑
+        # gui/__init__.py 已帶，這條每日續期 job 才是實際的續期主要觸發點）。
+        renewed, days = _maybe_auto_renew_self_signed(
+            cert_dir,
+            threshold_days=threshold,
+            days=int(tls_cfg.get("validity_days", _SELF_SIGNED_VALIDITY_DAYS)),
+            key_algorithm=tls_cfg.get("key_algorithm", "ecdsa-p256"),
+        )
         if renewed:
             logger.warning(
                 "TLS self-signed cert renewed on disk ({} days remaining); "

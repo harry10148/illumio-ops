@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import io
 import ipaddress
-import threading
 from contextlib import redirect_stdout
 
 from flask import Blueprint, jsonify, request
 
 from src.alerts import PLUGIN_METADATA
-from src.analyzer import QUERY_RESULT_CAP
+from src.analyzer import QUERY_RESULT_CAP, analysis_lock as _analysis_lock
 from src.config import ConfigManager
 from src.gui._helpers import (
     _err,
@@ -22,16 +21,9 @@ from src.gui._helpers import (
 from src.i18n import t
 from src.state_store import update_state_file
 
-# GUI 觸發的分析／debug 執行序列化：
-# - api_run_once：Analyzer.save_state 的 _merge 假設同時只有一個分析 cycle
-#   在跑（analyzer 自有 key 是整包覆蓋）——併發 GUI 觸發互相蓋掉
-#   alert_history/history 會造成重複告警或計數錯亂。
-# - api_debug：contextlib.redirect_stdout 換的是 process 全域 stdout，兩個
-#   debug 同時跑會互相污染輸出緩衝；共用同一把鎖也讓 GUI 觸發的分析 print
-#   不會被併發 debug 擷取走。
-# 注意：與排程器的 monitor cycle（scheduler/jobs.py）之間仍無互斥——那屬於
-# 排程器側的變更範圍，此鎖只序列化 GUI 端的觸發。
-_analysis_lock = threading.Lock()
+# _analysis_lock（= analyzer.analysis_lock，於 import 區取得）由 GUI 觸發的
+# api_run_once / api_debug 與排程器的 run_monitor_cycle 共用——`--monitor-gui`
+# 下兩者是同一行程的不同 thread，只鎖 GUI 側防不到排程器。詳見該處註解。
 
 
 def make_actions_blueprint(
