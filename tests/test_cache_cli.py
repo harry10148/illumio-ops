@@ -68,7 +68,11 @@ def test_cache_backfill_bad_date_exits_dataerr():
     runner = CliRunner()
     result = runner.invoke(cache_group, ["backfill", "--source", "events", "--since", "not-a-date"])
     assert result.exit_code == EXIT_DATAERR
-    assert "error:" in result.output
+    # 同 test_cli_workload_list：不可寫死英文前綴，實際語言由
+    # ConfigManager.load() 依 repo 的 config/config.json 設定（gitignored），
+    # 開發者本機設 zh_TW 時寫死字面會失敗、CI 卻是綠的。
+    from src.i18n import t
+    assert t("cli_error_prefix", default="error: ").strip() in result.output
     assert "since" in result.output.lower()
 
 

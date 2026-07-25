@@ -28,6 +28,24 @@ class AsyncDownloadError(APIError):
     """
 
 
+class RuleTrafficQueryError(APIError):
+    """Per-rule traffic count is indeterminate (payload / submit / poll failed).
+
+    Raised by TrafficQueryBuilder.get_rule_traffic_count so callers can
+    distinguish "the query never produced an answer" from "0 flows matched".
+    The old code returned 0 for both, so a rule that was never actually
+    checked was reported as unused — inviting an operator to decommission it.
+
+    ``pending`` marks the poll-timeout case (the PCE job may still finish),
+    mirroring the Query Pending / Query Failed split the batch path records
+    in pending_rule_details / failed_rule_details.
+    """
+
+    def __init__(self, message: str, *, pending: bool = False):
+        super().__init__(message)
+        self.pending = pending
+
+
 class TruncatedCollectionError(APIError):
     """Collection GET hit the PCE 500-object cap and the async-GET
     fallback could not recover the full set.

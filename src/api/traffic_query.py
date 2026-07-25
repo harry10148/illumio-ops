@@ -25,7 +25,7 @@ from io import BytesIO
 import orjson
 from loguru import logger
 
-from src.exceptions import AsyncDownloadError
+from src.exceptions import AsyncDownloadError, RuleTrafficQueryError
 from src.i18n import t
 from src.port_token import parse_port_token
 
@@ -1422,28 +1422,48 @@ class TrafficQueryBuilder:
             return None
 
     def get_rule_traffic_count(self, rule, start_date, end_date):
-        """Query traffic count for a single rule (sequential, for compatibility)."""
+        """Query traffic count for a single rule (sequential, for compatibility).
+
+        Returns the flow count. A returned 0 always means "the PCE answered and
+        the rule genuinely saw no traffic" — every path that fails to obtain an
+        answer raises instead, so an unchecked rule can never be rendered as
+        unused:
+
+          * RuleTrafficQueryError            — payload build / submit / poll or
+            any unexpected error; ``.pending`` is True for the poll timeout
+            (the PCE job may still complete later).
+          * AsyncDownloadError               — result download returned non-200.
+
+        This mirrors batch_get_rule_traffic_counts, which keeps such rules out
+        of the hit/unused lists and reports them via failed_rule_details /
+        pending_rule_details.
+        """
         jobs = self._client._jobs
+        rule_href = rule.get('href', '')
         try:
             payload = self._build_rule_query_payload(rule, start_date, end_date)
             if payload is None:
-                return 0
+                raise RuleTrafficQueryError(
+                    f"query payload build failed for {rule_href}")
             cached = jobs.find_cached_async_summary(payload, query_type="rule_usage")
             if cached:
                 return cached["count"]
             job_href = jobs.submit_async_query(payload)
             if not job_href:
-                return 0
+                raise RuleTrafficQueryError(
+                    f"async query submit failed for {rule_href}")
             if not jobs.poll_async_query(job_href, timeout=120):
-                return 0
+                raise RuleTrafficQueryError(
+                    f"async query poll timed out for {rule_href}", pending=True)
             return jobs.summarize_async_query(job_href)["count"]
-        except AsyncDownloadError:
-            # 下載失敗不得誤報 0 flows（會被解讀成 rule unused）——與
+        except (AsyncDownloadError, RuleTrafficQueryError):
+            # 失敗不得誤報 0 flows（會被解讀成 rule unused）——與
             # batch_get_rule_traffic_counts 的失敗語意一致。
             raise
         except Exception as e:
-            logger.warning(f"get_rule_traffic_count error for {rule.get('href')}: {e}")
-            return 0
+            logger.warning(f"get_rule_traffic_count error for {rule_href}: {e}")
+            raise RuleTrafficQueryError(
+                f"traffic query failed for {rule_href}: {e}") from e
 
     def batch_get_rule_traffic_counts(
         self,

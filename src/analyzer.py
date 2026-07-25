@@ -91,6 +91,8 @@ _ANALYZER_OWNED_STATE_KEYS = (
     "traffic_overflow_last_alert_at",
     "window_truncation",
     "window_truncation_last_alert_at",
+    "basis_mismatch",
+    "basis_mismatch_last_alert_at",
 )
 
 # record_local_read()/record_event_batch() 在純 cache-read cycle 寫入的
@@ -188,6 +190,40 @@ def flow_has_byte_fields(flow: dict[str, Any]) -> bool:
     在 cycle 層級（非逐 flow）記一次警告，避免「量測到 0」與「沒有量測」被
     當成同一件事。"""
     return any(flow.get(k) is not None for k in _BYTE_FIELD_KEYS)
+
+
+# ─── Bucket-basis guard（聚合基準守門）───────────────────────────────────────
+#
+# 真機事實（2026-07-25，對同一批 flow 分別以 5 / 30 / 120 分鐘視窗查詢比對）：
+# PCE 把 flow 聚合成「日」級 bucket，回傳的 dst_b*/num_connections 是**整個
+# bucket 的累計值，不會裁切到查詢視窗**——三個視窗拿到完全相同的
+# dst_bo/dst_bi/num_connections，且 first_detected 一律落在當日午夜。
+#
+# 後果：check_flow_match 只看 last_detected 在不在視窗內，所以 flow 會被收下，
+# 但它帶的量是整個 bucket 的。threshold_window=10 分鐘的規則在 08:27 評估時，
+# 等於拿 8.5 小時的累計量去比 10 分鐘的門檻——誤報幅度隨當日時間推移放大、
+# 午夜歸零。traffic（num_connections）、bandwidth、volume 三型全中。
+#
+# Phase 1（本守門）的處置：偵測到「flow 的聚合區間起點早於規則視窗起點」時，
+# 該規則本 cycle 不告警，並以 WARNING + meta-alert 讓操作者知道規則沒被評估
+# ——沉默比誤報更糟，操作者絕不可以以為規則還在保護他。
+# Phase 2（另案）：從連續兩次 pce_cache 觀測推導真正的視窗增量，屆時本守門
+# 只需保留在「推導不出增量」的殘餘情況。
+
+def flow_aggregation_start(flow: dict[str, Any]) -> datetime.datetime | None:
+    """flow 聚合區間的起點（PCE ``timestamp_range.first_detected``）。
+
+    cache 列與 API 回傳都可能把它放在頂層或巢狀 timestamp_range 下（比照
+    ``src/pce_cache/ingestor_traffic._ts``），兩處都認。欄位缺漏或無法解析時
+    回 None——呼叫端必須據此**放行**，不可以把「沒有證據」當成違規證據。
+    """
+    ts = flow.get("first_detected")
+    if not ts:
+        tr = flow.get("timestamp_range")
+        ts = tr.get("first_detected") if isinstance(tr, dict) else None
+    if not ts:
+        return None
+    return parse_event_timestamp(str(ts))
 
 
 def calculate_mbps(flow: dict[str, Any]) -> tuple[float, str, float, float]:
@@ -1098,6 +1134,16 @@ class Analyzer:
             details_key="alert_window_truncation_details",
             log_label="Traffic window truncation",
         )
+        # bucket-basis 守門觸發＝有規則本 cycle 根本沒被評估。只留一行 log 的話
+        # 操作者無從得知「沒收到告警」其實是「規則沒在跑」——升級成同一套
+        # meta-alert 機制（自有 state key 與 cooldown key）。
+        self._maybe_alert_single_overflow(
+            state_key="basis_mismatch",
+            cooldown_key="basis_mismatch_last_alert_at",
+            rule_key="alert_aggregation_basis_rule",
+            details_key="alert_aggregation_basis_details",
+            log_label="Traffic aggregation basis mismatch",
+        )
 
     def _maybe_alert_single_overflow(
         self, *, state_key: str, cooldown_key: str, rule_key: str, details_key: str, log_label: str
@@ -1116,15 +1162,24 @@ class Analyzer:
         if last and (now_utc - last).total_seconds() < OVERFLOW_ALERT_COOLDOWN_MINUTES * 60:
             return
         self.state[cooldown_key] = format_utc(now_utc)
+        # overflow 類訊號的四個共用 placeholder，外加訊號 state 裡的所有純量
+        # 欄位——讓後來的訊號（如 basis_mismatch）能用自己的 placeholder，而
+        # 不必硬塞進 raw/cap/since/until 這四個語意不合的欄位。str.format 會
+        # 忽略模板沒用到的 kwargs，故舊訊號逐位不變。
+        details_kwargs: dict[str, Any] = {
+            "raw": overflow.get("raw_count", "?"),
+            "cap": overflow.get("max_results", "?"),
+            "since": overflow.get("query_since", "?"),
+            "until": overflow.get("query_until", "?"),
+        }
+        details_kwargs.update(
+            {k: v for k, v in overflow.items() if isinstance(v, (str, int, float))}
+        )
         self.reporter.add_health_alert({
             "time": now_utc.strftime('%Y-%m-%d %H:%M:%S'),
             "rule": t(rule_key),
             "status": "warning",
-            "details": t(details_key,
-                         raw=overflow.get("raw_count", "?"),
-                         cap=overflow.get("max_results", "?"),
-                         since=overflow.get("query_since", "?"),
-                         until=overflow.get("query_until", "?")),
+            "details": t(details_key, **details_kwargs),
         })
         logger.warning(f"{log_label} meta-alert dispatched")
 
@@ -1357,6 +1412,9 @@ class Analyzer:
         # 每個 cycle 先歸零截斷訊號（下方 cache 分支才會重新設定）——否則
         # 規則全部停用或改走 legacy 路徑後，舊訊號會永遠留著每小時重發一次。
         self.state["window_truncation"] = {}
+        # 同理歸零 bucket-basis 守門訊號：它由 _run_rule_engine 在本 cycle
+        # 重新寫入；規則停用或不再命中時訊號必須自癒，不可永久黏著。
+        self.state["basis_mismatch"] = {}
         tr_rules = self._select_rules(
             lambda r: r.get("type") in ("traffic", "bandwidth", "volume"))
         if not tr_rules:
@@ -1465,6 +1523,10 @@ class Analyzer:
         """
         rule_results: dict[Any, dict[str, Any]] = {r['id']: {'max_val': 0.0, 'top_matches': []} for r in tr_rules}
         top_heaps: dict[Any, list] = {r['id']: [] for r in tr_rules}
+        # bucket-basis 守門的每規則彙總（見模組上方「Bucket-basis guard」）。
+        # per-flow 迴圈是熱路徑，因此這裡只累積數字，log 與 meta-alert 一律
+        # 放到迴圈外——每條規則每 cycle 最多吵一次。
+        basis_mismatch: dict[Any, dict[str, Any]] = {}
 
         count_processed = 0
         no_byte_fields = 0
@@ -1476,6 +1538,8 @@ class Analyzer:
             bw_val, bw_note, _, _ = self.calculate_mbps(f)
             vol_val, vol_note = self.calculate_volume_mb(f)
             conn_val = _safe_int(f.get("num_connections") or f.get("count", 1))
+            # 每 flow 解析一次（規則迴圈內重複解析同一個字串是白工）
+            f_span_start = flow_aggregation_start(f)
 
             for rule in tr_rules:
                 rid = rule['id']
@@ -1484,6 +1548,35 @@ class Analyzer:
 
                 if not self._match_flow_filters(rule, f, r_start, strict_window=True):
                     continue
+
+                # bucket-basis 守門：flow 的聚合區間起點早於本規則視窗起點時，
+                # 它帶的 byte/連線數涵蓋視窗外的流量，拿來比門檻必然高估。
+                # 唯一例外是 EDC 增量欄位（dst_db*）算出的 (Interval) 值——那
+                # 本來就是區間增量，不含 bucket 累計；traffic count 沒有對應的
+                # 增量欄位，故一律受影響。
+                if f_span_start is not None and f_span_start < r_start:
+                    if rule["type"] == "bandwidth":
+                        interval_scoped = bw_note == "(Interval)"
+                    elif rule["type"] == "volume":
+                        interval_scoped = vol_note == "(Interval)"
+                    else:
+                        interval_scoped = False
+                    if not interval_scoped:
+                        span_min = (now_utc - f_span_start).total_seconds() / 60.0
+                        info = basis_mismatch.get(rid)
+                        if info is None:
+                            basis_mismatch[rid] = {
+                                "rule_id": rid,
+                                "rule_name": rule.get("name", str(rid)),
+                                "window_minutes": r_win,
+                                "span_minutes": span_min,
+                                "flows": 1,
+                            }
+                        else:
+                            info["flows"] += 1
+                            if span_min > info["span_minutes"]:
+                                info["span_minutes"] = span_min
+                        continue
 
                 res = rule_results[rid]
                 heap = top_heaps[rid]
@@ -1526,6 +1619,44 @@ class Analyzer:
                 count_processed,
             )
 
+        # bucket-basis 守門的收斂：每條受影響的規則吵一次 WARNING（迴圈外），
+        # 把結果掛回 rule_results 讓 _dispatch_alerts 擋掉告警，並寫進 state
+        # 讓 _maybe_alert_overflow 發 meta-alert。三者缺一不可：只 suppress 不
+        # 出聲＝操作者以為規則還在保護他，那比誤報更糟。
+        for rid, info in basis_mismatch.items():
+            rule_results[rid]['basis_mismatch'] = info
+            logger.warning(
+                "Rule '{}' NOT evaluated this cycle (aggregation-basis guard): {} matched "
+                "flow(s) carry aggregate totals reaching back {:.0f} min, but the rule's "
+                "threshold_window is only {} min. This PCE returns whole-bucket byte and "
+                "connection totals that are NOT clipped to the query window, so evaluating "
+                "the rule would compare bucket-wide traffic against a short-window threshold "
+                "and raise a false alert. Alerting for this rule is suppressed until its "
+                "window covers the aggregation span (or the PCE reports interval deltas).",
+                info["rule_name"], info["flows"], info["span_minutes"], info["window_minutes"],
+            )
+        if basis_mismatch:
+            worst = max(basis_mismatch.values(), key=lambda i: i["span_minutes"])
+            self.state["basis_mismatch"] = {
+                "detected_at": format_utc(now_utc),
+                "rules": [
+                    {
+                        "id": i["rule_id"],
+                        "name": i["rule_name"],
+                        "window_minutes": i["window_minutes"],
+                        "span_minutes": round(i["span_minutes"], 1),
+                        "flows": i["flows"],
+                    }
+                    for i in basis_mismatch.values()
+                ],
+                # 以下純量欄位供 meta-alert 的 details 模板取用（見
+                # _maybe_alert_single_overflow：state 內的純量會成為 placeholder）
+                "rule_count": len(basis_mismatch),
+                "rule_names": ", ".join(i["rule_name"] for i in basis_mismatch.values()),
+                "worst_window_minutes": worst["window_minutes"],
+                "worst_span_minutes": round(worst["span_minutes"], 1),
+            }
+
         # 將每條規則的有界集合還原為原始 append 順序（idx 升冪），
         # 使下游（_dispatch_alerts 自己的 stable sort）看到的 tie-break
         # 行為與原始無界累積完全相同。
@@ -1546,6 +1677,20 @@ class Analyzer:
                       (used only for type information; mirrors the rules in triggers).
         """
         for rule, res in triggers:
+            # bucket-basis 守門（見 _run_rule_engine）：本 cycle 這條規則的加總
+            # 涵蓋視窗外的流量、已知會高估——寧可漏發，也不送一則已知錯誤的
+            # 告警。WARNING 與 meta-alert 已在規則引擎/overflow 路徑發出。
+            if res.get('basis_mismatch'):
+                mismatch = res['basis_mismatch']
+                self.stats.record_suppression(
+                    rule,
+                    "aggregation_basis",
+                    window_minutes=mismatch["window_minutes"],
+                    span_minutes=round(mismatch["span_minutes"], 1),
+                    flows=mismatch["flows"],
+                )
+                continue
+
             val = res['max_val']
             threshold = float(rule.get("threshold_count", 0))
 

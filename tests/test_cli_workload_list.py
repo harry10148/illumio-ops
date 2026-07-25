@@ -190,4 +190,11 @@ def test_workload_list_connection_error_exits_unavailable(tmp_path, monkeypatch)
         runner = CliRunner()
         result = runner.invoke(cli, ["workload", "list"])
     assert result.exit_code == EXIT_UNAVAILABLE
-    assert "error:" in result.output
+    # 斷言不可寫死英文字面：ConfigManager.load() 會依設定檔呼叫 set_language()
+    # （config.py:317），而它的路徑解析以套件根為準、不是 cwd——上面那份
+    # tmp_path 設定檔管不到語言，實際生效的是 repo 的 config/config.json
+    # （gitignored）。開發者本機設 zh_TW 時斷 "error:" 會失敗，CI 與新 worktree
+    # 卻是綠的（那裡沒有 config.json，回退成 en）。改斷「有印出當前語言的錯誤
+    # 前綴」，測到的是真正的意圖且不相依開發者環境。
+    from src.i18n import t
+    assert t("cli_error_prefix", default="error: ").strip() in result.output

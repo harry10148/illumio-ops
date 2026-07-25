@@ -1,4 +1,5 @@
-"""Contracts for the two packaging security defects found in review 2.
+"""Contracts for the packaging security defects found in review 2 (+ the wheel
+pinning defect found later).
 
 1. scripts/build_offline_bundle.sh staged the BUILD HOST's runtime-generated
    TLS material into the shipped tar.gz/zip, so every install made from one
@@ -12,7 +13,15 @@
    api.key/api.secret, smtp.password, LINE/Telegram tokens, web_gui.secret_key
    — was readable by every interactive user. install.sh keeps exactly those
    files 0600, so the Windows path must not be looser.
+
+3. The offline bundle resolved its wheels live from the ranges in
+   requirements-offline.txt: no pinning, no hash verification, no audit. Two
+   builds of the same source shipped different dependency sets, and a
+   substituted wheel would have installed silently on every offline host. The
+   bundle now downloads and installs requirements-offline.lock (pip-compile
+   --generate-hashes) with --require-hashes on both platforms.
 """
+import hashlib
 import re
 import shutil
 import subprocess
@@ -23,6 +32,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 BUILD_SCRIPT = ROOT / "scripts" / "build_offline_bundle.sh"
 INSTALL_PS1 = ROOT / "scripts" / "install.ps1"
+INSTALL_SH = ROOT / "scripts" / "install.sh"
+OFFLINE_REQ = ROOT / "requirements-offline.txt"
+OFFLINE_LOCK = ROOT / "requirements-offline.lock"
 
 
 def _bash_text(path: Path) -> str:
@@ -233,3 +245,149 @@ def test_uninstall_sh_does_not_orphan_secrets_to_a_reusable_uid():
     userdel_at = src.index("userdel")
     chown_at = src.index("chown -R root:root")
     assert chown_at < userdel_at, "chown must happen before userdel"
+
+
+# ── 3. Offline wheels must be pinned + hash-verified end to end ──────────────
+
+def _lock_requirement_lines(text: str) -> list[str]:
+    """Return the lock's logical requirement lines (backslash continuations joined)."""
+    joined = re.sub(r"\\\n\s*", " ", text)
+    return [
+        line.strip()
+        for line in joined.splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+
+
+def test_offline_lock_exists():
+    assert OFFLINE_LOCK.is_file(), (
+        "requirements-offline.lock is missing — the offline bundle would fall "
+        "back to resolving requirements-offline.txt's ranges live, which pins "
+        "nothing and verifies nothing"
+    )
+
+
+def test_every_offline_lock_entry_is_pinned_and_hashed():
+    lines = _lock_requirement_lines(OFFLINE_LOCK.read_text(encoding="utf-8"))
+    assert lines, "requirements-offline.lock has no requirements"
+    unpinned = [ln[:60] for ln in lines if not re.match(r"^[A-Za-z0-9._-]+==", ln)]
+    assert not unpinned, f"unpinned entries in requirements-offline.lock: {unpinned}"
+    unhashed = [ln.split()[0] for ln in lines if "--hash=" not in ln]
+    assert not unhashed, (
+        f"entries without --hash= in requirements-offline.lock: {unhashed}; "
+        "regenerate with pip-compile --generate-hashes"
+    )
+
+
+def test_offline_lock_records_the_sha256_of_its_source_spec():
+    """The freshness marker the build gate compares against must be present and correct."""
+    text = OFFLINE_LOCK.read_text(encoding="utf-8")
+    m = re.findall(r"^# requirements-offline\.txt sha256: *([0-9a-f]{64})$", text, re.M)
+    assert m, (
+        "requirements-offline.lock must end with a "
+        "'# requirements-offline.txt sha256: <hex>' marker; without it "
+        "build_offline_bundle.sh cannot tell a fresh lock from a stale one"
+    )
+    expected = hashlib.sha256(OFFLINE_REQ.read_bytes()).hexdigest()
+    assert m[-1] == expected, (
+        "requirements-offline.lock is stale: it was generated from a different "
+        "requirements-offline.txt. Regenerate it (see that file's header)."
+    )
+
+
+def test_install_sh_installs_the_lock_with_require_hashes():
+    src = _bash_text(INSTALL_SH)
+    assert "--require-hashes" in src, (
+        "install.sh must install the bundled wheels with --require-hashes; "
+        "without it a substituted wheel installs silently"
+    )
+    assert "requirements-offline.lock" in src, (
+        "install.sh must install from the hash-pinned lock, not from the "
+        "range-only requirements-offline.txt"
+    )
+    assert '-r "$INSTALL_ROOT/requirements-offline.txt"' not in src
+    # set -e means a hash mismatch (non-zero pip exit) aborts the install.
+    assert re.search(r"^set -euo pipefail$", src, re.M), (
+        "install.sh relies on set -e to turn a failed hash check into an abort"
+    )
+
+
+def test_install_ps1_installs_the_lock_with_require_hashes():
+    src = _ps_text(INSTALL_PS1)
+    assert "--require-hashes" in src, (
+        "install.ps1 must install the bundled wheels with --require-hashes "
+        "(parity with install.sh)"
+    )
+    assert r'-r "$InstallRoot\requirements-offline.lock"' in src
+    assert r'-r "$InstallRoot\requirements-offline.txt"' not in src
+    assert "ERROR: pip install failed" in src, (
+        "a hash mismatch must abort the install, not warn and continue"
+    )
+
+
+def test_build_script_downloads_wheels_from_the_lock():
+    src = _bash_text(BUILD_SCRIPT)
+    for fn in ("build_linux", "build_windows"):
+        body = _extract_fn(src, fn)
+        assert '-r "$LOCK_FILE"' in body, (
+            f"{fn}() must download wheels from requirements-offline.lock"
+        )
+        assert "--require-hashes" in body, (
+            f"{fn}() must pass --require-hashes so a tampered wheel fails the build"
+        )
+        assert '-r "$REPO_ROOT/requirements-offline.txt"' not in body
+
+
+def test_build_script_stages_the_lock_into_the_bundle():
+    stage = _extract_fn(_bash_text(BUILD_SCRIPT), "stage_app")
+    assert '"$LOCK_FILE" "$dest/app/"' in stage, (
+        "the lock must ship inside the bundle — install.sh/install.ps1 install "
+        "from it at the customer site"
+    )
+
+
+def test_build_script_runs_the_freshness_gate_before_building():
+    src = _bash_text(BUILD_SCRIPT)
+    assert "require_fresh_lock()" in src
+    assert re.search(r"^require_fresh_lock$", src, re.M), (
+        "require_fresh_lock must actually run at top level, before build_linux"
+    )
+    gate_at = src.index("\nrequire_fresh_lock\n")
+    assert gate_at < src.index("\nbuild_linux\n")
+
+
+def _run_lock_gate(tmp_path: Path, lock_body: str | None):
+    """Run require_fresh_lock() against a synthetic repo root."""
+    fn = _extract_fn(_bash_text(BUILD_SCRIPT), "require_fresh_lock")
+    (tmp_path / "requirements-offline.txt").write_text("flask>=3.0,<4.0\n")
+    lock = tmp_path / "requirements-offline.lock"
+    if lock_body is not None:
+        lock.write_text(lock_body)
+    script = (
+        f'REPO_ROOT="{tmp_path}"\nLOCK_FILE="{lock}"\n{fn}\nrequire_fresh_lock\n'
+    )
+    return subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash required")
+def test_lock_gate_passes_when_the_marker_matches(tmp_path):
+    digest = hashlib.sha256(b"flask>=3.0,<4.0\n").hexdigest()
+    r = _run_lock_gate(tmp_path, f"flask==3.1.3 --hash=sha256:deadbeef\n"
+                                 f"# requirements-offline.txt sha256: {digest}\n")
+    assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash required")
+@pytest.mark.parametrize(
+    "lock_body, expected",
+    [
+        (None, "is missing"),
+        ("flask==3.1.3\n", "no source sha256 marker"),
+        ("flask==3.1.3\n# requirements-offline.txt sha256: " + "0" * 64 + "\n",
+         "is stale"),
+    ],
+)
+def test_lock_gate_fails_closed(tmp_path, lock_body, expected):
+    r = _run_lock_gate(tmp_path, lock_body)
+    assert r.returncode != 0, "the build must not proceed on a missing/stale lock"
+    assert expected in r.stderr, r.stderr

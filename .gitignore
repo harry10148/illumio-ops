@@ -96,3 +96,7 @@ docs/ux-review-2026-05-14/
 # placeholder byte — Windows byte-range locks need a lockable byte. The OS
 # releases the lock on process death, so these are never unlinked.
 *.lock
+# 但相依鎖檔一定要進版控：requirements.lock 是 2026-07 之前就 tracked 才逃過
+# 上面這條，新增的 requirements-offline.lock 沒有這道豁免，漏了就會靜靜地不進
+# repo，CI 與離線建置都拿不到鎖檔。
+!requirements*.lock

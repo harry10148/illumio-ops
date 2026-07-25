@@ -550,6 +550,14 @@ class ApiClient:
         return self._traffic._build_rule_query_payload(rule, start_date, end_date)
 
     def get_rule_traffic_count(self, rule: dict[str, Any], start_date: str, end_date: str) -> int:
+        """Flow count for one rule; 0 only ever means "genuinely no traffic".
+
+        Indeterminate results (payload/submit/poll/download failure) raise
+        RuleTrafficQueryError or AsyncDownloadError and are deliberately NOT
+        caught here: swallowing them would turn an unchecked rule back into a
+        reported-unused rule. Callers must classify the rule as Query Failed /
+        Query Pending (see RuleTrafficQueryError.pending), never as unused.
+        """
         return self._traffic.get_rule_traffic_count(rule, start_date, end_date)
 
     def batch_get_rule_traffic_counts(self, rules: list[dict[str, Any]], start_date: str, end_date: str, max_concurrent: int = 10, on_progress: Any = None) -> tuple[set[str], dict[str, int]]:
