@@ -340,7 +340,13 @@ def make_config_blueprint(
             return jsonify({"ok": False, "error": t("gui_err_renew_self_signed_only", lang=lang)}), 400
         cert_dir = os.path.join(_ROOT_DIR, "config", "tls")
         try:
-            cert_path, key_path = _generate_self_signed_cert(cert_dir, force=True)
+            # 帶入設定的效期／金鑰演算法，否則手動續期會把 operator 設定的
+            # validity_days / key_algorithm 洗回函式預設值。
+            cert_path, key_path = _generate_self_signed_cert(
+                cert_dir, force=True,
+                days=int(tls_cfg.get("validity_days", _SELF_SIGNED_VALIDITY_DAYS)),
+                key_algorithm=tls_cfg.get("key_algorithm", "ecdsa-p256"),
+            )
             info = _get_cert_info(cert_path)
             return jsonify({
                 "ok": True,

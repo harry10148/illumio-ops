@@ -6,6 +6,7 @@ import os
 import re
 import json
 import datetime
+import threading
 from loguru import logger
 from src.utils import Colors
 from src.i18n import t
@@ -123,6 +124,44 @@ def truncate(text, width):
 # ==========================================
 # Schedule Database
 # ==========================================
+
+# ScheduleDB 寫入序列化：ScheduleDB 是「整檔覆寫」（load→改記憶體 dict→save
+# 全量重寫 rule_schedules.json），本身無跨 instance 鎖，而每個寫入者都各自新
+# 建 instance——任何兩個寫入者交錯，後存檔的一方會用自己「開始時」的過期快照
+# 整檔蓋掉前者（新建的 schedule 憑空消失、到期已刪的 one_time 復活）。
+#
+# 這把鎖住在 ScheduleDB 所在模組而非 GUI blueprint，因為 `--monitor-gui`
+# （正式部署模式）把 APScheduler 跑在背景 thread、Flask 跑在主 thread，
+# **同一個行程**：排程器 tick 的 engine.check 與 GUI route 是真正的併發寫入
+# 者，必須共用同一把鎖才有意義。所有寫入一律：持鎖 → 鎖內 load() 重讀 →
+# 改動 → save。
+#
+# 用 RLock：GUI 端有「持鎖後再呼叫下面 helper」的巢狀用法。
+_rs_db_lock = threading.RLock()
+
+
+def _rs_db_set_status(db, href, status):
+    """pce_status 對帳寫回：鎖內 re-load 後只改該 entry 的 pce_status。
+    條目已被併發刪除時直接略過——不得用過期快照把它復活。"""
+    with _rs_db_lock:
+        db.load()
+        fresh = db.db.get(href)
+        if fresh is not None and fresh.get('pce_status') != status:
+            fresh['pce_status'] = status
+            db.save()
+
+
+def _rs_db_delete(db, href):
+    """鎖內 re-load 後刪除單一條目，避免用過期快照整檔覆寫掉併發新增的排程。"""
+    with _rs_db_lock:
+        db.load()
+        if href in db.db:
+            del db.db[href]
+            db.save()
+            return True
+        return False
+
+
 class ScheduleDB:
     """Manages the local JSON-based storage for configured rule schedules."""
 
@@ -317,7 +356,7 @@ class ScheduleEngine:
                     # Clear deleted flag if item was previously marked deleted but is now found
                     if c.get('pce_status') == 'deleted':
                         c['pce_status'] = 'active'
-                        self.db.put(href, c)
+                        _rs_db_set_status(self.db, href, 'active')
                     curr_status = data.get('enabled')
                     if curr_status == target:
                         r_name = c.get('detail_name', c['name'])
@@ -341,7 +380,7 @@ class ScheduleEngine:
                     log(f"{Colors.WARNING}{t('rs_target_not_found', name=r_name, id=extract_id(href), default='[SKIP] {name} (ID:{id}) not found on PCE (deleted?). No action taken.')}{Colors.ENDC}")
                     if c.get('pce_status') != 'deleted':
                         c['pce_status'] = 'deleted'
-                        self.db.put(href, c)
+                        _rs_db_set_status(self.db, href, 'deleted')
                     continue
                 else:
                     r_name = c.get('detail_name', c['name'])
@@ -353,9 +392,10 @@ class ScheduleEngine:
                 tick_states[href]["last_result"] = "error"
                 tick_states[href]["error"] = str(_item_err)[:300]
 
-        # Clean up expired one-time schedules
+        # Clean up expired one-time schedules（鎖內 re-load 後刪，避免用 tick
+        # 開始時的快照整檔覆寫掉這段期間 GUI 新增的排程）
         for h in expired_hrefs:
-            self.db.delete(h)
+            _rs_db_delete(self.db, h)
         if expired_hrefs:
             log(f"{Colors.WARNING}[CLEANUP] {t('rs_cleanup', default='Removed')} {len(expired_hrefs)} {t('rs_expired_schedules', default='expired schedule(s)')}.{Colors.ENDC}")
 

@@ -290,7 +290,13 @@ def _web_gui_tls_menu(cm: ConfigManager) -> None:
                 input(f"{t('press_enter_to_continue')} ")
                 continue
             try:
-                cert_path, _ = _generate_self_signed_cert(cert_dir, force=True)
+                # 同 GUI /api/tls/renew：帶入設定的效期／金鑰演算法，避免手動
+                # 續期把 validity_days / key_algorithm 洗回函式預設值。
+                cert_path, _ = _generate_self_signed_cert(
+                    cert_dir, force=True,
+                    days=int(tls.get("validity_days", _SELF_SIGNED_VALIDITY_DAYS)),
+                    key_algorithm=tls.get("key_algorithm", "ecdsa-p256"),
+                )
                 days = _cert_days_remaining(cert_path)
                 print(f"\n{Colors.GREEN}"
                       + t("wgs_tls_renewed", default="Certificate renewed. Restart the Web GUI to apply.")

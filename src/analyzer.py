@@ -8,6 +8,7 @@ import json
 import gc
 import os
 import sys
+import threading
 from typing import Any, Iterator
 from loguru import logger
 from collections import Counter
@@ -154,6 +155,15 @@ def calculate_volume_mb(flow: dict[str, Any]) -> tuple[float, str]:
     return (tbo + tbi) / 1024 / 1024, "(Total)"
 
 QUERY_RESULT_CAP = 500  # query_flows 單次回傳上限（截斷需回報，不可無聲）
+
+# 分析 cycle 序列化：Analyzer.save_state 的 _merge 假設同時只有一個 cycle
+# 在跑（analyzer 自有 key 是整包覆蓋）——併發 cycle 互相蓋掉 alert_history/
+# history 會造成重複告警或計數錯亂。`--monitor-gui` 下 APScheduler 的
+# run_monitor_cycle 與 GUI 的 /api/actions/run|debug 在同一行程的不同 thread，
+# 因此鎖住在 Analyzer 所在模組、兩側共用；只放在 GUI 側等於沒防到排程器。
+# 一併涵蓋 run_debug_mode：它用 contextlib.redirect_stdout 換 process 全域
+# stdout，與併發分析的 print 會互相污染。
+analysis_lock = threading.Lock()
 
 # ─── Analyzer Class ───────────────────────────────────────────────────────────
 
