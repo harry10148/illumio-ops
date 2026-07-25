@@ -327,11 +327,11 @@ foreach ($d in @("logs", "data", "reports")) {
 Write-Host "==> Copying Python runtime"
 # /MIR (= /E /PURGE) restores a pristine bundled runtime on every install and
 # upgrade, exactly like install.sh's `rsync -a --delete`. Without the purge the
-# old site-packages survives, and because requirements-offline.txt uses range
-# specs the pip install below finds every requirement "already satisfied" and
-# upgrades nothing — the host would keep running a dependency set that neither
-# matches the bundle nor anything CI tested, and dropped packages would linger
-# forever. python\ is entirely bundle-owned, so nothing operator-owned is at risk.
+# old site-packages survives, the pip install below finds every requirement
+# "already satisfied" and upgrades nothing — the host would keep running a
+# dependency set that neither matches the bundle nor anything CI tested, and
+# dropped packages would linger forever. python\ is entirely bundle-owned, so
+# nothing operator-owned is at risk.
 Robocopy "$SRC\python" "$InstallRoot\python" /MIR /NP /NFL /NDL | Out-Null
 if ($LASTEXITCODE -ge 8) {
     Write-Host "ERROR: Robocopy failed copying Python runtime (exit $LASTEXITCODE)" -ForegroundColor Red
@@ -385,10 +385,14 @@ foreach ($d in @("config", "logs")) {
 }
 
 Write-Host "==> Installing Python packages (offline)"
+# --require-hashes: the lock pins a SHA256 for every wheel, so a substituted or
+# tampered wheel makes pip fail outright instead of installing silently. The
+# $LASTEXITCODE check below aborts the install - it never warns and continues.
 & "$InstallRoot\python\python.exe" -m pip install `
     --no-index `
     --find-links "$SRC\wheels" `
-    -r "$InstallRoot\requirements-offline.txt" `
+    --require-hashes `
+    -r "$InstallRoot\requirements-offline.lock" `
     --quiet
 
 if ($LASTEXITCODE -ne 0) {

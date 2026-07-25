@@ -192,8 +192,8 @@ mkdir -p "$INSTALL_ROOT/logs" "$INSTALL_ROOT/data" "$INSTALL_ROOT/reports" \
 # --delete restores a pristine bundled runtime each install/upgrade. This is
 # what makes the dependency refresh deterministic: site-packages is reset to
 # the bundle's baseline, then pip below installs exactly the bundled wheels.
-# Without it, range specs in requirements-offline.txt let pip keep stale
-# already-satisfied versions, and removed dependencies linger forever.
+# Without it, pip keeps every already-satisfied version from the previous
+# install and removed dependencies linger forever.
 rsync -a --delete "$SRC/python/" "$INSTALL_ROOT/python/"
 
 if [ "$IS_UPGRADE" = true ]; then
@@ -219,9 +219,12 @@ fi
 
 # site-packages was reset by the python/ rsync above, so this installs the
 # bundle's exact wheel set (deterministic; no --upgrade needed).
+# --require-hashes：鎖檔逐檔釘了 SHA256，任何 wheel 被掉包／改動都會讓 pip 直接
+# 失敗。set -e 在最上面，pip 非零離開即中止安裝（不是印警告後照裝）。
 "$INSTALL_ROOT/python/bin/python3" -m pip install \
     --no-index --find-links "$SRC/wheels" \
-    -r "$INSTALL_ROOT/requirements-offline.txt" --quiet
+    --require-hashes \
+    -r "$INSTALL_ROOT/requirements-offline.lock" --quiet
 
 # Migrate deprecated config fields on upgrade
 if [ "$IS_UPGRADE" = true ] && [ -f "$INSTALL_ROOT/config/config.json" ]; then

@@ -311,7 +311,7 @@ scripts/build_offline_bundle.sh
 
 輸出 `dist/illumio-ops-<version>-offline-linux-x86_64.tar.gz` 與對應的 Windows zip；`<version>` 由 `resolve_version.sh` 解出。腳本內嵌 python-build-standalone 的下載 URL 與 SHA256 pin（`PBS_TAG`／`PBS_PYTHON`／`PBS_SHA256_*`），升級內嵌 Python 版本時四個欄位要一起改、一起送同一個 commit，且 SHA256 要從發布來源以外的管道（GPG／Sigstore）重新核對，避免 same-origin 供應鏈攻擊。
 
-正式環境安裝／升級統一用 `scripts/setup.sh`（`pip install --require-hashes -r requirements.lock`，systemd service 啟停）。若目標機器無法連網，改用離線套件：`pip install --no-index --find-links wheels -r requirements-offline.txt`。
+正式環境安裝／升級統一用 `scripts/setup.sh`（`pip install --require-hashes -r requirements.lock`，systemd service 啟停）。若目標機器無法連網，改用離線套件：`pip install --no-index --find-links wheels --require-hashes -r requirements-offline.lock`（`requirements-offline.txt` 只是來源規格，實際安裝一律走逐檔 SHA256 釘選的鎖檔；改了 .txt 要重新產生鎖檔，否則 `build_offline_bundle.sh` 會擋下建置）。
 
 ### 5.3 遷移腳本
 
