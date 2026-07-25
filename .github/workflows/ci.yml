@@ -87,25 +87,12 @@ jobs:
           python-version: "3.12"
 
       - name: Audit the offline lock
-        # 下列 --ignore-vuln 全部是 pillow 12.2.0 的已知漏洞，修正版 12.3.0 起
-        # 只發 manylinux_2_28 wheel，而離線 bundle 的 Linux 目標平台是
-        # manylinux_2_17（docs/guide/installation.md 寫 glibc >= 2.17、
-        # preflight.sh 也照這條擋），所以在現行目標平台下無版可升。
-        # 影響評估：本專案不解析外部影像（pillow 只是 matplotlib 產圖的相依，
-        # 程式碼沒有任何 PIL 呼叫，GUI 只收 CSV 上傳），這些解碼漏洞觸及不到。
-        # 真正的解法是把 Linux 目標平台提升到 manylinux_2_28（安裝文件列的
-        # RHEL/Rocky 8+、Ubuntu 22.04+、Debian 12+ 其實都 >= 2.28），那是產品
-        # 決定；做完就可以同時刪掉這份清單和 requirements-offline.txt 裡的
-        # manylinux_2_17 上界。清單只列已知 ID：pillow 一有新漏洞就會擋下 CI。
+        # 沒有 --ignore-vuln：目標平台提升到 manylinux_2_28 之後，先前被
+        # manylinux_2_17 卡住的套件（pillow / pandas / greenlet / contourpy /
+        # argon2-cffi-bindings）都能升到已修補版本，這份鎖檔目前是零已知漏洞。
+        # 任何新漏洞——不論哪個套件——都會直接擋下 CI，這正是我們要的。
         run: |
           pip install --upgrade pip
           pip install pip-audit
-          pip-audit -r requirements-offline.lock --strict \
-            --ignore-vuln PYSEC-2026-2253 --ignore-vuln PYSEC-2026-2254 \
-            --ignore-vuln PYSEC-2026-2255 --ignore-vuln PYSEC-2026-2256 \
-            --ignore-vuln PYSEC-2026-2257 --ignore-vuln PYSEC-2026-3451 \
-            --ignore-vuln PYSEC-2026-3452 --ignore-vuln PYSEC-2026-3453 \
-            --ignore-vuln PYSEC-2026-3454 --ignore-vuln PYSEC-2026-3493 \
-            --ignore-vuln PYSEC-2026-3494 --ignore-vuln PYSEC-2026-3495 \
-            --ignore-vuln PYSEC-2026-3496
+          pip-audit -r requirements-offline.lock --strict
         continue-on-error: false
