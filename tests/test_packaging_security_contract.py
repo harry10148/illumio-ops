@@ -393,36 +393,57 @@ def test_lock_gate_fails_closed(tmp_path, lock_body, expected):
     assert expected in r.stderr, r.stderr
 
 
-# ── CI: the offline-lock audit must not resolve dependencies ─────────────────
-# requirements-offline.lock pins versions that only install on the bundle's
-# py3.12 target (matplotlib==3.11.1 requires Python >= 3.11), but the CI matrix
-# runs 3.10/3.11. Without --no-deps, pip-audit shells out to
-# `pip install --dry-run` and the job dies with "No matching distribution
-# found" — this actually happened (run 30155030182). The lock is already a
-# closed set, so resolving it again buys nothing.
+# ── CI: the offline lock must be audited on the interpreter it ships ────────
+# The lock pins versions that only install on the bundle's py3.12 target
+# (matplotlib==3.11.1 requires Python >= 3.11), but the test matrix runs
+# 3.10/3.11. pip-audit installs the requirements into a throwaway venv to
+# resolve them — --no-deps does NOT prevent that (verified: run 30155387549) —
+# so auditing this lock anywhere but 3.12 dies with "No matching distribution
+# found". Hence a dedicated job.
 
-def _ci_yml() -> str:
-    return (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
-
-
-def test_offline_lock_audit_skips_dependency_resolution():
-    ci = _ci_yml()
-    audit_lines = [ln for ln in ci.splitlines()
-                   if "pip-audit" in ln and "requirements-offline.lock" in ln]
-    assert audit_lines, "CI no longer audits requirements-offline.lock"
-    for ln in audit_lines:
-        assert "--no-deps" in ln, (
-            "pip-audit on the offline lock must pass --no-deps; without it the "
-            "py3.10 matrix entry fails resolving py3.12-only pins.\n" + ln)
+def _ci() -> dict:
+    import yaml
+    return yaml.safe_load((ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"))
 
 
-def test_runtime_lock_audit_still_resolves():
-    """The runtime lock IS installed on the CI interpreter, so it must keep the
-    full resolution check — --no-deps there would weaken the audit."""
-    ci = _ci_yml()
-    runtime = [ln for ln in ci.splitlines()
-               if "pip-audit" in ln and "requirements.lock" in ln
-               and "offline" not in ln]
-    assert runtime, "CI no longer audits requirements.lock"
-    for ln in runtime:
-        assert "--no-deps" not in ln, ln
+def _offline_audit_job() -> dict:
+    jobs = _ci()["jobs"]
+    for job in jobs.values():
+        for step in job.get("steps", []):
+            if "requirements-offline.lock" in str(step.get("run", "")):
+                return job
+    raise AssertionError("no CI job audits requirements-offline.lock")
+
+
+def test_offline_lock_is_audited_on_the_bundled_python():
+    job = _offline_audit_job()
+    versions = [str(s.get("with", {}).get("python-version", ""))
+                for s in job["steps"] if "setup-python" in str(s.get("uses", ""))]
+    assert versions, "the offline-audit job does not pin a Python version"
+    bundled = _bundled_python_major_minor()
+    assert any(v.strip('"\'') == bundled for v in versions), (
+        f"the offline lock must be audited on Python {bundled} (what the bundle "
+        f"ships, per build_offline_bundle.sh PBS_PYTHON); job pins {versions}")
+
+
+def test_offline_audit_is_not_in_the_test_matrix():
+    """It must not ride the 3.10/3.11 matrix — that is the failure this fixes."""
+    job = _offline_audit_job()
+    assert "matrix" not in str(job.get("strategy", {})), (
+        "the offline audit must be a standalone job, not a matrix entry")
+
+
+def _bundled_python_major_minor() -> str:
+    body = (ROOT / "scripts" / "build_offline_bundle.sh").read_text(encoding="utf-8")
+    m = re.search(r'PBS_PYTHON="?(\d+)\.(\d+)\.', body)
+    assert m, "could not read PBS_PYTHON from build_offline_bundle.sh"
+    return f"{m.group(1)}.{m.group(2)}"
+
+
+def test_offline_audit_still_blocks_the_build():
+    job = _offline_audit_job()
+    for step in job["steps"]:
+        if "requirements-offline.lock" in str(step.get("run", "")):
+            assert step.get("continue-on-error") is not True, (
+                "the offline audit must fail the build, not warn")
+            assert "--strict" in step["run"]

@@ -43,34 +43,6 @@ jobs:
         run: |
           pip install pip-audit
           pip-audit -r requirements.lock --strict
-          # 離線 bundle 裝的是 requirements-offline.lock（py3.12 解析、逐檔
-          # SHA256 釘選），跟 requirements.lock 是不同的套件集合，必須各自稽核。
-          # --no-deps 是必要的，不是最佳化：這份鎖檔釘的是 py3.12 才裝得起來的
-          # 版本（例如 matplotlib==3.11.1 需要 Python >= 3.11），而 CI matrix 跑
-          # 的是 3.10/3.11。沒有 --no-deps 時 pip-audit 會呼叫
-          # `pip install --dry-run` 去解析，在 3.10 上必然 "No matching
-          # distribution found" 而讓整個 job 失敗（實測：run 30155030182）。
-          # 鎖檔本身已是完整封閉集合，不需要再解析一次；--no-deps 仍會逐一查
-          # 每個釘選版本的漏洞（拿掉下面的 ignore 清單就會回報 pillow 並 exit 1）。
-          #
-          # 下列 --ignore-vuln 全部是 pillow 12.2.0 的已知漏洞，修正版 12.3.0 起
-          # 只發 manylinux_2_28 wheel，而離線 bundle 的 Linux 目標平台是
-          # manylinux_2_17（docs/guide/installation.md 寫 glibc >= 2.17、
-          # preflight.sh 也照這條擋），所以在現行目標平台下無版可升。
-          # 影響評估：本專案不解析外部影像（pillow 只是 matplotlib 產圖的相依，
-          # 程式碼沒有任何 PIL 呼叫，GUI 只收 CSV 上傳），這些解碼漏洞觸及不到。
-          # 真正的解法是把 Linux 目標平台提升到 manylinux_2_28（安裝文件列的
-          # RHEL/Rocky 8+、Ubuntu 22.04+、Debian 12+ 其實都 >= 2.28），那是產品
-          # 決定；做完就可以同時刪掉這份清單和 requirements-offline.txt 裡的
-          # manylinux_2_17 上界。清單只列已知 ID：pillow 一有新漏洞就會擋下 CI。
-          pip-audit --no-deps -r requirements-offline.lock --strict \
-            --ignore-vuln PYSEC-2026-2253 --ignore-vuln PYSEC-2026-2254 \
-            --ignore-vuln PYSEC-2026-2255 --ignore-vuln PYSEC-2026-2256 \
-            --ignore-vuln PYSEC-2026-2257 --ignore-vuln PYSEC-2026-3451 \
-            --ignore-vuln PYSEC-2026-3452 --ignore-vuln PYSEC-2026-3453 \
-            --ignore-vuln PYSEC-2026-3454 --ignore-vuln PYSEC-2026-3493 \
-            --ignore-vuln PYSEC-2026-3494 --ignore-vuln PYSEC-2026-3495 \
-            --ignore-vuln PYSEC-2026-3496
         continue-on-error: false
 
       - name: Lint naive datetime
@@ -94,3 +66,46 @@ jobs:
 
       - name: Run tests
         run: pytest --tb=short
+
+  # 離線 bundle 的套件集合（requirements-offline.lock）必須在**它實際部署的
+  # Python** 上稽核，所以獨立成一個 job 而不是掛在 test matrix 底下。
+  # 鎖檔釘的是 py3.12 才裝得起來的版本（matplotlib==3.11.1 需要 >= 3.11），
+  # 而 test matrix 跑 3.10/3.11；pip-audit 會把 requirements 裝進臨時 venv 驗證
+  # （--no-deps 也擋不掉，實測 run 30155387549），在 3.10 上必然
+  # "No matching distribution found" 而讓整個 job 失敗。
+  offline-audit:
+    name: Security audit (offline bundle lock)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        # 必須與 scripts/build_offline_bundle.sh 的 PBS_PYTHON 大版本一致——
+        # bundle 帶的就是這個直譯器，稽核對象要跟出貨對象相同。
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Audit the offline lock
+        # 下列 --ignore-vuln 全部是 pillow 12.2.0 的已知漏洞，修正版 12.3.0 起
+        # 只發 manylinux_2_28 wheel，而離線 bundle 的 Linux 目標平台是
+        # manylinux_2_17（docs/guide/installation.md 寫 glibc >= 2.17、
+        # preflight.sh 也照這條擋），所以在現行目標平台下無版可升。
+        # 影響評估：本專案不解析外部影像（pillow 只是 matplotlib 產圖的相依，
+        # 程式碼沒有任何 PIL 呼叫，GUI 只收 CSV 上傳），這些解碼漏洞觸及不到。
+        # 真正的解法是把 Linux 目標平台提升到 manylinux_2_28（安裝文件列的
+        # RHEL/Rocky 8+、Ubuntu 22.04+、Debian 12+ 其實都 >= 2.28），那是產品
+        # 決定；做完就可以同時刪掉這份清單和 requirements-offline.txt 裡的
+        # manylinux_2_17 上界。清單只列已知 ID：pillow 一有新漏洞就會擋下 CI。
+        run: |
+          pip install --upgrade pip
+          pip install pip-audit
+          pip-audit -r requirements-offline.lock --strict \
+            --ignore-vuln PYSEC-2026-2253 --ignore-vuln PYSEC-2026-2254 \
+            --ignore-vuln PYSEC-2026-2255 --ignore-vuln PYSEC-2026-2256 \
+            --ignore-vuln PYSEC-2026-2257 --ignore-vuln PYSEC-2026-3451 \
+            --ignore-vuln PYSEC-2026-3452 --ignore-vuln PYSEC-2026-3453 \
+            --ignore-vuln PYSEC-2026-3454 --ignore-vuln PYSEC-2026-3493 \
+            --ignore-vuln PYSEC-2026-3494 --ignore-vuln PYSEC-2026-3495 \
+            --ignore-vuln PYSEC-2026-3496
+        continue-on-error: false
